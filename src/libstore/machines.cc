@@ -1,3 +1,4 @@
+#include "nix/util/base-n.hh"
 #include "nix/store/machines.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
@@ -158,7 +159,7 @@ static Machine parseBuilderLine(const StringSet & defaultSystems, const std::str
     auto ensureBase64 = [&](size_t fieldIndex) {
         const auto & str = tokens[fieldIndex];
         try {
-            base64Decode(str);
+            base64::decode(str);
         } catch (FormatError & e) {
             e.addTrace({}, "while parsing machine specification at a column #%lu in a row: '%s'", fieldIndex, line);
             throw;

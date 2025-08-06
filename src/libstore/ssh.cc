@@ -4,13 +4,14 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/util.hh"
 #include "nix/util/exec.hh"
+#include "nix/util/base-n.hh"
 
 namespace nix {
 
 static std::string parsePublicHostKey(std::string_view host, std::string_view sshPublicHostKey)
 {
     try {
-        return base64Decode(sshPublicHostKey);
+        return base64::decode(sshPublicHostKey);
     } catch (Error & e) {
         e.addTrace({}, "while decoding ssh public host key for host '%s'", host);
         throw;

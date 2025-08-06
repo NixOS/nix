@@ -44,6 +44,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'args.cc',
+  'base-n.cc',
   'canon-path.cc',
   'checked-arithmetic.cc',
   'chunked-vector.cc',

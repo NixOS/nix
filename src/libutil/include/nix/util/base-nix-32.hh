@@ -7,14 +7,14 @@
 #include <string>
 #include <span>
 
+#include "nix/util/array-from-string-literal.hh"
+
 namespace nix {
 
 struct BaseNix32
 {
     /// omitted: E O U T
-    constexpr static std::array<char, 32> characters = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
-                                                        'b', 'c', 'd', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-                                                        'n', 'p', 'q', 'r', 's', 'v', 'w', 'x', 'y', 'z'};
+    constexpr static std::array<char, 32> characters = "0123456789abcdfghijklmnpqrsvwxyz"_arrayNoNull;
 
 private:
     static const std::array<uint8_t, 256> reverseMap;
@@ -34,12 +34,14 @@ public:
     /**
      * Returns the length of a base-32 representation of this hash.
      */
-    static size_t encodedLength(size_t originalLength)
+    [[nodiscard]] constexpr static inline size_t encodedLength(size_t originalLength)
     {
         return (originalLength * 8 - 1) / 5 + 1;
     }
 
-    static std::string encode(std::span<const uint8_t> originalData);
+    static std::string encode(std::span<const std::byte> originalData);
+
+    static std::string decode(std::string_view s);
 };
 
 } // namespace nix

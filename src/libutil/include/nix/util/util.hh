@@ -180,16 +180,6 @@ constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
 /**
- * Encode arbitrary bytes as Base64.
- */
-std::string base64Encode(std::string_view s);
-
-/**
- * Decode arbitrary bytes to Base64.
- */
-std::string base64Decode(std::string_view s);
-
-/**
  * Remove common leading whitespace from the lines in the string
  * 's'. For example, if every line is indented by at least 3 spaces,
  * then we remove 3 spaces from the start of every line.

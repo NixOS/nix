@@ -111,30 +111,6 @@ public:
     std::strong_ordering operator<=>(const Hash & h2) const noexcept;
 
     /**
-     * Returns the length of a base-16 representation of this hash.
-     */
-    [[nodiscard]] size_t base16Len() const
-    {
-        return hashSize * 2;
-    }
-
-    /**
-     * Returns the length of a base-32 representation of this hash.
-     */
-    [[nodiscard]] size_t base32Len() const
-    {
-        return (hashSize * 8 - 1) / 5 + 1;
-    }
-
-    /**
-     * Returns the length of a base-64 representation of this hash.
-     */
-    [[nodiscard]] size_t base64Len() const
-    {
-        return ((4 * hashSize / 3) + 3) & ~3;
-    }
-
-    /**
      * Return a string representation of the hash, in base-16, base-32
      * or base-64. By default, this is prefixed by the hash algo
      * (e.g. "sha256:").

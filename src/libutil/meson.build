@@ -112,6 +112,7 @@ subdir('nix-meson-build-support/common')
 sources = [config_priv_h] + files(
   'archive.cc',
   'args.cc',
+  'base-n.cc',
   'base-nix-32.cc',
   'canon-path.cc',
   'compression.cc',
