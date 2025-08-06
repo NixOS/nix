@@ -7,7 +7,7 @@
 #include "nix/util/archive.hh"
 #include "nix/store/builtins/buildenv.hh"
 #include "nix/flake/flakeref.hh"
-#include "../nix-env/user-env.hh"
+#include "nix-env/user-env.hh"
 #include "nix/store/profiles.hh"
 #include "nix/store/names.hh"
 #include "nix/util/url.hh"
