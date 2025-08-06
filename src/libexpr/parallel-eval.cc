@@ -13,7 +13,7 @@ unsigned int Executor::getEvalCores(const EvalSettings & evalSettings)
 
 Executor::Executor(const EvalSettings & evalSettings)
     : evalCores(getEvalCores(evalSettings))
-    , enabled(evalSettings.evalCores > 1)
+    , enabled(evalCores > 1)
 {
     debug("executor using %d threads", evalCores);
     auto state(state_.lock());
