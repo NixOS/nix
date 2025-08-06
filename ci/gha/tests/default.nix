@@ -190,17 +190,19 @@ rec {
             done
 
             arguments=$(concatStringsSep " -object " binaryFiles)
-            llvm-cov show $arguments -instr-profile ${mergedProfdata} -output-dir $out -format=html
+            arguments+=" -instr-profile ${mergedProfdata}"
+            llvm-cov show $arguments -output-dir $out -format=html
 
             {
               echo "# Code coverage summary (generated via \`llvm-cov\`):"
               echo
               echo '```'
-              llvm-cov report $arguments -instr-profile ${mergedProfdata} -format=text -use-color=false
+              llvm-cov report $arguments -format=text -use-color=false
               echo '```'
               echo
             } >> $out/index.txt
 
+            llvm-cov export $arguments -format=lcov -use-color=false > $out/coverage.info
           '';
     in
     assert withCoverage;
