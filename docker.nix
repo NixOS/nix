@@ -310,6 +310,7 @@ let
           # see doc/manual/source/command-ref/files/profiles.md
           ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
           ln -s /nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
+          ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
           # see doc/manual/source/command-ref/files/channels.md
           ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
