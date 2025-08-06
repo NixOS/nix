@@ -159,7 +159,6 @@ jobs:
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
           PREFETCH: "1"
-          #GC_INITIAL_HEAP_SIZE: "32G"
         run: |
           set -x
           echo "PARALLEL: $PARALLEL"

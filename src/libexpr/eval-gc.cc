@@ -98,7 +98,7 @@ static inline void initGCReal()
     GC_set_oom_fn(oomHandler);
 
     /* Set the initial heap size to something fairly big (80% of
-       free RAM, up to a maximum of 8 GiB) so that in most cases
+       free RAM, up to a maximum of 4 GiB) so that in most cases
        we don't need to garbage collect at all.  (Collection has a
        fairly significant overhead.)  The heap size can be overridden
        through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
@@ -109,12 +109,10 @@ static inline void initGCReal()
     if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #  if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 8ULL * 1024 * 1024 * 1024;
+        size_t maxSize = 4ULL * 1024 * 1024 * 1024;
         auto free = getFreeMem();
-        debug("free memory is %d bytes", free);
-        size = std::min((size_t) (free * 0.8), maxSize);
+        size = std::max(size, std::min((size_t) (free * 0.5), maxSize));
 #  endif
-        debug("setting initial heap size to %1% bytes", size);
         GC_expand_hp(size);
     }
 }
