@@ -67,6 +67,67 @@ static size_t getFreeMem()
     return 0;
 }
 
+/**
+ * When a thread goes into a coroutine, we lose its original sp until
+ * control flow returns to the thread. This causes Boehm GC to crash
+ * since it will scan memory between the coroutine's sp and the
+ * original stack base of the thread. Therefore, we detect when the
+ * current sp is outside of the original thread stack and push the
+ * entire thread stack instead, as an approximation.
+ *
+ * This is not optimal, because it causes the stack below sp to be
+ * scanned. However, we usually we don't have active coroutines during
+ * evaluation, so this is acceptable.
+ *
+ * Note that we don't scan coroutine stacks. It's currently assumed
+ * that we don't have GC roots in coroutines.
+ */
+void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
+{
+    void *& sp = *sp_ptr;
+    auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
+    size_t osStackSize;
+    // The low address of the stack, which grows down.
+    void * osStackLimit;
+
+#  ifdef __APPLE__
+    osStackSize = pthread_get_stacksize_np(pthread_id);
+    osStackLimit = pthread_get_stackaddr_np(pthread_id);
+#  else
+    pthread_attr_t pattr;
+    if (pthread_attr_init(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
+    }
+#    ifdef HAVE_PTHREAD_GETATTR_NP
+    if (pthread_getattr_np(pthread_id, &pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
+    }
+#    elif HAVE_PTHREAD_ATTR_GET_NP
+    if (!pthread_attr_init(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
+    }
+    if (!pthread_attr_get_np(pthread_id, &pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_get_np failed");
+    }
+#    else
+#      error "Need one of `pthread_attr_get_np` or `pthread_getattr_np`"
+#    endif
+    if (pthread_attr_getstack(&pattr, &osStackLimit, &osStackSize)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
+    }
+    if (pthread_attr_destroy(&pattr)) {
+        throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
+    }
+#  endif
+
+    void * osStackBase = (char *) osStackLimit + osStackSize;
+    // NOTE: We assume the stack grows down, as it does on all architectures we support.
+    //       Architectures that grow the stack up are rare.
+    if (sp >= osStackBase || sp < osStackLimit) { // sp is outside the os stack
+        sp = osStackLimit;
+    }
+}
+
 static inline void initGCReal()
 {
     /* Initialise the Boehm garbage collector. */
@@ -96,6 +157,9 @@ static inline void initGCReal()
             GC_register_displacement(i);
 
     GC_set_oom_fn(oomHandler);
+
+    GC_set_sp_corrector(&fixupBoehmStackPointer);
+    assert(GC_get_sp_corrector());
 
     /* Set the initial heap size to something fairly big (80% of
        free RAM, up to a maximum of 4 GiB) so that in most cases
