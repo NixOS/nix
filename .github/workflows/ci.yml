@@ -81,12 +81,12 @@ jobs:
           --argstr stdenv "${{ matrix.stdenv }}" \
           --out-link coverage-reports
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
+        cp coverage-reports/coverage.info coverage.info
       if: ${{ matrix.instrumented }}
-    - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
       with:
-        name: coverage-reports
-        path: coverage-reports/
+        token: ${{ secrets.CODECOV_TOKEN }}
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
       uses: actions/upload-artifact@v4
