@@ -1,7 +1,6 @@
 experimental_feature_descriptions_md = custom_target(
   command : nix_eval_for_docs + [
-    '--expr',
-    'import @INPUT0@ (builtins.fromJSON (builtins.readFile @INPUT1@))',
+    '--expr', 'import @INPUT0@ (builtins.fromJSON (builtins.readFile @INPUT1@))',
   ],
   input : [
     '../../generate-xp-features.nix',

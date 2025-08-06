@@ -1,4 +1,6 @@
-project('nix-util-test-support', 'cpp',
+project(
+  'nix-util-test-support',
+  'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -14,8 +16,7 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-util-c'),
@@ -44,7 +45,7 @@ this_library = library(
   include_directories : include_dirs,
   # TODO: Remove `-lrapidcheck` when https://github.com/emil-e/rapidcheck/pull/326
   #       is available. See also ../libutil/build.meson
-  link_args: linker_export_flags + ['-lrapidcheck'],
+  link_args : linker_export_flags + [ '-lrapidcheck' ],
   prelink : true, # For C++ static initializers
   install : true,
 )

@@ -1,4 +1,4 @@
-include_dirs = [include_directories('../..')]
+include_dirs = [ include_directories('../..') ]
 
 headers = files(
   'attrs.hh',

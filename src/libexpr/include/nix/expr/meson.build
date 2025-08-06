@@ -1,13 +1,13 @@
 # Public headers directory
 
-include_dirs = [include_directories('../..')]
+include_dirs = [ include_directories('../..') ]
 
 config_pub_h = configure_file(
   configuration : configdata_pub,
   output : 'config.hh',
 )
 
-headers = [config_pub_h] + files(
+headers = [ config_pub_h ] + files(
   'attr-path.hh',
   'attr-set.hh',
   'eval-cache.hh',

@@ -1,4 +1,6 @@
-project('nix-util-tests', 'cpp',
+project(
+  'nix-util-tests',
+  'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -19,8 +21,7 @@ deps_private_maybe_subproject = [
   dependency('nix-util-c'),
   dependency('nix-util-test-support'),
 ]
-deps_public_maybe_subproject = [
-]
+deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
 subdir('nix-meson-build-support/export-all-symbols')
@@ -76,7 +77,7 @@ sources = files(
   'xml-writer.cc',
 )
 
-include_dirs = [include_directories('.')]
+include_dirs = [ include_directories('.') ]
 
 
 this_exe = executable(
@@ -86,7 +87,7 @@ this_exe = executable(
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
-  link_args: linker_export_flags + ['-lrapidcheck'],
+  link_args : linker_export_flags + [ '-lrapidcheck' ],
   # get main from gtest
   install : true,
 )
@@ -95,7 +96,7 @@ test(
   meson.project_name(),
   this_exe,
   env : {
-    '_NIX_TEST_UNIT_DATA': meson.current_source_dir() / 'data',
+    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
   },
   protocol : 'gtest',
 )
