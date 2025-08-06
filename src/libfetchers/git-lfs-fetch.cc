@@ -44,16 +44,19 @@ static void downloadToSink(
 
 static std::string getLfsApiToken(const ParsedURL & url)
 {
+    assert(url.authority.has_value());
+
+    // FIXME: Not entirely correct.
     auto [status, output] = runProgram(
         RunOptions{
             .program = "ssh",
-            .args = {*url.authority, "git-lfs-authenticate", url.path, "download"},
+            .args = {url.authority->to_string(), "git-lfs-authenticate", url.path, "download"},
         });
 
     if (output.empty())
         throw Error(
             "git-lfs-authenticate: no output (cmd: ssh %s git-lfs-authenticate %s download)",
-            url.authority.value_or(""),
+            url.authority.value_or(ParsedURL::Authority{}).to_string(),
             url.path);
 
     auto queryResp = nlohmann::json::parse(output);

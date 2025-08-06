@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/sync.hh"
+#include "nix/util/url.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/file-system.hh"
 
@@ -11,7 +12,8 @@ class SSHMaster
 {
 private:
 
-    const std::string host;
+    ParsedURL::Authority authority;
+    std::string hostnameAndUser;
     bool fakeSSH;
     const std::string keyFile;
     /**
@@ -43,7 +45,7 @@ private:
 public:
 
     SSHMaster(
-        std::string_view host,
+        const ParsedURL::Authority & authority,
         std::string_view keyFile,
         std::string_view sshPublicHostKey,
         bool useMaster,

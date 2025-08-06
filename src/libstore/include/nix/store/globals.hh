@@ -291,7 +291,7 @@ public:
           Only the first element is required.
           To leave a field at its default, set it to `-`.
 
-          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+          1. The URI of the remote store in the format `ssh://[username@]hostname[:port]`.
 
              > **Example**
              >

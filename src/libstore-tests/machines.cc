@@ -39,6 +39,14 @@ TEST(machines, getMachinesUriOnly)
     EXPECT_THAT(actual[0], Field(&Machine::sshPublicHostKey, SizeIs(0)));
 }
 
+TEST(machines, getMachinesUriWithPort)
+{
+    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl:2222");
+    ASSERT_THAT(actual, SizeIs(1));
+    EXPECT_THAT(
+        actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl:2222"))));
+}
+
 TEST(machines, getMachinesDefaults)
 {
     auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl - - - - - - -");

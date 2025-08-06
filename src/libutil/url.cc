@@ -34,6 +34,81 @@ static std::string percentEncodeSpaces(std::string_view url)
     return replaceStrings(std::string(url), " ", percentEncode(" "));
 }
 
+ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthority)
+{
+    auto parsed = boost::urls::parse_authority(encodedAuthority);
+    if (!parsed)
+        throw BadURL("invalid URL authority: '%s': %s", encodedAuthority, parsed.error().message());
+
+    auto hostType = [&]() {
+        switch (parsed->host_type()) {
+        case boost::urls::host_type::ipv4:
+            return HostType::IPv4;
+        case boost::urls::host_type::ipv6:
+            return HostType::IPv6;
+        case boost::urls::host_type::ipvfuture:
+            return HostType::IPvFuture;
+        case boost::urls::host_type::none:
+        case boost::urls::host_type::name:
+            return HostType::Name;
+        }
+        unreachable();
+    }();
+
+    auto port = [&]() -> std::optional<uint16_t> {
+        if (!parsed->has_port())
+            return std::nullopt;
+        /* If the port number is non-zero and representable. */
+        if (auto portNumber = parsed->port_number())
+            return portNumber;
+        throw BadURL("port '%s' is invalid", parsed->port());
+    }();
+
+    return {
+        .hostType = hostType,
+        .host = parsed->host_address(),
+        .user = parsed->has_userinfo() ? parsed->user() : std::optional<std::string>{},
+        .password = parsed->has_password() ? parsed->password() : std::optional<std::string>{},
+        .port = port,
+    };
+}
+
+std::ostream & operator<<(std::ostream & os, const ParsedURL::Authority & self)
+{
+    if (self.user) {
+        os << percentEncode(*self.user);
+        if (self.password)
+            os << ":" << percentEncode(*self.password);
+        os << "@";
+    }
+
+    using HostType = ParsedURL::Authority::HostType;
+    switch (self.hostType) {
+    case HostType::Name:
+        os << percentEncode(self.host);
+        break;
+    case HostType::IPv4:
+        os << self.host;
+        break;
+    case HostType::IPv6:
+    case HostType::IPvFuture:
+        /* Reencode percent sign for RFC4007 ScopeId literals. */
+        os << "[" << percentEncode(self.host, ":") << "]";
+    }
+
+    if (self.port)
+        os << ":" << *self.port;
+
+    return os;
+}
+
+std::string ParsedURL::Authority::to_string() const
+{
+    std::ostringstream oss;
+    oss << *this;
+    return std::move(oss).str();
+}
+
 ParsedURL parseURL(const std::string & url)
 try {
     /* Drop the shevron suffix used for the flakerefs. Shevron character is reserved and
@@ -47,14 +122,21 @@ try {
         throw BadURL("'%s' doesn't have a scheme", url);
 
     auto scheme = urlView.scheme();
-    auto authority = [&]() -> std::optional<std::string> {
+    auto authority = [&]() -> std::optional<ParsedURL::Authority> {
         if (urlView.has_authority())
-            return percentDecode(urlView.authority().buffer());
+            return ParsedURL::Authority::parse(urlView.authority().buffer());
         return std::nullopt;
     }();
 
+    /* 3.2.2. Host (RFC3986):
+     * If the URI scheme defines a default for host, then that default
+     * applies when the host subcomponent is undefined or when the
+     * registered name is empty (zero length).  For example, the "file" URI
+     * scheme is defined so that no authority, an empty host, and
+     * "localhost" all mean the end-user's machine, whereas the "http"
+     * scheme considers a missing authority or empty host invalid. */
     auto transportIsFile = parseUrlScheme(scheme).transport == "file";
-    if (authority && *authority != "" && transportIsFile)
+    if (authority && authority->host.size() && transportIsFile)
         throw BadURL("file:// URL '%s' has unexpected authority '%s'", url, *authority);
 
     auto path = urlView.path();         /* Does pct-decoding */
@@ -135,7 +217,7 @@ std::string encodeQuery(const StringMap & ss)
 
 std::string ParsedURL::to_string() const
 {
-    return scheme + ":" + (authority ? "//" + *authority : "") + percentEncode(path, allowedInPath)
+    return scheme + ":" + (authority ? "//" + authority->to_string() : "") + percentEncode(path, allowedInPath)
            + (query.empty() ? "" : "?" + encodeQuery(query)) + (fragment.empty() ? "" : "#" + percentEncode(fragment));
 }
 
@@ -177,7 +259,7 @@ std::string fixGitURL(const std::string & url)
     if (hasPrefix(url, "file:"))
         return url;
     if (url.find("://") == std::string::npos) {
-        return (ParsedURL{.scheme = "file", .authority = "", .path = url}).to_string();
+        return (ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = url}).to_string();
     }
     return url;
 }
