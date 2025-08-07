@@ -6,8 +6,6 @@
 
 namespace nix {
 
-std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
-
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
 
 class PathRefScanSink : public RefScanSink
