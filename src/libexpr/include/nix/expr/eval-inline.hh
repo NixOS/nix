@@ -6,9 +6,6 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 
-// For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
-#include "nix/expr/config.hh"
-
 namespace nix {
 
 /**

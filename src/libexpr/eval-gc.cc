@@ -15,8 +15,6 @@
 #    include <pthread_np.h>
 #  endif
 
-#  include <gc/gc.h>
-#  include <gc/gc_cpp.h>
 #  include <gc/gc_allocator.h>
 
 #  include <boost/coroutine2/coroutine.hpp>
@@ -52,6 +50,9 @@ static inline void initGCReal()
     GC_start_performance_measurement();
 
     GC_INIT();
+
+    /* Enable parallel marking. */
+    GC_allow_register_threads();
 
     /* Register valid displacements in case we are using alignment niches
        for storing the type information. This way tagged pointers are considered
