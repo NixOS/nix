@@ -226,7 +226,7 @@ namespace detail {
 
 /**
  * Implementation mixin class for defining the public types
- * In can be inherited from by the actual ValueStorage implementations
+ * In can be inherited by the actual ValueStorage implementations
  * for free due to Empty Base Class Optimization (EBCO).
  */
 struct ValueBase
