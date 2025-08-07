@@ -1,6 +1,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/parallel-eval.hh"
 #include "nix/store/globals.hh"
+#include "nix/expr/primops.hh"
 
 namespace nix {
 
@@ -249,5 +250,24 @@ void ValueStorage<sizeof(void *)>::notifyWaiters()
 
     domain->cv.notify_all();
 }
+
+static void prim_parallel(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceList(*args[0], pos, "while evaluating the second argument passed to builtins.map");
+
+    if (state.executor->evalCores > 1) {
+        std::vector<std::pair<Executor::work_t, uint8_t>> work;
+        for (auto v : args[0]->listView())
+            if (!v->isFinished())
+                work.emplace_back([v, &state, pos]() { state.forceValue(*v, pos); }, 0);
+        state.executor->spawn(std::move(work));
+    }
+
+    state.forceValue(*args[1], pos);
+    v = *args[1];
+}
+
+// FIXME: gate this behind an experimental feature.
+static RegisterPrimOp r_parallel({.name = "__parallel", .arity = 2, .fun = prim_parallel});
 
 } // namespace nix
