@@ -92,13 +92,6 @@ struct Hash
 
     static Hash parseSRI(std::string_view original);
 
-private:
-    /**
-     * The type must be provided, the string view must not include <type>
-     * prefix. `isSRI` helps disambigate the various base-* encodings.
-     */
-    Hash(std::string_view s, HashAlgorithm algo, bool isSRI);
-
 public:
     /**
      * Check whether two hashes are equal.
