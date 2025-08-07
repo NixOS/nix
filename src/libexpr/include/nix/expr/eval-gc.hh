@@ -3,12 +3,13 @@
 
 #include <cstddef>
 
-// For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
+// For `NIX_USE_BOEHMGC`
 #include "nix/expr/config.hh"
 
 #if NIX_USE_BOEHMGC
 
 #  define GC_INCLUDE_NEW
+#  define GC_THREADS 1
 
 #  include <gc/gc.h>
 #  include <gc/gc_cpp.h>
