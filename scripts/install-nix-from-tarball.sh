@@ -26,8 +26,10 @@ if [ -z "$HOME" ]; then
     exit 1
 fi
 
+OS="$(uname -s)"
+
 # macOS support for 10.12.6 or higher
-if [ "$(uname -s)" = "Darwin" ]; then
+if [ "$OS" = "Darwin" ]; then
     IFS='.' read -r macos_major macos_minor macos_patch << EOF
 $(sw_vers -productVersion)
 EOF
@@ -39,11 +41,11 @@ EOF
 fi
 
 # Determine if we could use the multi-user installer or not
-if [ "$(uname -s)" = "Linux" ]; then
+if [ "$OS" = "Linux" ]; then
     echo "Note: a multi-user installation is possible. See https://nix.dev/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
-case "$(uname -s)" in
+case "$OS" in
     "Darwin")
         INSTALL_MODE=daemon;;
     *)
@@ -60,7 +62,7 @@ while [ $# -gt 0 ]; do
             ACTION=install
             ;;
         --no-daemon)
-            if [ "$(uname -s)" = "Darwin" ]; then
+            if [ "$OS" = "Darwin" ]; then
                 printf '\e[1;31mError: --no-daemon installs are no-longer supported on Darwin/macOS!\e[0m\n' >&2
                 exit 1
             fi
@@ -167,7 +169,7 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        if [ "$(uname -s)" = "Darwin" ]; then
+        if [ "$OS" = "Darwin" ] || [ "$OS" = "FreeBSD" ]; then
             cp -RPp "$self/store/$i" "$i_tmp"
         else
             cp -RP --preserve=ownership,timestamps "$self/store/$i" "$i_tmp"
