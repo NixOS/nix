@@ -368,16 +368,16 @@ StorePath BinaryCacheStore::addToStoreFromDump(
                        name,
                        ContentAddressWithReferences::fromParts(
                            hashMethod,
-                           caHash ? *caHash : nar.first,
+                           caHash ? *caHash : nar.hash,
                            {
                                .others = references,
                                // caller is not capable of creating a self-reference, because this is content-addressed
                                // without modulus
                                .self = false,
                            }),
-                       nar.first,
+                       nar.hash,
                    };
-                   info.narSize = nar.second;
+                   info.narSize = nar.numBytesDigested;
                    return info;
                })
         ->path;
@@ -493,9 +493,9 @@ StorePath BinaryCacheStore::addToStore(
                                // without modulus
                                .self = false,
                            }),
-                       nar.first,
+                       nar.hash,
                    };
-                   info.narSize = nar.second;
+                   info.narSize = nar.numBytesDigested;
                    return info;
                })
         ->path;

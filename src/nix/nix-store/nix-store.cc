@@ -582,7 +582,11 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
     while (1) {
         // We use a dummy value because we'll set it below. FIXME be correct by
         // construction and avoid dummy value.
-        auto hashResultOpt = !hashGiven ? std::optional<HashResult>{{Hash::dummy, -1}} : std::nullopt;
+        auto hashResultOpt = !hashGiven ? std::optional<HashResult>{{
+                                              Hash::dummy,
+                                              std::numeric_limits<uint64_t>::max(),
+                                          }}
+                                        : std::nullopt;
         auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
         if (!info)
             break;
@@ -599,8 +603,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                     {store->getFSAccessor(false), CanonPath{info->path.to_string()}},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
-                info->narHash = hash.first;
-                info->narSize = hash.second;
+                info->narHash = hash.hash;
+                info->narSize = hash.numBytesDigested;
             }
             infos.insert_or_assign(info->path, *info);
         }
@@ -836,12 +840,12 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         HashSink sink(info->narHash.algo);
         store->narFromPath(path, sink);
         auto current = sink.finish();
-        if (current.first != info->narHash) {
+        if (current.hash != info->narHash) {
             printError(
                 "path '%s' was modified! expected hash '%s', got '%s'",
                 store->printStorePath(path),
                 info->narHash.to_string(HashFormat::Nix32, true),
-                current.first.to_string(HashFormat::Nix32, true));
+                current.hash.to_string(HashFormat::Nix32, true));
             status = 1;
         }
     }

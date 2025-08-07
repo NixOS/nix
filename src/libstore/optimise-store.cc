@@ -160,7 +160,7 @@ void LocalStore::optimisePath_(
             {make_ref<PosixSourceAccessor>(), CanonPath(path)},
             FileSerialisationMethod::NixArchive,
             HashAlgorithm::SHA256)
-            .first;
+            .hash;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
@@ -175,7 +175,7 @@ void LocalStore::optimisePath_(
                                                                PosixSourceAccessor::createAtRoot(linkPath),
                                                                FileSerialisationMethod::NixArchive,
                                                                HashAlgorithm::SHA256)
-                                                               .first;
+                                                               .hash;
                                                        }))) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", linkPath);

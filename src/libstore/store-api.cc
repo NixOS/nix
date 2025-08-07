@@ -254,7 +254,7 @@ ValidPathInfo Store::addToStoreSlow(
 
     auto hash = method == ContentAddressMethod::Raw::NixArchive && hashAlgo == HashAlgorithm::SHA256 ? narHash
                 : method == ContentAddressMethod::Raw::Git ? git::dumpHash(hashAlgo, srcPath).hash
-                                                           : caHashSink.finish().first;
+                                                           : caHashSink.finish().hash;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
@@ -1035,8 +1035,8 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
             throw Error("number expected");
         hashGiven = {narHash, *narSize};
     }
-    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
-    info.narSize = hashGiven->second;
+    ValidPathInfo info(store.parseStorePath(path), hashGiven->hash);
+    info.narSize = hashGiven->numBytesDigested;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "")

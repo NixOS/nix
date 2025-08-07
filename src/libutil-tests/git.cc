@@ -270,7 +270,7 @@ TEST_F(GitTest, both_roundrip)
             HashSink hashSink{hashAlgo};
             TeeSink s2{s, hashSink};
             auto mode = dump(path, s2, dumpHook, defaultPathFilter, mockXpSettings);
-            auto hash = hashSink.finish().first;
+            auto hash = hashSink.finish().hash;
             cas.insert_or_assign(hash, std::move(s.s));
             return TreeEntry{
                 .mode = mode,

@@ -120,7 +120,7 @@ HashResult HashModuloSink::finish()
         hashSink(fmt("|%d", pos));
 
     auto h = hashSink.finish();
-    return {h.first, rewritingSink.pos};
+    return {.hash = h.hash, .numBytesDigested = rewritingSink.pos};
 }
 
 } // namespace nix

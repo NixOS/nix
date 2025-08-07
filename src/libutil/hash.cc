@@ -338,7 +338,7 @@ Hash hashFile(HashAlgorithm ha, const Path & path)
 {
     HashSink sink(ha);
     readFile(path, sink);
-    return sink.finish().first;
+    return sink.finish().hash;
 }
 
 HashSink::HashSink(HashAlgorithm ha)

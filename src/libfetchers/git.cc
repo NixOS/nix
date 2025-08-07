@@ -901,7 +901,7 @@ struct GitInputScheme : InputScheme
                     writeString(file.abs(), hashSink);
                 }
                 return makeFingerprint(*repoInfo.workdirInfo.headRev)
-                       + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+                       + ";d=" + hashSink.finish().hash.to_string(HashFormat::Base16, false);
             }
             return std::nullopt;
         }
