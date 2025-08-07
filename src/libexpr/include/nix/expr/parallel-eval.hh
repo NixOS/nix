@@ -49,6 +49,8 @@ struct Executor
 
     ~Executor();
 
+    void createWorker(State & state);
+
     void worker();
 
     std::vector<std::future<void>> spawn(std::vector<std::pair<work_t, uint8_t>> && items);

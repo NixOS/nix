@@ -18,17 +18,7 @@ Executor::Executor(const EvalSettings & evalSettings)
     debug("executor using %d threads", evalCores);
     auto state(state_.lock());
     for (size_t n = 0; n < evalCores; ++n)
-        state->threads.push_back(std::thread([&]() {
-#if NIX_USE_BOEHMGC
-            GC_stack_base sb;
-            GC_get_stack_base(&sb);
-            GC_register_my_thread(&sb);
-#endif
-            worker();
-#if NIX_USE_BOEHMGC
-            GC_unregister_my_thread();
-#endif
-        }));
+        createWorker(*state);
 }
 
 Executor::~Executor()
@@ -45,6 +35,21 @@ Executor::~Executor()
 
     for (auto & thr : threads)
         thr.join();
+}
+
+void Executor::createWorker(State & state)
+{
+    state.threads.push_back(std::thread([&]() {
+#if NIX_USE_BOEHMGC
+        GC_stack_base sb;
+        GC_get_stack_base(&sb);
+        GC_register_my_thread(&sb);
+#endif
+        worker();
+#if NIX_USE_BOEHMGC
+        GC_unregister_my_thread();
+#endif
+    }));
 }
 
 void Executor::worker()
