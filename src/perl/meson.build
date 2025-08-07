@@ -4,7 +4,7 @@
 
 # init project
 #============================================================================
-project (
+project(
   'nix-perl',
   'cpp',
   version : files('.version'),
@@ -65,7 +65,7 @@ yath = find_program('yath', required : false)
 
 # Required Libraries
 #-------------------------------------------------
-bzip2_dep = dependency('bzip2', required: false)
+bzip2_dep = dependency('bzip2', required : false)
 if not bzip2_dep.found()
   bzip2_dep = cpp.find_library('bz2')
   if not bzip2_dep.found()
@@ -87,15 +87,36 @@ nix_store_dep = dependency('nix-store')
 # the perl bindings does not appear to be possible.
 #-------------------------------------------------
 perl_archname = run_command(
-  perl, '-e', 'use Config; print $Config{archname};', check: true).stdout()
+  perl,
+  '-e',
+  'use Config; print $Config{archname};',
+  check : true,
+).stdout()
 perl_version = run_command(
-  perl, '-e', 'use Config; print $Config{version};', check: true).stdout()
+  perl,
+  '-e',
+  'use Config; print $Config{version};',
+  check : true,
+).stdout()
 perl_archlibexp = run_command(
-  perl, '-e', 'use Config; print $Config{archlibexp};', check: true).stdout()
+  perl,
+  '-e',
+  'use Config; print $Config{archlibexp};',
+  check : true,
+).stdout()
 perl_site_libdir = run_command(
-  perl, '-e', 'use Config; print $Config{installsitearch};', check: true).stdout()
+  perl,
+  '-e',
+  'use Config; print $Config{installsitearch};',
+  check : true,
+).stdout()
 nix_perl_install_dir = join_paths(
-  libdir, 'perl5', 'site_perl', perl_version, perl_archname)
+  libdir,
+  'perl5',
+  'site_perl',
+  perl_version,
+  perl_archname,
+)
 
 
 # print perl hints for logs
@@ -110,10 +131,11 @@ message('Assumed Nix-Perl install dir: @0@'.format(nix_perl_install_dir))
 #-------------------------------------------------
 perl_check_dbi = run_command(
   perl,
-  '-e', 'use DBI; use DBD::SQLite;',
+  '-e',
+  'use DBI; use DBD::SQLite;',
   '-I@0@'.format(get_option('dbi_path')),
   '-I@0@'.format(get_option('dbd_sqlite_path')),
-  check: true
+  check : true,
 )
 
 if perl_check_dbi.returncode() == 2
@@ -128,10 +150,11 @@ endif
 #-------------------------------------------------
 perl_dep = declare_dependency(
   dependencies : cpp.find_library(
-  'perl',
-  has_headers : [
-    join_paths(perl_archlibexp, 'CORE', 'perl.h'),
-    join_paths(perl_archlibexp, 'CORE', 'EXTERN.h')],
+    'perl',
+    has_headers : [
+      join_paths(perl_archlibexp, 'CORE', 'perl.h'),
+      join_paths(perl_archlibexp, 'CORE', 'EXTERN.h'),
+    ],
     dirs : [
       join_paths(perl_archlibexp, 'CORE'),
     ],
@@ -166,8 +189,8 @@ if get_option('tests').enabled()
   test(
     'nix-perl-test',
     yath,
-    args : ['test'],
+    args : [ 'test' ],
     workdir : meson.current_build_dir(),
-    depends : [nix_perl_store_lib],
+    depends : [ nix_perl_store_lib ],
   )
 endif

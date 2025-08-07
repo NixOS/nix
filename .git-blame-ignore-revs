@@ -1,2 +1,4 @@
 # bulk initial re-formatting with clang-format
 e4f62e46088919428a68bd8014201dc8e379fed7 # !autorebase ./maintainers/format.sh --until-stable
+# meson re-formatting
+385e2c3542c707d95e3784f7f6d623f67e77ab61 # !autorebase ./maintainers/format.sh --until-stable

@@ -1,4 +1,5 @@
-project('nix-functional-tests',
+project(
+  'nix-functional-tests',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -26,13 +27,13 @@ nix_bin_dir = fs.parent(nix.full_path())
 subdir('nix-meson-build-support/default-system-cpu')
 
 test_confdata = {
-  'bindir': nix_bin_dir,
-  'coreutils': fs.parent(coreutils.full_path()),
-  'dot': dot.found() ? dot.full_path() : '',
-  'bash': bash.full_path(),
-  'sandbox_shell': busybox.found() ? busybox.full_path() : '',
-  'PACKAGE_VERSION': meson.project_version(),
-  'system': nix_system_cpu + '-' + host_machine.system(),
+  'bindir' : nix_bin_dir,
+  'coreutils' : fs.parent(coreutils.full_path()),
+  'dot' : dot.found() ? dot.full_path() : '',
+  'bash' : bash.full_path(),
+  'sandbox_shell' : busybox.found() ? busybox.full_path() : '',
+  'PACKAGE_VERSION' : meson.project_version(),
+  'system' : nix_system_cpu + '-' + host_machine.system(),
 }
 
 # Just configures `common/vars-and-functions.sh.in`.
@@ -48,8 +49,8 @@ configure_file(
 suites = [
   {
     'name' : 'main',
-    'deps': [],
-    'tests': [
+    'deps' : [],
+    'tests' : [
       'test-infra.sh',
       'gc.sh',
       'nix-collect-garbage-d.sh',
@@ -174,7 +175,7 @@ suites = [
       'help.sh',
       'symlinks.sh',
     ],
-    'workdir': meson.current_source_dir(),
+    'workdir' : meson.current_source_dir(),
   },
 ]
 
@@ -183,14 +184,14 @@ if nix_store.found()
   add_languages('cpp')
   subdir('test-libstoreconsumer')
   suites += {
-    'name': 'libstoreconsumer',
-    'deps': [
+    'name' : 'libstoreconsumer',
+    'deps' : [
       libstoreconsumer_tester,
     ],
-    'tests': [
+    'tests' : [
       'test-libstoreconsumer.sh',
     ],
-    'workdir': meson.current_source_dir(),
+    'workdir' : meson.current_source_dir(),
   }
 
 endif
@@ -201,14 +202,14 @@ if nix_expr.found() and get_option('default_library') != 'static'
   add_languages('cpp')
   subdir('plugins')
   suites += {
-    'name': 'plugins',
-    'deps': [
+    'name' : 'plugins',
+    'deps' : [
       libplugintest,
     ],
-    'tests': [
+    'tests' : [
       'plugins.sh',
     ],
-    'workdir': meson.current_source_dir(),
+    'workdir' : meson.current_source_dir(),
   }
 endif
 
@@ -230,20 +231,21 @@ foreach suite : suites
     test(
       name,
       bash,
-      args: [
+      args : [
         '-x',
         '-e',
         '-u',
-        '-o', 'pipefail',
+        '-o',
+        'pipefail',
         script,
       ],
       suite : suite_name,
       env : {
-        '_NIX_TEST_SOURCE_DIR': meson.current_source_dir(),
-        '_NIX_TEST_BUILD_DIR': meson.current_build_dir(),
-        'TEST_NAME': suite_name / name,
-        'NIX_REMOTE': '',
-        'PS4': '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
+        '_NIX_TEST_SOURCE_DIR' : meson.current_source_dir(),
+        '_NIX_TEST_BUILD_DIR' : meson.current_build_dir(),
+        'TEST_NAME' : suite_name / name,
+        'NIX_REMOTE' : '',
+        'PS4' : '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
       },
       # Some tests take 15+ seconds even on an otherwise idle machine;
       # on a loaded machine this can easily drive them to failure. Give

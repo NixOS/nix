@@ -1,4 +1,6 @@
-project('nix-cmd', 'cpp',
+project(
+  'nix-cmd',
+  'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -16,8 +18,7 @@ subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -31,11 +32,18 @@ subdir('nix-meson-build-support/subprojects')
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-lowdown = dependency('lowdown', version : '>= 0.9.0', required : get_option('markdown'))
+lowdown = dependency(
+  'lowdown',
+  version : '>= 0.9.0',
+  required : get_option('markdown'),
+)
 deps_private += lowdown
 configdata.set('HAVE_LOWDOWN', lowdown.found().to_int())
 # The API changed slightly around terminal initialization.
-configdata.set('HAVE_LOWDOWN_1_4', lowdown.version().version_compare('>= 1.4.0').to_int())
+configdata.set(
+  'HAVE_LOWDOWN_1_4',
+  lowdown.version().version_compare('>= 1.4.0').to_int(),
+)
 
 readline_flavor = get_option('readline-flavor')
 if readline_flavor == 'editline'
@@ -50,7 +58,7 @@ endif
 configdata.set(
   'USE_READLINE',
   (readline_flavor == 'readline').to_int(),
-  description: 'Use readline instead of editline',
+  description : 'Use readline instead of editline',
 )
 
 config_priv_h = configure_file(
@@ -89,10 +97,10 @@ this_library = library(
   config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
-  cpp_pch : do_pch ? ['pch/precompiled-headers.hh'] : []
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/cmd', preserve_path : true)

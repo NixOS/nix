@@ -1,13 +1,12 @@
 xp_features_json = custom_target(
-  command : [nix, '__dump-xp-features'],
+  command : [ nix, '__dump-xp-features' ],
   capture : true,
   output : 'xp-features.json',
 )
 
 experimental_features_shortlist_md = custom_target(
   command : nix_eval_for_docs + [
-    '--expr',
-    'import @INPUT0@ (builtins.fromJSON (builtins.readFile ./@INPUT1@))',
+    '--expr', 'import @INPUT0@ (builtins.fromJSON (builtins.readFile ./@INPUT1@))',
   ],
   input : [
     '../../generate-xp-features-shortlist.nix',
@@ -19,14 +18,8 @@ experimental_features_shortlist_md = custom_target(
 )
 
 nix3_cli_files = custom_target(
-  command : [
-    python.full_path(),
-    '@INPUT0@',
-    '@OUTPUT@',
-    '--'
-  ] + nix_eval_for_docs + [
-    '--expr',
-    'import @INPUT1@ true (builtins.readFile ./@INPUT2@)',
+  command : [ python.full_path(), '@INPUT0@', '@OUTPUT@', '--' ] + nix_eval_for_docs + [
+    '--expr', 'import @INPUT1@ true (builtins.readFile ./@INPUT2@)',
   ],
   input : [
     '../../remove_before_wrapper.py',
@@ -40,8 +33,7 @@ nix3_cli_files = custom_target(
 conf_file_md_body = custom_target(
   command : [
     nix_eval_for_docs,
-    '--expr',
-    'import @INPUT0@ { prefix = "conf"; } (builtins.fromJSON (builtins.readFile ./@INPUT1@))',
+    '--expr', 'import @INPUT0@ { prefix = "conf"; } (builtins.fromJSON (builtins.readFile ./@INPUT1@))',
   ],
   capture : true,
   input : [

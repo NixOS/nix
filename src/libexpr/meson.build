@@ -1,4 +1,6 @@
-project('nix-expr', 'cpp',
+project(
+  'nix-expr',
+  'cpp',
   version : files('.version'),
   default_options : [
     'cpp_std=c++2a',
@@ -17,8 +19,7 @@ subdir('nix-meson-build-support/deps-lists')
 configdata_pub = configuration_data()
 configdata_priv = configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -39,8 +40,8 @@ endforeach
 
 boost = dependency(
   'boost',
-  modules : ['container', 'context'],
-  include_type: 'system',
+  modules : [ 'container', 'context' ],
+  include_type : 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -70,7 +71,7 @@ toml11 = dependency(
   'toml11',
   version : '>=3.7.0',
   method : 'cmake',
-  include_type: 'system',
+  include_type : 'system',
 )
 deps_other += toml11
 
@@ -113,8 +114,7 @@ lexer_tab = custom_target(
   command : [
     'flex',
     '-Cf', # Use full scanner tables
-    '--outfile',
-    '@OUTPUT0@',
+    '--outfile', '@OUTPUT0@',
     '--header-file=' + '@OUTPUT1@',
     '@INPUT0@',
   ],
@@ -175,10 +175,10 @@ this_library = library(
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
-  cpp_pch : do_pch ? ['pch/precompiled-headers.hh'] : []
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/expr', preserve_path : true)
