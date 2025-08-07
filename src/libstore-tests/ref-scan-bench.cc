@@ -1,4 +1,4 @@
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/store/path.hh"
 #include "nix/util/base-nix-32.hh"
 

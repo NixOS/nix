@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/store/path.hh"
 
 namespace nix {

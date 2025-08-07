@@ -62,6 +62,7 @@ headers = [ config_pub_h ] + files(
   'posix-fs-canonicalise.hh',
   'profiles.hh',
   'realisation.hh',
+  'references.hh',
   'remote-fs-accessor.hh',
   'remote-store-connection.hh',
   'remote-store.hh',

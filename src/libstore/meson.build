@@ -316,6 +316,7 @@ sources = files(
   'posix-fs-canonicalise.cc',
   'profiles.cc',
   'realisation.cc',
+  'references.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
   'restricted-store.cc',
