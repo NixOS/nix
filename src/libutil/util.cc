@@ -182,8 +182,10 @@ void ignoreExceptionInDestructor(Verbosity lvl)
     try {
         try {
             throw;
+        } catch (Error & e) {
+            printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
         } catch (std::exception & e) {
-            printMsg(lvl, "error (ignored): %1%", e.what());
+            printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
         }
     } catch (...) {
     }
@@ -195,8 +197,10 @@ void ignoreExceptionExceptInterrupt(Verbosity lvl)
         throw;
     } catch (const Interrupted & e) {
         throw;
+    } catch (Error & e) {
+        printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
     } catch (std::exception & e) {
-        printMsg(lvl, "error (ignored): %1%", e.what());
+        printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
     }
 }
 
