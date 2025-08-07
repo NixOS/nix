@@ -228,7 +228,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(drv.options.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void setBuildTmpDir() override
@@ -335,10 +335,10 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        if (drvOptions.useUidRange(drv))
+        if (drv.options.useUidRange(drv))
             chownToBuilder(chrootRootDir + "/etc");
 
-        if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
+        if (drv.options.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
@@ -743,7 +743,7 @@ struct ChrootLinuxDerivationBuilder : LinuxDerivationBuilder
         }
 
         /* Make /etc unwritable */
-        if (!drvOptions.useUidRange(drv))
+        if (!drv.options.useUidRange(drv))
             chmod_(chrootRootDir + "/etc", 0555);
 
         /* Unshare this mount namespace. This is necessary because

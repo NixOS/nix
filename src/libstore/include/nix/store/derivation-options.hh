@@ -204,6 +204,13 @@ struct DerivationOptions
     bool useUidRange(const BasicDerivation & drv) const;
 };
 
+template<typename T>
+struct json_avoids_null;
+
+template<>
+struct json_avoids_null<DerivationOptions> : std::true_type
+{};
+
 }; // namespace nix
 
 JSON_IMPL(DerivationOptions);
