@@ -523,8 +523,6 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
 
     void finish(PackedPointer p0_, PackedPointer p1_)
     {
-        debug("FINISH %x %08x %08x", this, p0_, p1_);
-
         // Note: p1 *must* be updated before p0.
         p1 = p1_;
         p0_ = p0.exchange(p0_, std::memory_order_release);

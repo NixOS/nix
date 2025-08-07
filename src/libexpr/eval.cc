@@ -1783,7 +1783,6 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                 .debugThrow();
     }
 
-    debug("DONE %x %x", &vRes, &vCur);
     vRes = vCur;
 }
 

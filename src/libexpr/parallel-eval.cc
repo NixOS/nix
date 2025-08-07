@@ -171,7 +171,6 @@ static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 static Sync<WaiterDomain> & getWaiterDomain(detail::ValueBase & v)
 {
     auto domain = (((size_t) &v) >> 5) % waiterDomains.size();
-    debug("HASH %x -> %d", &v, domain);
     return waiterDomains[domain];
 }
 
@@ -191,7 +190,6 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
         /* If the value has been finalized in the meantime (i.e. is no
            longer pending), we're done. */
         if (pd != pdAwaited) {
-            debug("VALUE DONE RIGHT AWAY 2 %x", this);
             assert(pd != pdThunk && pd != pdPending);
             return p0_;
         }
@@ -203,20 +201,15 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
                no longer pending), we're done. */
             auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
             if (pd != pdAwaited) {
-                debug("VALUE DONE RIGHT AWAY %x", this);
                 assert(pd != pdThunk && pd != pdPending);
                 return p0_;
             }
             /* The value was already in the "waited on" state, so we're
                not the only thread waiting on it. */
-            debug("ALREADY AWAITED %x", this);
-        } else
-            debug("PENDING -> AWAITED %x", this);
+        }
     }
 
     /* Wait for another thread to finish this value. */
-    debug("AWAIT %x", this);
-
     if (state.executor->evalCores <= 1)
         state.error<InfiniteRecursionError>("infinite recursion encountered")
             .atPos(((Value &) *this).determinePos(noPos))
@@ -231,7 +224,6 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
 
     while (true) {
         domain.wait(domain->cv);
-        debug("WAKEUP %x", this);
         auto p0_ = p0.load(std::memory_order_acquire);
         auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
         if (pd != pdAwaited) {
@@ -248,8 +240,6 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
 template<>
 void ValueStorage<sizeof(void *)>::notifyWaiters()
 {
-    debug("NOTIFY %x", this);
-
     auto domain = getWaiterDomain(*this).lock();
 
     domain->cv.notify_all();
