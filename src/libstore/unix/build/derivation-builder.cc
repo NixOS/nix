@@ -302,11 +302,9 @@ public:
 
     void stopDaemon() override;
 
-private:
+protected:
 
     void addDependency(const StorePath & path) override;
-
-protected:
 
     /**
      * Make a file owned by the builder.
@@ -2159,6 +2157,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 } // namespace nix
 
 // FIXME: do this properly
+#include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
 
@@ -2210,8 +2209,6 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         useSandbox = false;
     }
 
-    if (useSandbox)
-        return std::make_unique<ChrootLinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
 #endif
 
     if (!useSandbox && params.drvOptions.useUidRange(params.drv))
@@ -2220,6 +2217,9 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 #ifdef __APPLE__
     return std::make_unique<DarwinDerivationBuilder>(store, std::move(miscMethods), std::move(params), useSandbox);
 #elif defined(__linux__)
+    if (useSandbox)
+        return std::make_unique<ChrootLinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+
     return std::make_unique<LinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
 #else
     if (useSandbox)
