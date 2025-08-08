@@ -2,6 +2,12 @@
   nixFlake ? builtins.getFlake ("git+file://" + toString ../../..),
   system ? builtins.currentSystem,
   pkgs ? nixFlake.inputs.nixpkgs.legacyPackages.${system},
+  nixComponents ? (
+    nixFlake.lib.makeComponents {
+      inherit pkgs;
+      inherit getStdenv;
+    }
+  ),
   getStdenv ? p: p.stdenv,
   componentTestsPrefix ? "",
   withSanitizers ? false,
@@ -64,18 +70,13 @@ let
 in
 
 rec {
-  nixComponents =
-    (nixFlake.lib.makeComponents {
-      inherit pkgs;
-      inherit getStdenv;
-    }).overrideScope
-      (
-        final: prev: {
-          nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
+  nixComponentsInstrumented = nixComponents.overrideScope (
+    final: prev: {
+      nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
 
-          mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
-        }
-      );
+      mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
+    }
+  );
 
   /**
     Top-level tests for the flake outputs, as they would be built by hydra.
@@ -120,15 +121,15 @@ rec {
       lib.concatMapAttrs (testName: test: {
         "${componentTestsPrefix}${pkgName}-${testName}" = test;
       }) (pkg.tests or { })
-    ) nixComponents)
+    ) nixComponentsInstrumented)
     // lib.optionalAttrs (pkgs.stdenv.hostPlatform == pkgs.stdenv.buildPlatform) {
-      "${componentTestsPrefix}nix-functional-tests" = nixComponents.nix-functional-tests;
+      "${componentTestsPrefix}nix-functional-tests" = nixComponentsInstrumented.nix-functional-tests;
     };
 
   codeCoverage =
     let
       componentsTestsToProfile =
-        (builtins.mapAttrs (n: v: nixComponents.${n}.tests.run) {
+        (builtins.mapAttrs (n: v: nixComponentsInstrumented.${n}.tests.run) {
           "nix-util-tests" = { };
           "nix-store-tests" = { };
           "nix-fetchers-tests" = { };
@@ -136,7 +137,7 @@ rec {
           "nix-flake-tests" = { };
         })
         // {
-          inherit (nixComponents) nix-functional-tests;
+          inherit (nixComponentsInstrumented) nix-functional-tests;
         };
 
       coverageProfileDrvs = lib.mapAttrs (
@@ -170,12 +171,13 @@ rec {
 
       coverageReports =
         let
-          nixComponentDrvs = lib.filter (lib.isDerivation) (lib.attrValues nixComponents);
+          nixComponentDrvs = lib.filter (lib.isDerivation) (lib.attrValues nixComponentsInstrumented);
         in
         pkgs.runCommand "code-coverage-report"
           {
             nativeBuildInputs = [
               pkgs.llvmPackages.libllvm
+              pkgs.jq
             ];
             __structuredAttrs = true;
             nixComponents = nixComponentDrvs;
@@ -201,6 +203,24 @@ rec {
               echo
             } >> $out/index.txt
 
+            llvm-cov export $arguments -instr-profile ${mergedProfdata} -format=text > $out/coverage.json
+
+            mkdir -p $out/nix-support
+
+            coverageTotals=$(jq ".data[0].totals" $out/coverage.json)
+
+            # Mostly inline from pkgs/build-support/setup-hooks/make-coverage-analysis-report.sh [1],
+            # which we can't use here, because we rely on LLVM's infra for source code coverage collection.
+            # [1]: https://github.com/NixOS/nixpkgs/blob/67bb48c4c8e327417d6d5aa7e538244b209e852b/pkgs/build-support/setup-hooks/make-coverage-analysis-report.sh#L16
+            declare -A metricsArray=(["lineCoverage"]="lines" ["functionCoverage"]="functions" ["branchCoverage"]="branches")
+
+            for metricName in "''\${!metricsArray[@]}"; do
+              key="''\${metricsArray[$metricName]}"
+              metric=$(echo "$coverageTotals" | jq ".$key.percent * 10 | round / 10")
+              echo "$metricName $metric %" >> $out/nix-support/hydra-metrics
+            done
+
+            echo "report coverage $out" >> $out/nix-support/hydra-build-products
           '';
     in
     assert withCoverage;
