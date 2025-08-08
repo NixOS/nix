@@ -3,7 +3,7 @@
 #include "nix/store/content-address.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/main/shared.hh"
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
 #include "nix/util/posix-source-accessor.hh"

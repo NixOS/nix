@@ -55,7 +55,6 @@ headers = files(
   'posix-source-accessor.hh',
   'processes.hh',
   'ref.hh',
-  'references.hh',
   'regex-combinators.hh',
   'repair-flag.hh',
   'serialise.hh',
