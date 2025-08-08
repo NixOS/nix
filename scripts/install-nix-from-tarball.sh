@@ -41,7 +41,7 @@ EOF
 fi
 
 # Determine if we could use the multi-user installer or not
-if [ "$OS" = "Linux" ]; then
+if [ "$OS" = "Linux" ] || [ "$OS" = "FreeBSD" ]; then
     echo "Note: a multi-user installation is possible. See https://nix.dev/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
@@ -125,6 +125,13 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
+    # Check for bash on systems that don't have it by default
+    if [ "$OS" = "FreeBSD" ] && ! command -v bash >/dev/null 2>&1; then
+        printf '\e[1;31mError: bash is required for multi-user installation but was not found.\e[0m\n' >&2
+        printf 'Please install bash first:\n' >&2
+        printf '  pkg install bash\n' >&2
+        exit 1
+    fi
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
     exec "$self/install-multi-user" $ACTION
     exit 0
