@@ -60,12 +60,6 @@ std::strong_ordering Hash::operator<=>(const Hash & h) const noexcept
     return std::strong_ordering::equivalent;
 }
 
-std::string printHash16or32(const Hash & hash)
-{
-    assert(static_cast<char>(hash.algo));
-    return hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false);
-}
-
 std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 {
     std::string s;
