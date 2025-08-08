@@ -7,7 +7,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/nar-info.hh"
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/util/finally.hh"

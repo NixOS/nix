@@ -9,7 +9,6 @@
 #include "nix/util/util.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
-#include "nix/util/references.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/git.hh"
@@ -18,7 +17,6 @@
 // `addMultipleToStore`.
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/users.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>

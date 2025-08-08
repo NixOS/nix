@@ -1,6 +1,6 @@
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
+#include "nix/store/path.hh"
 #include "nix/util/hash.hh"
-#include "nix/util/archive.hh"
 #include "nix/util/base-nix-32.hh"
 
 #include <map>
@@ -10,7 +10,7 @@
 
 namespace nix {
 
-static size_t refLength = 32; /* characters */
+static constexpr auto refLength = StorePath::HashLen;
 
 static void search(std::string_view s, StringSet & hashes, StringSet & seen)
 {
