@@ -247,7 +247,9 @@ static int main_nix_prefetch_url(int argc, char ** argv)
         if (!printPath)
             printInfo("path is '%s'", store->printStorePath(storePath));
 
-        logger->cout(printHash16or32(hash));
+        assert(static_cast<char>(hash.algo));
+        std::cout << hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false) << std::endl;
+
         if (printPath)
             logger->cout(store->printStorePath(storePath));
 
