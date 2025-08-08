@@ -100,14 +100,14 @@ struct CmdHashBase : Command
                 // so we don't need to go low-level, or reject symlink `path`s.
                 auto hashSink = makeSink();
                 readFile(path, *hashSink);
-                h = hashSink->finish().first;
+                h = hashSink->finish().hash;
                 break;
             }
             case FileIngestionMethod::NixArchive: {
                 auto sourcePath = makeSourcePath();
                 auto hashSink = makeSink();
                 dumpPath(sourcePath, *hashSink, (FileSerialisationMethod) mode);
-                h = hashSink->finish().first;
+                h = hashSink->finish().hash;
                 break;
             }
             case FileIngestionMethod::Git: {
@@ -116,7 +116,7 @@ struct CmdHashBase : Command
                 hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
                     auto mode = dump(path, *hashSink, hook);
-                    auto hash = hashSink->finish().first;
+                    auto hash = hashSink->finish().hash;
                     return {
                         .mode = mode,
                         .hash = hash,

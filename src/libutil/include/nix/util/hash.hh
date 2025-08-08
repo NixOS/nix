@@ -153,10 +153,12 @@ Hash hashFile(HashAlgorithm ha, const Path & path);
 
 /**
  * The final hash and the number of bytes digested.
- *
- * @todo Convert to proper struct
  */
-typedef std::pair<Hash, uint64_t> HashResult;
+struct HashResult
+{
+    Hash hash;
+    uint64_t numBytesDigested;
+};
 
 /**
  * Compress a hash to the specified number of bytes by cyclically

@@ -1676,7 +1676,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     HashModuloSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath({getFSSourceAccessor(), CanonPath(actualPath)}, caSink, (FileSerialisationMethod) fim);
-                    return caSink.finish().first;
+                    return caSink.finish().hash;
                 }
                 case FileIngestionMethod::Git: {
                     return git::dumpHash(outputHash.hashAlgo, {getFSSourceAccessor(), CanonPath(actualPath)}).hash;
@@ -1705,8 +1705,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     {getFSSourceAccessor(), CanonPath(actualPath)},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
-                newInfo0.narHash = narHashAndSize.first;
-                newInfo0.narSize = narHashAndSize.second;
+                newInfo0.narHash = narHashAndSize.hash;
+                newInfo0.narSize = narHashAndSize.numBytesDigested;
             }
 
             assert(newInfo0.ca);
@@ -1729,8 +1729,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         {getFSSourceAccessor(), CanonPath(actualPath)},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
-                    ValidPathInfo newInfo0{requiredFinalPath, narHashAndSize.first};
-                    newInfo0.narSize = narHashAndSize.second;
+                    ValidPathInfo newInfo0{requiredFinalPath, narHashAndSize.hash};
+                    newInfo0.narSize = narHashAndSize.numBytesDigested;
                     auto refs = rewriteRefs();
                     newInfo0.references = std::move(refs.others);
                     if (refs.self)

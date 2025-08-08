@@ -1072,19 +1072,19 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 auto hashResult = hashSink.finish();
 
-                if (hashResult.first != info.narHash)
+                if (hashResult.hash != info.narHash)
                     throw Error(
                         "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
                         info.narHash.to_string(HashFormat::Nix32, true),
-                        hashResult.first.to_string(HashFormat::Nix32, true));
+                        hashResult.hash.to_string(HashFormat::Nix32, true));
 
-                if (hashResult.second != info.narSize)
+                if (hashResult.numBytesDigested != info.narSize)
                     throw Error(
                         "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
                         info.narSize,
-                        hashResult.second);
+                        hashResult.numBytesDigested);
 
                 if (info.ca) {
                     auto & specified = *info.ca;
@@ -1101,7 +1101,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                                 std::string{info.path.hashPart()},
                             };
                             dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                            h = caSink.finish().first;
+                            h = caSink.finish().hash;
                             break;
                         }
                         case FileIngestionMethod::Git:
@@ -1279,7 +1279,7 @@ StorePath LocalStore::addToStoreFromDump(
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
-            auto narHash = std::pair{dumpHash, size};
+            HashResult narHash = {dumpHash, size};
             if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink{HashAlgorithm::SHA256};
                 dumpPath(realPath, narSink);
@@ -1295,8 +1295,8 @@ StorePath LocalStore::addToStoreFromDump(
                 syncParent(realPath);
             }
 
-            ValidPathInfo info{*this, name, std::move(desc), narHash.first};
-            info.narSize = narHash.second;
+            ValidPathInfo info{*this, name, std::move(desc), narHash.hash};
+            info.narSize = narHash.numBytesDigested;
             registerValidPath(info);
         }
 
@@ -1402,12 +1402,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 dumpPath(Store::toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
-                if (info->narHash != nullHash && info->narHash != current.first) {
+                if (info->narHash != nullHash && info->narHash != current.hash) {
                     printError(
                         "path '%s' was modified! expected hash '%s', got '%s'",
                         printStorePath(i),
                         info->narHash.to_string(HashFormat::Nix32, true),
-                        current.first.to_string(HashFormat::Nix32, true));
+                        current.hash.to_string(HashFormat::Nix32, true));
                     if (repair)
                         repairPath(i);
                     else
@@ -1419,14 +1419,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
                         printInfo("fixing missing hash on '%s'", printStorePath(i));
-                        info->narHash = current.first;
+                        info->narHash = current.hash;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
-                        info->narSize = current.second;
+                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.numBytesDigested);
+                        info->narSize = current.numBytesDigested;
                         update = true;
                     }
 

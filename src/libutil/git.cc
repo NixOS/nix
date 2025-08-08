@@ -329,7 +329,7 @@ TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filte
     hook = [&](const SourcePath & path) -> TreeEntry {
         auto hashSink = HashSink(ha);
         auto mode = dump(path, hashSink, hook, filter);
-        auto hash = hashSink.finish().first;
+        auto hash = hashSink.finish().hash;
         return {
             .mode = mode,
             .hash = hash,
