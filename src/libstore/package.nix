@@ -5,6 +5,7 @@
 
   unixtools,
   darwin,
+  freebsd,
 
   nix-util,
   boost,
@@ -67,6 +68,7 @@ mkMesonLibrary (finalAttrs: {
     ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
     # There have been issues building these dependencies
     ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
+    ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
     ++ lib.optional withAWS aws-sdk-cpp;
 
   propagatedBuildInputs = [
