@@ -1,4 +1,4 @@
-builtins.fromJSON ''
+builtins.fromJSONC ''
   {
     // This is a comment
     "Video": {
