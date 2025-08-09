@@ -109,20 +109,35 @@ static void parseConfigFiles(
     unsigned int pos = 0;
 
     while (pos < contents.size()) {
-        std::string line;
-        while (pos < contents.size() && contents[pos] != '\n')
-            line += contents[pos++];
-        pos++;
+        std::string multiline;
+        size_t indent = contents.find_first_not_of(' ', pos);
+        if (indent == contents.npos)
+            indent = 0;
+        else
+            indent = indent - pos;
+        while (true) {
+            std::string line;
+            while (pos < contents.size() && contents[pos] != '\n')
+                line += contents[pos++];
+            pos++;
 
-        if (auto hash = line.find('#'); hash != line.npos)
-            line = std::string(line, 0, hash);
+            if (auto hash = line.find('#'); hash != line.npos)
+                line = std::string(line, 0, hash);
 
-        auto tokens = tokenizeString<std::vector<std::string>>(line);
+            if (pos + indent + 1 < contents.size() && std::string(" \n\r\t[]{}\"").find(contents[pos + indent + 1]) != std::string::npos && !line.empty())
+                multiline += line + "\n";
+            else {
+                multiline += line;
+                break;
+            }
+        }
+
+        auto tokens = tokenizeString<std::vector<std::string>>(multiline);
         if (tokens.empty())
             continue;
 
         if (tokens.size() < 2)
-            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", multiline, path);
 
         auto include = false;
         auto ignoreMissing = false;
@@ -135,7 +150,7 @@ static void parseConfigFiles(
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
+                throw UsageError("syntax error in configuration line '%1%' in '%2%'", multiline, path);
             auto p = absPath(tokens[1], dirOf(path));
             if (pathExists(p)) {
                 try {
@@ -151,7 +166,7 @@ static void parseConfigFiles(
         }
 
         if (tokens[1] != "=")
-            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%1%' in '%2%'", multiline, path);
 
         std::string name = std::move(tokens[0]);
 
