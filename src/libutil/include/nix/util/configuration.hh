@@ -377,7 +377,8 @@ public:
         const bool documentDefault = true,
         std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
         std::optional<std::string> jsonSchema = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature), std::move(jsonSchema))
+        : BaseSetting<T>(
+              def, documentDefault, name, description, aliases, std::move(experimentalFeature), std::move(jsonSchema))
     {
         options->addSetting(this);
     }

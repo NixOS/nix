@@ -309,7 +309,8 @@ TEST(Config, applyConfigWithReassignedSetting)
     ASSERT_EQ(settings["name-of-the-setting"].value, "second-value");
 }
 
-TEST(Config, applyConfigMultiLine) {
+TEST(Config, applyConfigMultiLine)
+{
     Config config;
     std::map<std::string, Config::SettingInfo> settings;
     Setting<StringSet> setting{&config, {}, "name-of-the-setting", "description"};

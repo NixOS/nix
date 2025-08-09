@@ -14,7 +14,7 @@
 #include "nix/util/users.hh"
 
 #ifdef __linux__
-#include "nix/util/idmaps.hh"
+#  include "nix/util/idmaps.hh"
 #endif
 
 #include "nix/store/config.hh"
@@ -539,7 +539,8 @@ public:
         "id-count",
         "The number of UIDs/GIDs to use for dynamic ID allocation."};
 
-    Setting<SupplementaryGroups> supplementaryGroups{this,
+    Setting<SupplementaryGroups> supplementaryGroups{
+        this,
 #ifdef __linux__
         {SupplementaryGroup("kvm")},
 #else
@@ -589,7 +590,10 @@ public:
           define that group then GID 10100 is used instead on the host side as
           well.
         )",
-        {"build-supplementary-groups"}, true, {}, "(array of (object or string))"};
+        {"build-supplementary-groups"},
+        true,
+        {},
+        "(array of (object or string))"};
 
 #ifdef __linux__
     Setting<bool> useCgroups{

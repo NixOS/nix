@@ -241,6 +241,7 @@ private:
         const std::string name;
         id_t hostId;
         uint nrIds;
+
         MappedID(std::string && name, const id_t hostId, const uint nrIds)
             : name(std::move(name))
             , hostId(hostId)
@@ -253,6 +254,7 @@ public:
     struct MappedGID : public MappedID
     {
         std::set<uid_t> members;
+
         MappedGID(
             std::string && name = "",
             std::set<uid_t> && users = {},
@@ -269,6 +271,7 @@ public:
         std::string desc, homeDir;
         gid_t group;
         std::string shell;
+
         MappedUID(
             std::string && name = "",
             std::string && desc = "",
@@ -345,4 +348,4 @@ IDMap::V readIDMapFile(const Path &, const IDMapping::T);
 
 int createUsernamespaceWithMappings(const IDMap & mapper);
 
-}
+} // namespace nix

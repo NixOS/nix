@@ -124,7 +124,8 @@ static void parseConfigFiles(
             if (auto hash = line.find('#'); hash != line.npos)
                 line = std::string(line, 0, hash);
 
-            if (pos + indent + 1 < contents.size() && std::string(" \n\r\t[]{}\"").find(contents[pos + indent + 1]) != std::string::npos && !line.empty())
+            if (pos + indent + 1 < contents.size()
+                && std::string(" \n\r\t[]{}\"").find(contents[pos + indent + 1]) != std::string::npos && !line.empty())
                 multiline += line + "\n";
             else {
                 multiline += line;

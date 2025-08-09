@@ -148,6 +148,7 @@ std::ostream & operator<<(std::ostream & os, const C & xs)
         os << it->to_string() << (++it != std::end(xs) ? ", " : "");
     return os << "]";
 };
+
 template std::ostream & operator<<(std::ostream & os, const std::set<IDMapping> & xs);
 template std::ostream & operator<<(std::ostream & os, const std::vector<IDMapping> & xs);
 
@@ -751,4 +752,4 @@ int createUsernamespaceWithMappings(const IDMap & mapper)
     return userFd;
 }
 
-}
+} // namespace nix

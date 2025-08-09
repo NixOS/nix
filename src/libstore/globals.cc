@@ -329,12 +329,14 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
-template<> struct BaseSetting<SupplementaryGroups>::trait
+template<>
+struct BaseSetting<SupplementaryGroups>::trait
 {
     static constexpr bool appendable = true;
 };
 
-template<> SupplementaryGroups BaseSetting<SupplementaryGroups>::parse(const std::string & str) const
+template<>
+SupplementaryGroups BaseSetting<SupplementaryGroups>::parse(const std::string & str) const
 {
     if (str.empty())
         return {};
@@ -364,14 +366,14 @@ template<> SupplementaryGroups BaseSetting<SupplementaryGroups>::parse(const std
             j.emplace("gid", gid);
             result.push_back(j);
 #endif
-        }
-        else
+        } else
             throw UsageError("option '%s' has invalid value '%s'", name, item);
     }
     return result;
 }
 
-template<> void BaseSetting<SupplementaryGroups>::appendOrSet(SupplementaryGroups newValue, bool append)
+template<>
+void BaseSetting<SupplementaryGroups>::appendOrSet(SupplementaryGroups newValue, bool append)
 {
     if (!append) {
         value = std::move(newValue);
@@ -388,7 +390,8 @@ template<> void BaseSetting<SupplementaryGroups>::appendOrSet(SupplementaryGroup
     }
 }
 
-template<> std::string BaseSetting<SupplementaryGroups>::to_string() const
+template<>
+std::string BaseSetting<SupplementaryGroups>::to_string() const
 {
     return nlohmann::json(value).dump();
 }
