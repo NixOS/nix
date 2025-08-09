@@ -4,7 +4,9 @@
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
 #  include "linux/fchmodat2-compat.hh"
+#  include "nix/util/idmaps.hh"
 
+#  include <fstream>
 #  include <sys/ioctl.h>
 #  include <net/if.h>
 #  include <netinet/ip.h>
@@ -198,15 +200,34 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     {
     }
 
-    uid_t sandboxUid()
+    uid_t sandboxUid() const override
     {
         return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
     }
 
-    gid_t sandboxGid() override
+    gid_t sandboxGid() const override
     {
         return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0)
                                   : ChrootDerivationBuilder::sandboxGid();
+    }
+
+    Path sandboxUserHomeDir() const override
+    {
+        return settings.sandboxBuildDir;
+    }
+
+    std::tuple<uid_t, gid_t, uint, std::vector<gid_t>> hostIDs() const override
+    {
+        if (buildUser)
+            return {
+                buildUser->getUID(), buildUser->getGID(), buildUser->getUIDCount(), buildUser->getSupplementaryGIDs()};
+        else
+            return SandboxIDMap::hostIDs();
+    }
+
+    std::vector<SupplementaryGroup> supplementaryGroups() const override
+    {
+        return usingUserNamespace ? settings.supplementaryGroups.get() : std::vector<SupplementaryGroup>{};
     }
 
     std::unique_ptr<UserLock> getBuildUser() override
@@ -261,6 +282,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void prepareSandbox() override
     {
+        // If disabling user namespaces, we need to do so early enough.
+        usingUserNamespace = userNamespacesSupported();
+
         ChrootDerivationBuilder::prepareSandbox();
 
         if (cgroup) {
@@ -311,7 +335,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         userNamespaceSync.create();
 
-        usingUserNamespace = userNamespacesSupported();
+        /** Get supplementary GIDs for sandbox. */
+        auto supplementaryGroups = getSupplementaryHostGIDs();
 
         Pipe sendPid;
         sendPid.create();
@@ -325,9 +350,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             openSlave();
 
             try {
-                /* Drop additional groups here because we can't do it
+                /* Drop and/or set additional groups here because we can't do it
                    after we've created the new user namespace. */
-                if (setgroups(0, 0) == -1) {
+                if (setgroups(supplementaryGroups.size(), supplementaryGroups.data()) == -1) {
                     if (errno != EPERM)
                         throw SysError("setgroups failed");
                     if (settings.requireDropSupplementaryGroups)
@@ -374,33 +399,13 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             /* Set the UID/GID mapping of the builder's user namespace
                such that the sandbox user maps to the build user, or to
                the calling user (if build users are disabled). */
-            uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
-            uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
-            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
-
-            writeFile("/proc/" + std::to_string(pid) + "/uid_map", fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
-
-            if (!buildUser || buildUser->getUIDCount() == 1)
-                writeFile("/proc/" + std::to_string(pid) + "/setgroups", "deny");
-
-            writeFile("/proc/" + std::to_string(pid) + "/gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            writeIDMapFiles(pid);
         } else {
             debug("note: not using a user namespace");
             if (!buildUser)
                 throw Error(
                     "cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
         }
-
-        /* Now that we now the sandbox uid, we can write
-           /etc/passwd. */
-        writeFile(
-            chrootRootDir + "/etc/passwd",
-            fmt("root:x:0:0:Nix build user:%3%:/noshell\n"
-                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
-                "nobody:x:65534:65534:Nobody:/:/noshell\n",
-                sandboxUid(),
-                sandboxGid(),
-                settings.sandboxBuildDir));
 
         /* Save the mount- and user namespace of the child. We have to do this
          *before* the child does a chroot. */

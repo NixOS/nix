@@ -329,6 +329,72 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
     }
 }
 
+template<> struct BaseSetting<SupplementaryGroups>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<> SupplementaryGroups BaseSetting<SupplementaryGroups>::parse(const std::string & str) const
+{
+    if (str.empty())
+        return {};
+
+    // Read json
+    if (str.starts_with("["))
+        try {
+            return nlohmann::json::parse(str, nullptr, true, true).template get<std::vector<SupplementaryGroup>>();
+        } catch (const nlohmann::json::exception & e) {
+            throw UsageError("option '%s' has invalid value '%s': %s", name, str, e.what());
+        } catch (UsageError & e) {
+            throw UsageError("option '%s' has invalid value '%s': %s", name, str, e.message());
+        }
+
+    // Read strings
+    SupplementaryGroups result = {};
+    for (auto & item : tokenizeString<StringSet>(str)) {
+        auto parts = splitString<std::vector<std::string>>(item, ":");
+        if (parts.size() > 0 && parts.size() < 3) {
+            auto group = parts[0];
+            std::optional<uint64_t> gid = parts.size() == 2 ? string2Int<uint64_t>(parts[1]) : std::nullopt;
+#ifdef __linux__
+            result.emplace_back(std::move(group), gid);
+#else
+            auto j = nlohmann::json::object();
+            j.emplace("group", group);
+            j.emplace("gid", gid);
+            result.push_back(j);
+#endif
+        }
+        else
+            throw UsageError("option '%s' has invalid value '%s'", name, item);
+    }
+    return result;
+}
+
+template<> void BaseSetting<SupplementaryGroups>::appendOrSet(SupplementaryGroups newValue, bool append)
+{
+    if (!append) {
+        value = std::move(newValue);
+    } else {
+        value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+#ifdef __linux__
+        for (auto it = value.rbegin(); it != value.rend(); ++it)
+            for (auto it2 = it + 1; it2 != value.rend();)
+                if (it->conflictsWith(*it2))
+                    it2 = std::reverse_iterator(value.erase(it2.base() - 1));
+                else
+                    ++it2;
+#endif
+    }
+}
+
+template<> std::string BaseSetting<SupplementaryGroups>::to_string() const
+{
+    return nlohmann::json(value).dump();
+}
+
+template class BaseSetting<SupplementaryGroups>;
+
 static void preloadNSS()
 {
     /* builtin:fetchurl can trigger a DNS lookup, which with glibc can trigger a dynamic library load of

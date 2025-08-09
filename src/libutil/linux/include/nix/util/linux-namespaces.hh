@@ -4,6 +4,8 @@
 #include <optional>
 
 #include "nix/util/types.hh"
+#include "nix/util/abstract-setting-to-json.hh"
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
