@@ -56,9 +56,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: true
         # The sandbox would otherwise be disabled by default on Darwin
-        extra_nix_config: |
-          sandbox = true
-          max-jobs = 1
+        extra_nix_config: "sandbox = true"
     - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
