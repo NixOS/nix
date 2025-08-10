@@ -259,13 +259,13 @@ void RemoteStore::queryPathInfoUncached(
     const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        std::shared_ptr<const ValidPathInfo> info;
-        {
+        auto info = ({
             auto conn(getConnection());
-            info = std::make_shared<ValidPathInfo>(
-                StorePath{path}, conn->queryPathInfo(*this, &conn.daemonException, path));
-        }
-        callback(std::move(info));
+            conn->queryPathInfo(*this, &conn.daemonException, path);
+        });
+        if (!info)
+            throw InvalidPath("path '%s' is not valid", printStorePath(path));
+        callback(std::make_shared<ValidPathInfo>(StorePath{path}, *info));
     } catch (...) {
         callback.rethrow();
     }
