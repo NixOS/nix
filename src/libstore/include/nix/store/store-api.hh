@@ -311,6 +311,8 @@ protected:
         LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
     };
 
+    void invalidatePathInfoCacheFor(const StorePath & path);
+
     SharedSync<State> state;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;

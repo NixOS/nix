@@ -457,7 +457,9 @@ StorePath RemoteStore::addToStoreFromDump(
     }
     if (fsm != dumpMethod)
         unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
-    return addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
+    auto storePath = addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
+    invalidatePathInfoCacheFor(storePath);
+    return storePath;
 }
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
