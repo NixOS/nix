@@ -264,8 +264,9 @@ void RemoteStore::queryPathInfoUncached(
             conn->queryPathInfo(*this, &conn.daemonException, path);
         });
         if (!info)
-            throw InvalidPath("path '%s' is not valid", printStorePath(path));
-        callback(std::make_shared<ValidPathInfo>(StorePath{path}, *info));
+            callback(nullptr);
+        else
+            callback(std::make_shared<ValidPathInfo>(StorePath{path}, *info));
     } catch (...) {
         callback.rethrow();
     }
