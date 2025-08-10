@@ -67,6 +67,7 @@ valid_ref 'foo./bar'
 valid_ref 'heads/foo@bar'
 valid_ref "$(printf 'heads/fu\303\237')"
 valid_ref 'foo-bar-baz'
+valid_ref 'branch#'
 valid_ref '$1'
 valid_ref 'foo.locke'
 
@@ -97,6 +98,7 @@ invalid_ref 'heads/v@{ation'
 invalid_ref 'heads/foo\.ar' # should fail due to \
 invalid_ref 'heads/foo\bar' # should fail due to \
 invalid_ref "$(printf 'heads/foo\t')" # should fail because it has a TAB
+invalid_ref "$(printf 'heads/foo\37')"
 invalid_ref "$(printf 'heads/foo\177')"
 invalid_ref '@'
 

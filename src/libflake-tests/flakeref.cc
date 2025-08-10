@@ -57,6 +57,25 @@ TEST(parseFlakeRef, path)
     }
 }
 
+TEST(parseFlakeRef, GitArchiveInput)
+{
+    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+
+    fetchers::Settings fetchSettings;
+
+    {
+        auto s = "github:foo/bar/branch%23"; // branch name with `#`
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
+    }
+
+    {
+        auto s = "github:foo/bar?ref=branch%23"; // branch name with `#`
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
+    }
+}
+
 TEST(to_string, doesntReencodeUrl)
 {
     fetchers::Settings fetchSettings;
