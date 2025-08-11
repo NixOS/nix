@@ -15,7 +15,7 @@ jobs:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
       with:
-        dogfood: true
+        dogfood: false
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -54,7 +54,7 @@ jobs:
     - uses: ./.github/actions/install-nix-action
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        dogfood: true
+        dogfood: false
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
     - uses: DeterminateSystems/magic-nix-cache-action@main
@@ -217,7 +217,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: true
+          dogfood: false
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -248,7 +248,7 @@ jobs:
           path: flake-regressions/tests
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: true
+          dogfood: false
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -269,7 +269,7 @@ jobs:
     - uses: ./.github/actions/install-nix-action
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        dogfood: true
+        dogfood: false
         extra_nix_config: |
           experimental-features = flakes nix-command ca-derivations impure-derivations
           max-jobs = 1
