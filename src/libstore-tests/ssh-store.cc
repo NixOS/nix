@@ -1,9 +1,8 @@
-// FIXME: Odd failures for templates that are causing the PR to break
-// for now with discussion with @Ericson2314 to comment out.
-#if 0
-#  include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
-#  include "nix/store/ssh-store.hh"
+#include "nix/store/ssh-store.hh"
+#include "nix/util/config-impl.hh"
+#include "nix/util/abstract-setting-to-json.hh"
 
 namespace nix {
 
@@ -51,5 +50,4 @@ TEST(MountedSSHStore, constructConfig)
         }));
 }
 
-}
-#endif
+} // namespace nix
