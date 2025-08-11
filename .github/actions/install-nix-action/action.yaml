@@ -9,7 +9,7 @@ inputs:
   install_url:
     description: "URL of the Nix installer"
     required: false
-    default: "https://releases.nixos.org/nix/nix-2.30.1/install"
+    default: "https://releases.nixos.org/nix/nix-2.30.2/install"
   github_token:
     description: "Github token"
     required: true
