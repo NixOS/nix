@@ -53,7 +53,7 @@ RemoteStore::RemoteStore(const Config & config)
 ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 {
     if (failed)
-        throw Error("opening a connection to remote store '%s' previously failed", getUri());
+        throw Error("opening a connection to remote store '%s' previously failed", config.getUri());
     try {
         return openConnection();
     } catch (...) {
@@ -95,7 +95,7 @@ void RemoteStore::initConnection(Connection & conn)
         if (ex)
             std::rethrow_exception(ex);
     } catch (Error & e) {
-        throw Error("cannot open connection to remote store '%s': %s", getUri(), e.what());
+        throw Error("cannot open connection to remote store '%s': %s", config.getUri(), e.what());
     }
 
     setOptions(conn);

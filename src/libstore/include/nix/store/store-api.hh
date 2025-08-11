@@ -197,6 +197,13 @@ struct StoreConfig : public StoreDirConfig
      * type.
      */
     virtual ref<Store> openStore() const = 0;
+
+    /**
+     * Render the config back to a "store URL". It should round-trip
+     * with `resolveStoreConfig` (for stores configs that are
+     * registered).
+     */
+    virtual std::string getUri() const;
 };
 
 /**
@@ -276,12 +283,6 @@ public:
     virtual void init() {};
 
     virtual ~Store() {}
-
-    /**
-     * @todo move to `StoreConfig` one we store enough information in
-     * those to recover the scheme and authority in all cases.
-     */
-    virtual std::string getUri() = 0;
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.
@@ -872,7 +873,7 @@ protected:
      */
     [[noreturn]] void unsupported(const std::string & op)
     {
-        throw Unsupported("operation '%s' is not supported by store '%s'", op, getUri());
+        throw Unsupported("operation '%s' is not supported by store '%s'", op, config.getUri());
     }
 };
 

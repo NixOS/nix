@@ -8,9 +8,7 @@ namespace nix {
 
 TEST(SSHStore, constructConfig)
 {
-    initLibStore(/*loadConfig=*/false);
-
-    auto config = make_ref<SSHStoreConfig>(
+    SSHStoreConfig config{
         "ssh-ng",
         "me@localhost:2222",
         StoreConfig::Params{
@@ -19,20 +17,19 @@ TEST(SSHStore, constructConfig)
                 // TODO #11106, no more split on space
                 "foo bar",
             },
-        });
+        },
+    };
 
     EXPECT_EQ(
-        config->remoteProgram.get(),
+        config.remoteProgram.get(),
         (Strings{
             "foo",
             "bar",
         }));
 
-    auto store = config->openStore();
-    EXPECT_EQ(store->getUri(), "ssh-ng://me@localhost:2222?remote-program=foo%20bar");
-    config->resetOverridden();
-    store = config->openStore();
-    EXPECT_EQ(store->getUri(), "ssh-ng://me@localhost:2222");
+    EXPECT_EQ(config.getUri(), "ssh-ng://me@localhost:2222?remote-program=foo%20bar");
+    config.resetOverridden();
+    EXPECT_EQ(config.getUri(), "ssh-ng://me@localhost:2222");
 }
 
 TEST(MountedSSHStore, constructConfig)

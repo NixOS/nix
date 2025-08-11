@@ -23,6 +23,11 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    std::string getUri() const override
+    {
+        return cacheUri;
+    }
 };
 
 } // namespace nix

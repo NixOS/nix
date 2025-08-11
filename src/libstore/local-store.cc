@@ -439,11 +439,11 @@ LocalStore::~LocalStore()
     }
 }
 
-std::string LocalStore::getUri()
+std::string LocalStoreConfig::getUri() const
 {
     std::ostringstream oss;
-    oss << *config->uriSchemes().begin();
-    auto queryParams = config->getQueryParams();
+    oss << *uriSchemes().begin();
+    auto queryParams = getQueryParams();
     if (!queryParams.empty())
         oss << "?";
     oss << encodeQuery(queryParams);

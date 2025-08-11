@@ -27,6 +27,6 @@ TEST(LegacySSHStore, constructConfig)
         }));
 
     auto store = config->openStore();
-    EXPECT_EQ(store->getUri(), "ssh://me@localhost:2222?remote-program=foo%20bar");
+    EXPECT_EQ(store->config.getUri(), "ssh://me@localhost:2222?remote-program=foo%20bar");
 }
 } // namespace nix

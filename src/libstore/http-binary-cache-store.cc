@@ -62,11 +62,6 @@ public:
         diskCache = getNarInfoDiskCache();
     }
 
-    std::string getUri() override
-    {
-        return config->cacheUri;
-    }
-
     void init() override
     {
         // FIXME: do this lazily?
@@ -90,7 +85,7 @@ protected:
         auto state(_state.lock());
         if (state->enabled && settings.tryFallback) {
             int t = 60;
-            printError("disabling binary cache '%s' for %s seconds", getUri(), t);
+            printError("disabling binary cache '%s' for %s seconds", config->getUri(), t);
             state->enabled = false;
             state->disabledUntil = std::chrono::steady_clock::now() + std::chrono::seconds(t);
         }
@@ -103,10 +98,10 @@ protected:
             return;
         if (std::chrono::steady_clock::now() > state->disabledUntil) {
             state->enabled = true;
-            debug("re-enabling binary cache '%s'", getUri());
+            debug("re-enabling binary cache '%s'", config->getUri());
             return;
         }
-        throw SubstituterDisabled("substituter '%s' is disabled", getUri());
+        throw SubstituterDisabled("substituter '%s' is disabled", config->getUri());
     }
 
     bool fileExists(const std::string & path) override
@@ -159,7 +154,7 @@ protected:
             getFileTransfer()->download(std::move(request), sink);
         } catch (FileTransferError & e) {
             if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
-                throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
+                throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, config->getUri());
             maybeDisable();
             throw;
         }

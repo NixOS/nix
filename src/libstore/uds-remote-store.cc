@@ -54,15 +54,14 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 {
 }
 
-std::string UDSRemoteStore::getUri()
+std::string UDSRemoteStoreConfig::getUri() const
 {
-    return config->path == settings.nixDaemonSocketFile
-               ? // FIXME: Not clear why we return daemon here and not default
-                 // to settings.nixDaemonSocketFile
-                 //
-                 // unix:// with no path also works. Change what we return?
+    return path == settings.nixDaemonSocketFile ? // FIXME: Not clear why we return daemon here and not default
+                                                  // to settings.nixDaemonSocketFile
+                                                  //
+                                                  // unix:// with no path also works. Change what we return?
                "daemon"
-               : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
+                                                : std::string(*uriSchemes().begin()) + "://" + path;
 }
 
 void UDSRemoteStore::Connection::closeWrite()

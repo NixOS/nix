@@ -57,11 +57,6 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
         return next->config->realStoreDir;
     }
 
-    std::string getUri() override
-    {
-        return next->getUri();
-    }
-
     StorePathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(

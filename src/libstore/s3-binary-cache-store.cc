@@ -254,6 +254,11 @@ std::string S3BinaryCacheStoreConfig::doc()
         ;
 }
 
+std::string S3BinaryCacheStoreConfig::getUri() const
+{
+    return "s3://" + bucketName;
+}
+
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 {
     Stats stats;
@@ -269,19 +274,14 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
         diskCache = getNarInfoDiskCache();
     }
 
-    std::string getUri() override
-    {
-        return "s3://" + config->bucketName;
-    }
-
     void init() override
     {
-        if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(config->getUri())) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
-            diskCache->createCache(getUri(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(config->getUri(), config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -519,7 +519,7 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
             sink(*res.data);
         } else
-            throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
+            throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, config->getUri());
     }
 
     StorePathSet queryAllValidPaths() override

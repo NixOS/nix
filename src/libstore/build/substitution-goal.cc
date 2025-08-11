@@ -101,7 +101,7 @@ Goal::Co PathSubstitutionGoal::init()
             } else {
                 printError(
                     "asked '%s' for '%s' but got '%s'",
-                    sub->getUri(),
+                    sub->config.getUri(),
                     worker.store.printStorePath(storePath),
                     sub->printStorePath(info->path));
                 continue;
@@ -127,7 +127,7 @@ Goal::Co PathSubstitutionGoal::init()
             warn(
                 "ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
                 worker.store.printStorePath(storePath),
-                sub->getUri());
+                sub->config.getUri());
             continue;
         }
 
@@ -217,7 +217,8 @@ Goal::Co PathSubstitutionGoal::tryToRun(
             /* Wake up the worker loop when we're done. */
             Finally updateStats([this]() { outPipe.writeSide.close(); });
 
-            Activity act(*logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->getUri()});
+            Activity act(
+                *logger, actSubstitute, Logger::Fields{worker.store.printStorePath(storePath), sub->config.getUri()});
             PushActivity pact(act.id);
 
             copyStorePath(*sub, worker.store, subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);

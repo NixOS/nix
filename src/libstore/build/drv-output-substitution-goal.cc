@@ -98,7 +98,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                         "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
                         "Local:  %s\n"
                         "Remote: %s",
-                        sub->getUri(),
+                        sub->config.getUri(),
                         depId.to_string(),
                         worker.store.printStorePath(localOutputInfo->outPath),
                         worker.store.printStorePath(depPath));

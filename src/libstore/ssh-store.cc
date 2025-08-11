@@ -25,6 +25,11 @@ std::string SSHStoreConfig::doc()
         ;
 }
 
+std::string SSHStoreConfig::getUri() const
+{
+    return ParsedURL{.scheme = *uriSchemes().begin(), .authority = authority, .query = getQueryParams()}.to_string();
+}
+
 struct SSHStore : virtual RemoteStore
 {
     using Config = SSHStoreConfig;
@@ -39,13 +44,6 @@ struct SSHStore : virtual RemoteStore
               // Use SSH master only if using more than 1 connection.
               connections->capacity() > 1))
     {
-    }
-
-    std::string getUri() override
-    {
-        return ParsedURL{
-            .scheme = *Config::uriSchemes().begin(), .authority = config->authority, .query = config->getQueryParams()}
-            .to_string();
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
