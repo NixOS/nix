@@ -73,7 +73,7 @@ public:
      * - res: map to store settings in
      * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
-    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) = 0;
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -160,7 +160,7 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
     void resetOverridden() override;
 

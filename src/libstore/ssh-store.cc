@@ -43,7 +43,9 @@ struct SSHStore : virtual RemoteStore
 
     std::string getUri() override
     {
-        return *Config::uriSchemes().begin() + "://" + host;
+        return ParsedURL{
+            .scheme = *Config::uriSchemes().begin(), .authority = config->authority, .query = config->getQueryParams()}
+            .to_string();
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
@@ -65,8 +67,6 @@ protected:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-
-    std::string host;
 
     std::vector<std::string> extraRemoteProgramArgs;
 

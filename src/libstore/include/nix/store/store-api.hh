@@ -127,6 +127,19 @@ struct StoreConfig : public StoreDirConfig
     }
 
     /**
+     * Get overridden store reference query parameters.
+     */
+    StringMap getQueryParams() const
+    {
+        auto queryParams = std::map<std::string, AbstractConfig::SettingInfo>{};
+        getSettings(queryParams, /*overriddenOnly=*/true);
+        StringMap res;
+        for (const auto & [name, info] : queryParams)
+            res.insert({name, info.value});
+        return res;
+    }
+
+    /**
      * An experimental feature this type store is gated, if it is to be
      * experimental.
      */

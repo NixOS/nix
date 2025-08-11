@@ -18,6 +18,11 @@ namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
 
+template<>
+SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<SandboxMode>::to_string() const;
+
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
     MaxBuildJobsSetting(

@@ -85,7 +85,7 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (const auto & opt : _settings)
         if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
