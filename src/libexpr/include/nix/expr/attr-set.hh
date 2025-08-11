@@ -22,7 +22,7 @@ struct Attr
        way we keep Attr size at two words with no wasted space. */
     Symbol name;
     PosIdx pos;
-    Value * value;
+    Value * value = nullptr;
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
         : name(name)
         , pos(pos)

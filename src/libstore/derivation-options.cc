@@ -144,7 +144,7 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                         if (auto maxClosureSize = get(output, "maxClosureSize"))
                             checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
-                        auto get_ = [&](const std::string & name) -> std::optional<StringSet> {
+                        auto get_ = [&output = output](const std::string & name) -> std::optional<StringSet> {
                             if (auto i = get(output, name)) {
                                 StringSet res;
                                 for (auto j = i->begin(); j != i->end(); ++j) {
