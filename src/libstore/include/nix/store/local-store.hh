@@ -111,6 +111,8 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    std::string getUri() const override;
 };
 
 class LocalStore : public virtual IndirectRootStore, public virtual GcStore
@@ -195,8 +197,6 @@ public:
     /**
      * Implementations of abstract store API methods.
      */
-
-    std::string getUri() override;
 
     bool isValidPathUncached(const StorePath & path) override;
 

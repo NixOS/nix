@@ -32,6 +32,11 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
     }
 
     ref<Store> openStore() const override;
+
+    std::string getUri() const override
+    {
+        return *uriSchemes().begin();
+    }
 };
 
 struct DummyStore : virtual Store
@@ -44,11 +49,6 @@ struct DummyStore : virtual Store
         : Store{*config}
         , config(config)
     {
-    }
-
-    std::string getUri() override
-    {
-        return *Config::uriSchemes().begin();
     }
 
     void queryPathInfoUncached(

@@ -88,6 +88,11 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     ref<Store> openStore() const override;
 
+    std::string getUri() const override
+    {
+        return "local-overlay://";
+    }
+
 protected:
     /**
      * @return The host OS path corresponding to the store path for the
@@ -115,11 +120,6 @@ struct LocalOverlayStore : virtual LocalStore
     ref<const Config> config;
 
     LocalOverlayStore(ref<const Config>);
-
-    std::string getUri() override
-    {
-        return "local-overlay://";
-    }
 
 private:
     /**

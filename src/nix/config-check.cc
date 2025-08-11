@@ -71,7 +71,7 @@ struct CmdConfigCheck : StoreCommand
 
     void run(ref<Store> store) override
     {
-        logger->log("Running checks against store uri: " + store->getUri());
+        logger->log("Running checks against store uri: " + store->config.getUri());
 
         if (store.dynamic_pointer_cast<LocalFSStore>()) {
             success &= checkNixInPath();
@@ -171,9 +171,9 @@ struct CmdConfigCheck : StoreCommand
     {
         if (auto trustedMay = store->isTrustedClient()) {
             std::string_view trusted = trustedMay.value() ? "trusted" : "not trusted";
-            checkInfo(fmt("You are %s by store uri: %s", trusted, store->getUri()));
+            checkInfo(fmt("You are %s by store uri: %s", trusted, store->config.getUri()));
         } else {
-            checkInfo(fmt("Store uri: %s doesn't have a notion of trusted user", store->getUri()));
+            checkInfo(fmt("Store uri: %s doesn't have a notion of trusted user", store->config.getUri()));
         }
     }
 };

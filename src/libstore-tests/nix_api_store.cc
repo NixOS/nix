@@ -104,7 +104,7 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     nix_libstore_init(ctx);
     Store * store = nix_store_open(ctx, "dummy://", nullptr);
     ASSERT_EQ(NIX_OK, ctx->last_err_code);
-    ASSERT_STREQ("dummy", store->ptr->getUri().c_str());
+    ASSERT_STREQ("dummy", store->ptr->config.getUri().c_str());
 
     std::string str;
     nix_store_get_version(ctx, store, OBSERVE_STRING(str));

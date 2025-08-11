@@ -23,6 +23,11 @@ std::string LocalBinaryCacheStoreConfig::doc()
         ;
 }
 
+std::string LocalBinaryCacheStoreConfig::getUri() const
+{
+    return "file://" + binaryCacheDir;
+}
+
 struct LocalBinaryCacheStore : virtual BinaryCacheStore
 {
     using Config = LocalBinaryCacheStoreConfig;
@@ -37,11 +42,6 @@ struct LocalBinaryCacheStore : virtual BinaryCacheStore
     }
 
     void init() override;
-
-    std::string getUri() override
-    {
-        return "file://" + config->binaryCacheDir;
-    }
 
 protected:
 

@@ -88,11 +88,9 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     return conn;
 };
 
-std::string LegacySSHStore::getUri()
+std::string LegacySSHStoreConfig::getUri() const
 {
-    return ParsedURL{
-        .scheme = *Config::uriSchemes().begin(), .authority = config->authority, .query = config->getQueryParams()}
-        .to_string();
+    return ParsedURL{.scheme = *uriSchemes().begin(), .authority = authority, .query = getQueryParams()}.to_string();
 }
 
 std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(const StorePathSet & paths)

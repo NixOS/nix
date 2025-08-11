@@ -48,7 +48,7 @@ struct CmdLog : InstallableCommand
         for (auto & sub : subs) {
             auto * logSubP = dynamic_cast<LogStore *>(&*sub);
             if (!logSubP) {
-                printInfo("Skipped '%s' which does not support retrieving build logs", sub->getUri());
+                printInfo("Skipped '%s' which does not support retrieving build logs", sub->config.getUri());
                 continue;
             }
             auto & logSub = *logSubP;
@@ -57,7 +57,7 @@ struct CmdLog : InstallableCommand
             if (!log)
                 continue;
             logger->stop();
-            printInfo("got build log for '%s' from '%s'", installable->what(), logSub.getUri());
+            printInfo("got build log for '%s' from '%s'", installable->what(), logSub.config.getUri());
             writeFull(getStandardOutput(), *log);
             return;
         }

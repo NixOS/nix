@@ -77,7 +77,7 @@ void execProgramInStore(
     auto store2 = store.dynamic_pointer_cast<LocalFSStore>();
 
     if (!store2)
-        throw Error("store '%s' is not a local store so it does not support command execution", store->getUri());
+        throw Error("store '%s' is not a local store so it does not support command execution", store->config.getUri());
 
     if (store->storeDir != store2->getRealStoreDir()) {
         Strings helperArgs = {

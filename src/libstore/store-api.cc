@@ -300,7 +300,7 @@ Store::Store(const Store::Config & config)
     assertLibStoreInitialized();
 }
 
-std::string Store::getUri()
+std::string StoreConfig::getUri() const
 {
     return "";
 }
@@ -395,11 +395,11 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
                         "replaced path '%s' with '%s' for substituter '%s'",
                         printStorePath(path.first),
                         sub->printStorePath(subPath),
-                        sub->getUri());
+                        sub->config.getUri());
             } else if (sub->storeDir != storeDir)
                 continue;
 
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
+            debug("checking substituter '%s' for path '%s'", sub->config.getUri(), sub->printStorePath(subPath));
             try {
                 auto info = sub->queryPathInfo(subPath);
 
@@ -439,7 +439,7 @@ bool Store::isValidPath(const StorePath & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), std::string(storePath.hashPart()));
+        auto res = diskCache->lookupNarInfo(config.getUri(), std::string(storePath.hashPart()));
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
@@ -455,7 +455,7 @@ bool Store::isValidPath(const StorePath & storePath)
 
     if (diskCache && !valid)
         // FIXME: handle valid = true case.
-        diskCache->upsertNarInfo(getUri(), std::string(storePath.hashPart()), 0);
+        diskCache->upsertNarInfo(config.getUri(), std::string(storePath.hashPart()), 0);
 
     return valid;
 }
@@ -509,7 +509,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+        auto res = diskCache->lookupNarInfo(config.getUri(), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             {
@@ -554,7 +554,7 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 auto info = fut.get();
 
                 if (diskCache)
-                    diskCache->upsertNarInfo(getUri(), hashPart, info);
+                    diskCache->upsertNarInfo(config.getUri(), hashPart, info);
 
                 {
                     auto state_(state.lock());
@@ -578,7 +578,7 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
     try {
         if (diskCache) {
-            auto [cacheOutcome, maybeCachedRealisation] = diskCache->lookupRealisation(getUri(), id);
+            auto [cacheOutcome, maybeCachedRealisation] = diskCache->lookupRealisation(config.getUri(), id);
             switch (cacheOutcome) {
             case NarInfoDiskCache::oValid:
                 debug("Returning a cached realisation for %s", id.to_string());
@@ -604,9 +604,9 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
                                      if (diskCache) {
                                          if (info)
-                                             diskCache->upsertRealisation(getUri(), *info);
+                                             diskCache->upsertRealisation(config.getUri(), *info);
                                          else
-                                             diskCache->upsertAbsentRealisation(getUri(), id);
+                                             diskCache->upsertAbsentRealisation(config.getUri(), id);
                                      }
 
                                      (*callbackPtr)(std::shared_ptr<const Realisation>(info));
@@ -801,8 +801,8 @@ void copyStorePath(
     if (!repair && dstStore.isValidPath(storePath))
         return;
 
-    auto srcUri = srcStore.getUri();
-    auto dstUri = dstStore.getUri();
+    auto srcUri = srcStore.config.getUri();
+    auto dstUri = dstStore.config.getUri();
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
         *logger, lvlInfo, actCopyPath, makeCopyPathMessage(srcUri, dstUri, storePathS), {storePathS, srcUri, dstUri});
@@ -839,7 +839,9 @@ void copyStorePath(
         },
         [&]() {
             throw EndOfFile(
-                "NAR for '%s' fetched from '%s' is incomplete", srcStore.printStorePath(storePath), srcStore.getUri());
+                "NAR for '%s' fetched from '%s' is incomplete",
+                srcStore.printStorePath(storePath),
+                srcStore.config.getUri());
         });
 
     dstStore.addToStore(*info, *source, repair, checkSigs);
@@ -937,7 +939,7 @@ std::map<StorePath, StorePath> copyPaths(
                     "replaced path '%s' to '%s' for substituter '%s'",
                     srcStore.printStorePath(storePathForSrc),
                     dstStore.printStorePath(storePathForDst),
-                    dstStore.getUri());
+                    dstStore.config.getUri());
         }
         return storePathForDst;
     };
@@ -955,8 +957,8 @@ std::map<StorePath, StorePath> copyPaths(
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
             uint64_t total = 0;
-            auto srcUri = srcStore.getUri();
-            auto dstUri = dstStore.getUri();
+            auto srcUri = srcStore.config.getUri();
+            auto dstUri = dstStore.config.getUri();
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,

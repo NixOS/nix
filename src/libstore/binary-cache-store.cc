@@ -58,7 +58,10 @@ void BinaryCacheStore::init()
             if (name == "StoreDir") {
                 if (value != storeDir)
                     throw Error(
-                        "binary cache '%s' is for Nix stores with prefix '%s', not '%s'", getUri(), value, storeDir);
+                        "binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                        config.getUri(),
+                        value,
+                        storeDir);
             } else if (name == "WantMassQuery") {
                 config.wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
@@ -129,7 +132,8 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
     }
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(
+            config.getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
@@ -427,7 +431,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 void BinaryCacheStore::queryPathInfoUncached(
     const StorePath & storePath, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
-    auto uri = getUri();
+    auto uri = config.getUri();
     auto storePathS = printStorePath(storePath);
     auto act = std::make_shared<Activity>(
         *logger,
@@ -527,7 +531,7 @@ void BinaryCacheStore::queryRealisationUncached(
 void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 {
     if (diskCache)
-        diskCache->upsertRealisation(getUri(), info);
+        diskCache->upsertRealisation(config.getUri(), info);
     auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
     upsertFile(filePath, info.toJSON().dump(), "application/json");
 }
@@ -555,7 +559,7 @@ std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & 
 {
     auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
-    debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
+    debug("fetching build log from binary cache '%s/%s'", config.getUri(), logPath);
 
     return getFile(logPath);
 }

@@ -44,6 +44,8 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
     }
 
     ref<Store> openStore() const override;
+
+    std::string getUri() const override;
 };
 
 struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
@@ -53,8 +55,6 @@ struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
     ref<const Config> config;
 
     UDSRemoteStore(ref<const Config>);
-
-    std::string getUri() override;
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     {
