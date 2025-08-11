@@ -228,10 +228,8 @@ struct GitInputScheme : InputScheme
 
         maybeGetBoolAttr(attrs, "verifyCommit");
 
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-        }
+        if (auto ref = maybeGetStrAttr(attrs, "ref"); ref && !isLegalRefName(*ref))
+            throw BadURL("invalid Git branch/tag name '%s'", *ref);
 
         Input input{settings};
         input.attrs = attrs;
