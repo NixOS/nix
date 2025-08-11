@@ -16,6 +16,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
+#include "nix/util/url.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
@@ -440,7 +441,13 @@ LocalStore::~LocalStore()
 
 std::string LocalStore::getUri()
 {
-    return "local";
+    std::ostringstream oss;
+    oss << *config->uriSchemes().begin();
+    auto queryParams = config->getQueryParams();
+    if (!queryParams.empty())
+        oss << "?";
+    oss << encodeQuery(queryParams);
+    return std::move(oss).str();
 }
 
 int LocalStore::getSchema()

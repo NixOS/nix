@@ -90,7 +90,9 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 
 std::string LegacySSHStore::getUri()
 {
-    return *Config::uriSchemes().begin() + "://" + config->authority.to_string();
+    return ParsedURL{
+        .scheme = *Config::uriSchemes().begin(), .authority = config->authority, .query = config->getQueryParams()}
+        .to_string();
 }
 
 std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(const StorePathSet & paths)
