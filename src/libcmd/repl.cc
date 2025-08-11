@@ -917,6 +917,7 @@ ReplExitStatus AbstractNixRepl::runSimple(
         return values;
     };
     LookupPath lookupPath = {};
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
     auto repl = std::make_unique<NixRepl>(
             lookupPath,
             openStore(),
