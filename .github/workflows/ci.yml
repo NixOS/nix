@@ -17,7 +17,7 @@ jobs:
   eval:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -55,7 +55,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -115,7 +115,7 @@ jobs:
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Download installer tarball
       uses: actions/download-artifact@v4
       with:
@@ -175,7 +175,7 @@ jobs:
         _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
       run: |
         echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - uses: cachix/install-nix-action@v31
@@ -221,7 +221,7 @@ jobs:
   vm_tests:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix-action
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -242,14 +242,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Checkout flake-regressions
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
@@ -270,7 +270,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref_name == 'master'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
