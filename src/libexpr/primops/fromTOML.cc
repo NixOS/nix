@@ -13,9 +13,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
 
     std::istringstream tomlStream(std::string{toml});
 
-    std::function<void(Value &, toml::value)> visit;
-
-    visit = [&](Value & v, toml::value t) {
+    auto visit = [&](auto & self, Value & v, toml::value t) -> void {
         switch (t.type()) {
         case toml::value_t::table: {
             auto table = toml::get<toml::table>(t);
@@ -30,7 +28,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
 
             for (auto & elem : table) {
                 forceNoNullByte(elem.first);
-                visit(attrs.alloc(elem.first), elem.second);
+                self(self, attrs.alloc(elem.first), elem.second);
             }
 
             v.mkAttrs(attrs);
@@ -40,7 +38,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
 
             auto list = state.buildList(array.size());
             for (const auto & [n, v] : enumerate(list))
-                visit(*(v = state.allocValue()), array[n]);
+                self(self, *(v = state.allocValue()), array[n]);
             v.mkList(list);
         } break;
         case toml::value_t::boolean:
@@ -81,7 +79,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
     };
 
     try {
-        visit(val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
+        visit(visit, val, toml::parse(tomlStream, "fromTOML" /* the "filename" */));
     } catch (std::exception & e) { // TODO: toml::syntax_error
         state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(pos).debugThrow();
     }
