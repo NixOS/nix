@@ -64,6 +64,16 @@ scope: {
         NIX_CFLAGS_COMPILE = "-DINITIAL_MARK_STACK_SIZE=1048576";
       });
 
+  toml11 = pkgs.toml11.overrideAttrs rec {
+    version = "4.4.0";
+    src = pkgs.fetchFromGitHub {
+      owner = "ToruNiina";
+      repo = "toml11";
+      tag = "v${version}";
+      hash = "sha256-sgWKYxNT22nw376ttGsTdg0AMzOwp8QH3E8mx0BZJTQ=";
+    };
+  };
+
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   boost =
     (pkgs.boost.override {
