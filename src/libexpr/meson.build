@@ -71,6 +71,12 @@ toml11 = dependency(
   method : 'cmake',
   include_type : 'system',
 )
+
+configdata_priv.set(
+  'HAVE_TOML11_4',
+  toml11.version().version_compare('>= 4.0.0').to_int(),
+)
+
 deps_other += toml11
 
 config_priv_h = configure_file(
