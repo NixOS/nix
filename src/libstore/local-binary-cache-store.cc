@@ -23,9 +23,15 @@ std::string LocalBinaryCacheStoreConfig::doc()
         ;
 }
 
-std::string LocalBinaryCacheStoreConfig::getUri() const
+StoreReference LocalBinaryCacheStoreConfig::getReference() const
 {
-    return "file://" + binaryCacheDir;
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = "file",
+                .authority = binaryCacheDir,
+            },
+    };
 }
 
 struct LocalBinaryCacheStore : virtual BinaryCacheStore

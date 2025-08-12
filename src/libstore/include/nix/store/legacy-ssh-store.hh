@@ -54,7 +54,7 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override;
+    StoreReference getReference() const override;
 };
 
 struct LegacySSHStore : public virtual Store

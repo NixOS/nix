@@ -1,3 +1,4 @@
+#include "nix/util/url.hh"
 #include "nix/store/binary-cache-store.hh"
 
 namespace nix {
@@ -11,7 +12,7 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
     HttpBinaryCacheStoreConfig(
         std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params);
 
-    Path cacheUri;
+    ParsedURL cacheUri;
 
     static const std::string name()
     {
@@ -24,10 +25,7 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override
-    {
-        return cacheUri;
-    }
+    StoreReference getReference() const override;
 };
 
 } // namespace nix

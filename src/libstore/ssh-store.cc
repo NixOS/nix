@@ -25,9 +25,16 @@ std::string SSHStoreConfig::doc()
         ;
 }
 
-std::string SSHStoreConfig::getUri() const
+StoreReference SSHStoreConfig::getReference() const
 {
-    return ParsedURL{.scheme = *uriSchemes().begin(), .authority = authority, .query = getQueryParams()}.to_string();
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = authority.to_string(),
+            },
+        .params = getQueryParams(),
+    };
 }
 
 struct SSHStore : virtual RemoteStore

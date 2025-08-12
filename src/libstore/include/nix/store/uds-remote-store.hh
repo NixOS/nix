@@ -45,7 +45,7 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override;
+    StoreReference getReference() const override;
 };
 
 struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore

@@ -254,9 +254,15 @@ std::string S3BinaryCacheStoreConfig::doc()
         ;
 }
 
-std::string S3BinaryCacheStoreConfig::getUri() const
+StoreReference S3BinaryCacheStoreConfig::getReference() const
 {
-    return "s3://" + bucketName;
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = bucketName,
+            },
+    };
 }
 
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore

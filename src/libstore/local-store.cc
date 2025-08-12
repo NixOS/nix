@@ -439,15 +439,15 @@ LocalStore::~LocalStore()
     }
 }
 
-std::string LocalStoreConfig::getUri() const
+StoreReference LocalStoreConfig::getReference() const
 {
-    std::ostringstream oss;
-    oss << *uriSchemes().begin();
-    auto queryParams = getQueryParams();
-    if (!queryParams.empty())
-        oss << "?";
-    oss << encodeQuery(queryParams);
-    return std::move(oss).str();
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+        .params = getQueryParams(),
+    };
 }
 
 int LocalStore::getSchema()
