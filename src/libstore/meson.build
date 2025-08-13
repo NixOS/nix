@@ -159,6 +159,23 @@ if aws_s3.found()
 endif
 deps_other += aws_s3
 
+# AWS CRT C++ for lightweight credential management
+# Similar to aws-cpp-sdk, but lighter weight dependency for credential resolution only
+aws_crt_cpp = dependency('aws-crt-cpp', required : false)
+if not aws_crt_cpp.found()
+  # Fallback: try pkg-config with different name
+  aws_crt_cpp = dependency('libaws-crt-cpp', required : false)
+endif
+if not aws_crt_cpp.found()
+  # Fallback: try to find library manually
+  aws_crt_cpp_lib = cxx.find_library('aws-crt-cpp', required : false)
+  if aws_crt_cpp_lib.found()
+    aws_crt_cpp = aws_crt_cpp_lib
+  endif
+endif
+configdata_pub.set('NIX_WITH_AWS_CRT_SUPPORT', aws_crt_cpp.found().to_int())
+deps_other += aws_crt_cpp
+
 subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
@@ -262,6 +279,7 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'aws-auth.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-building-goal.cc',
