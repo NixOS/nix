@@ -53,7 +53,7 @@ std::string SecretKey::signDetached(std::string_view data) const
     unsigned char sig[crypto_sign_BYTES];
     unsigned long long sigLen;
     crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
-    return name + ":" + base64::encode(std::as_bytes(std::span<const unsigned char>{sig, sigLen}));
+    return name + ":" + base64::encode(std::as_bytes(std::span<const unsigned char>(sig, sigLen)));
 }
 
 PublicKey SecretKey::toPublicKey() const
