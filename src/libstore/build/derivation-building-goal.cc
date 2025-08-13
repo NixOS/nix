@@ -151,6 +151,33 @@ std::string showKnownOutputs(Store & store, const Derivation & drv)
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
+    /* Recheck at goal start. In particular, whereas before we were
+       given this information by the downstream goal, that cannot happen
+       anymore if the downstream goal only cares about one output, but
+       we care about all outputs. */
+    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+    for (auto & [outputName, outputHash] : outputHashes) {
+        InitialOutput v{
+            .wanted = true, // Will be refined later
+            .outputHash = outputHash};
+
+        /* TODO we might want to also allow randomizing the paths
+           for regular CA derivations, e.g. for sake of checking
+           determinism. */
+        if (drv->type().isImpure()) {
+            v.known = InitialOutputStatus{
+                .path = StorePath::random(outputPathName(drv->name, outputName)),
+                .status = PathStatus::Absent,
+            };
+        }
+
+        initialOutputs.insert({
+            outputName,
+            std::move(v),
+        });
+    }
+    checkPathValidity();
+
     Goals waitees;
 
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;

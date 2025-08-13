@@ -82,9 +82,6 @@ Goal::Co DerivationGoal::haveDerivation()
         /* We will finish with it ourselves, as if we were the derivational goal. */
         g->preserveException = true;
 
-        // TODO move into constructor
-        g->initialOutputs = initialOutputs;
-
         {
             Goals waitees;
             waitees.insert(g);
