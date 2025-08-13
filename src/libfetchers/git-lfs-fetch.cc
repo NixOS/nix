@@ -5,6 +5,7 @@
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
 #include "nix/util/hash.hh"
+#include "nix/store/ssh.hh"
 
 #include <git2/attr.h>
 #include <git2/config.h>
@@ -15,10 +16,9 @@
 
 namespace nix::lfs {
 
-// if authHeader is "", downloadToSink assumes no auth is expected
 static void downloadToSink(
     const std::string & url,
-    const std::string & authHeader,
+    const std::optional<std::string> & authHeader,
     // FIXME: passing a StringSink is superfluous, we may as well
     // return a string. Or use an abstract Sink for streaming.
     StringSink & sink,
@@ -27,8 +27,8 @@ static void downloadToSink(
 {
     FileTransferRequest request(url);
     Headers headers;
-    if (!authHeader.empty())
-        headers.push_back({"Authorization", authHeader});
+    if (authHeader.has_value())
+        headers.push_back({"Authorization", *authHeader});
     request.headers = headers;
     getFileTransfer()->download(std::move(request), sink);
 
@@ -42,30 +42,53 @@ static void downloadToSink(
             "hash mismatch while fetching %s: expected sha256:%s but got sha256:%s", url, sha256Expected, sha256Actual);
 }
 
-static std::string getLfsApiToken(const ParsedURL & url)
+namespace {
+
+struct LfsApiInfo
+{
+    std::string endpoint;
+    std::optional<std::string> authHeader;
+};
+
+} // namespace
+
+static LfsApiInfo getLfsApi(const ParsedURL & url)
 {
     assert(url.authority.has_value());
+    if (url.scheme == "ssh") {
+        auto args = getNixSshOpts();
 
-    // FIXME: Not entirely correct.
-    auto [status, output] = runProgram(
-        RunOptions{
-            .program = "ssh",
-            .args = {url.authority->to_string(), "git-lfs-authenticate", url.path, "download"},
-        });
+        if (url.authority->port)
+            args.push_back(fmt("-p%d", *url.authority->port));
 
-    if (output.empty())
-        throw Error(
-            "git-lfs-authenticate: no output (cmd: ssh %s git-lfs-authenticate %s download)",
-            url.authority.value_or(ParsedURL::Authority{}).to_string(),
-            url.path);
+        std::ostringstream hostnameAndUser;
+        if (url.authority->user)
+            hostnameAndUser << *url.authority->user << "@";
+        hostnameAndUser << url.authority->host;
+        args.push_back(std::move(hostnameAndUser).str());
 
-    auto queryResp = nlohmann::json::parse(output);
-    if (!queryResp.contains("header"))
-        throw Error("no header in git-lfs-authenticate response");
-    if (!queryResp["header"].contains("Authorization"))
-        throw Error("no Authorization in git-lfs-authenticate response");
+        args.push_back("--");
+        args.push_back("git-lfs-authenticate");
+        args.push_back(url.path);
+        args.push_back("download");
 
-    return queryResp["header"]["Authorization"].get<std::string>();
+        auto [status, output] = runProgram({.program = "ssh", .args = args});
+
+        if (output.empty())
+            throw Error("git-lfs-authenticate: no output (cmd: 'ssh %s')", concatStringsSep(" ", args));
+
+        auto queryResp = nlohmann::json::parse(output);
+        auto headerIt = queryResp.find("header");
+        if (headerIt == queryResp.end())
+            throw Error("no header in git-lfs-authenticate response");
+        auto authIt = headerIt->find("Authorization");
+        if (authIt == headerIt->end())
+            throw Error("no Authorization in git-lfs-authenticate response");
+
+        return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
+    }
+
+    return {url.to_string() + "/info/lfs", std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
@@ -181,13 +204,14 @@ static nlohmann::json pointerToPayload(const std::vector<Pointer> & items)
 
 std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointers) const
 {
-    ParsedURL httpUrl(url);
-    httpUrl.scheme = url.scheme == "ssh" ? "https" : url.scheme;
-    FileTransferRequest request(httpUrl.to_string() + "/info/lfs/objects/batch");
+    auto api = lfs::getLfsApi(this->url);
+    auto url = api.endpoint + "/objects/batch";
+    const auto & authHeader = api.authHeader;
+    FileTransferRequest request(url);
     request.post = true;
     Headers headers;
-    if (this->url.scheme == "ssh")
-        headers.push_back({"Authorization", lfs::getLfsApiToken(this->url)});
+    if (authHeader.has_value())
+        headers.push_back({"Authorization", *authHeader});
     headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
     headers.push_back({"Accept", "application/vnd.git-lfs+json"});
     request.headers = headers;
@@ -260,11 +284,16 @@ void Fetch::fetch(
     try {
         std::string sha256 = obj.at("oid"); // oid is also the sha256
         std::string ourl = obj.at("actions").at("download").at("href");
-        std::string authHeader = "";
-        if (obj.at("actions").at("download").contains("header")
-            && obj.at("actions").at("download").at("header").contains("Authorization")) {
-            authHeader = obj["actions"]["download"]["header"]["Authorization"];
-        }
+        auto authHeader = [&]() -> std::optional<std::string> {
+            const auto & download = obj.at("actions").at("download");
+            auto headerIt = download.find("header");
+            if (headerIt == download.end())
+                return std::nullopt;
+            auto authIt = headerIt->find("Authorization");
+            if (authIt == headerIt->end())
+                return std::nullopt;
+            return *authIt;
+        }();
         const uint64_t size = obj.at("size");
         sizeCallback(size);
         downloadToSink(ourl, authHeader, sink, sha256, size);
