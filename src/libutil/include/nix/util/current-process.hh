@@ -12,6 +12,12 @@
 namespace nix {
 
 /**
+ * Get the current process's user time in seconds.
+ * If an error occurrs, the result will be `nan`
+ */
+float getCpuUserTime();
+
+/**
  * If cgroups are active, attempt to calculate the number of CPUs available.
  * If cgroups are unavailable or if cpu.max is set to "max", return 0.
  */

@@ -3,21 +3,23 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/expr/symbol-table.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/function-trace.hh"
+#include "nix/expr/print.hh"
+#include "nix/expr/gc-small-vector.hh"
+#include "nix/util/util.hh"
+#include "nix/util/current-process.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
-#include "nix/util/util.hh"
+#include "nix/util/url.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/strings-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
-#include "nix/expr/eval-inline.hh"
 #include "nix/store/filetransfer.hh"
-#include "nix/expr/function-trace.hh"
 #include "nix/store/profiles.hh"
-#include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
-#include "nix/util/memory-source-accessor.hh"
-#include "nix/expr/gc-small-vector.hh"
-#include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
@@ -36,12 +38,6 @@
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
-
-#ifndef _WIN32 // TODO use portable implementation
-#  include <sys/resource.h>
-#endif
-
-#include "nix/util/strings-inline.hh"
 
 using json = nlohmann::json;
 
@@ -2888,12 +2884,7 @@ void EvalState::maybePrintStats()
 
 void EvalState::printStatistics()
 {
-#ifndef _WIN32 // TODO use portable implementation
-    struct rusage buf;
-    getrusage(RUSAGE_SELF, &buf);
-    float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
-#endif
-
+    float cpuTime = getCpuUserTime();
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
     uint64_t bValues = nrValues * sizeof(Value);
@@ -2914,18 +2905,12 @@ void EvalState::printStatistics()
     if (outPath != "-")
         fs.open(outPath, std::fstream::out);
     json topObj = json::object();
-#ifndef _WIN32 // TODO implement
     topObj["cpuTime"] = cpuTime;
-#endif
     topObj["time"] = {
-#ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
-#endif
 #if NIX_USE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
-#  ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
-#  endif
 #endif
     };
     topObj["envs"] = {
