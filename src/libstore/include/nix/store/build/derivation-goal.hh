@@ -43,21 +43,6 @@ struct DerivationGoal : public Goal
      */
     OutputName wantedOutput;
 
-    /**
-     * The derivation stored at drvPath.
-     */
-    std::unique_ptr<Derivation> drv;
-
-    /**
-     * The remainder is state held during the build.
-     */
-
-    std::map<std::string, InitialOutput> initialOutputs;
-
-    BuildMode buildMode;
-
-    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
-
     DerivationGoal(
         const StorePath & drvPath,
         const Derivation & drv,
@@ -73,18 +58,32 @@ struct DerivationGoal : public Goal
 
     std::string key() override;
 
+    JobCategory jobCategory() const override
+    {
+        return JobCategory::Administration;
+    };
+
+private:
+
+    /**
+     * The derivation stored at drvPath.
+     */
+    std::unique_ptr<Derivation> drv;
+
+    /**
+     * The remainder is state held during the build.
+     */
+
+    std::map<std::string, InitialOutput> initialOutputs;
+
+    BuildMode buildMode;
+
+    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
+
     /**
      * The states.
      */
     Co haveDerivation();
-
-    /**
-     * Wrappers around the corresponding Store methods that first consult the
-     * derivation.  This is currently needed because when there is no drv file
-     * there also is no DB entry.
-     */
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
 
     /**
      * Update 'initialOutputs' to determine the current status of the
@@ -103,11 +102,6 @@ struct DerivationGoal : public Goal
     Co repairClosure();
 
     Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
-
-    JobCategory jobCategory() const override
-    {
-        return JobCategory::Administration;
-    };
 };
 
 } // namespace nix
