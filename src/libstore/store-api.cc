@@ -429,6 +429,11 @@ bool Store::PathInfoCacheValue::isKnownNow()
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
 
+void Store::invalidatePathInfoCacheFor(const StorePath & path)
+{
+    state.lock()->pathInfoCache.erase(path.to_string());
+}
+
 std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
 {
     std::map<std::string, std::optional<StorePath>> outputs;

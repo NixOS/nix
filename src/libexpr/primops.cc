@@ -1992,14 +1992,17 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Va
             .debugThrow();
     StorePathSet refs;
     if (state.store->isInStore(path.path.abs())) {
-        try {
-            refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
-        } catch (Error &) { // FIXME: should be InvalidPathError
+        auto storePath = state.store->toStorePath(path.path.abs()).first;
+        // Skip virtual paths since they don't have references and
+        // don't exist anyway.
+        if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath)))) {
+            if (auto info = state.store->maybeQueryPathInfo(state.store->toStorePath(path.path.abs()).first)) {
+                // Re-scan references to filter down to just the ones that actually occur in the file.
+                auto refsSink = PathRefScanSink::fromPaths(info->references);
+                refsSink << s;
+                refs = refsSink.getResultPaths();
+            }
         }
-        // Re-scan references to filter down to just the ones that actually occur in the file.
-        auto refsSink = PathRefScanSink::fromPaths(refs);
-        refsSink << s;
-        refs = refsSink.getResultPaths();
     }
     NixStringContext context;
     for (auto && p : std::move(refs)) {

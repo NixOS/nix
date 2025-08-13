@@ -86,7 +86,7 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v6.sqlite")
+    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v7.sqlite")
     {
         auto state(_state.lock());
 
