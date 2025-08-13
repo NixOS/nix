@@ -51,6 +51,18 @@ static void checkValidAuthority(const ParsedURL::Authority & authority)
     }
 }
 
+Strings getNixSshOpts()
+{
+    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
+
+    try {
+        return shellSplitString(sshOpts);
+    } catch (Error & e) {
+        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
+        throw;
+    }
+}
+
 SSHMaster::SSHMaster(
     const ParsedURL::Authority & authority,
     std::string_view keyFile,
@@ -82,16 +94,8 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 {
     auto state(state_.lock());
 
-    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
-
-    try {
-        std::list<std::string> opts = shellSplitString(sshOpts);
-        for (auto & i : opts)
-            args.push_back(i);
-    } catch (Error & e) {
-        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
-        throw;
-    }
+    auto sshArgs = getNixSshOpts();
+    args.insert(args.end(), sshArgs.begin(), sshArgs.end());
 
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});

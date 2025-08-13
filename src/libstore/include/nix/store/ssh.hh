@@ -8,6 +8,8 @@
 
 namespace nix {
 
+Strings getNixSshOpts();
+
 class SSHMaster
 {
 private:
