@@ -88,10 +88,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override
-    {
-        return "local-overlay://";
-    }
+    StoreReference getReference() const override;
 
 protected:
     /**

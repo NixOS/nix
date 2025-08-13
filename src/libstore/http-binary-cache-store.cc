@@ -22,13 +22,25 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme, std::string_view _cacheUri, const Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
-    , cacheUri(
+    , cacheUri(parseURL(
           std::string{scheme} + "://"
           + (!_cacheUri.empty() ? _cacheUri
-                                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme)))
+                                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme))))
 {
-    while (!cacheUri.empty() && cacheUri.back() == '/')
-        cacheUri.pop_back();
+    while (!cacheUri.path.empty() && cacheUri.path.back() == '/')
+        cacheUri.path.pop_back();
+}
+
+StoreReference HttpBinaryCacheStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = cacheUri.scheme,
+                .authority = (cacheUri.authority ? cacheUri.authority->to_string() : "") + cacheUri.path,
+            },
+        .params = cacheUri.query,
+    };
 }
 
 std::string HttpBinaryCacheStoreConfig::doc()
@@ -65,16 +77,17 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri)) {
+        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri.to_string())) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();
             } catch (UploadToHTTP &) {
-                throw Error("'%s' does not appear to be a binary cache", config->cacheUri);
+                throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
             }
-            diskCache->createCache(config->cacheUri, config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(
+                config->cacheUri.to_string(), config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -134,16 +147,29 @@ protected:
         try {
             getFileTransfer()->upload(req);
         } catch (FileTransferError & e) {
-            throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", config->cacheUri, e.msg());
+            throw UploadToHTTP(
+                "while uploading to HTTP binary cache at '%s': %s", config->cacheUri.to_string(), e.msg());
         }
     }
 
     FileTransferRequest makeRequest(const std::string & path)
     {
+        /* FIXME path is not a path, but a full relative or absolute
+           URL, e.g. we've seen in the wild NARINFO files have a URL
+           field which is
+           `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
+           (note the query param) and that gets passed here.
+
+           What should actually happen is that we have two parsed URLs
+           (if we support relative URLs), and then we combined them with
+           a URL `operator/` which would be like
+           `std::filesystem::path`'s equivalent operator, which properly
+           combines the the URLs, whether the right is relative or
+           absolute. */
         return FileTransferRequest(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
                 ? path
-                : config->cacheUri + "/" + path);
+                : config->cacheUri.to_string() + "/" + path);
     }
 
     void getFile(const std::string & path, Sink & sink) override

@@ -54,14 +54,19 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 {
 }
 
-std::string UDSRemoteStoreConfig::getUri() const
+StoreReference UDSRemoteStoreConfig::getReference() const
 {
-    return path == settings.nixDaemonSocketFile ? // FIXME: Not clear why we return daemon here and not default
-                                                  // to settings.nixDaemonSocketFile
-                                                  //
-                                                  // unix:// with no path also works. Change what we return?
-               "daemon"
-                                                : std::string(*uriSchemes().begin()) + "://" + path;
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                // We return the empty string when the path looks like the
+                // default path, but we could also just return the path
+                // verbatim always, to be robust to overall config changes
+                // at the cost of some verbosity.
+                .authority = path == settings.nixDaemonSocketFile ? "" : path,
+            },
+    };
 }
 
 void UDSRemoteStore::Connection::closeWrite()

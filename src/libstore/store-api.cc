@@ -300,9 +300,9 @@ Store::Store(const Store::Config & config)
     assertLibStoreInitialized();
 }
 
-std::string StoreConfig::getUri() const
+StoreReference StoreConfig::getReference() const
 {
-    return "";
+    return {.variant = StoreReference::Auto{}};
 }
 
 bool Store::PathInfoCacheValue::isKnownNow()

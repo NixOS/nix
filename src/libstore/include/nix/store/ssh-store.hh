@@ -34,7 +34,7 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override;
+    StoreReference getReference() const override;
 };
 
 struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig

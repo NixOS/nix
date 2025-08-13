@@ -33,9 +33,14 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override
+    StoreReference getReference() const override
     {
-        return *uriSchemes().begin();
+        return {
+            .variant =
+                StoreReference::Specified{
+                    .scheme = *uriSchemes().begin(),
+                },
+        };
     }
 };
 

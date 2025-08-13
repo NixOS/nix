@@ -112,7 +112,7 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override;
+    StoreReference getReference() const override;
 };
 
 class LocalStore : public virtual IndirectRootStore, public virtual GcStore

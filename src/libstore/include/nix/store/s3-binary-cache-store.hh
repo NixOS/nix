@@ -107,7 +107,7 @@ public:
 
     ref<Store> openStore() const override;
 
-    std::string getUri() const override;
+    StoreReference getReference() const override;
 };
 
 struct S3BinaryCacheStore : virtual BinaryCacheStore

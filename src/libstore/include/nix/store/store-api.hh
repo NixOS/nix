@@ -199,11 +199,16 @@ struct StoreConfig : public StoreDirConfig
     virtual ref<Store> openStore() const = 0;
 
     /**
-     * Render the config back to a "store URL". It should round-trip
+     * Render the config back to a `StoreReference`. It should round-trip
      * with `resolveStoreConfig` (for stores configs that are
      * registered).
      */
-    virtual std::string getUri() const;
+    virtual StoreReference getReference() const;
+
+    std::string getUri() const
+    {
+        return getReference().render();
+    }
 };
 
 /**
