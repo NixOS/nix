@@ -7,10 +7,14 @@
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/store-reference.hh"
 
 #include "store-config-private.hh"
 #if NIX_WITH_S3_SUPPORT
 #  include <aws/core/client/ClientConfiguration.h>
+#endif
+#if NIX_WITH_AWS_CRT_SUPPORT
+#  include "nix/store/aws-auth.hh"
 #endif
 
 #ifdef __linux__
@@ -77,6 +81,13 @@ struct curlFileTransfer : public FileTransfer
 
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 
+#if NIX_WITH_AWS_CRT_SUPPORT
+        // AWS SigV4 authentication data
+        bool isS3Request = false;
+        std::string awsCredentials;   // "access_key:secret_key" for CURLOPT_USERPWD
+        std::string awsSigV4Provider; // Provider string for CURLOPT_AWS_SIGV4
+#endif
+
         inline static const std::set<long> successfulStatuses{200, 201, 204, 206, 304, 0 /* other protocol */};
 
         /* Get the HTTP status code, or 0 for other protocols. */
@@ -131,6 +142,52 @@ struct curlFileTransfer : public FileTransfer
             for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
                 requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
             }
+
+#if NIX_WITH_AWS_CRT_SUPPORT && NIX_WITH_S3_SUPPORT
+            // Handle S3 URLs with curl-based AWS SigV4 authentication
+            if (hasPrefix(request.uri, "s3://")) {
+                try {
+                    auto [httpsUri, params] = fileTransfer.convertS3ToHttpsUri(request.uri);
+
+                    // Update the request URI to use HTTPS
+                    const_cast<FileTransferRequest &>(request).uri = httpsUri;
+                    result.urls.clear();
+                    result.urls.push_back(httpsUri);
+
+                    isS3Request = true;
+
+                    // Get credentials
+                    std::string profile = getOr(params, "profile", "");
+                    auto credProvider = profile.empty() ? AwsCredentialProvider::createDefault()
+                                                        : AwsCredentialProvider::createProfile(profile);
+
+                    if (credProvider) {
+                        auto creds = credProvider->getCredentials();
+                        if (creds) {
+                            awsCredentials = creds->accessKeyId + ":" + creds->secretAccessKey;
+
+                            std::string region = getOr(params, "region", "us-east-1");
+                            std::string service = "s3";
+                            awsSigV4Provider = "aws:amz:" + region + ":" + service;
+
+                            // Add session token header if present
+                            if (creds->sessionToken) {
+                                requestHeaders = curl_slist_append(
+                                    requestHeaders, ("x-amz-security-token: " + *creds->sessionToken).c_str());
+                            }
+
+                            debug("Using AWS SigV4 authentication for S3 request to %s", httpsUri);
+                        } else {
+                            warn("Failed to obtain AWS credentials for S3 request %s", request.uri);
+                        }
+                    } else {
+                        warn("Failed to create AWS credential provider for S3 request %s", request.uri);
+                    }
+                } catch (std::exception & e) {
+                    warn("Failed to set up AWS SigV4 authentication for S3 request %s: %s", request.uri, e.what());
+                }
+            }
+#endif
         }
 
         ~TransferItem()
@@ -425,6 +482,15 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
+
+#if NIX_WITH_AWS_CRT_SUPPORT && LIBCURL_VERSION_NUM >= 0x074b00 // curl 7.75.0
+            // Set up AWS SigV4 authentication if this is an S3 request
+            if (isS3Request && !awsCredentials.empty() && !awsSigV4Provider.empty()) {
+                curl_easy_setopt(req, CURLOPT_USERPWD, awsCredentials.c_str());
+                curl_easy_setopt(req, CURLOPT_AWS_SIGV4, awsSigV4Provider.c_str());
+                debug("Configured curl with AWS SigV4 authentication: provider=%s", awsSigV4Provider);
+            }
+#endif
 
             result.data.clear();
             result.bodySize = 0;
@@ -812,15 +878,42 @@ struct curlFileTransfer : public FileTransfer
 
         return {bucketName, key, params};
     }
+
+    /**
+     * Convert S3 URI to HTTPS URI for use with curl's AWS SigV4 authentication
+     */
+    std::pair<std::string, Store::Config::Params> convertS3ToHttpsUri(const std::string & s3Uri)
+    {
+        auto [bucketName, key, params] = parseS3Uri(s3Uri);
+
+        std::string region = getOr(params, "region", "us-east-1");
+        std::string endpoint = getOr(params, "endpoint", "");
+        std::string scheme = getOr(params, "scheme", "https");
+
+        std::string httpsUri;
+        if (!endpoint.empty()) {
+            // Custom endpoint (e.g., MinIO, custom S3-compatible service)
+            httpsUri = scheme + "://" + endpoint + "/" + bucketName + "/" + key;
+        } else {
+            // Standard AWS S3 endpoint
+            httpsUri = scheme + "://s3." + region + ".amazonaws.com/" + bucketName + "/" + key;
+        }
+
+        return {httpsUri, params};
+    }
 #endif
 
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Ugly hack to support s3:// URIs. */
+        /* Handle s3:// URIs with curl-based AWS SigV4 authentication or fall back to legacy S3Helper */
         if (hasPrefix(request.uri, "s3://")) {
+#if NIX_WITH_AWS_CRT_SUPPORT && LIBCURL_VERSION_NUM >= 0x074b00
+            // Use new curl-based approach with AWS SigV4 authentication
+            enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
+#elif NIX_WITH_S3_SUPPORT
+            // Fall back to legacy S3Helper approach
             // FIXME: do this on a worker thread
             try {
-#if NIX_WITH_S3_SUPPORT
                 auto [bucketName, key, params] = parseS3Uri(request.uri);
 
                 std::string profile = getOr(params, "profile", "");
@@ -838,12 +931,12 @@ struct curlFileTransfer : public FileTransfer
                 res.data = std::move(*s3Res.data);
                 res.urls.push_back(request.uri);
                 callback(std::move(res));
-#else
-                throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
-#endif
             } catch (...) {
                 callback.rethrow();
             }
+#else
+            throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
+#endif
             return;
         }
 
