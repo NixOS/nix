@@ -18,7 +18,7 @@ static bool isNonUriPath(const std::string & spec)
         && spec.find("/") != std::string::npos;
 }
 
-std::string StoreReference::render() const
+std::string StoreReference::render(bool withParams) const
 {
     std::string res;
 
@@ -33,7 +33,7 @@ std::string StoreReference::render() const
         },
         variant);
 
-    if (!params.empty()) {
+    if (withParams && !params.empty()) {
         res += "?";
         res += encodeQuery(params);
     }

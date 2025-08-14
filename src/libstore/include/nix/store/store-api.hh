@@ -205,9 +205,20 @@ struct StoreConfig : public StoreDirConfig
      */
     virtual StoreReference getReference() const;
 
-    std::string getUri() const
+    /**
+     * Get a textual representation of the store reference.
+     *
+     * @warning This is only suitable for logging or error messages.
+     * This will not roundtrip when parsed as a StoreReference.
+     * Must NOT be used as a cache key or otherwise be relied upon to
+     * be stable.
+     *
+     * Can be implemented by subclasses to make the URI more legible,
+     * e.g. when some query parameters are necessary to make sense of the URI.
+     */
+    virtual std::string getHumanReadableURI() const
     {
-        return getReference().render();
+        return getReference().render(/*withParams=*/false);
     }
 };
 
@@ -878,7 +889,7 @@ protected:
      */
     [[noreturn]] void unsupported(const std::string & op)
     {
-        throw Unsupported("operation '%s' is not supported by store '%s'", op, config.getUri());
+        throw Unsupported("operation '%s' is not supported by store '%s'", op, config.getHumanReadableURI());
     }
 };
 

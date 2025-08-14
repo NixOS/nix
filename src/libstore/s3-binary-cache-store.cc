@@ -282,12 +282,15 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->upToDateCacheExists(config->getUri())) {
+        /* FIXME: The URI (when used as a cache key) must have several parameters rendered (e.g. the endpoint).
+           This must be represented as a separate opaque string (probably a URI) that has the right query parameters. */
+        auto cacheUri = config->getReference().render(/*withParams=*/false);
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
-            diskCache->createCache(config->getUri(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(cacheUri, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -525,7 +528,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
             sink(*res.data);
         } else
-            throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, config->getUri());
+            throw NoSuchBinaryCacheFile(
+                "file '%s' does not exist in binary cache '%s'", path, config->getHumanReadableURI());
     }
 
     StorePathSet queryAllValidPaths() override
