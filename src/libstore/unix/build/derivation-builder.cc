@@ -1481,8 +1481,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto & initialInfo = *initialOutput;
 
         /* Don't register if already valid, and not checking */
-        initialInfo.wanted = buildMode == bmCheck || !(initialInfo.known && initialInfo.known->isValid());
-        if (!initialInfo.wanted) {
+        bool wanted = buildMode == bmCheck || !(initialInfo.known && initialInfo.known->isValid());
+        if (!wanted) {
             outputReferencesIfUnregistered.insert_or_assign(
                 outputName, AlreadyRegistered{.path = initialInfo.known->path});
             continue;
