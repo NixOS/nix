@@ -75,7 +75,6 @@ private:
      */
 
     Hash outputHash;
-    std::optional<InitialOutputStatus> outputKnown;
 
     BuildMode buildMode;
 
@@ -87,18 +86,19 @@ private:
     Co haveDerivation();
 
     /**
-     * Update 'initialOutput' to determine the current status of the
-     * outputs of the derivation. Also returns a Boolean denoting
-     * whether all outputs are valid and non-corrupt, and a
-     * 'SingleDrvOutputs' structure containing the valid outputs.
+     * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
+     * floating content-addressing derivation. Otherwise, returns a pair
+     * of a `Realisation`, containing among other things the store path
+     * of the wanted output, and a `PathStatus` with the
+     * current status of that output.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
+    std::optional<std::pair<Realisation, PathStatus>> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
+     * returns a 'Realisation' for the wanted output.
      */
-    SingleDrvOutputs assertPathValidity();
+    Realisation assertPathValidity();
 
     Co repairClosure();
 
