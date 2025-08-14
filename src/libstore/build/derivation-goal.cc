@@ -169,18 +169,21 @@ Goal::Co DerivationGoal::haveDerivation()
            So we want to make sure the ones that we wanted to check are
            properly there. */
         buildResult.builtOutputs = {{wantedOutput, assertPathValidity()}};
-    }
-
-    for (auto it = buildResult.builtOutputs.begin(); it != buildResult.builtOutputs.end();) {
-        if (it->first != wantedOutput) {
-            it = buildResult.builtOutputs.erase(it);
-        } else {
-            ++it;
+    } else {
+        /* Otherwise the builder will give us info for out output, but
+           also for other outputs. Filter down to just our output so as
+           not to leak info on unrelated things. */
+        for (auto it = buildResult.builtOutputs.begin(); it != buildResult.builtOutputs.end();) {
+            if (it->first != wantedOutput) {
+                it = buildResult.builtOutputs.erase(it);
+            } else {
+                ++it;
+            }
         }
-    }
 
-    if (buildResult.success())
-        assert(buildResult.builtOutputs.count(wantedOutput) > 0);
+        if (buildResult.success())
+            assert(buildResult.builtOutputs.count(wantedOutput) > 0);
+    }
 
     co_return amDone(g->exitCode, g->ex);
 }
