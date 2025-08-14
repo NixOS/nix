@@ -126,23 +126,18 @@ Goal::Co DerivationGoal::haveDerivation()
             experimentalFeatureSettings.require(Xp::ImpureDerivations);
 
         auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-        for (auto & [outputName, outputHash] : outputHashes) {
-            if (outputName != wantedOutput)
-                continue;
-
-            this->outputHash = outputHash;
+        if (auto * mOutputHash = get(outputHashes, wantedOutput)) {
+            outputHash = *mOutputHash;
 
             /* TODO we might want to also allow randomizing the paths
                for regular CA derivations, e.g. for sake of checking
                determinism. */
             if (impure) {
                 outputKnown = InitialOutputStatus{
-                    .path = StorePath::random(outputPathName(drv->name, outputName)),
+                    .path = StorePath::random(outputPathName(drv->name, wantedOutput)),
                     .status = PathStatus::Absent,
                 };
             }
-
-            break;
         }
 
         if (impure) {
@@ -247,7 +242,7 @@ Goal::Co DerivationGoal::repairClosure()
     }();
 
     StorePathSet outputClosure;
-    if (auto mPath = get(outputs, wantedOutput)) {
+    if (auto * mPath = get(outputs, wantedOutput)) {
         worker.store.computeFSClosure(*mPath, outputClosure);
     }
 
