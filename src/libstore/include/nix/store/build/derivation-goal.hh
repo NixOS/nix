@@ -102,7 +102,13 @@ private:
 
     Co repairClosure();
 
-    Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
+    /**
+     * @param builtOutput Must be set if `status` is successful.
+     */
+    Done done(
+        BuildResult::Status status,
+        std::optional<Realisation> builtOutput = std::nullopt,
+        std::optional<Error> ex = {});
 };
 
 } // namespace nix

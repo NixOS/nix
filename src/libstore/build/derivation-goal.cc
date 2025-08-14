@@ -93,7 +93,7 @@ Goal::Co DerivationGoal::haveDerivation()
 
         /* If they are all valid, then we're done. */
         if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
-            co_return done(BuildResult::AlreadyValid, {{wantedOutput, checkResult->first}});
+            co_return done(BuildResult::AlreadyValid, checkResult->first);
         }
 
         Goals waitees;
@@ -136,7 +136,7 @@ Goal::Co DerivationGoal::haveDerivation()
         bool allValid = checkResult && checkResult->second == PathStatus::Valid;
 
         if (buildMode == bmNormal && allValid) {
-            co_return done(BuildResult::Substituted, {{wantedOutput, checkResult->first}});
+            co_return done(BuildResult::Substituted, checkResult->first);
         }
         if (buildMode == bmRepair && allValid) {
             co_return repairClosure();
@@ -280,7 +280,7 @@ Goal::Co DerivationGoal::repairClosure()
                 "some paths in the output closure of derivation '%s' could not be repaired",
                 worker.store.printStorePath(drvPath));
     }
-    co_return done(BuildResult::AlreadyValid, {{wantedOutput, assertPathValidity()}});
+    co_return done(BuildResult::AlreadyValid, assertPathValidity());
 }
 
 std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValidity()
@@ -338,7 +338,8 @@ Realisation DerivationGoal::assertPathValidity()
     return checkResult->first;
 }
 
-Goal::Done DerivationGoal::done(BuildResult::Status status, SingleDrvOutputs builtOutputs, std::optional<Error> ex)
+Goal::Done
+DerivationGoal::done(BuildResult::Status status, std::optional<Realisation> builtOutput, std::optional<Error> ex)
 {
     buildResult.status = status;
     if (ex)
@@ -351,8 +352,8 @@ Goal::Done DerivationGoal::done(BuildResult::Status status, SingleDrvOutputs bui
     mcExpectedBuilds.reset();
 
     if (buildResult.success()) {
-        assert(!builtOutputs.empty());
-        buildResult.builtOutputs = std::move(builtOutputs);
+        assert(builtOutput);
+        buildResult.builtOutputs = {{wantedOutput, std::move(*builtOutput)}};
         if (status == BuildResult::Built)
             worker.doneBuilds++;
     } else {
