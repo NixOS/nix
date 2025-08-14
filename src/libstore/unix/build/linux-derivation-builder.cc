@@ -491,7 +491,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
            Marking chrootRootDir as MS_SHARED causes pivot_root()
            to fail with EINVAL. Don't know why. */
-        Path chrootStoreDir = chrootRootDir + store.storeDir;
+        Path chrootStoreDir = chrootRootDir + storeDirConfig.storeDir;
 
         if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
             throw SysError("unable to bind mount the Nix store", chrootStoreDir);
@@ -725,7 +725,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         int status = child.wait();
         if (status != 0)
-            throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
+            throw Error("could not add path '%s' to sandbox", storeDirConfig.printStorePath(path));
     }
 };
 

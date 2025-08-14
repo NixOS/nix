@@ -79,6 +79,8 @@ protected:
 
     LocalStore & store;
 
+    const StoreDirConfig & storeDirConfig;
+
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
 public:
@@ -87,6 +89,7 @@ public:
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
         , store{store}
+        , storeDirConfig{*store.config}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
@@ -233,7 +236,7 @@ protected:
      * Return the paths that should be made available in the sandbox.
      * This includes:
      *
-     * * The paths specified by the `sandbox-paths` setting, and their closure in the Nix store.
+     * * The paths specified by the `sandbox-paths` setting, and their closure in the Nix storeDirConfig.
      * * The contents of the `__impureHostDeps` derivation attribute, if the sandbox is in relaxed mode.
      * * The paths returned by the `pre-build-hook`.
      * * The paths in the input closure of the derivation.
@@ -271,7 +274,7 @@ protected:
 
     virtual Strings getPreBuildHookArgs()
     {
-        return Strings({store.printStorePath(drvPath)});
+        return Strings({storeDirConfig.printStorePath(drvPath)});
     }
 
     virtual Path realPathInSandbox(const Path & p)
@@ -467,7 +470,7 @@ std::pair<int, bool> DerivationBuilderImpl::unprepareBuild()
        kill it. */
     int status = pid.kill();
 
-    debug("builder process for '%s' finished", store.printStorePath(drvPath));
+    debug("builder process for '%s' finished", storeDirConfig.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(0);
@@ -494,7 +497,7 @@ std::pair<int, bool> DerivationBuilderImpl::unprepareBuild()
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug(
             "builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-            store.printStorePath(drvPath),
+            storeDirConfig.printStorePath(drvPath),
             status,
             ((double) buildResult.cpuUser->count()) / 1000000,
             ((double) buildResult.cpuSystem->count()) / 1000000);
@@ -707,7 +710,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
         /* Substitute output placeholders with the scratch output paths.
            We'll use during the build. */
-        inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
+        inputRewrites[hashPlaceholder(outputName)] = storeDirConfig.printStorePath(scratchPath);
 
         /* Additional tasks if we know the final path a priori. */
         if (!status.known)
@@ -720,7 +723,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
             continue;
 
         /* Ensure scratch path is ours to use. */
-        deletePath(store.printStorePath(scratchPath));
+        deletePath(storeDirConfig.printStorePath(scratchPath));
 
         /* Rewrite and unrewrite paths */
         {
@@ -797,7 +800,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
        host file system. */
     PathsInChroot pathsInChroot = defaultPathsInChroot;
 
-    if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
+    if (hasPrefix(storeDirConfig.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
@@ -824,7 +827,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         if (!found)
             throw Error(
                 "derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 i);
 
         /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
@@ -914,7 +917,7 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 e.addTrace(
                     {},
                     "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
-                    store.printStorePath(drvPath),
+                    storeDirConfig.printStorePath(drvPath),
                     statusToString(status),
                     concatStringsSep("|", msgs));
                 throw;
@@ -954,7 +957,7 @@ void DerivationBuilderImpl::initEnv()
        shouldn't care, but this is useful for purity checking (e.g.,
        the compiler or linker might only want to accept paths to files
        in the store or in the build directory). */
-    env["NIX_STORE"] = store.storeDir;
+    env["NIX_STORE"] = storeDirConfig.storeDir;
 
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
@@ -1213,7 +1216,7 @@ void DerivationBuilderImpl::runChild()
                 logger = makeJSONLogger(getStandardError());
 
                 for (auto & e : drv.outputs)
-                    ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));
+                    ctx.outputs.insert_or_assign(e.first, storeDirConfig.printStorePath(scratchOutputs.at(e.first)));
 
                 std::string builtinName = drv.builder.substr(8);
                 assert(RegisterBuiltinBuilder::builtinBuilders);
@@ -1320,7 +1323,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         assert(scratchOutput);
-        auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInSandbox(storeDirConfig.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
@@ -1342,7 +1345,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at '%s'",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 outputName,
                 actualPath);
         struct stat & st = *optSt;
@@ -1396,7 +1399,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     BuildResult::Failure::OutputRejected,
                     "no output reference for '%s' in build of '%s'",
                     name,
-                    store.printStorePath(drvPath));
+                    storeDirConfig.printStorePath(drvPath));
             return std::visit(
                 overloaded{
                     /* Since we'll use the already installed versions of these, we
@@ -1420,7 +1423,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             return BuildError(
                 BuildResult::Failure::OutputRejected,
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 path,
                 parent);
         }});
@@ -1433,7 +1436,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = realPathInSandbox(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInSandbox(storeDirConfig.printStorePath(*scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
@@ -1638,7 +1641,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
            their usual "final destination" */
-        auto finalDestPath = store.printStorePath(newInfo.path);
+        auto finalDestPath = storeDirConfig.printStorePath(newInfo.path);
 
         /* Lock final output path, if not already locked. This happens with
            floating CA derivations and hash-mismatching fixed-output
@@ -1646,7 +1649,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
         auto optFixedPath = output->path(store, drv.name, outputName);
-        if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
+        if (!optFixedPath || storeDirConfig.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
             dynamicOutputLock.lockPaths({store.toRealPath(finalDestPath)});
         }
@@ -1690,18 +1693,18 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                             buildUser ? buildUser->getGID() : getgid(),
                             finalDestPath,
                             dst,
-                            store.printStorePath(drvPath),
+                            storeDirConfig.printStorePath(drvPath),
                             tmpDir);
 
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                            store.printStorePath(drvPath),
+                            storeDirConfig.printStorePath(drvPath),
                             store.toRealPath(finalDestPath),
                             dst);
                     } else
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs",
-                            store.printStorePath(drvPath),
+                            storeDirConfig.printStorePath(drvPath),
                             store.toRealPath(finalDestPath));
                 }
 
@@ -1718,9 +1721,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* For debugging, print out the referenced and unreferenced paths. */
             for (auto & i : inputPaths) {
                 if (references.count(i))
-                    debug("referenced input: '%1%'", store.printStorePath(i));
+                    debug("referenced input: '%1%'", storeDirConfig.printStorePath(i));
                 else
-                    debug("unreferenced input: '%1%'", store.printStorePath(i));
+                    debug("unreferenced input: '%1%'", storeDirConfig.printStorePath(i));
             }
 
             store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
@@ -1802,7 +1805,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to
          * clean up, the `tmpDir` will be chowned as if we were to move
-         * it inside the Nix store.
+         * it inside the Nix storeDirConfig.
          *
          * This hardens against an attack which smuggles a file descriptor
          * to make use of the temporary directory.
@@ -1829,7 +1832,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
     // TODO: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the
     // hashing
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
-    return store.makeStorePath(
+    return storeDirConfig.makeStorePath(
         pathType,
         // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256),
@@ -1841,7 +1844,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
     // See doc/manual/source/protocols/store-path.md for details
     auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
-    return store.makeStorePath(
+    return storeDirConfig.makeStorePath(
         pathType,
         // pass an all-zeroes hash
         Hash(HashAlgorithm::SHA256),
@@ -1863,6 +1866,8 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 {
     bool useSandbox = false;
 
+    const StoreDirConfig & storeDirConfig = *store.config;
+
     /* Are we doing a sandboxed build? */
     {
         if (settings.sandboxMode == smEnabled) {
@@ -1870,13 +1875,13 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'",
-                    store.printStorePath(params.drvPath));
+                    storeDirConfig.printStorePath(params.drvPath));
 #ifdef __APPLE__
             if (params.drvOptions.additionalSandboxProfile != "")
                 throw Error(
                     "derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'",
-                    store.printStorePath(params.drvPath));
+                    storeDirConfig.printStorePath(params.drvPath));
 #endif
             useSandbox = true;
         } else if (settings.sandboxMode == smDisabled)
@@ -1886,7 +1891,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    if (store.storeDir != store.config->realStoreDir.get()) {
+    if (storeDirConfig.storeDir != store.config->realStoreDir.get()) {
 #ifdef __linux__
         useSandbox = true;
 #else
