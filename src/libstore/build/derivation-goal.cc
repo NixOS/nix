@@ -62,15 +62,6 @@ Goal::Co DerivationGoal::haveDerivation()
 {
     trace("have derivation");
 
-    auto drvOptions = [&]() -> DerivationOptions {
-        try {
-            return DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs);
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
-
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
@@ -170,7 +161,7 @@ Goal::Co DerivationGoal::haveDerivation()
     /* We are first going to try to create the invalid output paths
        through substitutes.  If that doesn't work, we'll build
        them. */
-    if (settings.useSubstitutes && drvOptions.substitutesAllowed())
+    if (settings.useSubstitutes && drv->options.substitutesAllowed())
         for (auto & [outputName, status] : initialOutputs) {
             if (!status.wanted)
                 continue;
