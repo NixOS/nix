@@ -363,14 +363,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
             "derivation '%s' does not have wanted outputs '%s'", worker.store.printStorePath(drvPath), wantedOutput);
     }
 
-    bool allValid = true;
-    {
-        if (!outputKnown || !outputKnown->isValid()) {
-            allValid = false;
-        }
-    }
-
-    return {allValid, validOutputs};
+    return {outputKnown && outputKnown->isValid(), validOutputs};
 }
 
 SingleDrvOutputs DerivationGoal::assertPathValidity()
