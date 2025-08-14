@@ -54,12 +54,14 @@ deps_private += gtest
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'aws-auth.cc',
   'common-protocol.cc',
   'content-address.cc',
   'derivation-advanced-attrs.cc',
   'derivation.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
+  'filetransfer-s3.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
   'local-binary-cache-store.cc',
@@ -74,6 +76,8 @@ sources = files(
   'path.cc',
   'references.cc',
   's3-binary-cache-store.cc',
+  's3-edge-cases.cc',
+  's3-http-integration.cc',
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
