@@ -1,7 +1,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/config.hh"
 
-#if NIX_WITH_AWS_CRT_SUPPORT && NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_CRT_SUPPORT
 
 #  include <gtest/gtest.h>
 #  include <gmock/gmock.h>
@@ -159,4 +159,4 @@ TEST_F(S3FileTransferTest, regionExtraction)
 
 } // namespace nix
 
-#endif // NIX_WITH_AWS_CRT_SUPPORT && NIX_WITH_S3_SUPPORT
+#endif // NIX_WITH_AWS_CRT_SUPPORT

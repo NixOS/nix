@@ -2,7 +2,6 @@
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/s3.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
@@ -11,9 +10,6 @@
 #include "nix/util/url.hh"
 
 #include "store-config-private.hh"
-#if NIX_WITH_S3_SUPPORT
-#  include <aws/core/client/ClientConfiguration.h>
-#endif
 #if NIX_WITH_AWS_CRT_SUPPORT
 #  include "nix/store/aws-auth.hh"
 #endif
@@ -144,7 +140,7 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
             }
 
-#if NIX_WITH_AWS_CRT_SUPPORT && NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_CRT_SUPPORT
             // Handle S3 URLs with curl-based AWS SigV4 authentication
             if (hasPrefix(request.uri, "s3://")) {
                 try {
@@ -485,8 +481,9 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 
-#if NIX_WITH_AWS_CRT_SUPPORT && LIBCURL_VERSION_NUM >= 0x074b00 // curl 7.75.0
+#if NIX_WITH_AWS_CRT_SUPPORT
             // Set up AWS SigV4 authentication if this is an S3 request
+            // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
             if (isS3Request && !awsCredentials.empty() && !awsSigV4Provider.empty()) {
                 curl_easy_setopt(req, CURLOPT_USERPWD, awsCredentials.c_str());
                 curl_easy_setopt(req, CURLOPT_AWS_SIGV4, awsSigV4Provider.c_str());
@@ -866,7 +863,7 @@ struct curlFileTransfer : public FileTransfer
 #endif
     }
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_CRT_SUPPORT
     /**
      * Parsed S3 URL with convenience methods for parameter access and HTTPS conversion
      */
@@ -956,37 +953,15 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Handle s3:// URIs with curl-based AWS SigV4 authentication or fall back to legacy S3Helper */
+        /* Handle s3:// URIs with curl-based AWS SigV4 authentication */
         if (hasPrefix(request.uri, "s3://")) {
-#if NIX_WITH_AWS_CRT_SUPPORT && LIBCURL_VERSION_NUM >= 0x074b00
-            // Use new curl-based approach with AWS SigV4 authentication
+#if NIX_WITH_AWS_CRT_SUPPORT
+            // Use curl-based approach with AWS SigV4 authentication
             enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
-#elif NIX_WITH_S3_SUPPORT
-            // Fall back to legacy S3Helper approach
-            // FIXME: do this on a worker thread
-            try {
-                auto s3Parsed = this->parseS3Url(request.uri);
-
-                std::string profile = getOr(s3Parsed.params, "profile", "");
-                std::string region = getOr(s3Parsed.params, "region", Aws::Region::US_EAST_1);
-                std::string scheme = getOr(s3Parsed.params, "scheme", "");
-                std::string endpoint = getOr(s3Parsed.params, "endpoint", "");
-
-                S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(s3Parsed.bucket, s3Parsed.key);
-                FileTransferResult res;
-                if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
-                res.data = std::move(*s3Res.data);
-                res.urls.push_back(request.uri);
-                callback(std::move(res));
-            } catch (...) {
-                callback.rethrow();
-            }
 #else
-            throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
+            throw nix::Error(
+                "cannot download '%s' because Nix is not built with AWS CRT support (requires aws-crt-cpp and curl >= 7.75.0)",
+                request.uri);
 #endif
             return;
         }

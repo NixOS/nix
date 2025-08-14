@@ -440,7 +440,7 @@ in
 
       Example:
       ```
-      overrideScope (finalScope: prevScope: { aws-sdk-cpp = null; })
+      overrideScope (finalScope: prevScope: { aws-crt-cpp = null; })
       ```
     */
     overrideScope = f: (scope.overrideScope f).nix-everything;
