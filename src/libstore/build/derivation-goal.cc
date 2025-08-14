@@ -24,16 +24,17 @@
 
 namespace nix {
 
-DerivationGoal::DerivationGoal(const StorePath & drvPath, const Derivation & drv,
-    const OutputName & wantedOutput, Worker & worker, BuildMode buildMode)
+DerivationGoal::DerivationGoal(
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    Worker & worker,
+    BuildMode buildMode)
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
-    , initialOutput{
-        .wanted = true,
-        .outputHash = Hash::dummy, // will be updated
-        .known = {},
-    }
+    , outputHash{Hash::dummy} // will be updated
+    , outputKnown{}
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<Derivation>(drv);
@@ -129,19 +130,18 @@ Goal::Co DerivationGoal::haveDerivation()
             if (outputName != wantedOutput)
                 continue;
 
-            InitialOutput v{.wanted = true, .outputHash = outputHash};
+            this->outputHash = outputHash;
 
             /* TODO we might want to also allow randomizing the paths
                for regular CA derivations, e.g. for sake of checking
                determinism. */
             if (impure) {
-                v.known = InitialOutputStatus{
+                outputKnown = InitialOutputStatus{
                     .path = StorePath::random(outputPathName(drv->name, outputName)),
                     .status = PathStatus::Absent,
                 };
             }
 
-            initialOutput = std::move(v);
             break;
         }
 
@@ -168,13 +168,13 @@ Goal::Co DerivationGoal::haveDerivation()
        through substitutes.  If that doesn't work, we'll build
        them. */
     if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
-        if (!initialOutput.known)
+        if (!outputKnown)
             waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                DrvOutput{initialOutput.outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+                DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
         else {
             auto * cap = getDerivationCA(*drv);
             waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
-                initialOutput.known->path,
+                outputKnown->path,
                 buildMode == bmRepair ? Repair : NoRepair,
                 cap ? std::optional{*cap} : std::nullopt)));
         }
@@ -330,24 +330,23 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
     }();
 
     if (auto * mpath = get(partialDerivationOutputMap, wantedOutput)) {
-        auto & info = initialOutput;
         if (*mpath) {
             auto & outputPath = **mpath;
-            info.known = {
+            outputKnown = {
                 .path = outputPath,
                 .status = !worker.store.isValidPath(outputPath)               ? PathStatus::Absent
                           : !checkHash || worker.pathContentsGood(outputPath) ? PathStatus::Valid
                                                                               : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{info.outputHash, wantedOutput};
+        auto drvOutput = DrvOutput{outputHash, wantedOutput};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
-                info.known = {
+                outputKnown = {
                     .path = real->outPath,
                     .status = PathStatus::Valid,
                 };
-            } else if (info.known && info.known->isValid()) {
+            } else if (outputKnown && outputKnown->isValid()) {
                 // We know the output because it's a static output of the
                 // derivation, and the output path is valid, but we don't have
                 // its realisation stored (probably because it has been built
@@ -355,12 +354,12 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
                 worker.store.registerDrvOutput(
                     Realisation{
                         drvOutput,
-                        info.known->path,
+                        outputKnown->path,
                     });
             }
         }
-        if (info.known && info.known->isValid())
-            validOutputs.emplace(wantedOutput, Realisation{drvOutput, info.known->path});
+        if (outputKnown && outputKnown->isValid())
+            validOutputs.emplace(wantedOutput, Realisation{drvOutput, outputKnown->path});
     } else {
         // If we requested all the outputs, we are always fine.
         // If we requested specific elements, the loop above removes all the valid
@@ -371,7 +370,7 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
 
     bool allValid = true;
     {
-        if (!initialOutput.known || !initialOutput.known->isValid()) {
+        if (!outputKnown || !outputKnown->isValid()) {
             allValid = false;
         }
     }

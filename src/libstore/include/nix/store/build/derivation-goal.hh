@@ -74,7 +74,8 @@ private:
      * The remainder is state held during the build.
      */
 
-    InitialOutput initialOutput;
+    Hash outputHash;
+    std::optional<InitialOutputStatus> outputKnown;
 
     BuildMode buildMode;
 
