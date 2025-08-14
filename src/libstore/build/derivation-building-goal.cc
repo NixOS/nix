@@ -707,7 +707,8 @@ tryToBuild:
 
     co_await yield();
 
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+    auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+    if (!localStoreP) {
         throw Error(
             R"(
             Unable to build with a primary store that isn't a local store;
@@ -767,9 +768,6 @@ tryToBuild:
                 }
             };
 
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
-
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
@@ -800,7 +798,7 @@ tryToBuild:
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
-                *localStoreP,
+                makeBuildingStoreFromLocalStore(*localStoreP),
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
                     .drvPath = drvPath,
@@ -860,7 +858,7 @@ tryToBuild:
     try {
         /* Compute the FS closure of the outputs and register them as
            being valid. */
-        builtOutputs = builder->registerOutputs();
+        builtOutputs = builder->registerOutputs(*localStoreP);
         builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();
