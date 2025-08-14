@@ -21,7 +21,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
     bool useSandbox;
 
     DarwinDerivationBuilder(
-        Store & store,
+        LocalStore & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)

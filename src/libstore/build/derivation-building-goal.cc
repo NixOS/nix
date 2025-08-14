@@ -673,10 +673,13 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 }
             };
 
+            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+            assert(localStoreP);
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
-                worker.store,
+                *localStoreP,
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
                     drvPath,

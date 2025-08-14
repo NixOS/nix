@@ -191,7 +191,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     std::optional<Path> cgroup;
 
     ChrootLinuxDerivationBuilder(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
         , ChrootDerivationBuilder{store, std::move(miscMethods), std::move(params)}
         , LinuxDerivationBuilder{store, std::move(miscMethods), std::move(params)}
@@ -492,7 +492,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             createDirs(chrootRootDir + "/dev/shm");
             createDirs(chrootRootDir + "/dev/pts");
             ss.push_back("/dev/full");
-            if (store.config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+            if (store.Store::config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
                 ss.push_back("/dev/kvm");
             ss.push_back("/dev/null");
             ss.push_back("/dev/random");
