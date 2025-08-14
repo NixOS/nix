@@ -75,121 +75,114 @@ Goal::Co DerivationGoal::haveDerivation()
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    /* At least one of the output paths could not be
-       produced using a substitute.  So we have to build instead. */
-    auto gaveUpOnSubstitution = [&]() -> Goal::Co {
-        auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode);
-
-        /* We will finish with it ourselves, as if we were the derivational goal. */
-        g->preserveException = true;
-
-        {
-            Goals waitees;
-            waitees.insert(g);
-            co_await await(std::move(waitees));
-        }
-
-        trace("outer build done");
-
-        buildResult = g->buildResult;
-
-        if (buildMode == bmCheck) {
-            /* In checking mode, the builder will not register any outputs.
-               So we want to make sure the ones that we wanted to check are
-               properly there. */
-            buildResult.builtOutputs = {{wantedOutput, assertPathValidity()}};
-        }
-
-        for (auto it = buildResult.builtOutputs.begin(); it != buildResult.builtOutputs.end();) {
-            if (it->first != wantedOutput) {
-                it = buildResult.builtOutputs.erase(it);
-            } else {
-                ++it;
-            }
-        }
-
-        if (buildResult.success())
-            assert(buildResult.builtOutputs.count(wantedOutput) > 0);
-
-        co_return amDone(g->exitCode, g->ex);
-    };
-
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
 
+    if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, *drv), wantedOutput)) {
+        outputHash = *mOutputHash;
+    }
+
+    /* We don't yet have any safe way to cache an impure derivation at
+       this step. */
+    if (drv->type().isImpure()) {
+        experimentalFeatureSettings.require(Xp::ImpureDerivations);
+    } else {
+        /* Check what outputs paths are not already valid. */
+        auto checkResult = checkPathValidity();
+
+        /* If they are all valid, then we're done. */
+        if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
+            co_return done(BuildResult::AlreadyValid, {{wantedOutput, checkResult->first}});
+        }
+
+        Goals waitees;
+
+        /* We are first going to try to create the invalid output paths
+           through substitutes.  If that doesn't work, we'll build
+           them. */
+        if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+            if (!checkResult)
+                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
+                    DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+            else {
+                auto * cap = getDerivationCA(*drv);
+                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
+                    checkResult->first.outPath,
+                    buildMode == bmRepair ? Repair : NoRepair,
+                    cap ? std::optional{*cap} : std::nullopt)));
+            }
+        }
+
+        co_await await(std::move(waitees));
+
+        trace("all outputs substituted (maybe)");
+
+        assert(!drv->type().isImpure());
+
+        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
+            co_return done(
+                BuildResult::TransientFailure,
+                {},
+                Error(
+                    "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
+                    worker.store.printStorePath(drvPath)));
+        }
+
+        nrFailed = nrNoSubstituters = 0;
+
+        checkResult = checkPathValidity();
+
+        bool allValid = checkResult && checkResult->second == PathStatus::Valid;
+
+        if (buildMode == bmNormal && allValid) {
+            co_return done(BuildResult::Substituted, {{wantedOutput, checkResult->first}});
+        }
+        if (buildMode == bmRepair && allValid) {
+            co_return repairClosure();
+        }
+        if (buildMode == bmCheck && !allValid)
+            throw Error(
+                "some outputs of '%s' are not valid, so checking is not possible",
+                worker.store.printStorePath(drvPath));
+    }
+
+    /* Give up on substitution for the output we want, actually build this derivation */
+
+    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode);
+
+    /* We will finish with it ourselves, as if we were the derivational goal. */
+    g->preserveException = true;
+
     {
-        if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, *drv), wantedOutput)) {
-            outputHash = *mOutputHash;
-        }
-
-        if (drv->type().isImpure()) {
-            experimentalFeatureSettings.require(Xp::ImpureDerivations);
-            /* We don't yet have any safe way to cache an impure derivation at
-               this step. */
-            co_return gaveUpOnSubstitution();
-        }
+        Goals waitees;
+        waitees.insert(g);
+        co_await await(std::move(waitees));
     }
 
-    /* Check what outputs paths are not already valid. */
-    auto checkResult = checkPathValidity();
+    trace("outer build done");
 
-    /* If they are all valid, then we're done. */
-    if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
-        co_return done(BuildResult::AlreadyValid, {{wantedOutput, checkResult->first}});
+    buildResult = g->buildResult;
+
+    if (buildMode == bmCheck) {
+        /* In checking mode, the builder will not register any outputs.
+           So we want to make sure the ones that we wanted to check are
+           properly there. */
+        buildResult.builtOutputs = {{wantedOutput, assertPathValidity()}};
     }
 
-    Goals waitees;
-
-    /* We are first going to try to create the invalid output paths
-       through substitutes.  If that doesn't work, we'll build
-       them. */
-    if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
-        if (!checkResult)
-            waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
-        else {
-            auto * cap = getDerivationCA(*drv);
-            waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
-                checkResult->first.outPath,
-                buildMode == bmRepair ? Repair : NoRepair,
-                cap ? std::optional{*cap} : std::nullopt)));
+    for (auto it = buildResult.builtOutputs.begin(); it != buildResult.builtOutputs.end();) {
+        if (it->first != wantedOutput) {
+            it = buildResult.builtOutputs.erase(it);
+        } else {
+            ++it;
         }
     }
 
-    co_await await(std::move(waitees));
+    if (buildResult.success())
+        assert(buildResult.builtOutputs.count(wantedOutput) > 0);
 
-    trace("all outputs substituted (maybe)");
-
-    assert(!drv->type().isImpure());
-
-    if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
-        co_return done(
-            BuildResult::TransientFailure,
-            {},
-            Error(
-                "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
-                worker.store.printStorePath(drvPath)));
-    }
-
-    nrFailed = nrNoSubstituters = 0;
-
-    checkResult = checkPathValidity();
-
-    bool allValid = checkResult && checkResult->second == PathStatus::Valid;
-
-    if (buildMode == bmNormal && allValid) {
-        co_return done(BuildResult::Substituted, {{wantedOutput, checkResult->first}});
-    }
-    if (buildMode == bmRepair && allValid) {
-        co_return repairClosure();
-    }
-    if (buildMode == bmCheck && !allValid)
-        throw Error(
-            "some outputs of '%s' are not valid, so checking is not possible", worker.store.printStorePath(drvPath));
-
-    /* Nothing to wait for; tail call */
-    co_return gaveUpOnSubstitution();
+    co_return amDone(g->exitCode, g->ex);
 }
 
 /**
