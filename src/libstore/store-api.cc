@@ -803,7 +803,7 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
         /* At this point StoreReference **must** be resolved. */
         const auto & specified = std::get<StoreReference::Specified>(ref.variant);
         const auto & scheme = specified.scheme;
-        return (scheme == "local" || scheme == "unix") && specified.authority.empty() && ref.params.empty();
+        return (scheme == "local" || scheme == "unix") && specified.authority.empty();
     };
 
     if (isShorthand(src))
