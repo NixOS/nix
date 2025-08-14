@@ -117,7 +117,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        Path chrootStoreDir = chrootRootDir + store.storeDir;
+        Path chrootStoreDir = chrootRootDir + storeDirConfig.storeDir;
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
@@ -127,7 +127,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         pathsInChroot = getPathsInSandbox();
 
         for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
+            auto p = storeDirConfig.printStorePath(i);
             pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
         }
 
@@ -143,14 +143,14 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                is already in the sandbox, so we don't need to worry about
                removing it.  */
             if (i.second.second)
-                pathsInChroot.erase(store.printStorePath(*i.second.second));
+                pathsInChroot.erase(storeDirConfig.printStorePath(*i.second.second));
         }
     }
 
     Strings getPreBuildHookArgs() override
     {
         assert(!chrootRootDir.empty());
-        return Strings({store.printStorePath(drvPath), chrootRootDir});
+        return Strings({storeDirConfig.printStorePath(drvPath), chrootRootDir});
     }
 
     Path realPathInSandbox(const Path & p) override
@@ -183,15 +183,15 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     {
         DerivationBuilderImpl::addDependency(path);
 
-        debug("materialising '%s' in the sandbox", store.printStorePath(path));
+        debug("materialising '%s' in the sandbox", storeDirConfig.printStorePath(path));
 
         Path source = store.Store::toRealPath(path);
-        Path target = chrootRootDir + store.printStorePath(path);
+        Path target = chrootRootDir + storeDirConfig.printStorePath(path);
 
         if (pathExists(target)) {
             // There is a similar debug message in doBind, so only run it in this block to not have double messages.
             debug("bind-mounting %s -> %s", target, source);
-            throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
+            throw Error("store path '%s' already exists in the sandbox", storeDirConfig.printStorePath(path));
         }
 
         return {source, target};
