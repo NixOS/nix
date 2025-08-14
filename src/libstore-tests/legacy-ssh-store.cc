@@ -6,9 +6,7 @@ namespace nix {
 
 TEST(LegacySSHStore, constructConfig)
 {
-    initLibStore(/*loadConfig=*/false);
-
-    auto config = make_ref<LegacySSHStoreConfig>(
+    LegacySSHStoreConfig config(
         "ssh",
         "me@localhost:2222",
         StoreConfig::Params{
@@ -20,13 +18,13 @@ TEST(LegacySSHStore, constructConfig)
         });
 
     EXPECT_EQ(
-        config->remoteProgram.get(),
+        config.remoteProgram.get(),
         (Strings{
             "foo",
             "bar",
         }));
 
-    auto store = config->openStore();
-    EXPECT_EQ(store->config.getUri(), "ssh://me@localhost:2222?remote-program=foo%20bar");
+    EXPECT_EQ(config.getReference().render(/*withParams=*/true), "ssh://me@localhost:2222?remote-program=foo%20bar");
+    EXPECT_EQ(config.getReference().render(/*withParams=*/false), "ssh://me@localhost:2222");
 }
 } // namespace nix

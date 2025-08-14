@@ -395,11 +395,14 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
                         "replaced path '%s' with '%s' for substituter '%s'",
                         printStorePath(path.first),
                         sub->printStorePath(subPath),
-                        sub->config.getUri());
+                        sub->config.getHumanReadableURI());
             } else if (sub->storeDir != storeDir)
                 continue;
 
-            debug("checking substituter '%s' for path '%s'", sub->config.getUri(), sub->printStorePath(subPath));
+            debug(
+                "checking substituter '%s' for path '%s'",
+                sub->config.getHumanReadableURI(),
+                sub->printStorePath(subPath));
             try {
                 auto info = sub->queryPathInfo(subPath);
 
@@ -439,7 +442,8 @@ bool Store::isValidPath(const StorePath & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(config.getUri(), std::string(storePath.hashPart()));
+        auto res = diskCache->lookupNarInfo(
+            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()));
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
@@ -455,7 +459,8 @@ bool Store::isValidPath(const StorePath & storePath)
 
     if (diskCache && !valid)
         // FIXME: handle valid = true case.
-        diskCache->upsertNarInfo(config.getUri(), std::string(storePath.hashPart()), 0);
+        diskCache->upsertNarInfo(
+            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()), 0);
 
     return valid;
 }
@@ -509,7 +514,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(config.getUri(), hashPart);
+        auto res = diskCache->lookupNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             {
@@ -554,7 +559,7 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 auto info = fut.get();
 
                 if (diskCache)
-                    diskCache->upsertNarInfo(config.getUri(), hashPart, info);
+                    diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
                 {
                     auto state_(state.lock());
@@ -578,7 +583,8 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
     try {
         if (diskCache) {
-            auto [cacheOutcome, maybeCachedRealisation] = diskCache->lookupRealisation(config.getUri(), id);
+            auto [cacheOutcome, maybeCachedRealisation] =
+                diskCache->lookupRealisation(config.getReference().render(/*FIXME: withParams=*/false), id);
             switch (cacheOutcome) {
             case NarInfoDiskCache::oValid:
                 debug("Returning a cached realisation for %s", id.to_string());
@@ -604,9 +610,11 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
                                      if (diskCache) {
                                          if (info)
-                                             diskCache->upsertRealisation(config.getUri(), *info);
+                                             diskCache->upsertRealisation(
+                                                 config.getReference().render(/*FIXME withParams=*/false), *info);
                                          else
-                                             diskCache->upsertAbsentRealisation(config.getUri(), id);
+                                             diskCache->upsertAbsentRealisation(
+                                                 config.getReference().render(/*FIXME withParams=*/false), id);
                                      }
 
                                      (*callbackPtr)(std::shared_ptr<const Realisation>(info));
@@ -786,23 +794,26 @@ const Store::Stats & Store::getStats()
 }
 
 static std::string
-makeCopyPathMessage(const StoreReference & src, const StoreReference & dst, std::string_view storePath)
+makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std::string_view storePath)
 {
+    auto src = srcCfg.getReference();
+    auto dst = dstCfg.getReference();
+
     auto isShorthand = [](const StoreReference & ref) {
-        if (const auto * specified = std::get_if<StoreReference::Specified>(&ref.variant)) {
-            const auto & scheme = specified->scheme;
-            return (scheme == "local" || scheme == "unix") && specified->authority.empty() && ref.params.empty();
-        }
-        return false;
+        /* At this point StoreReference **must** be resolved. */
+        const auto & specified = std::get<StoreReference::Specified>(ref.variant);
+        const auto & scheme = specified.scheme;
+        return (scheme == "local" || scheme == "unix") && specified.authority.empty() && ref.params.empty();
     };
 
     if (isShorthand(src))
-        return fmt("copying path '%s' to '%s'", storePath, dst.render());
+        return fmt("copying path '%s' to '%s'", storePath, dstCfg.getHumanReadableURI());
 
     if (isShorthand(dst))
-        return fmt("copying path '%s' from '%s'", storePath, src.render());
+        return fmt("copying path '%s' from '%s'", storePath, srcCfg.getHumanReadableURI());
 
-    return fmt("copying path '%s' from '%s' to '%s'", storePath, src.render(), dst.render());
+    return fmt(
+        "copying path '%s' from '%s' to '%s'", storePath, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI());
 }
 
 void copyStorePath(
@@ -813,15 +824,15 @@ void copyStorePath(
     if (!repair && dstStore.isValidPath(storePath))
         return;
 
-    auto srcRef = srcStore.config.getReference();
-    auto dstRef = dstStore.config.getReference();
+    const auto & srcCfg = srcStore.config;
+    const auto & dstCfg = dstStore.config;
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
         *logger,
         lvlInfo,
         actCopyPath,
-        makeCopyPathMessage(srcRef, dstRef, storePathS),
-        {storePathS, srcRef.render(), dstRef.render()});
+        makeCopyPathMessage(srcCfg, dstCfg, storePathS),
+        {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -857,7 +868,7 @@ void copyStorePath(
             throw EndOfFile(
                 "NAR for '%s' fetched from '%s' is incomplete",
                 srcStore.printStorePath(storePath),
-                srcStore.config.getUri());
+                srcStore.config.getHumanReadableURI());
         });
 
     dstStore.addToStore(*info, *source, repair, checkSigs);
@@ -955,7 +966,7 @@ std::map<StorePath, StorePath> copyPaths(
                     "replaced path '%s' to '%s' for substituter '%s'",
                     srcStore.printStorePath(storePathForSrc),
                     dstStore.printStorePath(storePathForDst),
-                    dstStore.config.getUri());
+                    dstStore.config.getHumanReadableURI());
         }
         return storePathForDst;
     };
@@ -973,15 +984,15 @@ std::map<StorePath, StorePath> copyPaths(
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
             uint64_t total = 0;
-            auto srcRef = srcStore.config.getReference();
-            auto dstRef = dstStore.config.getReference();
+            const auto & srcCfg = srcStore.config;
+            const auto & dstCfg = dstStore.config;
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,
                 lvlInfo,
                 actCopyPath,
-                makeCopyPathMessage(srcRef, dstRef, storePathS),
-                {storePathS, srcRef.render(), dstRef.render()});
+                makeCopyPathMessage(srcCfg, dstCfg, storePathS),
+                {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {

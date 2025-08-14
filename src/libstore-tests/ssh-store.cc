@@ -27,9 +27,9 @@ TEST(SSHStore, constructConfig)
             "bar",
         }));
 
-    EXPECT_EQ(config.getUri(), "ssh-ng://me@localhost:2222?remote-program=foo%20bar");
+    EXPECT_EQ(config.getReference().render(/*withParams=*/true), "ssh-ng://me@localhost:2222?remote-program=foo%20bar");
     config.resetOverridden();
-    EXPECT_EQ(config.getUri(), "ssh-ng://me@localhost:2222");
+    EXPECT_EQ(config.getReference().render(/*withParams=*/true), "ssh-ng://me@localhost:2222");
 }
 
 TEST(MountedSSHStore, constructConfig)

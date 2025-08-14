@@ -574,14 +574,15 @@ ProcessLineResult NixRepl::processLine(std::string line)
             for (auto & sub : subs) {
                 auto * logSubP = dynamic_cast<LogStore *>(&*sub);
                 if (!logSubP) {
-                    printInfo("Skipped '%s' which does not support retrieving build logs", sub->config.getUri());
+                    printInfo(
+                        "Skipped '%s' which does not support retrieving build logs", sub->config.getHumanReadableURI());
                     continue;
                 }
                 auto & logSub = *logSubP;
 
                 auto log = logSub.getBuildLog(drvPath);
                 if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.config.getUri());
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.config.getHumanReadableURI());
                     logger->writeToStdout(*log);
                     foundLog = true;
                     break;
