@@ -785,12 +785,24 @@ const Store::Stats & Store::getStats()
     return stats;
 }
 
-static std::string makeCopyPathMessage(std::string_view srcUri, std::string_view dstUri, std::string_view storePath)
+static std::string
+makeCopyPathMessage(const StoreReference & src, const StoreReference & dst, std::string_view storePath)
 {
-    return srcUri == "local" || srcUri == "daemon" ? fmt("copying path '%s' to '%s'", storePath, dstUri)
-           : dstUri == "local" || dstUri == "daemon"
-               ? fmt("copying path '%s' from '%s'", storePath, srcUri)
-               : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri);
+    auto isShorthand = [](const StoreReference & ref) {
+        if (const auto * specified = std::get_if<StoreReference::Specified>(&ref.variant)) {
+            const auto & scheme = specified->scheme;
+            return (scheme == "local" || scheme == "unix") && specified->authority.empty() && ref.params.empty();
+        }
+        return false;
+    };
+
+    if (isShorthand(src))
+        return fmt("copying path '%s' to '%s'", storePath, dst.render());
+
+    if (isShorthand(dst))
+        return fmt("copying path '%s' from '%s'", storePath, src.render());
+
+    return fmt("copying path '%s' from '%s' to '%s'", storePath, src.render(), dst.render());
 }
 
 void copyStorePath(
@@ -801,11 +813,15 @@ void copyStorePath(
     if (!repair && dstStore.isValidPath(storePath))
         return;
 
-    auto srcUri = srcStore.config.getUri();
-    auto dstUri = dstStore.config.getUri();
+    auto srcRef = srcStore.config.getReference();
+    auto dstRef = dstStore.config.getReference();
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
-        *logger, lvlInfo, actCopyPath, makeCopyPathMessage(srcUri, dstUri, storePathS), {storePathS, srcUri, dstUri});
+        *logger,
+        lvlInfo,
+        actCopyPath,
+        makeCopyPathMessage(srcRef, dstRef, storePathS),
+        {storePathS, srcRef.render(), dstRef.render()});
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -957,15 +973,15 @@ std::map<StorePath, StorePath> copyPaths(
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
             uint64_t total = 0;
-            auto srcUri = srcStore.config.getUri();
-            auto dstUri = dstStore.config.getUri();
+            auto srcRef = srcStore.config.getReference();
+            auto dstRef = dstStore.config.getReference();
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,
                 lvlInfo,
                 actCopyPath,
-                makeCopyPathMessage(srcUri, dstUri, storePathS),
-                {storePathS, srcUri, dstUri});
+                makeCopyPathMessage(srcRef, dstRef, storePathS),
+                {storePathS, srcRef.render(), dstRef.render()});
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
