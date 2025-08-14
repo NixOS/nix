@@ -119,16 +119,12 @@ Goal::Co DerivationGoal::haveDerivation()
             worker.store.addTempRoot(*i.second.second);
 
     {
-        bool impure = drv->type().isImpure();
-
-        if (impure)
-            experimentalFeatureSettings.require(Xp::ImpureDerivations);
-
         if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, *drv), wantedOutput)) {
             outputHash = *mOutputHash;
         }
 
-        if (impure) {
+        if (drv->type().isImpure()) {
+            experimentalFeatureSettings.require(Xp::ImpureDerivations);
             /* We don't yet have any safe way to cache an impure derivation at
                this step. */
             co_return gaveUpOnSubstitution();
