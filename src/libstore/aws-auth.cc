@@ -16,13 +16,23 @@
 namespace nix {
 
 static std::once_flag crtInitFlag;
-static std::unique_ptr<Aws::Crt::ApiHandle> crtApiHandle;
+static bool crtInitialized = false;
 
 static void initAwsCrt()
 {
     std::call_once(crtInitFlag, []() {
-        crtApiHandle = std::make_unique<Aws::Crt::ApiHandle>();
-        crtApiHandle->InitializeLogging(Aws::Crt::LogLevel::Warn, (FILE *) nullptr);
+        try {
+            // Use a static local variable instead of global to control destruction order
+            static Aws::Crt::ApiHandle apiHandle;
+            apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, (FILE *) nullptr);
+            crtInitialized = true;
+        } catch (const std::exception & e) {
+            debug("Failed to initialize AWS CRT: %s", e.what());
+            crtInitialized = false;
+        } catch (...) {
+            debug("Failed to initialize AWS CRT: unknown error");
+            crtInitialized = false;
+        }
     });
 }
 
@@ -30,37 +40,63 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
 {
     initAwsCrt();
 
-    Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-    config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-
-    auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
-    if (!provider) {
-        debug("Failed to create default AWS credentials provider");
+    if (!crtInitialized) {
+        debug("AWS CRT not initialized, cannot create credential provider");
         return nullptr;
     }
 
-    return std::make_unique<AwsCredentialProvider>(provider);
+    try {
+        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
+        if (!provider) {
+            debug("Failed to create default AWS credentials provider");
+            return nullptr;
+        }
+
+        return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const std::exception & e) {
+        debug("Exception creating AWS credential provider: %s", e.what());
+        return nullptr;
+    } catch (...) {
+        debug("Unknown exception creating AWS credential provider");
+        return nullptr;
+    }
 }
 
 std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createProfile(const std::string & profile)
 {
     initAwsCrt();
 
+    if (!crtInitialized) {
+        debug("AWS CRT not initialized, cannot create credential provider");
+        return nullptr;
+    }
+
     if (profile.empty()) {
         return createDefault();
     }
 
-    Aws::Crt::Auth::CredentialsProviderProfileConfig config;
-    config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-    config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+    try {
+        Aws::Crt::Auth::CredentialsProviderProfileConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+        config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
 
-    auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
-    if (!provider) {
-        debug("Failed to create AWS credentials provider for profile '%s'", profile);
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+        if (!provider) {
+            debug("Failed to create AWS credentials provider for profile '%s'", profile);
+            return nullptr;
+        }
+
+        return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const std::exception & e) {
+        debug("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
+        return nullptr;
+    } catch (...) {
+        debug("Unknown exception creating AWS credential provider for profile '%s'", profile);
         return nullptr;
     }
-
-    return std::make_unique<AwsCredentialProvider>(provider);
 }
 
 AwsCredentialProvider::AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
