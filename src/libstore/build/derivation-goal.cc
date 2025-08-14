@@ -308,59 +308,51 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
     if (drv->type().isImpure())
         return {false, {}};
 
-    bool checkHash = buildMode == bmRepair;
     SingleDrvOutputs validOutputs;
 
-    auto partialDerivationOutputMap = [&] {
-        for (auto * drvStore : {&worker.evalStore, &worker.store})
-            if (drvStore->isValidPath(drvPath))
-                return worker.store.queryPartialDerivationOutputMap(drvPath, drvStore);
+    auto drvOutput = DrvOutput{outputHash, wantedOutput};
 
-        /* In-memory derivation will naturally fall back on this case, where
-           we do best-effort with static information. */
-        std::map<std::string, std::optional<StorePath>> res;
-        for (auto & [name, output] : drv->outputs)
-            res.insert_or_assign(name, output.path(worker.store, drv->name, name));
-        return res;
-    }();
+    std::optional<Realisation> mRealisation;
 
-    if (auto * mpath = get(partialDerivationOutputMap, wantedOutput)) {
-        if (*mpath) {
-            auto & outputPath = **mpath;
-            outputKnown = {
-                .path = outputPath,
-                .status = !worker.store.isValidPath(outputPath)               ? PathStatus::Absent
-                          : !checkHash || worker.pathContentsGood(outputPath) ? PathStatus::Valid
-                                                                              : PathStatus::Corrupt,
-            };
+    if (auto * mOutput = get(drv->outputs, wantedOutput)) {
+        if (auto mPath = mOutput->path(worker.store, drv->name, wantedOutput)) {
+            mRealisation = Realisation{drvOutput, std::move(*mPath)};
         }
-        auto drvOutput = DrvOutput{outputHash, wantedOutput};
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-            if (auto real = worker.store.queryRealisation(drvOutput)) {
-                outputKnown = {
-                    .path = real->outPath,
-                    .status = PathStatus::Valid,
-                };
-            } else if (outputKnown && outputKnown->isValid()) {
+    } else {
+        throw Error(
+            "derivation '%s' does not have wanted outputs '%s'", worker.store.printStorePath(drvPath), wantedOutput);
+    }
+
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        for (auto * drvStore : {&worker.evalStore, &worker.store}) {
+            if (auto real = drvStore->queryRealisation(drvOutput)) {
+                mRealisation = *real;
+                break;
+            }
+        }
+    }
+
+    if (mRealisation) {
+        auto & outputPath = mRealisation->outPath;
+        bool checkHash = buildMode == bmRepair;
+        outputKnown = {
+            .path = outputPath,
+            .status = !worker.store.isValidPath(outputPath)               ? PathStatus::Absent
+                      : !checkHash || worker.pathContentsGood(outputPath) ? PathStatus::Valid
+                                                                          : PathStatus::Corrupt,
+        };
+
+        if (outputKnown->isValid()) {
+            if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 // We know the output because it's a static output of the
                 // derivation, and the output path is valid, but we don't have
                 // its realisation stored (probably because it has been built
                 // without the `ca-derivations` experimental flag).
-                worker.store.registerDrvOutput(
-                    Realisation{
-                        drvOutput,
-                        outputKnown->path,
-                    });
+                worker.store.registerDrvOutput(*mRealisation);
             }
+
+            validOutputs.emplace(wantedOutput, *mRealisation);
         }
-        if (outputKnown && outputKnown->isValid())
-            validOutputs.emplace(wantedOutput, Realisation{drvOutput, outputKnown->path});
-    } else {
-        // If we requested all the outputs, we are always fine.
-        // If we requested specific elements, the loop above removes all the valid
-        // ones, so any that are left must be invalid.
-        throw Error(
-            "derivation '%s' does not have wanted outputs '%s'", worker.store.printStorePath(drvPath), wantedOutput);
     }
 
     return {outputKnown && outputKnown->isValid(), validOutputs};
