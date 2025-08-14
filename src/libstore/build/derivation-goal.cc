@@ -359,9 +359,8 @@ Goal::Done DerivationGoal::done(BuildResult::Status status, SingleDrvOutputs bui
     mcExpectedBuilds.reset();
 
     if (buildResult.success()) {
-        auto wantedBuiltOutputs = filterDrvOutputs(OutputsSpec::Names{wantedOutput}, std::move(builtOutputs));
-        assert(!wantedBuiltOutputs.empty());
-        buildResult.builtOutputs = std::move(wantedBuiltOutputs);
+        assert(!builtOutputs.empty());
+        buildResult.builtOutputs = std::move(builtOutputs);
         if (status == BuildResult::Built)
             worker.doneBuilds++;
     } else {
