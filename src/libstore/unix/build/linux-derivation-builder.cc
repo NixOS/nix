@@ -192,10 +192,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     std::optional<Path> cgroup;
 
     ChrootLinuxDerivationBuilder(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
-        , ChrootDerivationBuilder{store, std::move(miscMethods), std::move(params)}
-        , LinuxDerivationBuilder{store, std::move(miscMethods), std::move(params)}
+        std::unique_ptr<BuildingStore> store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : DerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
+        , ChrootDerivationBuilder{std::move(store), std::move(miscMethods), std::move(params)}
+        , LinuxDerivationBuilder{std::move(store), std::move(miscMethods), std::move(params)}
     {
     }
 

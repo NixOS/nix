@@ -175,7 +175,7 @@ struct DerivationBuilder : RestrictionContext
      * Check that the derivation outputs all exist and register them
      * as valid.
      */
-    virtual SingleDrvOutputs registerOutputs() = 0;
+    virtual SingleDrvOutputs registerOutputs(LocalStore & store) = 0;
 
     /**
      * Delete the temporary directory, if we have one.
@@ -201,16 +201,56 @@ struct ExternalBuilder
     std::vector<std::string> args;
 };
 
+/**
+ * This type exists to aid with FFI: we cannot make a full `LocalStore`
+ * with everything (including building, which uses this!) from FFI, but
+ * we do have a chance of making something that just has the methods we
+ * actually need from `LocalStore`.
+ */
+struct BuildingStore : StoreDirConfig
+{
+    virtual ~BuildingStore() = default;
+
+    BuildingStore(const Path & storeDir)
+        : StoreDirConfig{storeDir}
+    {
+    }
+
+    virtual Path getRealStoreDir() const = 0;
+
+    virtual Path getBuildDir() const = 0;
+
+    // virtual ref<const ValidPathInfo> queryPathInfo(const StorePath & path) = 0;
+
+    virtual std::thread startDaemon(
+        Descriptor daemonListeningSocket, RestrictionContext & ctx, std::vector<std::thread> & daemonWorkerThreads) = 0;
+
+    Path toRealPath(const Path & storePath)
+    {
+        assert(isInStore(storePath));
+        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
+    }
+
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
+    }
+};
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore &);
+
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+    std::unique_ptr<BuildingStore> store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params);
 
 /**
  * @param handler Must be chosen such that it supports the given
  * derivation.
  */
 std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);

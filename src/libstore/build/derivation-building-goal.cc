@@ -502,7 +502,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     co_await yield();
 
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+    auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+    if (!localStoreP) {
         throw Error(
             R"(
             Unable to build with a primary store that isn't a local store;
@@ -562,9 +563,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 }
             };
 
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
-
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
@@ -608,12 +606,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = externalBuilder ? makeExternalDerivationBuilder(
-                                            *localStoreP,
+                                            makeBuildingStoreFromLocalStore(*localStoreP),
                                             std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                                             std::move(params),
                                             *externalBuilder)
                                       : makeDerivationBuilder(
-                                            *localStoreP,
+                                            makeBuildingStoreFromLocalStore(*localStoreP),
                                             std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                                             std::move(params));
         }
@@ -662,7 +660,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     try {
         /* Compute the FS closure of the outputs and register them as
            being valid. */
-        builtOutputs = builder->registerOutputs();
+        builtOutputs = builder->registerOutputs(*localStoreP);
         builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();

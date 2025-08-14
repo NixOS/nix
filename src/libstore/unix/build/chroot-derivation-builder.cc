@@ -5,8 +5,10 @@ namespace nix {
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 {
     ChrootDerivationBuilder(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        std::unique_ptr<BuildingStore> store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : DerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
     {
     }
 
@@ -58,7 +60,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        auto chrootParentDir = store.Store::toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = store->toRealPath(drvPath) + ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
@@ -128,7 +130,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         for (auto & i : inputPaths) {
             auto p = storeDirConfig.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store->toRealPath(p)});
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -136,7 +138,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            rebuilding a path that is in settings.sandbox-paths
            (typically the dependencies of /bin/sh).  Throw them
            out. */
-        for (auto & i : drv.outputsAndOptPaths(store)) {
+        for (auto & i : drv.outputsAndOptPaths(storeDirConfig)) {
             /* If the name isn't known a priori (i.e. floating
                content-addressing derivation), the temporary location we use
                should be fresh.  Freshness means it is impossible that the path
@@ -156,7 +158,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     Path realPathInSandbox(const Path & p) override
     {
         // FIXME: why the needsHashRewrite() conditional?
-        return !needsHashRewrite() ? chrootRootDir + p : store.toRealPath(p);
+        return !needsHashRewrite() ? chrootRootDir + p : store->toRealPath(p);
     }
 
     void cleanupBuild(bool force) override
@@ -171,7 +173,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                     continue;
                 if (buildMode != bmCheck && status.known->isValid())
                     continue;
-                auto p = store.Store::toRealPath(status.known->path);
+                auto p = store->toRealPath(status.known->path);
                 if (pathExists(chrootRootDir + p))
                     std::filesystem::rename((chrootRootDir + p), p);
             }
@@ -185,7 +187,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         debug("materialising '%s' in the sandbox", storeDirConfig.printStorePath(path));
 
-        Path source = store.Store::toRealPath(path);
+        Path source = store->toRealPath(path);
         Path target = chrootRootDir + storeDirConfig.printStorePath(path);
 
         if (pathExists(target)) {

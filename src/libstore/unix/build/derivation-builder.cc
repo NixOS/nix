@@ -77,7 +77,7 @@ protected:
      */
     Pid pid;
 
-    LocalStore & store;
+    std::unique_ptr<BuildingStore> store;
 
     const StoreDirConfig & storeDirConfig;
 
@@ -86,10 +86,12 @@ protected:
 public:
 
     DerivationBuilderImpl(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        std::unique_ptr<BuildingStore> store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , storeDirConfig{*store.config}
+        , store{std::move(store)}
+        , storeDirConfig{*this->store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
@@ -279,7 +281,7 @@ protected:
 
     virtual Path realPathInSandbox(const Path & p)
     {
-        return store.toRealPath(p);
+        return store->toRealPath(p);
     }
 
     /**
@@ -367,7 +369,7 @@ protected:
 
 public:
 
-    SingleDrvOutputs registerOutputs() override;
+    SingleDrvOutputs registerOutputs(LocalStore & store) override;
 
     void cleanupBuild(bool force) override;
 
@@ -404,8 +406,42 @@ private:
     StorePath makeFallbackPath(OutputNameView outputName);
 };
 
+struct LocalBuildingStore : BuildingStore
+{
+    LocalStore & localStore;
+
+    LocalBuildingStore(LocalStore & localStore)
+        : BuildingStore{localStore.storeDir}
+        , localStore{localStore}
+    {
+    }
+
+    Path getRealStoreDir() const override
+    {
+        return localStore.config->realStoreDir;
+    }
+
+    Path getBuildDir() const override
+    {
+        return localStore.config->getBuildDir();
+    }
+
+    // ref<const ValidPathInfo> queryPathInfo(const StorePath & path) override;
+
+    std::thread startDaemon(
+        Descriptor daemonListeningSocket,
+        RestrictionContext & ctx,
+        std::vector<std::thread> & daemonWorkerThreads) override;
+};
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore & localStore)
+{
+    return std::make_unique<LocalBuildingStore>(localStore);
+}
+
 void handleDiffHook(
     uid_t uid, uid_t gid, const Path & tryA, const Path & tryB, const Path & drvPath, const Path & tmpDir)
+
 {
     auto & diffHookOpt = settings.diffHook.get();
     if (diffHookOpt && settings.runDiffHook) {
@@ -584,8 +620,7 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-            && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (statvfs(store->getRealStoreDir().c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
@@ -658,7 +693,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
        calls. */
     prepareUser();
 
-    auto buildDir = store.config->getBuildDir();
+    auto buildDir = store->getBuildDir();
 
     createDirs(buildDir);
 
@@ -1031,17 +1066,6 @@ void DerivationBuilderImpl::startDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
-    auto store = makeRestrictedStore(
-        [&] {
-            auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize = 0;
-            config->stateDir = "/no-such-path";
-            config->logDir = "/no-such-path";
-            return config;
-        }(),
-        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-        *this);
-
     addedPaths.clear();
 
     auto socketName = ".nix-socket";
@@ -1052,14 +1076,31 @@ void DerivationBuilderImpl::startDaemon()
 
     chownToBuilder(socketPath);
 
-    daemonThread = std::thread([this, store]() {
+    daemonThread = store->startDaemon(daemonSocket.get(), *this, daemonWorkerThreads);
+}
+
+std::thread LocalBuildingStore::startDaemon(
+    Descriptor daemonListeningSocket, RestrictionContext & ctx, std::vector<std::thread> & daemonWorkerThreads)
+{
+    auto store = makeRestrictedStore(
+        [&] {
+            auto config = make_ref<LocalStore::Config>(*this->localStore.config);
+            config->pathInfoCacheSize = 0;
+            config->stateDir = "/no-such-path";
+            config->logDir = "/no-such-path";
+            return config;
+        }(),
+        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->localStore.shared_from_this())),
+        ctx);
+
+    return std::thread([store, daemonListeningSocket, &daemonWorkerThreads]() {
         while (true) {
 
             /* Accept a connection. */
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            AutoCloseFD remote = accept(daemonListeningSocket, (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN)
                     continue;
@@ -1281,7 +1322,7 @@ void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & en
     execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
-SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
+SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 {
     std::map<std::string, ValidPathInfo> infos;
 
@@ -1547,7 +1588,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }();
 
             auto newInfo0 = ValidPathInfo::makeFromCA(
-                store,
+                storeDirConfig,
                 outputPathName(drv.name, outputName),
                 ContentAddressWithReferences::fromParts(outputHash.method, std::move(got), rewriteRefs()),
                 Hash::dummy);
@@ -1648,29 +1689,29 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(store, drv.name, outputName);
+        auto optFixedPath = output->path(storeDirConfig, drv.name, outputName);
         if (!optFixedPath || storeDirConfig.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(finalDestPath)});
+            dynamicOutputLock.lockPaths({store->toRealPath(finalDestPath)});
         }
 
         /* Move files, if needed */
-        if (store.toRealPath(finalDestPath) != actualPath) {
+        if (store->toRealPath(finalDestPath) != actualPath) {
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
-                replaceValidPath(store.toRealPath(finalDestPath), actualPath);
-                actualPath = store.toRealPath(finalDestPath);
+                replaceValidPath(store->toRealPath(finalDestPath), actualPath);
+                actualPath = store->toRealPath(finalDestPath);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
-            } else if (store.isValidPath(newInfo.path)) {
+            } else if (localStore.isValidPath(newInfo.path)) {
                 /* Path already exists because CA path produced by something
                    else. No moving needed. */
                 assert(newInfo.ca);
                 /* Can delete our scratch copy now. */
                 deletePath(actualPath);
             } else {
-                auto destPath = store.toRealPath(finalDestPath);
+                auto destPath = store->toRealPath(finalDestPath);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
                 actualPath = destPath;
@@ -1680,11 +1721,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if (buildMode == bmCheck) {
             /* Check against already registered outputs */
 
-            if (store.isValidPath(newInfo.path)) {
-                ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
+            if (localStore.isValidPath(newInfo.path)) {
+                ValidPathInfo oldInfo(*localStore.queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
                     if (settings.runDiffHook || settings.keepFailed) {
-                        auto dst = store.toRealPath(finalDestPath + ".check");
+                        auto dst = store->toRealPath(finalDestPath + ".check");
                         deletePath(dst);
                         movePath(actualPath, dst);
 
@@ -1699,20 +1740,20 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
                             storeDirConfig.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath),
+                            store->toRealPath(finalDestPath),
                             dst);
                     } else
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs",
                             storeDirConfig.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath));
+                            store->toRealPath(finalDestPath));
                 }
 
                 /* Since we verified the build, it's now ultimately trusted. */
                 if (!oldInfo.ultimate) {
                     oldInfo.ultimate = true;
-                    store.signPathInfo(oldInfo);
-                    store.registerValidPaths({{oldInfo.path, oldInfo}});
+                    localStore.signPathInfo(oldInfo);
+                    localStore.registerValidPaths({{oldInfo.path, oldInfo}});
                 }
             }
         } else {
@@ -1726,11 +1767,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     debug("unreferenced input: '%1%'", storeDirConfig.printStorePath(i));
             }
 
-            store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+            localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
-            store.signPathInfo(newInfo);
+            localStore.signPathInfo(newInfo);
 
             finish(newInfo.path);
 
@@ -1745,7 +1786,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                possibly quite slow thing it was) doesn't have to be done
                again. */
             if (newInfo.ca)
-                store.registerValidPaths({{newInfo.path, newInfo}});
+                localStore.registerValidPaths({{newInfo.path, newInfo}});
         }
 
         /* Do this in both the check and non-check cases, because we
@@ -1756,7 +1797,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv.outputs, drvOptions.outputChecks, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -1770,7 +1811,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         for (auto & [outputName, newInfo] : infos) {
             infos2.insert_or_assign(newInfo.path, newInfo);
         }
-        store.registerValidPaths(infos2);
+        localStore.registerValidPaths(infos2);
     }
 
     /* If we made it this far, we are sure the output matches the
@@ -1785,8 +1826,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         assert(oldinfo);
         auto thisRealisation = Realisation{.id = DrvOutput{oldinfo->outputHash, outputName}, .outPath = newInfo.path};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
-            store.signRealisation(thisRealisation);
-            store.registerDrvOutput(thisRealisation);
+            localStore.signRealisation(thisRealisation);
+            localStore.registerDrvOutput(thisRealisation);
         }
         builtOutputs.emplace(outputName, thisRealisation);
     }
@@ -1799,7 +1840,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
+            deletePath(store->toRealPath(i.second));
     }
 
     if (topTmpDir != "") {
@@ -1862,11 +1903,13 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 namespace nix {
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+    std::unique_ptr<BuildingStore> store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params)
 {
     bool useSandbox = false;
 
-    const StoreDirConfig & storeDirConfig = *store.config;
+    const StoreDirConfig & storeDirConfig = *store;
 
     /* Are we doing a sandboxed build? */
     {
@@ -1891,7 +1934,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    if (storeDirConfig.storeDir != store.config->realStoreDir.get()) {
+    if (storeDirConfig.storeDir != store->getRealStoreDir()) {
 #ifdef __linux__
         useSandbox = true;
 #else
@@ -1914,12 +1957,14 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__
-    return std::make_unique<DarwinDerivationBuilder>(store, std::move(miscMethods), std::move(params), useSandbox);
+    return std::make_unique<DarwinDerivationBuilder>(
+        std::move(store), std::move(miscMethods), std::move(params), useSandbox);
 #elif defined(__linux__)
     if (useSandbox)
-        return std::make_unique<ChrootLinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+        return std::make_unique<ChrootLinuxDerivationBuilder>(
+            std::move(store), std::move(miscMethods), std::move(params));
 
-    return std::make_unique<LinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+    return std::make_unique<LinuxDerivationBuilder>(std::move(store), std::move(miscMethods), std::move(params));
 #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
