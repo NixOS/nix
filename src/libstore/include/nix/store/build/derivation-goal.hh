@@ -70,13 +70,13 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
+    const Hash outputHash;
+
+    const BuildMode buildMode;
+
     /**
      * The remainder is state held during the build.
      */
-
-    Hash outputHash;
-
-    BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
 

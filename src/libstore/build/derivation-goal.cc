@@ -33,7 +33,13 @@ DerivationGoal::DerivationGoal(
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
-    , outputHash{Hash::dummy} // will be updated
+    , outputHash{[&] {
+        if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, drv), wantedOutput))
+            return *mOutputHash;
+        else
+            throw Error(
+                "derivation '%s' does not have output '%s'", worker.store.printStorePath(drvPath), wantedOutput);
+    }()}
     , buildMode(buildMode)
 {
     this->drv = std::make_unique<Derivation>(drv);
@@ -78,10 +84,6 @@ Goal::Co DerivationGoal::haveDerivation()
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
-
-    if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, *drv), wantedOutput)) {
-        outputHash = *mOutputHash;
-    }
 
     /* We don't yet have any safe way to cache an impure derivation at
        this step. */
