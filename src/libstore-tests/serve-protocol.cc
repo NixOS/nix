@@ -275,7 +275,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         }),
         ({
             ValidPathInfo info{
-                *LibStoreTest::store,
+                store,
                 "foo",
                 FixedOutputInfo{
                     .method = FileIngestionMethod::NixArchive,

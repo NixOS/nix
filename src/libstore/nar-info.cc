@@ -6,7 +6,7 @@
 
 namespace nix {
 
-NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
+NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
     unsigned line = 1;
@@ -102,7 +102,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     }
 }
 
-std::string NarInfo::to_string(const Store & store) const
+std::string NarInfo::to_string(const StoreDirConfig & store) const
 {
     std::string res;
     res += "StorePath: " + store.printStorePath(path) + "\n";
@@ -130,7 +130,7 @@ std::string NarInfo::to_string(const Store & store) const
     return res;
 }
 
-nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
 {
     using nlohmann::json;
 
@@ -150,7 +150,7 @@ nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, Hash
     return jsonObject;
 }
 
-NarInfo NarInfo::fromJSON(const Store & store, const StorePath & path, const nlohmann::json & json)
+NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, const nlohmann::json & json)
 {
     using nlohmann::detail::value_t;
 
