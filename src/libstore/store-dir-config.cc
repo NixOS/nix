@@ -6,7 +6,7 @@
 
 namespace nix {
 
-StorePath MixStoreDirMethods::parseStorePath(std::string_view path) const
+StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
     // On Windows, `/nix/store` is not a canonical path. More broadly it
     // is unclear whether this function should be using the native
@@ -25,7 +25,7 @@ StorePath MixStoreDirMethods::parseStorePath(std::string_view path) const
     return StorePath(baseNameOf(p));
 }
 
-std::optional<StorePath> MixStoreDirMethods::maybeParseStorePath(std::string_view path) const
+std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
 {
     try {
         return parseStorePath(path);
@@ -34,12 +34,12 @@ std::optional<StorePath> MixStoreDirMethods::maybeParseStorePath(std::string_vie
     }
 }
 
-bool MixStoreDirMethods::isStorePath(std::string_view path) const
+bool StoreDirConfig::isStorePath(std::string_view path) const
 {
     return (bool) maybeParseStorePath(path);
 }
 
-StorePathSet MixStoreDirMethods::parseStorePathSet(const PathSet & paths) const
+StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
 {
     StorePathSet res;
     for (auto & i : paths)
@@ -47,12 +47,12 @@ StorePathSet MixStoreDirMethods::parseStorePathSet(const PathSet & paths) const
     return res;
 }
 
-std::string MixStoreDirMethods::printStorePath(const StorePath & path) const
+std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
     return (storeDir + "/").append(path.to_string());
 }
 
-PathSet MixStoreDirMethods::printStorePathSet(const StorePathSet & paths) const
+PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
 {
     PathSet res;
     for (auto & i : paths)
@@ -69,7 +69,7 @@ also update the user-visible behavior, please update the specification
 to match.
 */
 
-StorePath MixStoreDirMethods::makeStorePath(std::string_view type, std::string_view hash, std::string_view name) const
+StorePath StoreDirConfig::makeStorePath(std::string_view type, std::string_view hash, std::string_view name) const
 {
     /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
     auto s = std::string(type) + ":" + std::string(hash) + ":" + storeDir + ":" + std::string(name);
@@ -77,12 +77,12 @@ StorePath MixStoreDirMethods::makeStorePath(std::string_view type, std::string_v
     return StorePath(h, name);
 }
 
-StorePath MixStoreDirMethods::makeStorePath(std::string_view type, const Hash & hash, std::string_view name) const
+StorePath StoreDirConfig::makeStorePath(std::string_view type, const Hash & hash, std::string_view name) const
 {
     return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
 }
 
-StorePath MixStoreDirMethods::makeOutputPath(std::string_view id, const Hash & hash, std::string_view name) const
+StorePath StoreDirConfig::makeOutputPath(std::string_view id, const Hash & hash, std::string_view name) const
 {
     return makeStorePath("output:" + std::string{id}, hash, outputPathName(name, id));
 }
@@ -90,7 +90,7 @@ StorePath MixStoreDirMethods::makeOutputPath(std::string_view id, const Hash & h
 /* Stuff the references (if any) into the type.  This is a bit
    hacky, but we can't put them in, say, <s2> (per the grammar above)
    since that would be ambiguous. */
-static std::string makeType(const MixStoreDirMethods & store, std::string && type, const StoreReferences & references)
+static std::string makeType(const StoreDirConfig & store, std::string && type, const StoreReferences & references)
 {
     for (auto & i : references.others) {
         type += ":";
@@ -101,7 +101,7 @@ static std::string makeType(const MixStoreDirMethods & store, std::string && typ
     return std::move(type);
 }
 
-StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
+StorePath StoreDirConfig::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
 {
     if (info.method == FileIngestionMethod::Git
         && !(info.hash.algo == HashAlgorithm::SHA1 || info.hash.algo == HashAlgorithm::SHA256)) {
@@ -126,7 +126,7 @@ StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const F
 }
 
 StorePath
-MixStoreDirMethods::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
+StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
 {
     // New template
     return std::visit(
@@ -148,7 +148,7 @@ MixStoreDirMethods::makeFixedOutputPathFromCA(std::string_view name, const Conte
         ca.raw);
 }
 
-std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
+std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
     std::string_view name,
     const SourcePath & path,
     ContentAddressMethod method,
@@ -171,12 +171,6 @@ std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
                 })),
         h,
     };
-}
-
-StoreDirConfig::StoreDirConfig(const Params & params)
-    : StoreDirConfigBase(params)
-    , MixStoreDirMethods{storeDir_}
-{
 }
 
 } // namespace nix
