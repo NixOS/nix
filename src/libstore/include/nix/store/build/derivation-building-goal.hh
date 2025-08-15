@@ -21,9 +21,6 @@ struct DerivationBuilder;
 
 typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
 
-/** Used internally */
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
  * A goal for building a derivation. Substitution, (or any other method of
  * obtaining the outputs) will not be attempted, so it is the calling goal's

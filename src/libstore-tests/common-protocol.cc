@@ -25,7 +25,7 @@ public:
         CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
                 StringSource from{encoded};
-                CommonProto::Serialise<T>::read(*store, CommonProto::ReadConn{.from = from});
+                CommonProto::Serialise<T>::read(store, CommonProto::ReadConn{.from = from});
             });
 
             ASSERT_EQ(got, expected);
@@ -40,7 +40,7 @@ public:
     {
         CharacterizationTest::writeTest(testStem, [&]() -> std::string {
             StringSink to;
-            CommonProto::Serialise<T>::write(*store, CommonProto::WriteConn{.to = to}, decoded);
+            CommonProto::Serialise<T>::write(store, CommonProto::WriteConn{.to = to}, decoded);
             return to.s;
         });
     }
