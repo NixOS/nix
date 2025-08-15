@@ -405,7 +405,14 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
 
-            curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
+            // Use the actual URL, which may have been transformed from s3:// to https://
+            std::string actualUrl = request.uri;
+#if NIX_WITH_AWS_CRT_SUPPORT
+            if (isS3Request && !result.urls.empty()) {
+                actualUrl = result.urls[0];
+            }
+#endif
+            curl_easy_setopt(req, CURLOPT_URL, actualUrl.c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
