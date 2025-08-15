@@ -856,7 +856,11 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && !hasPrefix(item->request.uri, "http://") && !hasPrefix(item->request.uri, "https://"))
+        if (item->request.data && !hasPrefix(item->request.uri, "http://") && !hasPrefix(item->request.uri, "https://")
+#if NIX_WITH_AWS_CRT_SUPPORT
+            && !hasPrefix(item->request.uri, "s3://")
+#endif
+        )
             throw nix::Error("uploading to '%s' is not supported", item->request.uri);
 
         {
