@@ -214,6 +214,10 @@ typename T::mapped_type * get(T & map, const typename T::key_type & key)
     return &i->second;
 }
 
+/** Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set. */
+template<class T>
+typename T::mapped_type * get(T && map, const typename T::key_type & key) = delete;
+
 /**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
@@ -226,6 +230,11 @@ getOr(T & map, const typename T::key_type & key, const typename T::mapped_type &
         return defaultValue;
     return i->second;
 }
+
+/** Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set. */
+template<class T>
+const typename T::mapped_type &
+getOr(T && map, const typename T::key_type & key, const typename T::mapped_type & defaultValue) = delete;
 
 /**
  * Remove and return the first item from a container.
