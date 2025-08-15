@@ -289,9 +289,14 @@ protected:
 private:
 
     /**
-     * Write a JSON file containing the derivation attributes.
+     * In the structured attrs case, write a JSON file containing the
+     * derivation attributes.
+     *
+     * In the non-structured attrs case, convey the export graph
+     * information (which is also part of the structured attrs JSON) in
+     * the old text file format way.
      */
-    void writeStructuredAttrs();
+    void writeSupplementaryInformation();
 
     /**
      * Start an in-process nix daemon thread for recursive-nix.
@@ -796,15 +801,7 @@ void DerivationBuilderImpl::startBuilder()
     /* Construct the environment passed to the builder. */
     initEnv();
 
-    writeStructuredAttrs();
-
-    /* Handle exportReferencesGraph(), if set. */
-    if (!drv.structuredAttrs) {
-        for (auto & [fileName, closure] : drvOptions.getParsedExpandedExportReferencesGraph(store, inputPaths)) {
-            /* Write closure info to <fileName>. */
-            writeFile(tmpDir + "/" + fileName, store.makeValidityRegistration(closure, false, false));
-        }
-    }
+    writeSupplementaryInformation();
 
     prepareSandbox();
 
@@ -1129,7 +1126,7 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::writeStructuredAttrs()
+void DerivationBuilderImpl::writeSupplementaryInformation()
 {
     if (drv.structuredAttrs) {
         auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
@@ -1148,6 +1145,12 @@ void DerivationBuilderImpl::writeStructuredAttrs()
         env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
         writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
+    } else {
+        /* Handle exportReferencesGraph(), if set. */
+        for (auto & [fileName, closure] : drvOptions.getParsedExpandedExportReferencesGraph(store, inputPaths)) {
+            /* Write closure info to <fileName>. */
+            writeFile(tmpDir + "/" + fileName, store.makeValidityRegistration(closure, false, false));
+        }
     }
 }
 
