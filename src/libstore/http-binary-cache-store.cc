@@ -15,6 +15,10 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     auto ret = StringSet{"http", "https"};
     if (forceHttp)
         ret.insert("file");
+#if NIX_WITH_AWS_CRT_SUPPORT
+    // S3 support is now handled via curl with AWS SigV4 authentication
+    ret.insert("s3");
+#endif
     return ret;
 }
 
