@@ -1456,18 +1456,14 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     std::map<std::string, struct stat> outputStats;
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
-        if (!scratchOutput)
-            throw BuildError(
-                "builder for '%s' has no scratch output for '%s'", store.printStorePath(drvPath), outputName);
+        assert(scratchOutput);
         auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
         /* Updated wanted info to remove the outputs we definitely don't need to register */
         auto initialOutput = get(initialOutputs, outputName);
-        if (!initialOutput)
-            throw BuildError(
-                "builder for '%s' has no initial output for '%s'", store.printStorePath(drvPath), outputName);
+        assert(initialOutput);
         auto & initialInfo = *initialOutput;
 
         /* Don't register if already valid, and not checking */
