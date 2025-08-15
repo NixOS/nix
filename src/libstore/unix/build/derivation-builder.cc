@@ -1422,8 +1422,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    Path checkSuffix = ".check";
-
     std::exception_ptr delayedException;
 
     /* The paths that can be referenced are the input closures, the
@@ -1839,7 +1837,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 miscMethods->noteCheckMismatch();
                 if (settings.runDiffHook || settings.keepFailed) {
-                    auto dst = store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = store.toRealPath(finalDestPath + ".check");
                     deletePath(dst);
                     movePath(actualPath, dst);
 
