@@ -102,13 +102,6 @@ typedef std::map<OutputName, Realisation> SingleDrvOutputs;
  */
 typedef std::map<DrvOutput, Realisation> DrvOutputs;
 
-/**
- * Filter a SingleDrvOutputs to include only specific output names
- *
- * Moves the `outputs` input.
- */
-SingleDrvOutputs filterDrvOutputs(const OutputsSpec &, SingleDrvOutputs &&);
-
 struct OpaquePath
 {
     StorePath path;

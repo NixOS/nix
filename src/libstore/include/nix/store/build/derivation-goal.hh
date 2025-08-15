@@ -70,13 +70,13 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
+    const Hash outputHash;
+
+    const BuildMode buildMode;
+
     /**
      * The remainder is state held during the build.
      */
-
-    std::map<std::string, InitialOutput> initialOutputs;
-
-    BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
 
@@ -86,22 +86,29 @@ private:
     Co haveDerivation();
 
     /**
-     * Update 'initialOutputs' to determine the current status of the
-     * outputs of the derivation. Also returns a Boolean denoting
-     * whether all outputs are valid and non-corrupt, and a
-     * 'SingleDrvOutputs' structure containing the valid outputs.
+     * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
+     * floating content-addressing derivation. Otherwise, returns a pair
+     * of a `Realisation`, containing among other things the store path
+     * of the wanted output, and a `PathStatus` with the
+     * current status of that output.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
+    std::optional<std::pair<Realisation, PathStatus>> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
+     * returns a 'Realisation' for the wanted output.
      */
-    SingleDrvOutputs assertPathValidity();
+    Realisation assertPathValidity();
 
     Co repairClosure();
 
-    Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
+    /**
+     * @param builtOutput Must be set if `status` is successful.
+     */
+    Done done(
+        BuildResult::Status status,
+        std::optional<Realisation> builtOutput = std::nullopt,
+        std::optional<Error> ex = {});
 };
 
 } // namespace nix
