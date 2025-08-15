@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-builder.hh"
+#include "unix-derivation-builder.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
@@ -15,6 +16,15 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/restricted-store.hh"
+
+#ifdef __linux__
+#  include "nix/util/linux-namespaces.hh"
+#  include "linux-derivation-builder.hh"
+#endif
+
+#ifdef __APPLE__
+#  include "darwin-derivation-builder.hh"
+#endif
 
 #include <queue>
 
@@ -44,354 +54,6 @@
 namespace nix {
 
 MakeError(NotDeterministic, BuildError);
-
-/**
- * This class represents the state for building locally.
- *
- * @todo Ideally, it would not be a class, but a single function.
- * However, besides the main entry point, there are a few more methods
- * which are externally called, and need to be gotten rid of. There are
- * also some virtual methods (either directly here or inherited from
- * `DerivationBuilderCallbacks`, a stop-gap) that represent outgoing
- * rather than incoming call edges that either should be removed, or
- * become (higher order) function parameters.
- */
-// FIXME: rename this to UnixDerivationBuilder or something like that.
-class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
-{
-protected:
-
-    Store & store;
-
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
-
-public:
-
-    DerivationBuilderImpl(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , miscMethods{std::move(miscMethods)}
-        , derivationType{drv.type()}
-    {
-    }
-
-protected:
-
-    /**
-     * User selected for running the builder.
-     */
-    std::unique_ptr<UserLock> buildUser;
-
-    /**
-     * The temporary directory used for the build.
-     */
-    Path tmpDir;
-
-    /**
-     * The top-level temporary directory. `tmpDir` is either equal to
-     * or a child of this directory.
-     */
-    Path topTmpDir;
-
-    /**
-     * The file descriptor of the temporary directory.
-     */
-    AutoCloseFD tmpDirFd;
-
-    /**
-     * The sort of derivation we are building.
-     *
-     * Just a cached value, computed from `drv`.
-     */
-    const DerivationType derivationType;
-
-    /**
-     * Stuff we need to pass to initChild().
-     */
-    struct ChrootPath
-    {
-        Path source;
-        bool optional;
-
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source)
-            , optional(optional)
-        {
-        }
-    };
-
-    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
-
-    typedef StringMap Environment;
-    Environment env;
-
-    /**
-     * Hash rewriting.
-     */
-    StringMap inputRewrites, outputRewrites;
-    typedef std::map<StorePath, StorePath> RedirectedOutputs;
-    RedirectedOutputs redirectedOutputs;
-
-    /**
-     * The output paths used during the build.
-     *
-     * - Input-addressed derivations or fixed content-addressed outputs are
-     *   sometimes built when some of their outputs already exist, and can not
-     *   be hidden via sandboxing. We use temporary locations instead and
-     *   rewrite after the build. Otherwise the regular predetermined paths are
-     *   put here.
-     *
-     * - Floating content-addressing derivations do not know their final build
-     *   output paths until the outputs are hashed, so random locations are
-     *   used, and then renamed. The randomness helps guard against hidden
-     *   self-references.
-     */
-    OutputPathMap scratchOutputs;
-
-    const static Path homeDir;
-
-    /**
-     * The recursive Nix daemon socket.
-     */
-    AutoCloseFD daemonSocket;
-
-    /**
-     * The daemon main thread.
-     */
-    std::thread daemonThread;
-
-    /**
-     * The daemon worker threads.
-     */
-    std::vector<std::thread> daemonWorkerThreads;
-
-    const StorePathSet & originalPaths() override
-    {
-        return inputPaths;
-    }
-
-    bool isAllowed(const StorePath & path) override
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    bool isAllowed(const DrvOutput & id) override
-    {
-        return addedDrvOutputs.count(id);
-    }
-
-    bool isAllowed(const DerivedPath & req);
-
-    friend struct RestrictedStore;
-
-    /**
-     * Whether we need to perform hash rewriting if there are valid output paths.
-     */
-    virtual bool needsHashRewrite()
-    {
-        return true;
-    }
-
-public:
-
-    bool prepareBuild() override;
-
-    void startBuilder() override;
-
-    std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
-
-protected:
-
-    /**
-     * Acquire a build user lock. Return nullptr if no lock is available.
-     */
-    virtual std::unique_ptr<UserLock> getBuildUser()
-    {
-        return acquireUserLock(1, false);
-    }
-
-    /**
-     * Return the paths that should be made available in the sandbox.
-     * This includes:
-     *
-     * * The paths specified by the `sandbox-paths` setting, and their closure in the Nix store.
-     * * The contents of the `__impureHostDeps` derivation attribute, if the sandbox is in relaxed mode.
-     * * The paths returned by the `pre-build-hook`.
-     * * The paths in the input closure of the derivation.
-     */
-    PathsInChroot getPathsInSandbox();
-
-    virtual void setBuildTmpDir()
-    {
-        tmpDir = topTmpDir;
-    }
-
-    /**
-     * Return the path of the temporary directory in the sandbox.
-     */
-    virtual Path tmpDirInSandbox()
-    {
-        assert(!topTmpDir.empty());
-        return topTmpDir;
-    }
-
-    /**
-     * Ensure that there are no processes running that conflict with
-     * `buildUser`.
-     */
-    virtual void prepareUser()
-    {
-        killSandbox(false);
-    }
-
-    /**
-     * Called by prepareBuild() to do any setup in the parent to
-     * prepare for a sandboxed build.
-     */
-    virtual void prepareSandbox();
-
-    virtual Strings getPreBuildHookArgs()
-    {
-        return Strings({store.printStorePath(drvPath)});
-    }
-
-    virtual Path realPathInSandbox(const Path & p)
-    {
-        return store.toRealPath(p);
-    }
-
-    /**
-     * Open the slave side of the pseudoterminal and use it as stderr.
-     */
-    void openSlave();
-
-    /**
-     * Called by prepareBuild() to start the child process for the
-     * build. Must set `pid`. The child must call runChild().
-     */
-    virtual void startChild();
-
-private:
-
-    /**
-     * Fill in the environment for the builder.
-     */
-    void initEnv();
-
-protected:
-
-    /**
-     * Process messages send by the sandbox initialization.
-     */
-    void processSandboxSetupMessages();
-
-private:
-
-    /**
-     * Write a JSON file containing the derivation attributes.
-     */
-    void writeStructuredAttrs();
-
-    /**
-     * Start an in-process nix daemon thread for recursive-nix.
-     */
-    void startDaemon();
-
-public:
-
-    void stopDaemon() override;
-
-protected:
-
-    void addDependency(const StorePath & path) override;
-
-    /**
-     * Make a file owned by the builder.
-     *
-     * SAFETY: this function is prone to TOCTOU as it receives a path and not a descriptor.
-     * It's only safe to call in a child of a directory only visible to the owner.
-     */
-    void chownToBuilder(const Path & path);
-
-    /**
-     * Make a file owned by the builder addressed by its file descriptor.
-     */
-    void chownToBuilder(int fd, const Path & path);
-
-    /**
-     * Create a file in `tmpDir` owned by the builder.
-     */
-    void writeBuilderFile(const std::string & name, std::string_view contents);
-
-    /**
-     * Run the builder's process.
-     */
-    void runChild();
-
-    /**
-     * Move the current process into the chroot, if any. Called early
-     * by runChild().
-     */
-    virtual void enterChroot() {}
-
-    /**
-     * Change the current process's uid/gid to the build user, if
-     * any. Called by runChild().
-     */
-    virtual void setUser();
-
-    /**
-     * Execute the derivation builder process. Called by runChild() as
-     * its final step. Should not return unless there is an error.
-     */
-    virtual void execBuilder(const Strings & args, const Strings & envStrs);
-
-private:
-
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     */
-    SingleDrvOutputs registerOutputs();
-
-    /**
-     * Check that an output meets the requirements specified by the
-     * 'outputChecks' attribute (or the legacy
-     * '{allowed,disallowed}{References,Requisites}' attributes).
-     */
-    void checkOutputs(const std::map<std::string, ValidPathInfo> & outputs);
-
-public:
-
-    void deleteTmpDir(bool force) override;
-
-    void killSandbox(bool getStats) override;
-
-protected:
-
-    virtual void cleanupBuild();
-
-private:
-
-    bool decideWhetherDiskFull();
-
-    /**
-     * Create alternative path calculated from but distinct from the
-     * input, so we can avoid overwriting outputs (or other store paths)
-     * that already exist.
-     */
-    StorePath makeFallbackPath(const StorePath & path);
-
-    /**
-     * Make a path to another based on the output name along with the
-     * derivation hash.
-     *
-     * @todo Add option to randomize, so we can audit whether our
-     * rewrites caught everything
-     */
-    StorePath makeFallbackPath(OutputNameView outputName);
-};
 
 void handleDiffHook(
     uid_t uid, uid_t gid, const Path & tryA, const Path & tryB, const Path & drvPath, const Path & tmpDir)
@@ -423,6 +85,69 @@ void handleDiffHook(
 }
 
 const Path DerivationBuilderImpl::homeDir = "/homeless-shelter";
+
+// DerivationBuilderImpl constructor implementation
+DerivationBuilderImpl::DerivationBuilderImpl(
+    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+    : DerivationBuilderParams{std::move(params)}
+    , store{store}
+    , miscMethods{std::move(miscMethods)}
+    , derivationType{drv.type()}
+{
+}
+
+const StorePathSet & DerivationBuilderImpl::originalPaths()
+{
+    return inputPaths;
+}
+
+bool DerivationBuilderImpl::isAllowed(const StorePath & path)
+{
+    return inputPaths.count(path) || addedPaths.count(path);
+}
+
+bool DerivationBuilderImpl::isAllowed(const DrvOutput & id)
+{
+    return addedDrvOutputs.count(id);
+}
+
+bool DerivationBuilderImpl::needsHashRewrite()
+{
+    return true;
+}
+
+std::unique_ptr<UserLock> DerivationBuilderImpl::getBuildUser()
+{
+    return acquireUserLock(1, false);
+}
+
+void DerivationBuilderImpl::setBuildTmpDir()
+{
+    tmpDir = topTmpDir;
+}
+
+Path DerivationBuilderImpl::tmpDirInSandbox()
+{
+    assert(!topTmpDir.empty());
+    return topTmpDir;
+}
+
+void DerivationBuilderImpl::prepareUser()
+{
+    killSandbox(false);
+}
+
+Strings DerivationBuilderImpl::getPreBuildHookArgs()
+{
+    return Strings({store.printStorePath(drvPath)});
+}
+
+Path DerivationBuilderImpl::realPathInSandbox(const Path & p)
+{
+    return store.toRealPath(p);
+}
+
+void DerivationBuilderImpl::enterChroot() {}
 
 static LocalStore & getLocalStore(Store & store)
 {
@@ -561,12 +286,6 @@ void DerivationBuilderImpl::cleanupBuild()
     deleteTmpDir(false);
 }
 
-static void chmod_(const Path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
-}
-
 /* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
    it's a directory and we're not root (to be able to update the
    directory's parent link ".."). */
@@ -577,12 +296,12 @@ static void movePath(const Path & src, const Path & dst)
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
     if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
+        changeFileMode(src, st.st_mode | S_IWUSR);
 
     std::filesystem::rename(src, dst);
 
     if (changePerm)
-        chmod_(dst, st.st_mode);
+        changeFileMode(dst, st.st_mode);
 }
 
 static void replaceValidPath(const Path & storePath, const Path & tmpPath)
@@ -665,7 +384,7 @@ static void rethrowExceptionAsError()
  * Send the current exception to the parent in the format expected by
  * `DerivationBuilderImpl::processSandboxSetupMessages()`.
  */
-static void handleChildException(bool sendException)
+void handleChildException(bool sendException)
 {
     try {
         rethrowExceptionAsError();
@@ -878,7 +597,7 @@ void DerivationBuilderImpl::startBuilder()
     processSandboxSetupMessages();
 }
 
-DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
+PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
     PathsInChroot pathsInChroot;
 
@@ -2156,11 +1875,6 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 
 } // namespace nix
 
-// FIXME: do this properly
-#include "chroot-derivation-builder.cc"
-#include "linux-derivation-builder.cc"
-#include "darwin-derivation-builder.cc"
-
 namespace nix {
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
@@ -2215,12 +1929,12 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__
-    return std::make_unique<DarwinDerivationBuilder>(store, std::move(miscMethods), std::move(params), useSandbox);
+    return makeDarwinDerivationBuilder(store, std::move(miscMethods), std::move(params), useSandbox);
 #elif defined(__linux__)
     if (useSandbox)
-        return std::make_unique<ChrootLinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+        return makeChrootLinuxDerivationBuilder(store, std::move(miscMethods), std::move(params));
 
-    return std::make_unique<LinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+    return makeLinuxDerivationBuilder(store, std::move(miscMethods), std::move(params));
 #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");

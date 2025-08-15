@@ -1,9 +1,13 @@
 #ifdef __linux__
 
+#  include "linux-derivation-builder.hh"
+#  include "unix-derivation-builder.hh"
+#  include "chroot-derivation-builder.cc"
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
 #  include "linux/fchmodat2-compat.hh"
+#  include "nix/util/file-system.hh"
 
 #  include <sys/ioctl.h>
 #  include <net/if.h>
@@ -13,6 +17,8 @@
 #  include <sys/param.h>
 #  include <sys/mount.h>
 #  include <sys/syscall.h>
+#  include <grp.h>
+#  include <unistd.h>
 
 #  if HAVE_SECCOMP
 #    include <seccomp.h>
@@ -21,6 +27,8 @@
 #  define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 
 namespace nix {
+
+namespace {
 
 static void setupSeccomp()
 {
@@ -551,7 +559,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 auto dst = chrootRootDir + i.first;
                 createDirs(dirOf(dst));
                 writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
-                chmod_(dst, 0555);
+                changeFileMode(dst, 0555);
             } else
 #  endif
             {
@@ -594,7 +602,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
                 /* Make sure /dev/pts/ptmx is world-writable.  With some
                    Linux versions, it is created with permissions 0.  */
-                chmod_(chrootRootDir + "/dev/pts/ptmx", 0666);
+                changeFileMode(chrootRootDir + "/dev/pts/ptmx", 0666);
             } else {
                 if (errno != EINVAL)
                     throw SysError("mounting /dev/pts");
@@ -605,7 +613,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         /* Make /etc unwritable */
         if (!drvOptions.useUidRange(drv))
-            chmod_(chrootRootDir + "/etc", 0555);
+            changeFileMode(chrootRootDir + "/etc", 0555);
 
         /* Unshare this mount namespace. This is necessary because
            pivot_root() below changes the root of the mount
@@ -706,6 +714,20 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
     }
 };
+
+} // anonymous namespace
+
+std::unique_ptr<DerivationBuilder> makeLinuxDerivationBuilder(
+    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+{
+    return std::make_unique<LinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+}
+
+std::unique_ptr<DerivationBuilder> makeChrootLinuxDerivationBuilder(
+    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+{
+    return std::make_unique<ChrootLinuxDerivationBuilder>(store, std::move(miscMethods), std::move(params));
+}
 
 } // namespace nix
 

@@ -1,5 +1,7 @@
 #ifdef __linux__
 
+#  include "nix/util/file-system.hh"
+
 namespace nix {
 
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
@@ -92,7 +94,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            instead.) */
         Path chrootTmpDir = chrootRootDir + "/tmp";
         createDirs(chrootTmpDir);
-        chmod_(chrootTmpDir, 01777);
+        changeFileMode(chrootTmpDir, 01777);
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
@@ -126,7 +128,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            build user. */
         Path chrootStoreDir = chrootRootDir + store.storeDir;
         createDirs(chrootStoreDir);
-        chmod_(chrootStoreDir, 01775);
+        changeFileMode(chrootStoreDir, 01775);
 
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of '%1%'", chrootStoreDir);
