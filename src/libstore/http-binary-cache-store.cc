@@ -33,6 +33,12 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == '/')
         cacheUri.path.pop_back();
+
+    // For S3 stores, preserve query parameters as part of the URL
+    // These are needed for region specification and other S3-specific settings
+    if (scheme == "s3" && !params.empty()) {
+        cacheUri.query = params;
+    }
 }
 
 StoreReference HttpBinaryCacheStoreConfig::getReference() const
@@ -170,10 +176,14 @@ protected:
            `std::filesystem::path`'s equivalent operator, which properly
            combines the the URLs, whether the right is relative or
            absolute. */
-        return FileTransferRequest(
-            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-                ? path
-                : config->cacheUri.to_string() + "/" + path);
+        if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
+            return FileTransferRequest(path);
+        } else {
+            // Properly construct URL preserving query parameters
+            auto baseUrl = config->cacheUri;
+            baseUrl.path = baseUrl.path + "/" + path;
+            return FileTransferRequest(baseUrl.to_string());
+        }
     }
 
     void getFile(const std::string & path, Sink & sink) override
