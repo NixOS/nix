@@ -179,6 +179,6 @@ struct DerivationBuilder : RestrictionContext
 };
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 
 } // namespace nix

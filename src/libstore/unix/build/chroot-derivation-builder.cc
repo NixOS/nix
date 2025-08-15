@@ -5,7 +5,7 @@ namespace nix {
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 {
     ChrootDerivationBuilder(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
     {
     }
@@ -178,7 +178,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                     continue;
                 if (buildMode != bmCheck && status.known->isValid())
                     continue;
-                auto p = store.toRealPath(status.known->path);
+                auto p = store.Store::toRealPath(status.known->path);
                 if (pathExists(chrootRootDir + p))
                     std::filesystem::rename((chrootRootDir + p), p);
             }

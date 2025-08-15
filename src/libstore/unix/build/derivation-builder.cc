@@ -61,14 +61,14 @@ class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilder
 {
 protected:
 
-    Store & store;
+    LocalStore & store;
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
 public:
 
     DerivationBuilderImpl(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
@@ -424,13 +424,6 @@ void handleDiffHook(
 
 const Path DerivationBuilderImpl::homeDir = "/homeless-shelter";
 
-static LocalStore & getLocalStore(Store & store)
-{
-    auto p = dynamic_cast<LocalStore *>(&store);
-    assert(p);
-    return *p;
-}
-
 void DerivationBuilderImpl::killSandbox(bool getStats)
 {
     if (buildUser) {
@@ -631,10 +624,9 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
        so, we don't mark this build as a permanent failure. */
 #if HAVE_STATVFS
     {
-        auto & localStore = getLocalStore(store);
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(localStore.config->realStoreDir.get().c_str(), &st) == 0
+        if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
             && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
@@ -712,7 +704,7 @@ void DerivationBuilderImpl::startBuilder()
                 Magenta(drv.platform),
                 concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
                 Magenta(settings.thisSystem),
-                concatStringsSep<StringSet>(", ", store.config.systemFeatures));
+                concatStringsSep<StringSet>(", ", store.Store::config.systemFeatures));
 
         // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should
         // tell them to run the command to install Darwin 2
@@ -724,7 +716,7 @@ void DerivationBuilderImpl::startBuilder()
         throw BuildError(msg);
     }
 
-    auto buildDir = getLocalStore(store).config->getBuildDir();
+    auto buildDir = store.config->getBuildDir();
 
     createDirs(buildDir);
 
@@ -1173,7 +1165,7 @@ void DerivationBuilderImpl::startDaemon()
 
     auto store = makeRestrictedStore(
         [&] {
-            auto config = make_ref<LocalStore::Config>(*getLocalStore(this->store).config);
+            auto config = make_ref<LocalStore::Config>(*this->store.config);
             config->pathInfoCacheSize = 0;
             config->stateDir = "/no-such-path";
             config->logDir = "/no-such-path";
@@ -1430,8 +1422,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    Path checkSuffix = ".check";
-
     std::exception_ptr delayedException;
 
     /* The paths that can be referenced are the input closures, the
@@ -1466,23 +1456,19 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     std::map<std::string, struct stat> outputStats;
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
-        if (!scratchOutput)
-            throw BuildError(
-                "builder for '%s' has no scratch output for '%s'", store.printStorePath(drvPath), outputName);
+        assert(scratchOutput);
         auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
         /* Updated wanted info to remove the outputs we definitely don't need to register */
         auto initialOutput = get(initialOutputs, outputName);
-        if (!initialOutput)
-            throw BuildError(
-                "builder for '%s' has no initial output for '%s'", store.printStorePath(drvPath), outputName);
+        assert(initialOutput);
         auto & initialInfo = *initialOutput;
 
         /* Don't register if already valid, and not checking */
-        initialInfo.wanted = buildMode == bmCheck || !(initialInfo.known && initialInfo.known->isValid());
-        if (!initialInfo.wanted) {
+        bool wanted = buildMode == bmCheck || !(initialInfo.known && initialInfo.known->isValid());
+        if (!wanted) {
             outputReferencesIfUnregistered.insert_or_assign(
                 outputName, AlreadyRegistered{.path = initialInfo.known->path});
             continue;
@@ -1839,8 +1825,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
         }
 
-        auto & localStore = getLocalStore(store);
-
         if (buildMode == bmCheck) {
 
             if (!store.isValidPath(newInfo.path))
@@ -1849,7 +1833,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (newInfo.narHash != oldInfo.narHash) {
                 miscMethods->noteCheckMismatch();
                 if (settings.runDiffHook || settings.keepFailed) {
-                    auto dst = store.toRealPath(finalDestPath + checkSuffix);
+                    auto dst = store.toRealPath(finalDestPath + ".check");
                     deletePath(dst);
                     movePath(actualPath, dst);
 
@@ -1876,8 +1860,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* Since we verified the build, it's now ultimately trusted. */
             if (!oldInfo.ultimate) {
                 oldInfo.ultimate = true;
-                localStore.signPathInfo(oldInfo);
-                localStore.registerValidPaths({{oldInfo.path, oldInfo}});
+                store.signPathInfo(oldInfo);
+                store.registerValidPaths({{oldInfo.path, oldInfo}});
             }
 
             continue;
@@ -1891,12 +1875,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 debug("unreferenced input: '%1%'", store.printStorePath(i));
         }
 
-        localStore.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+        store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
         miscMethods->markContentsGood(newInfo.path);
 
         newInfo.deriver = drvPath;
         newInfo.ultimate = true;
-        localStore.signPathInfo(newInfo);
+        store.signPathInfo(newInfo);
 
         finish(newInfo.path);
 
@@ -1904,7 +1888,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            isn't statically known so that we can safely unlock the path before
            the next iteration */
         if (newInfo.ca)
-            localStore.registerValidPaths({{newInfo.path, newInfo}});
+            store.registerValidPaths({{newInfo.path, newInfo}});
 
         infos.emplace(outputName, std::move(newInfo));
     }
@@ -1925,13 +1909,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
     {
-        auto & localStore = getLocalStore(store);
-
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
             infos2.insert_or_assign(newInfo.path, newInfo);
         }
-        localStore.registerValidPaths(infos2);
+        store.registerValidPaths(infos2);
     }
 
     /* In case of a fixed-output derivation hash mismatch, throw an
@@ -2164,7 +2146,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 namespace nix {
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    Store & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
     bool useSandbox = false;
 
@@ -2191,8 +2173,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    auto & localStore = getLocalStore(store);
-    if (localStore.storeDir != localStore.config->realStoreDir.get()) {
+    if (store.storeDir != store.config->realStoreDir.get()) {
 #ifdef __linux__
         useSandbox = true;
 #else

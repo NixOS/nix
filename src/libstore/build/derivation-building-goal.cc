@@ -157,9 +157,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        we care about all outputs. */
     auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
     for (auto & [outputName, outputHash] : outputHashes) {
-        InitialOutput v{
-            .wanted = true, // Will be refined later
-            .outputHash = outputHash};
+        InitialOutput v{.outputHash = outputHash};
 
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
@@ -675,10 +673,13 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 }
             };
 
+            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+            assert(localStoreP);
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
-                worker.store,
+                *localStoreP,
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
                     drvPath,
@@ -1202,7 +1203,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
             // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())
             continue;
         auto & info = *initialOutput;
-        info.wanted = true;
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -1237,8 +1237,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
 
     bool allValid = true;
     for (auto & [_, status] : initialOutputs) {
-        if (!status.wanted)
-            continue;
         if (!status.known || !status.known->isValid()) {
             allValid = false;
             break;
