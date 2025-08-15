@@ -27,12 +27,18 @@ using json = nlohmann::json;
 
 namespace nix {
 
-bool MixStoreDirMethods::isInStore(PathView path) const
+StoreConfig::StoreConfig(const Params & params)
+    : StoreConfigBase(params)
+    , StoreDirConfig{storeDir_}
+{
+}
+
+bool StoreDirConfig::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
-std::pair<StorePath, Path> MixStoreDirMethods::toStorePath(PathView path) const
+std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -293,7 +299,7 @@ StringSet Store::Config::getDefaultSystemFeatures()
 }
 
 Store::Store(const Store::Config & config)
-    : MixStoreDirMethods{config}
+    : StoreDirConfig{config}
     , config{config}
     , state({(size_t) config.pathInfoCacheSize})
 {
@@ -1082,7 +1088,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
     return std::optional<ValidPathInfo>(std::move(info));
 }
 
-std::string MixStoreDirMethods::showPaths(const StorePathSet & paths) const
+std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
 {
     std::string s;
     for (auto & i : paths) {

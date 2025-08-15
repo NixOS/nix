@@ -82,6 +82,25 @@ struct MissingPaths
 };
 
 /**
+ * Need to make this a separate class so I can get the right
+ * initialization order in the constructor for `StoreConfig`.
+ */
+struct StoreConfigBase : Config
+{
+    using Config::Config;
+
+    const PathSetting storeDir_{
+        this,
+        settings.nixStore,
+        "store",
+        R"(
+          Logical location of the Nix store, usually
+          `/nix/store`. Note that you can only copy store paths
+          between stores if they have the same `store` setting.
+        )"};
+};
+
+/**
  * About the class hierarchy of the store types:
  *
  * Each store type `Foo` consists of two classes:
@@ -107,10 +126,17 @@ struct MissingPaths
  * ```
  * cpp static RegisterStoreImplementation<FooConfig> regStore;
  * ```
+ *
+ * @note The order of `StoreConfigBase` and then `StorerConfig` is
+ * very important. This ensures that `StoreConfigBase::storeDir_`
+ * is initialized before we have our one chance (because references are
+ * immutable) to initialize `StoreConfig::storeDir`.
  */
-struct StoreConfig : public StoreDirConfig
+struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
-    using StoreDirConfig::StoreDirConfig;
+    using Params = StoreReference::Params;
+
+    StoreConfig(const Params & params);
 
     StoreConfig() = delete;
 
@@ -233,7 +259,7 @@ struct StoreConfig : public StoreDirConfig
  * underlying resource, which could be an external process (daemon
  * server), file system state, etc.
  */
-class Store : public std::enable_shared_from_this<Store>, public MixStoreDirMethods
+class Store : public std::enable_shared_from_this<Store>, public StoreDirConfig
 {
 public:
 
