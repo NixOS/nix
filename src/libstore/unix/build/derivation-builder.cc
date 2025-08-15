@@ -1128,8 +1128,10 @@ void DerivationBuilderImpl::initEnv()
 
 void DerivationBuilderImpl::writeSupplementaryInformation()
 {
+    auto referenceGraph = drvOptions.getParsedExpandedExportReferencesGraph(store, inputPaths);
+
     if (drv.structuredAttrs) {
-        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
+        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, referenceGraph, drv.outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1147,7 +1149,7 @@ void DerivationBuilderImpl::writeSupplementaryInformation()
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
     } else {
         /* Handle exportReferencesGraph(), if set. */
-        for (auto & [fileName, closure] : drvOptions.getParsedExpandedExportReferencesGraph(store, inputPaths)) {
+        for (auto & [fileName, closure] : referenceGraph) {
             /* Write closure info to <fileName>. */
             writeFile(tmpDir + "/" + fileName, store.makeValidityRegistration(closure, false, false));
         }

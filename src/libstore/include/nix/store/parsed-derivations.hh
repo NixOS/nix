@@ -47,8 +47,7 @@ struct StructuredAttrs
 
     nlohmann::json prepareStructuredAttrs(
         Store & store,
-        const DerivationOptions & drvOptions,
-        const StorePathSet & inputPaths,
+        const std::map<std::string, StorePathSet> & referenceGraph,
         const DerivationOutputs & outputs) const;
 
     /**
