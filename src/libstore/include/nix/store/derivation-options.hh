@@ -117,6 +117,24 @@ struct DerivationOptions
     std::map<std::string, StringSet> exportReferencesGraph;
 
     /**
+     * Once a derivations is resolved, the strings in in
+     * `exportReferencesGraph` should all be store paths (with possible
+     * suffix paths, but those are discarded).
+     *
+     * Parse those paths, and then expand them into their closures in
+     * the way that is expected at build time.
+     *
+     * @todo Ideally, `exportReferencesGraph` would just store
+     * `StorePath`s for this, but we can't just do that, because for CA
+     * derivations they is actually in general `DerivedPath`s (via
+     * placeholder strings) until the derivation is resolved and exact
+     * inputs store paths are known. We can use better types for that
+     * too, but that is a longer project.
+     */
+    std::map<std::string, StorePathSet>
+    getParsedExpandedExportReferencesGraph(Store & store, const StorePathSet & inputWhitelist) const;
+
+    /**
      * env: __sandboxProfile
      *
      * Just for Darwin
