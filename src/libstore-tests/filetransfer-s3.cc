@@ -1,5 +1,8 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/config.hh"
+#include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/types.hh"
 
 #if NIX_WITH_AWS_CRT_SUPPORT
 
@@ -154,6 +157,106 @@ TEST_F(S3FileTransferTest, regionExtraction)
         // We would need access to internal parsing to verify regions
         // For now, just verify the URL is recognized as S3
         EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL: " << url;
+    }
+}
+
+/**
+ * Regression test for commit 7a2f2891e
+ * Test that S3 store URLs are properly recognized and handled
+ */
+TEST_F(S3FileTransferTest, s3StoreRegistration)
+{
+    // Test that S3 URI scheme is in the supported schemes
+    auto schemes = HttpBinaryCacheStoreConfig::uriSchemes();
+    EXPECT_TRUE(schemes.count("s3") > 0) << "S3 scheme should be in supported URI schemes";
+
+    // Test that S3 store can be opened without error
+    try {
+        auto storeUrl = "s3://test-bucket";
+        auto parsedUrl = parseURL(storeUrl);
+        EXPECT_EQ(parsedUrl.scheme, "s3");
+
+        // Verify that HttpBinaryCacheStoreConfig accepts S3 URLs
+        HttpBinaryCacheStoreConfig config("s3", "test-bucket", {});
+        EXPECT_EQ(config.cacheUri.scheme, "s3");
+        EXPECT_EQ(config.cacheUri.authority->host, "test-bucket");
+    } catch (const std::exception & e) {
+        FAIL() << "Should be able to create S3 store config: " << e.what();
+    }
+}
+
+/**
+ * Regression test for commit c0164e087
+ * Test that S3 uploads are not rejected with "not supported" error
+ */
+TEST_F(S3FileTransferTest, s3UploadsNotRejected)
+{
+    auto ft = makeFileTransfer();
+
+    // Create a mock upload request
+    FileTransferRequest uploadReq("s3://test-bucket/test-file");
+    uploadReq.data = std::string("test data");
+
+    // This should not throw "uploading to 's3://...' is not supported"
+    // We're testing that S3 uploads aren't immediately rejected
+    bool gotNotSupportedError = false;
+    try {
+        ft->upload(uploadReq);
+    } catch (const Error & e) {
+        std::string msg = e.what();
+        if (msg.find("is not supported") != std::string::npos) {
+            gotNotSupportedError = true;
+        }
+    } catch (...) {
+        // Other errors are expected (no credentials, network issues, etc.)
+    }
+
+    EXPECT_FALSE(gotNotSupportedError) << "S3 uploads should not be rejected with 'not supported' error";
+}
+
+/**
+ * Regression test for commit e618ac7e0
+ * Test that S3 URLs with region query parameters are handled correctly
+ */
+TEST_F(S3FileTransferTest, s3RegionQueryParameters)
+{
+    // Test that query parameters are preserved in S3 URLs
+    StringMap params;
+    params["region"] = "us-west-2";
+
+    HttpBinaryCacheStoreConfig config("s3", "test-bucket", params);
+
+    // For S3 stores, query parameters should be preserved
+    EXPECT_FALSE(config.cacheUri.query.empty()) << "S3 store should preserve query parameters";
+    EXPECT_EQ(config.cacheUri.query["region"], "us-west-2") << "Region parameter should be preserved";
+
+    // Test with different regions
+    StringMap params2;
+    params2["region"] = "eu-central-1";
+
+    HttpBinaryCacheStoreConfig config2("s3", "another-bucket", params2);
+    EXPECT_EQ(config2.cacheUri.query["region"], "eu-central-1") << "Different region parameter should be preserved";
+}
+
+/**
+ * Test S3 URL parsing with various query parameters
+ */
+TEST_F(S3FileTransferTest, s3UrlParsingWithQueryParams)
+{
+    // Test various S3 URLs with query parameters
+    std::vector<std::tuple<std::string, std::string, std::string, std::string>> testCases = {
+        {"s3://bucket/key?region=us-east-2", "s3", "bucket", "us-east-2"},
+        {"s3://my-bucket/path/to/file?region=eu-west-1", "s3", "my-bucket", "eu-west-1"},
+        {"s3://test/obj?region=ap-south-1", "s3", "test", "ap-south-1"},
+    };
+
+    for (const auto & [url, expectedScheme, expectedBucket, expectedRegion] : testCases) {
+        auto parsed = parseURL(url);
+        EXPECT_EQ(parsed.scheme, expectedScheme) << "URL: " << url;
+        EXPECT_EQ(parsed.authority->host, expectedBucket) << "URL: " << url;
+        if (!expectedRegion.empty()) {
+            EXPECT_EQ(parsed.query["region"], expectedRegion) << "URL: " << url;
+        }
     }
 }
 
