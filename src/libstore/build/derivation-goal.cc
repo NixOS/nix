@@ -34,11 +34,10 @@ DerivationGoal::DerivationGoal(
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
     , outputHash{[&] {
-        if (auto * mOutputHash = get(staticOutputHashes(worker.evalStore, drv), wantedOutput))
+        auto outputHashes = staticOutputHashes(worker.evalStore, drv);
+        if (auto * mOutputHash = get(outputHashes, wantedOutput))
             return *mOutputHash;
-        else
-            throw Error(
-                "derivation '%s' does not have output '%s'", worker.store.printStorePath(drvPath), wantedOutput);
+        throw Error("derivation '%s' does not have output '%s'", worker.store.printStorePath(drvPath), wantedOutput);
     }()}
     , buildMode(buildMode)
 {
