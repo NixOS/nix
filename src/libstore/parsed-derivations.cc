@@ -113,10 +113,7 @@ nlohmann::json StructuredAttrs::prepareStructuredAttrs(
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, inputPaths] : drvOptions.exportReferencesGraph) {
-        StorePathSet storePaths;
-        for (auto & p : inputPaths)
-            storePaths.insert(store.toStorePath(p).first);
+    for (auto & [key, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
         json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, storePaths));
     }
 

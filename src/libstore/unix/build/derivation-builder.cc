@@ -785,17 +785,11 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Handle exportReferencesGraph(), if set. */
     if (!drv.structuredAttrs) {
-        for (auto & [fileName, ss] : drvOptions.exportReferencesGraph) {
-            StorePathSet storePathSet;
-            for (auto & storePathS : ss) {
-                if (!store.isInStore(storePathS))
-                    throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-                storePathSet.insert(store.toStorePath(storePathS).first);
-            }
+        for (auto & [fileName, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
             /* Write closure info to <fileName>. */
             writeFile(
                 tmpDir + "/" + fileName,
-                store.makeValidityRegistration(store.exportReferences(storePathSet, inputPaths), false, false));
+                store.makeValidityRegistration(store.exportReferences(storePaths, inputPaths), false, false));
         }
     }
 
