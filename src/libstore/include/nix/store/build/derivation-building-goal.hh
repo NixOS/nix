@@ -174,8 +174,6 @@ struct DerivationBuildingGoal : public Goal
 
     void appendLogTailErrorMsg(std::string & msg);
 
-    StorePathSet exportReferences(const StorePathSet & storePaths);
-
     JobCategory jobCategory() const override
     {
         return JobCategory::Build;
