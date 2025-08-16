@@ -89,6 +89,7 @@ this_exe = executable(
   link_args : linker_export_flags + [ '-lrapidcheck' ],
   # get main from gtest
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 test(
