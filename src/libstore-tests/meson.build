@@ -94,6 +94,7 @@ this_exe = executable(
   link_args : linker_export_flags + [ '-lrapidcheck' ],
   # get main from gtest
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 test(
@@ -127,6 +128,7 @@ if get_option('benchmarks')
     include_directories : include_dirs,
     link_args : linker_export_flags,
     install : true,
+    cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
     cpp_args : [
       '-DNIX_UNIT_TEST_DATA="' + meson.current_source_dir() + '/data"',
     ],
