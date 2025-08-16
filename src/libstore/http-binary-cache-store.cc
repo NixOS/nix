@@ -87,7 +87,11 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri.to_string())) {
+        // For consistent cache key handling, use the reference without parameters
+        // This matches what's used in Store::queryPathInfo() lookups
+        auto cacheKey = config->getReference().render(/*withParams=*/false);
+
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
@@ -96,8 +100,7 @@ public:
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
             }
-            diskCache->createCache(
-                config->cacheUri.to_string(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -179,10 +182,24 @@ protected:
         if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
             return FileTransferRequest(path);
         } else {
-            // Properly construct URL preserving query parameters
-            auto baseUrl = config->cacheUri;
-            baseUrl.path = baseUrl.path + "/" + path;
-            return FileTransferRequest(baseUrl.to_string());
+            // For S3 URLs, we need to properly construct the URL with path before query parameters
+            if (config->cacheUri.scheme == "s3") {
+                auto s3Url = config->cacheUri;
+
+                // Check if path contains its own query parameters
+                auto questionPos = path.find('?');
+                if (questionPos != std::string::npos) {
+                    // Path has query params - don't include base query params
+                    s3Url.query.clear();
+                }
+
+                // Append the path and reconstruct with query parameters in the right place
+                s3Url.path = s3Url.path + "/" + path;
+                return FileTransferRequest(s3Url.to_string());
+            } else {
+                // For non-S3 URLs, use the original simpler approach
+                return FileTransferRequest(config->cacheUri.to_string() + "/" + path);
+            }
         }
     }
 

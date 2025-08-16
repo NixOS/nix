@@ -918,8 +918,23 @@ struct curlFileTransfer : public FileTransfer
 
             if (!endpoint.empty()) {
                 // Custom endpoint (e.g., MinIO, custom S3-compatible service)
-                httpsUrl.authority = ParsedURL::Authority{.host = endpoint};
-                httpsUrl.path = "/" + bucket + "/" + key;
+                // Parse the endpoint if it's a full URL
+                if (hasPrefix(endpoint, "http://") || hasPrefix(endpoint, "https://")) {
+                    try {
+                        auto endpointUrl = parseURL(endpoint);
+                        httpsUrl.scheme = endpointUrl.scheme;
+                        httpsUrl.authority = endpointUrl.authority;
+                        httpsUrl.path = "/" + bucket + "/" + key;
+                    } catch (BadURL & e) {
+                        // If parsing fails, treat it as a hostname
+                        httpsUrl.authority = ParsedURL::Authority{.host = endpoint};
+                        httpsUrl.path = "/" + bucket + "/" + key;
+                    }
+                } else {
+                    // Endpoint is just a hostname
+                    httpsUrl.authority = ParsedURL::Authority{.host = endpoint};
+                    httpsUrl.path = "/" + bucket + "/" + key;
+                }
             } else {
                 // Standard AWS S3 endpoint
                 httpsUrl.authority = ParsedURL::Authority{.host = "s3." + region + ".amazonaws.com"};
@@ -952,8 +967,8 @@ struct curlFileTransfer : public FileTransfer
                 key = key.substr(1);
             }
 
-            if (key.empty())
-                throw nix::Error("S3 URI missing object key");
+            // Allow empty keys for store-level operations
+            // The key will be filled in by the specific operation (e.g., "nix-cache-info")
 
             return S3Url{.bucket = bucket, .key = key, .params = parsed.query};
         } catch (BadURL & e) {
