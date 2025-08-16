@@ -1,48 +1,33 @@
+#include "nix/store/dummy-store.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/callback.hh"
 
 namespace nix {
 
-struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
+DummyStoreConfig::DummyStoreConfig(
+    std::string_view scheme, std::string_view authority, const StoreConfig::Params & params)
+    : StoreConfig{params}
 {
-    using StoreConfig::StoreConfig;
+    if (!authority.empty())
+        throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
+}
 
-    DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
-    {
-        if (!authority.empty())
-            throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
-    }
-
-    static const std::string name()
-    {
-        return "Dummy Store";
-    }
-
-    static std::string doc()
-    {
-        return
+std::string DummyStoreConfig::doc()
+{
+    return
 #include "dummy-store.md"
-            ;
-    }
+        ;
+}
 
-    static StringSet uriSchemes()
-    {
-        return {"dummy"};
-    }
-
-    ref<Store> openStore() const override;
-
-    StoreReference getReference() const override
-    {
-        return {
-            .variant =
-                StoreReference::Specified{
-                    .scheme = *uriSchemes().begin(),
-                },
-        };
-    }
-};
+StoreReference DummyStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+    };
+}
 
 struct DummyStore : virtual Store
 {

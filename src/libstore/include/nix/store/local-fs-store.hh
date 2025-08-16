@@ -7,9 +7,22 @@
 
 namespace nix {
 
-struct LocalFSStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct LocalFSStoreConfigT
 {
-    using StoreConfig::StoreConfig;
+    F<std::optional<Path>> rootDir;
+    F<Path> stateDir;
+    F<Path> logDir;
+    F<Path> realStoreDir;
+};
+
+struct LocalFSStoreConfig : LocalFSStoreConfigT<config::PlainValue>
+{
+    const Store::Config & storeConfig;
+
+    static config::SettingDescriptionMap descriptions();
+
+    LocalFSStoreConfig(const Store::Config & storeConfig, const StoreConfig::Params &);
 
     /**
      * Used to override the `root` settings. Can't be done via modifying
@@ -18,24 +31,7 @@ struct LocalFSStoreConfig : virtual StoreConfig
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
-
-    OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
-
-    PathSetting stateDir{
-        this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
-        "state",
-        "Directory where Nix stores state."};
-
-    PathSetting logDir{
-        this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
-        "log",
-        "directory where Nix stores log files."};
-
-    PathSetting realStoreDir{
-        this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
+    LocalFSStoreConfig(const Store::Config & storeConfig, PathView path, const StoreConfig::Params & params);
 };
 
 struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
