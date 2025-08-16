@@ -179,9 +179,23 @@ protected:
         if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
             return FileTransferRequest(path);
         } else {
-            // Properly construct URL preserving query parameters
+            // Construct the URL
             auto baseUrl = config->cacheUri;
+            
+            // Check if the path contains its own query parameters
+            auto questionPos = path.find('?');
+            if (questionPos != std::string::npos && baseUrl.scheme != "s3") {
+                // For non-S3 URLs with path query params, clear base query params
+                baseUrl.query.clear();
+            }
+            
+            // For S3 URLs, preserve query parameters as they contain
+            // important configuration like region and endpoint
+            // The filetransfer layer will handle these appropriately
+            
+            // Append the path
             baseUrl.path = baseUrl.path + "/" + path;
+            
             return FileTransferRequest(baseUrl.to_string());
         }
     }

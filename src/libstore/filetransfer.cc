@@ -952,9 +952,9 @@ struct curlFileTransfer : public FileTransfer
                 key = key.substr(1);
             }
 
-            if (key.empty())
-                throw nix::Error("S3 URI missing object key");
-
+            // Allow empty keys for store-level operations
+            // The key will be filled in by the specific operation (e.g., "nix-cache-info")
+            
             return S3Url{.bucket = bucket, .key = key, .params = parsed.query};
         } catch (BadURL & e) {
             throw nix::Error("invalid S3 URI '%s': %s", uri, e.what());
