@@ -55,7 +55,9 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'args.cc',
   'common-args.cc',
+  'configuration.cc',
   'loggers.cc',
   'plugin.cc',
   'progress-bar.cc',
