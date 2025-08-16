@@ -171,7 +171,7 @@ static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun) __attribute__((
 static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 {
 #ifdef __linux__
-    pid_t pid = allowVfork ? vfork() : fork();
+    pid_t pid = allowVfork ? vfork() : fork(); // NOLINT(clang-analyzer-unix.Vfork,clang-analyzer-security.insecureAPI.vfork)
 #else
     pid_t pid = fork();
 #endif

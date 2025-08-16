@@ -201,7 +201,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 TEST_F(nix_api_expr_test, nix_build_and_init_attr)
 {
     int size = 10;
-    const char ** out_name = (const char **) malloc(sizeof(char *));
+    auto out_name_ptr = std::make_unique<const char *>();
 
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, size);
 
@@ -222,9 +222,9 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     ASSERT_EQ(42, nix_get_int(ctx, out_value));
     nix_gc_decref(ctx, out_value);
 
-    out_value = nix_get_attr_byidx(ctx, value, state, 0, out_name);
+    out_value = nix_get_attr_byidx(ctx, value, state, 0, out_name_ptr.get());
     ASSERT_EQ(42, nix_get_int(ctx, out_value));
-    ASSERT_STREQ("a", *out_name);
+    ASSERT_STREQ("a", *out_name_ptr);
     nix_gc_decref(ctx, out_value);
 
     ASSERT_STREQ("a", nix_get_attr_name_byidx(ctx, value, state, 0));
@@ -238,10 +238,10 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     ASSERT_STREQ("foo", string_value.c_str());
     nix_gc_decref(nullptr, out_value);
 
-    out_value = nix_get_attr_byidx(ctx, value, state, 1, out_name);
+    out_value = nix_get_attr_byidx(ctx, value, state, 1, out_name_ptr.get());
     nix_get_string(ctx, out_value, OBSERVE_STRING(string_value));
     ASSERT_STREQ("foo", string_value.c_str());
-    ASSERT_STREQ("b", *out_name);
+    ASSERT_STREQ("b", *out_name_ptr);
     nix_gc_decref(nullptr, out_value);
 
     ASSERT_STREQ("b", nix_get_attr_name_byidx(ctx, value, state, 1));
@@ -252,7 +252,6 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     // Clean up
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
-    free(out_name);
 }
 
 TEST_F(nix_api_expr_test, nix_value_init)
