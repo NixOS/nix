@@ -15,6 +15,10 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     auto ret = StringSet{"http", "https"};
     if (forceHttp)
         ret.insert("file");
+#if NIX_WITH_AWS_CRT_SUPPORT
+    // S3 support is now handled via curl with AWS SigV4 authentication
+    ret.insert("s3");
+#endif
     return ret;
 }
 
@@ -29,6 +33,12 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == '/')
         cacheUri.path.pop_back();
+
+    // For S3 stores, preserve query parameters as part of the URL
+    // These are needed for region specification and other S3-specific settings
+    if (scheme == "s3" && !params.empty()) {
+        cacheUri.query = params;
+    }
 }
 
 StoreReference HttpBinaryCacheStoreConfig::getReference() const
@@ -166,10 +176,28 @@ protected:
            `std::filesystem::path`'s equivalent operator, which properly
            combines the the URLs, whether the right is relative or
            absolute. */
-        return FileTransferRequest(
-            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-                ? path
-                : config->cacheUri.to_string() + "/" + path);
+        if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
+            return FileTransferRequest(path);
+        } else {
+            // Construct the URL
+            auto baseUrl = config->cacheUri;
+            
+            // Check if the path contains its own query parameters
+            auto questionPos = path.find('?');
+            if (questionPos != std::string::npos && baseUrl.scheme != "s3") {
+                // For non-S3 URLs with path query params, clear base query params
+                baseUrl.query.clear();
+            }
+            
+            // For S3 URLs, preserve query parameters as they contain
+            // important configuration like region and endpoint
+            // The filetransfer layer will handle these appropriately
+            
+            // Append the path
+            baseUrl.path = baseUrl.path + "/" + path;
+            
+            return FileTransferRequest(baseUrl.to_string());
+        }
     }
 
     void getFile(const std::string & path, Sink & sink) override
