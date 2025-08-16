@@ -11,28 +11,6 @@ namespace nix {
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 
-/**
- * Drop trailing shevron for output installable syntax.
- *
- * FIXME: parseURL shouldn't really be used for parsing the OutputSpec, but it does
- * get used. That code should actually use ExtendedOutputsSpec::parseOpt.
- */
-static std::string_view dropShevronSuffix(std::string_view url)
-{
-    auto shevron = url.rfind("^");
-    if (shevron == std::string_view::npos)
-        return url;
-    return url.substr(0, shevron);
-}
-
-/**
- * Percent encode spaces in the url.
- */
-static std::string percentEncodeSpaces(std::string_view url)
-{
-    return replaceStrings(std::string(url), " ", percentEncode(" "));
-}
-
 ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthority)
 {
     auto parsed = boost::urls::parse_authority(encodedAuthority);
@@ -108,14 +86,65 @@ std::string ParsedURL::Authority::to_string() const
     return std::move(oss).str();
 }
 
+/**
+ * Additional characters that don't need URL encoding in the fragment.
+ */
+static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInFragment = " \"^";
+
+/**
+ * Additional characters that don't need URL encoding in the query.
+ */
+static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInQuery = " \"";
+
+static std::string percentEncodeCharSet(std::string_view s, auto charSet)
+{
+    std::string res;
+    for (auto c : s) {
+        if (charSet(c))
+            res += percentEncode(std::string_view{&c, &c + 1});
+        else
+            res += c;
+    }
+    return res;
+}
+
 ParsedURL parseURL(const std::string & url)
 try {
-    /* Drop the shevron suffix used for the flakerefs. Shevron character is reserved and
-       shouldn't appear in normal URIs. */
-    auto unparsedView = dropShevronSuffix(url);
-    /* For back-compat literal spaces are allowed. */
-    auto withFixedSpaces = percentEncodeSpaces(unparsedView);
-    auto urlView = boost::urls::url_view(withFixedSpaces);
+    auto unparsedView = url;
+
+    /* Account for several non-standard properties of nix urls (for back-compat):
+     *  - Allow unescaped spaces ' ' and '"' characters in queries.
+     *  - Allow '"', ' ' and '^' characters in the fragment component.
+     * We could write our own grammar for this, but fixing it up here seems
+     * more concise, since the deviation is rather minor.
+     */
+    std::string fixedEncodedUrl = [&]() {
+        std::string fixed;
+        std::string_view view = url;
+
+        if (auto beforeQuery = splitPrefixTo(view, '?')) {
+            fixed += *beforeQuery;
+            fixed += '?';
+            auto fragmentStart = view.find('#');
+            auto queryView = view.substr(0, fragmentStart);
+            auto fixedQuery = percentEncodeCharSet(queryView, extraAllowedCharsInQuery);
+            fixed += fixedQuery;
+            view.remove_prefix(std::min(fragmentStart, view.size()));
+        }
+
+        if (auto beforeFragment = splitPrefixTo(view, '#')) {
+            fixed += *beforeFragment;
+            fixed += '#';
+            auto fixedFragment = percentEncodeCharSet(view, extraAllowedCharsInFragment);
+            fixed += fixedFragment;
+            return fixed;
+        }
+
+        fixed += view;
+        return fixed;
+    }();
+
+    auto urlView = boost::urls::url_view(fixedEncodedUrl);
 
     if (!urlView.has_scheme())
         throw BadURL("'%s' doesn't have a scheme", url);
@@ -176,12 +205,12 @@ std::string percentEncode(std::string_view s, std::string_view keep)
 
 StringMap decodeQuery(const std::string & query)
 try {
-    /* For back-compat literal spaces are allowed. */
-    auto withFixedSpaces = percentEncodeSpaces(query);
+    /* For back-compat unescaped characters are allowed. */
+    auto fixedEncodedQuery = percentEncodeCharSet(query, extraAllowedCharsInQuery);
 
     StringMap result;
 
-    auto encodedQuery = boost::urls::params_encoded_view(withFixedSpaces);
+    auto encodedQuery = boost::urls::params_encoded_view(fixedEncodedQuery);
     for (auto && [key, value, value_specified] : encodedQuery) {
         if (!value_specified) {
             warn("dubious URI query '%s' is missing equal sign '%s', ignoring", std::string_view(key), "=");
