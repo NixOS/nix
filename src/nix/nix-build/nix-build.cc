@@ -595,7 +595,8 @@ static void main_nix_build(int argc, char ** argv)
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
-            auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
+            auto json = drv.structuredAttrs->prepareStructuredAttrs(
+                *store, drvOptions.getParsedExpandedExportReferencesGraph(*store, inputs), drv.outputs);
 
             structuredAttrsRC = StructuredAttrs::writeShell(json);
 

@@ -289,9 +289,14 @@ protected:
 private:
 
     /**
-     * Write a JSON file containing the derivation attributes.
+     * In the structured attrs case, write a JSON file containing the
+     * derivation attributes.
+     *
+     * In the non-structured attrs case, convey the export graph
+     * information (which is also part of the structured attrs JSON) in
+     * the old text file format way.
      */
-    void writeStructuredAttrs();
+    void writeSupplementaryInformation();
 
     /**
      * Start an in-process nix daemon thread for recursive-nix.
@@ -796,23 +801,7 @@ void DerivationBuilderImpl::startBuilder()
     /* Construct the environment passed to the builder. */
     initEnv();
 
-    writeStructuredAttrs();
-
-    /* Handle exportReferencesGraph(), if set. */
-    if (!drv.structuredAttrs) {
-        for (auto & [fileName, ss] : drvOptions.exportReferencesGraph) {
-            StorePathSet storePathSet;
-            for (auto & storePathS : ss) {
-                if (!store.isInStore(storePathS))
-                    throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-                storePathSet.insert(store.toStorePath(storePathS).first);
-            }
-            /* Write closure info to <fileName>. */
-            writeFile(
-                tmpDir + "/" + fileName,
-                store.makeValidityRegistration(store.exportReferences(storePathSet, inputPaths), false, false));
-        }
-    }
+    writeSupplementaryInformation();
 
     prepareSandbox();
 
@@ -1137,10 +1126,12 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::writeStructuredAttrs()
+void DerivationBuilderImpl::writeSupplementaryInformation()
 {
+    auto referenceGraph = drvOptions.getParsedExpandedExportReferencesGraph(store, inputPaths);
+
     if (drv.structuredAttrs) {
-        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
+        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, referenceGraph, drv.outputs);
         nlohmann::json rewritten;
         for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
             /* The placeholder must have a rewrite, so we use it to cover both the
@@ -1156,6 +1147,12 @@ void DerivationBuilderImpl::writeStructuredAttrs()
         env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
         writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
         env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
+    } else {
+        /* Handle exportReferencesGraph(), if set. */
+        for (auto & [fileName, closure] : referenceGraph) {
+            /* Write closure info to <fileName>. */
+            writeFile(tmpDir + "/" + fileName, store.makeValidityRegistration(closure, false, false));
+        }
     }
 }
 
