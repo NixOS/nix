@@ -115,6 +115,16 @@ __dumpEnv() {
         printf '\n  }'
     fi
 
+    printf ',\n  "meta": {\n    '
+    # min-bash-version is supposed to be an integer.
+    # If not, just ignore it.
+    if [[ -n "${NIX_ENV_MIN_BASH_VERSION-}" && "$NIX_ENV_MIN_BASH_VERSION" -eq "$NIX_ENV_MIN_BASH_VERSION" ]]; then
+        __escapeString "min-bash-version"
+        printf ': '
+        printf '%d' "${NIX_ENV_MIN_BASH_VERSION}"
+    fi
+    printf '\n  }'
+
     printf '\n}'
 }
 
