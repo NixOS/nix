@@ -2,7 +2,7 @@
 
 namespace nix {
 
-struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
+struct ChrootDerivationBuilder : virtual DerivationBuilderImpl, SandboxIDMap
 {
     ChrootDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
@@ -54,7 +54,12 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         return settings.sandboxBuildDir;
     }
 
-    virtual gid_t sandboxGid()
+    virtual uid_t sandboxUid() const override
+    {
+        return buildUser->getUID();
+    }
+
+    virtual gid_t sandboxGid() const override
     {
         return buildUser->getGID();
     }
@@ -74,7 +79,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create '%s'", chrootRootDir);
+            throw SysError("cannot create '%s'", chrootParentDir);
 
         chrootRootDir = chrootParentDir + "/root";
 
@@ -94,9 +99,6 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         createDirs(chrootTmpDir);
         chmod_(chrootTmpDir, 01777);
 
-        /* Create a /etc/passwd with entries for the build user and the
-           nobody account.  The latter is kind of a hack to support
-           Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
         if (drvOptions.useUidRange(drv))
             chownToBuilder(chrootRootDir + "/etc");
@@ -104,14 +106,14 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
+        /* Create a /etc/passwd with entries for the build user and the
+           nobody account.  The latter is kind of a hack to support
+           Samba-in-QEMU. */
+        writeEtcPasswd(chrootRootDir + "/etc/passwd");
+
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */
-        writeFile(
-            chrootRootDir + "/etc/group",
-            fmt("root:x:0:\n"
-                "nixbld:!:%1%:\n"
-                "nogroup:x:65534:\n",
-                sandboxGid()));
+        writeEtcGroups(chrootRootDir + "/etc/group");
 
         /* Create /etc/hosts with localhost entry. */
         if (derivationType.isSandboxed())

@@ -10,6 +10,7 @@
 #include <sys/resource.h>
 #include "nix/util/cgroup.hh"
 
+#include <grp.h>
 #include <sys/mount.h>
 
 namespace nix {

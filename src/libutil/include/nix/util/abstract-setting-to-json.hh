@@ -13,6 +13,7 @@ std::map<std::string, nlohmann::json> BaseSetting<T>::toJSONObject() const
     obj.emplace("value", value);
     obj.emplace("defaultValue", defaultValue);
     obj.emplace("documentDefault", documentDefault);
+    obj.emplace("jsonSchema", jsonSchema);
     return obj;
 }
 } // namespace nix
