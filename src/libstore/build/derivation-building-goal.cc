@@ -491,6 +491,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     bool useHook;
 
+    const ExternalBuilder * externalBuilder = nullptr;
+
     while (true) {
         trace("trying to build");
 
@@ -584,7 +586,42 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 co_await waitForAWhile();
                 continue;
             case rpDecline:
-                /* We should do it ourselves. */
+                /* We should do it ourselves.
+
+                   Now that we've decided we can't / won't do a remote build, check
+                   that we can in fact build locally. First see if there is an
+                   external builder for a "semi-local build". If there is, prefer to
+                   use that. If there is not, then check if we can do a "true" local
+                   build. */
+
+                externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
+
+                if (!externalBuilder && !drvOptions->canBuildLocally(worker.store, *drv)) {
+                    auto msg =
+                        fmt("Cannot build '%s'.\n"
+                            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
+                            "\n"
+                            "Required system: '%s' with features {%s}\n"
+                            "Current system: '%s' with features {%s}",
+                            Magenta(worker.store.printStorePath(drvPath)),
+                            Magenta(drv->platform),
+                            concatStringsSep(", ", drvOptions->getRequiredSystemFeatures(*drv)),
+                            Magenta(settings.thisSystem),
+                            concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
+
+                    // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
+                    // we should tell them to run the command to install Darwin 2
+                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+                        msg += fmt(
+                            "\nNote: run `%s` to run programs for x86_64-darwin",
+                            Magenta(
+                                "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
+
+                    builder.reset();
+                    outputLocks.unlock();
+                    worker.permanentFailure = true;
+                    co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
+                }
                 useHook = false;
                 break;
             }
@@ -771,36 +808,35 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 co_return doneFailure(std::move(e));
             }
 
+            DerivationBuilderParams params{
+                .drvPath = drvPath,
+                .buildResult = buildResult,
+                .drv = *drv,
+                .drvOptions = *drvOptions,
+                .inputPaths = inputPaths,
+                .initialOutputs = initialOutputs,
+                .buildMode = buildMode,
+                .defaultPathsInChroot = std::move(defaultPathsInChroot),
+                .systemFeatures = worker.store.config.systemFeatures.get(),
+                .desugaredEnv = std::move(desugaredEnv),
+            };
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
-            builder = makeDerivationBuilder(
-                *localStoreP,
-                std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
-                DerivationBuilderParams{
-                    .drvPath = drvPath,
-                    .buildResult = buildResult,
-                    .drv = *drv,
-                    .drvOptions = *drvOptions,
-                    .inputPaths = inputPaths,
-                    .initialOutputs = initialOutputs,
-                    .buildMode = buildMode,
-                    .defaultPathsInChroot = std::move(defaultPathsInChroot),
-                    .systemFeatures = worker.store.config.systemFeatures.get(),
-                    .desugaredEnv = std::move(desugaredEnv),
-                });
+            builder = externalBuilder ? makeExternalDerivationBuilder(
+                                            *localStoreP,
+                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
+                                            std::move(params),
+                                            *externalBuilder)
+                                      : makeDerivationBuilder(
+                                            *localStoreP,
+                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
+                                            std::move(params));
         }
 
-        std::optional<Descriptor> builderOutOpt;
-        try {
-            /* Okay, we have to build. */
-            builderOutOpt = builder->startBuild();
-        } catch (BuildError & e) {
-            builder.reset();
-            outputLocks.unlock();
-            worker.permanentFailure = true;
-            co_return doneFailure(std::move(e)); // InputRejected
-        }
-        if (!builderOutOpt) {
+        if (auto builderOutOpt = builder->startBuild()) {
+            builderOut = *std::move(builderOutOpt);
+        } else {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
@@ -809,9 +845,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
             continue;
-        } else {
-            builderOut = *std::move(builderOutOpt);
-        };
+        }
 
         break;
     }

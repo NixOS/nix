@@ -2,30 +2,17 @@ namespace nix {
 
 struct ExternalDerivationBuilder : DerivationBuilderImpl
 {
-    Settings::ExternalBuilder externalBuilder;
+    ExternalBuilder externalBuilder;
 
     ExternalDerivationBuilder(
         LocalStore & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
-        Settings::ExternalBuilder externalBuilder)
+        ExternalBuilder externalBuilder)
         : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
-    }
-
-    static std::unique_ptr<ExternalDerivationBuilder> newIfSupported(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
-    {
-        if (auto it = std::ranges::find_if(
-                settings.externalBuilders.get(),
-                [&](const auto & handler) { return handler.systems.contains(params.drv.platform); });
-            it != settings.externalBuilders.get().end()) {
-            return std::make_unique<ExternalDerivationBuilder>(
-                store, std::move(miscMethods), std::move(params), *it);
-        }
-        return {};
     }
 
     Path tmpDirInSandbox() override
@@ -40,8 +27,6 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         tmpDir = topTmpDir + "/build";
         createDir(tmpDir, 0700);
     }
-
-    void checkSystem() override {}
 
     void startChild() override
     {
@@ -120,5 +105,14 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         });
     }
 };
+
+std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
+    LocalStore & store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params,
+    const ExternalBuilder & handler)
+{
+    return std::make_unique<ExternalDerivationBuilder>(store, std::move(miscMethods), std::move(params), handler);
+}
 
 } // namespace nix

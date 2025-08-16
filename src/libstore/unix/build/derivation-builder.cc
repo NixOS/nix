@@ -230,12 +230,6 @@ protected:
     }
 
     /**
-     * Throw an exception if we can't do this derivation because of
-     * missing system features.
-     */
-    virtual void checkSystem();
-
-    /**
      * Return the paths that should be made available in the sandbox.
      * This includes:
      *
@@ -672,33 +666,6 @@ static bool checkNotWorldWritable(std::filesystem::path path)
     return true;
 }
 
-void DerivationBuilderImpl::checkSystem()
-{
-    /* Right platform? */
-    if (!drvOptions.canBuildLocally(store, drv)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
-                "\n"
-                "Required system: '%s' with features {%s}\n"
-                "Current system: '%s' with features {%s}",
-                Magenta(store.printStorePath(drvPath)),
-                Magenta(drv.platform),
-                concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
-                Magenta(settings.thisSystem),
-                concatStringsSep<StringSet>(", ", store.Store::config.systemFeatures));
-
-        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should
-        // tell them to run the command to install Darwin 2
-        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-            msg +=
-                fmt("\nNote: run `%s` to run programs for x86_64-darwin",
-                    Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
-
-        throw BuildError(BuildResult::Failure::InputRejected, msg);
-    }
-}
-
 std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 {
     if (useBuildUsers()) {
@@ -708,8 +675,6 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
         if (!buildUser)
             return std::nullopt;
     }
-
-    checkSystem();
 
     /* Make sure that no other processes are executing under the
        sandbox uids. This must be done before any chownToBuilder()
@@ -1922,9 +1887,6 @@ namespace nix {
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
-    if (auto builder = ExternalDerivationBuilder::newIfSupported(store, miscMethods, params))
-        return builder;
-
     bool useSandbox = false;
 
     /* Are we doing a sandboxed build? */

@@ -298,6 +298,7 @@ sources = files(
   'aws-creds.cc',
   'binary-cache-store.cc',
   'build-result.cc',
+  'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
   'build/derivation-env-desugar.cc',
