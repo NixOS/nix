@@ -84,7 +84,7 @@
           su --login mallory -c '
             nix-store --generate-binary-cache-key cache1.example.org sk1 pk1
             (! nix store sign --key-file sk1 ${pathFour} 2>&1)' | tee diag 1>&2
-          grep -F "cannot open connection to remote store 'daemon'" diag
+          grep -F "cannot open connection to remote store 'unix://'" diag
       """)
 
       machine.succeed("""
