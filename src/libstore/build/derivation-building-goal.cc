@@ -581,7 +581,36 @@ tryToBuild:
                 co_await waitForAWhile();
                 continue;
             case rpDecline:
-                /* We should do it ourselves. */
+                /* We should do it ourselves.
+
+                   Now that we've decided we can't / won't do a remote build, check
+                   that we can in fact build locally. */
+                if (!drvOptions->canBuildLocally(worker.store, *drv)) {
+                    auto msg =
+                        fmt("Cannot build '%s'.\n"
+                            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
+                            "\n"
+                            "Required system: '%s' with features {%s}\n"
+                            "Current system: '%s' with features {%s}",
+                            Magenta(worker.store.printStorePath(drvPath)),
+                            Magenta(drv->platform),
+                            concatStringsSep(", ", drvOptions->getRequiredSystemFeatures(*drv)),
+                            Magenta(settings.thisSystem),
+                            concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
+
+                    // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
+                    // we should tell them to run the command to install Darwin 2
+                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+                        msg += fmt(
+                            "\nNote: run `%s` to run programs for x86_64-darwin",
+                            Magenta(
+                                "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
+
+                    builder.reset();
+                    outputLocks.unlock();
+                    worker.permanentFailure = true;
+                    co_return doneFailure({BuildResult::InputRejected, std::move(msg)});
+                }
                 useHook = false;
                 break;
             }
@@ -787,17 +816,9 @@ tryToBuild:
                 });
         }
 
-        std::optional<Descriptor> builderOutOpt;
-        try {
-            /* Okay, we have to build. */
-            builderOutOpt = builder->startBuild();
-        } catch (BuildError & e) {
-            builder.reset();
-            outputLocks.unlock();
-            worker.permanentFailure = true;
-            co_return doneFailure(std::move(e)); // InputRejected
-        }
-        if (!builderOutOpt) {
+        if (auto builderOutOpt = builder->startBuild()) {
+            builderOut = *std::move(builderOutOpt);
+        } else {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
@@ -806,9 +827,7 @@ tryToBuild:
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
             continue;
-        } else {
-            builderOut = *std::move(builderOutOpt);
-        };
+        }
 
         break;
     }
