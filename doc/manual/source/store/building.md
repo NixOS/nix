@@ -30,13 +30,13 @@ The life cycle of a build can be broken down into 3 parts:
    Nix also logs the standard output and error of the process, but this is just for human convenience and does not influence the behavior of the system.
    (Builder processes have no idea what the consumer of their standard output and error does with those streams, only that they are indeed consumed so buffers do not fill up and writes to them will continue to succeed.)
 
-3. Processing the outputs after the builder has exited.
+3. Processing the outputs
 
-   The builder process on exit should have left beyond files for each output the derivation is supposed to produce.
-   The files must be processed to turn them into bona fide store objects.
-   If the processing suceeds, those store objects are associated with the derivation as (the results of) a successful build.
+   Traditionally, this happened only after the builder has exited.
+   But there is now also a second approach where the builder sends messages to Nix while it's running, messages including submitting outputs.
+   This allows outputs to be processed concurrently during the build, allows outputs to depend on other newly created store objects, and also resolves some tricky issues with content-addressing and output-to-output references.
 
-Step (3) happens externally, with just inert data since the process has exited or been killed by then.
+Step (3) happens externally, with inert data (either by forcing the process to relinquish access to the data, by such means as making a fresh copy and/or killing the process, its process group, etc.).
 Step (1) however is best described not from Nix's perspective, but from the process's perspective.
 
 > **Explanation**
@@ -157,7 +157,11 @@ In addition, the following variables are set:
 
 ## Processing outputs
 
-If the builder exited successfully, the following steps happen in order to turn the output directories left behind by the builder into proper store objects:
+There are two methods for processing outputs, as mentioned above.
+But first, let us cover the requirements common to both methods.
+
+Regardless of which method is used, each output must be turned into a valid store object.
+This involves two steps:
 
 - **Normalize the file permissions**
 
@@ -171,15 +175,61 @@ If the builder exited successfully, the following steps happen in order to turn 
   Likewise, a digest not preceded by the [store directory path] also still scans as a reference.)
   Since these are potential runtime dependencies, Nix will register them as references of the output store object they occur in.
 
-  Nix also scans for references from one output to another in the same way, because outputs are allowed to refer to each other.
-  If the outputs' references to each other form a cycle, this is an error, because the references of store objects much be acyclic.
+### Traditional (post-build) processing
 
-  In the case of derivations with fixed in advance output paths (i.e. [input-addressing] derivations, or [fixed content-addressing] derivations), the actual final store path to each output is used during the build.
-  For [floating content-addressing] derivations, however, the final store path is not known in advance by definition.
-  Scratch store paths must therefore be used instead.
-  Scanning will use those scratch paths, but then any output-to-be that contains such a scanned scratch path must be rewritten to instead use the final (content-addressed) path of the output in question.
+With the traditional method, the builder process on exit should have left behind files for each output the derivation is supposed to produce.
+The files must be processed to turn them into bona fide store objects.
+If the processing succeeds, those store objects are associated with the derivation as (the results of) a successful build.
+
+The scanning for references that is done for each output also accounts for references from one output to another, in addition to references to the inputs.
+If the outputs' references to each other form a cycle, this is an error, because the references of store objects must be acyclic.
+In the case of derivations with output paths that are fixed in advance (i.e. [input-addressing] derivations, or [fixed content-addressing] derivations), the actual final store path of each output is used during the build.
+For [floating content-addressing] derivations, however, the final store path is not known in advance by definition.
+Scratch store paths must therefore be used instead.
+Reference scanning looks for those scratch path digests, but then any output-to-be that contains such a scratch path digest must be rewritten to use the final store path digest (which is the actual valid content address) of the output in question.
+
+In addition to output-to-output references, rewriting is also needed to support self-references in the content-addressing case.
+An output may contain its own store path digest, which is a self-reference.
+Hash functions which are secure cannot allow the easy calculation of the quasi-fixed points needed to support self-references "natively", so instead we replace all would-be self-references with a sentinel value, and then rewrite the sentinel value to be the final store path digest.
+Superficially, this post-hashing rewriting breaks the content address, but as the self-references are easily identified, the rewriting can be inverted to yield the original hashed data, allowing verifying the content address after all.
 
 At this point, the file system data is in the proper form, and the valid acyclic reference data for each output is also calculated, so the outputs can be registered as proper store objects, and associated with the derivation in the [build trace] in the record for a successful build.
+
+### Concurrent processing via IPC
+
+With this method, the builder communicates with Nix during the build using inter-process communication (IPC).
+(The exact varlink-based protocol used is [documented in full in the protocols chapter](@docroot@/protocols/derivation-builder/index.md).)
+Instead of leaving files behind for Nix to process after exit, the builder explicitly submits information to create store objects one at a time, and (separately) also submits assignments from output names to store objects.
+
+Scanning for references proceeds as usual for each store object creation request, but the set of potential references to be scanned is greater: it includes both all inputs (as before) and also all previously-added store objects.
+This means, if output `bar` is supposed to reference output `foo`, `foo` should be created first, and `bar` second.
+
+All store objects being created are content-addressed (there is no support for input-addressed outputs with the IPC approach).
+When a store object is created, its content address store path will be calculated by Nix and then returned in the IPC response message.
+The builder then knows what store path to use in subsequent store objects in order for reference scanning to pick them up.
+
+This overall approach has several advantages:
+
+- **No Nix-side rewriting**
+
+  For content-addressed outputs, the builder is responsible for adding outputs in reference order, using the store paths from earlier adds in later ones.
+  This avoids the fragile rewriting that would otherwise be needed to fix up output-to-output references described above.
+  The builder, unlike Nix itself, is free to leverage domain-specific knowledge to do a better job. For example it can
+
+  - uncompress, rewrite, and then recompress man pages, to not miss references hidden by compression.
+
+  - make sure to rewrite data that is to be signed, like Apple binaries, before signing that data, so as not to invalidate any signatures by mistake.
+
+- **Pipelining**
+
+  Downstream builds that only need some outputs (e.g., a "dev" or "headers" output) can start without waiting for all outputs to be ready.
+  Nix doesn't yet implement this, but it could and should.
+
+The major *disadvantage* of this approach is that it doesn't yet support self-references.
+Unlike acyclic output-to-output references, self-references fundamentally do require rewriting.
+The output-to-output case was only a challenge in the traditional case because all the outputs were submitted simultaneously, whereas the self-reference case is fundamentally challenging because of what it means for a hash function to be secure, as described above.
+Neither batched (traditional) nor serial (IPC) submission of outputs can avoid this fundamental property of secure hash functions.
+We could add support for such rewriting just for self-references, as is done for the traditional post-build processing, but we haven't yet done so as the very point of the IPC approach is to free Nix from any obligation to rewrite black-box data in unsound ways.
 
 [Nix instance]: @docroot@/glossary.md#gloss-nix-instance
 [input-addressing]: ./derivation/outputs/input-address.md
