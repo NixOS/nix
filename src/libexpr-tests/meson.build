@@ -75,6 +75,7 @@ this_exe = executable(
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args : linker_export_flags + [ '-lrapidcheck' ],
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 test(

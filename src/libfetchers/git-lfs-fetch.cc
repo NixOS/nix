@@ -292,7 +292,7 @@ void Fetch::fetch(
             auto authIt = headerIt->find("Authorization");
             if (authIt == headerIt->end())
                 return std::nullopt;
-            return *authIt;
+            return std::string(*authIt);
         }();
         const uint64_t size = obj.at("size");
         sizeCallback(size);
