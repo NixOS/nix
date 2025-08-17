@@ -1,6 +1,7 @@
-#include <rapidcheck/gen/Arbitrary.h>
+#include <exception> // Needed by rapidcheck on Darwin
 #include <regex>
 
+#include <rapidcheck/gen/Arbitrary.h>
 #include <rapidcheck.h>
 
 #include "nix/store/path-regex.hh"

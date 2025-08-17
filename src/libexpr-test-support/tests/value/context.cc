@@ -1,3 +1,4 @@
+#include <exception> // Needed by rapidcheck on Darwin
 #include <rapidcheck.h>
 
 #include "nix/store/tests/path.hh"
