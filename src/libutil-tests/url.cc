@@ -212,6 +212,26 @@ TEST(parseURL, parsedUrlsIsEqualToItself)
     ASSERT_TRUE(url == url);
 }
 
+TEST(parseURL, parsedUrlsWithUnescapedChars)
+{
+    /* Test for back-compat. Behavior is rather questionable, but
+     * is ingrained pretty deep into how URL parsing is shared between
+     * flakes and libstore.
+     * 1. Unescaped spaces, quotes and shevron (^) in fragment.
+     * 2. Unescaped spaces and quotes in query.
+     */
+    auto s = "http://www.example.org/file.tar.gz?query \"= 123\"#shevron^quote\"space ";
+    auto url = parseURL(s);
+
+    ASSERT_EQ(url.fragment, "shevron^quote\"space ");
+
+    auto query = StringMap{
+        {"query \"", " 123\""},
+    };
+
+    ASSERT_EQ(url.query, query);
+}
+
 TEST(parseURL, parseFTPUrl)
 {
     auto s = "ftp://ftp.nixos.org/downloads/nixos.iso";

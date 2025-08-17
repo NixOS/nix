@@ -74,6 +74,20 @@ TEST(parseFlakeRef, GitArchiveInput)
         auto flakeref = parseFlakeRef(fetchSettings, s);
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
     }
+
+    {
+        auto s = "github:foo/bar?ref=branch#\"name.with.dot\""; // unescaped quotes `"`
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        ASSERT_EQ(fragment, "\"name.with.dot\"");
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch");
+    }
+
+    {
+        auto s = "github:foo/bar#\"name.with.dot\""; // unescaped quotes `"`
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        ASSERT_EQ(fragment, "\"name.with.dot\"");
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar");
+    }
 }
 
 TEST(to_string, doesntReencodeUrl)
