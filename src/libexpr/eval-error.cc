@@ -44,12 +44,13 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
     // NOTE: This is abusing side-effects.
     // TODO: check compatibility with nested debugger calls.
     // TODO: What side-effects??
-    error.state.debugTraces.push_front(DebugTrace{
-        .pos = expr.getPos(),
-        .expr = expr,
-        .env = env,
-        .hint = HintFmt("Fake frame for debugging purposes"),
-        .isError = true});
+    error.state.debugTraces.push_front(
+        DebugTrace{
+            .pos = expr.getPos(),
+            .expr = expr,
+            .env = env,
+            .hint = HintFmt("Fake frame for debugging purposes"),
+            .isError = true});
     return *this;
 }
 

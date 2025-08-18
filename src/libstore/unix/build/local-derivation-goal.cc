@@ -88,13 +88,14 @@ void handleDiffHook(
     if (diffHookOpt && settings.runDiffHook) {
         auto & diffHook = *diffHookOpt;
         try {
-            auto diffRes = runProgram(RunOptions{
-                .program = diffHook,
-                .lookupPath = true,
-                .args = {tryA, tryB, drvPath, tmpDir},
-                .uid = uid,
-                .gid = gid,
-                .chdir = "/"});
+            auto diffRes = runProgram(
+                RunOptions{
+                    .program = diffHook,
+                    .lookupPath = true,
+                    .args = {tryA, tryB, drvPath, tmpDir},
+                    .uid = uid,
+                    .gid = gid,
+                    .chdir = "/"});
             if (!statusOk(diffRes.first))
                 throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
 
@@ -2715,10 +2716,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
-                    auto newInfo0 = newInfoFromCA(DerivationOutput::CAFloating{
-                        .method = dof.ca.method,
-                        .hashAlgo = wanted.algo,
-                    });
+                    auto newInfo0 = newInfoFromCA(
+                        DerivationOutput::CAFloating{
+                            .method = dof.ca.method,
+                            .hashAlgo = wanted.algo,
+                        });
 
                     /* Check wanted hash */
                     assert(newInfo0.ca);
@@ -2754,10 +2756,11 @@ SingleDrvOutputs LocalDerivationGoal::registerOutputs()
                 },
 
                 [&](const DerivationOutput::Impure & doi) {
-                    return newInfoFromCA(DerivationOutput::CAFloating{
-                        .method = doi.method,
-                        .hashAlgo = doi.hashAlgo,
-                    });
+                    return newInfoFromCA(
+                        DerivationOutput::CAFloating{
+                            .method = doi.method,
+                            .hashAlgo = doi.hashAlgo,
+                        });
                 },
 
             },

@@ -34,13 +34,14 @@ struct CmdSearch : InstallableValueCommand, MixJSON
     CmdSearch()
     {
         expectArgs("regex", &res);
-        addFlag(Flag{
-            .longName = "exclude",
-            .shortName = 'e',
-            .description = "Hide packages whose attribute path, name or description contain *regex*.",
-            .labels = {"regex"},
-            .handler = {[this](std::string s) { excludeRes.push_back(s); }},
-        });
+        addFlag(
+            Flag{
+                .longName = "exclude",
+                .shortName = 'e',
+                .description = "Hide packages whose attribute path, name or description contain *regex*.",
+                .labels = {"regex"},
+                .handler = {[this](std::string s) { excludeRes.push_back(s); }},
+            });
     }
 
     std::string description() override

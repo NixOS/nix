@@ -1456,10 +1456,11 @@ std::pair<bool, SingleDrvOutputs> DerivationGoal::checkPathValidity()
                 // derivation, and the output path is valid, but we don't have
                 // its realisation stored (probably because it has been built
                 // without the `ca-derivations` experimental flag).
-                worker.store.registerDrvOutput(Realisation{
-                    drvOutput,
-                    info.known->path,
-                });
+                worker.store.registerDrvOutput(
+                    Realisation{
+                        drvOutput,
+                        info.known->path,
+                    });
             }
         }
         if (info.known && info.known->isValid())
@@ -1551,10 +1552,11 @@ void DerivationGoal::waiteeDone(GoalPtr waitee, ExitCode result)
     auto & outputs = nodeP->value;
 
     for (auto & outputName : outputs) {
-        auto buildResult = dg->getBuildResult(DerivedPath::Built{
-            .drvPath = makeConstantStorePathRef(dg->drvPath),
-            .outputs = OutputsSpec::Names{outputName},
-        });
+        auto buildResult = dg->getBuildResult(
+            DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(dg->drvPath),
+                .outputs = OutputsSpec::Names{outputName},
+            });
         if (buildResult.success()) {
             auto i = buildResult.builtOutputs.find(outputName);
             if (i != buildResult.builtOutputs.end())

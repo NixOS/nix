@@ -389,11 +389,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 continue;
             std::string key2(key, 0, key.size() - 5);
             auto path = CanonPath(value);
-            result.push_back(Submodule{
-                .path = path,
-                .url = entries[key2 + ".url"],
-                .branch = entries[key2 + ".branch"],
-            });
+            result.push_back(
+                Submodule{
+                    .path = path,
+                    .url = entries[key2 + ".url"],
+                    .branch = entries[key2 + ".branch"],
+                });
         }
 
         return result;
@@ -533,14 +534,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             append(gitArgs, {"--depth", "1"});
         append(gitArgs, {std::string("--"), url, refspec});
 
-        runProgram(RunOptions{
-            .program = "git",
-            .lookupPath = true,
-            // FIXME: git stderr messes up our progress indicator, so
-            // we're using --quiet for now. Should process its stderr.
-            .args = gitArgs,
-            .input = {},
-            .isInteractive = true});
+        runProgram(
+            RunOptions{
+                .program = "git",
+                .lookupPath = true,
+                // FIXME: git stderr messes up our progress indicator, so
+                // we're using --quiet for now. Should process its stderr.
+                .args = gitArgs,
+                .input = {},
+                .isInteractive = true});
     }
 
     void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) override
@@ -566,17 +568,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         writeFile(allowedSignersFile, allowedSigners);
 
         // Run verification command
-        auto [status, output] = runProgram(RunOptions{
-            .program = "git",
-            .args =
-                {"-c",
-                 "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
-                 "-C",
-                 path.string(),
-                 "verify-commit",
-                 rev.gitRev()},
-            .mergeStderrToStdout = true,
-        });
+        auto [status, output] = runProgram(
+            RunOptions{
+                .program = "git",
+                .args =
+                    {"-c",
+                     "gpg.ssh.allowedSignersFile=" + allowedSignersFile,
+                     "-C",
+                     path.string(),
+                     "verify-commit",
+                     rev.gitRev()},
+                .mergeStderrToStdout = true,
+            });
 
         /* Evaluate result through status code and checking if public
            key fingerprints appear on stderr. This is neccessary

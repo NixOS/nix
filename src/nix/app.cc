@@ -70,28 +70,29 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
 
         std::vector<DerivedPath> context2;
         for (auto & c : context) {
-            context2.emplace_back(std::visit(
-                overloaded{
-                    [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
-                        /* We want all outputs of the drv */
-                        return DerivedPath::Built{
-                            .drvPath = makeConstantStorePathRef(d.drvPath),
-                            .outputs = OutputsSpec::All{},
-                        };
+            context2.emplace_back(
+                std::visit(
+                    overloaded{
+                        [&](const NixStringContextElem::DrvDeep & d) -> DerivedPath {
+                            /* We want all outputs of the drv */
+                            return DerivedPath::Built{
+                                .drvPath = makeConstantStorePathRef(d.drvPath),
+                                .outputs = OutputsSpec::All{},
+                            };
+                        },
+                        [&](const NixStringContextElem::Built & b) -> DerivedPath {
+                            return DerivedPath::Built{
+                                .drvPath = b.drvPath,
+                                .outputs = OutputsSpec::Names{b.output},
+                            };
+                        },
+                        [&](const NixStringContextElem::Opaque & o) -> DerivedPath {
+                            return DerivedPath::Opaque{
+                                .path = o.path,
+                            };
+                        },
                     },
-                    [&](const NixStringContextElem::Built & b) -> DerivedPath {
-                        return DerivedPath::Built{
-                            .drvPath = b.drvPath,
-                            .outputs = OutputsSpec::Names{b.output},
-                        };
-                    },
-                    [&](const NixStringContextElem::Opaque & o) -> DerivedPath {
-                        return DerivedPath::Opaque{
-                            .path = o.path,
-                        };
-                    },
-                },
-                c.raw));
+                    c.raw));
         }
 
         return UnresolvedApp{App{

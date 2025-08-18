@@ -41,10 +41,11 @@ Suggestions Suggestions::bestMatches(const std::set<std::string> & allMatches, s
 {
     std::set<Suggestion> res;
     for (const auto & possibleMatch : allMatches) {
-        res.insert(Suggestion{
-            .distance = levenshteinDistance(query, possibleMatch),
-            .suggestion = possibleMatch,
-        });
+        res.insert(
+            Suggestion{
+                .distance = levenshteinDistance(query, possibleMatch),
+                .suggestion = possibleMatch,
+            });
     }
     return Suggestions{res};
 }

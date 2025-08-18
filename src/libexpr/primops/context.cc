@@ -276,9 +276,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
 
         if (auto attr = i.value->attrs()->get(sPath)) {
             if (state.forceBool(*attr->value, attr->pos, "while evaluating the `path` attribute of a string context"))
-                context.emplace(NixStringContextElem::Opaque{
-                    .path = namePath,
-                });
+                context.emplace(
+                    NixStringContextElem::Opaque{
+                        .path = namePath,
+                    });
         }
 
         if (auto attr = i.value->attrs()->get(sAllOutputs)) {
@@ -291,9 +292,10 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
                         .atPos(i.pos)
                         .debugThrow();
                 }
-                context.emplace(NixStringContextElem::DrvDeep{
-                    .drvPath = namePath,
-                });
+                context.emplace(
+                    NixStringContextElem::DrvDeep{
+                        .drvPath = namePath,
+                    });
             }
         }
 
@@ -309,10 +311,11 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
             for (auto elem : attr->value->listItems()) {
                 auto outputName =
                     state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
-                context.emplace(NixStringContextElem::Built{
-                    .drvPath = makeConstantStorePathRef(namePath),
-                    .output = std::string{outputName},
-                });
+                context.emplace(
+                    NixStringContextElem::Built{
+                        .drvPath = makeConstantStorePathRef(namePath),
+                        .output = std::string{outputName},
+                    });
             }
         }
     }

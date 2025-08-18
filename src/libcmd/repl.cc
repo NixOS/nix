@@ -650,7 +650,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 for (auto & arg : args)
                     arg = "*" + arg + "*";
 
-                markdown += "**Synopsis:** `builtins." + (std::string)(*doc->name) + "` " + concatStringsSep(" ", args)
+                markdown += "**Synopsis:** `builtins." + (std::string) (*doc->name) + "` " + concatStringsSep(" ", args)
                             + "\n\n";
             }
 
