@@ -20,7 +20,8 @@ let
       nix.settings.sandbox = true;
       services.openssh.ports = [
         22
-      ] ++ lib.optional supportsCustomPort 2222;
+      ]
+      ++ lib.optional supportsCustomPort 2222;
 
       # Regression test for use of PID namespaces when /proc has
       # filesystems mounted on top of it

@@ -65,61 +65,60 @@ let
     iana-etc
     gitMinimal
     openssh
-  ] ++ extraPkgs;
+  ]
+  ++ extraPkgs;
 
-  users =
-    {
+  users = {
 
-      root = {
-        uid = 0;
-        shell = lib.getExe bashInteractive;
-        home = "/root";
-        gid = 0;
-        groups = [ "root" ];
-        description = "System administrator";
-      };
-
-      nobody = {
-        uid = 65534;
-        shell = lib.getExe' shadow "nologin";
-        home = "/var/empty";
-        gid = 65534;
-        groups = [ "nobody" ];
-        description = "Unprivileged account (don't use!)";
-      };
-
-    }
-    // lib.optionalAttrs (uid != 0) {
-      "${uname}" = {
-        uid = uid;
-        shell = lib.getExe bashInteractive;
-        home = "/home/${uname}";
-        gid = gid;
-        groups = [ "${gname}" ];
-        description = "Nix user";
-      };
-    }
-    // lib.listToAttrs (
-      map (n: {
-        name = "nixbld${toString n}";
-        value = {
-          uid = 30000 + n;
-          gid = 30000;
-          groups = [ "nixbld" ];
-          description = "Nix build user ${toString n}";
-        };
-      }) (lib.lists.range 1 32)
-    );
-
-  groups =
-    {
-      root.gid = 0;
-      nixbld.gid = 30000;
-      nobody.gid = 65534;
-    }
-    // lib.optionalAttrs (gid != 0) {
-      "${gname}".gid = gid;
+    root = {
+      uid = 0;
+      shell = lib.getExe bashInteractive;
+      home = "/root";
+      gid = 0;
+      groups = [ "root" ];
+      description = "System administrator";
     };
+
+    nobody = {
+      uid = 65534;
+      shell = lib.getExe' shadow "nologin";
+      home = "/var/empty";
+      gid = 65534;
+      groups = [ "nobody" ];
+      description = "Unprivileged account (don't use!)";
+    };
+
+  }
+  // lib.optionalAttrs (uid != 0) {
+    "${uname}" = {
+      uid = uid;
+      shell = lib.getExe bashInteractive;
+      home = "/home/${uname}";
+      gid = gid;
+      groups = [ "${gname}" ];
+      description = "Nix user";
+    };
+  }
+  // lib.listToAttrs (
+    map (n: {
+      name = "nixbld${toString n}";
+      value = {
+        uid = 30000 + n;
+        gid = 30000;
+        groups = [ "nixbld" ];
+        description = "Nix build user ${toString n}";
+      };
+    }) (lib.lists.range 1 32)
+  );
+
+  groups = {
+    root.gid = 0;
+    nixbld.gid = 30000;
+    nobody.gid = 65534;
+  }
+  // lib.optionalAttrs (gid != 0) {
+    "${gname}".gid = gid;
+  };
 
   userToPasswd = (
     k:
