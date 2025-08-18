@@ -677,6 +677,42 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
             assert(localStoreP);
 
+            decltype(DerivationBuilderParams::extraEnv) extraEnv;
+            decltype(DerivationBuilderParams::extraFiles) extraFiles;
+
+            try {
+                if (drv->structuredAttrs) {
+                    auto json = drv->structuredAttrs->prepareStructuredAttrs(
+                        worker.store, *drvOptions, inputPaths, drv->outputs);
+
+                    extraEnv.insert_or_assign(
+                        "NIX_ATTRS_SH_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.sh",
+                            .value = StructuredAttrs::writeShell(json),
+                        });
+                    extraEnv.insert_or_assign(
+                        "NIX_ATTRS_JSON_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.json",
+                            .value = json.dump(),
+                        });
+                } else {
+                    /* Handle exportReferencesGraph(), if set. */
+                    for (auto & [fileName, storePaths] : drvOptions->getParsedExportReferencesGraph(worker.store)) {
+                        /* Write closure info to <fileName>. */
+                        extraFiles.insert_or_assign(
+                            fileName,
+                            worker.store.makeValidityRegistration(
+                                worker.store.exportReferences(storePaths, inputPaths), false, false));
+                    }
+                }
+            } catch (BuildError & e) {
+                outputLocks.unlock();
+                worker.permanentFailure = true;
+                co_return done(BuildResult::InputRejected, {}, std::move(e));
+            }
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
@@ -690,6 +726,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     *drvOptions,
                     inputPaths,
                     initialOutputs,
+                    std::move(extraEnv),
+                    std::move(extraFiles),
                 });
         }
 

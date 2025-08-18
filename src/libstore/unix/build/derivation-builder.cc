@@ -274,11 +274,6 @@ protected:
 private:
 
     /**
-     * Write a JSON file containing the derivation attributes.
-     */
-    void writeStructuredAttrs();
-
-    /**
      * Start an in-process nix daemon thread for recursive-nix.
      */
     void startDaemon();
@@ -781,18 +776,6 @@ void DerivationBuilderImpl::startBuilder()
     /* Construct the environment passed to the builder. */
     initEnv();
 
-    writeStructuredAttrs();
-
-    /* Handle exportReferencesGraph(), if set. */
-    if (!drv.structuredAttrs) {
-        for (auto & [fileName, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
-            /* Write closure info to <fileName>. */
-            writeFile(
-                tmpDir + "/" + fileName,
-                store.makeValidityRegistration(store.exportReferences(storePaths, inputPaths), false, false));
-        }
-    }
-
     prepareSandbox();
 
     if (needsHashRewrite() && pathExists(homeDir))
@@ -1033,6 +1016,11 @@ void DerivationBuilderImpl::initEnv()
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
+    auto writeEnv = [&](const std::string & envVarName, const std::string & fileName, const std::string & value) {
+        writeBuilderFile(fileName, rewriteStrings(value, inputRewrites));
+        env[envVarName] = tmpDirInSandbox() + "/" + fileName;
+    };
+
     /* In non-structured mode, set all bindings either directory in the
        environment or via a file, as specified by
        `DerivationOptions::passAsFile`. */
@@ -1043,10 +1031,24 @@ void DerivationBuilderImpl::initEnv()
             } else {
                 auto hash = hashString(HashAlgorithm::SHA256, i.first);
                 std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                writeBuilderFile(fn, rewriteStrings(i.second, inputRewrites));
-                env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
+                writeEnv(i.first + "Path", fn, i.second);
             }
         }
+    }
+
+    /* Do this with or without structured attrs --- actually, this is
+       used to desugar structured attrs. */
+    for (const auto & [name, info] : extraEnv) {
+        if (info.nameOfPassAsFile) {
+            writeEnv(name, *info.nameOfPassAsFile, info.value);
+        } else {
+            env[name] = info.value;
+        }
+    }
+
+    /* Add extra files, analogous to `extraEnv` */
+    for (const auto & [fileName, value] : extraFiles) {
+        writeBuilderFile(fileName, value);
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1100,20 +1102,6 @@ void DerivationBuilderImpl::initEnv()
 
     /* Trigger colored output in various tools. */
     env["TERM"] = "xterm-256color";
-}
-
-void DerivationBuilderImpl::writeStructuredAttrs()
-{
-    if (drv.structuredAttrs) {
-        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
-
-        auto jsonSh = StructuredAttrs::writeShell(json);
-
-        writeBuilderFile(".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
-        writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
-    }
 }
 
 void DerivationBuilderImpl::startDaemon()

@@ -59,6 +59,35 @@ struct DerivationBuilderParams
 
     const BuildMode & buildMode;
 
+    struct EnvEntry
+    {
+        /**
+         * Actually, this should be passed as a file, but with a custom
+         * name (rather than hash-derived name for usual "pass as file").
+         */
+        std::optional<std::string> nameOfPassAsFile;
+
+        /**
+         * String value of env var, or contents of the file
+         */
+        std::string value;
+    };
+
+    /**
+     * Extra environment variables to additionally set, possibly
+     * indirectly via a file.
+     *
+     * This is used by the caller to desugar the "structured attrs"
+     * mechanism, so `DerivationBuilder` doesn't need to know about it.
+     */
+    std::map<std::string, EnvEntry, std::less<>> extraEnv;
+
+    /**
+     * Inserted in the temp dir, but no file names placed in env, unlike
+     * `EnvEntry::nameOfPassAsFile` above.
+     */
+    StringMap extraFiles;
+
     DerivationBuilderParams(
         const StorePath & drvPath,
         const BuildMode & buildMode,
@@ -66,7 +95,9 @@ struct DerivationBuilderParams
         const Derivation & drv,
         const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
-        std::map<std::string, InitialOutput> & initialOutputs)
+        std::map<std::string, InitialOutput> & initialOutputs,
+        std::map<std::string, EnvEntry, std::less<>> extraEnv,
+        StringMap extraFiles)
         : drvPath{drvPath}
         , buildResult{buildResult}
         , drv{drv}
@@ -74,6 +105,8 @@ struct DerivationBuilderParams
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
         , buildMode{buildMode}
+        , extraEnv{std::move(extraEnv)}
+        , extraFiles{std::move(extraFiles)}
     {
     }
 
