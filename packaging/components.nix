@@ -54,12 +54,12 @@ let
     preConfigure =
       prevAttrs.preConfigure or ""
       +
-        # Update the repo-global .version file.
-        # Symlink ./.version points there, but by default only workDir is writable.
-        ''
-          chmod u+w ./.version
-          echo ${finalAttrs.version} > ./.version
-        '';
+      # Update the repo-global .version file.
+      # Symlink ./.version points there, but by default only workDir is writable.
+      ''
+        chmod u+w ./.version
+        echo ${finalAttrs.version} > ./.version
+      '';
   };
 
   localSourceLayer =
@@ -148,7 +148,8 @@ let
     nativeBuildInputs = [
       meson
       ninja
-    ] ++ prevAttrs.nativeBuildInputs or [ ];
+    ]
+    ++ prevAttrs.nativeBuildInputs or [ ];
     mesonCheckFlags = prevAttrs.mesonCheckFlags or [ ] ++ [
       "--print-errorlogs"
     ];
