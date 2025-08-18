@@ -70,7 +70,7 @@ scope: {
       url = "https://kristaps.bsd.lv/lowdown/snapshots/lowdown-${version}.tar.gz";
       hash = "sha512-cfzhuF4EnGmLJf5EGSIbWqJItY3npbRSALm+GarZ7SMU7Hr1xw0gtBFMpOdi5PBar4TgtvbnG4oRPh+COINGlA==";
     };
-    nativeBuildInputs = prevAttrs.nativeBuildInputs ++ [ pkgs.bmake ];
+    nativeBuildInputs = prevAttrs.nativeBuildInputs ++ [ pkgs.buildPackages.bmake ];
     postInstall =
       lib.replaceStrings [ "lowdown.so.1" "lowdown.1.dylib" ] [ "lowdown.so.2" "lowdown.2.dylib" ]
         prevAttrs.postInstall;
