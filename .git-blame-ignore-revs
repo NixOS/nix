@@ -1,2 +1,4 @@
 # bulk initial re-formatting with clang-format
 95d9c13716e0000f46f5279367fdecb5b4545923 # !autorebase ./maintainers/format.sh --until-stable
+# nixfmt 1.0.0
+7518fdc1f8f9468b3c3c310cbf4bfebb7d848692 # !autorebase ./maintainers/format.sh --until-stable
