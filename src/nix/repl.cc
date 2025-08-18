@@ -15,13 +15,14 @@ void runNix(Path program, const Strings & args, const std::optional<std::string>
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
     // isInteractive avoid grabling interactive commands
-    runProgram2(RunOptions{
-        .program = getNixBin(program).string(),
-        .args = args,
-        .environment = subprocessEnv,
-        .input = input,
-        .isInteractive = true,
-    });
+    runProgram2(
+        RunOptions{
+            .program = getNixBin(program).string(),
+            .args = args,
+            .environment = subprocessEnv,
+            .input = input,
+            .isInteractive = true,
+        });
 
     return;
 }

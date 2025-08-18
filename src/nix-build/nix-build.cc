@@ -480,10 +480,11 @@ static void main_nix_build(int argc, char ** argv)
                     throw Error("the 'bashInteractive' attribute in <nixpkgs> did not evaluate to a derivation");
 
                 auto bashDrv = drv->requireDrvPath();
-                pathsToBuild.push_back(DerivedPath::Built{
-                    .drvPath = makeConstantStorePathRef(bashDrv),
-                    .outputs = OutputsSpec::Names{"out"},
-                });
+                pathsToBuild.push_back(
+                    DerivedPath::Built{
+                        .drvPath = makeConstantStorePathRef(bashDrv),
+                        .outputs = OutputsSpec::Names{"out"},
+                    });
                 pathsToCopy.insert(bashDrv);
                 shellDrv = bashDrv;
 
@@ -499,10 +500,11 @@ static void main_nix_build(int argc, char ** argv)
         accumDerivedPath = [&](ref<SingleDerivedPath> inputDrv,
                                const DerivedPathMap<StringSet>::ChildNode & inputNode) {
             if (!inputNode.value.empty())
-                pathsToBuild.push_back(DerivedPath::Built{
-                    .drvPath = inputDrv,
-                    .outputs = OutputsSpec::Names{inputNode.value},
-                });
+                pathsToBuild.push_back(
+                    DerivedPath::Built{
+                        .drvPath = inputDrv,
+                        .outputs = OutputsSpec::Names{inputNode.value},
+                    });
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 accumDerivedPath(
                     make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
@@ -687,10 +689,11 @@ static void main_nix_build(int argc, char ** argv)
             if (outputName == "")
                 throw Error("derivation '%s' lacks an 'outputName' attribute", store->printStorePath(drvPath));
 
-            pathsToBuild.push_back(DerivedPath::Built{
-                .drvPath = makeConstantStorePathRef(drvPath),
-                .outputs = OutputsSpec::Names{outputName},
-            });
+            pathsToBuild.push_back(
+                DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(drvPath),
+                    .outputs = OutputsSpec::Names{outputName},
+                });
             pathsToBuildOrdered.push_back({drvPath, {outputName}});
             drvsToCopy.insert(drvPath);
 

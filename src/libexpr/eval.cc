@@ -795,8 +795,9 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         printError("%s\n", error->what());
 
         if (trylevel > 0 && error->info().level != lvlInfo)
-            printError("This exception occurred in a 'tryEval' call. Use " ANSI_GREEN "--ignore-try" ANSI_NORMAL
-                       " to skip these.\n");
+            printError(
+                "This exception occurred in a 'tryEval' call. Use " ANSI_GREEN "--ignore-try" ANSI_NORMAL
+                " to skip these.\n");
     }
 
     auto se = getStaticEnv(expr);

@@ -187,9 +187,9 @@ in
            github.succeed("cat /var/log/httpd/*.log >&2")
 
       github.wait_for_unit("httpd.service")
-      github.wait_for_unit("network-online.target")
+      github.wait_for_unit("network-addresses-eth1.service")
 
-      client.wait_for_unit("network-online.target")
+      client.wait_for_unit("network-addresses-eth1.service")
       client.succeed("curl -v https://github.com/ >&2")
       out = client.succeed("nix registry list")
       print(out)

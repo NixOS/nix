@@ -68,10 +68,11 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     results.reserve(state.size());
 
     for (auto & [req, goalPtr] : state)
-        results.emplace_back(KeyedBuildResult{
-            goalPtr->getBuildResult(req),
-            /* .path = */ req,
-        });
+        results.emplace_back(
+            KeyedBuildResult{
+                goalPtr->getBuildResult(req),
+                /* .path = */ req,
+            });
 
     return results;
 }
@@ -88,10 +89,11 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
 
     try {
         worker.run(Goals{goal});
-        return goal->getBuildResult(DerivedPath::Built{
-            .drvPath = makeConstantStorePathRef(drvPath),
-            .outputs = OutputsSpec::All{},
-        });
+        return goal->getBuildResult(
+            DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(drvPath),
+                .outputs = OutputsSpec::All{},
+            });
     } catch (Error & e) {
         return BuildResult{
             .status = BuildResult::MiscFailure,

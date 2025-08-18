@@ -402,10 +402,11 @@ void mainWrapped(int argc, char ** argv)
        self-aware. That is, it has to know where it is installed. We
        don't think it's sentient.
      */
-    settings.buildHook.setDefault(Strings{
-        getNixBin({}).string(),
-        "__build-remote",
-    });
+    settings.buildHook.setDefault(
+        Strings{
+            getNixBin({}).string(),
+            "__build-remote",
+        });
 
 #ifdef __linux__
     if (isRootUser()) {

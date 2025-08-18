@@ -467,9 +467,10 @@ static void printMissing(EvalState & state, PackageInfos & elems)
             };
             targets.emplace_back(std::move(path));
         } else
-            targets.emplace_back(DerivedPath::Opaque{
-                .path = i.queryOutPath(),
-            });
+            targets.emplace_back(
+                DerivedPath::Opaque{
+                    .path = i.queryOutPath(),
+                });
 
     printMissing(state.store, targets);
 }
@@ -1108,7 +1109,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                     attrs["substitutable"] = hasSubs ? "1" : "0";
                 } else
                     columns.push_back(
-                        (std::string)(isInstalled ? "I" : "-") + (isValid ? "P" : "-") + (hasSubs ? "S" : "-"));
+                        (std::string) (isInstalled ? "I" : "-") + (isValid ? "P" : "-") + (hasSubs ? "S" : "-"));
             }
 
             if (xmlOutput)

@@ -27,25 +27,26 @@ namespace nix {
 RemoteStore::RemoteStore(const Params & params)
     : RemoteStoreConfig(params)
     , Store(params)
-    , connections(make_ref<Pool<Connection>>(
-          std::max(1, (int) maxConnections),
-          [this]() {
-              auto conn = openConnectionWrapper();
-              try {
-                  initConnection(*conn);
-              } catch (...) {
-                  failed = true;
-                  throw;
-              }
-              return conn;
-          },
-          [this](const ref<Connection> & r) {
-              return r->to.good() && r->from.good()
-                     && std::chrono::duration_cast<std::chrono::seconds>(
-                            std::chrono::steady_clock::now() - r->startTime)
-                                .count()
-                            < maxConnectionAge;
-          }))
+    , connections(
+          make_ref<Pool<Connection>>(
+              std::max(1, (int) maxConnections),
+              [this]() {
+                  auto conn = openConnectionWrapper();
+                  try {
+                      initConnection(*conn);
+                  } catch (...) {
+                      failed = true;
+                      throw;
+                  }
+                  return conn;
+              },
+              [this](const ref<Connection> & r) {
+                  return r->to.good() && r->from.good()
+                         && std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::steady_clock::now() - r->startTime)
+                                    .count()
+                                < maxConnectionAge;
+              }))
 {
 }
 
@@ -655,12 +656,13 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
             std::visit(
                 overloaded{
                     [&](const DerivedPath::Opaque & bo) {
-                        results.push_back(KeyedBuildResult{
-                            {
-                                .status = BuildResult::Substituted,
-                            },
-                            /* .path = */ bo,
-                        });
+                        results.push_back(
+                            KeyedBuildResult{
+                                {
+                                    .status = BuildResult::Substituted,
+                                },
+                                /* .path = */ bo,
+                            });
                     },
                     [&](const DerivedPath::Built & bfd) {
                         KeyedBuildResult res{

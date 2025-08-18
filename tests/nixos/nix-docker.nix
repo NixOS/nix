@@ -61,7 +61,7 @@ in
     { nodes }:
     ''
       cache.wait_for_unit("harmonia.service")
-      cache.wait_for_unit("network-online.target")
+      cache.wait_for_unit("network-addresses-eth1.service")
 
       machine.succeed("mkdir -p /etc/containers")
       machine.succeed("""echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json""")

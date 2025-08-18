@@ -123,13 +123,13 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::FullAttrs)(0, false).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::FullAttrs) (0, false).exec();
 
             AttrId rowId = state->db.getLastInsertedRowId();
             assert(rowId);
 
             for (auto & attr : attrs)
-                state->insertAttribute.use()(rowId)(symbols[attr])(AttrType::Placeholder)(0, false).exec();
+                state->insertAttribute.use()(rowId)(symbols[attr])(AttrType::Placeholder) (0, false).exec();
 
             return rowId;
         });
@@ -147,10 +147,10 @@ struct AttrDb
                         ctx.push_back(' ');
                     ctx.append(*p);
                 }
-                state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String)(s) (ctx)
+                state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String) (s) (ctx)
                     .exec();
             } else {
-                state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::String)(s).exec();
+                state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::String) (s).exec();
             }
 
             return state->db.getLastInsertedRowId();
@@ -162,7 +162,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Bool)(b ? 1 : 0).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Bool) (b ? 1 : 0).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -173,7 +173,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Int)(n).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Int) (n).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -185,8 +185,8 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute
-                .use()(key.first)(symbols[key.second])(AttrType::ListOfStrings)(
-                    dropEmptyInitThenConcatStringsSep("\t", l))
+                .use()(key.first)(symbols[key.second])(
+                    AttrType::ListOfStrings) (dropEmptyInitThenConcatStringsSep("\t", l))
                 .exec();
 
             return state->db.getLastInsertedRowId();
@@ -198,7 +198,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Placeholder)(0, false).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Placeholder) (0, false).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -209,7 +209,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Missing)(0, false).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Missing) (0, false).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -220,7 +220,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Misc)(0, false).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Misc) (0, false).exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -231,7 +231,7 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Failed)(0, false).exec();
+            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Failed) (0, false).exec();
 
             return state->db.getLastInsertedRowId();
         });

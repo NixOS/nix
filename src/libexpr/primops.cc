@@ -68,10 +68,11 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
         std::visit(
             overloaded{
                 [&](const NixStringContextElem::Built & b) {
-                    drvs.push_back(DerivedPath::Built{
-                        .drvPath = b.drvPath,
-                        .outputs = OutputsSpec::Names{b.output},
-                    });
+                    drvs.push_back(
+                        DerivedPath::Built{
+                            .drvPath = b.drvPath,
+                            .outputs = OutputsSpec::Names{b.output},
+                        });
                     ensureValid(b.drvPath->getBaseStorePath());
                 },
                 [&](const NixStringContextElem::Opaque & o) {
@@ -117,10 +118,11 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             /* Get all the output paths corresponding to the placeholders we had */
             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                 res.insert_or_assign(
-                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(SingleDerivedPath::Built{
-                                                                          .drvPath = drv.drvPath,
-                                                                          .output = outputName,
-                                                                      })
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(
+                        SingleDerivedPath::Built{
+                            .drvPath = drv.drvPath,
+                            .output = outputName,
+                        })
                         .render(),
                     buildStore->printStorePath(outputPath));
             }
@@ -297,10 +299,11 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     }
 }
 
-static RegisterPrimOp primop_scopedImport(PrimOp{
-    .name = "scopedImport", .arity = 2, .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
-        import(state, pos, *args[1], args[0], v);
-    }});
+static RegisterPrimOp primop_scopedImport(
+    PrimOp{
+        .name = "scopedImport", .arity = 2, .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
+            import(state, pos, *args[1], args[0], v);
+        }});
 
 static RegisterPrimOp primop_import(
     {.name = "import",
@@ -806,11 +809,12 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
     v.mkList(list);
 }
 
-static RegisterPrimOp primop_genericClosure(PrimOp{
-    .name = "__genericClosure",
-    .args = {"attrset"},
-    .arity = 1,
-    .doc = R"(
+static RegisterPrimOp primop_genericClosure(
+    PrimOp{
+        .name = "__genericClosure",
+        .args = {"attrset"},
+        .arity = 1,
+        .doc = R"(
       `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
       It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attribute sets:
@@ -860,8 +864,8 @@ static RegisterPrimOp primop_genericClosure(PrimOp{
       > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
       > ```
       )",
-    .fun = prim_genericClosure,
-});
+        .fun = prim_genericClosure,
+    });
 
 static RegisterPrimOp primop_break(
     {.name = "break",
@@ -872,11 +876,12 @@ static RegisterPrimOp primop_break(
     )",
      .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
          if (state.canDebug()) {
-             auto error = Error(ErrorInfo{
-                 .level = lvlInfo,
-                 .msg = HintFmt("breakpoint reached"),
-                 .pos = state.positions[pos],
-             });
+             auto error = Error(
+                 ErrorInfo{
+                     .level = lvlInfo,
+                     .msg = HintFmt("breakpoint reached"),
+                     .pos = state.positions[pos],
+                 });
 
              state.runDebugRepl(&error);
          }
@@ -940,13 +945,14 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value ** a
     }
 }
 
-static RegisterPrimOp primop_addErrorContext(PrimOp{
-    .name = "__addErrorContext",
-    .arity = 2,
-    // The normal trace item is redundant
-    .addTrace = false,
-    .fun = prim_addErrorContext,
-});
+static RegisterPrimOp primop_addErrorContext(
+    PrimOp{
+        .name = "__addErrorContext",
+        .arity = 2,
+        // The normal trace item is redundant
+        .addTrace = false,
+        .fun = prim_addErrorContext,
+    });
 
 static void prim_ceil(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
@@ -1656,11 +1662,12 @@ static void derivationStrictInternal(EvalState & state, const std::string & drvN
     v.mkAttrs(result);
 }
 
-static RegisterPrimOp primop_derivationStrict(PrimOp{
-    .name = "derivationStrict",
-    .arity = 1,
-    .fun = prim_derivationStrict,
-});
+static RegisterPrimOp primop_derivationStrict(
+    PrimOp{
+        .name = "derivationStrict",
+        .arity = 1,
+        .fun = prim_derivationStrict,
+    });
 
 /* Return a placeholder string for the specified output that will be
    substituted by the corresponding output path at build time. For
@@ -1898,9 +1905,10 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Va
     }
     NixStringContext context;
     for (auto && p : std::move(refs)) {
-        context.insert(NixStringContextElem::Opaque{
-            .path = std::move((StorePath &&) p),
-        });
+        context.insert(
+            NixStringContextElem::Opaque{
+                .path = std::move((StorePath &&) p),
+            });
     }
     v.mkString(s, context);
 }
@@ -1956,10 +1964,11 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
                 .debugThrow();
         }
 
-        lookupPath.elements.emplace_back(LookupPath::Elem{
-            .prefix = LookupPath::Prefix{.s = prefix},
-            .path = LookupPath::Path{.s = path},
-        });
+        lookupPath.elements.emplace_back(
+            LookupPath::Elem{
+                .prefix = LookupPath::Prefix{.s = prefix},
+                .path = LookupPath::Path{.s = path},
+            });
     }
 
     auto path =
@@ -1968,10 +1977,11 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
     v.mkPath(state.findFile(lookupPath, path, pos));
 }
 
-static RegisterPrimOp primop_findFile(PrimOp{
-    .name = "__findFile",
-    .args = {"search-path", "lookup-path"},
-    .doc = R"(
+static RegisterPrimOp primop_findFile(
+    PrimOp{
+        .name = "__findFile",
+        .args = {"search-path", "lookup-path"},
+        .doc = R"(
       Find *lookup-path* in *search-path*.
 
       [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](#builtins-nixPath):
@@ -2099,8 +2109,8 @@ static RegisterPrimOp primop_findFile(PrimOp{
       >
       > makes `<nixpkgs>` refer to a particular branch of the `NixOS/nixpkgs` repository on GitHub.
     )",
-    .fun = prim_findFile,
-});
+        .fun = prim_findFile,
+    });
 
 /* Return the cryptographic hash of a file in base-16. */
 static void prim_hashFile(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -2871,11 +2881,12 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value ** 
         state.mkPos(v, i->pos);
 }
 
-static RegisterPrimOp primop_unsafeGetAttrPos(PrimOp{
-    .name = "__unsafeGetAttrPos",
-    .arity = 2,
-    .fun = prim_unsafeGetAttrPos,
-});
+static RegisterPrimOp primop_unsafeGetAttrPos(
+    PrimOp{
+        .name = "__unsafeGetAttrPos",
+        .arity = 2,
+        .fun = prim_unsafeGetAttrPos,
+    });
 
 // access to exact position information (ie, line and colum numbers) is deferred
 // due to the cost associated with calculating that information and how rarely

@@ -56,12 +56,13 @@ Path getCachePath(std::string_view key, bool shallow)
 //   ...
 std::optional<std::string> readHead(const Path & path)
 {
-    auto [status, output] = runProgram(RunOptions{
-        .program = "git",
-        // FIXME: use 'HEAD' to avoid returning all refs
-        .args = {"ls-remote", "--symref", path},
-        .isInteractive = true,
-    });
+    auto [status, output] = runProgram(
+        RunOptions{
+            .program = "git",
+            // FIXME: use 'HEAD' to avoid returning all refs
+            .args = {"ls-remote", "--symref", path},
+            .isInteractive = true,
+        });
     if (status != 0)
         return std::nullopt;
 
@@ -325,17 +326,18 @@ struct GitInputScheme : InputScheme
 
         writeFile(*repoPath / path.rel(), contents);
 
-        auto result = runProgram(RunOptions{
-            .program = "git",
-            .args =
-                {"-C",
-                 repoPath->string(),
-                 "--git-dir",
-                 repoInfo.gitDir,
-                 "check-ignore",
-                 "--quiet",
-                 std::string(path.rel())},
-        });
+        auto result = runProgram(
+            RunOptions{
+                .program = "git",
+                .args =
+                    {"-C",
+                     repoPath->string(),
+                     "--git-dir",
+                     repoInfo.gitDir,
+                     "check-ignore",
+                     "--quiet",
+                     std::string(path.rel())},
+            });
         auto exitCode =
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
             WEXITSTATUS(result.first)

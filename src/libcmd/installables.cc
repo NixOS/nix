@@ -505,8 +505,9 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 
         for (auto & s : ss) {
             auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(s);
-            result.push_back(make_ref<InstallableAttrPath>(
-                InstallableAttrPath::parse(state, *this, vFile, std::move(prefix), std::move(extendedOutputsSpec))));
+            result.push_back(
+                make_ref<InstallableAttrPath>(InstallableAttrPath::parse(
+                    state, *this, vFile, std::move(prefix), std::move(extendedOutputsSpec))));
         }
 
     } else {
@@ -521,8 +522,9 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 
             if (prefix.find('/') != std::string::npos) {
                 try {
-                    result.push_back(make_ref<InstallableDerivedPath>(
-                        InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec.raw)));
+                    result.push_back(
+                        make_ref<InstallableDerivedPath>(
+                            InstallableDerivedPath::parse(store, prefix, extendedOutputsSpec.raw)));
                     continue;
                 } catch (BadStorePath &) {
                 } catch (...) {
@@ -534,15 +536,16 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
             try {
                 auto [flakeRef, fragment] =
                     parseFlakeRefWithFragment(fetchSettings, std::string{prefix}, absPath(getCommandBaseDir()));
-                result.push_back(make_ref<InstallableFlake>(
-                    this,
-                    getEvalState(),
-                    std::move(flakeRef),
-                    fragment,
-                    std::move(extendedOutputsSpec),
-                    getDefaultFlakeAttrPaths(),
-                    getDefaultFlakeAttrPathPrefixes(),
-                    lockFlags));
+                result.push_back(
+                    make_ref<InstallableFlake>(
+                        this,
+                        getEvalState(),
+                        std::move(flakeRef),
+                        fragment,
+                        std::move(extendedOutputsSpec),
+                        getDefaultFlakeAttrPaths(),
+                        getDefaultFlakeAttrPathPrefixes(),
+                        lockFlags));
                 continue;
             } catch (...) {
                 ex = std::current_exception();
@@ -610,10 +613,11 @@ static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const
             StringSet failedPaths;
             for (; failedResult != failed.end(); failedResult++) {
                 if (!failedResult->errorMsg.empty()) {
-                    logError(ErrorInfo{
-                        .level = lvlError,
-                        .msg = failedResult->errorMsg,
-                    });
+                    logError(
+                        ErrorInfo{
+                            .level = lvlError,
+                            .msg = failedResult->errorMsg,
+                        });
                 }
                 failedPaths.insert(failedResult->path.to_string(store));
             }

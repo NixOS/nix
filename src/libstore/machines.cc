@@ -15,15 +15,16 @@ Machine::Machine(
     decltype(supportedFeatures) supportedFeatures,
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey)
-    : storeUri(StoreReference::parse(
-          // Backwards compatibility: if the URI is schemeless, is not a path,
-          // and is not one of the special store connection words, prepend
-          // ssh://.
-          storeUri.find("://") != std::string::npos || storeUri.find("/") != std::string::npos || storeUri == "auto"
-                  || storeUri == "daemon" || storeUri == "local" || hasPrefix(storeUri, "auto?")
-                  || hasPrefix(storeUri, "daemon?") || hasPrefix(storeUri, "local?") || hasPrefix(storeUri, "?")
-              ? storeUri
-              : "ssh://" + storeUri))
+    : storeUri(
+          StoreReference::parse(
+              // Backwards compatibility: if the URI is schemeless, is not a path,
+              // and is not one of the special store connection words, prepend
+              // ssh://.
+              storeUri.find("://") != std::string::npos || storeUri.find("/") != std::string::npos || storeUri == "auto"
+                      || storeUri == "daemon" || storeUri == "local" || hasPrefix(storeUri, "auto?")
+                      || hasPrefix(storeUri, "daemon?") || hasPrefix(storeUri, "local?") || hasPrefix(storeUri, "?")
+                  ? storeUri
+                  : "ssh://" + storeUri))
     , systemTypes(systemTypes)
     , sshKey(sshKey)
     , maxJobs(maxJobs)
@@ -171,22 +172,23 @@ static Machine parseBuilderLine(const std::set<std::string> & defaultSystems, co
 
     // TODO use designated initializers, once C++ supports those with
     // custom constructors.
-    return {// `storeUri`
-            tokens[0],
-            // `systemTypes`
-            isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : defaultSystems,
-            // `sshKey`
-            isSet(2) ? tokens[2] : "",
-            // `maxJobs`
-            isSet(3) ? parseUnsignedIntField(3) : 1U,
-            // `speedFactor`
-            isSet(4) ? parseFloatField(4) : 1.0f,
-            // `supportedFeatures`
-            isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
-            // `mandatoryFeatures`
-            isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
-            // `sshPublicHostKey`
-            isSet(7) ? ensureBase64(7) : ""};
+    return {
+        // `storeUri`
+        tokens[0],
+        // `systemTypes`
+        isSet(1) ? tokenizeString<std::set<std::string>>(tokens[1], ",") : defaultSystems,
+        // `sshKey`
+        isSet(2) ? tokens[2] : "",
+        // `maxJobs`
+        isSet(3) ? parseUnsignedIntField(3) : 1U,
+        // `speedFactor`
+        isSet(4) ? parseFloatField(4) : 1.0f,
+        // `supportedFeatures`
+        isSet(5) ? tokenizeString<std::set<std::string>>(tokens[5], ",") : std::set<std::string>{},
+        // `mandatoryFeatures`
+        isSet(6) ? tokenizeString<std::set<std::string>>(tokens[6], ",") : std::set<std::string>{},
+        // `sshPublicHostKey`
+        isSet(7) ? ensureBase64(7) : ""};
 }
 
 static Machines

@@ -35,11 +35,12 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Path &
                     toAttrs.erase(j);
                 }
                 auto exact = i.find("exact");
-                registry->entries.push_back(Entry{
-                    .from = Input::fromAttrs(settings, jsonToAttrs(i["from"])),
-                    .to = Input::fromAttrs(settings, std::move(toAttrs)),
-                    .extraAttrs = extraAttrs,
-                    .exact = exact != i.end() && exact.value()});
+                registry->entries.push_back(
+                    Entry{
+                        .from = Input::fromAttrs(settings, jsonToAttrs(i["from"])),
+                        .to = Input::fromAttrs(settings, std::move(toAttrs)),
+                        .extraAttrs = extraAttrs,
+                        .exact = exact != i.end() && exact.value()});
             }
         }
 

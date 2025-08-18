@@ -77,7 +77,15 @@ let
     { lib, pkgs, ... }:
     {
       imports = [ checkOverrideNixVersion ];
-      nix.package = lib.mkForce pkgs.nixVersions.nix_2_3;
+      nix.package = lib.mkForce (
+        pkgs.nixVersions.nix_2_3.overrideAttrs (o: {
+          meta = o.meta // {
+            # This version shouldn't be used by end-users, but we run tests against
+            # it to ensure we don't break protocol compatibility.
+            knownVulnerabilities = [ ];
+          };
+        })
+      );
     };
 
   otherNixes.nix_2_13.setNixPackage =
@@ -88,6 +96,8 @@ let
         nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_13.overrideAttrs
           (o: {
             meta = o.meta // {
+              # This version shouldn't be used by end-users, but we run tests against
+              # it to ensure we don't break protocol compatibility.
               knownVulnerabilities = [ ];
             };
           })
@@ -98,7 +108,9 @@ let
     { lib, pkgs, ... }:
     {
       imports = [ checkOverrideNixVersion ];
-      nix.package = lib.mkForce pkgs.nixVersions.nix_2_18;
+      nix.package =
+        lib.mkForce
+          nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_18;
     };
 
 in
