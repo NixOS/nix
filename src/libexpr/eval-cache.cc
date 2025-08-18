@@ -69,10 +69,10 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/eval-cache-v5";
+        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v5";
         createDirs(cacheDir);
 
-        Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
+        auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
 
         state->db = SQLite(dbPath);
         state->db.isCache();
@@ -705,6 +705,7 @@ StorePath AttrCursor::forceDerivation()
     auto aDrvPath = getAttr(root->state.sDrvPath);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
+    root->state.waitForPath(drvPath);
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
            been garbage-collected. So force it to be regenerated. */
