@@ -21,101 +21,156 @@ protected:
     }
 };
 
-TEST_F(S3HttpIntegrationTest, s3UrlDetection)
+// Parameterized test for S3 URL detection
+struct UrlTestCase
 {
+    std::string url;
+    bool isS3;
+    std::string description;
+};
+
+class S3UrlDetectionTest : public S3HttpIntegrationTest, public ::testing::WithParamInterface<UrlTestCase>
+{};
+
+TEST_P(S3UrlDetectionTest, DetectsUrlCorrectly)
+{
+    const auto & testCase = GetParam();
+    auto ft = makeFileTransfer();
+    FileTransferRequest request(testCase.url);
+
+    if (testCase.isS3) {
+        EXPECT_TRUE(hasPrefix(request.uri, "s3://"))
+            << "URL should be detected as S3: " << testCase.url << " (" << testCase.description << ")";
+    } else {
+        EXPECT_EQ(request.uri, testCase.url)
+            << "Non-S3 URL should remain unchanged: " << testCase.url << " (" << testCase.description << ")";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    S3UrlDetection,
+    S3UrlDetectionTest,
+    ::testing::Values(
+        // S3 URLs
+        UrlTestCase{"s3://bucket/key", true, "basic S3 URL"},
+        UrlTestCase{"s3://my-bucket/path/to/file.nar.xz", true, "S3 with path"},
+        UrlTestCase{"s3://bucket/key?region=us-west-2", true, "S3 with region"},
+        UrlTestCase{"s3://bucket/key?profile=myprofile&region=eu-central-1", true, "S3 with multiple params"},
+        // Non-S3 URLs
+        UrlTestCase{"http://example.com/file.txt", false, "HTTP URL"},
+        UrlTestCase{"https://cache.nixos.org/nar/abc123.nar.xz", false, "HTTPS URL"},
+        UrlTestCase{"file:///local/path/file.txt", false, "file URL"},
+        UrlTestCase{"ftp://ftp.example.com/file.txt", false, "FTP URL"}),
+    [](const ::testing::TestParamInfo<UrlTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        std::replace(name.begin(), name.end(), '/', '_');
+        return name;
+    });
+
+// Parameterized test for malformed S3 URLs
+struct MalformedUrlTestCase
+{
+    std::string url;
+    std::string description;
+};
+
+class S3MalformedUrlTest : public S3HttpIntegrationTest, public ::testing::WithParamInterface<MalformedUrlTestCase>
+{};
+
+TEST_P(S3MalformedUrlTest, HandlesGracefully)
+{
+    const auto & testCase = GetParam();
     auto ft = makeFileTransfer();
 
-    // Test that S3 URLs are properly detected
-    std::vector<std::string> s3Urls = {
-        "s3://bucket/key",
-        "s3://my-bucket/path/to/file.nar.xz",
-        "s3://bucket/key?region=us-west-2",
-        "s3://bucket/key?profile=myprofile&region=eu-central-1"};
-
-    for (const auto & url : s3Urls) {
-        FileTransferRequest request(url);
-        EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL should be detected as S3: " << url;
-    }
+    // Creating the request shouldn't crash, but enqueueFileTransfer should handle errors
+    EXPECT_NO_THROW({ FileTransferRequest request(testCase.url); })
+        << "Creating request for malformed URL should not crash: " << testCase.url << " (" << testCase.description
+        << ")";
 }
 
-TEST_F(S3HttpIntegrationTest, nonS3UrlPassthrough)
+INSTANTIATE_TEST_SUITE_P(
+    MalformedUrls,
+    S3MalformedUrlTest,
+    ::testing::Values(
+        MalformedUrlTestCase{"s3://", "missing bucket and key"},
+        MalformedUrlTestCase{"s3:///key", "empty bucket"},
+        MalformedUrlTestCase{"s3://bucket", "missing key"},
+        MalformedUrlTestCase{"s3://bucket/", "empty key"},
+        MalformedUrlTestCase{"s3://bucket with spaces/key", "invalid bucket name"}),
+    [](const ::testing::TestParamInfo<MalformedUrlTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
+
+// Parameterized test for S3 parameter parsing
+struct S3ParameterTestCase
 {
-    auto ft = makeFileTransfer();
+    std::string url;
+    std::string expectedBucket;
+    std::string expectedKey;
+    std::string expectedRegion;
+    std::string expectedProfile;
+    std::string expectedEndpoint;
+    std::string description;
+};
 
-    // Test that non-S3 URLs are not affected
-    std::vector<std::string> httpUrls = {
-        "http://example.com/file.txt",
-        "https://cache.nixos.org/nar/abc123.nar.xz",
-        "file:///local/path/file.txt",
-        "ftp://ftp.example.com/file.txt"};
+class S3ParameterParsingTest : public S3HttpIntegrationTest, public ::testing::WithParamInterface<S3ParameterTestCase>
+{};
 
-    for (const auto & url : httpUrls) {
-        FileTransferRequest request(url);
-        EXPECT_EQ(request.uri, url) << "Non-S3 URL should remain unchanged: " << url;
-    }
-}
-
-TEST_F(S3HttpIntegrationTest, malformedS3Urls)
+TEST_P(S3ParameterParsingTest, ParsesParametersCorrectly)
 {
-    // Test malformed S3 URLs that should trigger errors
-    std::vector<std::string> malformedUrls = {
-        "s3://",                      // Missing bucket and key
-        "s3:///key",                  // Empty bucket
-        "s3://bucket",                // Missing key
-        "s3://bucket/",               // Empty key
-        "s3://",                      // Completely empty
-        "s3://bucket with spaces/key" // Invalid bucket name
-    };
+    const auto & tc = GetParam();
+    FileTransferRequest request(tc.url);
 
-    auto ft = makeFileTransfer();
+    // Basic validation that the URL is recognized
+    EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL: " << tc.url << " (" << tc.description << ")";
 
-    for (const auto & url : malformedUrls) {
-        // Creating the request shouldn't crash, but enqueueFileTransfer should handle errors
-        EXPECT_NO_THROW({ FileTransferRequest request(url); })
-            << "Creating request for malformed URL should not crash: " << url;
-    }
+    // Note: To fully test parameter extraction, we'd need to expose
+    // the parseS3Uri function or add getter methods to FileTransferRequest
 }
 
-TEST_F(S3HttpIntegrationTest, s3Parameters_Parsing)
-{
-    // Test parameter parsing for various S3 configurations
-    struct TestCase
-    {
-        std::string url;
-        std::string expectedBucket;
-        std::string expectedKey;
-        std::string expectedRegion;
-        std::string expectedProfile;
-        std::string expectedEndpoint;
-    };
+INSTANTIATE_TEST_SUITE_P(
+    ParameterParsing,
+    S3ParameterParsingTest,
+    ::testing::Values(
+        S3ParameterTestCase{
+            "s3://my-bucket/my-key.txt", "my-bucket", "my-key.txt", "us-east-1", "", "", "basic S3 URL"},
+        S3ParameterTestCase{
+            "s3://prod-cache/nix/store/abc123.nar.xz?region=eu-west-1",
+            "prod-cache",
+            "nix/store/abc123.nar.xz",
+            "eu-west-1",
+            "",
+            "",
+            "with region"},
+        S3ParameterTestCase{
+            "s3://cache/file.txt?profile=production&region=ap-southeast-2",
+            "cache",
+            "file.txt",
+            "ap-southeast-2",
+            "production",
+            "",
+            "with profile and region"},
+        S3ParameterTestCase{
+            "s3://bucket/key?endpoint=minio.local&scheme=http",
+            "bucket",
+            "key",
+            "us-east-1",
+            "",
+            "minio.local",
+            "with custom endpoint"}),
+    [](const ::testing::TestParamInfo<S3ParameterTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
 
-    std::vector<TestCase> testCases = {
-        {"s3://my-bucket/my-key.txt", "my-bucket", "my-key.txt", "us-east-1", "", ""},
-        {"s3://prod-cache/nix/store/abc123.nar.xz?region=eu-west-1",
-         "prod-cache",
-         "nix/store/abc123.nar.xz",
-         "eu-west-1",
-         "",
-         ""},
-        {"s3://cache/file.txt?profile=production&region=ap-southeast-2",
-         "cache",
-         "file.txt",
-         "ap-southeast-2",
-         "production",
-         ""},
-        {"s3://bucket/key?endpoint=minio.local&scheme=http", "bucket", "key", "us-east-1", "", "minio.local"}};
-
-    for (const auto & tc : testCases) {
-        FileTransferRequest request(tc.url);
-
-        // Basic validation that the URL is recognized
-        EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL: " << tc.url;
-
-        // Note: To fully test parameter extraction, we'd need to expose
-        // the parseS3Uri function or add getter methods to FileTransferRequest
-    }
-}
-
+// Non-parameterized tests for specific integration scenarios
 TEST_F(S3HttpIntegrationTest, awsCredentials_Integration)
 {
     // Test integration with AWS credential resolution

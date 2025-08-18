@@ -25,6 +25,152 @@ protected:
     }
 };
 
+// Parameterized test for valid S3 URLs
+struct S3UrlTestCase
+{
+    std::string url;
+    std::string description;
+};
+
+class S3ValidUrlTest : public S3FileTransferTest, public ::testing::WithParamInterface<S3UrlTestCase>
+{};
+
+TEST_P(S3ValidUrlTest, ParsesSuccessfully)
+{
+    const auto & testCase = GetParam();
+    EXPECT_NO_THROW({
+        FileTransferRequest request(testCase.url);
+        EXPECT_TRUE(hasPrefix(request.uri, "s3://"));
+    }) << "Failed for URL: "
+       << testCase.url << " (" << testCase.description << ")";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    S3UrlParameters,
+    S3ValidUrlTest,
+    ::testing::Values(
+        S3UrlTestCase{"s3://bucket/key", "basic URL"},
+        S3UrlTestCase{"s3://bucket/path/key.txt?region=eu-west-1", "with region parameter"},
+        S3UrlTestCase{"s3://bucket/key?profile=myprofile", "with profile parameter"},
+        S3UrlTestCase{"s3://bucket/key?region=ap-southeast-1&profile=prod&scheme=https", "with multiple parameters"},
+        S3UrlTestCase{"s3://bucket/key?endpoint=s3.custom.com&region=us-east-1", "with custom endpoint"}),
+    [](const ::testing::TestParamInfo<S3UrlTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
+
+// Parameterized test for invalid S3 URLs
+class S3InvalidUrlTest : public S3FileTransferTest, public ::testing::WithParamInterface<S3UrlTestCase>
+{};
+
+TEST_P(S3InvalidUrlTest, HandlesGracefully)
+{
+    const auto & testCase = GetParam();
+    FileTransferRequest request(testCase.url);
+
+    // Test that creating the request doesn't crash
+    // The actual error should occur during enqueueFileTransfer
+    EXPECT_NO_THROW({
+        auto ft = makeFileTransfer();
+        // Note: We can't easily test the actual transfer without real credentials
+        // This test verifies the URL parsing validation
+    }) << "Should handle invalid URL gracefully: "
+       << testCase.url << " (" << testCase.description << ")";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidFormats,
+    S3InvalidUrlTest,
+    ::testing::Values(
+        S3UrlTestCase{"s3://", "no bucket"},
+        S3UrlTestCase{"s3:///key", "empty bucket"},
+        S3UrlTestCase{"s3://bucket", "no key"},
+        S3UrlTestCase{"s3://bucket/", "empty key"}),
+    [](const ::testing::TestParamInfo<S3UrlTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
+
+// Parameterized test for region extraction
+struct RegionTestCase
+{
+    std::string url;
+    std::string expectedRegion;
+    std::string description;
+};
+
+class S3RegionTest : public S3FileTransferTest, public ::testing::WithParamInterface<RegionTestCase>
+{};
+
+TEST_P(S3RegionTest, ExtractsRegionCorrectly)
+{
+    const auto & testCase = GetParam();
+    FileTransferRequest request(testCase.url);
+    // We would need access to internal parsing to verify regions
+    // For now, just verify the URL is recognized as S3
+    EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL: " << testCase.url << " (" << testCase.description << ")";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RegionExtraction,
+    S3RegionTest,
+    ::testing::Values(
+        RegionTestCase{"s3://bucket/key", "us-east-1", "default region"},
+        RegionTestCase{"s3://bucket/key?region=eu-west-1", "eu-west-1", "explicit region"},
+        RegionTestCase{"s3://bucket/key?region=ap-southeast-2", "ap-southeast-2", "different region"}),
+    [](const ::testing::TestParamInfo<RegionTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
+
+// Parameterized test for S3 URL parsing with query parameters
+struct ParsedUrlTestCase
+{
+    std::string url;
+    std::string expectedScheme;
+    std::string expectedBucket;
+    std::string expectedRegion;
+    std::string description;
+};
+
+class S3UrlParsingTest : public S3FileTransferTest, public ::testing::WithParamInterface<ParsedUrlTestCase>
+{};
+
+TEST_P(S3UrlParsingTest, ParsesUrlCorrectly)
+{
+    const auto & testCase = GetParam();
+    auto parsed = parseURL(testCase.url);
+    EXPECT_EQ(parsed.scheme, testCase.expectedScheme) << "URL: " << testCase.url << " (" << testCase.description << ")";
+    EXPECT_EQ(parsed.authority->host, testCase.expectedBucket)
+        << "URL: " << testCase.url << " (" << testCase.description << ")";
+    if (!testCase.expectedRegion.empty()) {
+        EXPECT_EQ(parsed.query["region"], testCase.expectedRegion)
+            << "URL: " << testCase.url << " (" << testCase.description << ")";
+    }
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    QueryParams,
+    S3UrlParsingTest,
+    ::testing::Values(
+        ParsedUrlTestCase{"s3://bucket/key?region=us-east-2", "s3", "bucket", "us-east-2", "basic with region"},
+        ParsedUrlTestCase{
+            "s3://my-bucket/path/to/file?region=eu-west-1", "s3", "my-bucket", "eu-west-1", "path with region"},
+        ParsedUrlTestCase{"s3://test/obj?region=ap-south-1", "s3", "test", "ap-south-1", "short name with region"}),
+    [](const ::testing::TestParamInfo<ParsedUrlTestCase> & info) {
+        std::string name = info.param.description;
+        std::replace(name.begin(), name.end(), ' ', '_');
+        std::replace(name.begin(), name.end(), '-', '_');
+        return name;
+    });
+
+// Non-parameterized tests for specific functionality
 TEST_F(S3FileTransferTest, parseS3Uri_Basic)
 {
     auto ft = makeFileTransfer();
@@ -64,51 +210,6 @@ TEST_F(S3FileTransferTest, convertS3ToHttps_CustomEndpoint)
     // (We'd need to expose parseS3Uri or add getter methods for full verification)
 }
 
-TEST_F(S3FileTransferTest, s3Request_Parameters)
-{
-    // Test various S3 URL parameter combinations
-    std::vector<std::string> testUrls = {
-        "s3://bucket/key",
-        "s3://bucket/path/key.txt?region=eu-west-1",
-        "s3://bucket/key?profile=myprofile",
-        "s3://bucket/key?region=ap-southeast-1&profile=prod&scheme=https",
-        "s3://bucket/key?endpoint=s3.custom.com&region=us-east-1"};
-
-    for (const auto & url : testUrls) {
-        EXPECT_NO_THROW({
-            FileTransferRequest request(url);
-            EXPECT_TRUE(hasPrefix(request.uri, "s3://"));
-        }) << "Failed for URL: "
-           << url;
-    }
-}
-
-TEST_F(S3FileTransferTest, s3Uri_InvalidFormats)
-{
-    // Test that invalid S3 URIs are handled gracefully
-    std::vector<std::string> invalidUrls = {
-        "s3://",        // No bucket
-        "s3:///key",    // Empty bucket
-        "s3://bucket",  // No key
-        "s3://bucket/", // Empty key
-    };
-
-    auto ft = makeFileTransfer();
-
-    for (const auto & url : invalidUrls) {
-        FileTransferRequest request(url);
-
-        // Test that creating the request doesn't crash
-        // The actual error should occur during enqueueFileTransfer
-        EXPECT_NO_THROW({
-            auto ft = makeFileTransfer();
-            // Note: We can't easily test the actual transfer without real credentials
-            // This test verifies the URL parsing validation
-        }) << "Should handle invalid URL gracefully: "
-           << url;
-    }
-}
-
 TEST_F(S3FileTransferTest, s3Request_WithMockCredentials)
 {
     // Set up mock credentials for testing
@@ -142,23 +243,6 @@ TEST_F(S3FileTransferTest, s3Request_WithSessionToken)
     unsetenv("AWS_ACCESS_KEY_ID");
     unsetenv("AWS_SECRET_ACCESS_KEY");
     unsetenv("AWS_SESSION_TOKEN");
-}
-
-TEST_F(S3FileTransferTest, regionExtraction)
-{
-    // Test that regions are properly extracted and used
-    std::vector<std::pair<std::string, std::string>> testCases = {
-        {"s3://bucket/key", "us-east-1"},                            // Default region
-        {"s3://bucket/key?region=eu-west-1", "eu-west-1"},           // Explicit region
-        {"s3://bucket/key?region=ap-southeast-2", "ap-southeast-2"}, // Different region
-    };
-
-    for (const auto & [url, expectedRegion] : testCases) {
-        FileTransferRequest request(url);
-        // We would need access to internal parsing to verify regions
-        // For now, just verify the URL is recognized as S3
-        EXPECT_TRUE(hasPrefix(request.uri, "s3://")) << "URL: " << url;
-    }
 }
 
 /**
@@ -241,28 +325,6 @@ TEST_F(S3FileTransferTest, s3RegionQueryParameters)
 
     S3BinaryCacheStoreConfig config2("s3", "another-bucket", params2);
     EXPECT_EQ(config2.cacheUri.query["region"], "eu-central-1") << "Different region parameter should be preserved";
-}
-
-/**
- * Test S3 URL parsing with various query parameters
- */
-TEST_F(S3FileTransferTest, s3UrlParsingWithQueryParams)
-{
-    // Test various S3 URLs with query parameters
-    std::vector<std::tuple<std::string, std::string, std::string, std::string>> testCases = {
-        {"s3://bucket/key?region=us-east-2", "s3", "bucket", "us-east-2"},
-        {"s3://my-bucket/path/to/file?region=eu-west-1", "s3", "my-bucket", "eu-west-1"},
-        {"s3://test/obj?region=ap-south-1", "s3", "test", "ap-south-1"},
-    };
-
-    for (const auto & [url, expectedScheme, expectedBucket, expectedRegion] : testCases) {
-        auto parsed = parseURL(url);
-        EXPECT_EQ(parsed.scheme, expectedScheme) << "URL: " << url;
-        EXPECT_EQ(parsed.authority->host, expectedBucket) << "URL: " << url;
-        if (!expectedRegion.empty()) {
-            EXPECT_EQ(parsed.query["region"], expectedRegion) << "URL: " << url;
-        }
-    }
 }
 
 } // namespace nix
