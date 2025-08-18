@@ -15,10 +15,7 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     auto ret = StringSet{"http", "https"};
     if (forceHttp)
         ret.insert("file");
-#if NIX_WITH_AWS_CRT_SUPPORT
-    // S3 support is now handled via curl with AWS SigV4 authentication
-    ret.insert("s3");
-#endif
+    // S3 is now handled by S3BinaryCacheStoreConfig
     return ret;
 }
 
@@ -33,12 +30,6 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == '/')
         cacheUri.path.pop_back();
-
-    // For S3 stores, preserve query parameters as part of the URL
-    // These are needed for region specification and other S3-specific settings
-    if (scheme == "s3" && !params.empty()) {
-        cacheUri.query = params;
-    }
 }
 
 StoreReference HttpBinaryCacheStoreConfig::getReference() const
@@ -182,24 +173,50 @@ protected:
         if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
             return FileTransferRequest(path);
         } else {
-            // For S3 URLs, we need to properly construct the URL with path before query parameters
-            if (config->cacheUri.scheme == "s3") {
-                auto s3Url = config->cacheUri;
+            // Properly handle paths with query parameters
+            auto resultUrl = config->cacheUri;
 
-                // Check if path contains its own query parameters
-                auto questionPos = path.find('?');
-                if (questionPos != std::string::npos) {
-                    // Path has query params - don't include base query params
-                    s3Url.query.clear();
-                }
+            // Parse the path to separate the actual path from query parameters
+            auto questionPos = path.find('?');
+            std::string pathPart = path;
+            std::string queryPart;
 
-                // Append the path and reconstruct with query parameters in the right place
-                s3Url.path = s3Url.path + "/" + path;
-                return FileTransferRequest(s3Url.to_string());
-            } else {
-                // For non-S3 URLs, use the original simpler approach
-                return FileTransferRequest(config->cacheUri.to_string() + "/" + path);
+            if (questionPos != std::string::npos) {
+                pathPart = path.substr(0, questionPos);
+                queryPart = path.substr(questionPos + 1);
             }
+
+            // Append the path part
+            if (!pathPart.empty()) {
+                // Ensure there's a separator between existing path and new path
+                if (!resultUrl.path.empty()) {
+                    if (resultUrl.path.back() != '/' && pathPart.front() != '/')
+                        resultUrl.path += '/';
+                } else {
+                    // If path is empty, ensure we start with / for absolute path
+                    if (pathPart.front() != '/')
+                        resultUrl.path = '/';
+                }
+                resultUrl.path += pathPart;
+            }
+
+            // Handle query parameters
+            if (!queryPart.empty()) {
+                // If the path has its own query parameters, use those instead of base URL's
+                resultUrl.query.clear();
+                // Parse the query string into key-value pairs
+                auto params = tokenizeString<Strings>(queryPart, "&");
+                for (auto & param : params) {
+                    auto eq = param.find('=');
+                    if (eq != std::string::npos) {
+                        resultUrl.query[param.substr(0, eq)] = param.substr(eq + 1);
+                    } else {
+                        resultUrl.query[param] = "";
+                    }
+                }
+            }
+
+            return FileTransferRequest(resultUrl.to_string());
         }
     }
 

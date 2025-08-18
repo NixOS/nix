@@ -338,6 +338,7 @@ sources = files(
   'remote-fs-accessor.cc',
   'remote-store.cc',
   'restricted-store.cc',
+  's3-binary-cache-store.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',

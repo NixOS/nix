@@ -1,6 +1,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/config.hh"
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 
@@ -166,9 +167,13 @@ TEST_F(S3FileTransferTest, regionExtraction)
  */
 TEST_F(S3FileTransferTest, s3StoreRegistration)
 {
-    // Test that S3 URI scheme is in the supported schemes
-    auto schemes = HttpBinaryCacheStoreConfig::uriSchemes();
-    EXPECT_TRUE(schemes.count("s3") > 0) << "S3 scheme should be in supported URI schemes";
+    // Test that S3 URI scheme is in the supported schemes (now in S3BinaryCacheStoreConfig)
+    auto s3Schemes = S3BinaryCacheStoreConfig::uriSchemes();
+    EXPECT_TRUE(s3Schemes.count("s3") > 0) << "S3 scheme should be in S3BinaryCacheStoreConfig URI schemes";
+
+    // Verify that HttpBinaryCacheStoreConfig does NOT include S3
+    auto httpSchemes = HttpBinaryCacheStoreConfig::uriSchemes();
+    EXPECT_FALSE(httpSchemes.count("s3") > 0) << "S3 scheme should NOT be in HttpBinaryCacheStoreConfig URI schemes";
 
     // Test that S3 store can be opened without error
     try {
@@ -176,8 +181,8 @@ TEST_F(S3FileTransferTest, s3StoreRegistration)
         auto parsedUrl = parseURL(storeUrl);
         EXPECT_EQ(parsedUrl.scheme, "s3");
 
-        // Verify that HttpBinaryCacheStoreConfig accepts S3 URLs
-        HttpBinaryCacheStoreConfig config("s3", "test-bucket", {});
+        // Verify that S3BinaryCacheStoreConfig accepts S3 URLs
+        S3BinaryCacheStoreConfig config("s3", "test-bucket", {});
         EXPECT_EQ(config.cacheUri.scheme, "s3");
         EXPECT_EQ(config.cacheUri.authority->host, "test-bucket");
     } catch (const std::exception & e) {
@@ -224,7 +229,7 @@ TEST_F(S3FileTransferTest, s3RegionQueryParameters)
     StringMap params;
     params["region"] = "us-west-2";
 
-    HttpBinaryCacheStoreConfig config("s3", "test-bucket", params);
+    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
 
     // For S3 stores, query parameters should be preserved
     EXPECT_FALSE(config.cacheUri.query.empty()) << "S3 store should preserve query parameters";
@@ -234,7 +239,7 @@ TEST_F(S3FileTransferTest, s3RegionQueryParameters)
     StringMap params2;
     params2["region"] = "eu-central-1";
 
-    HttpBinaryCacheStoreConfig config2("s3", "another-bucket", params2);
+    S3BinaryCacheStoreConfig config2("s3", "another-bucket", params2);
     EXPECT_EQ(config2.cacheUri.query["region"], "eu-central-1") << "Different region parameter should be preserved";
 }
 
