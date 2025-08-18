@@ -2,3 +2,5 @@
 e4f62e46088919428a68bd8014201dc8e379fed7 # !autorebase ./maintainers/format.sh --until-stable
 # meson re-formatting
 385e2c3542c707d95e3784f7f6d623f67e77ab61 # !autorebase ./maintainers/format.sh --until-stable
+# nixfmt 1.0.0
+1d943f581908f35075a84a3d89c2eba3ff35067f # !autorebase ./maintainers/format.sh --until-stable

@@ -43,15 +43,14 @@ mkMesonExecutable (finalAttrs: {
   ];
 
   # Hack for sake of the dev shell
-  passthru.externalBuildInputs =
-    [
-      sqlite
-      rapidcheck
-      gtest
-    ]
-    ++ lib.optionals withBenchmarks [
-      gbenchmark
-    ];
+  passthru.externalBuildInputs = [
+    sqlite
+    rapidcheck
+    gtest
+  ]
+  ++ lib.optionals withBenchmarks [
+    gbenchmark
+  ];
 
   buildInputs = finalAttrs.passthru.externalBuildInputs ++ [
     nix-store

@@ -55,13 +55,11 @@ let
       };
 
     # Done in a pre-configure hook, because $NIX_BUILD_TOP needs to be substituted.
-    preConfigure =
-      prevAttrs.preConfigure or ""
-      + ''
-        mappingFlag=" -fcoverage-prefix-map=$NIX_BUILD_TOP/${finalAttrs.src.name}=${finalAttrs.src}"
-        CFLAGS+="$mappingFlag"
-        CXXFLAGS+="$mappingFlag"
-      '';
+    preConfigure = prevAttrs.preConfigure or "" + ''
+      mappingFlag=" -fcoverage-prefix-map=$NIX_BUILD_TOP/${finalAttrs.src.name}=${finalAttrs.src}"
+      CFLAGS+="$mappingFlag"
+      CXXFLAGS+="$mappingFlag"
+    '';
   };
 
   componentOverrides =
