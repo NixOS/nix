@@ -739,8 +739,16 @@ struct GitInputScheme : InputScheme
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", resolved);
-                if (submodule.branch != "")
-                    attrs.insert_or_assign("ref", submodule.branch);
+                if (submodule.branch != "") {
+                    // A special value of . is used to indicate that the name of the branch in the submodule
+                    // should be the same name as the current branch in the current repository.
+                    // https://git-scm.com/docs/gitmodules
+                    if (submodule.branch == ".") {
+                        attrs.insert_or_assign("ref", ref);
+                    } else {
+                        attrs.insert_or_assign("ref", submodule.branch);
+                    }
+                }
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{exportIgnore});
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
