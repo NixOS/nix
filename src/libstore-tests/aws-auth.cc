@@ -23,45 +23,58 @@ protected:
 
 TEST_F(AwsCredentialProviderTest, createDefault)
 {
-    auto provider = AwsCredentialProvider::createDefault();
-    // Provider may be null in sandboxed environments, which is acceptable
-    if (!provider) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
+    try {
+        auto provider = AwsCredentialProvider::createDefault();
+        EXPECT_NE(provider, nullptr);
+    } catch (const AwsAuthError & e) {
+        // Expected in sandboxed environments where AWS CRT isn't available
+        GTEST_SKIP() << "AWS CRT not available: " << e.what();
     }
-    EXPECT_NE(provider, nullptr);
 }
 
 TEST_F(AwsCredentialProviderTest, createProfile_Empty)
 {
-    auto provider = AwsCredentialProvider::createProfile("");
-    // Provider may be null in sandboxed environments, which is acceptable
-    if (!provider) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
+    try {
+        auto provider = AwsCredentialProvider::createProfile("");
+        EXPECT_NE(provider, nullptr);
+    } catch (const AwsAuthError & e) {
+        // Expected in sandboxed environments where AWS CRT isn't available
+        GTEST_SKIP() << "AWS CRT not available: " << e.what();
     }
-    EXPECT_NE(provider, nullptr);
 }
 
 TEST_F(AwsCredentialProviderTest, createProfile_Named)
 {
-    auto provider = AwsCredentialProvider::createProfile("test-profile");
-    // Profile creation may fail if profile doesn't exist, which is expected
-    // Just verify the call doesn't crash
-    EXPECT_TRUE(true);
+    // Creating a non-existent profile should throw
+    try {
+        auto provider = AwsCredentialProvider::createProfile("test-profile");
+        // If we got here, the profile exists (unlikely in test environment)
+        EXPECT_NE(provider, nullptr);
+    } catch (const AwsAuthError & e) {
+        // Expected - profile doesn't exist
+        EXPECT_TRUE(std::string(e.what()).find("test-profile") != std::string::npos);
+    }
 }
 
 TEST_F(AwsCredentialProviderTest, getCredentials_NoCredentials)
 {
-    // With no environment variables or profile, should return nullopt
-    auto provider = AwsCredentialProvider::createDefault();
-    if (!provider) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
-    }
-    ASSERT_NE(provider, nullptr);
+    // With no environment variables or profile, should throw when getting credentials
+    try {
+        auto provider = AwsCredentialProvider::createDefault();
+        ASSERT_NE(provider, nullptr);
 
-    auto creds = provider->getCredentials();
-    // This may or may not be null depending on environment,
-    // so just verify the call doesn't crash
-    EXPECT_TRUE(true); // Basic sanity check
+        // This should throw if there are no credentials available
+        try {
+            auto creds = provider->getCredentials();
+            // If we got here, credentials were found (e.g., from IMDS or ~/.aws/credentials)
+            EXPECT_TRUE(true); // Basic sanity check
+        } catch (const AwsAuthError &) {
+            // Expected if no credentials are available
+            EXPECT_TRUE(true);
+        }
+    } catch (const AwsAuthError & e) {
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
+    }
 }
 
 TEST_F(AwsCredentialProviderTest, getCredentials_FromEnvironment)
@@ -71,22 +84,21 @@ TEST_F(AwsCredentialProviderTest, getCredentials_FromEnvironment)
     setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key", 1);
     setenv("AWS_SESSION_TOKEN", "test-session-token", 1);
 
-    auto provider = AwsCredentialProvider::createDefault();
-    if (!provider) {
+    try {
+        auto provider = AwsCredentialProvider::createDefault();
+        ASSERT_NE(provider, nullptr);
+
+        auto creds = provider->getCredentials();
+        EXPECT_EQ(creds.accessKeyId, "test-access-key");
+        EXPECT_EQ(creds.secretAccessKey, "test-secret-key");
+        EXPECT_TRUE(creds.sessionToken.has_value());
+        EXPECT_EQ(*creds.sessionToken, "test-session-token");
+    } catch (const AwsAuthError & e) {
         // Clean up first
         unsetenv("AWS_ACCESS_KEY_ID");
         unsetenv("AWS_SECRET_ACCESS_KEY");
         unsetenv("AWS_SESSION_TOKEN");
-        GTEST_SKIP() << "AWS CRT not available in this environment";
-    }
-    ASSERT_NE(provider, nullptr);
-
-    auto creds = provider->getCredentials();
-    if (creds.has_value()) {
-        EXPECT_EQ(creds->accessKeyId, "test-access-key");
-        EXPECT_EQ(creds->secretAccessKey, "test-secret-key");
-        EXPECT_TRUE(creds->sessionToken.has_value());
-        EXPECT_EQ(*creds->sessionToken, "test-session-token");
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
     }
 
     // Clean up
@@ -101,20 +113,19 @@ TEST_F(AwsCredentialProviderTest, getCredentials_WithoutSessionToken)
     setenv("AWS_ACCESS_KEY_ID", "test-access-key-2", 1);
     setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key-2", 1);
 
-    auto provider = AwsCredentialProvider::createDefault();
-    if (!provider) {
+    try {
+        auto provider = AwsCredentialProvider::createDefault();
+        ASSERT_NE(provider, nullptr);
+
+        auto creds = provider->getCredentials();
+        EXPECT_EQ(creds.accessKeyId, "test-access-key-2");
+        EXPECT_EQ(creds.secretAccessKey, "test-secret-key-2");
+        EXPECT_FALSE(creds.sessionToken.has_value());
+    } catch (const AwsAuthError & e) {
         // Clean up first
         unsetenv("AWS_ACCESS_KEY_ID");
         unsetenv("AWS_SECRET_ACCESS_KEY");
-        GTEST_SKIP() << "AWS CRT not available in this environment";
-    }
-    ASSERT_NE(provider, nullptr);
-
-    auto creds = provider->getCredentials();
-    if (creds.has_value()) {
-        EXPECT_EQ(creds->accessKeyId, "test-access-key-2");
-        EXPECT_EQ(creds->secretAccessKey, "test-secret-key-2");
-        EXPECT_FALSE(creds->sessionToken.has_value());
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
     }
 
     // Clean up
@@ -125,15 +136,16 @@ TEST_F(AwsCredentialProviderTest, getCredentials_WithoutSessionToken)
 TEST_F(AwsCredentialProviderTest, multipleProviders_Independent)
 {
     // Test that multiple providers can be created independently
-    auto provider1 = AwsCredentialProvider::createDefault();
-    auto provider2 = AwsCredentialProvider::createDefault(); // Use default for both
+    try {
+        auto provider1 = AwsCredentialProvider::createDefault();
+        auto provider2 = AwsCredentialProvider::createDefault(); // Use default for both
 
-    if (!provider1 || !provider2) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
+        EXPECT_NE(provider1, nullptr);
+        EXPECT_NE(provider2, nullptr);
+        EXPECT_NE(provider1.get(), provider2.get());
+    } catch (const AwsAuthError & e) {
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
     }
-    EXPECT_NE(provider1, nullptr);
-    EXPECT_NE(provider2, nullptr);
-    EXPECT_NE(provider1.get(), provider2.get());
 }
 
 } // namespace nix

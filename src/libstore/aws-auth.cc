@@ -5,6 +5,7 @@
 
 #  include "nix/util/logging.hh"
 #  include "nix/util/finally.hh"
+#  include "nix/util/error.hh"
 
 #  include <aws/crt/Api.h>
 #  include <aws/crt/auth/Credentials.h>
@@ -41,8 +42,7 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
     initAwsCrt();
 
     if (!crtInitialized) {
-        debug("AWS CRT not initialized, cannot create credential provider");
-        return nullptr;
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
     try {
@@ -51,17 +51,16 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
 
         auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
         if (!provider) {
-            debug("Failed to create default AWS credentials provider");
-            return nullptr;
+            throw AwsAuthError("Failed to create default AWS credentials provider");
         }
 
         return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const AwsAuthError &) {
+        throw;
     } catch (const std::exception & e) {
-        debug("Exception creating AWS credential provider: %s", e.what());
-        return nullptr;
+        throw AwsAuthError("Exception creating AWS credential provider: %s", e.what());
     } catch (...) {
-        debug("Unknown exception creating AWS credential provider");
-        return nullptr;
+        throw AwsAuthError("Unknown exception creating AWS credential provider");
     }
 }
 
@@ -70,8 +69,7 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createProfile(cons
     initAwsCrt();
 
     if (!crtInitialized) {
-        debug("AWS CRT not initialized, cannot create credential provider");
-        return nullptr;
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
     if (profile.empty()) {
@@ -85,17 +83,16 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createProfile(cons
 
         auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
         if (!provider) {
-            debug("Failed to create AWS credentials provider for profile '%s'", profile);
-            return nullptr;
+            throw AwsAuthError("Failed to create AWS credentials provider for profile '%s'", profile);
         }
 
         return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const AwsAuthError &) {
+        throw;
     } catch (const std::exception & e) {
-        debug("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
-        return nullptr;
+        throw AwsAuthError("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
     } catch (...) {
-        debug("Unknown exception creating AWS credential provider for profile '%s'", profile);
-        return nullptr;
+        throw AwsAuthError("Unknown exception creating AWS credential provider for profile '%s'", profile);
     }
 }
 
@@ -106,23 +103,23 @@ AwsCredentialProvider::AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICr
 
 AwsCredentialProvider::~AwsCredentialProvider() = default;
 
-std::optional<AwsCredentials> AwsCredentialProvider::getCredentials()
+AwsCredentials AwsCredentialProvider::getCredentials()
 {
     if (!provider || !provider->IsValid()) {
-        debug("AWS credential provider is invalid");
-        return std::nullopt;
+        throw AwsAuthError("AWS credential provider is invalid");
     }
 
     std::mutex mutex;
     std::condition_variable cv;
     std::optional<AwsCredentials> result;
+    int resolvedErrorCode = 0;
     bool resolved = false;
 
     provider->GetCredentials([&](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
         std::lock_guard<std::mutex> lock(mutex);
 
         if (errorCode != 0 || !credentials) {
-            debug("Failed to resolve AWS credentials: error code %d", errorCode);
+            resolvedErrorCode = errorCode;
         } else {
             auto accessKeyId = credentials->GetAccessKeyId();
             auto secretAccessKey = credentials->GetSecretAccessKey();
@@ -146,7 +143,11 @@ std::optional<AwsCredentials> AwsCredentialProvider::getCredentials()
     std::unique_lock<std::mutex> lock(mutex);
     cv.wait(lock, [&] { return resolved; });
 
-    return result;
+    if (!result) {
+        throw AwsAuthError("Failed to resolve AWS credentials: error code %d", resolvedErrorCode);
+    }
+
+    return *result;
 }
 
 } // namespace nix

@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/error.hh"
 #include "nix/store/config.hh"
 
 #include <memory>
@@ -21,6 +22,11 @@ class Credentials;
 } // namespace Aws
 
 namespace nix {
+
+/**
+ * Exception thrown when AWS authentication fails
+ */
+MakeError(AwsAuthError, Error);
 
 /**
  * AWS credentials obtained from credential providers
@@ -55,19 +61,21 @@ public:
     /**
      * Create credential provider using the default AWS credential chain
      * This includes: Environment -> Profile -> IMDS/ECS
+     * @throws AwsAuthError if credential provider cannot be created
      */
     static std::unique_ptr<AwsCredentialProvider> createDefault();
 
     /**
      * Create credential provider for a specific profile
+     * @throws AwsAuthError if credential provider cannot be created
      */
     static std::unique_ptr<AwsCredentialProvider> createProfile(const std::string & profile);
 
     /**
      * Get credentials synchronously
-     * Returns nullopt if credentials cannot be resolved
+     * @throws AwsAuthError if credentials cannot be resolved
      */
-    std::optional<AwsCredentials> getCredentials();
+    AwsCredentials getCredentials();
 
     AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider);
     ~AwsCredentialProvider();

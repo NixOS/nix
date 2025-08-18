@@ -155,31 +155,28 @@ struct curlFileTransfer : public FileTransfer
                     isS3Request = true;
 
                     // Get credentials
-                    std::string profile = s3Url.getProfile();
-                    auto credProvider = profile.empty() ? AwsCredentialProvider::createDefault()
-                                                        : AwsCredentialProvider::createProfile(profile);
+                    try {
+                        std::string profile = s3Url.getProfile();
+                        auto credProvider = profile.empty() ? AwsCredentialProvider::createDefault()
+                                                            : AwsCredentialProvider::createProfile(profile);
 
-                    if (credProvider) {
                         auto creds = credProvider->getCredentials();
-                        if (creds) {
-                            awsCredentials = creds->accessKeyId + ":" + creds->secretAccessKey;
+                        awsCredentials = creds.accessKeyId + ":" + creds.secretAccessKey;
 
-                            std::string region = s3Url.getRegion();
-                            std::string service = "s3";
-                            awsSigV4Provider = "aws:amz:" + region + ":" + service;
+                        std::string region = s3Url.getRegion();
+                        std::string service = "s3";
+                        awsSigV4Provider = "aws:amz:" + region + ":" + service;
 
-                            // Add session token header if present
-                            if (creds->sessionToken) {
-                                requestHeaders = curl_slist_append(
-                                    requestHeaders, ("x-amz-security-token: " + *creds->sessionToken).c_str());
-                            }
-
-                            debug("Using AWS SigV4 authentication for S3 request to %s", httpsUri.c_str());
-                        } else {
-                            warn("Failed to obtain AWS credentials for S3 request %s", request.uri);
+                        // Add session token header if present
+                        if (creds.sessionToken) {
+                            requestHeaders = curl_slist_append(
+                                requestHeaders, ("x-amz-security-token: " + *creds.sessionToken).c_str());
                         }
-                    } else {
-                        warn("Failed to create AWS credential provider for S3 request %s", request.uri);
+
+                        debug("Using AWS SigV4 authentication for S3 request to %s", httpsUri.c_str());
+                    } catch (const AwsAuthError & e) {
+                        warn("AWS authentication failed for S3 request %s: %s", request.uri, e.what());
+                        // Continue without authentication - might be a public bucket
                     }
                 } catch (std::exception & e) {
                     warn("Failed to set up AWS SigV4 authentication for S3 request %s: %s", request.uri, e.what());

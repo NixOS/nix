@@ -26,48 +26,51 @@ protected:
 TEST_F(S3EdgeCasesTest, credentialProvider_Null)
 {
     // Test behavior when credential provider creation fails
-    // Profile creation may fail for non-existent profiles, which is expected behavior
-    EXPECT_NO_THROW({
-        auto provider = AwsCredentialProvider::createProfile("non-existent-profile");
-        // Provider creation might return nullptr for invalid profiles
-        // This is acceptable behavior
-    });
+    // Profile creation should throw for non-existent profiles
+    EXPECT_THROW({ auto provider = AwsCredentialProvider::createProfile("non-existent-profile"); }, AwsAuthError);
 }
 
 TEST_F(S3EdgeCasesTest, credentialProvider_EmptyProfile)
 {
     // Test that empty profile falls back to default
-    auto provider1 = AwsCredentialProvider::createProfile("");
-    auto provider2 = AwsCredentialProvider::createDefault();
+    try {
+        auto provider1 = AwsCredentialProvider::createProfile("");
+        auto provider2 = AwsCredentialProvider::createDefault();
 
-    if (!provider1 || !provider2) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
+        EXPECT_NE(provider1, nullptr);
+        EXPECT_NE(provider2, nullptr);
+
+        // Both should be created successfully
+        EXPECT_TRUE(true);
+    } catch (const AwsAuthError & e) {
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
     }
-    EXPECT_NE(provider1, nullptr);
-    EXPECT_NE(provider2, nullptr);
-
-    // Both should be created successfully
-    EXPECT_TRUE(true);
 }
 
 TEST_F(S3EdgeCasesTest, concurrentCredentialRequests)
 {
     // Test that multiple concurrent credential requests work
-    auto provider = AwsCredentialProvider::createDefault();
-    if (!provider) {
-        GTEST_SKIP() << "AWS CRT not available in this environment";
+    try {
+        auto provider = AwsCredentialProvider::createDefault();
+        ASSERT_NE(provider, nullptr);
+
+        // Simulate concurrent access (basic test)
+        std::vector<AwsCredentials> results;
+        results.reserve(3);
+
+        for (int i = 0; i < 3; ++i) {
+            try {
+                results.push_back(provider->getCredentials());
+            } catch (const AwsAuthError &) {
+                // May fail if no credentials are available
+            }
+        }
+
+        // At least the calls should complete without crashing
+        EXPECT_TRUE(true);
+    } catch (const AwsAuthError & e) {
+        GTEST_SKIP() << "AWS authentication failed: " << e.what();
     }
-    ASSERT_NE(provider, nullptr);
-
-    // Simulate concurrent access (basic test)
-    std::vector<std::optional<AwsCredentials>> results(3);
-
-    for (int i = 0; i < 3; ++i) {
-        results[i] = provider->getCredentials();
-    }
-
-    // All calls should complete without crashing
-    EXPECT_EQ(results.size(), 3);
 }
 
 TEST_F(S3EdgeCasesTest, specialCharacters_BucketAndKey)
@@ -133,7 +136,6 @@ TEST_F(S3EdgeCasesTest, multipleParameters)
 TEST_F(S3EdgeCasesTest, credentialTypes_AllScenarios)
 {
     // Test different credential scenarios
-    // Provider creation may return nullptr in sandboxed environments, which is acceptable
 
     // 1. Environment variables with session token
     setenv("AWS_ACCESS_KEY_ID", "ASIATEST", 1);
@@ -141,11 +143,12 @@ TEST_F(S3EdgeCasesTest, credentialTypes_AllScenarios)
     setenv("AWS_SESSION_TOKEN", "session", 1);
 
     EXPECT_NO_THROW({
-        auto provider1 = AwsCredentialProvider::createDefault();
-        // Provider creation might fail in sandboxed build environments
-        if (provider1) {
+        try {
+            auto provider1 = AwsCredentialProvider::createDefault();
             auto creds = provider1->getCredentials();
             // Just verify the call doesn't crash
+        } catch (const AwsAuthError &) {
+            // May fail in sandboxed build environments
         }
     });
 
@@ -153,9 +156,11 @@ TEST_F(S3EdgeCasesTest, credentialTypes_AllScenarios)
     unsetenv("AWS_SESSION_TOKEN");
 
     EXPECT_NO_THROW({
-        auto provider2 = AwsCredentialProvider::createDefault();
-        if (provider2) {
+        try {
+            auto provider2 = AwsCredentialProvider::createDefault();
             auto creds = provider2->getCredentials();
+        } catch (const AwsAuthError &) {
+            // May fail in sandboxed build environments
         }
     });
 
@@ -164,9 +169,11 @@ TEST_F(S3EdgeCasesTest, credentialTypes_AllScenarios)
     unsetenv("AWS_SECRET_ACCESS_KEY");
 
     EXPECT_NO_THROW({
-        auto provider3 = AwsCredentialProvider::createDefault();
-        if (provider3) {
+        try {
+            auto provider3 = AwsCredentialProvider::createDefault();
             auto creds = provider3->getCredentials();
+        } catch (const AwsAuthError &) {
+            // Expected to fail with no credentials
         }
     });
 
@@ -201,11 +208,13 @@ TEST_F(S3EdgeCasesTest, memory_LargeCredentials)
     setenv("AWS_SESSION_TOKEN", largeSessionToken.c_str(), 1);
 
     EXPECT_NO_THROW({
-        auto provider = AwsCredentialProvider::createDefault();
-        if (provider) {
+        try {
+            auto provider = AwsCredentialProvider::createDefault();
             // Should handle large credentials without memory issues
             auto creds = provider->getCredentials();
             // Just verify the call completes
+        } catch (const AwsAuthError &) {
+            // May fail in sandboxed environments
         }
     });
 
@@ -219,19 +228,25 @@ TEST_F(S3EdgeCasesTest, threadSafety_MultipleProviders)
 {
     // Basic thread safety test
     EXPECT_NO_THROW({
-        std::vector<std::unique_ptr<AwsCredentialProvider>> providers;
+        try {
+            std::vector<std::unique_ptr<AwsCredentialProvider>> providers;
 
-        // Create multiple providers
-        for (int i = 0; i < 5; ++i) {
-            providers.push_back(AwsCredentialProvider::createDefault());
-        }
-
-        // Test concurrent credential resolution
-        for (const auto & provider : providers) {
-            if (provider) {
-                auto creds = provider->getCredentials();
-                // Just verify calls complete without crashing
+            // Create multiple providers
+            for (int i = 0; i < 5; ++i) {
+                providers.push_back(AwsCredentialProvider::createDefault());
             }
+
+            // Test concurrent credential resolution
+            for (const auto & provider : providers) {
+                try {
+                    auto creds = provider->getCredentials();
+                    // Just verify calls complete without crashing
+                } catch (const AwsAuthError &) {
+                    // May fail if no credentials available
+                }
+            }
+        } catch (const AwsAuthError &) {
+            // May fail in sandboxed environments
         }
     });
 
