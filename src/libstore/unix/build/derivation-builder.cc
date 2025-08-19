@@ -885,10 +885,21 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
             i.pop_back();
         }
         size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {i, optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
+
+        std::string inside, outside;
+        if (p == std::string::npos) {
+            inside = i;
+            outside = i;
+        } else {
+            inside = i.substr(0, p);
+            outside = i.substr(p + 1);
+        }
+
+        if (!optional && !maybeLstat(outside)) {
+          throw SysError("path '%s' is configured as part of the `sandbox-paths` option, but is inaccessible", outside);
+        }
+
+        pathsInChroot[inside] = {outside, optional};
     }
     if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
