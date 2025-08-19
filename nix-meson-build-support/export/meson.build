@@ -14,7 +14,7 @@ extra_pkg_config_variables = get_variable('extra_pkg_config_variables', {})
 
 extra_cflags = []
 if not meson.project_name().endswith('-c')
-  extra_cflags += [ '-std=c++2a' ]
+  extra_cflags += [ '-std=c++23' ]
 endif
 
 import('pkgconfig').generate(
@@ -34,7 +34,7 @@ meson.override_dependency(
   declare_dependency(
     include_directories : include_dirs,
     link_with : this_library,
-    compile_args : [ '-std=c++2a' ],
+    compile_args : [ '-std=c++23' ],
     dependencies : deps_public_subproject + deps_public,
     variables : extra_pkg_config_variables,
   ),
