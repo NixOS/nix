@@ -6,6 +6,7 @@
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"

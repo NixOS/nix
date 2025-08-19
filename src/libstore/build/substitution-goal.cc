@@ -4,6 +4,8 @@
 #include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/globals.hh"
+
 #include <coroutine>
 
 namespace nix {

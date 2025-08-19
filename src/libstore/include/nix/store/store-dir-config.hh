@@ -3,7 +3,6 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/configuration.hh"
 
 #include <map>

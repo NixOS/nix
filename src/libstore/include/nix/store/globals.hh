@@ -11,6 +11,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"
+#include "nix/store/build/derivation-builder.hh"
 
 #include "nix/store/config.hh"
 

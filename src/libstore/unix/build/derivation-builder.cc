@@ -16,6 +16,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
+#include "nix/store/globals.hh"
 
 #include <queue>
 

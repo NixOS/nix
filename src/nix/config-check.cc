@@ -9,6 +9,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/store/globals.hh"
 
 namespace nix::fs {
 using namespace std::filesystem;

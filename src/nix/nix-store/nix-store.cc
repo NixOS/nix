@@ -12,7 +12,9 @@
 #include "graphml.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
+
 #include "man-pages.hh"
 
 #ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface

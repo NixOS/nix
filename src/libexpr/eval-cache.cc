@@ -4,6 +4,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 // Need specialization involving `SymbolStr` just in this one module.
 #include "nix/util/strings-inline.hh"
 

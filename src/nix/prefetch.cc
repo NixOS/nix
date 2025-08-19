@@ -12,6 +12,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/environment-variables.hh"
 
 #include "man-pages.hh"
 

@@ -1,6 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/log-store.hh"
 

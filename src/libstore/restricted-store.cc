@@ -2,6 +2,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/local-store.hh"
 
 namespace nix {
 

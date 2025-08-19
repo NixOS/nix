@@ -13,6 +13,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

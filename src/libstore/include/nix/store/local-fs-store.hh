@@ -22,15 +22,31 @@ struct LocalFSStoreConfig : virtual StoreConfig
 
     OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
 
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultStateDir();
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultLogDir();
+
+public:
+
     PathSetting stateDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
         "state",
         "Directory where Nix stores state."};
 
     PathSetting logDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
         "log",
         "directory where Nix stores log files."};
 
