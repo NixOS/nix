@@ -3,6 +3,7 @@
 source ./common.sh
 
 requireGit
+TODO_NixOS
 
 lazy="$TEST_ROOT/lazy"
 createGitRepo "$lazy"
