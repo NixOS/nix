@@ -15,6 +15,7 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     auto ret = StringSet{"http", "https"};
     if (forceHttp)
         ret.insert("file");
+    // S3 is now handled by S3BinaryCacheStoreConfig
     return ret;
 }
 
@@ -77,7 +78,11 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri.to_string())) {
+        // For consistent cache key handling, use the reference without parameters
+        // This matches what's used in Store::queryPathInfo() lookups
+        auto cacheKey = config->getReference().render(/*withParams=*/false);
+
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
@@ -86,8 +91,7 @@ public:
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
             }
-            diskCache->createCache(
-                config->cacheUri.to_string(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -166,10 +170,54 @@ protected:
            `std::filesystem::path`'s equivalent operator, which properly
            combines the the URLs, whether the right is relative or
            absolute. */
-        return FileTransferRequest(
-            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-                ? path
-                : config->cacheUri.to_string() + "/" + path);
+        if (hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")) {
+            return FileTransferRequest(path);
+        } else {
+            // Properly handle paths with query parameters
+            auto resultUrl = config->cacheUri;
+
+            // Parse the path to separate the actual path from query parameters
+            auto questionPos = path.find('?');
+            std::string pathPart = path;
+            std::string queryPart;
+
+            if (questionPos != std::string::npos) {
+                pathPart = path.substr(0, questionPos);
+                queryPart = path.substr(questionPos + 1);
+            }
+
+            // Append the path part
+            if (!pathPart.empty()) {
+                // Ensure there's a separator between existing path and new path
+                if (!resultUrl.path.empty()) {
+                    if (resultUrl.path.back() != '/' && pathPart.front() != '/')
+                        resultUrl.path += '/';
+                } else {
+                    // If path is empty, ensure we start with / for absolute path
+                    if (pathPart.front() != '/')
+                        resultUrl.path = '/';
+                }
+                resultUrl.path += pathPart;
+            }
+
+            // Handle query parameters
+            if (!queryPart.empty()) {
+                // If the path has its own query parameters, use those instead of base URL's
+                resultUrl.query.clear();
+                // Parse the query string into key-value pairs
+                auto params = tokenizeString<Strings>(queryPart, "&");
+                for (auto & param : params) {
+                    auto eq = param.find('=');
+                    if (eq != std::string::npos) {
+                        resultUrl.query[param.substr(0, eq)] = param.substr(eq + 1);
+                    } else {
+                        resultUrl.query[param] = "";
+                    }
+                }
+            }
+
+            return FileTransferRequest(resultUrl.to_string());
+        }
     }
 
     void getFile(const std::string & path, Sink & sink) override

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "nix/util/url.hh"
 #include "nix/store/binary-cache-store.hh"
 

@@ -9,7 +9,7 @@
   nix-util,
   boost,
   curl,
-  aws-sdk-cpp,
+  aws-crt-cpp,
   libseccomp,
   nlohmann_json,
   sqlite,
@@ -22,8 +22,8 @@
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
 
-  withAWS ?
-    # Default is this way because there have been issues building this dependency
+  withS3 ?
+    # Enable S3 support via aws-crt-cpp for lightweight S3 credential management
     stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
 }:
 
@@ -66,7 +66,7 @@ mkMesonLibrary (finalAttrs: {
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
   # There have been issues building these dependencies
   ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
-  ++ lib.optional withAWS aws-sdk-cpp;
+  ++ lib.optional withS3 aws-crt-cpp;
 
   propagatedBuildInputs = [
     nix-util

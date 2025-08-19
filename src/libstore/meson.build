@@ -111,6 +111,9 @@ deps_other += boost
 curl = dependency('libcurl', 'curl')
 deps_private += curl
 
+# Check if curl supports AWS SigV4 (requires >= 7.75.0)
+curl_supports_aws_sigv4 = curl.version().version_compare('>= 7.75.0')
+
 # seccomp only makes sense on Linux
 is_linux = host_machine.system() == 'linux'
 seccomp_required = get_option('seccomp-sandboxing')
@@ -137,27 +140,41 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config. See
-# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-# The S3 store definitions in the header will be hidden based on this variables.
-configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
-if aws_s3.found()
-  aws_s3 = declare_dependency(
-    include_directories : include_directories(aws_s3.get_variable('includedir')),
-    link_args : [
-      '-L' + aws_s3.get_variable('libdir'),
-      '-laws-cpp-sdk-transfer',
-      '-laws-cpp-sdk-s3',
-      '-laws-cpp-sdk-identity-management',
-      '-laws-cpp-sdk-cognito-identity',
-      '-laws-cpp-sdk-sts',
-      '-laws-cpp-sdk-core',
-      '-laws-crt-cpp',
-    ],
-  ).as_system('system')
+# AWS C++ SDK removed - now using lightweight aws-crt-cpp for S3 support
+
+# AWS CRT C++ for lightweight credential management
+# Similar to aws-cpp-sdk, but lighter weight dependency for credential resolution only
+aws_crt_cpp = dependency('aws-crt-cpp', required : false)
+if not aws_crt_cpp.found()
+  # Fallback: try pkg-config with different name
+  aws_crt_cpp = dependency('libaws-crt-cpp', required : false)
 endif
-deps_other += aws_s3
+if not aws_crt_cpp.found()
+  # Fallback: try to find library manually
+  aws_crt_cpp_lib = cxx.find_library('aws-crt-cpp', required : false)
+  if aws_crt_cpp_lib.found()
+    aws_crt_cpp = aws_crt_cpp_lib
+  endif
+endif
+# Only enable AWS CRT support if both aws-crt-cpp AND curl >= 7.75.0 are available
+aws_crt_support_available = aws_crt_cpp.found() and curl_supports_aws_sigv4
+
+# Warn if aws-crt-cpp is available but S3 support disabled due to curl version
+if aws_crt_cpp.found() and not curl_supports_aws_sigv4
+  warning(
+    'AWS CRT C++ found but S3 support disabled: curl version @0@ is too old. S3 support requires curl >= 7.75.0 for AWS SigV4 authentication.'.format(
+      curl.version(),
+    ),
+  )
+endif
+
+configdata_pub.set(
+  'NIX_WITH_AWS_CRT_SUPPORT',
+  aws_crt_support_available.to_int(),
+)
+if aws_crt_support_available
+  deps_other += aws_crt_cpp
+endif
 
 subdir('nix-meson-build-support/generate-header')
 
@@ -262,6 +279,7 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'aws-auth.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-building-goal.cc',
