@@ -8,7 +8,6 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/restricted-store.hh"
-#include "nix/store/user-lock.hh"
 
 namespace nix {
 
