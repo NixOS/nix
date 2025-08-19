@@ -74,6 +74,7 @@ sources = files(
   'path.cc',
   'references.cc',
   's3-binary-cache-store.cc',
+  's3.cc',
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
