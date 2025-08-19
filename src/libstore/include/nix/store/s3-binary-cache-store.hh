@@ -50,6 +50,23 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           https is used.
         )"};
 
+    const Setting<bool> useTransferAcceleration{
+        this,
+        false,
+        "use-transfer-acceleration",
+        R"(
+          Enable AWS S3 Transfer Acceleration for improved upload and download
+          speeds. When enabled, requests will be routed through CloudFront edge
+          locations using the endpoint bucket-name.s3-accelerate.dualstack.amazonaws.com.
+          
+          Requirements:
+          - Transfer Acceleration must be enabled on the S3 bucket
+          - Bucket name must be DNS-compliant (no dots, lowercase alphanumeric and hyphens only)
+          - Not compatible with custom endpoints
+          
+          Note: Additional data transfer charges may apply when using Transfer Acceleration.
+        )"};
+
     static const std::string name()
     {
         return "S3 Binary Cache Store";

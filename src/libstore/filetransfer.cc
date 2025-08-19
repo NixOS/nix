@@ -875,6 +875,55 @@ struct curlFileTransfer : public FileTransfer
     /**
      * Parsed S3 URL with convenience methods for parameter access and HTTPS conversion
      */
+    /**
+     * Check if a bucket name is DNS-compliant for use with transfer acceleration
+     * Requirements:
+     * - 3-63 characters long
+     * - Only lowercase letters, numbers, and hyphens
+     * - Cannot start or end with hyphen
+     * - Cannot contain consecutive hyphens
+     * - Cannot contain dots (for transfer acceleration)
+     * - Cannot be an IP address
+     */
+    static bool isDnsCompliantBucketName(const std::string & bucket)
+    {
+        if (bucket.length() < 3 || bucket.length() > 63)
+            return false;
+
+        if (bucket[0] == '-' || bucket[bucket.length() - 1] == '-')
+            return false;
+
+        // Check for IP address pattern (e.g., 192.168.1.1)
+        bool allDigitsAndDots = true;
+        int dotCount = 0;
+
+        for (size_t i = 0; i < bucket.length(); i++) {
+            char c = bucket[i];
+
+            // For transfer acceleration, dots are not allowed
+            if (c == '.')
+                return false;
+
+            if (c == '-') {
+                // Check for consecutive hyphens
+                if (i > 0 && bucket[i - 1] == '-')
+                    return false;
+                allDigitsAndDots = false;
+            } else if (!std::isdigit(c) && !std::islower(c)) {
+                // Only lowercase letters, numbers, and hyphens allowed
+                return false;
+            } else if (!std::isdigit(c)) {
+                allDigitsAndDots = false;
+            }
+        }
+
+        // Reject if it looks like an IP address
+        if (allDigitsAndDots && dotCount == 3)
+            return false;
+
+        return true;
+    }
+
     struct S3Url
     {
         std::string bucket;
@@ -901,6 +950,11 @@ struct curlFileTransfer : public FileTransfer
             return getOr(params, "endpoint", "");
         }
 
+        bool getUseTransferAcceleration() const
+        {
+            return getOr(params, "use-transfer-acceleration", "") == "true";
+        }
+
         /**
          * Convert S3 URL to HTTPS URL for use with curl's AWS SigV4 authentication
          */
@@ -909,12 +963,18 @@ struct curlFileTransfer : public FileTransfer
             std::string region = getRegion();
             std::string endpoint = getEndpoint();
             std::string scheme = getScheme();
+            bool useTransferAcceleration = getUseTransferAcceleration();
 
             ParsedURL httpsUrl;
             httpsUrl.scheme = scheme;
 
             if (!endpoint.empty()) {
                 // Custom endpoint (e.g., MinIO, custom S3-compatible service)
+                // Transfer acceleration is not compatible with custom endpoints
+                if (useTransferAcceleration) {
+                    throw nix::Error("S3 Transfer Acceleration cannot be used with custom endpoints");
+                }
+
                 // Parse the endpoint if it's a full URL
                 if (hasPrefix(endpoint, "http://") || hasPrefix(endpoint, "https://")) {
                     try {
@@ -932,6 +992,24 @@ struct curlFileTransfer : public FileTransfer
                     httpsUrl.authority = ParsedURL::Authority{.host = endpoint};
                     httpsUrl.path = "/" + bucket + "/" + key;
                 }
+            } else if (useTransferAcceleration) {
+                // Transfer Acceleration endpoint
+                // Validate bucket name for DNS compliance
+                if (!isDnsCompliantBucketName(bucket)) {
+                    throw nix::Error(
+                        "Bucket name '%s' is not DNS-compliant. "
+                        "Transfer Acceleration requires bucket names to be 3-63 characters, "
+                        "contain only lowercase letters, numbers, and hyphens, "
+                        "cannot contain dots, and cannot start/end with hyphens.",
+                        bucket);
+                }
+
+                // Use virtual-hosted style with acceleration endpoint
+                // Format: bucket-name.s3-accelerate.dualstack.amazonaws.com
+                httpsUrl.authority = ParsedURL::Authority{.host = bucket + ".s3-accelerate.dualstack.amazonaws.com"};
+                httpsUrl.path = "/" + key;
+
+                debug("Using S3 Transfer Acceleration endpoint for bucket '%s'", bucket);
             } else {
                 // Standard AWS S3 endpoint
                 httpsUrl.authority = ParsedURL::Authority{.host = "s3." + region + ".amazonaws.com"};

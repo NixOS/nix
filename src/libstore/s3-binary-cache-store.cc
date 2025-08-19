@@ -21,6 +21,11 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
     if (!params.empty()) {
         cacheUri.query = params;
     }
+
+    // Ensure transfer acceleration setting is in the query parameters if set
+    if (useTransferAcceleration.get()) {
+        cacheUri.query["use-transfer-acceleration"] = "true";
+    }
 }
 
 std::string S3BinaryCacheStoreConfig::doc()
@@ -32,6 +37,43 @@ std::string S3BinaryCacheStoreConfig::doc()
 
         This new implementation uses libcurl with AWS SigV4 authentication instead of the
         AWS SDK, providing a lighter and more reliable solution.
+
+        ### Transfer Acceleration
+
+        AWS S3 Transfer Acceleration can be enabled to improve upload and download speeds
+        by routing transfers through CloudFront edge locations. To enable:
+
+        ```
+        nix copy --to 's3://my-bucket?use-transfer-acceleration=true' ...
+        ```
+
+        Requirements for Transfer Acceleration:
+        - Transfer Acceleration must be enabled on the S3 bucket
+        - Bucket name must be DNS-compliant (lowercase, no dots, 3-63 characters)
+        - Cannot be used with custom endpoints
+        - Additional data transfer charges may apply
+
+        ### Configuration Examples
+
+        Basic S3 store:
+        ```
+        s3://my-bucket
+        ```
+
+        With specific region:
+        ```
+        s3://my-bucket?region=eu-west-1
+        ```
+
+        With Transfer Acceleration:
+        ```
+        s3://my-bucket?use-transfer-acceleration=true
+        ```
+
+        With custom endpoint (e.g., MinIO):
+        ```
+        s3://my-bucket?endpoint=minio.example.com
+        ```
     )";
 }
 
