@@ -12,6 +12,8 @@ namespace nix {
 
 static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 {
+    experimentalFeatureSettings.require(Xp::BuildTimeFetchTree);
+
     auto out = get(ctx.drv.outputs, "out");
     if (!out)
         throw Error("'builtin:fetch-tree' requires an 'out' output");

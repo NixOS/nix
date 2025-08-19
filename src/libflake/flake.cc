@@ -133,6 +133,8 @@ static FlakeInput parseFlakeInput(
             } else if (attr.name == sBuildTime) {
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.buildTime = attr.value->boolean();
+                if (input.buildTime)
+                    experimentalFeatureSettings.require(Xp::BuildTimeFetchTree);
             } else if (attr.name == sInputs) {
                 input.overrides =
                     parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
