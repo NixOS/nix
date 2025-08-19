@@ -188,7 +188,9 @@ struct DerivationBuilder : RestrictionContext
     virtual void killSandbox(bool getStats) = 0;
 };
 
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+#endif
 
 } // namespace nix

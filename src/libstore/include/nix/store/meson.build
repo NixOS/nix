@@ -12,6 +12,7 @@ config_pub_h = configure_file(
 headers = [ config_pub_h ] + files(
   'binary-cache-store.hh',
   'build-result.hh',
+  'build/derivation-builder.hh',
   'build/derivation-building-goal.hh',
   'build/derivation-building-misc.hh',
   'build/derivation-goal.hh',
