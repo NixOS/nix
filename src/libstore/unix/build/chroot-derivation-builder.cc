@@ -135,7 +135,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         for (auto & i : inputPaths) {
             auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, store.toRealPath(p));
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
         }
 
         /* If we're repairing, checking or rebuilding part of a

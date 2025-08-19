@@ -112,13 +112,7 @@ protected:
     struct ChrootPath
     {
         Path source;
-        bool optional;
-
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source)
-            , optional(optional)
-        {
-        }
+        bool optional = false;
     };
 
     typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
@@ -886,14 +880,14 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         }
         size_t p = i.find('=');
         if (p == std::string::npos)
-            pathsInChroot[i] = {i, optional};
+            pathsInChroot[i] = {.source = i, .optional = optional};
         else
-            pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
+            pathsInChroot[i.substr(0, p)] = {.source = i.substr(p + 1), .optional = optional};
     }
     if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox()] = tmpDir;
+    pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
     /* Add the closure of store paths to the chroot. */
     StorePathSet closure;
@@ -908,7 +902,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         }
     for (auto & i : closure) {
         auto p = store.printStorePath(i);
-        pathsInChroot.insert_or_assign(p, p);
+        pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
     }
 
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
@@ -964,9 +958,9 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 } else {
                     auto p = line.find('=');
                     if (p == std::string::npos)
-                        pathsInChroot[line] = line;
+                        pathsInChroot[line] = {.source = line};
                     else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                        pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
                 }
             }
         }
