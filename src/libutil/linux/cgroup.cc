@@ -8,6 +8,7 @@
 #include <cmath>
 #include <regex>
 #include <unordered_set>
+#include <sys/wait.h>
 #include <thread>
 
 #include <dirent.h>
@@ -104,6 +105,11 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
             // FIXME: pid wraparound
             if (kill(pid, SIGKILL) == -1 && errno != ESRCH)
                 throw SysError("killing member %d of cgroup '%s'", pid, cgroup);
+
+            while (waitpid(pid, nullptr, 0) == -1) {
+                if (errno == ECHILD) break; // Process already reaped
+                if (errno != EINTR) throw SysError("waiting for pid %d", pid);
+            }
         }
 
         auto sleep = std::chrono::milliseconds((int) std::pow(2.0, std::min(round, 10)));
