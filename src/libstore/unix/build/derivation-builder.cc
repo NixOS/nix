@@ -107,17 +107,6 @@ protected:
      */
     const DerivationType derivationType;
 
-    /**
-     * Stuff we need to pass to initChild().
-     */
-    struct ChrootPath
-    {
-        Path source;
-        bool optional = false;
-    };
-
-    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
-
     typedef StringMap Environment;
     Environment env;
 
@@ -865,7 +854,7 @@ void DerivationBuilderImpl::startBuilder()
     processSandboxSetupMessages();
 }
 
-DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
+PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
     PathsInChroot pathsInChroot;
 

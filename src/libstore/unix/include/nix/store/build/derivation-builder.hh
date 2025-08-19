@@ -12,6 +12,17 @@
 namespace nix {
 
 /**
+ * Stuff we need to pass to initChild().
+ */
+struct ChrootPath
+{
+    Path source;
+    bool optional = false;
+};
+
+typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+
+/**
  * Parameters by (mostly) `const` reference for `DerivationBuilder`.
  */
 struct DerivationBuilderParams
