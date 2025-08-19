@@ -108,10 +108,8 @@ static std::string percentEncodeCharSet(std::string_view s, auto charSet)
     return res;
 }
 
-ParsedURL parseURL(const std::string & url)
+ParsedURL parseURL(std::string_view url)
 try {
-    auto unparsedView = url;
-
     /* Account for several non-standard properties of nix urls (for back-compat):
      *  - Allow unescaped spaces ' ' and '"' characters in queries.
      *  - Allow '"', ' ' and '^' characters in the fragment component.

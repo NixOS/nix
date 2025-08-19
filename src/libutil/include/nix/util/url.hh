@@ -30,7 +30,7 @@ struct ParsedURL
         };
 
         static Authority parse(std::string_view encodedAuthority);
-        bool operator==(const Authority & other) const = default;
+        auto operator<=>(const Authority & other) const = default;
         std::string to_string() const;
         friend std::ostream & operator<<(std::ostream & os, const Authority & self);
 
@@ -81,7 +81,7 @@ struct ParsedURL
 
     std::string to_string() const;
 
-    bool operator==(const ParsedURL & other) const noexcept = default;
+    auto operator<=>(const ParsedURL & other) const noexcept = default;
 
     /**
      * Remove `.` and `..` path elements.
@@ -111,7 +111,7 @@ std::string encodeQuery(const StringMap & query);
  *
  * @throws BadURL
  */
-ParsedURL parseURL(const std::string & url);
+ParsedURL parseURL(std::string_view url);
 
 /**
  * Although that’s not really standardized anywhere, an number of tools
