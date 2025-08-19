@@ -109,7 +109,8 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
         const StorePathSet & paths,
         SubstituteFlag maybeSubstitute);
 
-    UnkeyedValidPathInfo queryPathInfo(const StoreDirConfig & store, bool * daemonException, const StorePath & path);
+    std::optional<UnkeyedValidPathInfo>
+    queryPathInfo(const StoreDirConfig & store, bool * daemonException, const StorePath & path);
 
     void putBuildDerivationRequest(
         const StoreDirConfig & store,
