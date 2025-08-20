@@ -35,7 +35,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
     // since it's in a broken state after the fork. We also must not
     // delete it, so hang on to the shared_ptr.
     // FIXME: move FileTransfer into fetchers::Settings.
-    auto prevFileTransfer = resetFileTransfer();
+    static auto prevFileTransfer = resetFileTransfer();
 
     // FIXME: disable use of the git/tarball cache
 
