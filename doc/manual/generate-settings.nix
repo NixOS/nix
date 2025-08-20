@@ -32,6 +32,7 @@ let
       aliases,
       value,
       experimentalFeature,
+      jsonSchema,
     }:
     let
       result = squash ''
@@ -78,10 +79,12 @@ let
           # a StringMap value type is specified as a string, but
           # this shows the value type. The empty stringmap is `null` in
           # JSON, but that converts to `{ }` here.
-          if defaultValue == "" || defaultValue == [ ] || isAttrs defaultValue then
+          if defaultValue == "" || defaultValue == [ ] || defaultValue == { } then
             "*empty*"
           else if isBool defaultValue then
             if defaultValue then "`true`" else "`false`"
+          else if !isNull jsonSchema then
+            "`${builtins.toJSON defaultValue}` (JSON)"
           else
             "`${toString defaultValue}`"
         else

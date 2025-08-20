@@ -229,6 +229,12 @@ protected:
     const bool documentDefault;
 
     /**
+     * Options that can use values which are structured JSON data. Used in
+     * documentation generation.
+     */
+    const std::optional<std::string> jsonSchema;
+
+    /**
      * Parse the string into a `T`.
      *
      * Used by `set()`.
@@ -253,11 +259,13 @@ public:
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {},
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        const std::optional<std::string> & jsonSchema = std::nullopt)
         : AbstractSetting(name, description, aliases, experimentalFeature)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
+        , jsonSchema(jsonSchema)
     {
     }
 
@@ -367,8 +375,10 @@ public:
         const std::string & description,
         const StringSet & aliases = {},
         const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        std::optional<std::string> jsonSchema = std::nullopt)
+        : BaseSetting<T>(
+              def, documentDefault, name, description, aliases, std::move(experimentalFeature), std::move(jsonSchema))
     {
         options->addSetting(this);
     }
