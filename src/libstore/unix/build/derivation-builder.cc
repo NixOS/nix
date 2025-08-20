@@ -857,24 +857,10 @@ void DerivationBuilderImpl::startBuilder()
 
 PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
-    PathsInChroot pathsInChroot;
-
     /* Allow a user-configurable set of directories from the
        host file system. */
-    for (auto i : settings.sandboxPaths.get()) {
-        if (i.empty())
-            continue;
-        bool optional = false;
-        if (i[i.size() - 1] == '?') {
-            optional = true;
-            i.pop_back();
-        }
-        size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {.source = i, .optional = optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {.source = i.substr(p + 1), .optional = optional};
-    }
+    PathsInChroot pathsInChroot = settings.sandboxPaths.get();
+
     if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }

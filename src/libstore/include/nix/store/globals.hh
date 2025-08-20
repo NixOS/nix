@@ -24,6 +24,20 @@ SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
 template<>
 std::string BaseSetting<SandboxMode>::to_string() const;
 
+template<>
+PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<PathsInChroot>::to_string() const;
+
+template<>
+struct BaseSetting<PathsInChroot>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append);
+
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
     MaxBuildJobsSetting(
@@ -698,7 +712,7 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<PathsInChroot> sandboxPaths{
         this,
         {},
         "sandbox-paths",
