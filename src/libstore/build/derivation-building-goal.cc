@@ -677,6 +677,64 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
             assert(localStoreP);
 
+            decltype(DerivationBuilderParams::finalEnv) finalEnv;
+            decltype(DerivationBuilderParams::extraFiles) extraFiles;
+
+            try {
+                if (drv->structuredAttrs) {
+                    auto json = drv->structuredAttrs->prepareStructuredAttrs(
+                        worker.store, *drvOptions, inputPaths, drv->outputs);
+
+                    finalEnv.insert_or_assign(
+                        "NIX_ATTRS_SH_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.sh",
+                            .value = StructuredAttrs::writeShell(json),
+                        });
+                    finalEnv.insert_or_assign(
+                        "NIX_ATTRS_JSON_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.json",
+                            .value = json.dump(),
+                        });
+                } else {
+                    /* In non-structured mode, set all bindings either directory in the
+                       environment or via a file, as specified by
+                       `DerivationOptions::passAsFile`. */
+                    for (auto & [envName, envValue] : drv->env) {
+                        if (drvOptions->passAsFile.find(envName) == drvOptions->passAsFile.end()) {
+                            finalEnv.insert_or_assign(
+                                envName,
+                                DerivationBuilderParams::EnvEntry{
+                                    .nameOfPassAsFile = std::nullopt,
+                                    .value = envValue,
+                                });
+                        } else {
+                            auto hash = hashString(HashAlgorithm::SHA256, envName);
+                            finalEnv.insert_or_assign(
+                                envName + "Path",
+                                DerivationBuilderParams::EnvEntry{
+                                    .nameOfPassAsFile = ".attr-" + hash.to_string(HashFormat::Nix32, false),
+                                    .value = envValue,
+                                });
+                        }
+                    }
+
+                    /* Handle exportReferencesGraph(), if set. */
+                    for (auto & [fileName, storePaths] : drvOptions->getParsedExportReferencesGraph(worker.store)) {
+                        /* Write closure info to <fileName>. */
+                        extraFiles.insert_or_assign(
+                            fileName,
+                            worker.store.makeValidityRegistration(
+                                worker.store.exportReferences(storePaths, inputPaths), false, false));
+                    }
+                }
+            } catch (BuildError & e) {
+                outputLocks.unlock();
+                worker.permanentFailure = true;
+                co_return done(BuildResult::InputRejected, {}, std::move(e));
+            }
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
@@ -690,6 +748,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     *drvOptions,
                     inputPaths,
                     initialOutputs,
+                    std::move(finalEnv),
+                    std::move(extraFiles),
                 });
         }
 

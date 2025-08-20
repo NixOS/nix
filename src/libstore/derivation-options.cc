@@ -256,6 +256,24 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
     };
 }
 
+std::map<std::string, StorePathSet>
+DerivationOptions::getParsedExportReferencesGraph(const StoreDirConfig & store) const
+{
+    std::map<std::string, StorePathSet> res;
+
+    for (auto & [fileName, ss] : exportReferencesGraph) {
+        StorePathSet storePaths;
+        for (auto & storePathS : ss) {
+            if (!store.isInStore(storePathS))
+                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+            storePaths.insert(store.toStorePath(storePathS).first);
+        }
+        res.insert_or_assign(fileName, storePaths);
+    }
+
+    return res;
+}
+
 StringSet DerivationOptions::getRequiredSystemFeatures(const BasicDerivation & drv) const
 {
     // FIXME: cache this?

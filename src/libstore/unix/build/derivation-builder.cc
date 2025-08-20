@@ -274,11 +274,6 @@ protected:
 private:
 
     /**
-     * Write a JSON file containing the derivation attributes.
-     */
-    void writeStructuredAttrs();
-
-    /**
      * Start an in-process nix daemon thread for recursive-nix.
      */
     void startDaemon();
@@ -781,24 +776,6 @@ void DerivationBuilderImpl::startBuilder()
     /* Construct the environment passed to the builder. */
     initEnv();
 
-    writeStructuredAttrs();
-
-    /* Handle exportReferencesGraph(), if set. */
-    if (!drv.structuredAttrs) {
-        for (auto & [fileName, ss] : drvOptions.exportReferencesGraph) {
-            StorePathSet storePathSet;
-            for (auto & storePathS : ss) {
-                if (!store.isInStore(storePathS))
-                    throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
-                storePathSet.insert(store.toStorePath(storePathS).first);
-            }
-            /* Write closure info to <fileName>. */
-            writeFile(
-                tmpDir + "/" + fileName,
-                store.makeValidityRegistration(store.exportReferences(storePathSet, inputPaths), false, false));
-        }
-    }
-
     prepareSandbox();
 
     if (needsHashRewrite() && pathExists(homeDir))
@@ -1039,20 +1016,22 @@ void DerivationBuilderImpl::initEnv()
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
-    /* In non-structured mode, set all bindings either directory in the
-       environment or via a file, as specified by
-       `DerivationOptions::passAsFile`. */
-    if (!drv.structuredAttrs) {
-        for (auto & i : drv.env) {
-            if (drvOptions.passAsFile.find(i.first) == drvOptions.passAsFile.end()) {
-                env[i.first] = i.second;
-            } else {
-                auto hash = hashString(HashAlgorithm::SHA256, i.first);
-                std::string fn = ".attr-" + hash.to_string(HashFormat::Nix32, false);
-                writeBuilderFile(fn, rewriteStrings(i.second, inputRewrites));
-                env[i.first + "Path"] = tmpDirInSandbox() + "/" + fn;
-            }
+    /* Write the final environment. Note that this is intentionally
+       *not* `drv.env`, because we've desugared things like like
+       "passAFile", "expandReferencesGraph", structured attrs, etc. */
+    for (const auto & [name, info] : finalEnv) {
+        if (info.nameOfPassAsFile) {
+            auto & fileName = *info.nameOfPassAsFile;
+            writeBuilderFile(fileName, rewriteStrings(info.value, inputRewrites));
+            env[name] = tmpDirInSandbox() + "/" + fileName;
+        } else {
+            env[name] = info.value;
         }
+    }
+
+    /* Add extra files, similar to `finalEnv` */
+    for (const auto & [fileName, value] : extraFiles) {
+        writeBuilderFile(fileName, value);
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1106,28 +1085,6 @@ void DerivationBuilderImpl::initEnv()
 
     /* Trigger colored output in various tools. */
     env["TERM"] = "xterm-256color";
-}
-
-void DerivationBuilderImpl::writeStructuredAttrs()
-{
-    if (drv.structuredAttrs) {
-        auto json = drv.structuredAttrs->prepareStructuredAttrs(store, drvOptions, inputPaths, drv.outputs);
-        nlohmann::json rewritten;
-        for (auto & [i, v] : json["outputs"].get<nlohmann::json::object_t>()) {
-            /* The placeholder must have a rewrite, so we use it to cover both the
-               cases where we know or don't know the output path ahead of time. */
-            rewritten[i] = rewriteStrings((std::string) v, inputRewrites);
-        }
-
-        json["outputs"] = rewritten;
-
-        auto jsonSh = StructuredAttrs::writeShell(json);
-
-        writeBuilderFile(".attrs.sh", rewriteStrings(jsonSh, inputRewrites));
-        env["NIX_ATTRS_SH_FILE"] = tmpDirInSandbox() + "/.attrs.sh";
-        writeBuilderFile(".attrs.json", rewriteStrings(json.dump(), inputRewrites));
-        env["NIX_ATTRS_JSON_FILE"] = tmpDirInSandbox() + "/.attrs.json";
-    }
 }
 
 void DerivationBuilderImpl::startDaemon()
