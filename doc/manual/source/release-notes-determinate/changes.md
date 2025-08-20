@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.5.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.6.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -130,3 +130,17 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 * Importing Nixpkgs and other tarballs to the cache 2-4x faster [DeterminateSystems/nix-src#149](https://github.com/DeterminateSystems/nix-src/pull/149)
 
 * Adding paths to the store is significantly faster [DeterminateSystems/nix-src#162](https://github.com/DeterminateSystems/nix-src/pull/162)
+
+<!-- Determinate Nix version 3.8.6 -->
+
+* Auto update release notes by @grahamc in [DeterminateSystems/nix-src#170](https://github.com/DeterminateSystems/nix-src/pull/170)
+
+* Use WAL mode for SQLite cache databases (2nd attempt) by @edolstra in [DeterminateSystems/nix-src#167](https://github.com/DeterminateSystems/nix-src/pull/167)
+
+* Enable parallel marking in boehm-gc by @edolstra in [DeterminateSystems/nix-src#168](https://github.com/DeterminateSystems/nix-src/pull/168)
+
+* BasicClientConnection::queryPathInfo(): Don't throw exception for invalid paths by @edolstra in [DeterminateSystems/nix-src#172](https://github.com/DeterminateSystems/nix-src/pull/172)
+
+* Fix queryPathInfo() negative caching by @edolstra in [DeterminateSystems/nix-src#173](https://github.com/DeterminateSystems/nix-src/pull/173)
+
+* forceDerivation(): Wait for async path write after forcing value by @edolstra in [DeterminateSystems/nix-src#176](https://github.com/DeterminateSystems/nix-src/pull/176)
