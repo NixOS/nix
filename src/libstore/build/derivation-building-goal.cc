@@ -677,8 +677,25 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
             assert(localStoreP);
 
+            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             decltype(DerivationBuilderParams::finalEnv) finalEnv;
             decltype(DerivationBuilderParams::extraFiles) extraFiles;
+
+            /* Add the closure of store paths to the chroot. */
+            StorePathSet closure;
+            for (auto & i : defaultPathsInChroot)
+                try {
+                    if (worker.store.isInStore(i.second.source))
+                        worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
+                } catch (InvalidPath & e) {
+                } catch (Error & e) {
+                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    throw;
+                }
+            for (auto & i : closure) {
+                auto p = worker.store.printStorePath(i);
+                defaultPathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
+            }
 
             try {
                 if (drv->structuredAttrs) {
@@ -748,6 +765,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     *drvOptions,
                     inputPaths,
                     initialOutputs,
+                    std::move(defaultPathsInChroot),
                     std::move(finalEnv),
                     std::move(extraFiles),
                 });

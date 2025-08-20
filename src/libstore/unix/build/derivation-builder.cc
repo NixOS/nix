@@ -836,28 +836,12 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
     /* Allow a user-configurable set of directories from the
        host file system. */
-    PathsInChroot pathsInChroot = settings.sandboxPaths.get();
+    PathsInChroot pathsInChroot = defaultPathsInChroot;
 
     if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
-
-    /* Add the closure of store paths to the chroot. */
-    StorePathSet closure;
-    for (auto & i : pathsInChroot)
-        try {
-            if (store.isInStore(i.second.source))
-                store.computeFSClosure(store.toStorePath(i.second.source).first, closure);
-        } catch (InvalidPath & e) {
-        } catch (Error & e) {
-            e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
-            throw;
-        }
-    for (auto & i : closure) {
-        auto p = store.printStorePath(i);
-        pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
-    }
 
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 

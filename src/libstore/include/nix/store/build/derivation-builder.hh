@@ -59,6 +59,12 @@ struct DerivationBuilderParams
 
     const BuildMode & buildMode;
 
+    /**
+     * Extra paths we want to be in the chroot, regardless of the
+     * derivation we are building.
+     */
+    PathsInChroot defaultPathsInChroot;
+
     struct EnvEntry
     {
         /**
@@ -96,6 +102,7 @@ struct DerivationBuilderParams
         const DerivationOptions & drvOptions,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs,
+        PathsInChroot defaultPathsInChroot,
         std::map<std::string, EnvEntry, std::less<>> finalEnv,
         StringMap extraFiles)
         : drvPath{drvPath}
@@ -105,6 +112,7 @@ struct DerivationBuilderParams
         , inputPaths{inputPaths}
         , initialOutputs{initialOutputs}
         , buildMode{buildMode}
+        , defaultPathsInChroot{std::move(defaultPathsInChroot)}
         , finalEnv{std::move(finalEnv)}
         , extraFiles{std::move(extraFiles)}
     {
