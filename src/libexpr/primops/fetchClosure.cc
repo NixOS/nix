@@ -3,6 +3,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/util/url.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 

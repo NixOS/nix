@@ -69,7 +69,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             /* Add all our input paths to the chroot */
             for (auto & i : inputPaths) {
                 auto p = store.printStorePath(i);
-                pathsInChroot.insert_or_assign(p, p);
+                pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
             }
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be

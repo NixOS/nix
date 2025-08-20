@@ -5,6 +5,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/store/globals.hh"
 
 namespace nix::fs {
 using namespace std::filesystem;

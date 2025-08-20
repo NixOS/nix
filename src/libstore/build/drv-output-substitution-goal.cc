@@ -4,6 +4,7 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

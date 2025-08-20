@@ -5,6 +5,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/derivations.hh"
 

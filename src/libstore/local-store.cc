@@ -86,6 +86,11 @@ ref<Store> LocalStore::Config::openStore() const
     return make_ref<LocalStore>(ref{shared_from_this()});
 }
 
+bool LocalStoreConfig::getDefaultRequireSigs()
+{
+    return settings.requireSigs;
+}
+
 struct LocalStore::State::Stmts
 {
     /* Some precompiled SQLite statements. */

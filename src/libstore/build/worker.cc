@@ -10,6 +10,7 @@
 #  include "nix/store/build/hook-instance.hh"
 #endif
 #include "nix/util/signals.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

@@ -8,9 +8,19 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/restricted-store.hh"
-#include "nix/store/user-lock.hh"
 
 namespace nix {
+
+/**
+ * Stuff we need to pass to initChild().
+ */
+struct ChrootPath
+{
+    Path source;
+    bool optional = false;
+};
+
+typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
 
 /**
  * Parameters by (mostly) `const` reference for `DerivationBuilder`.
@@ -178,7 +188,9 @@ struct DerivationBuilder : RestrictionContext
     virtual void killSandbox(bool getStats) = 0;
 };
 
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+#endif
 
 } // namespace nix

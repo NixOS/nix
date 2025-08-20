@@ -4,6 +4,7 @@
 #include "nix/store/sqlite.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 
 #include <nlohmann/json.hpp>
 

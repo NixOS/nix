@@ -11,6 +11,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"
+#include "nix/store/build/derivation-builder.hh"
 
 #include "nix/store/config.hh"
 
@@ -22,6 +23,20 @@ template<>
 SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
 template<>
 std::string BaseSetting<SandboxMode>::to_string() const;
+
+template<>
+PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<PathsInChroot>::to_string() const;
+
+template<>
+struct BaseSetting<PathsInChroot>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append);
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -697,7 +712,7 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<PathsInChroot> sandboxPaths{
         this,
         {},
         "sandbox-paths",

@@ -15,6 +15,8 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/restricted-store.hh"
+#include "nix/store/user-lock.hh"
+#include "nix/store/globals.hh"
 
 #include <queue>
 
@@ -105,23 +107,6 @@ protected:
      * Just a cached value, computed from `drv`.
      */
     const DerivationType derivationType;
-
-    /**
-     * Stuff we need to pass to initChild().
-     */
-    struct ChrootPath
-    {
-        Path source;
-        bool optional;
-
-        ChrootPath(Path source = "", bool optional = false)
-            : source(source)
-            , optional(optional)
-        {
-        }
-    };
-
-    typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
 
     typedef StringMap Environment;
     Environment env;
@@ -870,30 +855,16 @@ void DerivationBuilderImpl::startBuilder()
     processSandboxSetupMessages();
 }
 
-DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
+PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 {
-    PathsInChroot pathsInChroot;
-
     /* Allow a user-configurable set of directories from the
        host file system. */
-    for (auto i : settings.sandboxPaths.get()) {
-        if (i.empty())
-            continue;
-        bool optional = false;
-        if (i[i.size() - 1] == '?') {
-            optional = true;
-            i.pop_back();
-        }
-        size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {i, optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {i.substr(p + 1), optional};
-    }
+    PathsInChroot pathsInChroot = settings.sandboxPaths.get();
+
     if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox()] = tmpDir;
+    pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
     /* Add the closure of store paths to the chroot. */
     StorePathSet closure;
@@ -908,7 +879,7 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         }
     for (auto & i : closure) {
         auto p = store.printStorePath(i);
-        pathsInChroot.insert_or_assign(p, p);
+        pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
     }
 
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
@@ -964,9 +935,9 @@ DerivationBuilderImpl::PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 } else {
                     auto p = line.find('=');
                     if (p == std::string::npos)
-                        pathsInChroot[line] = line;
+                        pathsInChroot[line] = {.source = line};
                     else
-                        pathsInChroot[line.substr(0, p)] = line.substr(p + 1);
+                        pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
                 }
             }
         }

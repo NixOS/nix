@@ -8,7 +8,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/configuration.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/repair-flag.hh"
@@ -89,9 +88,19 @@ struct StoreConfigBase : Config
 {
     using Config::Config;
 
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultNixStoreDir();
+
+public:
+
     const PathSetting storeDir_{
         this,
-        settings.nixStore,
+        getDefaultNixStoreDir(),
         "store",
         R"(
           Logical location of the Nix store, usually

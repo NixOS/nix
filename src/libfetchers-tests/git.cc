@@ -1,4 +1,5 @@
 #include "nix/store/store-open.hh"
+#include "nix/store/globals.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"

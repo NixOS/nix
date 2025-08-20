@@ -11,7 +11,7 @@
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
-#include "nix/store/local-store.hh"          // TODO remove, along with remaining downcasts
+#include "nix/store/globals.hh"
 
 #include <fstream>
 #include <sys/types.h>

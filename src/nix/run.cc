@@ -11,6 +11,8 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/util.hh"
+#include "nix/store/globals.hh"
+
 #include <filesystem>
 
 #ifdef __linux__

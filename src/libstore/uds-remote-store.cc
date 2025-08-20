@@ -2,6 +2,7 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

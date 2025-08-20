@@ -27,6 +27,11 @@ using json = nlohmann::json;
 
 namespace nix {
 
+Path StoreConfigBase::getDefaultNixStoreDir()
+{
+    return settings.nixStore;
+}
+
 StoreConfig::StoreConfig(const Params & params)
     : StoreConfigBase(params)
     , StoreDirConfig{storeDir_}

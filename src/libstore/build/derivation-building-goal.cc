@@ -12,6 +12,7 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/store/globals.hh"
 
 #include <fstream>
 #include <sys/types.h>

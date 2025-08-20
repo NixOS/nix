@@ -6,6 +6,7 @@
 #include "run.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/environment-variables.hh"
 
 using namespace nix;
 

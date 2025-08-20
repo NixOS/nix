@@ -5,6 +5,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/store/globals.hh"
 
 #include <optional>
 #include <string>

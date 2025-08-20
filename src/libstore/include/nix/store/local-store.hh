@@ -74,9 +74,19 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
 
     LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    bool getDefaultRequireSigs();
+
+public:
+
     Setting<bool> requireSigs{
         this,
-        settings.requireSigs,
+        getDefaultRequireSigs(),
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
