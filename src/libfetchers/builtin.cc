@@ -43,11 +43,12 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 
     std::cerr << fmt("fetching '%s'...\n", input.to_string());
 
-    /* Make sure we don't use the real store because we're in a forked
-       process. */
-    auto dummyStore = openStore("dummy://");
+    /* Functions like downloadFile() expect a store. We can't use the
+       real one since we're in a forked process. FIXME: use recursive
+       Nix's daemon so we can use the real store? */
+    auto tmpStore = openStore(ctx.tmpDirInSandbox + "/nix");
 
-    auto [accessor, lockedInput] = input.getAccessor(dummyStore);
+    auto [accessor, lockedInput] = input.getAccessor(tmpStore);
 
     auto source = sinkToSource([&](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
 
