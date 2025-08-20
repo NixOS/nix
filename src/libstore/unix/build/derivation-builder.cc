@@ -506,11 +506,6 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
            being valid. */
         auto builtOutputs = registerOutputs();
 
-        StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
-            outputPaths.insert(output.outPath);
-        runPostBuildHook(store, *logger, drvPath, outputPaths);
-
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
             deletePath(store.Store::toRealPath(i.second));
