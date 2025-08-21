@@ -3,49 +3,84 @@
 #include "nix/store/config.hh"
 #if NIX_WITH_S3_SUPPORT
 
+#  include "nix/util/types.hh"
 #  include "nix/util/ref.hh"
+#  include "nix/util/error.hh"
 #  include "nix/util/url.hh"
 #  include "nix/util/util.hh"
 
+#  include <memory>
 #  include <optional>
 #  include <string>
 #  include <variant>
 
 namespace Aws {
-namespace Client {
-struct ClientConfiguration;
-}
-} // namespace Aws
-
-namespace Aws {
-namespace S3 {
-class S3Client;
-}
+namespace Crt {
+namespace Auth {
+class ICredentialsProvider;
+class Credentials;
+} // namespace Auth
+} // namespace Crt
 } // namespace Aws
 
 namespace nix {
 
-struct S3Helper
+/**
+ * Exception thrown when AWS authentication fails
+ */
+MakeError(AwsAuthError, Error);
+
+/**
+ * AWS credentials obtained from credential providers
+ */
+struct AwsCredentials
 {
-    ref<Aws::Client::ClientConfiguration> config;
-    ref<Aws::S3::S3Client> client;
+    std::string accessKeyId;
+    std::string secretAccessKey;
+    std::optional<std::string> sessionToken;
 
-    S3Helper(
-        const std::string & profile,
-        const std::string & region,
-        const std::string & scheme,
-        const std::string & endpoint);
-
-    ref<Aws::Client::ClientConfiguration>
-    makeConfig(const std::string & region, const std::string & scheme, const std::string & endpoint);
-
-    struct FileTransferResult
+    AwsCredentials(
+        const std::string & accessKeyId,
+        const std::string & secretAccessKey,
+        const std::optional<std::string> & sessionToken = std::nullopt)
+        : accessKeyId(accessKeyId)
+        , secretAccessKey(secretAccessKey)
+        , sessionToken(sessionToken)
     {
-        std::optional<std::string> data;
-        unsigned int durationMs;
-    };
+    }
+};
 
-    FileTransferResult getObject(const std::string & bucketName, const std::string & key);
+/**
+ * AWS credential provider wrapper using aws-crt-cpp
+ * Provides lightweight credential resolution without full AWS SDK dependency
+ */
+class AwsCredentialProvider
+{
+private:
+    std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
+
+public:
+    /**
+     * Create credential provider using the default AWS credential chain
+     * This includes: Environment -> Profile -> IMDS/ECS
+     * @throws AwsAuthError if credential provider cannot be created
+     */
+    static std::unique_ptr<AwsCredentialProvider> createDefault();
+
+    /**
+     * Create credential provider for a specific profile
+     * @throws AwsAuthError if credential provider cannot be created
+     */
+    static std::unique_ptr<AwsCredentialProvider> createProfile(const std::string & profile);
+
+    /**
+     * Get credentials synchronously
+     * @throws AwsAuthError if credentials cannot be resolved
+     */
+    AwsCredentials getCredentials();
+
+    AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider);
+    ~AwsCredentialProvider();
 };
 
 /**
@@ -91,4 +126,4 @@ struct ParsedS3URL
 
 } // namespace nix
 
-#endif
+#endif // NIX_WITH_S3_SUPPORT
