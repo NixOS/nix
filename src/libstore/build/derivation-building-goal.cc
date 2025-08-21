@@ -758,16 +758,16 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 *localStoreP,
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
-                    drvPath,
-                    buildMode,
-                    buildResult,
-                    *drv,
-                    *drvOptions,
-                    inputPaths,
-                    initialOutputs,
-                    std::move(defaultPathsInChroot),
-                    std::move(finalEnv),
-                    std::move(extraFiles),
+                    .drvPath = drvPath,
+                    .buildResult = buildResult,
+                    .drv = *drv,
+                    .drvOptions = *drvOptions,
+                    .inputPaths = inputPaths,
+                    .initialOutputs = initialOutputs,
+                    .buildMode = buildMode,
+                    .defaultPathsInChroot = std::move(defaultPathsInChroot),
+                    .finalEnv = std::move(finalEnv),
+                    .extraFiles = std::move(extraFiles),
                 });
         }
 
