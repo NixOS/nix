@@ -62,13 +62,13 @@ static StoreReference::Params decodeParamsJson(StringMap paramsRaw)
     for (auto && [k, v] : std::move(paramsRaw)) {
         nlohmann::json j;
         /* We have to parse the URL un an "untyped" way before we do a
-           "typed" conversion to specific store-configuration types. As
-           such, the best we can do for back-compat is just white-list
-           specific query parameter names.
+           "typed" conversion to specific store-configuration types. As such,
+           the best we can do for back-compat is just white-list specific query
+           parameter names.
 
-           These are all the boolean store parameters in use at the time
-           of the introduction of JSON store configuration, as evidenced
-           by `git grep 'F<bool>'`. So these will continue working with
+           These are all the boolean store parameters in use at the time of the
+           introduction of JSON store configuration, as evidenced by `git grep
+           'F<bool>::type'`. So these will continue working with
            "yes"/"no"/"1"/"0", whereas any new ones will require
            "true"/"false".
          */

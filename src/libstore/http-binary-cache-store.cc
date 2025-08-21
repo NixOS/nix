@@ -88,9 +88,8 @@ public:
     {
         // FIXME: do this lazily?
         if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri.to_string())) {
-            resolvedSubstConfig.wantMassQuery.value =
-                config->storeConfig.wantMassQuery.value_or(cacheInfo->wantMassQuery);
-            resolvedSubstConfig.priority.value = config->storeConfig.priority.value_or(cacheInfo->priority);
+            resolvedSubstConfig.wantMassQuery = config->storeConfig.wantMassQuery.value_or(cacheInfo->wantMassQuery);
+            resolvedSubstConfig.priority = config->storeConfig.priority.value_or(cacheInfo->priority);
         } else {
             try {
                 BinaryCacheStore::init();

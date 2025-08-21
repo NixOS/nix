@@ -13,23 +13,21 @@
 
 namespace nix {
 
-constexpr static const SSHStoreConfigT<config::SettingInfo> sshStoreConfigDescriptions = {
+constexpr static const SSHStoreConfigT<config::SettingInfoWithDefault> sshStoreConfigDescriptions = {
     .remoteProgram{
-        .name = "remote-program",
-        .description = "Path to the `nix-daemon` executable on the remote machine.",
+        {
+            .name = "remote-program",
+            .description = "Path to the `nix-daemon` executable on the remote machine.",
+        },
+        {
+            .makeDefault = []() -> Strings { return {"nix-daemon"}; },
+        },
     },
 };
 
 #define SSH_STORE_CONFIG_FIELDS(X) X(remoteProgram)
 
 MAKE_PARSE(SSHStoreConfig, sshStoreConfig, SSH_STORE_CONFIG_FIELDS)
-
-static SSHStoreConfigT<config::PlainValue> sshStoreConfigDefaults()
-{
-    return {
-        .remoteProgram = {{"nix-daemon"}},
-    };
-}
 
 MAKE_APPLY_PARSE(SSHStoreConfig, sshStoreConfig, SSH_STORE_CONFIG_FIELDS)
 
@@ -41,7 +39,6 @@ config::SettingDescriptionMap SSHStoreConfig::descriptions()
     ret.merge(RemoteStoreConfig::descriptions());
     {
         constexpr auto & descriptions = sshStoreConfigDescriptions;
-        auto defaults = sshStoreConfigDefaults();
         ret.merge(decltype(ret){SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
     }
     ret.insert_or_assign(
@@ -251,11 +248,11 @@ ref<Store> MountedSSHStore::Config::openStore() const
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = config->remoteProgram.get();
+    Strings command = config->remoteProgram;
     command.push_back("--stdio");
-    if (config->remoteStore.get() != "") {
+    if (config->remoteStore != "") {
         command.push_back("--store");
-        command.push_back(config->remoteStore.get());
+        command.push_back(config->remoteStore);
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
     conn->sshConn = master.startCommand(std::move(command));

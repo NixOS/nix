@@ -17,14 +17,14 @@ TEST(LocalStore, constructConfig_rootQueryParam)
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir, std::optional{"/foo/bar"});
 }
 
 TEST(LocalStore, constructConfig_rootPath)
 {
     LocalStoreConfig config{"local", "/foo/bar", {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir, std::optional{"/foo/bar"});
 }
 
 } // namespace nix

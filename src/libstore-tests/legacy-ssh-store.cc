@@ -20,7 +20,7 @@ TEST(LegacySSHStore, constructConfig)
         });
 
     EXPECT_EQ(
-        config.remoteProgram.get(),
+        config.remoteProgram,
         (Strings{
             "foo",
             "bar",

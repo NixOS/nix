@@ -90,17 +90,17 @@ struct MissingPaths
 template<template<typename> class F>
 struct StoreConfigT
 {
-    F<Path> _storeDir;
-    F<int> pathInfoCacheSize;
-    F<bool> isTrusted;
-    F<StringSet> systemFeatures;
+    F<Path>::type _storeDir;
+    F<int>::type pathInfoCacheSize;
+    F<bool>::type isTrusted;
+    F<StringSet>::type systemFeatures;
 };
 
 template<template<typename> class F>
 struct SubstituterConfigT
 {
-    F<int> priority;
-    F<bool> wantMassQuery;
+    F<int>::type priority;
+    F<bool>::type wantMassQuery;
 };
 
 /**
@@ -144,7 +144,7 @@ SubstituterConfigT<config::PlainValue> substituterConfigDefaults();
  * config) can update default settings, but aren't allowed to update settings
  * specified by the client (i.e. us).
  */
-struct StoreConfig : StoreConfigT<config::PlainValue>, StoreDirConfig, SubstituterConfigT<std::optional>
+struct StoreConfig : StoreConfigT<config::PlainValue>, StoreDirConfig, SubstituterConfigT<config::OptionalValue>
 {
     using Params = StoreReference::Params;
 

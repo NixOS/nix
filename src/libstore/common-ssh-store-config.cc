@@ -6,26 +6,46 @@
 
 namespace nix {
 
-constexpr static const CommonSSHStoreConfigT<config::SettingInfo> commonSSHStoreConfigDescriptions = {
+constexpr static const CommonSSHStoreConfigT<config::SettingInfoWithDefault> commonSSHStoreConfigDescriptions = {
     .sshKey{
-        .name = "ssh-key",
-        .description = "Path to the SSH private key used to authenticate to the remote machine.",
+        {
+            .name = "ssh-key",
+            .description = "Path to the SSH private key used to authenticate to the remote machine.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
     },
     .sshPublicHostKey{
-        .name = "base64-ssh-public-host-key",
-        .description = "The public host key of the remote machine.",
+        {
+            .name = "base64-ssh-public-host-key",
+            .description = "The public host key of the remote machine.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
     },
     .compress{
-        .name = "compress",
-        .description = "Whether to enable SSH compression.",
+        {
+            .name = "compress",
+            .description = "Whether to enable SSH compression.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
     },
     .remoteStore{
-        .name = "remote-store",
-        .description = R"(
-            [Store URL](@docroot@/store/types/index.md#store-url-format)
-            to be used on the remote machine. The default is `auto`
-            (i.e. use the Nix daemon or `/nix/store` directly).
-        )",
+        {
+            .name = "remote-store",
+            .description = R"(
+              [Store URL](@docroot@/store/types/index.md#store-url-format)
+              to be used on the remote machine. The default is `auto`
+              (i.e. use the Nix daemon or `/nix/store` directly).
+            )",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
     },
 };
 
@@ -33,22 +53,11 @@ constexpr static const CommonSSHStoreConfigT<config::SettingInfo> commonSSHStore
 
 MAKE_PARSE(CommonSSHStoreConfig, commonSSHStoreConfig, COMMON_SSH_STORE_CONFIG_FIELDS)
 
-static CommonSSHStoreConfigT<config::PlainValue> commonSSHStoreConfigDefaults()
-{
-    return {
-        .sshKey = {""},
-        .sshPublicHostKey = {""},
-        .compress = {false},
-        .remoteStore = {""},
-    };
-}
-
 MAKE_APPLY_PARSE(CommonSSHStoreConfig, commonSSHStoreConfig, COMMON_SSH_STORE_CONFIG_FIELDS)
 
 config::SettingDescriptionMap CommonSSHStoreConfig::descriptions()
 {
     constexpr auto & descriptions = commonSSHStoreConfigDescriptions;
-    auto defaults = commonSSHStoreConfigDefaults();
     return {COMMON_SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
 }
 
@@ -69,8 +78,8 @@ SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD
 {
     return {
         authority,
-        sshKey.get(),
-        sshPublicHostKey.get(),
+        sshKey,
+        sshPublicHostKey,
         useMaster,
         compress,
         logFD,

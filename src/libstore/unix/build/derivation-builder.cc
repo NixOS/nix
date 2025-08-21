@@ -606,8 +606,7 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-            && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (statvfs(store.config->realStoreDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
@@ -1078,9 +1077,9 @@ void DerivationBuilderImpl::startDaemon()
     auto store = makeRestrictedStore(
         [&] {
             auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize.value = 0;
-            config->stateDir.value = "/no-such-path";
-            config->logDir.value = "/no-such-path";
+            config->pathInfoCacheSize = 0;
+            config->stateDir = "/no-such-path";
+            config->logDir = "/no-such-path";
             return config;
         }(),
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
@@ -2085,7 +2084,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    if (store.storeDir != store.config->realStoreDir.get()) {
+    if (store.storeDir != store.config->realStoreDir) {
 #ifdef __linux__
         useSandbox = true;
 #else

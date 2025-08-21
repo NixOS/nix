@@ -14,15 +14,15 @@ namespace nix {
 template<template<typename> class F>
 struct S3BinaryCacheStoreConfigT
 {
-    F<std::string> profile;
-    F<std::string> region;
-    F<std::string> scheme;
-    F<std::string> endpoint;
-    F<std::string> narinfoCompression;
-    F<std::string> lsCompression;
-    F<std::string> logCompression;
-    F<bool> multipartUpload;
-    F<uint64_t> bufferSize;
+    F<std::string>::type profile;
+    F<std::string>::type region;
+    F<std::string>::type scheme;
+    F<std::string>::type endpoint;
+    F<std::string>::type narinfoCompression;
+    F<std::string>::type lsCompression;
+    F<std::string>::type logCompression;
+    F<bool>::type multipartUpload;
+    F<uint64_t>::type bufferSize;
 };
 
 struct S3BinaryCacheStoreConfig : std::enable_shared_from_this<S3BinaryCacheStoreConfig>,

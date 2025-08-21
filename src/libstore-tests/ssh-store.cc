@@ -21,7 +21,7 @@ TEST(SSHStore, constructConfig)
     };
 
     EXPECT_EQ(
-        config.remoteProgram.get(),
+        config.remoteProgram,
         (Strings{
             "foo",
             "bar",
@@ -57,7 +57,7 @@ TEST(MountedSSHStore, constructConfig)
     };
 
     EXPECT_EQ(
-        config.remoteProgram.get(),
+        config.remoteProgram,
         (Strings{
             "foo",
             "bar",
@@ -95,7 +95,7 @@ TEST(MountedSSHStore, constructConfigWithFunnyRealStoreDir)
     };
 
     EXPECT_EQ(
-        config.remoteProgram.get(),
+        config.remoteProgram,
         (Strings{
             "foo",
             "bar",

@@ -25,43 +25,87 @@
 
 namespace nix {
 
-constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheStoreConfigDescriptions = {
+constexpr static const BinaryCacheStoreConfigT<config::SettingInfoWithDefault> binaryCacheStoreConfigDescriptions = {
     .compression{
-        .name = "compression",
-        .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+        {
+            .name = "compression",
+            .description = "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`).",
+        },
+        {
+            .makeDefault = []() -> std::string { return "xz"; },
+        },
     },
     .writeNARListing{
-        .name = "write-nar-listing",
-        .description = "Whether to write a JSON file that lists the files in each NAR.",
+        {
+            .name = "write-nar-listing",
+            .description = "Whether to write a JSON file that lists the files in each NAR.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
     },
     .writeDebugInfo{
-        .name = "index-debug-info",
-        .description = R"(
-          Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
-          fetch debug info on demand
-        )",
+        {
+            .name = "index-debug-info",
+            .description = R"(
+              Whether to index DWARF debug info files by build ID. This allows [`dwarffs`](https://github.com/edolstra/dwarffs) to
+              fetch debug info on demand
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
     },
     .secretKeyFile{
-        .name = "secret-key",
-        .description = "Path to the secret key used to sign the binary cache.",
+        {
+            .name = "secret-key",
+            .description = "Path to the secret key used to sign the binary cache.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
+    },
+    .secretKeyFiles{
+        {
+            .name = "secret-keys",
+            .description = "List of paths to the secret keys used to sign the binary cache.",
+        },
+        {
+            .makeDefault = []() -> std::vector<Path> { return {}; },
+        },
     },
     .localNarCache{
-        .name = "local-nar-cache",
-        .description =
-            "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+        {
+            .name = "local-nar-cache",
+            .description =
+                "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`.",
+        },
+        {
+            .makeDefault = []() -> Path { return ""; },
+        },
     },
     .parallelCompression{
-        .name = "parallel-compression",
-        .description =
-            "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+        {
+            .name = "parallel-compression",
+            .description =
+                "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
     },
     .compressionLevel{
-        .name = "compression-level",
-        .description = R"(
-          The *preset level* to be used when compressing NARs.
-          The meaning and accepted values depend on the compression method selected.
-          `-1` specifies that the default compression level should be used.
-        )",
+        {
+            .name = "compression-level",
+            .description = R"(
+              The *preset level* to be used when compressing NARs.
+              The meaning and accepted values depend on the compression method selected.
+              `-1` specifies that the default compression level should be used.
+            )",
+        },
+        {
+            .makeDefault = [] { return -1; },
+        },
     },
 };
 
@@ -70,20 +114,6 @@ constexpr static const BinaryCacheStoreConfigT<config::SettingInfo> binaryCacheS
         X(parallelCompression), X(compressionLevel),
 
 MAKE_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
-
-static BinaryCacheStoreConfigT<config::PlainValue> binaryCacheStoreConfigDefaults()
-{
-    return {
-        .compression = {"xz"},
-        .writeNARListing = {false},
-        .writeDebugInfo = {false},
-        .secretKeyFile = {""},
-        .secretKeyFiles = {{}},
-        .localNarCache = {""},
-        .parallelCompression = {false},
-        .compressionLevel = {-1},
-    };
-}
 
 MAKE_APPLY_PARSE(BinaryCacheStoreConfig, binaryCacheStoreConfig, BINARY_CACHE_STORE_CONFIG_FIELDS)
 
@@ -96,7 +126,6 @@ BinaryCacheStore::Config::BinaryCacheStoreConfig(const Store::Config & storeConf
 config::SettingDescriptionMap BinaryCacheStoreConfig::descriptions()
 {
     constexpr auto & descriptions = binaryCacheStoreConfigDescriptions;
-    auto defaults = binaryCacheStoreConfigDefaults();
     return {BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
 }
 
@@ -107,7 +136,7 @@ BinaryCacheStore::BinaryCacheStore(const Config & config)
     if (config.secretKeyFile != "")
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile)}));
 
-    for (auto & keyPath : config.secretKeyFiles.value) {
+    for (auto & keyPath : config.secretKeyFiles) {
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(keyPath)}));
     }
 
@@ -142,9 +171,9 @@ void BinaryCacheStore::init()
                         value,
                         storeDir);
             } else if (name == "WantMassQuery") {
-                resolvedSubstConfig.wantMassQuery.value = config.storeConfig.wantMassQuery.value_or(value == "1");
+                resolvedSubstConfig.wantMassQuery = config.storeConfig.wantMassQuery.value_or(value == "1");
             } else if (name == "Priority") {
-                resolvedSubstConfig.priority.value = config.storeConfig.priority.value_or(std::stoi(value));
+                resolvedSubstConfig.priority = config.storeConfig.priority.value_or(std::stoi(value));
             }
         }
     }

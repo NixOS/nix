@@ -11,10 +11,10 @@ class SSHMaster;
 template<template<typename> class F>
 struct CommonSSHStoreConfigT
 {
-    F<Path> sshKey;
-    F<std::string> sshPublicHostKey;
-    F<bool> compress;
-    F<std::string> remoteStore;
+    F<Path>::type sshKey;
+    F<std::string>::type sshPublicHostKey;
+    F<bool>::type compress;
+    F<std::string>::type remoteStore;
 };
 
 struct CommonSSHStoreConfig : CommonSSHStoreConfigT<config::PlainValue>

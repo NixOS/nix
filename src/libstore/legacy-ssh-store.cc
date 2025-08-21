@@ -18,28 +18,30 @@
 
 namespace nix {
 
-constexpr static const LegacySSHStoreConfigT<config::SettingInfo> legacySSHStoreConfigDescriptions = {
+constexpr static const LegacySSHStoreConfigT<config::SettingInfoWithDefault> legacySSHStoreConfigDescriptions = {
     .remoteProgram{
-        .name = "remote-program",
-        .description = "Path to the `nix-store` executable on the remote machine.",
+        {
+            .name = "remote-program",
+            .description = "Path to the `nix-store` executable on the remote machine.",
+        },
+        {
+            .makeDefault = []() -> Strings { return {"nix-store"}; },
+        },
     },
     .maxConnections{
-        .name = "max-connections",
-        .description = "Maximum number of concurrent SSH connections.",
+        {
+            .name = "max-connections",
+            .description = "Maximum number of concurrent SSH connections.",
+        },
+        {
+            .makeDefault = [] { return 1; },
+        },
     },
 };
 
 #define LEGACY_SSH_STORE_CONFIG_FIELDS(X) X(remoteProgram), X(maxConnections)
 
 MAKE_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
-
-static LegacySSHStoreConfigT<config::PlainValue> legacySSHStoreConfigDefaults()
-{
-    return {
-        .remoteProgram = {{"nix-store"}},
-        .maxConnections = {1},
-    };
-}
 
 MAKE_APPLY_PARSE(LegacySSHStoreConfig, legacySSHStoreConfig, LEGACY_SSH_STORE_CONFIG_FIELDS)
 
@@ -51,7 +53,6 @@ config::SettingDescriptionMap LegacySSHStoreConfig::descriptions()
     ret.merge(RemoteStoreConfig::descriptions());
     {
         constexpr auto & descriptions = legacySSHStoreConfigDescriptions;
-        auto defaults = legacySSHStoreConfigDefaults();
         ret.merge(decltype(ret){LEGACY_SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
     }
     return ret;
@@ -101,12 +102,12 @@ LegacySSHStore::LegacySSHStore(ref<const Config> config)
 ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = config->remoteProgram.get();
+    Strings command = config->remoteProgram;
     command.push_back("--serve");
     command.push_back("--write");
-    if (config->remoteStore.get() != "") {
+    if (config->remoteStore != "") {
         command.push_back("--store");
-        command.push_back(config->remoteStore.get());
+        command.push_back(config->remoteStore);
     }
     conn->sshConn = master.startCommand(std::move(command), std::list{config->extraSshArgs});
     if (config->connPipeSize) {
