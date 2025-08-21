@@ -12,7 +12,6 @@
   componentTestsPrefix ? "",
   withSanitizers ? false,
   withCoverage ? false,
-  withAWS ? null,
   withCurlS3 ? null,
   ...
 }:
@@ -60,8 +59,7 @@ rec {
 
       # Override AWS configuration if specified
       nix-store = prev.nix-store.override (
-        lib.optionalAttrs (withAWS != null) { inherit withAWS; }
-        // lib.optionalAttrs (withCurlS3 != null) { inherit withCurlS3; }
+        lib.optionalAttrs (withCurlS3 != null) { inherit withCurlS3; }
       );
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
@@ -230,11 +228,6 @@ rec {
     };
 
   vmTests = {
-  }
-  # FIXME: when the curlS3 implementation is complete, it should also enable these tests.
-  // lib.optionalAttrs (withAWS == true) {
-    # S3 binary cache store test only runs when S3 support is enabled
-    inherit (nixosTests) s3-binary-cache-store;
   }
   // lib.optionalAttrs (withCurlS3 == true) {
     # S3 binary cache store test using curl implementation

@@ -2,7 +2,6 @@
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/s3.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
@@ -10,9 +9,6 @@
 
 #include "store-config-private.hh"
 #include <optional>
-#if NIX_WITH_S3_SUPPORT
-#  include <aws/core/client/ClientConfiguration.h>
-#endif
 #if NIX_WITH_CURL_S3
 #  include "nix/store/aws-creds.hh"
 #  include "nix/store/s3-url.hh"
@@ -850,30 +846,6 @@ struct curlFileTransfer : public FileTransfer
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
             enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-#elif NIX_WITH_S3_SUPPORT
-            // Old AWS SDK-based implementation
-            // FIXME: do this on a worker thread
-            try {
-                auto parsed = ParsedS3URL::parse(request.uri.parsed());
-
-                std::string profile = parsed.profile.value_or("");
-                std::string region = parsed.region.value_or(Aws::Region::US_EAST_1);
-                std::string scheme = parsed.scheme.value_or("");
-                std::string endpoint = parsed.getEncodedEndpoint().value_or("");
-
-                S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(parsed.bucket, encodeUrlPath(parsed.key));
-                FileTransferResult res;
-                if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
-                res.data = std::move(*s3Res.data);
-                res.urls.push_back(request.uri.to_string());
-                callback(std::move(res));
-            } catch (...) {
-                callback.rethrow();
-            }
 #else
             throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
 #endif

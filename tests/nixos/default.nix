@@ -199,8 +199,6 @@ in
 
   user-sandboxing = runNixOSTest ./user-sandboxing;
 
-  s3-binary-cache-store = runNixOSTest ./s3-binary-cache-store.nix;
-
   curl-s3-binary-cache-store = runNixOSTest ./curl-s3-binary-cache-store.nix;
 
   fsync = runNixOSTest ./fsync.nix;

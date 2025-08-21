@@ -1,6 +1,6 @@
 #include "nix/store/s3-url.hh"
 
-#if NIX_WITH_S3_SUPPORT || NIX_WITH_CURL_S3
+#if NIX_WITH_CURL_S3
 
 #  include "nix/util/error.hh"
 #  include "nix/util/split.hh"

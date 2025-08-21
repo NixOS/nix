@@ -142,29 +142,7 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config. See
-# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-# The S3 store definitions in the header will be hidden based on this variables.
-configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
-if aws_s3.found()
-  aws_s3 = declare_dependency(
-    include_directories : include_directories(aws_s3.get_variable('includedir')),
-    link_args : [
-      '-L' + aws_s3.get_variable('libdir'),
-      '-laws-cpp-sdk-transfer',
-      '-laws-cpp-sdk-s3',
-      '-laws-cpp-sdk-identity-management',
-      '-laws-cpp-sdk-cognito-identity',
-      '-laws-cpp-sdk-sts',
-      '-laws-cpp-sdk-core',
-      '-laws-crt-cpp',
-    ],
-  ).as_system('system')
-endif
-deps_other += aws_s3
-
-# Curl-based S3 store support (alternative to AWS SDK)
+# Curl-based S3 store support
 # Check if curl supports AWS SigV4 (requires >= 7.75.0)
 curl_supports_aws_sigv4 = curl.version().version_compare('>= 7.75.0')
 # AWS CRT C++ for lightweight credential management
@@ -177,13 +155,6 @@ curl_s3_store_opt = get_option('curl-s3-store').require(
   aws_crt_cpp.found(),
   error_message : 'curl-based S3 support requires aws-crt-cpp',
 )
-
-# Make AWS SDK and curl-based S3 mutually exclusive
-if aws_s3.found() and curl_s3_store_opt.enabled()
-  error(
-    'Cannot enable both AWS SDK S3 support and curl-based S3 support. Please choose one.',
-  )
-endif
 
 if curl_s3_store_opt.enabled()
   deps_other += aws_crt_cpp

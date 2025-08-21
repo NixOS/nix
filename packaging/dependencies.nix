@@ -16,21 +16,6 @@ in
 scope: {
   inherit stdenv;
 
-  aws-sdk-cpp =
-    (pkgs.aws-sdk-cpp.override {
-      apis = [
-        "identity-management"
-        "s3"
-        "transfer"
-      ];
-      customMemoryManagement = false;
-    }).overrideAttrs
-      {
-        # only a stripped down version is built, which takes a lot less resources
-        # to build, so we don't need a "big-parallel" machine.
-        requiredSystemFeatures = [ ];
-      };
-
   boehmgc =
     (pkgs.boehmgc.override {
       enableLargeConfig = true;

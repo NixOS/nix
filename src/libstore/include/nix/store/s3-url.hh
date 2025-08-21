@@ -2,7 +2,7 @@
 ///@file
 #include "nix/store/config.hh"
 
-#if NIX_WITH_S3_SUPPORT || NIX_WITH_CURL_S3
+#if NIX_WITH_CURL_S3
 
 #  include "nix/util/url.hh"
 #  include "nix/util/util.hh"
