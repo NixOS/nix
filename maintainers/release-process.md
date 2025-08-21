@@ -24,6 +24,12 @@ release:
 * In a checkout of the Nix repo, make sure you're on `master` and run
   `git pull`.
 
+* Compile a release notes to-do list by running
+
+  ```console
+  $ ./maintainers/release-notes-todo PREV_RELEASE HEAD
+  ```
+
 * Compile the release notes by running
 
   ```console
