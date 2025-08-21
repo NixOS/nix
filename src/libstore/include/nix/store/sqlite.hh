@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <functional>
 #include <string>
 
@@ -41,7 +42,7 @@ struct SQLite
 
     SQLite() {}
 
-    SQLite(const Path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
+    SQLite(const std::filesystem::path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
     SQLite(const SQLite & from) = delete;
     SQLite & operator=(const SQLite & from) = delete;
 

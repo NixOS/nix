@@ -58,7 +58,7 @@ static void traceSQL(void * x, const char * sql)
     notice("SQL<[%1%]>", sql);
 };
 
-SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
+SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
 {
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
@@ -68,7 +68,7 @@ SQLite::SQLite(const Path & path, SQLiteOpenMode mode)
     int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
     if (mode == SQLiteOpenMode::Normal)
         flags |= SQLITE_OPEN_CREATE;
-    auto uri = "file:" + percentEncode(path) + "?immutable=" + (immutable ? "1" : "0");
+    auto uri = "file:" + percentEncode(path.string()) + "?immutable=" + (immutable ? "1" : "0");
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
         const char * err = sqlite3_errstr(ret);
@@ -99,7 +99,7 @@ SQLite::~SQLite()
 void SQLite::isCache()
 {
     exec("pragma synchronous = off");
-    exec("pragma main.journal_mode = truncate");
+    exec("pragma main.journal_mode = wal");
 }
 
 void SQLite::exec(const std::string & stmt)
