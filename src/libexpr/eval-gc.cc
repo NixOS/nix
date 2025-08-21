@@ -87,45 +87,37 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
     void *& sp = *sp_ptr;
     auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
     size_t osStackSize;
-    // The low address of the stack, which grows down.
-    void * osStackLimit;
+    char * osStackHi;
+    char * osStackLo;
 
 #  ifdef __APPLE__
     osStackSize = pthread_get_stacksize_np(pthread_id);
-    osStackLimit = pthread_get_stackaddr_np(pthread_id);
+    osStackHi = (char *) pthread_get_stackaddr_np(pthread_id);
+    osStackLo = osStackHi - osStackSize;
 #  else
     pthread_attr_t pattr;
-    if (pthread_attr_init(&pattr)) {
+    if (pthread_attr_init(&pattr))
         throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
-    }
 #    ifdef HAVE_PTHREAD_GETATTR_NP
-    if (pthread_getattr_np(pthread_id, &pattr)) {
+    if (pthread_getattr_np(pthread_id, &pattr))
         throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
-    }
 #    elif HAVE_PTHREAD_ATTR_GET_NP
-    if (!pthread_attr_init(&pattr)) {
+    if (!pthread_attr_init(&pattr))
         throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
-    }
-    if (!pthread_attr_get_np(pthread_id, &pattr)) {
+    if (!pthread_attr_get_np(pthread_id, &pattr))
         throw Error("fixupBoehmStackPointer: pthread_attr_get_np failed");
-    }
 #    else
 #      error "Need one of `pthread_attr_get_np` or `pthread_getattr_np`"
 #    endif
-    if (pthread_attr_getstack(&pattr, &osStackLimit, &osStackSize)) {
+    if (pthread_attr_getstack(&pattr, (void **) &osStackLo, &osStackSize))
         throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
-    }
-    if (pthread_attr_destroy(&pattr)) {
+    if (pthread_attr_destroy(&pattr))
         throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
-    }
+    osStackHi = osStackLo + osStackSize;
 #  endif
 
-    void * osStackBase = (char *) osStackLimit + osStackSize;
-    // NOTE: We assume the stack grows down, as it does on all architectures we support.
-    //       Architectures that grow the stack up are rare.
-    if (sp >= osStackBase || sp < osStackLimit) { // sp is outside the os stack
-        sp = osStackLimit;
-    }
+    if (sp >= osStackHi || sp < osStackLo) // sp is outside the os stack
+        sp = osStackLo;
 }
 
 static inline void initGCReal()
