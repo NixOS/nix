@@ -1,14 +1,168 @@
 #include "nix/store/s3.hh"
+#include "nix/store/config.hh"
 #include "nix/util/split.hh"
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"
 #include "nix/util/canon-path.hh"
 
-namespace nix {
+#if NIX_WITH_S3_SUPPORT
+
+#  include "nix/util/logging.hh"
+#  include "nix/util/finally.hh"
+#  include "nix/util/error.hh"
+#  include "nix/util/split.hh"
+#  include "nix/util/url.hh"
+
+#  include <aws/crt/Api.h>
+#  include <aws/crt/auth/Credentials.h>
+#  include <aws/crt/io/Bootstrap.h>
+
+#  include <condition_variable>
+#  include <mutex>
+#  include <string_view>
 
 using namespace std::string_view_literals;
 
-#if NIX_WITH_S3_SUPPORT
+namespace nix {
+
+// AWS CRT initialization
+static std::once_flag crtInitFlag;
+static bool crtInitialized = false;
+
+static void initAwsCrt()
+{
+    std::call_once(crtInitFlag, []() {
+        try {
+            // Use a static local variable instead of global to control destruction order
+            static Aws::Crt::ApiHandle apiHandle;
+            apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, (FILE *) nullptr);
+            crtInitialized = true;
+        } catch (const std::exception & e) {
+            debug("Failed to initialize AWS CRT: %s", e.what());
+            crtInitialized = false;
+        } catch (...) {
+            debug("Failed to initialize AWS CRT: unknown error");
+            crtInitialized = false;
+        }
+    });
+}
+
+// AwsCredentialProvider implementation
+
+std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
+{
+    initAwsCrt();
+
+    if (!crtInitialized) {
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
+    }
+
+    try {
+        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
+        if (!provider) {
+            throw AwsAuthError("Failed to create default AWS credentials provider");
+        }
+
+        return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const AwsAuthError &) {
+        throw;
+    } catch (const std::exception & e) {
+        throw AwsAuthError("Exception creating AWS credential provider: %s", e.what());
+    } catch (...) {
+        throw AwsAuthError("Unknown exception creating AWS credential provider");
+    }
+}
+
+std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createProfile(const std::string & profile)
+{
+    initAwsCrt();
+
+    if (!crtInitialized) {
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
+    }
+
+    if (profile.empty()) {
+        return createDefault();
+    }
+
+    try {
+        Aws::Crt::Auth::CredentialsProviderProfileConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+        config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+        if (!provider) {
+            throw AwsAuthError("Failed to create AWS credentials provider for profile '%s'", profile);
+        }
+
+        return std::make_unique<AwsCredentialProvider>(provider);
+    } catch (const AwsAuthError &) {
+        throw;
+    } catch (const std::exception & e) {
+        throw AwsAuthError("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
+    } catch (...) {
+        throw AwsAuthError("Unknown exception creating AWS credential provider for profile '%s'", profile);
+    }
+}
+
+AwsCredentialProvider::AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
+    : provider(provider)
+{
+}
+
+AwsCredentialProvider::~AwsCredentialProvider() = default;
+
+AwsCredentials AwsCredentialProvider::getCredentials()
+{
+    if (!provider || !provider->IsValid()) {
+        throw AwsAuthError("AWS credential provider is invalid");
+    }
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::optional<AwsCredentials> result;
+    int resolvedErrorCode = 0;
+    bool resolved = false;
+
+    provider->GetCredentials([&](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        if (errorCode != 0 || !credentials) {
+            resolvedErrorCode = errorCode;
+        } else {
+            auto accessKeyId = credentials->GetAccessKeyId();
+            auto secretAccessKey = credentials->GetSecretAccessKey();
+            auto sessionToken = credentials->GetSessionToken();
+
+            std::optional<std::string> sessionTokenStr;
+            if (sessionToken.len > 0) {
+                sessionTokenStr = std::string(reinterpret_cast<const char *>(sessionToken.ptr), sessionToken.len);
+            }
+
+            result = AwsCredentials(
+                std::string(reinterpret_cast<const char *>(accessKeyId.ptr), accessKeyId.len),
+                std::string(reinterpret_cast<const char *>(secretAccessKey.ptr), secretAccessKey.len),
+                sessionTokenStr);
+        }
+
+        resolved = true;
+        cv.notify_one();
+    });
+
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock, [&] { return resolved; });
+
+    if (!result) {
+        throw AwsAuthError("Failed to resolve AWS credentials: error code %d", resolvedErrorCode);
+    }
+
+    return *result;
+}
+
+// ParsedS3URL implementation
 
 ParsedS3URL ParsedS3URL::parse(const ParsedURL & parsed)
 try {
@@ -102,6 +256,6 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
         endpoint);
 }
 
-#endif
-
 } // namespace nix
+
+#endif // NIX_WITH_S3_SUPPORT
