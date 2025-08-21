@@ -26,9 +26,32 @@
 
   Prior versions of Nix since [#4646](https://github.com/NixOS/nix/pull/4646) accepted [IPv6 scoped addresses](https://datatracker.ietf.org/doc/html/rfc4007) in URIs like [store references](@docroot@/store/types/index.md#store-url-format) in the textual representation with a literal percent character: `[fe80::1%18]`. This was ambiguous, because the the percent literal `%` is reserved by [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986), since it's used to indicate percent encoding. Nix now requires that the percent `%` symbol is percent-encoded as `%25`. This implements [RFC6874](https://datatracker.ietf.org/doc/html/rfc6874), which defines the representation of zone identifiers in URIs. The example from above now has to be specified as `[fe80::1%2518]`.
 
+- Use WAL mode for SQLite cache databases [#13800](https://github.com/NixOS/nix/pull/13800)
+
+  Previously, Nix used SQLite's "truncate" mode for caches. However, this could cause a Nix process to block if another process was updating the cache. This was a problem for the flake evaluation cache in particular, since it uses long-running transactions. Thus, concurrent Nix commands operating on the same flake could be blocked for an unbounded amount of time. WAL mode avoids this problem.
+
+  This change required updating the versions of the SQLite caches. For instance, `eval-cache-v5.sqlite` is now `eval-cache-v6.sqlite`.
+
+- Enable parallel marking in bdwgc [#13708](https://github.com/NixOS/nix/pull/13708)
+
+  Previously marking was done by only one thread, which takes a long time if the heap gets big. Enabling parallel marking speeds up evaluation a lot, for example (on a Ryzen 9 5900X 12-Core):
+
+  * `nix search nixpkgs` from 24.3s to 18.9s.
+  * Evaluating the `NixOS/nix/2.21.2` flake regression test from 86.1s to 71.2s.
+
+- New command `nix flake prefetch-inputs` [#13565](https://github.com/NixOS/nix/pull/13565)
+
+  This command fetches all inputs of a flake in parallel. This can be a lot faster than the serialized on-demand fetching during regular flake evaluation. The downside is that it may fetch inputs that aren't normally used.
+
+- Add `warn-short-path-literals` setting [#13489](https://github.com/NixOS/nix/pull/13489)
+
+  This setting, when enabled, causes Nix to emit warnings when encountering relative path literals that don't start with `.` or `/`, for instance suggesting that `foo/bar` should be rewritten to `./foo/bar`.
+
+- When updating a lock, respect the input's lock file [#13437](https://github.com/NixOS/nix/pull/13437)
+
+  For example, if a flake has a lock for `a` and `a/b`, and we change the flakeref for `a`, previously Nix would fetch the latest version of `b` rather than using the lock for `b` from `a`.
 
 ## Contributors
-
 
 This release was made possible by the following 34 contributors:
 
