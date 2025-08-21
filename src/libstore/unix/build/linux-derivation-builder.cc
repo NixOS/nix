@@ -492,7 +492,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             createDirs(chrootRootDir + "/dev/shm");
             createDirs(chrootRootDir + "/dev/pts");
             ss.push_back("/dev/full");
-            if (store.Store::config.systemFeatures.get().count("kvm") && pathExists("/dev/kvm"))
+            if (systemFeatures.count("kvm") && pathExists("/dev/kvm"))
                 ss.push_back("/dev/kvm");
             ss.push_back("/dev/null");
             ss.push_back("/dev/random");

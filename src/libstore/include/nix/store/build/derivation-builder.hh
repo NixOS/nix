@@ -65,6 +65,14 @@ struct DerivationBuilderParams
      */
     PathsInChroot defaultPathsInChroot;
 
+    /**
+     * May be used to control various platform-specific functionality.
+     *
+     * For example, on Linux, the `kvm` system feature controls whether
+     * `/dev/kvm` should be exposed to the builder within the sandbox.
+     */
+    StringSet systemFeatures;
+
     struct EnvEntry
     {
         /**
