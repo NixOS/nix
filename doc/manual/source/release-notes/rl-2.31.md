@@ -2,7 +2,7 @@
 
 - `build-cores = 0` now auto-detects CPU cores [#13402](https://github.com/NixOS/nix/pull/13402)
 
-  When `build-cores` is set to `0`, nix now automatically detects the number of available CPU cores and passes this value via `NIX_BUILD_CORES`, instead of passing `0` directly. This matches the behavior when `build-cores` is unset. This prevents the builder from having to detect the number of cores.
+  When `build-cores` is set to `0`, Nix now automatically detects the number of available CPU cores and passes this value via `NIX_BUILD_CORES`, instead of passing `0` directly. This matches the behavior when `build-cores` is unset. This prevents the builder from having to detect the number of cores.
 
 - Fix Git LFS SSH issues [#13337](https://github.com/NixOS/nix/issues/13337) [#13743](https://github.com/NixOS/nix/pull/13743)
 
@@ -12,9 +12,9 @@
   * Properly use the parsed port from URL.
   * Better use of the response of `git-lfs-authenticate` to determine API endpoint when the API is not exposed on port 443.
 
-- Add support for user@address:port syntax in store URIs [#7044](https://github.com/NixOS/nix/issues/7044) [#3425](https://github.com/NixOS/nix/pull/3425)
+- Add support for `user@address:port` syntax in store URIs [#7044](https://github.com/NixOS/nix/issues/7044) [#3425](https://github.com/NixOS/nix/pull/3425)
 
-  It's now possible to specify the port used for the SSH stores directly in the store URL in accordance with [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986). Previously the only way to specify custom ports was via `ssh_config` or `NIX_SSHOPTS` environment variable, because Nix incorrectly passed the port number together with the host name to the SSH executable. This has now been fixed.
+  It's now possible to specify the port used for SSH stores directly in the store URL in accordance with [RFC3986](https://datatracker.ietf.org/doc/html/rfc3986). Previously the only way to specify custom ports was via `ssh_config` or the `NIX_SSHOPTS` environment variable, because Nix incorrectly passed the port number together with the host name to the SSH executable.
 
   This change affects [store references](@docroot@/store/types/index.md#store-url-format) passed via the `--store` and similar flags in CLI as well as in the configuration for [remote builders](@docroot@/command-ref/conf-file.md#conf-builders). For example, the following store URIs now work:
 
