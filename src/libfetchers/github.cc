@@ -19,7 +19,7 @@ namespace nix::fetchers {
 
 struct DownloadUrl
 {
-    std::string url;
+    ParsedURL url;
     Headers headers;
 };
 
@@ -420,7 +420,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         const auto url =
             fmt(urlFmt, host, getOwner(input), getRepo(input), input.getRev()->to_string(HashFormat::Base16, false));
 
-        return DownloadUrl{url, headers};
+        return DownloadUrl{parseURL(url), headers};
     }
 
     void clone(const Input & input, const Path & destDir) const override
@@ -500,7 +500,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
                 input.getRev()->to_string(HashFormat::Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
-        return DownloadUrl{url, headers};
+        return DownloadUrl{parseURL(url), headers};
     }
 
     void clone(const Input & input, const Path & destDir) const override
@@ -592,7 +592,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
                 input.getRev()->to_string(HashFormat::Base16, false));
 
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
-        return DownloadUrl{url, headers};
+        return DownloadUrl{parseURL(url), headers};
     }
 
     void clone(const Input & input, const Path & destDir) const override

@@ -25,7 +25,7 @@ static void downloadToSink(
     std::string sha256Expected,
     size_t sizeExpected)
 {
-    FileTransferRequest request(url);
+    FileTransferRequest request(parseURL(url));
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
@@ -207,7 +207,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     auto api = lfs::getLfsApi(this->url);
     auto url = api.endpoint + "/objects/batch";
     const auto & authHeader = api.authHeader;
-    FileTransferRequest request(url);
+    FileTransferRequest request(parseURL(url));
     request.post = true;
     Headers headers;
     if (authHeader.has_value())

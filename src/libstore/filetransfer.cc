@@ -100,7 +100,7 @@ struct curlFileTransfer : public FileTransfer
                   lvlTalkative,
                   actFileTransfer,
                   fmt("%sing '%s'", request.verb(), request.uri),
-                  {request.uri},
+                  {request.uri.to_string()},
                   request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -121,7 +121,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
             })
         {
-            result.urls.push_back(request.uri);
+            result.urls.push_back(request.uri.to_string());
 
             requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
@@ -350,7 +350,7 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
 
-            curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
+            curl_easy_setopt(req, CURLOPT_URL, request.uri.to_string().c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
@@ -784,8 +784,8 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && !hasPrefix(item->request.uri, "http://") && !hasPrefix(item->request.uri, "https://"))
-            throw nix::Error("uploading to '%s' is not supported", item->request.uri);
+        if (item->request.data && item->request.uri.scheme != "http" && item->request.uri.scheme != "https")
+            throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
             auto state(state_.lock());
@@ -801,7 +801,7 @@ struct curlFileTransfer : public FileTransfer
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
-        if (hasPrefix(request.uri, "s3://")) {
+        if (request.uri.scheme == "s3") {
             // FIXME: do this on a worker thread
             try {
 #if NIX_WITH_S3_SUPPORT
@@ -820,10 +820,11 @@ struct curlFileTransfer : public FileTransfer
                 if (!s3Res.data)
                     throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
                 res.data = std::move(*s3Res.data);
-                res.urls.push_back(request.uri);
+                res.urls.push_back(request.uri.to_string());
                 callback(std::move(res));
 #else
-                throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
+                throw nix::Error(
+                    "cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
 #endif
             } catch (...) {
                 callback.rethrow();
