@@ -21,8 +21,8 @@ class RemoteFSAccessor;
 template<template<typename> class F>
 struct RemoteStoreConfigT
 {
-    F<int> maxConnections;
-    F<unsigned int> maxConnectionAge;
+    F<int>::type maxConnections;
+    F<unsigned int>::type maxConnectionAge;
 };
 
 struct RemoteStoreConfig : RemoteStoreConfigT<config::PlainValue>

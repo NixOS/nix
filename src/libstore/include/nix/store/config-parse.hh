@@ -28,6 +28,11 @@ template<typename T>
 struct SettingInfo
 {
     /**
+     * The "self reference" is a trick For higher order stuff to work without extra wrappers
+     */
+    using type = SettingInfo<T>;
+
+    /**
      * Name of the setting, used when parsing configuration maps
      */
     std::string_view name;
@@ -62,10 +67,33 @@ struct SettingInfo
      * The default value will be rendered to JSON if it is to be
      * documented.
      */
-    std::pair<std::string, SettingDescription> describe(const PlainValue<T> & def) const;
+    std::pair<std::string, SettingDescription> describe(const T & def) const;
 
     std::optional<T>
     parseConfig(const nlohmann::json::object_t & map, const ExperimentalFeatureSettings & xpSettings) const;
+};
+
+template<typename T>
+struct MakeDefault
+{
+    T (*makeDefault)();
+};
+
+/**
+ * For the common case where the defaults are completely independent
+ * from one another.
+ *
+ * @note occasionally, when this is not the case, the defaulting logic
+ * can be written more manually instead. This is needed e.g. for
+ * `LocaFSStore` in libnixstore.
+ */
+template<typename T>
+struct SettingInfoWithDefault : SettingInfo<T>, MakeDefault<T>
+{
+    /**
+     * The "self reference" is a trick For higher order stuff to work without extra wrappers
+     */
+    using type = SettingInfoWithDefault<T>;
 };
 
 struct SettingDescription;

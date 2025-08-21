@@ -13,8 +13,8 @@ namespace nix {
 template<template<typename> class F>
 struct LegacySSHStoreConfigT
 {
-    F<Strings> remoteProgram;
-    F<int> maxConnections;
+    F<Strings>::type remoteProgram;
+    F<int>::type maxConnections;
 };
 
 struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>,

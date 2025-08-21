@@ -5,10 +5,10 @@ namespace nix {
 template<template<typename> class F>
 struct LocalOverlayStoreConfigT
 {
-    F<ref<const StoreConfig>> lowerStoreConfig;
-    F<Path> upperLayer;
-    F<bool> checkMount;
-    F<Path> remountHook;
+    F<ref<const StoreConfig>>::type lowerStoreConfig;
+    F<Path>::type upperLayer;
+    F<bool>::type checkMount;
+    F<Path>::type remountHook;
 };
 
 /**

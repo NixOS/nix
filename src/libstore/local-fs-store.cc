@@ -40,25 +40,25 @@ static LocalFSStoreConfigT<config::PlainValue>
 localFSStoreConfigDefaults(const Path & storeDir, const std::optional<Path> & rootDir)
 {
     return {
-        .rootDir = {std::nullopt},
-        .stateDir = {rootDir ? *rootDir + "/nix/var/nix" : settings.nixStateDir},
-        .logDir = {rootDir ? *rootDir + "/nix/var/log/nix" : settings.nixLogDir},
-        .realStoreDir = {rootDir ? *rootDir + "/nix/store" : storeDir},
+        .rootDir = std::nullopt,
+        .stateDir = rootDir ? *rootDir + "/nix/var/nix" : settings.nixStateDir,
+        .logDir = rootDir ? *rootDir + "/nix/var/log/nix" : settings.nixLogDir,
+        .realStoreDir = rootDir ? *rootDir + "/nix/store" : storeDir,
     };
 }
 
 static LocalFSStoreConfigT<config::PlainValue>
-localFSStoreConfigApplyParse(const Path & storeDir, LocalFSStoreConfigT<std::optional> parsed)
+localFSStoreConfigApplyParse(const Path & storeDir, LocalFSStoreConfigT<config::OptionalValue> parsed)
 {
     auto defaults = localFSStoreConfigDefaults(storeDir, parsed.rootDir.value_or(std::nullopt));
-    return {LOCAL_FS_STORE_CONFIG_FIELDS(APPLY_ROW)};
+    return {LOCAL_FS_STORE_CONFIG_FIELDS(APPLY_ROW_SEP_DEFAULTS)};
 }
 
 config::SettingDescriptionMap LocalFSStoreConfig::descriptions()
 {
     constexpr auto & descriptions = localFSStoreConfigDescriptions;
     auto defaults = localFSStoreConfigDefaults(settings.nixStore, std::nullopt);
-    return {LOCAL_FS_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
+    return {LOCAL_FS_STORE_CONFIG_FIELDS(DESCRIBE_ROW_SEP_DEFAULTS)};
 }
 
 LocalFSStore::Config::LocalFSStoreConfig(const Store::Config & storeConfig, const StoreConfig::Params & params)
@@ -68,7 +68,8 @@ LocalFSStore::Config::LocalFSStoreConfig(const Store::Config & storeConfig, cons
 {
 }
 
-static LocalFSStoreConfigT<std::optional> applyAuthority(LocalFSStoreConfigT<std::optional> parsed, PathView rootDir)
+static LocalFSStoreConfigT<config::OptionalValue>
+applyAuthority(LocalFSStoreConfigT<config::OptionalValue> parsed, PathView rootDir)
 {
     if (!rootDir.empty())
         parsed.rootDir = std::optional{Path{rootDir}};
@@ -95,7 +96,7 @@ struct LocalStoreAccessor : PosixSourceAccessor
     bool requireValidPath;
 
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : PosixSourceAccessor(std::filesystem::path{store->config.realStoreDir.get()})
+        : PosixSourceAccessor(std::filesystem::path{store->config.realStoreDir})
         , store(store)
         , requireValidPath(requireValidPath)
     {
@@ -146,7 +147,7 @@ ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 
 std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & path, bool requireValidPath)
 {
-    auto absPath = std::filesystem::path{config.realStoreDir.get()} / path.to_string();
+    auto absPath = std::filesystem::path{config.realStoreDir} / path.to_string();
     if (requireValidPath) {
         /* Only return non-null if the store object is a fully-valid
            member of the store. */
@@ -176,9 +177,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        Path logPath =
-            j == 0 ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-                   : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
+        Path logPath = j == 0 ? fmt("%s/%s/%s/%s", config.logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
+                              : fmt("%s/%s/%s", config.logDir, drvsLogDir, baseName);
         Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))

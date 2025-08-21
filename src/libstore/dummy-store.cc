@@ -10,26 +10,24 @@
 
 namespace nix {
 
-constexpr static const DummyStoreConfigT<config::SettingInfo> dummyStoreConfigDescriptions = {
+constexpr static const DummyStoreConfigT<config::SettingInfoWithDefault> dummyStoreConfigDescriptions = {
     .readOnly{
-        .name = "read-only",
-        .description = R"(
-          Make any sort of write fail instead of succeeding.
-          No additional memory will be used, because no information needs to be stored.
-        )",
+        {
+            .name = "read-only",
+            .description = R"(
+              Make any sort of write fail instead of succeeding.
+              No additional memory will be used, because no information needs to be stored.
+            )",
+        },
+        {
+            .makeDefault = [] { return true; },
+        },
     },
 };
 
 #define DUMMY_STORE_CONFIG_FIELDS(X) X(readOnly)
 
 MAKE_PARSE(DummyStoreConfig, dummyStoreConfig, DUMMY_STORE_CONFIG_FIELDS)
-
-static DummyStoreConfigT<config::PlainValue> dummyStoreConfigDefaults()
-{
-    return {
-        .readOnly = {true},
-    };
-}
 
 MAKE_APPLY_PARSE(DummyStoreConfig, dummyStoreConfig, DUMMY_STORE_CONFIG_FIELDS)
 
@@ -40,7 +38,6 @@ config::SettingDescriptionMap DummyStoreConfig::descriptions()
     ret.merge(LocalFSStoreConfig::descriptions());
     {
         constexpr auto & descriptions = dummyStoreConfigDescriptions;
-        auto defaults = dummyStoreConfigDefaults();
         ret.merge(decltype(ret){DUMMY_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
     }
     return ret;
@@ -51,7 +48,7 @@ DummyStoreConfig::DummyStoreConfig(const Params & params)
     , DummyStoreConfigT<config::PlainValue>{dummyStoreConfigApplyParse(params)}
 {
     // Disable caching since this a temporary in-memory store.
-    pathInfoCacheSize.value = 0;
+    pathInfoCacheSize = 0;
 }
 
 std::string DummyStoreConfig::doc()

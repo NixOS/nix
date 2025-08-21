@@ -8,7 +8,7 @@ namespace nix {
 template<template<typename> class F>
 struct DummyStoreConfigT
 {
-    F<bool> readOnly;
+    F<bool>::type readOnly;
 };
 
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,

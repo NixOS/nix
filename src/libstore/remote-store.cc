@@ -24,14 +24,24 @@
 
 namespace nix {
 
-constexpr static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfigDescriptions = {
+constexpr static const RemoteStoreConfigT<config::SettingInfoWithDefault> remoteStoreConfigDescriptions = {
     .maxConnections{
-        .name = "max-connections",
-        .description = "Maximum number of concurrent connections to the Nix daemon.",
+        {
+            .name = "max-connections",
+            .description = "Maximum number of concurrent connections to the Nix daemon.",
+        },
+        {
+            .makeDefault = [] { return 1; },
+        },
     },
     .maxConnectionAge{
-        .name = "max-connection-age",
-        .description = "Maximum age of a connection before it is closed.",
+        {
+            .name = "max-connection-age",
+            .description = "Maximum age of a connection before it is closed.",
+        },
+        {
+            .makeDefault = [] { return std::numeric_limits<unsigned int>::max(); },
+        },
     },
 };
 
@@ -39,20 +49,11 @@ constexpr static const RemoteStoreConfigT<config::SettingInfo> remoteStoreConfig
 
 MAKE_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
 
-static RemoteStoreConfigT<config::PlainValue> remoteStoreConfigDefaults()
-{
-    return {
-        .maxConnections = {1},
-        .maxConnectionAge = {std::numeric_limits<unsigned int>::max()},
-    };
-}
-
 MAKE_APPLY_PARSE(RemoteStoreConfig, remoteStoreConfig, REMOTE_STORE_CONFIG_FIELDS)
 
 config::SettingDescriptionMap RemoteStoreConfig::descriptions()
 {
     constexpr auto & descriptions = remoteStoreConfigDescriptions;
-    auto defaults = remoteStoreConfigDefaults();
     return {REMOTE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)};
 }
 
@@ -68,7 +69,7 @@ RemoteStore::RemoteStore(const Config & config)
     , config{config}
     , connections(
           make_ref<Pool<Connection>>(
-              std::max(1, config.maxConnections.get()),
+              std::max(1, config.maxConnections),
               [this]() {
                   auto conn = openConnectionWrapper();
                   try {

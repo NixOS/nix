@@ -17,14 +17,14 @@ class RemoteFSAccessor;
 template<template<typename> class F>
 struct BinaryCacheStoreConfigT
 {
-    F<std::string> compression;
-    F<bool> writeNARListing;
-    F<bool> writeDebugInfo;
-    F<Path> secretKeyFile;
-    F<std::vector<Path>> secretKeyFiles;
-    F<Path> localNarCache;
-    F<bool> parallelCompression;
-    F<int> compressionLevel;
+    F<std::string>::type compression;
+    F<bool>::type writeNARListing;
+    F<bool>::type writeDebugInfo;
+    F<Path>::type secretKeyFile;
+    F<std::vector<Path>>::type secretKeyFiles;
+    F<Path>::type localNarCache;
+    F<bool>::type parallelCompression;
+    F<int>::type compressionLevel;
 };
 
 struct BinaryCacheStoreConfig : BinaryCacheStoreConfigT<config::PlainValue>

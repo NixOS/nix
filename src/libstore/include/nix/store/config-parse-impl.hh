@@ -20,7 +20,7 @@ SettingInfo<T>::parseConfig(const nlohmann::json::object_t & map, const Experime
 }
 
 template<typename T>
-std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const PlainValue<T> & def) const
+std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const T & def) const
 {
     return {
         std::string{name},
@@ -29,8 +29,8 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const PlainV
             .experimentalFeature = experimentalFeature,
             .info =
                 SettingDescription::Single{
-                    .defaultValue = documentDefault ? (std::optional{nlohmann::json(def.value)})
-                                                    : (std::optional<nlohmann::json>{}),
+                    .defaultValue =
+                        documentDefault ? (std::optional{nlohmann::json(def)}) : (std::optional<nlohmann::json>{}),
                 },
         },
     };
@@ -42,15 +42,15 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const PlainV
  */
 #define CONFIG_ROW(FIELD) .FIELD = descriptions.FIELD.parseConfig(params, xpSettings)
 
-#define APPLY_ROW(FIELD) .FIELD = {.value = parsed.FIELD.value_or(std::move(defaults.FIELD))}
-
-#define DESCRIBE_ROW(FIELD)                          \
-    {                                                \
-        descriptions.FIELD.describe(defaults.FIELD), \
+#define DESCRIBE_ROW(FIELD)                                            \
+    {                                                                  \
+        descriptions.FIELD.describe(descriptions.FIELD.makeDefault()), \
     }
 
+#define APPLY_ROW(FIELD) .FIELD = parsed.FIELD ? *parsed.FIELD : descriptions.FIELD.makeDefault()
+
 #define MAKE_PARSE(CAPITAL, LOWER, FIELDS)                                            \
-    static CAPITAL##T<std::optional> LOWER##Parse(                                    \
+    static CAPITAL##T<config::OptionalValue> LOWER##Parse(                            \
         const StoreReference::Params & params,                                        \
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings) \
     {                                                                                 \
@@ -61,9 +61,33 @@ std::pair<std::string, SettingDescription> SettingInfo<T>::describe(const PlainV
 #define MAKE_APPLY_PARSE(CAPITAL, LOWER, FIELDS)                                                   \
     static CAPITAL##T<config::PlainValue> LOWER##ApplyParse(const StoreReference::Params & params) \
     {                                                                                              \
+        auto parsed = LOWER##Parse(params);                                                        \
+        constexpr auto & descriptions = LOWER##Descriptions;                                       \
+        return {FIELDS(APPLY_ROW)};                                                                \
+    }
+
+/**
+ * Version for separate defaults
+ */
+#define DESCRIBE_ROW_SEP_DEFAULTS(FIELD)             \
+    {                                                \
+        descriptions.FIELD.describe(defaults.FIELD), \
+    }
+
+/**
+ * Version for separate defaults
+ */
+#define APPLY_ROW_SEP_DEFAULTS(FIELD) .FIELD = parsed.FIELD.value_or(std::move(defaults.FIELD))
+
+/**
+ * Version for separate defaults
+ */
+#define MAKE_APPLY_PARSE_SEP_DEFAULTS(CAPITAL, LOWER, FIELDS)                                      \
+    static CAPITAL##T<config::PlainValue> LOWER##ApplyParse(const StoreReference::Params & params) \
+    {                                                                                              \
         auto defaults = LOWER##Defaults();                                                         \
         auto parsed = LOWER##Parse(params);                                                        \
-        return {FIELDS(APPLY_ROW)};                                                                \
+        return {FIELDS(APPLY_ROW_SEP_DEFAULTS)};                                                   \
     }
 
 } // namespace nix::config

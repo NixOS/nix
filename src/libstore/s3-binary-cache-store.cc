@@ -225,70 +225,120 @@ S3Helper::FileTransferResult S3Helper::getObject(const std::string & bucketName,
     return res;
 }
 
-constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfo> s3BinaryCacheStoreConfigDescriptions = {
+// We don't want clang-format to move the brance to the next line causing
+// everything to be indented even more.
+
+// clang-format off
+constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfoWithDefault> s3BinaryCacheStoreConfigDescriptions = {
+    // clang-format on
     .profile{
-        .name = "profile",
-        .description = R"(
-          The name of the AWS configuration profile to use. By default
-          Nix uses the `default` profile.
-        )",
+        {
+            .name = "profile",
+            .description = R"(
+              The name of the AWS configuration profile to use. By default
+              Nix uses the `default` profile.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .region{
-        .name = "region",
-        .description = R"(
-          The region of the S3 bucket. If your bucket is not in
-          `us–east-1`, you should always explicitly specify the region
-          parameter.
-        )",
+        {
+            .name = "region",
+            .description = R"(
+              The region of the S3 bucket. If your bucket is not in
+              `us–east-1`, you should always explicitly specify the region
+              parameter.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{Aws::Region::US_EAST_1}; },
+        },
     },
     .scheme{
-        .name = "scheme",
-        .description = R"(
-          The scheme used for S3 requests, `https` (default) or `http`. This
-          option allows you to disable HTTPS for binary caches which don't
-          support it.
+        {
+            .name = "scheme",
+            .description = R"(
+              The scheme used for S3 requests, `https` (default) or `http`. This
+              option allows you to disable HTTPS for binary caches which don't
+              support it.
 
-          > **Note**
-          >
-          > HTTPS should be used if the cache might contain sensitive
-          > information.
-        )",
+              > **Note**
+              >
+              > HTTPS should be used if the cache might contain sensitive
+              > information.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .endpoint{
-        .name = "endpoint",
-        .description = R"(
-          The URL of the endpoint of an S3-compatible service such as MinIO.
-          Do not specify this setting if you're using Amazon S3.
+        {
+            .name = "endpoint",
+            .description = R"(
+              The URL of the endpoint of an S3-compatible service such as MinIO.
+              Do not specify this setting if you're using Amazon S3.
 
-          > **Note**
-          >
-          > This endpoint must support HTTPS and uses path-based
-          > addressing instead of virtual host based addressing.
-        )",
+              > **Note**
+              >
+              > This endpoint must support HTTPS and uses path-based
+              > addressing instead of virtual host based addressing.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .narinfoCompression{
-        .name = "narinfo-compression",
-        .description = "Compression method for `.narinfo` files.",
+        {
+            .name = "narinfo-compression",
+            .description = "Compression method for `.narinfo` files.",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .lsCompression{
-        .name = "ls-compression",
-        .description = "Compression method for `.ls` files.",
+        {
+            .name = "ls-compression",
+            .description = "Compression method for `.ls` files.",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .logCompression{
-        .name = "log-compression",
-        .description = R"(
-          Compression method for `log/*` files. It is recommended to
-          use a compression method supported by most web browsers
-          (e.g. `brotli`).
-        )",
+        {
+            .name = "log-compression",
+            .description = R"(
+              Compression method for `log/*` files. It is recommended to
+              use a compression method supported by most web browsers
+              (e.g. `brotli`).
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
     },
     .multipartUpload{
-        .name = "multipart-upload",
-        .description = "Whether to use multi-part uploads.",
+        {
+            .name = "multipart-upload",
+            .description = "Whether to use multi-part uploads.",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
     },
     .bufferSize{
-        .name = "buffer-size",
-        .description = "Size (in bytes) of each part in multi-part uploads.",
+        {
+            .name = "buffer-size",
+            .description = "Size (in bytes) of each part in multi-part uploads.",
+        },
+        {
+            .makeDefault = []() -> uint64_t { return 5 * 1024 * 1024; },
+        },
     },
 };
 
@@ -297,21 +347,6 @@ constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfo> s3BinaryCa
           X(multipartUpload), X(bufferSize),
 
 MAKE_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
-
-static S3BinaryCacheStoreConfigT<config::PlainValue> s3BinaryCacheStoreConfigDefaults()
-{
-    return {
-        .profile = {""},
-        .region = {Aws::Region::US_EAST_1},
-        .scheme = {""},
-        .endpoint = {""},
-        .narinfoCompression = {""},
-        .lsCompression = {""},
-        .logCompression = {""},
-        .multipartUpload = {false},
-        .bufferSize = {5 * 1024 * 1024},
-    };
-}
 
 MAKE_APPLY_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
 
@@ -322,7 +357,6 @@ config::SettingDescriptionMap S3BinaryCacheStoreConfig::descriptions()
     ret.merge(BinaryCacheStoreConfig::descriptions());
     {
         constexpr auto & descriptions = s3BinaryCacheStoreConfigDescriptions;
-        auto defaults = s3BinaryCacheStoreConfigDefaults();
         ret.merge(decltype(ret){S3_BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
     }
     return ret;
@@ -384,9 +418,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
            This must be represented as a separate opaque string (probably a URI) that has the right query parameters. */
         auto cacheUri = config->getReference().render(/*withParams=*/false);
         if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
-            resolvedSubstConfig.wantMassQuery.value =
-                config->storeConfig.wantMassQuery.value_or(cacheInfo->wantMassQuery);
-            resolvedSubstConfig.priority.value = config->storeConfig.priority.value_or(cacheInfo->priority);
+            resolvedSubstConfig.wantMassQuery = config->storeConfig.wantMassQuery.value_or(cacheInfo->wantMassQuery);
+            resolvedSubstConfig.priority = config->storeConfig.priority.value_or(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
             diskCache->createCache(

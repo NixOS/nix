@@ -11,7 +11,7 @@ namespace nix {
 template<template<typename> class F>
 struct SSHStoreConfigT
 {
-    F<Strings> remoteProgram;
+    F<Strings>::type remoteProgram;
 };
 
 struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,

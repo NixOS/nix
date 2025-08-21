@@ -34,12 +34,12 @@ struct OptimiseStats
 template<template<typename> class F>
 struct LocalStoreConfigT
 {
-    F<bool> requireSigs;
-    F<bool> readOnly;
+    F<bool>::type requireSigs;
+    F<bool>::type readOnly;
     /**
       Input for computing the build directory. See `getBuildDir()`.
      */
-    F<std::optional<Path>> buildDir;
+    F<std::optional<Path>>::type buildDir;
 };
 
 struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
