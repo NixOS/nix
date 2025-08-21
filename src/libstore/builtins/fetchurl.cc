@@ -4,6 +4,8 @@
 #include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
+#include "nix/util/logging.hh"
+#include <unistd.h>
 
 namespace nix {
 
@@ -33,12 +35,24 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
     /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */
+    debug("[pid=%d] builtin:fetchurl creating fresh FileTransfer instance", getpid());
     auto fileTransfer = makeFileTransfer();
 
     auto fetch = [&](const std::string & url) {
         auto source = sinkToSource([&](Sink & sink) {
             FileTransferRequest request(ValidURL{url});
             request.decompress = false;
+
+#if NIX_WITH_CURL_S3
+            // Use pre-resolved credentials if available
+            if (ctx.awsCredentials && request.uri.scheme() == "s3") {
+                debug("[pid=%d] Using pre-resolved AWS credentials from parent process", getpid());
+                request.preResolvedAwsCredentials = AwsCredentials{
+                    ctx.awsCredentials->accessKeyId,
+                    ctx.awsCredentials->secretAccessKey,
+                    ctx.awsCredentials->sessionToken};
+            }
+#endif
 
             auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);

@@ -23,11 +23,9 @@
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
 
-  withAWS ?
+  withCurlS3 ?
     # Default is this way because there have been issues building this dependency
     stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
-
-  withCurlS3 ? false,
 }:
 
 let
@@ -67,7 +65,6 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
-  ++ lib.optional withAWS aws-sdk-cpp
   ++ lib.optional withCurlS3 aws-crt-cpp;
 
   propagatedBuildInputs = [

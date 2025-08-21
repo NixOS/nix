@@ -2,8 +2,24 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/config.hh"
+#include <optional>
 
 namespace nix {
+
+#if NIX_WITH_CURL_S3
+/**
+ * Pre-resolved AWS credentials for S3 access.
+ * Passed from parent to avoid credential provider recreation in forked process.
+ */
+struct AwsCredentialsForBuilder
+{
+    std::string accessKeyId;
+    std::string secretAccessKey;
+    std::optional<std::string> sessionToken;
+    std::string region;
+};
+#endif
 
 struct BuiltinBuilderContext
 {
@@ -12,6 +28,14 @@ struct BuiltinBuilderContext
     std::string netrcData;
     std::string caFileData;
     Path tmpDirInSandbox;
+
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolved AWS credentials for S3 URLs in builtin:fetchurl.
+     * When present, these should be used instead of creating new credential providers.
+     */
+    std::optional<AwsCredentialsForBuilder> awsCredentials;
+#endif
 };
 
 using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;
