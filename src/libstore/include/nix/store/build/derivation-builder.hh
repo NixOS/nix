@@ -88,6 +88,14 @@ struct DerivationBuilderParams
      */
     std::map<std::string, EnvEntry, std::less<>> finalEnv;
 
+#ifdef __linux__
+    /**
+     * On Linux, whether `/dev/kvm` should be exposed to the builder
+     * within the sandbox.
+     */
+    bool exposeKVM;
+#endif
+
     /**
      * Inserted in the temp dir, but no file names placed in env, unlike
      * `EnvEntry::nameOfPassAsFile` above.
@@ -104,7 +112,12 @@ struct DerivationBuilderParams
         std::map<std::string, InitialOutput> & initialOutputs,
         PathsInChroot defaultPathsInChroot,
         std::map<std::string, EnvEntry, std::less<>> finalEnv,
-        StringMap extraFiles)
+        StringMap extraFiles
+#ifdef __linux__
+        ,
+        bool exposeKVM
+#endif
+        )
         : drvPath{drvPath}
         , buildResult{buildResult}
         , drv{drv}
