@@ -50,6 +50,11 @@ void _interrupted();
 void startSignalHandlerThread();
 
 /**
+ * Restart signal handling in a child that continues running after fork().
+ */
+void startSignalHandlerThreadAfterFork();
+
+/**
  * Saves the signal mask, which is the signal mask that nix will restore
  * before creating child processes.
  */

@@ -114,9 +114,11 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     }
 }
 
-bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait)
+bool PathLocks::lockPaths(
+    const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait, LockOwnerTracking trackOwner)
 {
     assert(fds.empty());
+    (void) trackOwner;
 
     for (auto & path : paths) {
         checkInterrupt();

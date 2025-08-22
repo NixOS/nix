@@ -206,6 +206,20 @@ StorePathSet RemoteStore::queryAllValidPaths()
     return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
 }
 
+std::optional<uint64_t> RemoteStore::killBuild(const StorePath & path)
+{
+    auto conn(getConnection());
+    if (!conn->protoVersion.features.contains(WorkerProto::featureBuildControl))
+        throw UsageError("build termination is not supported by store '%s'", config.getHumanReadableURI());
+
+    conn->to << WorkerProto::Op::KillBuild;
+    WorkerProto::write(*this, *conn, path);
+    conn.processStderr();
+
+    auto pid = readInt(conn->from);
+    return pid == 0 ? std::nullopt : std::optional{pid};
+}
+
 StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 {
     auto conn(getConnection());

@@ -9,6 +9,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/build-control-store.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/indirect-root-store.hh"
@@ -885,6 +886,20 @@ static void performOp(
         auto paths = store->queryAllValidPaths();
         logger->stopWork();
         WorkerProto::write(*store, wconn, paths);
+        break;
+    }
+
+    case WorkerProto::Op::KillBuild: {
+        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
+        if (!trusted)
+            throw Error("you are not privileged to terminate builds");
+
+        logger->startWork();
+        auto & buildControlStore = require<BuildControlStore>(*store);
+        auto pid = buildControlStore.killBuild(path);
+        logger->stopWork();
+
+        conn.to << pid.value_or(0);
         break;
     }
 
