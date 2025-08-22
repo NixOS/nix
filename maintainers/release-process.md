@@ -29,6 +29,7 @@ release:
   ```console
   $ export VERSION=X.YY
   $ git checkout -b release-notes
+  $ export GITHUB_TOKEN=...
   $ ./maintainers/release-notes
   ```
 
