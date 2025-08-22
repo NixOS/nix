@@ -105,7 +105,8 @@ std::string getNameFromElement(const ProfileElement & element)
 {
     std::optional<std::string> result = std::nullopt;
     if (element.source) {
-        result = getNameFromURL(parseURL(element.source->to_string()));
+        // Seems to be for Flake URLs
+        result = getNameFromURL(parseURL(element.source->to_string(), /*lenient=*/true));
     }
     return result.value_or(element.identifier());
 }
@@ -160,11 +161,15 @@ struct ProfileManifest
                         e["outputs"].get<ExtendedOutputsSpec>()};
                 }
 
-                std::string name =
-                    elems.is_object() ? elem.key()
-                    : element.source
-                        ? getNameFromURL(parseURL(element.source->to_string())).value_or(element.identifier())
-                        : element.identifier();
+                std::string name = [&] {
+                    if (elems.is_object())
+                        return elem.key();
+                    if (element.source) {
+                        if (auto optName = getNameFromURL(parseURL(element.source->to_string(), /*lenient=*/true)))
+                            return *optName;
+                    }
+                    return element.identifier();
+                }();
 
                 addElement(name, std::move(element));
             }

@@ -96,14 +96,18 @@ MakeError(BadURL, Error);
 std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep = "");
 
-StringMap decodeQuery(const std::string & query);
+/**
+ * @param lenient @see parseURL
+ */
+StringMap decodeQuery(std::string_view query, bool lenient = false);
 
 std::string encodeQuery(const StringMap & query);
 
 /**
- * Parse a Nix URL into a ParsedURL.
+ * Parse a URL into a ParsedURL.
  *
- * Nix URI is mostly compliant with RFC3986, but with some deviations:
+ * @parm lenient Also allow some long-supported Nix URIs that are not quite compliant with RFC3986.
+ * Here are the deviations:
  * - Fragments can contain unescaped (not URL encoded) '^', '"' or space literals.
  * - Queries may contain unescaped '"' or spaces.
  *
@@ -111,7 +115,7 @@ std::string encodeQuery(const StringMap & query);
  *
  * @throws BadURL
  */
-ParsedURL parseURL(std::string_view url);
+ParsedURL parseURL(std::string_view url, bool lenient = false);
 
 /**
  * Although that’s not really standardized anywhere, an number of tools

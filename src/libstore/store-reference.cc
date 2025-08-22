@@ -45,7 +45,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
 {
     auto params = extraParams;
     try {
-        auto parsedUri = parseURL(uri);
+        auto parsedUri = parseURL(uri, /*lenient=*/true);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
         auto baseURI = parsedUri.authority.value_or(ParsedURL::Authority{}).to_string() + parsedUri.path;
@@ -107,7 +107,7 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
     StoreReference::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
-        params = decodeQuery(uri.substr(q + 1));
+        params = decodeQuery(uri.substr(q + 1), /*lenient=*/true);
         uri = uri_.substr(0, q);
     }
     return {uri, params};

@@ -82,7 +82,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
     assert(succeeds);
     auto path = match[1].str();
-    auto query = decodeQuery(match[3].str());
+    auto query = decodeQuery(match[3].str(), /*lenient=*/true);
     auto fragment = percentDecode(match[5].str());
 
     if (baseDir) {
@@ -210,7 +210,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     bool isFlake)
 {
     try {
-        auto parsed = parseURL(url);
+        auto parsed = parseURL(url, /*lenient=*/true);
         if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file") && !isAbsolute(parsed.path))
             parsed.path = absPath(parsed.path, *baseDir);
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
@@ -289,7 +289,7 @@ FlakeRef FlakeRef::canonicalize() const
        filtering the `dir` query parameter from the URL. */
     if (auto url = fetchers::maybeGetStrAttr(flakeRef.input.attrs, "url")) {
         try {
-            auto parsed = parseURL(*url);
+            auto parsed = parseURL(*url, /*lenient=*/true);
             if (auto dir2 = get(parsed.query, "dir")) {
                 if (flakeRef.subdir != "" && flakeRef.subdir == *dir2)
                     parsed.query.erase("dir");
