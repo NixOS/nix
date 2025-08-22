@@ -51,6 +51,8 @@
 
   For example, if a flake has a lock for `a` and `a/b`, and we change the flakeref for `a`, previously Nix would fetch the latest version of `b` rather than using the lock for `b` from `a`.
 
+- The experimental support for [Git-hashing](@docroot@/development/experimental-features.md#xp-feature-git-hashing) store objects now also includes support for SHA-256, not just SHA-1, in line up with upstream Git.
+
 ## Contributors
 
 This release was made possible by the following 34 contributors:
