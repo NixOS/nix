@@ -4,13 +4,13 @@
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
 
 #include <functional>
 #include <map>
 #include <sstream>
 #include <optional>
-
-#include "nix/util/strings.hh"
+#include <ranges>
 
 namespace nix {
 
@@ -300,53 +300,12 @@ struct MaintainCount
 
 /**
  * A Rust/Python-like enumerate() iterator adapter.
- *
- * Borrowed from http://reedbeta.com/blog/python-like-enumerate-in-cpp17.
  */
-template<
-    typename T,
-    typename TIter = decltype(std::begin(std::declval<T>())),
-    typename = decltype(std::end(std::declval<T>()))>
-constexpr auto enumerate(T && iterable)
+template<std::ranges::viewable_range R>
+constexpr auto enumerate(R && range)
 {
-    struct iterator
-    {
-        size_t i;
-        TIter iter;
-
-        constexpr bool operator!=(const iterator & other) const
-        {
-            return iter != other.iter;
-        }
-
-        constexpr void operator++()
-        {
-            ++i;
-            ++iter;
-        }
-
-        constexpr auto operator*() const
-        {
-            return std::tie(i, *iter);
-        }
-    };
-
-    struct iterable_wrapper
-    {
-        T iterable;
-
-        constexpr auto begin()
-        {
-            return iterator{0, std::begin(iterable)};
-        }
-
-        constexpr auto end()
-        {
-            return iterator{0, std::end(iterable)};
-        }
-    };
-
-    return iterable_wrapper{std::forward<T>(iterable)};
+    /* Not std::views::enumerate because it uses difference_type for the index. */
+    return std::views::zip(std::views::iota(size_t{0}), std::forward<R>(range));
 }
 
 /**
