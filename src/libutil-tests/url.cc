@@ -221,15 +221,20 @@ TEST(parseURL, parsedUrlsWithUnescapedChars)
      * 2. Unescaped spaces and quotes in query.
      */
     auto s = "http://www.example.org/file.tar.gz?query \"= 123\"#shevron^quote\"space ";
-    auto url = parseURL(s);
 
-    ASSERT_EQ(url.fragment, "shevron^quote\"space ");
+    /* Without leniency for back compat, this should throw. */
+    EXPECT_THROW(parseURL(s), Error);
+
+    /* With leniency for back compat, this should parse. */
+    auto url = parseURL(s, /*lenient=*/true);
+
+    EXPECT_EQ(url.fragment, "shevron^quote\"space ");
 
     auto query = StringMap{
         {"query \"", " 123\""},
     };
 
-    ASSERT_EQ(url.query, query);
+    EXPECT_EQ(url.query, query);
 }
 
 TEST(parseURL, parseFTPUrl)
