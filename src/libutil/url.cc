@@ -179,7 +179,7 @@ try {
         .scheme = scheme,
         .authority = authority,
         .path = path,
-        .query = decodeQuery(std::string(query)),
+        .query = decodeQuery(query),
         .fragment = fragment,
     };
 } catch (boost::system::system_error & e) {
@@ -201,7 +201,7 @@ std::string percentEncode(std::string_view s, std::string_view keep)
         s, [keep](char c) { return boost::urls::unreserved_chars(c) || keep.find(c) != keep.npos; });
 }
 
-StringMap decodeQuery(const std::string & query)
+StringMap decodeQuery(std::string_view query)
 try {
     /* For back-compat unescaped characters are allowed. */
     auto fixedEncodedQuery = percentEncodeCharSet(query, extraAllowedCharsInQuery);
