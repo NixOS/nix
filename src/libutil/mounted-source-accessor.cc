@@ -1,18 +1,19 @@
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/util/sync.hh"
 
 namespace nix {
 
 struct MountedSourceAccessorImpl : MountedSourceAccessor
 {
-    std::map<CanonPath, ref<SourceAccessor>> mounts;
+    SharedSync<std::map<CanonPath, ref<SourceAccessor>>> mounts_;
 
     MountedSourceAccessorImpl(std::map<CanonPath, ref<SourceAccessor>> _mounts)
-        : mounts(std::move(_mounts))
+        : mounts_(std::move(_mounts))
     {
         displayPrefix.clear();
 
         // Currently we require a root filesystem. This could be relaxed.
-        assert(mounts.contains(CanonPath::root));
+        assert(mounts_.lock()->contains(CanonPath::root));
 
         // FIXME: return dummy parent directories automatically?
     }
@@ -58,10 +59,13 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         // Find the nearest parent of `path` that is a mount point.
         std::vector<std::string> subpath;
         while (true) {
-            auto i = mounts.find(path);
-            if (i != mounts.end()) {
-                std::reverse(subpath.begin(), subpath.end());
-                return {i->second, CanonPath(subpath)};
+            {
+                auto mounts(mounts_.readLock());
+                auto i = mounts->find(path);
+                if (i != mounts->end()) {
+                    std::reverse(subpath.begin(), subpath.end());
+                    return {i->second, CanonPath(subpath)};
+                }
             }
 
             assert(!path.isRoot());
@@ -78,14 +82,14 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
 
     void mount(CanonPath mountPoint, ref<SourceAccessor> accessor) override
     {
-        // FIXME: thread-safety
-        mounts.insert_or_assign(std::move(mountPoint), accessor);
+        mounts_.lock()->insert_or_assign(std::move(mountPoint), accessor);
     }
 
     std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
     {
-        auto i = mounts.find(mountPoint);
-        if (i != mounts.end())
+        auto mounts(mounts_.readLock());
+        auto i = mounts->find(mountPoint);
+        if (i != mounts->end())
             return i->second;
         else
             return nullptr;
