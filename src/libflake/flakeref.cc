@@ -82,7 +82,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
     assert(succeeds);
     auto path = match[1].str();
-    auto query = decodeQuery(match[3]);
+    auto query = decodeQuery(match[3].str());
     auto fragment = percentDecode(match[5].str());
 
     if (baseDir) {
