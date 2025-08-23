@@ -9,6 +9,7 @@
 #include "nix/util/ref.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -70,7 +71,7 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 struct FileTransferRequest
 {
-    std::string uri;
+    ParsedURL uri;
     Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
@@ -84,7 +85,7 @@ struct FileTransferRequest
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(std::string_view uri)
+    FileTransferRequest(ParsedURL uri)
         : uri(uri)
         , parentAct(getCurActivity())
     {
@@ -111,6 +112,9 @@ struct FileTransferResult
 
     /**
      * All URLs visited in the redirect chain.
+     *
+     * @note Intentionally strings and not `ParsedURL`s so we faithfully
+     * return what cURL gave us.
      */
     std::vector<std::string> urls;
 

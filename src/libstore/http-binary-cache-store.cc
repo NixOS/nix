@@ -166,10 +166,10 @@ protected:
            `std::filesystem::path`'s equivalent operator, which properly
            combines the the URLs, whether the right is relative or
            absolute. */
-        return FileTransferRequest(
+        return FileTransferRequest(parseURL(
             hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
                 ? path
-                : config->cacheUri.to_string() + "/" + path);
+                : config->cacheUri.to_string() + "/" + path));
     }
 
     void getFile(const std::string & path, Sink & sink) override

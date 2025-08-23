@@ -74,7 +74,7 @@ struct ParsedS3URL
             endpoint);
     }
 
-    static ParsedS3URL parse(std::string_view uri);
+    static ParsedS3URL parse(const ParsedURL & uri);
     auto operator<=>(const ParsedS3URL & other) const = default;
 };
 

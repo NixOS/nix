@@ -8,10 +8,8 @@ using namespace std::string_view_literals;
 
 #if NIX_WITH_S3_SUPPORT
 
-ParsedS3URL ParsedS3URL::parse(std::string_view uri)
+ParsedS3URL ParsedS3URL::parse(const ParsedURL & parsed)
 try {
-    auto parsed = parseURL(uri);
-
     if (parsed.scheme != "s3"sv)
         throw BadURL("URI scheme '%s' is not 's3'", parsed.scheme);
 
@@ -43,7 +41,7 @@ try {
     auto endpoint = getOptionalParam("endpoint");
 
     return ParsedS3URL{
-        .bucket = std::move(parsed.authority->host),
+        .bucket = parsed.authority->host,
         .key = std::string{key},
         .profile = getOptionalParam("profile"),
         .region = getOptionalParam("region"),
@@ -62,7 +60,7 @@ try {
         }(),
     };
 } catch (BadURL & e) {
-    e.addTrace({}, "while parsing S3 URI: '%s'", uri);
+    e.addTrace({}, "while parsing S3 URI: '%s'", parsed.to_string());
     throw;
 }
 

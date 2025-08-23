@@ -43,7 +43,7 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    FileTransferRequest request(url);
+    FileTransferRequest request(parseURL(url));
     request.headers = headers;
     if (cached)
         request.expectedETag = getStrAttr(cached->value, "etag");
@@ -153,7 +153,7 @@ static DownloadTarballResult downloadTarball_(
     auto _res = std::make_shared<Sync<FileTransferResult>>();
 
     auto source = sinkToSource([&](Sink & sink) {
-        FileTransferRequest req(url);
+        FileTransferRequest req(parseURL(url));
         req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
         getFileTransfer()->download(std::move(req), sink, [_res](FileTransferResult r) { *_res->lock() = r; });
     });

@@ -21,7 +21,7 @@ class ParsedS3URLTest : public ::testing::WithParamInterface<ParsedS3URLTestCase
 TEST_P(ParsedS3URLTest, parseS3URLSuccessfully)
 {
     const auto & testCase = GetParam();
-    auto parsed = ParsedS3URL::parse(testCase.url);
+    auto parsed = ParsedS3URL::parse(parseURL(testCase.url));
     ASSERT_EQ(parsed, testCase.expected);
 }
 
@@ -86,9 +86,9 @@ TEST(InvalidParsedS3URLTest, parseS3URLErrors)
         testing::HasSubstrIgnoreANSIMatcher("error: URI has a missing or invalid bucket name"));
 
     /* Empty bucket (authority) */
-    ASSERT_THAT([]() { ParsedS3URL::parse("s3:///key"); }, invalidBucketMatcher);
+    ASSERT_THAT([]() { ParsedS3URL::parse(parseURL("s3:///key")); }, invalidBucketMatcher);
     /* Invalid bucket name */
-    ASSERT_THAT([]() { ParsedS3URL::parse("s3://127.0.0.1"); }, invalidBucketMatcher);
+    ASSERT_THAT([]() { ParsedS3URL::parse(parseURL("s3://127.0.0.1")); }, invalidBucketMatcher);
 }
 
 } // namespace nix
