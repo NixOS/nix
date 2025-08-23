@@ -108,41 +108,48 @@ static std::string percentEncodeCharSet(std::string_view s, auto charSet)
     return res;
 }
 
-ParsedURL parseURL(std::string_view url)
+ParsedURL parseURL(std::string_view url, bool lenient)
 try {
     /* Account for several non-standard properties of nix urls (for back-compat):
      *  - Allow unescaped spaces ' ' and '"' characters in queries.
      *  - Allow '"', ' ' and '^' characters in the fragment component.
      * We could write our own grammar for this, but fixing it up here seems
      * more concise, since the deviation is rather minor.
+     *
+     * If `!lenient` don't bother initializing, because we can just
+     * parse `url` directly`.
      */
-    std::string fixedEncodedUrl = [&]() {
-        std::string fixed;
-        std::string_view view = url;
+    std::string fixedEncodedUrl;
 
-        if (auto beforeQuery = splitPrefixTo(view, '?')) {
-            fixed += *beforeQuery;
-            fixed += '?';
-            auto fragmentStart = view.find('#');
-            auto queryView = view.substr(0, fragmentStart);
-            auto fixedQuery = percentEncodeCharSet(queryView, extraAllowedCharsInQuery);
-            fixed += fixedQuery;
-            view.remove_prefix(std::min(fragmentStart, view.size()));
-        }
+    if (lenient) {
+        fixedEncodedUrl = [&] {
+            std::string fixed;
+            std::string_view view = url;
 
-        if (auto beforeFragment = splitPrefixTo(view, '#')) {
-            fixed += *beforeFragment;
-            fixed += '#';
-            auto fixedFragment = percentEncodeCharSet(view, extraAllowedCharsInFragment);
-            fixed += fixedFragment;
+            if (auto beforeQuery = splitPrefixTo(view, '?')) {
+                fixed += *beforeQuery;
+                fixed += '?';
+                auto fragmentStart = view.find('#');
+                auto queryView = view.substr(0, fragmentStart);
+                auto fixedQuery = percentEncodeCharSet(queryView, extraAllowedCharsInQuery);
+                fixed += fixedQuery;
+                view.remove_prefix(std::min(fragmentStart, view.size()));
+            }
+
+            if (auto beforeFragment = splitPrefixTo(view, '#')) {
+                fixed += *beforeFragment;
+                fixed += '#';
+                auto fixedFragment = percentEncodeCharSet(view, extraAllowedCharsInFragment);
+                fixed += fixedFragment;
+                return fixed;
+            }
+
+            fixed += view;
             return fixed;
-        }
+        }();
+    }
 
-        fixed += view;
-        return fixed;
-    }();
-
-    auto urlView = boost::urls::url_view(fixedEncodedUrl);
+    auto urlView = boost::urls::url_view(lenient ? fixedEncodedUrl : url);
 
     if (!urlView.has_scheme())
         throw BadURL("'%s' doesn't have a scheme", url);
@@ -179,7 +186,7 @@ try {
         .scheme = scheme,
         .authority = authority,
         .path = path,
-        .query = decodeQuery(std::string(query)),
+        .query = decodeQuery(query, lenient),
         .fragment = fragment,
     };
 } catch (boost::system::system_error & e) {
@@ -201,14 +208,17 @@ std::string percentEncode(std::string_view s, std::string_view keep)
         s, [keep](char c) { return boost::urls::unreserved_chars(c) || keep.find(c) != keep.npos; });
 }
 
-StringMap decodeQuery(const std::string & query)
+StringMap decodeQuery(std::string_view query, bool lenient)
 try {
-    /* For back-compat unescaped characters are allowed. */
-    auto fixedEncodedQuery = percentEncodeCharSet(query, extraAllowedCharsInQuery);
+    /* When `lenient = true`, for back-compat unescaped characters are allowed. */
+    std::string fixedEncodedQuery;
+    if (lenient) {
+        fixedEncodedQuery = percentEncodeCharSet(query, extraAllowedCharsInQuery);
+    }
 
     StringMap result;
 
-    auto encodedQuery = boost::urls::params_encoded_view(fixedEncodedQuery);
+    auto encodedQuery = boost::urls::params_encoded_view(lenient ? fixedEncodedQuery : query);
     for (auto && [key, value, value_specified] : encodedQuery) {
         if (!value_specified) {
             warn("dubious URI query '%s' is missing equal sign '%s', ignoring", std::string_view(key), "=");
