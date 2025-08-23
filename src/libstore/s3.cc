@@ -20,6 +20,7 @@
 #  include <condition_variable>
 #  include <mutex>
 #  include <string_view>
+#  include <pthread.h>
 
 using namespace std::string_view_literals;
 
@@ -29,13 +30,31 @@ namespace nix {
 static std::once_flag crtInitFlag;
 static bool crtInitialized = false;
 
+// Forward declaration for cleanup function
+void cleanupCredentialProviderCache();
+
 static void initAwsCrt()
 {
     std::call_once(crtInitFlag, []() {
         try {
             // Use a static local variable instead of global to control destruction order
-            static Aws::Crt::ApiHandle apiHandle;
-            apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, (FILE *) nullptr);
+            struct CrtWrapper
+            {
+                Aws::Crt::ApiHandle apiHandle;
+                CrtWrapper()
+                {
+                    apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, (FILE *) nullptr);
+                }
+                ~CrtWrapper()
+                {
+                    // CRITICAL: Clear credential provider cache BEFORE AWS CRT shuts down
+                    // This ensures all providers (which hold references to ClientBootstrap)
+                    // are destroyed while AWS CRT is still valid
+                    cleanupCredentialProviderCache();
+                    // Now it's safe for ApiHandle destructor to run
+                }
+            };
+            static CrtWrapper crt;
             crtInitialized = true;
         } catch (const std::exception & e) {
             debug("Failed to initialize AWS CRT: %s", e.what());

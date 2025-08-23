@@ -61,6 +61,7 @@ in
 
   testScript =
     { nodes }:
+    # python
     ''
       # fmt: off
       start_all()
@@ -73,7 +74,11 @@ in
       server.succeed("mc config host add minio http://localhost:9000 ${accessKey} ${secretKey} --api s3v4")
       server.succeed("mc mb minio/my-cache")
 
-      server.succeed("${env} nix copy --to '${storeUrl}' ${pkgA}")
+      # Test copying from a store and credential caching works
+      server_cp_out = server.succeed("${env} nix copy --debug --to '${storeUrl}' ${pkgA} 2>&1")
+      server_providers_created = server_cp_out.count("creating new AWS credential provider")
+      if server_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {server_providers_created}. Credential provider caching is probably not working.")
 
       client.wait_for_unit("network-addresses-eth1.service")
 
@@ -105,7 +110,11 @@ in
       assert store_info.get("url"), "Store should have a URL"
       print(f"Store URL: {store_info.get('url')}")
 
-      client.succeed("${env} nix copy --no-check-sigs --from '${storeUrl}' ${pkgA}")
+      # Test copying from a store and credential caching works
+      client_cp_out = client.succeed("${env} nix copy --debug --no-check-sigs --from '${storeUrl}' ${pkgA} 2>&1")
+      client_providers_created = client_cp_out.count("creating new AWS credential provider")
+      if client_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {client_providers_created}. Credential provider caching is probably not working.")
 
       client.succeed("nix path-info ${pkgA}")
     '';
