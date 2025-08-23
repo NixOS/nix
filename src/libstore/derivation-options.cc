@@ -295,7 +295,7 @@ bool DerivationOptions::canBuildLocally(Store & localStore, const BasicDerivatio
         return false;
 
     for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.config.systemFeatures.get().count(feature))
+        if (!localStore.config.systemFeatures.count(feature))
             return false;
 
     return true;
