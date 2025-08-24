@@ -118,6 +118,16 @@ std::string encodeQuery(const StringMap & query);
 ParsedURL parseURL(std::string_view url, bool lenient = false);
 
 /**
+ * Like `parseURL`, but also accepts relative URLs, which are resolved
+ * against the given base URL.
+ *
+ * This is specified in [IETF RFC 3986, section 5](https://datatracker.ietf.org/doc/html/rfc3986#section-5)
+ *
+ * Behavior should also match the `new URL(url, base)` JavaScript constructor.
+ */
+ParsedURL parseURLRelative(std::string_view url, const ParsedURL & base);
+
+/**
  * Although that’s not really standardized anywhere, an number of tools
  * use a scheme of the form 'x+y' in urls, where y is the “transport layer”
  * scheme, and x is the “application layer” scheme.
@@ -136,7 +146,7 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme);
 /* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
    them by removing the `:` and assuming a scheme of `ssh://`. Also
    changes absolute paths into file:// URLs. */
-std::string fixGitURL(const std::string & url);
+ParsedURL fixGitURL(const std::string & url);
 
 /**
  * Whether a string is valid as RFC 3986 scheme name.
