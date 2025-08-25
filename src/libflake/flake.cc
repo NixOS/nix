@@ -101,6 +101,7 @@ static FlakeInput parseFlakeInput(
     auto sUrl = state.symbols.create("url");
     auto sFlake = state.symbols.create("flake");
     auto sFollows = state.symbols.create("follows");
+    auto sBuildTime = state.symbols.create("buildTime");
 
     fetchers::Attrs attrs;
     std::optional<std::string> url;
@@ -129,6 +130,11 @@ static FlakeInput parseFlakeInput(
             } else if (attr.name == sFlake) {
                 expectType(state, nBool, *attr.value, attr.pos);
                 input.isFlake = attr.value->boolean();
+            } else if (attr.name == sBuildTime) {
+                expectType(state, nBool, *attr.value, attr.pos);
+                input.buildTime = attr.value->boolean();
+                if (input.buildTime)
+                    experimentalFeatureSettings.require(Xp::BuildTimeFetchTree);
             } else if (attr.name == sInputs) {
                 input.overrides =
                     parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
@@ -581,7 +587,11 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                            didn't change and there is no override from a
                            higher level flake. */
                         auto childNode = make_ref<LockedNode>(
-                            oldLock->lockedRef, oldLock->originalRef, oldLock->isFlake, oldLock->parentInputAttrPath);
+                            oldLock->lockedRef,
+                            oldLock->originalRef,
+                            oldLock->isFlake,
+                            oldLock->buildTime,
+                            oldLock->parentInputAttrPath);
 
                         node->inputs.insert_or_assign(id, childNode);
 
@@ -695,8 +705,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             auto inputFlake = getInputFlake(
                                 *input.ref, inputIsOverride ? fetchers::UseRegistries::All : useRegistriesInputs);
 
-                            auto childNode =
-                                make_ref<LockedNode>(inputFlake.lockedRef, ref, true, overriddenParentPath);
+                            auto childNode = make_ref<LockedNode>(
+                                inputFlake.lockedRef, ref, true, input.buildTime, overriddenParentPath);
 
                             node->inputs.insert_or_assign(id, childNode);
 
@@ -739,12 +749,13 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                                     return {
                                         state.storePath(state.mountInput(
-                                            lockedRef.input, input.ref->input, cachedInput.accessor, true)),
+                                            lockedRef.input, input.ref->input, cachedInput.accessor, true, true)),
                                         lockedRef};
                                 }
                             }();
 
-                            auto childNode = make_ref<LockedNode>(lockedRef, ref, false, overriddenParentPath);
+                            auto childNode =
+                                make_ref<LockedNode>(lockedRef, ref, false, input.buildTime, overriddenParentPath);
 
                             nodePaths.emplace(childNode, path);
 

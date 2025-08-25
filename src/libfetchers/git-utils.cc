@@ -11,6 +11,7 @@
 #include "nix/util/sync.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/pool.hh"
+#include "nix/util/executable-path.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -559,25 +560,47 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // that)
         //       then use code that was removed in this commit (see blame)
 
-        auto dir = this->path;
-        Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--quiet", "--force"};
-        if (shallow)
-            append(gitArgs, {"--depth", "1"});
-        append(gitArgs, {std::string("--"), url, refspec});
+        if (ExecutablePath::load().findName("git")) {
+            auto dir = this->path;
+            Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--quiet", "--force"};
+            if (shallow)
+                append(gitArgs, {"--depth", "1"});
+            append(gitArgs, {std::string("--"), url, refspec});
 
-        auto [status, output] = runProgram(
-            RunOptions{
-                .program = "git",
-                .lookupPath = true,
-                // FIXME: git stderr messes up our progress indicator, so
-                // we're using --quiet for now. Should process its stderr.
-                .args = gitArgs,
-                .input = {},
-                .mergeStderrToStdout = true,
-                .isInteractive = true});
+            auto [status, output] = runProgram(
+                RunOptions{
+                    .program = "git",
+                    .lookupPath = true,
+                    // FIXME: git stderr messes up our progress indicator, so
+                    // we're using --quiet for now. Should process its stderr.
+                    .args = gitArgs,
+                    .input = {},
+                    .mergeStderrToStdout = true,
+                    .isInteractive = true});
 
-        if (status > 0) {
-            throw Error("Failed to fetch git repository %s : %s", url, output);
+            if (status > 0)
+                throw Error("Failed to fetch git repository %s : %s", url, output);
+        } else {
+            // Fall back to using libgit2 for fetching. This does not
+            // support SSH very well.
+            Remote remote;
+
+            if (git_remote_create_anonymous(Setter(remote), *this, url.c_str()))
+                throw Error("cannot create Git remote '%s': %s", url, git_error_last()->message);
+
+            char * refspecs[] = {(char *) refspec.c_str()};
+            git_strarray refspecs2{.strings = refspecs, .count = 1};
+
+            git_fetch_options opts = GIT_FETCH_OPTIONS_INIT;
+            // FIXME: for some reason, shallow fetching over ssh barfs
+            // with "could not read from remote repository".
+            opts.depth = shallow && parseURL(url).scheme != "ssh" ? 1 : GIT_FETCH_DEPTH_FULL;
+            opts.callbacks.payload = &act;
+            opts.callbacks.sideband_progress = sidebandProgressCallback;
+            opts.callbacks.transfer_progress = transferProgressCallback;
+
+            if (git_remote_fetch(remote.get(), &refspecs2, &opts, nullptr))
+                throw Error("fetching '%s' from '%s': %s", refspec, url, git_error_last()->message);
         }
     }
 
@@ -1327,12 +1350,17 @@ std::vector<std::tuple<GitRepoImpl::Submodule, Hash>> GitRepoImpl::getSubmodules
     return result;
 }
 
-ref<GitRepo> getTarballCache()
-{
-    static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
+namespace fetchers {
 
-    return GitRepo::openRepo(repoDir, true, true);
+ref<GitRepo> Settings::getTarballCache() const
+{
+    auto tarballCache(_tarballCache.lock());
+    if (!*tarballCache)
+        *tarballCache = GitRepo::openRepo(std::filesystem::path(getCacheDir()) / "tarball-cache", true, true);
+    return ref<GitRepo>(*tarballCache);
 }
+
+} // namespace fetchers
 
 GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
 {

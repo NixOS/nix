@@ -3,7 +3,11 @@
 
 #include "nix/store/derivations.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
+
+struct StructuredAttrs;
 
 struct BuiltinBuilderContext
 {

@@ -4,7 +4,7 @@
   mkMesonLibrary,
 
   unixtools,
-  darwin,
+  apple-sdk,
 
   nix-util,
   boost,
@@ -67,7 +67,7 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
   # There have been issues building these dependencies
-  ++ lib.optional stdenv.hostPlatform.isDarwin darwin.apple_sdk.libs.sandbox
+  ++ lib.optional stdenv.hostPlatform.isDarwin apple-sdk
   ++ lib.optional withAWS aws-sdk-cpp;
 
   propagatedBuildInputs = [

@@ -2,7 +2,6 @@ name: "CI"
 
 on:
   pull_request:
-  merge_group:
   push:
     branches:
       # NOTE: make sure any branches here are also valid directory names,

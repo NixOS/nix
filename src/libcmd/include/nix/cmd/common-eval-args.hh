@@ -25,9 +25,6 @@ namespace flake {
 struct Settings;
 }
 
-/**
- * @todo Get rid of global settings variables
- */
 extern fetchers::Settings fetchSettings;
 
 /**

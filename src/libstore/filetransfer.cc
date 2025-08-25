@@ -835,24 +835,29 @@ struct curlFileTransfer : public FileTransfer
     }
 };
 
-ref<curlFileTransfer> makeCurlFileTransfer()
-{
-    return make_ref<curlFileTransfer>();
-}
+static Sync<std::shared_ptr<curlFileTransfer>> _fileTransfer;
 
 ref<FileTransfer> getFileTransfer()
 {
-    static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
+    auto fileTransfer(_fileTransfer.lock());
 
-    if (fileTransfer->state_.lock()->quit)
-        fileTransfer = makeCurlFileTransfer();
+    if (!*fileTransfer || (*fileTransfer)->state_.lock()->quit)
+        *fileTransfer = std::make_shared<curlFileTransfer>();
 
-    return fileTransfer;
+    return ref<FileTransfer>(*fileTransfer);
 }
 
 ref<FileTransfer> makeFileTransfer()
 {
-    return makeCurlFileTransfer();
+    return make_ref<curlFileTransfer>();
+}
+
+std::shared_ptr<FileTransfer> resetFileTransfer()
+{
+    auto fileTransfer(_fileTransfer.lock());
+    std::shared_ptr<curlFileTransfer> prev;
+    fileTransfer->swap(prev);
+    return prev;
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)

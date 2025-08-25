@@ -203,6 +203,27 @@ in
       assert info["revision"] == "${nixpkgs.rev}", f"revision mismatch: {info['revision']} != ${nixpkgs.rev}"
       cat_log()
 
+      out = client.succeed("nix flake prefetch nixpkgs --json")
+      nar_hash = json.loads(out)['hash']
+
+      # Test build-time fetching of public flakes.
+      expr = f"""
+        derivation {{
+          name = "source";
+          builder = "builtin:fetch-tree";
+          system = "builtin";
+          __structuredAttrs = true;
+          input = {{
+            type = "github";
+            owner = "NixOS";
+            repo = "nixpkgs";
+          }};
+          outputHashMode = "recursive";
+          outputHash = "{nar_hash}";
+        }}
+      """
+      client.succeed(f"nix build --store /run/store --extra-experimental-features build-time-fetch-tree -L --expr '{expr}'")
+
       # ... otherwise it should use the API
       out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0 --no-trust-tarballs-from-git-forges")
       print(out)
@@ -210,6 +231,24 @@ in
       assert info["revision"] == "${private-flake-rev}", f"revision mismatch: {info['revision']} != ${private-flake-rev}"
       assert info["fingerprint"]
       cat_log()
+
+      # Test build-time fetching of private flakes.
+      expr = f"""
+        derivation {{
+          name = "source";
+          builder = "builtin:fetch-tree";
+          system = "builtin";
+          __structuredAttrs = true;
+          input = {{
+            type = "github";
+            owner = "fancy-enterprise";
+            repo = "private-flake";
+          }};
+          outputHashMode = "recursive";
+          outputHash = "{info['locked']['narHash']}";
+        }}
+      """
+      client.succeed(f"nix build --store /run/store --extra-experimental-features build-time-fetch-tree --access-tokens github.com=ghp_000000000000000000000000000000000000 -L --expr '{expr}'")
 
       # Fetching with the resolved URL should produce the same result.
       info2 = json.loads(client.succeed(f"nix flake metadata {info['url']} --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0"))

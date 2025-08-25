@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+source ./common.sh
+
+requireGit
+TODO_NixOS
+
+lazy="$TEST_ROOT/lazy"
+createGitRepo "$lazy"
+echo world > "$lazy/who"
+git -C "$lazy" add who
+git -C "$lazy" commit -a -m foo
+
+repo="$TEST_ROOT/repo"
+
+createGitRepo "$repo"
+
+cat > "$repo/flake.nix" <<EOF
+{
+  inputs.lazy = {
+    type = "git";
+    url = "file://$lazy";
+    flake = false;
+    buildTime = true;
+  };
+
+  outputs = { self, lazy }: {
+    packages.$system.default = (import ./config.nix).mkDerivation {
+      name = "foo";
+      buildCommand = "cat \${lazy}/who > \$out";
+    };
+  };
+}
+EOF
+
+cp "${config_nix}" "$repo/"
+git -C "$repo" add flake.nix config.nix
+nix flake lock --extra-experimental-features build-time-fetch-tree "$repo"
+git -C "$repo" add flake.lock
+git -C "$repo" commit -a -m foo
+
+clearStore
+
+nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo"
+[[ $(cat "$TEST_ROOT/result") = world ]]
+
+echo utrecht > "$lazy/who"
+git -C "$lazy" commit -a -m foo
+
+nix flake update --extra-experimental-features build-time-fetch-tree --flake "$repo"
+
+clearStore
+
+nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo"
+[[ $(cat "$TEST_ROOT/result") = utrecht ]]
+
+rm -rf "$lazy"
+
+clearStore
+
+expectStderr 1 nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo" | grepQuiet "Cannot build.*source.drv"
