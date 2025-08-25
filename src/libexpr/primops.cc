@@ -4604,9 +4604,9 @@ struct RegexCache
     }
 };
 
-std::shared_ptr<RegexCache> makeRegexCache()
+ref<RegexCache> makeRegexCache()
 {
-    return std::make_shared<RegexCache>();
+    return make_ref<RegexCache>();
 }
 
 void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)

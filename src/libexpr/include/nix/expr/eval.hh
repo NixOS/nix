@@ -189,7 +189,7 @@ std::ostream & operator<<(std::ostream & os, const ValueType t);
 
 struct RegexCache;
 
-std::shared_ptr<RegexCache> makeRegexCache();
+ref<RegexCache> makeRegexCache();
 
 struct DebugTrace
 {
@@ -403,7 +403,7 @@ private:
     /**
      * Cache used by prim_match().
      */
-    std::shared_ptr<RegexCache> regexCache;
+    ref<RegexCache> regexCache;
 
 public:
 
