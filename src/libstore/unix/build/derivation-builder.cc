@@ -1340,6 +1340,7 @@ void DerivationBuilderImpl::runChild()
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
+            .parsedDrv = parsedDrv,
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {

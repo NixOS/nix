@@ -36,6 +36,7 @@ enum struct ExperimentalFeature {
     PipeOperators,
     ExternalBuilders,
     BLAKE3Hashes,
+    BuildTimeFetchTree,
 };
 
 extern std::set<std::string> stabilizedFeatures;

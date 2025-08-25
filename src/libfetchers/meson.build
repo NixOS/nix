@@ -34,6 +34,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'attrs.cc',
+  'builtin.cc',
   'cache.cc',
   'fetch-settings.cc',
   'fetch-to-store.cc',

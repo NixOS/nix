@@ -43,12 +43,18 @@ typedef std::map<FlakeId, FlakeInput> FlakeInputs;
 struct FlakeInput
 {
     std::optional<FlakeRef> ref;
+
     /**
-     * true = process flake to get outputs
-     *
-     * false = (fetched) static source path
+     * Whether to call the `flake.nix` file in this input to get its outputs.
      */
     bool isFlake = true;
+
+    /**
+     * Whether to fetch this input at evaluation time or at build
+     * time.
+     */
+    bool buildTime = false;
+
     std::optional<InputAttrPath> follows;
     FlakeInputs overrides;
 };
