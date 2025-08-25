@@ -113,7 +113,7 @@ static void fetchTree(
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(
                     state.symbols[attr.name],
-                    params.isFetchGit && state.symbols[attr.name] == "url" ? fixGitURL(s) : s);
+                    params.isFetchGit && state.symbols[attr.name] == "url" ? fixGitURL(s).to_string() : s);
             } else if (attr.value->type() == nBool)
                 attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
             else if (attr.value->type() == nInt) {
@@ -175,7 +175,7 @@ static void fetchTree(
         if (params.isFetchGit) {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", fixGitURL(url));
+            attrs.emplace("url", fixGitURL(url).to_string());
             if (!attrs.contains("exportIgnore")
                 && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});

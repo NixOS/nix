@@ -274,6 +274,139 @@ TEST(parseURL, emptyStringIsInvalidURL)
 }
 
 /* ----------------------------------------------------------------------------
+ * parseURLRelative
+ * --------------------------------------------------------------------------*/
+
+TEST(parseURLRelative, resolvesRelativePath)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, baseUrlZoneIdNotAllowed)
+{
+    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c]/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed.authority->hostType, expected.authority->hostType);
+    ASSERT_EQ(parsed.authority, expected.authority);
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesRelativePathIpv6AddressWithZoneId)
+{
+    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file2.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
+        .path = "/dir/subdir/file2.txt",
+        .query = (StringMap) {},
+        .fragment = "",
+    };
+
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesRelativePathWithDot)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("./subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesParentDirectory)
+{
+    ParsedURL base = parseURL("http://example.org:234/dir/page.html");
+    auto parsed = parseURLRelative("../up.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
+        .path = "/up.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, replacesPathWithAbsoluteRelative)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("/rooted.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/rooted.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, keepsQueryAndFragmentFromRelative)
+{
+    // But discard query params on base URL
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?z=3");
+    auto parsed = parseURLRelative("other.html?x=1&y=2#frag", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/other.html",
+        .query = {{"x", "1"}, {"y", "2"}},
+        .fragment = "frag",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, absOverride)
+{
+    ParsedURL base = parseURL("http://example.org/path/page.html");
+    std::string_view abs = "https://127.0.0.1.org/secure";
+    auto parsed = parseURLRelative(abs, base);
+    auto parsedAbs = parseURL(abs);
+    ASSERT_EQ(parsed, parsedAbs);
+}
+
+TEST(parseURLRelative, absOverrideWithZoneId)
+{
+    ParsedURL base = parseURL("http://example.org/path/page.html");
+    std::string_view abs = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar";
+    auto parsed = parseURLRelative(abs, base);
+    auto parsedAbs = parseURL(abs);
+    ASSERT_EQ(parsed, parsedAbs);
+}
+
+TEST(parseURLRelative, bothWithoutAuthority)
+{
+    ParsedURL base = parseURL("mailto:mail-base@bar.baz?bcc=alice@asdf.com");
+    std::string_view over = "mailto:mail-override@foo.bar?subject=url-testing";
+    auto parsed = parseURLRelative(over, base);
+    auto parsedOverride = parseURL(over);
+    ASSERT_EQ(parsed, parsedOverride);
+}
+
+/* ----------------------------------------------------------------------------
  * decodeQuery
  * --------------------------------------------------------------------------*/
 

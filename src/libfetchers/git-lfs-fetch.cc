@@ -179,7 +179,7 @@ Fetch::Fetch(git_repository * repo, git_oid rev)
 
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
-    this->url = nix::parseURL(nix::fixGitURL(remoteUrl)).canonicalise();
+    this->url = nix::fixGitURL(remoteUrl).canonicalise();
 }
 
 bool Fetch::shouldFetch(const CanonPath & path) const
