@@ -68,8 +68,10 @@ try {
 
 ParsedURL ParsedS3URL::toHttpsUrl() const
 {
-    std::string regionStr = region.value_or("us-east-1");
-    std::string schemeStr = scheme.value_or("https");
+    auto toView = [](const auto & x) { return std::string_view{x}; };
+
+    auto regionStr = region.transform(toView).value_or("us-east-1");
+    auto schemeStr = scheme.transform(toView).value_or("https");
 
     // Handle endpoint configuration using std::visit
     return std::visit(
@@ -77,7 +79,7 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
             [&](const std::monostate &) {
                 // No custom endpoint, use standard AWS S3 endpoint
                 return ParsedURL{
-                    .scheme = schemeStr,
+                    .scheme = std::string{schemeStr},
                     .authority = ParsedURL::Authority{.host = "s3." + regionStr + ".amazonaws.com"},
                     .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
                 };
@@ -85,7 +87,7 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
             [&](const ParsedURL::Authority & auth) {
                 // Endpoint is just an authority (hostname/port)
                 return ParsedURL{
-                    .scheme = schemeStr,
+                    .scheme = std::string{schemeStr},
                     .authority = auth,
                     .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
                 };
