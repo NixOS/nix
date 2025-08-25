@@ -75,6 +75,12 @@ struct ParsedS3URL
     }
 
     static ParsedS3URL parse(const ParsedURL & uri);
+
+    /**
+     * Convert this ParsedS3URL to HTTPS ParsedURL for use with curl's AWS SigV4 authentication
+     */
+    ParsedURL toHttpsUrl() const;
+
     auto operator<=>(const ParsedS3URL & other) const = default;
 };
 
