@@ -250,17 +250,99 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
+struct ScpLike
+{
+    std::string_view user;
+    std::string_view host;
+    std::string_view path;
+};
+
+/**
+ * Parse a scp url. This is a helper struct for fixGitURL.
+ * This is needed since we support scp-style urls for git urls.
+ * https://git-scm.com/book/ms/v2/Git-on-the-Server-The-Protocols
+ *
+ * A good reference is libgit2 also allows scp style
+ * https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/util/net.c#L806
+ */
+static std::optional<ScpLike> parse_scp(std::string_view s) noexcept
+{
+    if (s.empty() || s.front() == '/')
+        return std::nullopt;
+
+    // Find the colon that separates host from path.
+    // Find the right-most since ipv6 has colons
+    const auto colon = s.rfind(':');
+    if (colon == std::string_view::npos)
+        return std::nullopt;
+
+    // Split head:[path]
+    const auto head = s.substr(0, colon);
+    const auto path = s.substr(colon + 1);
+
+    if (head.empty())
+        return std::nullopt;
+
+    ScpLike out{};
+
+    // Optional user@
+    const auto at = head.find('@');
+    std::string_view host = head;
+
+    if (at != std::string_view::npos) {
+        // empty user
+        if (at == 0)
+            return std::nullopt;
+        out.user = head.substr(0, at);
+        host = head.substr(at + 1);
+        // empty host
+        if (host.empty())
+            return std::nullopt;
+    }
+
+    // Host can be bracketed IPv6: [....]
+    if (host.front() == '[') {
+        // Must contain a closing ']' and nothing between ']' and ':'
+        const auto rb = host.find(']');
+        if (rb == std::string_view::npos)
+            return std::nullopt;
+        out.host = host.substr(0, rb + 1);
+    } else {
+        out.host = host;
+    }
+
+    out.path = path;
+    return out;
+}
+
 std::string fixGitURL(const std::string & url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    if (auto r = boost::urls::parse_uri(url); r && r->has_scheme() && r->has_authority()) {
+        return url;
+    }
+
     if (hasPrefix(url, "file:"))
         return url;
-    if (url.find("://") == std::string::npos) {
-        return (ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = url}).to_string();
+
+    if (auto scp = parse_scp(url)) {
+        auto [user, host, path] = *scp;
+        std::string out = "ssh://";
+        if (!user.empty()) {
+            out.append(user);
+            out.push_back('@');
+        }
+        out.append(host);
+        if (!path.empty()) {
+            // Only absolute paths are allowed for ssh variant
+            if (!hasPrefix(path, "/")) {
+                out.push_back('/');
+            }
+            out.append(path);
+        }
+        return out;
     }
-    return url;
+
+    return ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = std::string(url)}.to_string();
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
