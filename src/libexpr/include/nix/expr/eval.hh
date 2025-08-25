@@ -16,6 +16,7 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/counter.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
@@ -950,27 +951,27 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    std::atomic<uint64_t> nrEnvs = 0;
-    std::atomic<uint64_t> nrValuesInEnvs = 0;
-    std::atomic<uint64_t> nrValues = 0;
-    std::atomic<uint64_t> nrListElems = 0;
-    std::atomic<uint64_t> nrLookups = 0;
-    std::atomic<uint64_t> nrAttrsets = 0;
-    std::atomic<uint64_t> nrAttrsInAttrsets = 0;
-    std::atomic<uint64_t> nrAvoided = 0;
-    std::atomic<uint64_t> nrOpUpdates = 0;
-    std::atomic<uint64_t> nrOpUpdateValuesCopied = 0;
-    std::atomic<uint64_t> nrListConcats = 0;
-    std::atomic<uint64_t> nrPrimOpCalls = 0;
-    std::atomic<uint64_t> nrFunctionCalls = 0;
+    Counter nrEnvs;
+    Counter nrValuesInEnvs;
+    Counter nrValues;
+    Counter nrListElems;
+    Counter nrLookups;
+    Counter nrAttrsets;
+    Counter nrAttrsInAttrsets;
+    Counter nrAvoided;
+    Counter nrOpUpdates;
+    Counter nrOpUpdateValuesCopied;
+    Counter nrListConcats;
+    Counter nrPrimOpCalls;
+    Counter nrFunctionCalls;
 
 public:
-    std::atomic<uint64_t> nrThunksAwaited{0};
-    std::atomic<uint64_t> nrThunksAwaitedSlow{0};
-    std::atomic<uint64_t> microsecondsWaiting{0};
-    std::atomic<uint64_t> currentlyWaiting{0};
-    std::atomic<uint64_t> maxWaiting{0};
-    std::atomic<uint64_t> nrSpuriousWakeups{0};
+    Counter nrThunksAwaited;
+    Counter nrThunksAwaitedSlow;
+    Counter microsecondsWaiting;
+    Counter currentlyWaiting;
+    Counter maxWaiting;
+    Counter nrSpuriousWakeups;
 
 private:
     bool countCalls;

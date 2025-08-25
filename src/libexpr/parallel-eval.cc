@@ -223,8 +223,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
 
     state.nrThunksAwaitedSlow++;
     state.currentlyWaiting++;
-    state.maxWaiting = std::max(
-        state.maxWaiting.load(std::memory_order_acquire), state.currentlyWaiting.load(std::memory_order_acquire));
+    state.maxWaiting = std::max<uint64_t>(state.maxWaiting, state.currentlyWaiting);
 
     auto now1 = std::chrono::steady_clock::now();
 

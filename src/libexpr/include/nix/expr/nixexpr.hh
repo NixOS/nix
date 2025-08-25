@@ -8,6 +8,7 @@
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/util/pos-idx.hh"
+#include "nix/expr/counter.hh"
 
 namespace nix {
 
@@ -89,7 +90,7 @@ struct Expr
         Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
     };
 
-    static unsigned long nrExprs;
+    static Counter nrExprs;
 
     Expr()
     {

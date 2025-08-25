@@ -964,7 +964,7 @@ Value * EvalState::getBool(bool b)
     return b ? &vTrue : &vFalse;
 }
 
-static std::atomic<uint64_t> nrThunks = 0;
+static Counter nrThunks;
 
 static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
@@ -2930,11 +2930,11 @@ bool EvalState::fullGC()
 #endif
 }
 
+bool Counter::enabled = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
+
 void EvalState::maybePrintStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
-
-    if (showStats) {
+    if (Counter::enabled) {
         // Make the final heap size more deterministic.
 #if NIX_USE_BOEHMGC
         if (!fullGC()) {
@@ -2992,7 +2992,7 @@ void EvalState::printStatistics()
         {"elements", nrValuesInEnvs.load()},
         {"bytes", bEnvs},
     };
-    topObj["nrExprs"] = Expr::nrExprs;
+    topObj["nrExprs"] = Expr::nrExprs.load();
     topObj["list"] = {
         {"elements", nrListElems.load()},
         {"bytes", bLists},
