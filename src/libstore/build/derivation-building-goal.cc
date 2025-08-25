@@ -768,6 +768,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     std::move(defaultPathsInChroot),
                     std::move(finalEnv),
                     std::move(extraFiles),
+#  ifdef __linux__
+                    worker.store.config.systemFeatures.get().count("kvm") > 0,
+#  endif
                 });
         }
 
