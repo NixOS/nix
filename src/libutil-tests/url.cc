@@ -12,6 +12,154 @@ namespace nix {
 using Authority = ParsedURL::Authority;
 using HostType = Authority::HostType;
 
+struct FixGitURLParam
+{
+    std::string input;
+    std::string expected;
+    ParsedURL parsed;
+};
+
+std::ostream & operator<<(std::ostream & os, const FixGitURLParam & param)
+{
+    return os << "Input: \"" << param.input << "\", Expected: \"" << param.expected << "\"";
+}
+
+class FixGitURLTestSuite : public ::testing::TestWithParam<FixGitURLParam>
+{};
+
+INSTANTIATE_TEST_SUITE_P(
+    FixGitURLs,
+    FixGitURLTestSuite,
+    ::testing::Values(
+        // https://github.com/NixOS/nix/issues/5958
+        // Already proper URL with git+ssh
+        FixGitURLParam{
+            .input = "git+ssh://user@domain:1234/path",
+            .expected = "git+ssh://user@domain:1234/path",
+            .parsed =
+                ParsedURL{
+                    .scheme = "git+ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "domain",
+                            .user = "user",
+                            .port = 1234,
+                        },
+                    .path = {"", "path"},
+                },
+        },
+        // SCP-like URL (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "git@github.com:owner/repo.git",
+            .expected = "ssh://git@github.com/owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                            .user = "git",
+                        },
+                    .path = {"", "owner", "repo.git"},
+                },
+        },
+        // Absolute path (becomes file:)
+        FixGitURLParam{
+            .input = "/home/me/repo",
+            .expected = "file:///home/me/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "home", "me", "repo"},
+                },
+        },
+        // Already file: scheme
+        // NOTE: Git/SCP treat this as a `<hostname>:<path>`, so we are
+        // failing to "fix up" this case.
+        FixGitURLParam{
+            .input = "file:/var/repos/x",
+            .expected = "file:/var/repos/x",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = std::nullopt,
+                    .path = {"", "var", "repos", "x"},
+                },
+        },
+        // IPV6 test case
+        FixGitURLParam{
+            .input = "user@[2001:db8:1::2]:/home/file",
+            .expected = "ssh://user@[2001:db8:1::2]//home/file",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "2001:db8:1::2",
+                            .user = "user",
+                        },
+                    .path = {"", "", "home", "file"},
+                },
+        }));
+
+TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
+{
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.input);
+    EXPECT_EQ(actual, p.parsed);
+    EXPECT_EQ(actual.to_string(), p.expected);
+}
+
+TEST(FixGitURLTestSuite, scpLikeNoUserParsesPoorly)
+{
+    // SCP-like URL (no user)
+
+    // Cannot "to_string" this because has illegal path not starting
+    // with `/`.
+    EXPECT_EQ(
+        fixGitURL("github.com:owner/repo.git"),
+        (ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = {"github.com:owner", "repo.git"},
+        }));
+}
+
+TEST(FixGitURLTestSuite, scpLikePathLeadingSlashParsesPoorly)
+{
+    // SCP-like URL (no user)
+
+    // Cannot "to_string" this because has illegal path not starting
+    // with `/`.
+    EXPECT_EQ(
+        fixGitURL("github.com:/owner/repo.git"),
+        (ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = {"github.com:", "owner", "repo.git"},
+        }));
+}
+
+TEST(FixGitURLTestSuite, relativePathParsesPoorly)
+{
+    // Relative path (becomes file:// absolute)
+
+    // Cannot "to_string" this because has illegal path not starting
+    // with `/`.
+    EXPECT_EQ(
+        fixGitURL("relative/repo"),
+        (ParsedURL{
+            .scheme = "file",
+            .authority =
+                ParsedURL::Authority{
+                    .hostType = ParsedURL::Authority::HostType::Name,
+                    .host = "",
+                },
+            .path = {"relative", "repo"}}));
+}
+
 TEST(parseURL, parsesSimpleHttpUrl)
 {
     auto s = "http://www.example.org/file.tar.gz";
