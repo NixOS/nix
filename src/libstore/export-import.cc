@@ -33,7 +33,7 @@ void Store::exportPath(const StorePath & path, Sink & sink)
     /* Refuse to export paths that have changed.  This prevents
        filesystem corruption from spreading to other machines.
        Don't complain if the stored hash is zero (unknown). */
-    Hash hash = hashSink.currentHash().first;
+    Hash hash = hashSink.currentHash().hash;
     if (hash != info->narHash && info->narHash != Hash(info->narHash.algo))
         throw Error(
             "hash of path '%s' has changed from '%s' to '%s'!",

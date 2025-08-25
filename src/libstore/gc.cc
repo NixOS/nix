@@ -829,7 +829,6 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
             auto linksName = baseNameOf(linksDir);
-            Paths entries;
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();

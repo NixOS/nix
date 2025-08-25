@@ -35,11 +35,11 @@ EOF
 git -C "$flake1Dir" add flake.nix
 git -C "$flake1Dir" commit -m "Init"
 
-expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
-expect 1 nix build "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
+expect 1 nix build --no-link "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
+expect 1 nix build --no-link "$flake1Dir#foo.bar" 2>&1 | grepQuiet 'error: breaks'
 
 # Stack overflow error must not be cached
-expect 1 nix build --max-call-depth 50 "$flake1Dir#stack-depth" 2>&1 \
+expect 1 nix build --no-link --max-call-depth 50 "$flake1Dir#stack-depth" 2>&1 \
   | grepQuiet 'error: stack overflow; max-call-depth exceeded'
 # If the SO is cached, the following invocation will produce a cached failure; we expect it to succeed
 nix build --no-link "$flake1Dir#stack-depth"
@@ -52,7 +52,7 @@ nix build --no-link "$flake1Dir#ifd"
 # Test that a store derivation is recreated when it has been deleted
 # but the corresponding attribute is still cached.
 if ! isTestOnNixOS; then
-    nix build "$flake1Dir#drv"
+    nix build --no-link "$flake1Dir#drv"
     clearStore
-    nix build "$flake1Dir#drv"
+    nix build --no-link "$flake1Dir#drv"
 fi

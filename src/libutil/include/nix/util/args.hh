@@ -51,8 +51,8 @@ public:
     }
 
     /**
-     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the
-     * command.
+     * @brief Get the [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory) for
+     * the command.
      *
      * @return Generally the working directory, but in case of a shebang
      *         interpreter, returns the directory of the script.

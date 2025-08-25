@@ -140,10 +140,17 @@ in
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
   # # Line coverage analysis.
-  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-  #   pname = "nix-coverage";
-  #   withCoverageChecks = true;
-  # };
+  coverage =
+    (import ./../ci/gha/tests rec {
+      withCoverage = true;
+      pkgs = nixpkgsFor.x86_64-linux.nativeForStdenv.clangStdenv;
+      nixComponents = pkgs.nixComponents2;
+      nixFlake = null;
+      getStdenv = p: p.clangStdenv;
+    }).codeCoverage.coverageReports.overrideAttrs
+      {
+        name = "nix-coverage"; # For historical consistency
+      };
 
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-manual;
@@ -157,7 +164,9 @@ in
   # System tests.
   tests =
     import ../tests/nixos {
-      inherit lib nixpkgs nixpkgsFor;
+      inherit lib nixpkgs;
+      pkgs = nixpkgsFor.x86_64-linux.native;
+      nixComponents = nixpkgsFor.x86_64-linux.native.nixComponents2;
       inherit (self.inputs) nixpkgs-23-11;
     }
     // {

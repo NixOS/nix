@@ -3,6 +3,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/util/url.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 
@@ -184,7 +185,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
             {.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
              .pos = state.positions[pos]});
 
-    auto parsedURL = parseURL(*fromStoreUrl);
+    auto parsedURL = parseURL(*fromStoreUrl, /*lenient=*/true);
 
     if (parsedURL.scheme != "http" && parsedURL.scheme != "https"
         && !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))

@@ -53,6 +53,8 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    StoreReference getReference() const override;
 };
 
 struct LegacySSHStore : public virtual Store
@@ -70,8 +72,6 @@ struct LegacySSHStore : public virtual Store
     LegacySSHStore(ref<const Config>);
 
     ref<Connection> openConnection();
-
-    std::string getUri() override;
 
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;

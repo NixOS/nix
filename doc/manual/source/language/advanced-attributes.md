@@ -160,7 +160,6 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
 ## Other output modifications
 
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
-
     When using [structured attributes](#adv-attr-structuredAttrs), the
     attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
     If set to `true`, it disables scanning the output for runtime dependencies.
@@ -195,7 +194,6 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
     [`builder`]: ./derivations.md#attr-builder
 
 - [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
-
   If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
 
   For example, setting

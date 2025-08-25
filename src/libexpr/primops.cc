@@ -5,6 +5,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/json-to-value.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
@@ -1372,7 +1373,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
-    std::optional<json> jsonObject;
+    std::optional<StructuredAttrs> jsonObject;
     auto pos = v.determinePos(noPos);
     auto attr = attrs->find(state.sStructuredAttrs);
     if (attr != attrs->end()
@@ -1381,7 +1382,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             pos,
             "while evaluating the `__structuredAttrs` "
             "attribute passed to builtins.derivationStrict"))
-        jsonObject = json::object();
+        jsonObject = StructuredAttrs{.structuredAttrs = json::object()};
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -1493,7 +1494,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     if (i->name == state.sStructuredAttrs)
                         continue;
 
-                    jsonObject->emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
+                    jsonObject->structuredAttrs.emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
 
                     if (i->name == state.sBuilder)
                         drv.builder = state.forceString(*i->value, context, pos, context_below);
@@ -1541,23 +1542,26 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
-                    drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder)
-                        drv.builder = std::move(s);
-                    else if (i->name == state.sSystem)
-                        drv.platform = std::move(s);
-                    else if (i->name == state.sOutputHash)
-                        outputHash = std::move(s);
-                    else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = parseHashAlgoOpt(s);
-                    else if (i->name == state.sOutputHashMode)
-                        handleHashMode(s);
-                    else if (i->name == state.sOutputs)
-                        handleOutputs(tokenizeString<Strings>(s));
-                    else if (i->name == state.sJson)
+                    if (i->name == state.sJson) {
                         warn(
                             "In derivation '%s': setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead.",
                             drvName);
+                        drv.structuredAttrs = StructuredAttrs::parse(s);
+                    } else {
+                        drv.env.emplace(key, s);
+                        if (i->name == state.sBuilder)
+                            drv.builder = std::move(s);
+                        else if (i->name == state.sSystem)
+                            drv.platform = std::move(s);
+                        else if (i->name == state.sOutputHash)
+                            outputHash = std::move(s);
+                        else if (i->name == state.sOutputHashAlgo)
+                            outputHashAlgo = parseHashAlgoOpt(s);
+                        else if (i->name == state.sOutputHashMode)
+                            handleHashMode(s);
+                        else if (i->name == state.sOutputs)
+                            handleOutputs(tokenizeString<Strings>(s));
+                    }
                 }
             }
 
@@ -1569,8 +1573,10 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     }
 
     if (jsonObject) {
-        drv.env.emplace("__json", jsonObject->dump());
-        jsonObject.reset();
+        /* The only other way `drv.structuredAttrs` can be set is when
+           `jsonObject` is not set. */
+        assert(!drv.structuredAttrs);
+        drv.structuredAttrs = std::move(*jsonObject);
     }
 
     /* Everything in the context of the strings in the derivation
@@ -4318,9 +4324,9 @@ static RegisterPrimOp primop_lessThan({
     .name = "__lessThan",
     .args = {"e1", "e2"},
     .doc = R"(
-      Return `true` if the number *e1* is less than the number *e2*, and
-      `false` otherwise. Evaluation aborts if either *e1* or *e2* does not
-      evaluate to a number.
+      Return `true` if the value *e1* is less than the value *e2*, and `false` otherwise.
+      Evaluation aborts if either *e1* or *e2* does not evaluate to a number, string or path.
+      Furthermore, it aborts if *e2* does not match *e1*'s type according to the aforementioned classification of number, string or path.
     )",
     .fun = prim_lessThan,
 });

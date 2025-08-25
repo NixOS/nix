@@ -24,7 +24,7 @@ nar-obj-inner
   | str("type"), str("directory") directory
   ;
 
-regular = [ str("executable"), str("") ], str("contents"), str(contents);
+regular = [ str("executable") ], str("contents"), str(contents);
 
 symlink = str("target"), str(target);
 

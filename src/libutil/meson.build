@@ -1,7 +1,9 @@
-project('nix-util', 'cpp',
+project(
+  'nix-util',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -16,10 +18,8 @@ subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
-deps_private_maybe_subproject = [
-]
-deps_public_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
+deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
 # Check for each of these functions, and create a define like `#define
@@ -34,7 +34,7 @@ check_funcs = [
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
   define_value = cxx.has_function(funcspec[0]).to_int()
-  configdata.set(define_name, define_value, description: funcspec[1])
+  configdata.set(define_name, define_value, description : funcspec[1])
 endforeach
 
 subdir('nix-meson-build-support/libatomic')
@@ -45,20 +45,21 @@ if host_machine.system() == 'windows'
 elif host_machine.system() == 'sunos'
   socket = cxx.find_library('socket')
   network_service_library = cxx.find_library('nsl')
-  deps_other += [socket, network_service_library]
+  deps_other += [ socket, network_service_library ]
 endif
 
 blake3 = dependency(
   'libblake3',
-  version: '>= 1.8.2',
+  version : '>= 1.8.2',
   method : 'pkg-config',
 )
 deps_private += blake3
 
 boost = dependency(
   'boost',
-  modules : ['context', 'coroutine', 'iostreams'],
-  include_type: 'system',
+  modules : [ 'context', 'coroutine', 'iostreams', 'url' ],
+  include_type : 'system',
+  version : '>=1.82.0',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -92,7 +93,12 @@ cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
 endif
-cpuid = dependency('libcpuid', 'cpuid', version : '>= 0.7.0', required : cpuid_required)
+cpuid = dependency(
+  'libcpuid',
+  'cpuid',
+  version : '>= 0.7.0',
+  required : cpuid_required,
+)
 configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 
@@ -108,14 +114,16 @@ config_priv_h = configure_file(
 
 subdir('nix-meson-build-support/common')
 
-sources = [config_priv_h] + files(
+sources = [ config_priv_h ] + files(
   'archive.cc',
   'args.cc',
+  'base-n.cc',
+  'base-nix-32.cc',
   'canon-path.cc',
   'compression.cc',
   'compute-levels.cc',
-  'configuration.cc',
   'config-global.cc',
+  'configuration.cc',
   'current-process.cc',
   'english.cc',
   'environment-variables.cc',
@@ -134,17 +142,16 @@ sources = [config_priv_h] + files(
   'logging.cc',
   'memory-source-accessor.cc',
   'mounted-source-accessor.cc',
-  'position.cc',
   'pos-table.cc',
+  'position.cc',
   'posix-source-accessor.cc',
-  'references.cc',
   'serialise.cc',
   'signature/local-keys.cc',
   'signature/signer.cc',
   'source-accessor.cc',
   'source-path.cc',
-  'subdir-source-accessor.cc',
   'strings.cc',
+  'subdir-source-accessor.cc',
   'suggestions.cc',
   'tarfile.cc',
   'tee-logger.cc',
@@ -187,9 +194,10 @@ this_library = library(
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/util', preserve_path : true)
@@ -198,7 +206,7 @@ libraries_private = []
 if host_machine.system() == 'windows'
   # `libraries_private` cannot contain ad-hoc dependencies (from
   # `find_library), so we need to do this manually
-  libraries_private += ['-lws2_32']
+  libraries_private += [ '-lws2_32' ]
 endif
 
 subdir('nix-meson-build-support/export')

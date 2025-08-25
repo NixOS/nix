@@ -10,7 +10,7 @@
 namespace nix {
 
 template<class Proto, const char * protocolDir>
-class ProtoTest : public CharacterizationTest, public LibStoreTest
+class ProtoTest : public CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / protocolDir;
 
@@ -18,6 +18,10 @@ class ProtoTest : public CharacterizationTest, public LibStoreTest
     {
         return unitTestData / (std::string{testStem + ".bin"});
     }
+
+public:
+    Path storeDir = "/nix/store";
+    StoreDirConfig store{storeDir};
 };
 
 template<class Proto, const char * protocolDir>
@@ -34,7 +38,7 @@ public:
             T got = ({
                 StringSource from{encoded};
                 Proto::template Serialise<T>::read(
-                    *LibStoreTest::store,
+                    this->store,
                     typename Proto::ReadConn{
                         .from = from,
                         .version = version,
@@ -54,7 +58,7 @@ public:
         CharacterizationTest::writeTest(testStem, [&]() {
             StringSink to;
             Proto::template Serialise<T>::write(
-                *LibStoreTest::store,
+                this->store,
                 typename Proto::WriteConn{
                     .to = to,
                     .version = version,

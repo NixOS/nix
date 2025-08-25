@@ -5,6 +5,7 @@
 
 #include "nix/store/tests/nix_api_store.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/url.hh"
 
 #include "store-tests-config.hh"
 
@@ -23,7 +24,13 @@ TEST_F(nix_api_store_test, nix_store_get_uri)
     std::string str;
     auto ret = nix_store_get_uri(ctx, store, OBSERVE_STRING(str));
     ASSERT_EQ(NIX_OK, ret);
-    ASSERT_STREQ("local", str.c_str());
+    auto expectedStoreURI = "local://?"
+                            + nix::encodeQuery({
+                                {"log", nixLogDir},
+                                {"state", nixStateDir},
+                                {"store", nixStoreDir},
+                            });
+    ASSERT_EQ(expectedStoreURI, str);
 }
 
 TEST_F(nix_api_util_context, nix_store_get_storedir_default)
@@ -97,7 +104,7 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
     nix_libstore_init(ctx);
     Store * store = nix_store_open(ctx, "dummy://", nullptr);
     ASSERT_EQ(NIX_OK, ctx->last_err_code);
-    ASSERT_STREQ("dummy", store->ptr->getUri().c_str());
+    ASSERT_STREQ("dummy://", store->ptr->config.getReference().render(/*withParams=*/true).c_str());
 
     std::string str;
     nix_store_get_version(ctx, store, OBSERVE_STRING(str));

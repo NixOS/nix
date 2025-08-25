@@ -2,6 +2,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

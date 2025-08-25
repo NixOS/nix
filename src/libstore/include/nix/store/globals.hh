@@ -11,12 +11,32 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"
+#include "nix/store/build/derivation-builder.hh"
 
 #include "nix/store/config.hh"
 
 namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+
+template<>
+SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<SandboxMode>::to_string() const;
+
+template<>
+PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<PathsInChroot>::to_string() const;
+
+template<>
+struct BaseSetting<PathsInChroot>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append);
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -45,8 +65,6 @@ const uint32_t maxIdsPerBuild =
 class Settings : public Config
 {
 
-    unsigned int getDefaultCores();
-
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -58,6 +76,8 @@ class Settings : public Config
 public:
 
     Settings();
+
+    unsigned int getDefaultCores() const;
 
     Path nixPrefix;
 
@@ -166,7 +186,7 @@ public:
 
     Setting<unsigned int> buildCores{
         this,
-        getDefaultCores(),
+        0,
         "cores",
         R"(
           Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
@@ -179,15 +199,13 @@ public:
           -->
           For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
 
-          The value `0` means that the `builder` should use all available CPU cores in the system.
+          If set to `0`, nix will detect the number of CPU cores and pass this number via NIX_BUILD_CORES.
 
           > **Note**
           >
           > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
         )",
-        {"build-cores"},
-        // Don't document the machine-specific default value
-        false};
+        {"build-cores"}};
 
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
@@ -293,7 +311,7 @@ public:
           Only the first element is required.
           To leave a field at its default, set it to `-`.
 
-          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+          1. The URI of the remote store in the format `ssh://[username@]hostname[:port]`.
 
              > **Example**
              >
@@ -694,7 +712,7 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<PathsInChroot> sandboxPaths{
         this,
         {},
         "sandbox-paths",
@@ -967,7 +985,7 @@ public:
             On Linux, Nix can run builds in a user namespace where they run as root (UID 0) and have 65,536 UIDs available.
             This is primarily useful for running containers such as `systemd-nspawn` inside a Nix build. For an example, see [`tests/systemd-nspawn/nix`][nspawn].
 
-            [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix.
+            [nspawn]: https://github.com/NixOS/nix/blob/67bcb99700a0da1395fa063d7c6586740b304598/tests/systemd-nspawn.nix
 
             Included by default on Linux if the [`auto-allocate-uids`](#conf-auto-allocate-uids) setting is enabled.
         )",

@@ -8,10 +8,12 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/store/path.hh"
 
 namespace nix {
 
 class Store;
+struct StoreDirConfig;
 struct BasicDerivation;
 struct StructuredAttrs;
 
@@ -117,6 +119,22 @@ struct DerivationOptions
     std::map<std::string, StringSet> exportReferencesGraph;
 
     /**
+     * Once a derivations is resolved, the strings in in
+     * `exportReferencesGraph` should all be store paths (with possible
+     * suffix paths, but those are discarded).
+     *
+     * @return The parsed path set for for each key in the map.
+     *
+     * @todo Ideally, `exportReferencesGraph` would just store
+     * `StorePath`s for this, but we can't just do that, because for CA
+     * derivations they is actually in general `DerivedPath`s (via
+     * placeholder strings) until the derivation is resolved and exact
+     * inputs store paths are known. We can use better types for that
+     * too, but that is a longer project.
+     */
+    std::map<std::string, StorePathSet> getParsedExportReferencesGraph(const StoreDirConfig & store) const;
+
+    /**
      * env: __sandboxProfile
      *
      * Just for Darwin
@@ -175,6 +193,9 @@ struct DerivationOptions
      */
     static DerivationOptions
     fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
+
+    static DerivationOptions
+    fromStructuredAttrs(const StringMap & env, const std::optional<StructuredAttrs> & parsed, bool shouldWarn = true);
 
     /**
      * @param drv Must be the same derivation we parsed this from. In

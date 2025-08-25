@@ -5,7 +5,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     Settings::ExternalBuilder externalBuilder;
 
     ExternalDerivationBuilder(
-        Store & store,
+        LocalStore & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         Settings::ExternalBuilder externalBuilder)
@@ -16,7 +16,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     }
 
     static std::unique_ptr<ExternalDerivationBuilder> newIfSupported(
-        Store & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
     {
         for (auto & handler : settings.externalBuilders.get()) {
             for (auto & system : handler.systems)
@@ -84,7 +84,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("tmpDir", tmpDir);
         json.emplace("tmpDirInSandbox", tmpDirInSandbox());
         json.emplace("storeDir", store.storeDir);
-        json.emplace("realStoreDir", getLocalStore(store).config->realStoreDir.get());
+        json.emplace("realStoreDir", store.config->realStoreDir.get());
         json.emplace("system", drv.platform);
 
         // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit

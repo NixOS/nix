@@ -35,28 +35,20 @@ in
           server = {
             DOMAIN = "gitea";
             HTTP_PORT = 3000;
+            SSH_PORT = 3001;
+            START_SSH_SERVER = true;
           };
           log.LEVEL = "Info";
           database.LOG_SQL = false;
         };
-        services.openssh.enable = true;
-        networking.firewall.allowedTCPPorts = [ 3000 ];
+        networking.firewall.allowedTCPPorts = [
+          3000
+          3001
+        ];
         environment.systemPackages = [
           pkgs.git
           pkgs.gitea
         ];
-
-        users.users.root.openssh.authorizedKeys.keys = [ clientPublicKey ];
-
-        # TODO: remove this after updating to nixos-23.11
-        nixpkgs.pkgs = lib.mkForce (
-          import nixpkgs {
-            inherit system;
-            config.permittedInsecurePackages = [
-              "gitea-1.19.4"
-            ];
-          }
-        );
       };
     client =
       { pkgs, ... }:
@@ -67,38 +59,33 @@ in
         ];
       };
   };
-  defaults =
-    { pkgs, ... }:
-    {
-      environment.systemPackages = [ pkgs.jq ];
-    };
 
   setupScript = ''
     import shlex
 
     gitea.wait_for_unit("gitea.service")
 
-    gitea_admin = "test"
-    gitea_admin_password = "test123test"
+    gitea_user = "test"
+    gitea_password = "test123test"
 
     gitea.succeed(f"""
       gitea --version >&2
       su -l gitea -c 'GITEA_WORK_DIR=/var/lib/gitea gitea admin user create \
-        --username {gitea_admin} --password {gitea_admin_password} --email test@client'
+        --username {gitea_user} --password {gitea_password} --email test@client'
     """)
 
     client.wait_for_unit("multi-user.target")
     gitea.wait_for_open_port(3000)
+    gitea.wait_for_open_port(3001)
 
-    gitea_admin_token = gitea.succeed(f"""
-      curl --fail -X POST http://{gitea_admin}:{gitea_admin_password}@gitea:3000/api/v1/users/test/tokens \
+    gitea.succeed(f"""
+      curl --fail -X POST http://{gitea_user}:{gitea_password}@gitea:3000/api/v1/user/keys \
         -H 'Accept: application/json' -H 'Content-Type: application/json' \
-        -d {shlex.quote( '{"name":"token", "scopes":["all"]}' )} \
-        | jq -r '.sha1'
-    """).strip()
+        -d {shlex.quote( '{"title":"key", "key":"${clientPublicKey}", "read_only": false}' )} >&2
+    """)
 
     client.succeed(f"""
-      echo "http://{gitea_admin}:{gitea_admin_password}@gitea:3000" >~/.git-credentials-admin
+      echo "http://{gitea_user}:{gitea_password}@gitea:3000" >~/.git-credentials-admin
       git config --global credential.helper 'store --file ~/.git-credentials-admin'
       git config --global user.email "test@client"
       git config --global user.name "Test User"
@@ -118,13 +105,7 @@ in
       echo "Host gitea" >>~/.ssh/config
       echo "  StrictHostKeyChecking no" >>~/.ssh/config
       echo "  UserKnownHostsFile /dev/null" >>~/.ssh/config
-      echo "  User root" >>~/.ssh/config
+      echo "  User gitea" >>~/.ssh/config
     """)
-
-    # ensure ssh from client to gitea works
-    client.succeed("""
-      ssh root@gitea true
-    """)
-
   '';
 }

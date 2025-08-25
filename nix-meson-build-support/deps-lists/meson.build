@@ -6,7 +6,7 @@
 # *interface*.
 #
 # See `man pkg-config` for some details.
-deps_private = [ ]
+deps_private = []
 
 # These are public dependencies with pkg-config files. Public is the
 # opposite of private: these dependencies are used in installed header
@@ -23,14 +23,14 @@ deps_private = [ ]
 # N.B. For distributions that care about "ABI" stability and not just
 # "API" stability, the private dependencies also matter as they can
 # potentially affect the public ABI.
-deps_public = [ ]
+deps_public = []
 
 # These are subproject deps (type == "internal"). They are other
 # packages in `/src` in this repo. The private vs public distinction is
 # the same as above.
-deps_private_subproject = [ ]
-deps_public_subproject = [ ]
+deps_private_subproject = []
+deps_public_subproject = []
 
 # These are dependencencies without pkg-config files. Ideally they are
 # just private, but they may also be public (e.g. boost).
-deps_other = [ ]
+deps_other = []

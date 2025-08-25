@@ -25,6 +25,18 @@ std::string SSHStoreConfig::doc()
         ;
 }
 
+StoreReference SSHStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = authority.to_string(),
+            },
+        .params = getQueryParams(),
+    };
+}
+
 struct SSHStore : virtual RemoteStore
 {
     using Config = SSHStoreConfig;
@@ -39,11 +51,6 @@ struct SSHStore : virtual RemoteStore
               // Use SSH master only if using more than 1 connection.
               connections->capacity() > 1))
     {
-    }
-
-    std::string getUri() override
-    {
-        return *Config::uriSchemes().begin() + "://" + host;
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
@@ -65,8 +72,6 @@ protected:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-
-    std::string host;
 
     std::vector<std::string> extraRemoteProgramArgs;
 

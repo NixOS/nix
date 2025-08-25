@@ -2,6 +2,7 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
@@ -94,8 +95,11 @@ Hash toHash(const git_oid & oid)
 
 static void initLibGit2()
 {
-    if (git_libgit2_init() < 0)
-        throw Error("initialising libgit2: %s", git_error_last()->message);
+    static std::once_flag initialized;
+    std::call_once(initialized, []() {
+        if (git_libgit2_init() < 0)
+            throw Error("initialising libgit2: %s", git_error_last()->message);
+    });
 }
 
 git_oid hashToOID(const Hash & hash)
@@ -375,7 +379,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     Hash resolveRef(std::string ref) override
     {
         Object object;
-        if (git_revparse_single(Setter(object), *this, ref.c_str()))
+
+        // Using the rev-parse notation which libgit2 supports, make sure we peel
+        // the ref ultimately down to the underlying commit.
+        // This is to handle the case where it may be an annotated tag which itself has
+        // an object_id.
+        std::string peeledRef = ref + "^{commit}";
+        if (git_revparse_single(Setter(object), *this, peeledRef.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
         auto oid = git_object_id(object.get());
         return toHash(*oid);
@@ -555,7 +565,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             append(gitArgs, {"--depth", "1"});
         append(gitArgs, {std::string("--"), url, refspec});
 
-        runProgram(
+        auto [status, output] = runProgram(
             RunOptions{
                 .program = "git",
                 .lookupPath = true,
@@ -563,7 +573,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 // we're using --quiet for now. Should process its stderr.
                 .args = gitArgs,
                 .input = {},
+                .mergeStderrToStdout = true,
                 .isInteractive = true});
+
+        if (status > 0) {
+            throw Error("Failed to fetch git repository %s : %s", url, output);
+        }
     }
 
     void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) override
@@ -612,7 +627,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
             std::string keyDecoded;
             try {
-                keyDecoded = base64Decode(k.key);
+                keyDecoded = base64::decode(k.key);
             } catch (Error & e) {
                 e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
             }
@@ -1331,6 +1346,65 @@ GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path &
     auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
     _cache.lock()->emplace(path, workdirInfo);
     return workdirInfo;
+}
+
+/**
+ * Checks that the git reference is valid and normalizes slash '/' sequences.
+ *
+ * Accepts shorthand references (one-level refnames are allowed).
+ */
+bool isValidRefNameAllowNormalizations(const std::string & refName)
+{
+    /* Unfortunately libgit2 doesn't expose the limit in headers, but its internal
+       limit is also 1024. */
+    std::array<char, 1024> normalizedRefBuffer;
+
+    /* It would be nice to have a better API like git_reference_name_is_valid, but
+     * with GIT_REFERENCE_FORMAT_REFSPEC_SHORTHAND flag. libgit2 uses it internally
+     * but doesn't expose it in public headers [1].
+     * [1]:
+     * https://github.com/libgit2/libgit2/blob/9d5f1bacc23594c2ba324c8f0d41b88bf0e9ef04/src/libgit2/refs.c#L1362-L1365
+     */
+
+    auto res = git_reference_normalize_name(
+        normalizedRefBuffer.data(),
+        normalizedRefBuffer.size(),
+        refName.c_str(),
+        GIT_REFERENCE_FORMAT_ALLOW_ONELEVEL | GIT_REFERENCE_FORMAT_REFSPEC_SHORTHAND);
+
+    return res == 0;
+}
+
+bool isLegalRefName(const std::string & refName)
+{
+    initLibGit2();
+
+    /* Since `git_reference_normalize_name` is the best API libgit2 has for verifying
+     * reference names with shorthands (see comment in normalizeRefName), we need to
+     * ensure that exceptions to the validity checks imposed by normalization [1] are checked
+     * explicitly.
+     * [1]: https://git-scm.com/docs/git-check-ref-format#Documentation/git-check-ref-format.txt---normalize
+     */
+
+    /* Check for cases that don't get rejected by libgit2.
+     * FIXME: libgit2 should reject this. */
+    if (refName == "@")
+        return false;
+
+    /* Leading slashes and consecutive slashes are stripped during normalizatiton. */
+    if (refName.starts_with('/') || refName.find("//") != refName.npos)
+        return false;
+
+    /* Refer to libgit2. */
+    if (!isValidRefNameAllowNormalizations(refName))
+        return false;
+
+    /* libgit2 doesn't barf on DEL symbol.
+     * FIXME: libgit2 should reject this. */
+    if (refName.find('\177') != refName.npos)
+        return false;
+
+    return true;
 }
 
 } // namespace nix

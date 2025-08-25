@@ -45,16 +45,16 @@ struct InitialOutputStatus
 
 struct InitialOutput
 {
-    bool wanted;
     Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+void runPostBuildHook(
+    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
 
 /**
  * Format the known outputs of a derivation for use in error messages.
  */
-std::string showKnownOutputs(Store & store, const Derivation & drv);
+std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
 
 } // namespace nix

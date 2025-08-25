@@ -9,7 +9,6 @@
 #include "nix/util/util.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
-#include "nix/util/references.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/git.hh"
@@ -18,7 +17,6 @@
 // `addMultipleToStore`.
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/users.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -29,12 +27,23 @@ using json = nlohmann::json;
 
 namespace nix {
 
-bool MixStoreDirMethods::isInStore(PathView path) const
+Path StoreConfigBase::getDefaultNixStoreDir()
+{
+    return settings.nixStore;
+}
+
+StoreConfig::StoreConfig(const Params & params)
+    : StoreConfigBase(params)
+    , StoreDirConfig{storeDir_}
+{
+}
+
+bool StoreDirConfig::isInStore(PathView path) const
 {
     return isInDir(path, storeDir);
 }
 
-std::pair<StorePath, Path> MixStoreDirMethods::toStorePath(PathView path) const
+std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
@@ -62,116 +71,6 @@ Path Store::followLinksToStore(std::string_view _path) const
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
     return toStorePath(followLinksToStore(path)).first;
-}
-
-/*
-The exact specification of store paths is in `protocols/store-path.md`
-in the Nix manual. These few functions implement that specification.
-
-If changes to these functions go beyond mere implementation changes i.e.
-also update the user-visible behavior, please update the specification
-to match.
-*/
-
-StorePath MixStoreDirMethods::makeStorePath(std::string_view type, std::string_view hash, std::string_view name) const
-{
-    /* e.g., "source:sha256:1abc...:/nix/store:foo.tar.gz" */
-    auto s = std::string(type) + ":" + std::string(hash) + ":" + storeDir + ":" + std::string(name);
-    auto h = compressHash(hashString(HashAlgorithm::SHA256, s), 20);
-    return StorePath(h, name);
-}
-
-StorePath MixStoreDirMethods::makeStorePath(std::string_view type, const Hash & hash, std::string_view name) const
-{
-    return makeStorePath(type, hash.to_string(HashFormat::Base16, true), name);
-}
-
-StorePath MixStoreDirMethods::makeOutputPath(std::string_view id, const Hash & hash, std::string_view name) const
-{
-    return makeStorePath("output:" + std::string{id}, hash, outputPathName(name, id));
-}
-
-/* Stuff the references (if any) into the type.  This is a bit
-   hacky, but we can't put them in, say, <s2> (per the grammar above)
-   since that would be ambiguous. */
-static std::string makeType(const MixStoreDirMethods & store, std::string && type, const StoreReferences & references)
-{
-    for (auto & i : references.others) {
-        type += ":";
-        type += store.printStorePath(i);
-    }
-    if (references.self)
-        type += ":self";
-    return std::move(type);
-}
-
-StorePath MixStoreDirMethods::makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const
-{
-    if (info.method == FileIngestionMethod::Git && info.hash.algo != HashAlgorithm::SHA1)
-        throw Error("Git file ingestion must use SHA-1 hash");
-
-    if (info.hash.algo == HashAlgorithm::SHA256 && info.method == FileIngestionMethod::NixArchive) {
-        return makeStorePath(makeType(*this, "source", info.references), info.hash, name);
-    } else {
-        if (!info.references.empty()) {
-            throw Error(
-                "fixed output derivation '%s' is not allowed to refer to other store paths.\nYou may need to use the 'unsafeDiscardReferences' derivation attribute, see the manual for more details.",
-                name);
-        }
-        // make a unique digest based on the parameters for creating this store object
-        auto payload =
-            "fixed:out:" + makeFileIngestionPrefix(info.method) + info.hash.to_string(HashFormat::Base16, true) + ":";
-        auto digest = hashString(HashAlgorithm::SHA256, payload);
-        return makeStorePath("output:out", digest, name);
-    }
-}
-
-StorePath
-MixStoreDirMethods::makeFixedOutputPathFromCA(std::string_view name, const ContentAddressWithReferences & ca) const
-{
-    // New template
-    return std::visit(
-        overloaded{
-            [&](const TextInfo & ti) {
-                assert(ti.hash.algo == HashAlgorithm::SHA256);
-                return makeStorePath(
-                    makeType(
-                        *this,
-                        "text",
-                        StoreReferences{
-                            .others = ti.references,
-                            .self = false,
-                        }),
-                    ti.hash,
-                    name);
-            },
-            [&](const FixedOutputInfo & foi) { return makeFixedOutputPath(name, foi); }},
-        ca.raw);
-}
-
-std::pair<StorePath, Hash> MixStoreDirMethods::computeStorePath(
-    std::string_view name,
-    const SourcePath & path,
-    ContentAddressMethod method,
-    HashAlgorithm hashAlgo,
-    const StorePathSet & references,
-    PathFilter & filter) const
-{
-    auto [h, size] = hashPath(path, method.getFileIngestionMethod(), hashAlgo, filter);
-    if (settings.warnLargePathThreshold && size && *size >= settings.warnLargePathThreshold)
-        warn("hashed large path '%s' (%s)", path, renderSize(*size));
-    return {
-        makeFixedOutputPathFromCA(
-            name,
-            ContentAddressWithReferences::fromParts(
-                method,
-                h,
-                {
-                    .others = references,
-                    .self = false,
-                })),
-        h,
-    };
 }
 
 StorePath Store::addToStore(
@@ -368,7 +267,7 @@ ValidPathInfo Store::addToStoreSlow(
 
     auto hash = method == ContentAddressMethod::Raw::NixArchive && hashAlgo == HashAlgorithm::SHA256 ? narHash
                 : method == ContentAddressMethod::Raw::Git ? git::dumpHash(hashAlgo, srcPath).hash
-                                                           : caHashSink.finish().first;
+                                                           : caHashSink.finish().hash;
 
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
@@ -409,16 +308,16 @@ StringSet Store::Config::getDefaultSystemFeatures()
 }
 
 Store::Store(const Store::Config & config)
-    : MixStoreDirMethods{config}
+    : StoreDirConfig{config}
     , config{config}
     , state({(size_t) config.pathInfoCacheSize})
 {
     assertLibStoreInitialized();
 }
 
-std::string Store::getUri()
+StoreReference StoreConfig::getReference() const
 {
-    return "";
+    return {.variant = StoreReference::Auto{}};
 }
 
 bool Store::PathInfoCacheValue::isKnownNow()
@@ -516,11 +415,14 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
                         "replaced path '%s' with '%s' for substituter '%s'",
                         printStorePath(path.first),
                         sub->printStorePath(subPath),
-                        sub->getUri());
+                        sub->config.getHumanReadableURI());
             } else if (sub->storeDir != storeDir)
                 continue;
 
-            debug("checking substituter '%s' for path '%s'", sub->getUri(), sub->printStorePath(subPath));
+            debug(
+                "checking substituter '%s' for path '%s'",
+                sub->config.getHumanReadableURI(),
+                sub->printStorePath(subPath));
             try {
                 auto info = sub->queryPathInfo(subPath);
 
@@ -560,7 +462,8 @@ bool Store::isValidPath(const StorePath & storePath)
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), std::string(storePath.hashPart()));
+        auto res = diskCache->lookupNarInfo(
+            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()));
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             auto state_(state.lock());
@@ -576,7 +479,8 @@ bool Store::isValidPath(const StorePath & storePath)
 
     if (diskCache && !valid)
         // FIXME: handle valid = true case.
-        diskCache->upsertNarInfo(getUri(), std::string(storePath.hashPart()), 0);
+        diskCache->upsertNarInfo(
+            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()), 0);
 
     return valid;
 }
@@ -647,7 +551,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     }
 
     if (diskCache) {
-        auto res = diskCache->lookupNarInfo(getUri(), hashPart);
+        auto res = diskCache->lookupNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             {
@@ -692,7 +596,7 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 auto info = fut.get();
 
                 if (diskCache)
-                    diskCache->upsertNarInfo(getUri(), hashPart, info);
+                    diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
                 {
                     auto state_(state.lock());
@@ -716,7 +620,8 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
     try {
         if (diskCache) {
-            auto [cacheOutcome, maybeCachedRealisation] = diskCache->lookupRealisation(getUri(), id);
+            auto [cacheOutcome, maybeCachedRealisation] =
+                diskCache->lookupRealisation(config.getReference().render(/*FIXME: withParams=*/false), id);
             switch (cacheOutcome) {
             case NarInfoDiskCache::oValid:
                 debug("Returning a cached realisation for %s", id.to_string());
@@ -742,9 +647,11 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
                                      if (diskCache) {
                                          if (info)
-                                             diskCache->upsertRealisation(getUri(), *info);
+                                             diskCache->upsertRealisation(
+                                                 config.getReference().render(/*FIXME withParams=*/false), *info);
                                          else
-                                             diskCache->upsertAbsentRealisation(getUri(), id);
+                                             diskCache->upsertAbsentRealisation(
+                                                 config.getReference().render(/*FIXME withParams=*/false), id);
                                      }
 
                                      (*callbackPtr)(std::shared_ptr<const Realisation>(info));
@@ -923,12 +830,27 @@ const Store::Stats & Store::getStats()
     return stats;
 }
 
-static std::string makeCopyPathMessage(std::string_view srcUri, std::string_view dstUri, std::string_view storePath)
+static std::string
+makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std::string_view storePath)
 {
-    return srcUri == "local" || srcUri == "daemon" ? fmt("copying path '%s' to '%s'", storePath, dstUri)
-           : dstUri == "local" || dstUri == "daemon"
-               ? fmt("copying path '%s' from '%s'", storePath, srcUri)
-               : fmt("copying path '%s' from '%s' to '%s'", storePath, srcUri, dstUri);
+    auto src = srcCfg.getReference();
+    auto dst = dstCfg.getReference();
+
+    auto isShorthand = [](const StoreReference & ref) {
+        /* At this point StoreReference **must** be resolved. */
+        const auto & specified = std::get<StoreReference::Specified>(ref.variant);
+        const auto & scheme = specified.scheme;
+        return (scheme == "local" || scheme == "unix") && specified.authority.empty();
+    };
+
+    if (isShorthand(src))
+        return fmt("copying path '%s' to '%s'", storePath, dstCfg.getHumanReadableURI());
+
+    if (isShorthand(dst))
+        return fmt("copying path '%s' from '%s'", storePath, srcCfg.getHumanReadableURI());
+
+    return fmt(
+        "copying path '%s' from '%s' to '%s'", storePath, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI());
 }
 
 void copyStorePath(
@@ -939,11 +861,15 @@ void copyStorePath(
     if (!repair && dstStore.isValidPath(storePath))
         return;
 
-    auto srcUri = srcStore.getUri();
-    auto dstUri = dstStore.getUri();
+    const auto & srcCfg = srcStore.config;
+    const auto & dstCfg = dstStore.config;
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
-        *logger, lvlInfo, actCopyPath, makeCopyPathMessage(srcUri, dstUri, storePathS), {storePathS, srcUri, dstUri});
+        *logger,
+        lvlInfo,
+        actCopyPath,
+        makeCopyPathMessage(srcCfg, dstCfg, storePathS),
+        {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -977,7 +903,9 @@ void copyStorePath(
         },
         [&]() {
             throw EndOfFile(
-                "NAR for '%s' fetched from '%s' is incomplete", srcStore.printStorePath(storePath), srcStore.getUri());
+                "NAR for '%s' fetched from '%s' is incomplete",
+                srcStore.printStorePath(storePath),
+                srcStore.config.getHumanReadableURI());
         });
 
     dstStore.addToStore(*info, *source, repair, checkSigs);
@@ -1075,7 +1003,7 @@ std::map<StorePath, StorePath> copyPaths(
                     "replaced path '%s' to '%s' for substituter '%s'",
                     srcStore.printStorePath(storePathForSrc),
                     dstStore.printStorePath(storePathForDst),
-                    dstStore.getUri());
+                    dstStore.config.getHumanReadableURI());
         }
         return storePathForDst;
     };
@@ -1093,15 +1021,15 @@ std::map<StorePath, StorePath> copyPaths(
             // We can reasonably assume that the copy will happen whenever we
             // read the path, so log something about that at that point
             uint64_t total = 0;
-            auto srcUri = srcStore.getUri();
-            auto dstUri = dstStore.getUri();
+            const auto & srcCfg = srcStore.config;
+            const auto & dstCfg = dstStore.config;
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,
                 lvlInfo,
                 actCopyPath,
-                makeCopyPathMessage(srcUri, dstUri, storePathS),
-                {storePathS, srcUri, dstUri});
+                makeCopyPathMessage(srcCfg, dstCfg, storePathS),
+                {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
@@ -1171,8 +1099,8 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
             throw Error("number expected");
         hashGiven = {narHash, *narSize};
     }
-    ValidPathInfo info(store.parseStorePath(path), hashGiven->first);
-    info.narSize = hashGiven->second;
+    ValidPathInfo info(store.parseStorePath(path), hashGiven->hash);
+    info.narSize = hashGiven->numBytesDigested;
     std::string deriver;
     getline(str, deriver);
     if (deriver != "")
@@ -1191,7 +1119,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
     return std::optional<ValidPathInfo>(std::move(info));
 }
 
-std::string MixStoreDirMethods::showPaths(const StorePathSet & paths) const
+std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
 {
     std::string s;
     for (auto & i : paths) {

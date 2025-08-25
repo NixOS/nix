@@ -17,7 +17,7 @@ struct GlobalConfig : public AbstractConfig
 
     bool set(const std::string & name, const std::string & value) override;
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
     void resetOverridden() override;
 

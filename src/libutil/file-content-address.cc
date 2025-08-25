@@ -101,7 +101,7 @@ hashPath(const SourcePath & path, FileIngestionMethod method, HashAlgorithm ht, 
     case FileIngestionMethod::Flat:
     case FileIngestionMethod::NixArchive: {
         auto res = hashPath(path, (FileSerialisationMethod) method, ht, filter);
-        return {res.first, {res.second}};
+        return {res.hash, res.numBytesDigested};
     }
     case FileIngestionMethod::Git:
         return {git::dumpHash(ht, path, filter).hash, std::nullopt};

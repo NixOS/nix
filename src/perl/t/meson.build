@@ -7,10 +7,9 @@
 
 nix_perl_tests = files(
   'init.t',
-  # hack for trailing newline
 )
 
-
+nix_perl_tests_copy_tgts = []
 foreach f : nix_perl_tests
-  fs.copyfile(f)
+  nix_perl_tests_copy_tgts += fs.copyfile(f)
 endforeach

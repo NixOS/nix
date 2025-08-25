@@ -121,6 +121,7 @@
 - [Development](development/index.md)
   - [Building](development/building.md)
   - [Testing](development/testing.md)
+  - [Benchmarking](development/benchmarking.md)
   - [Debugging](development/debugging.md)
   - [Documentation](development/documentation.md)
   - [CLI guideline](development/cli-guideline.md)
@@ -155,6 +156,7 @@
   - [Release 3.0.0 (2025-03-04)](release-notes-determinate/rl-3.0.0.md)
 - [Nix Release Notes](release-notes/index.md)
 {{#include ./SUMMARY-rl-next.md}}
+  - [Release 2.31 (2025-08-21)](release-notes/rl-2.31.md)
   - [Release 2.30 (2025-07-07)](release-notes/rl-2.30.md)
   - [Release 2.29 (2025-05-14)](release-notes/rl-2.29.md)
   - [Release 2.28 (2025-04-02)](release-notes/rl-2.28.md)

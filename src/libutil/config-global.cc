@@ -15,7 +15,7 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
     return false;
 }
 
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (auto & config : configRegistrations())
         config->getSettings(res, overriddenOnly);

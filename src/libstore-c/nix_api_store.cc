@@ -62,7 +62,7 @@ nix_err nix_store_get_uri(nix_c_context * context, Store * store, nix_get_string
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto res = store->ptr->getUri();
+        auto res = store->ptr->config.getReference().render(/*withParams=*/true);
         return call_nix_get_string_callback(res, callback, user_data);
     }
     NIXC_CATCH_ERRS

@@ -5,7 +5,7 @@ if host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
   # and not detail with this yet.
   #
   # TODO do not do this, and instead do fine-grained export annotations.
-  linker_export_flags = ['-Wl,--export-all-symbols']
+  linker_export_flags = [ '-Wl,--export-all-symbols' ]
 else
   linker_export_flags = []
 endif

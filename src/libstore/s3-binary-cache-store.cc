@@ -37,11 +37,13 @@ namespace nix {
 struct S3Error : public Error
 {
     Aws::S3::S3Errors err;
+    Aws::String exceptionName;
 
     template<typename... Args>
-    S3Error(Aws::S3::S3Errors err, const Args &... args)
+    S3Error(Aws::S3::S3Errors err, Aws::String exceptionName, const Args &... args)
         : Error(args...)
-        , err(err){};
+        , err(err)
+        , exceptionName(exceptionName){};
 };
 
 /* Helper: given an Outcome<R, E>, return R in case of success, or
@@ -52,6 +54,7 @@ R && checkAws(std::string_view s, Aws::Utils::Outcome<R, E> && outcome)
     if (!outcome.IsSuccess())
         throw S3Error(
             outcome.GetError().GetErrorType(),
+            outcome.GetError().GetExceptionName(),
             fmt("%s: %s (request id: %s)", s, outcome.GetError().GetMessage(), outcome.GetError().GetRequestId()));
     return outcome.GetResultWithOwnership();
 }
@@ -207,7 +210,12 @@ S3Helper::FileTransferResult S3Helper::getObject(const std::string & bucketName,
         res.data = decompress(result.GetContentEncoding(), dynamic_cast<std::stringstream &>(result.GetBody()).str());
 
     } catch (S3Error & e) {
-        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) && (e.err != Aws::S3::S3Errors::ACCESS_DENIED))
+        if ((e.err != Aws::S3::S3Errors::NO_SUCH_KEY) && (e.err != Aws::S3::S3Errors::ACCESS_DENIED) &&
+            // Expired tokens are not really an error, more of a caching problem. Should be treated same as 403.
+            //
+            // AWS unwilling to provide a specific error type for the situation
+            // (https://github.com/aws/aws-sdk-cpp/issues/1843) so use this hack
+            (e.exceptionName != "ExpiredToken"))
             throw;
     }
 
@@ -246,6 +254,17 @@ std::string S3BinaryCacheStoreConfig::doc()
         ;
 }
 
+StoreReference S3BinaryCacheStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = bucketName,
+            },
+    };
+}
+
 struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 {
     Stats stats;
@@ -259,23 +278,19 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
         , s3Helper(config->profile, config->region, config->scheme, config->endpoint)
     {
         diskCache = getNarInfoDiskCache();
-
-        init();
-    }
-
-    std::string getUri() override
-    {
-        return "s3://" + config->bucketName;
     }
 
     void init() override
     {
-        if (auto cacheInfo = diskCache->upToDateCacheExists(getUri())) {
+        /* FIXME: The URI (when used as a cache key) must have several parameters rendered (e.g. the endpoint).
+           This must be represented as a separate opaque string (probably a URI) that has the right query parameters. */
+        auto cacheUri = config->getReference().render(/*withParams=*/false);
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheUri)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
             BinaryCacheStore::init();
-            diskCache->createCache(getUri(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(cacheUri, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -309,6 +324,10 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
             auto & error = res.GetError();
             if (error.GetErrorType() == Aws::S3::S3Errors::RESOURCE_NOT_FOUND
                 || error.GetErrorType() == Aws::S3::S3Errors::NO_SUCH_KEY
+                // Expired tokens are not really an error, more of a caching problem. Should be treated same as 403.
+                // AWS unwilling to provide a specific error type for the situation
+                // (https://github.com/aws/aws-sdk-cpp/issues/1843) so use this hack
+                || (error.GetErrorType() == Aws::S3::S3Errors::UNKNOWN && error.GetExceptionName() == "ExpiredToken")
                 // If bucket listing is disabled, 404s turn into 403s
                 || error.GetErrorType() == Aws::S3::S3Errors::ACCESS_DENIED)
                 return false;
@@ -509,7 +528,8 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
             sink(*res.data);
         } else
-            throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache '%s'", path, getUri());
+            throw NoSuchBinaryCacheFile(
+                "file '%s' does not exist in binary cache '%s'", path, config->getHumanReadableURI());
     }
 
     StorePathSet queryAllValidPaths() override
@@ -557,9 +577,11 @@ struct S3BinaryCacheStoreImpl : virtual S3BinaryCacheStore
 
 ref<Store> S3BinaryCacheStoreImpl::Config::openStore() const
 {
-    return make_ref<S3BinaryCacheStoreImpl>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<S3BinaryCacheStore::Config>(shared_from_this())});
+    auto store =
+        make_ref<S3BinaryCacheStoreImpl>(ref{// FIXME we shouldn't actually need a mutable config
+                                             std::const_pointer_cast<S3BinaryCacheStore::Config>(shared_from_this())});
+    store->init();
+    return store;
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreImpl::Config> regS3BinaryCacheStore;
