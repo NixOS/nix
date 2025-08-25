@@ -148,6 +148,9 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     return msg;
 }
 
+static void runPostBuildHook(
+    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
@@ -810,6 +813,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         outputLocks.unlock();
         co_return done(std::move(ste->first), {}, std::move(ste->second));
     } else if (auto * builtOutputs = std::get_if<1>(&res)) {
+        StorePathSet outputPaths;
+        for (auto & [_, output] : *builtOutputs)
+            outputPaths.insert(output.outPath);
+        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
            not create new lock files with the same names as the old
@@ -823,7 +831,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
 }
 
-void runPostBuildHook(
+static void runPostBuildHook(
     const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
 {
     auto hook = settings.postBuildHook;

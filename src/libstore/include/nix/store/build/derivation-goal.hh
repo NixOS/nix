@@ -14,9 +14,6 @@ namespace nix {
 
 using std::map;
 
-/** Used internally */
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
  * A goal for realising a single output of a derivation. Various sorts of
  * fetching (which will be done by other goal types) is tried, and if none of
