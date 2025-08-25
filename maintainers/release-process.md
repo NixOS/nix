@@ -133,6 +133,8 @@ release:
 
   Commit and push this to the maintenance branch.
 
+* Create a backport label.
+
 * Bump the version of `master`:
 
   ```console
@@ -140,16 +142,13 @@ release:
   $ git pull
   $ NEW_VERSION=2.13.0
   $ echo $NEW_VERSION > .version
+  $ ... edit .mergify.yml to add the previous version ...
   $ git checkout -b bump-$NEW_VERSION
   $ git commit -a -m 'Bump version'
   $ git push --set-upstream origin bump-$NEW_VERSION
   ```
 
   Make a pull request and auto-merge it.
-
-* Create a backport label.
-
-* Add the new backport label to `.mergify.yml`.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.
