@@ -202,7 +202,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
     } else {
         /* Mark this value as being waited on. */
         PackedPointer p0_ = pdPending;
-        if (!p0.compare_exchange_strong(p0_, pdAwaited, std::memory_order_relaxed, std::memory_order_acquire)) {
+        if (!p0.compare_exchange_strong(p0_, pdAwaited, std::memory_order_acquire, std::memory_order_acquire)) {
             /* If the value has been finalized in the meantime (i.e. is
                no longer pending), we're done. */
             auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
