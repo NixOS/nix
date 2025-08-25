@@ -595,12 +595,17 @@ struct ExprOpNot : Expr
         {                                                                                    \
             return pos;                                                                      \
         }                                                                                    \
-    };
+    }
 
-MakeBinOp(ExprOpEq, "==") MakeBinOp(ExprOpNEq, "!=") MakeBinOp(ExprOpAnd, "&&") MakeBinOp(ExprOpOr, "||")
-    MakeBinOp(ExprOpImpl, "->") MakeBinOp(ExprOpUpdate, "//") MakeBinOp(ExprOpConcatLists, "++")
+MakeBinOp(ExprOpEq, "==");
+MakeBinOp(ExprOpNEq, "!=");
+MakeBinOp(ExprOpAnd, "&&");
+MakeBinOp(ExprOpOr, "||");
+MakeBinOp(ExprOpImpl, "->");
+MakeBinOp(ExprOpUpdate, "//");
+MakeBinOp(ExprOpConcatLists, "++");
 
-        struct ExprConcatStrings : Expr
+struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
