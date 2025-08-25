@@ -62,6 +62,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
     NixStringContext context2;
     for (auto && c : context) {
         if (auto * ptr = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
+            state.waitForPath(ptr->drvPath); // FIXME: why?
             context2.emplace(NixStringContextElem::Opaque{.path = ptr->drvPath});
         } else {
             /* Can reuse original item */
