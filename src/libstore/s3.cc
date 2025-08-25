@@ -1,6 +1,8 @@
 #include "nix/store/s3.hh"
 #include "nix/util/split.hh"
 #include "nix/util/url.hh"
+#include "nix/util/util.hh"
+#include "nix/util/canon-path.hh"
 
 namespace nix {
 
@@ -62,6 +64,42 @@ try {
 } catch (BadURL & e) {
     e.addTrace({}, "while parsing S3 URI: '%s'", parsed.to_string());
     throw;
+}
+
+ParsedURL ParsedS3URL::toHttpsUrl() const
+{
+    std::string regionStr = region.value_or("us-east-1");
+    std::string schemeStr = scheme.value_or("https");
+
+    // Handle endpoint configuration using std::visit
+    return std::visit(
+        overloaded{
+            [&](const std::monostate &) {
+                // No custom endpoint, use standard AWS S3 endpoint
+                return ParsedURL{
+                    .scheme = schemeStr,
+                    .authority = ParsedURL::Authority{.host = "s3." + regionStr + ".amazonaws.com"},
+                    .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
+                };
+            },
+            [&](const ParsedURL::Authority & auth) {
+                // Endpoint is just an authority (hostname/port)
+                return ParsedURL{
+                    .scheme = schemeStr,
+                    .authority = auth,
+                    .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
+                };
+            },
+            [&](const ParsedURL & endpointUrl) {
+                // Endpoint is already a ParsedURL (e.g., http://server:9000)
+                return ParsedURL{
+                    .scheme = endpointUrl.scheme,
+                    .authority = endpointUrl.authority,
+                    .path = (CanonPath(endpointUrl.path) / bucket / CanonPath(key)).abs(),
+                };
+            },
+        },
+        endpoint);
 }
 
 #endif
