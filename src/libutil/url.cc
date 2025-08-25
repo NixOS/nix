@@ -408,28 +408,91 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
-ParsedURL fixGitURL(const std::string & url)
+struct ScpLike
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
-    std::string_view path = url;
-    if (splitPrefix(path, "file:")) {
-        if (hasPrefix(url, "file://"))
-            return parseURL(url);
-        throw BadURL(
-            "URL '%s' would parse as SCP authority = 'file', path = '%s' but this is also a valid `file:..` URL, and so we choose to disallow it",
-            url,
-            path);
+    ParsedURL::Authority authority;
+    std::string_view path;
+};
+
+/**
+ * Parse a scp url. This is a helper struct for fixGitURL.
+ * This is needed since we support scp-style urls for git urls.
+ * https://git-scm.com/book/ms/v2/Git-on-the-Server-The-Protocols
+ *
+ * A good reference is libgit2 also allows scp style
+ * https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/util/net.c#L806
+ */
+static std::optional<ScpLike> parseScp(const std::string_view s) noexcept
+{
+    if (s.empty() || s.front() == '/')
+        return std::nullopt;
+
+    // Find the colon that separates host from path.
+    // Find the right-most since ipv6 has colons
+    const auto colon = s.rfind(':');
+    if (colon == std::string_view::npos)
+        return std::nullopt;
+
+    // Split head:[path]
+    const auto head = s.substr(0, colon);
+    const auto path = s.substr(colon + 1);
+
+    if (head.empty())
+        return std::nullopt;
+
+    return ScpLike{
+        .authority = ParsedURL::Authority::parse(head),
+        .path = path,
+    };
+}
+
+ParsedURL fixGitURL(const std::string_view url)
+{
+    {
+        std::optional<ParsedURL> parsedOpt;
+        try {
+            parsedOpt = parseURL(url);
+        } catch (BadURL &) {
+            if (hasPrefix(url, "file:"))
+                throw;
+        }
+        if (parsedOpt) {
+            auto & parsed = *parsedOpt;
+            if (parsed.authority)
+                return parsed;
+            if (parsed.scheme == "file")
+                throw BadURL(
+                    "URL '%s' would parse as SCP authority = 'file', path = '%s' but this is also a valid `file:..` URL, and so we choose to disallow it",
+                    url,
+                    parsed.renderPath(true));
+        }
     }
-    if (url.find("://") == std::string::npos) {
+
+    // if the url does not start with forward slash, add one
+    auto splitMakeAbs = [&](std::string_view pathS) {
+        std::vector<std::string> path;
+
+        if (!hasPrefix(pathS, "/")) {
+            path.emplace_back("");
+        }
+        splitStringInto(path, pathS, "/");
+
+        return path;
+    };
+
+    if (auto scp = parseScp(url)) {
         return ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = splitString<std::vector<std::string>>(url, "/"),
+            .scheme = "ssh",
+            .authority = std::move(scp->authority),
+            .path = splitMakeAbs(scp->path),
         };
     }
-    return parseURL(url);
+
+    return ParsedURL{
+        .scheme = "file",
+        .authority = ParsedURL::Authority{},
+        .path = splitMakeAbs(url),
+    };
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
