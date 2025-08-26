@@ -8,9 +8,8 @@ templatesDir=$TEST_ROOT/templates
 flakeDir=$TEST_ROOT/flake
 nixpkgsDir=$TEST_ROOT/nixpkgs
 
-# remap the flake reference in the registry to obey the sandbox
-nix registry add --registry "$registry" https://flakehub.com/f/DeterminateSystems/flake-templates/0.1 "git+file://$templatesDir"
 nix registry add --registry "$registry" nixpkgs "git+file://$nixpkgsDir"
+nix registry add --registry "$registry" templates "git+file://$templatesDir"
 
 createGitRepo "$nixpkgsDir"
 createSimpleGitFlake "$nixpkgsDir"
@@ -62,8 +61,8 @@ nix flake show templates
 nix flake show templates --json | jq
 
 createGitRepo "$flakeDir"
-(cd "$flakeDir" && nix flake init)
-(cd "$flakeDir" && nix flake init) # check idempotence
+(cd "$flakeDir" && nix flake init --template "git+file://$templatesDir")
+(cd "$flakeDir" && nix flake init --template "git+file://$templatesDir") # check idempotence
 git -C "$flakeDir" add flake.nix
 nix flake check "$flakeDir"
 nix flake show "$flakeDir"
@@ -73,13 +72,13 @@ git -C "$flakeDir" commit -a -m 'Initial'
 # Test 'nix flake init' with benign conflicts
 createGitRepo "$flakeDir"
 echo a > "$flakeDir/a"
-(cd "$flakeDir" && nix flake init) # check idempotence
+(cd "$flakeDir" && nix flake init --template "git+file://$templatesDir") # check idempotence
 
 # Test 'nix flake init' with conflicts
 createGitRepo "$flakeDir"
 echo b > "$flakeDir/a"
 pushd "$flakeDir"
-(! nix flake init) |& grep "refusing to overwrite existing file '$flakeDir/a'"
+(! nix flake init --template "git+file://$templatesDir") |& grep "refusing to overwrite existing file '$flakeDir/a'"
 popd
 git -C "$flakeDir" commit -a -m 'Changed'
 
