@@ -63,8 +63,8 @@ nix flake show templates
 nix flake show templates --json | jq
 
 createGitRepo "$flakeDir"
-(cd "$flakeDir" && nix flake init)
-(cd "$flakeDir" && nix flake init) # check idempotence
+(cd "$flakeDir" && nix flake init --option flake-registry "$registry")
+(cd "$flakeDir" && nix flake init --option flake-registry "$registry") # check idempotence
 git -C "$flakeDir" add flake.nix
 nix flake check "$flakeDir"
 nix flake show "$flakeDir"
@@ -74,13 +74,13 @@ git -C "$flakeDir" commit -a -m 'Initial'
 # Test 'nix flake init' with benign conflicts
 createGitRepo "$flakeDir"
 echo a > "$flakeDir/a"
-(cd "$flakeDir" && nix flake init) # check idempotence
+(cd "$flakeDir" && nix flake init --option flake-registry "$registry") # check idempotence
 
 # Test 'nix flake init' with conflicts
 createGitRepo "$flakeDir"
 echo b > "$flakeDir/a"
 pushd "$flakeDir"
-(! nix flake init) |& grep "refusing to overwrite existing file '$flakeDir/a'"
+(! nix flake init --option flake-registry "$registry") |& grep "refusing to overwrite existing file '$flakeDir/a'"
 popd
 git -C "$flakeDir" commit -a -m 'Changed'
 
