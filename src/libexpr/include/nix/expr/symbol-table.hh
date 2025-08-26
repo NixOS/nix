@@ -28,7 +28,11 @@ struct ContiguousArena
 {
     const char * data;
     const size_t maxSize;
-    std::atomic<size_t> size{0};
+
+    // Put this in a separate cache line to ensure that a thread
+    // adding a symbol doesn't slow down threads dereferencing symbols
+    // by invalidating the read-only `data` field.
+    std::atomic<size_t> size __attribute__((aligned(64))){0};
 
     ContiguousArena(size_t maxSize);
 
@@ -235,8 +239,10 @@ public:
 
     SymbolStr operator[](Symbol s) const
     {
+#if 0
         if (s.id == 0 || s.id > arena.size)
             unreachable();
+#endif
         return SymbolStr(*reinterpret_cast<const SymbolValue *>(arena.data + s.id));
     }
 
