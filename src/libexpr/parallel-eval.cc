@@ -170,7 +170,7 @@ void FutureVector::finishAll()
 struct WaiterDomain
 {
     std::condition_variable cv;
-};
+} __attribute__((aligned(64))); // cache line alignment to prevent false sharing
 
 static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 
