@@ -8,11 +8,9 @@ templatesDir=$TEST_ROOT/templates
 flakeDir=$TEST_ROOT/flake
 nixpkgsDir=$TEST_ROOT/nixpkgs
 
-# remap the flake reference in the registry to $tempalatesDir to obey the sandbox
+# remap the flake reference in the registry to obey the sandbox
 nix registry add --registry "$registry" https://flakehub.com/f/DeterminateSystems/flake-templates/0.1 "git+file://$templatesDir"
 nix registry add --registry "$registry" nixpkgs "git+file://$nixpkgsDir"
-
-nix registry list
 
 createGitRepo "$nixpkgsDir"
 createSimpleGitFlake "$nixpkgsDir"
