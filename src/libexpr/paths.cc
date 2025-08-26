@@ -73,7 +73,11 @@ std::string EvalState::computeBaseName(const SourcePath & path, PosIdx pos)
 }
 
 StorePath EvalState::mountInput(
-    fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor, bool requireLockable)
+    fetchers::Input & input,
+    const fetchers::Input & originalInput,
+    ref<SourceAccessor> accessor,
+    bool requireLockable,
+    bool forceNarHash)
 {
     auto storePath = settings.lazyTrees
                          ? StorePath::random(input.getName())
@@ -95,7 +99,9 @@ StorePath EvalState::mountInput(
 
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    if (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked()) && !input.getNarHash())
+    if (forceNarHash
+        || (requireLockable && (!settings.lazyTrees || !settings.lazyLocks || !input.isLocked())
+            && !input.getNarHash()))
         input.attrs.insert_or_assign("narHash", getNarHash()->to_string(HashFormat::SRI, true));
 
     if (originalInput.getNarHash() && *getNarHash() != *originalInput.getNarHash())

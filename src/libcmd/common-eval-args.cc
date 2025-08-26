@@ -18,10 +18,6 @@
 
 namespace nix {
 
-fetchers::Settings fetchSettings;
-
-static GlobalConfig::Register rFetchSettings(&fetchSettings);
-
 EvalSettings evalSettings{
     settings.readOnlyMode,
     {

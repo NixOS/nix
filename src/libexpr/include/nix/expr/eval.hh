@@ -471,7 +471,8 @@ public:
         fetchers::Input & input,
         const fetchers::Input & originalInput,
         ref<SourceAccessor> accessor,
-        bool requireLockable);
+        bool requireLockable,
+        bool forceNarHash = false);
 
     /**
      * Parse a Nix expression from the specified file.

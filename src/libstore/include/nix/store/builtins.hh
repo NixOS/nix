@@ -3,7 +3,11 @@
 
 #include "nix/store/derivations.hh"
 
+#include <nlohmann/json_fwd.hpp>
+
 namespace nix {
+
+struct StructuredAttrs;
 
 struct BuiltinBuilderContext
 {
@@ -12,6 +16,7 @@ struct BuiltinBuilderContext
     std::string netrcData;
     std::string caFileData;
     Path tmpDirInSandbox;
+    const StructuredAttrs * parsedDrv;
 };
 
 using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;

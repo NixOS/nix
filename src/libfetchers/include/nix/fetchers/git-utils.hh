@@ -120,8 +120,6 @@ struct GitRepo
     virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
 
-ref<GitRepo> getTarballCache();
-
 // A helper to ensure that the `git_*_free` functions get called.
 template<auto del>
 struct Deleter

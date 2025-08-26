@@ -269,7 +269,7 @@ struct GitArchiveInputScheme : InputScheme
             if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
                 auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
                 auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
-                if (getTarballCache()->hasObject(treeHash))
+                if (input.settings->getTarballCache()->hasObject(treeHash))
                     return {std::move(input), TarballInfo{.treeHash = treeHash, .lastModified = (time_t) lastModified}};
                 else
                     debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
@@ -289,7 +289,7 @@ struct GitArchiveInputScheme : InputScheme
             *logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", input.to_string()));
 
         TarArchive archive{*source};
-        auto tarballCache = getTarballCache();
+        auto tarballCache = input.settings->getTarballCache();
         auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
         auto tree = parseSink->flush();
@@ -323,7 +323,8 @@ struct GitArchiveInputScheme : InputScheme
 #endif
         input.attrs.insert_or_assign("lastModified", uint64_t(tarballInfo.lastModified));
 
-        auto accessor = getTarballCache()->getAccessor(tarballInfo.treeHash, false, "«" + input.to_string() + "»");
+        auto accessor =
+            input.settings->getTarballCache()->getAccessor(tarballInfo.treeHash, false, "«" + input.to_string() + "»");
 
         if (!input.settings->trustTarballsFromGitForges)
             // FIXME: computing the NAR hash here is wasteful if
