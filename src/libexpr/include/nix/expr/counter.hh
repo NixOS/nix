@@ -56,6 +56,6 @@ struct Counter
     {
         return enabled ? inner -= n : 0;
     }
-};
+} __attribute__((aligned(64))); // cache line alignment to prevent false sharing
 
 } // namespace nix

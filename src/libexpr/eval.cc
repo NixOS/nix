@@ -347,6 +347,7 @@ EvalState::EvalState(
     assertGCInitialized();
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+    static_assert(sizeof(Counter) == 64, "counters must be 64 bytes");
 
     vEmptyList.mkList(buildList(0));
     vNull.mkNull();
