@@ -38,7 +38,7 @@ struct GitArchiveInputScheme : InputScheme
         if (url.scheme != schemeName())
             return {};
 
-        auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
+        const auto & path = url.path;
 
         std::optional<Hash> rev;
         std::optional<std::string> ref;
@@ -139,12 +139,12 @@ struct GitArchiveInputScheme : InputScheme
         auto repo = getStrAttr(input.attrs, "repo");
         auto ref = input.getRef();
         auto rev = input.getRev();
-        auto path = owner + "/" + repo;
+        std::vector<std::string> path{owner, repo};
         assert(!(ref && rev));
         if (ref)
-            path += "/" + *ref;
+            path.push_back(*ref);
         if (rev)
-            path += "/" + rev->to_string(HashFormat::Base16, false);
+            path.push_back(rev->to_string(HashFormat::Base16, false));
         auto url = ParsedURL{
             .scheme = std::string{schemeName()},
             .path = path,

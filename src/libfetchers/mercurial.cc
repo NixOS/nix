@@ -120,7 +120,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return url.path;
+            return renderUrlPathEnsureLegal(url.path);
         return {};
     }
 
@@ -152,7 +152,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file";
-        return {isLocal, isLocal ? url.path : url.to_string()};
+        return {isLocal, isLocal ? renderUrlPathEnsureLegal(url.path) : url.to_string()};
     }
 
     StorePath fetchToStore(ref<Store> store, Input & input) const

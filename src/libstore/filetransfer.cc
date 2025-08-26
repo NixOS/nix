@@ -815,7 +815,7 @@ struct curlFileTransfer : public FileTransfer
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
                 // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(parsed.bucket, parsed.key);
+                auto s3Res = s3Helper.getObject(parsed.bucket, encodeUrlPath(parsed.key));
                 FileTransferResult res;
                 if (!s3Res.data)
                     throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);

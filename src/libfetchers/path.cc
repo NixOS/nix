@@ -20,7 +20,7 @@ struct PathInputScheme : InputScheme
 
         Input input{settings};
         input.attrs.insert_or_assign("type", "path");
-        input.attrs.insert_or_assign("path", url.path);
+        input.attrs.insert_or_assign("path", renderUrlPathEnsureLegal(url.path));
 
         for (auto & [name, value] : url.query)
             if (name == "rev" || name == "narHash")
@@ -74,7 +74,7 @@ struct PathInputScheme : InputScheme
         query.erase("__final");
         return ParsedURL{
             .scheme = "path",
-            .path = getStrAttr(input.attrs, "path"),
+            .path = splitString<std::vector<std::string>>(getStrAttr(input.attrs, "path"), "/"),
             .query = query,
         };
     }

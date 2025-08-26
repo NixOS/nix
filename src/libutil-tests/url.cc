@@ -18,7 +18,7 @@ TEST(parseURL, parsesSimpleHttpUrl)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -35,7 +35,7 @@ TEST(parseURL, parsesSimpleHttpsUrl)
     ParsedURL expected{
         .scheme = "https",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -52,7 +52,7 @@ TEST(parseURL, parsesSimpleHttpUrlWithQueryAndFragment)
     ParsedURL expected{
         .scheme = "https",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
         .fragment = "hello",
     };
@@ -69,7 +69,7 @@ TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"field", "value"}},
         .fragment = "?foo=bar#",
     };
@@ -85,7 +85,7 @@ TEST(parseURL, parsesFilePlusHttpsUrl)
     ParsedURL expected{
         .scheme = "file+https",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/video.mp4",
+        .path = {"", "video.mp4"},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -108,7 +108,7 @@ TEST(parseURL, parseIPv4Address)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
         .fragment = "hello",
     };
@@ -125,7 +125,7 @@ TEST(parseURL, parseScopedRFC6874IPv6Address)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
-        .path = "",
+        .path = {""},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -147,7 +147,7 @@ TEST(parseURL, parseIPv6Address)
                 .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
                 .port = 8080,
             },
-        .path = "",
+        .path = {""},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -178,7 +178,7 @@ TEST(parseURL, parseUserPassword)
                 .password = "pass",
                 .port = 8080,
             },
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -195,11 +195,12 @@ TEST(parseURL, parseFileURLWithQueryAndFragment)
     ParsedURL expected{
         .scheme = "file",
         .authority = Authority{},
-        .path = "/none/of//your/business",
+        .path = {"", "none", "of", "", "your", "business"},
         .query = (StringMap) {},
         .fragment = "",
     };
 
+    ASSERT_EQ(parsed.renderPath(), "/none/of//your/business");
     ASSERT_EQ(parsed, expected);
     ASSERT_EQ(s, parsed.to_string());
 }
@@ -212,9 +213,10 @@ TEST(parseURL, parseFileURL)
     ParsedURL expected{
         .scheme = "file",
         .authority = std::nullopt,
-        .path = "/none/of/your/business/",
+        .path = {"", "none", "of", "your", "business", ""},
     };
 
+    ASSERT_EQ(parsed.renderPath(), "/none/of/your/business/");
     ASSERT_EQ(parsed, expected);
     ASSERT_EQ(s, parsed.to_string());
 }
@@ -227,10 +229,11 @@ TEST(parseURL, parseFileURLWithAuthority)
     ParsedURL expected{
         .scheme = "file",
         .authority = Authority{.host = ""},
-        .path = "///of/your/business//",
+        .path = {"", "", "", "of", "your", "business", "", ""},
     };
 
-    ASSERT_EQ(parsed.authority, expected.authority);
+    ASSERT_EQ(parsed.path, expected.path);
+    ASSERT_EQ(parsed.renderPath(), "///of/your/business//");
     ASSERT_EQ(parsed, expected);
     ASSERT_EQ(s, parsed.to_string());
 }
@@ -243,9 +246,10 @@ TEST(parseURL, parseFileURLNoLeadingSlash)
     ParsedURL expected{
         .scheme = "file",
         .authority = std::nullopt,
-        .path = "none/of/your/business/",
+        .path = {"none", "of", "your", "business", ""},
     };
 
+    ASSERT_EQ(parsed.renderPath(), "none/of/your/business/");
     ASSERT_EQ(parsed, expected);
     ASSERT_EQ("file:none/of/your/business/", parsed.to_string());
 }
@@ -258,9 +262,10 @@ TEST(parseURL, parseHttpTrailingSlash)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.host = "example.com"},
-        .path = "/",
+        .path = {"", ""},
     };
 
+    ASSERT_EQ(parsed.renderPath(), "/");
     ASSERT_EQ(parsed, expected);
     ASSERT_EQ(s, parsed.to_string());
 }
@@ -306,7 +311,7 @@ TEST(parseURL, parseFTPUrl)
     ParsedURL expected{
         .scheme = "ftp",
         .authority = Authority{.hostType = HostType::Name, .host = "ftp.nixos.org"},
-        .path = "/downloads/nixos.iso",
+        .path = {"", "downloads", "nixos.iso"},
         .query = (StringMap) {},
         .fragment = "",
     };
@@ -342,7 +347,7 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/file.tar.gz",
+        .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"foo", "bar"}},
         .fragment = "",
     };
@@ -362,7 +367,7 @@ TEST(parseURLRelative, resolvesRelativePath)
     ParsedURL expected{
         .scheme = "http",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = "/dir/subdir/file.txt",
+        .path = {"", "dir", "subdir", "file.txt"},
         .query = {},
         .fragment = "",
     };
@@ -376,7 +381,7 @@ TEST(parseURLRelative, baseUrlIpv6AddressWithoutZoneId)
     ParsedURL expected{
         .scheme = "http",
         .authority = ParsedURL::Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c"},
-        .path = "/dir/subdir/file.txt",
+        .path = {"", "dir", "subdir", "file.txt"},
         .query = {},
         .fragment = "",
     };
@@ -390,7 +395,7 @@ TEST(parseURLRelative, resolvesRelativePathIpv6AddressWithZoneId)
     ParsedURL expected{
         .scheme = "http",
         .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
-        .path = "/dir/subdir/file2.txt",
+        .path = {"", "dir", "subdir", "file2.txt"},
         .query = {},
         .fragment = "",
     };
@@ -405,7 +410,7 @@ TEST(parseURLRelative, resolvesRelativePathWithDot)
     ParsedURL expected{
         .scheme = "http",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = "/dir/subdir/file.txt",
+        .path = {"", "dir", "subdir", "file.txt"},
         .query = {},
         .fragment = "",
     };
@@ -419,7 +424,21 @@ TEST(parseURLRelative, resolvesParentDirectory)
     ParsedURL expected{
         .scheme = "http",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
-        .path = "/up.txt",
+        .path = {"", "up.txt"},
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesParentDirectoryNotTrickedByEscapedSlash)
+{
+    ParsedURL base = parseURL("http://example.org:234/dir\%2Ffirst-trick/another-dir\%2Fsecond-trick/page.html");
+    auto parsed = parseURLRelative("../up.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
+        .path = {"", "dir/first-trick", "up.txt"},
         .query = {},
         .fragment = "",
     };
@@ -433,7 +452,7 @@ TEST(parseURLRelative, replacesPathWithAbsoluteRelative)
     ParsedURL expected{
         .scheme = "http",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = "/rooted.txt",
+        .path = {"", "rooted.txt"},
         .query = {},
         .fragment = "",
     };
@@ -448,7 +467,7 @@ TEST(parseURLRelative, keepsQueryAndFragmentFromRelative)
     ParsedURL expected{
         .scheme = "https",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/path/other.html",
+        .path = {"", "path", "other.html"},
         .query = {{"x", "1"}, {"y", "2"}},
         .fragment = "frag",
     };
@@ -489,7 +508,7 @@ TEST(parseURLRelative, emptyRelative)
     ParsedURL expected{
         .scheme = "https",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/path/index.html",
+        .path = {"", "path", "index.html"},
         .query = {{"a b", "5 6"}, {"x y", "34"}},
         .fragment = "",
     };
@@ -504,7 +523,7 @@ TEST(parseURLRelative, fragmentRelative)
     ParsedURL expected{
         .scheme = "https",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/path/index.html",
+        .path = {"", "path", "index.html"},
         .query = {{"a b", "5 6"}, {"x y", "34"}},
         .fragment = "frag2",
     };
@@ -518,7 +537,7 @@ TEST(parseURLRelative, queryRelative)
     ParsedURL expected{
         .scheme = "https",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/path/index.html",
+        .path = {"", "path", "index.html"},
         .query = {{"asdf qwer", "1 2 3"}},
         .fragment = "",
     };
@@ -532,7 +551,7 @@ TEST(parseURLRelative, queryFragmentRelative)
     ParsedURL expected{
         .scheme = "https",
         .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = "/path/index.html",
+        .path = {"", "path", "index.html"},
         .query = {{"asdf qwer", "1 2 3"}},
         .fragment = "frag2",
     };
@@ -646,6 +665,25 @@ TEST(percentEncode, yen)
 
     ASSERT_EQ(percentEncode(s), e);
     ASSERT_EQ(percentDecode(e), s);
+}
+
+TEST(parseURL, gitlabNamespacedProjectUrls)
+{
+    // Test GitLab URL patterns with namespaced projects
+    // These should preserve %2F encoding in the path
+    auto s = "https://gitlab.example.com/api/v4/projects/group%2Fsubgroup%2Fproject/repository/archive.tar.gz";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = Authority{.hostType = HostType::Name, .host = "gitlab.example.com"},
+        .path = {"", "api", "v4", "projects", "group/subgroup/project", "repository", "archive.tar.gz"},
+        .query = {},
+        .fragment = "",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(nix, isValidSchemeName)

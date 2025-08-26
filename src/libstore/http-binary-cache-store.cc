@@ -27,7 +27,7 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
           + (!_cacheUri.empty() ? _cacheUri
                                 : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme))))
 {
-    while (!cacheUri.path.empty() && cacheUri.path.back() == '/')
+    while (!cacheUri.path.empty() && cacheUri.path.back() == "")
         cacheUri.path.pop_back();
 }
 
@@ -37,7 +37,7 @@ StoreReference HttpBinaryCacheStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = cacheUri.scheme,
-                .authority = (cacheUri.authority ? cacheUri.authority->to_string() : "") + cacheUri.path,
+                .authority = cacheUri.renderAuthorityAndPath(),
             },
         .params = cacheUri.query,
     };
@@ -157,7 +157,7 @@ protected:
         /* Otherwise the last path fragment will get discarded. */
         auto cacheUriWithTrailingSlash = config->cacheUri;
         if (!cacheUriWithTrailingSlash.path.empty())
-            cacheUriWithTrailingSlash.path += "/";
+            cacheUriWithTrailingSlash.path.push_back("");
 
         /* path is not a path, but a full relative or absolute
            URL, e.g. we've seen in the wild NARINFO files have a URL

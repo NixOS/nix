@@ -69,7 +69,8 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
 
         args.push_back("--");
         args.push_back("git-lfs-authenticate");
-        args.push_back(url.path);
+        // FIXME %2F encode slashes? Does this command take/accept percent encoding?
+        args.push_back(url.renderPath(/*encode=*/false));
         args.push_back("download");
 
         auto [status, output] = runProgram({.program = "ssh", .args = args});

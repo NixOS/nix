@@ -143,7 +143,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     auto parsedURL = ParsedURL{
                         .scheme = "git+file",
                         .authority = ParsedURL::Authority{},
-                        .path = flakeRoot,
+                        .path = splitString<std::vector<std::string>>(flakeRoot, "/"),
                         .query = query,
                         .fragment = fragment,
                     };
@@ -172,7 +172,13 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     return fromParsedURL(
         fetchSettings,
-        {.scheme = "path", .authority = ParsedURL::Authority{}, .path = path, .query = query, .fragment = fragment},
+        {
+            .scheme = "path",
+            .authority = ParsedURL::Authority{},
+            .path = splitString<std::vector<std::string>>(path, "/"),
+            .query = query,
+            .fragment = fragment,
+        },
         isFlake);
 }
 
@@ -193,7 +199,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
         auto parsedURL = ParsedURL{
             .scheme = "flake",
             .authority = ParsedURL::Authority{},
-            .path = match[1],
+            .path = splitString<std::vector<std::string>>(match[1].str(), "/"),
         };
 
         return std::make_pair(
@@ -211,8 +217,12 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 {
     try {
         auto parsed = parseURL(url, /*lenient=*/true);
-        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file") && !isAbsolute(parsed.path))
-            parsed.path = absPath(parsed.path, *baseDir);
+        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
+            /* Here we know that the path must not contain encoded '/' or NUL bytes. */
+            auto path = renderUrlPathEnsureLegal(parsed.path);
+            if (!isAbsolute(path))
+                parsed.path = splitString<std::vector<std::string>>(absPath(path, *baseDir), "/");
+        }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
         return std::nullopt;

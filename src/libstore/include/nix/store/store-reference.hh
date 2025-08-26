@@ -77,11 +77,21 @@ struct StoreReference
      */
     std::string render(bool withParams = true) const;
 
+    std::string to_string() const
+    {
+        return render();
+    }
+
     /**
      * Parse a URI into a store reference.
      */
     static StoreReference parse(const std::string & uri, const Params & extraParams = Params{});
 };
+
+static inline std::ostream & operator<<(std::ostream & os, const StoreReference & ref)
+{
+    return os << ref.render();
+}
 
 /**
  * Split URI into protocol+hierarchy part and its parameter set.
