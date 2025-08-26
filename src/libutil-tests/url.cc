@@ -10,6 +10,36 @@ namespace nix {
 using Authority = ParsedURL::Authority;
 using HostType = Authority::HostType;
 
+TEST(fixGitURL, parsesMultipleTypesOfGitUrls)
+{
+    std::vector<std::tuple<std::string, std::string>> tests = {
+        // https://github.com/NixOS/nix/issues/5958
+        {"git+ssh://user@domain:1234/path", "git+ssh://user@domain:1234/path"},
+        // Already proper URL
+        {"git+ssh://user@domain:1234/path", "git+ssh://user@domain:1234/path"},
+        // SCP-like URL (rewritten to ssh://)
+        {"git@github.com:owner/repo.git", "ssh://git@github.com/owner/repo.git"},
+        // SCP-like URL (no user)
+        {"github.com:owner/repo.git", "ssh://github.com/owner/repo.git"},
+        // SCP-like URL (leading slash)
+        {"github.com:/owner/repo.git", "ssh://github.com/owner/repo.git"},
+        // Absolute path (becomes file:)
+        {"/home/me/repo", "file:///home/me/repo"},
+        // Relative path (becomes file:)
+        // NOTE: This is not valid technically as it's not absolute
+        {"relative/repo", "file://relative/repo"},
+        // Already file: scheme
+        // NOTE: This is not valid technically as it's not absolute
+        {"file:/var/repos/x", "file:/var/repos/x"},
+        // IPV6 test case
+        {"user@[2001:db8:0:1]:/home/file", "ssh://user@[2001:db8:0:1]/home/file"}};
+
+    for (const auto & [url, expected] : tests) {
+        std::string actual = fixGitURL(url);
+        EXPECT_EQ(actual, expected);
+    }
+}
+
 TEST(parseURL, parsesSimpleHttpUrl)
 {
     auto s = "http://www.example.org/file.tar.gz";
