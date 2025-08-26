@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.6.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.9.0.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -144,3 +144,11 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 * Fix queryPathInfo() negative caching by @edolstra in [DeterminateSystems/nix-src#173](https://github.com/DeterminateSystems/nix-src/pull/173)
 
 * forceDerivation(): Wait for async path write after forcing value by @edolstra in [DeterminateSystems/nix-src#176](https://github.com/DeterminateSystems/nix-src/pull/176)
+
+<!-- Determinate Nix version 3.9.0 -->
+
+* Build-time flake inputs by @edolstra in [DeterminateSystems/nix-src#49](https://github.com/DeterminateSystems/nix-src/pull/49)
+
+* libstore: use new apple-sdk pattern by @cole-h in [DeterminateSystems/nix-src#179](https://github.com/DeterminateSystems/nix-src/pull/179)
+
+* nix flake check: Wait for the async path writer to finish by @edolstra in [DeterminateSystems/nix-src#182](https://github.com/DeterminateSystems/nix-src/pull/182)
