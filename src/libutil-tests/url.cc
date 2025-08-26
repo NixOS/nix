@@ -382,6 +382,25 @@ TEST(percentEncode, yen)
     ASSERT_EQ(percentDecode(e), s);
 }
 
+TEST(parseURL, gitlabNamespacedProjectUrls)
+{
+    // Test GitLab URL patterns with namespaced projects
+    // These should preserve %2F encoding in the path
+    auto s = "https://gitlab.example.com/api/v4/projects/group%2Fsubgroup%2Fproject/repository/archive.tar.gz";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = Authority{.hostType = HostType::Name, .host = "gitlab.example.com"},
+        .path = "/api/v4/projects/group%2Fsubgroup%2Fproject/repository/archive.tar.gz",
+        .query = {},
+        .fragment = "",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
+}
+
 TEST(nix, isValidSchemeName)
 {
     ASSERT_TRUE(isValidSchemeName("http"));
