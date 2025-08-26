@@ -61,6 +61,7 @@ in
 
   testScript =
     { nodes }:
+    # python
     ''
       # fmt: off
       start_all()
@@ -73,7 +74,11 @@ in
       server.succeed("mc config host add minio http://localhost:9000 ${accessKey} ${secretKey} --api s3v4")
       server.succeed("mc mb minio/my-cache")
 
-      server.succeed("${env} nix copy --to '${storeUrl}' ${pkgA}")
+      # Test copying from a store and credential caching works
+      server_cp_out = server.succeed("${env} nix copy --debug --to '${storeUrl}' ${pkgA} 2>&1")
+      server_providers_created = server_cp_out.count("creating new AWS credential provider")
+      if server_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {server_providers_created}. Credential provider caching is probably not working.")
 
       client.wait_for_unit("network-addresses-eth1.service")
 
@@ -82,16 +87,34 @@ in
 
       # Test that the format string in the error message is properly setup and won't display `%s` instead of the failed URI
       msg = client.fail("${env} nix eval --impure --expr 'builtins.fetchurl { name = \"foo\"; url = \"${objectThatDoesNotExist}\"; }' 2>&1")
-      if "S3 object '${objectThatDoesNotExist}' does not exist" not in msg:
+      if "unable to download '${objectThatDoesNotExist}': HTTP error 404" not in msg:
         print(msg) # So that you can see the message that was improperly formatted
         raise Exception("Error message formatting didn't work")
 
       # Copy a package from the binary cache.
       client.fail("nix path-info ${pkgA}")
 
+      # Test nix store info with various S3 URL formats
       client.succeed("${env} nix store info --store '${storeUrl}' >&2")
 
-      client.succeed("${env} nix copy --no-check-sigs --from '${storeUrl}' ${pkgA}")
+      # Test with different region parameter (should work without warnings)
+      client.succeed("${env} nix store info --store 's3://my-cache?endpoint=http://server:9000&region=us-east-2' >&2")
+
+      # Test with just bucket name and region
+      client.succeed("${env} nix store info --store 's3://my-cache?region=eu-west-1&endpoint=http://server:9000' >&2")
+
+      # Test that store info shows the store is available
+      info = client.succeed("${env} nix store info --json --store '${storeUrl}'")
+      import json
+      store_info = json.loads(info)
+      assert store_info.get("url"), "Store should have a URL"
+      print(f"Store URL: {store_info.get('url')}")
+
+      # Test copying from a store and credential caching works
+      client_cp_out = client.succeed("${env} nix copy --debug --no-check-sigs --from '${storeUrl}' ${pkgA} 2>&1")
+      client_providers_created = client_cp_out.count("creating new AWS credential provider")
+      if client_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {client_providers_created}. Credential provider caching is probably not working.")
 
       client.succeed("nix path-info ${pkgA}")
     '';
