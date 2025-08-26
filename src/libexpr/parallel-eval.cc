@@ -252,7 +252,7 @@ void ValueStorage<sizeof(void *)>::notifyWaiters()
 
 static void prim_parallel(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceList(*args[0], pos, "while evaluating the second argument passed to builtins.map");
+    state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.parallel");
 
     if (state.executor->evalCores > 1) {
         std::vector<std::pair<Executor::work_t, uint8_t>> work;
