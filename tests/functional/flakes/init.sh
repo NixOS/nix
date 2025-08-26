@@ -11,6 +11,8 @@ nixpkgsDir=$TEST_ROOT/nixpkgs
 nix registry add --registry "$registry" templates "git+file://$templatesDir"
 nix registry add --registry "$registry" nixpkgs "git+file://$nixpkgsDir"
 
+nix registry list
+
 createGitRepo "$nixpkgsDir"
 createSimpleGitFlake "$nixpkgsDir"
 
