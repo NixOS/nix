@@ -33,7 +33,7 @@ ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthori
     }();
 
     auto port = [&]() -> std::optional<uint16_t> {
-        if (!parsed->has_port())
+        if (!parsed->has_port() || parsed->port() == "")
             return std::nullopt;
         /* If the port number is non-zero and representable. */
         if (auto portNumber = parsed->port_number())
