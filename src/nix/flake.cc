@@ -842,7 +842,7 @@ static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate
 
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
-    std::string templateUrl = "templates";
+    std::string templateUrl = "https://flakehub.com/f/DeterminateSystems/flake-templates/0.1";
     Path destDir;
 
     const LockFlags lockFlags{.writeLockFile = false};
