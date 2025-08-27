@@ -49,9 +49,6 @@ struct InitialOutput
     std::optional<InitialOutputStatus> known;
 };
 
-void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
  * Format the known outputs of a derivation for use in error messages.
  */
