@@ -79,7 +79,8 @@ private:
 
         try {
             debug(
-                "creating new AWS credential provider for profile '%s'",
+                "[pid=%d] creating new AWS credential provider for profile '%s'",
+                getpid(),
                 profile.empty() ? "(default)" : profile.c_str());
             auto provider = profile.empty() ? AwsCredentialProvider::createDefault()
                                             : AwsCredentialProvider::createProfile(profile);

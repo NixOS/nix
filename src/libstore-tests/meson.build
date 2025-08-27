@@ -77,6 +77,7 @@ sources = files(
   'path.cc',
   'references.cc',
   's3-edge-cases.cc',
+  's3-fork-safety.cc',
   's3-http-integration.cc',
   's3.cc',
   'serve-protocol.cc',
