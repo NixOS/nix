@@ -766,6 +766,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     .initialOutputs = initialOutputs,
                     .buildMode = buildMode,
                     .defaultPathsInChroot = std::move(defaultPathsInChroot),
+                    .systemFeatures = worker.store.config.systemFeatures.get(),
                     .finalEnv = std::move(finalEnv),
                     .extraFiles = std::move(extraFiles),
                 });
