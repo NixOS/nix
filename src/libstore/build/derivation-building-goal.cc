@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
@@ -681,8 +682,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             assert(localStoreP);
 
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
-            decltype(DerivationBuilderParams::finalEnv) finalEnv;
-            decltype(DerivationBuilderParams::extraFiles) extraFiles;
+            DesugaredEnv desugaredEnv;
 
             /* Add the closure of store paths to the chroot. */
             StorePathSet closure;
@@ -701,54 +701,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             }
 
             try {
-                if (drv->structuredAttrs) {
-                    auto json = drv->structuredAttrs->prepareStructuredAttrs(
-                        worker.store, *drvOptions, inputPaths, drv->outputs);
-
-                    finalEnv.insert_or_assign(
-                        "NIX_ATTRS_SH_FILE",
-                        DerivationBuilderParams::EnvEntry{
-                            .nameOfPassAsFile = ".attrs.sh",
-                            .value = StructuredAttrs::writeShell(json),
-                        });
-                    finalEnv.insert_or_assign(
-                        "NIX_ATTRS_JSON_FILE",
-                        DerivationBuilderParams::EnvEntry{
-                            .nameOfPassAsFile = ".attrs.json",
-                            .value = json.dump(),
-                        });
-                } else {
-                    /* In non-structured mode, set all bindings either directory in the
-                       environment or via a file, as specified by
-                       `DerivationOptions::passAsFile`. */
-                    for (auto & [envName, envValue] : drv->env) {
-                        if (drvOptions->passAsFile.find(envName) == drvOptions->passAsFile.end()) {
-                            finalEnv.insert_or_assign(
-                                envName,
-                                DerivationBuilderParams::EnvEntry{
-                                    .nameOfPassAsFile = std::nullopt,
-                                    .value = envValue,
-                                });
-                        } else {
-                            auto hash = hashString(HashAlgorithm::SHA256, envName);
-                            finalEnv.insert_or_assign(
-                                envName + "Path",
-                                DerivationBuilderParams::EnvEntry{
-                                    .nameOfPassAsFile = ".attr-" + hash.to_string(HashFormat::Nix32, false),
-                                    .value = envValue,
-                                });
-                        }
-                    }
-
-                    /* Handle exportReferencesGraph(), if set. */
-                    for (auto & [fileName, storePaths] : drvOptions->getParsedExportReferencesGraph(worker.store)) {
-                        /* Write closure info to <fileName>. */
-                        extraFiles.insert_or_assign(
-                            fileName,
-                            worker.store.makeValidityRegistration(
-                                worker.store.exportReferences(storePaths, inputPaths), false, false));
-                    }
-                }
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, *drvOptions, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 worker.permanentFailure = true;
@@ -770,8 +723,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     .buildMode = buildMode,
                     .defaultPathsInChroot = std::move(defaultPathsInChroot),
                     .systemFeatures = worker.store.config.systemFeatures.get(),
-                    .finalEnv = std::move(finalEnv),
-                    .extraFiles = std::move(extraFiles),
+                    .desugaredEnv = std::move(desugaredEnv),
                 });
         }
 
