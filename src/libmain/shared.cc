@@ -191,6 +191,7 @@ void initNix(bool loadConfig)
        now.  In particular, store objects should be readable by
        everybody. */
     umask(0022);
+<<<<<<< HEAD
 
     /* Initialise the PRNG. */
     struct timeval tv;
@@ -199,6 +200,8 @@ void initNix(bool loadConfig)
     srandom(tv.tv_usec);
 #endif
     srand(tv.tv_usec);
+=======
+>>>>>>> 6aed9d877 (cherry-pick https://gerrit.lix.systems/c/lix/+/2100)
 }
 
 LegacyArgs::LegacyArgs(

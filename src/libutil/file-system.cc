@@ -8,12 +8,12 @@
 #include "nix/util/util.hh"
 
 #include <atomic>
+#include <random>
 #include <cerrno>
 #include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <deque>
-#include <sstream>
 #include <filesystem>
 
 #include <fcntl.h>
@@ -26,10 +26,6 @@
 #ifdef _WIN32
 #  include <io.h>
 #endif
-
-#include "nix/util/strings-inline.hh"
-
-#include "util-config-private.hh"
 
 namespace nix {
 
@@ -598,6 +594,7 @@ std::string defaultTempDir()
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
+<<<<<<< HEAD
 static Path tempName(Path tmpRoot, const Path & prefix, bool includePid, std::atomic<unsigned int> & counter)
 {
     tmpRoot = canonPath(tmpRoot.empty() ? defaultTempDir() : tmpRoot, true);
@@ -618,6 +615,14 @@ Path createTempDir(const Path & tmpRoot, const Path & prefix, bool includePid, b
         Path tmpDir = tempName(tmpRoot, prefix, includePid, counter);
         if (mkdir(
                 tmpDir.c_str()
+=======
+Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
+{
+    while (1) {
+        checkInterrupt();
+        Path tmpDir = makeTempPath(tmpRoot, prefix);
+        if (mkdir(tmpDir.c_str()
+>>>>>>> 9e26549c2 (Consolidate tempName and makeTempPath)
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
                     ,
                 mode
@@ -655,6 +660,14 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), tmpl};
+}
+
+Path makeTempPath(const Path & root, const Path & suffix)
+{
+    // start the counter at a random value to minimize issues with preexisting temp paths
+    static std::atomic<uint32_t> counter(std::random_device{}());
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
+    return fmt("%1%/%2%-%3%-%4%", tmpRoot, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 
 void createSymlink(const Path & target, const Path & link)
