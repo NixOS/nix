@@ -93,32 +93,6 @@ struct DerivationBuilderParams
      * `EnvEntry::nameOfPassAsFile` above.
      */
     StringMap extraFiles;
-
-    DerivationBuilderParams(
-        const StorePath & drvPath,
-        const BuildMode & buildMode,
-        BuildResult & buildResult,
-        const Derivation & drv,
-        const DerivationOptions & drvOptions,
-        const StorePathSet & inputPaths,
-        std::map<std::string, InitialOutput> & initialOutputs,
-        PathsInChroot defaultPathsInChroot,
-        std::map<std::string, EnvEntry, std::less<>> finalEnv,
-        StringMap extraFiles)
-        : drvPath{drvPath}
-        , buildResult{buildResult}
-        , drv{drv}
-        , drvOptions{drvOptions}
-        , inputPaths{inputPaths}
-        , initialOutputs{initialOutputs}
-        , buildMode{buildMode}
-        , defaultPathsInChroot{std::move(defaultPathsInChroot)}
-        , finalEnv{std::move(finalEnv)}
-        , extraFiles{std::move(extraFiles)}
-    {
-    }
-
-    DerivationBuilderParams(DerivationBuilderParams &&) = default;
 };
 
 /**
