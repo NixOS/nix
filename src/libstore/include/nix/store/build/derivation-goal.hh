@@ -99,13 +99,9 @@ private:
 
     Co repairClosure();
 
-    /**
-     * @param builtOutput Must be set if `status` is successful.
-     */
-    Done done(
-        BuildResult::Status status,
-        std::optional<Realisation> builtOutput = std::nullopt,
-        std::optional<Error> ex = {});
+    Done doneSuccess(BuildResult::Status status, Realisation builtOutput);
+
+    Done doneFailure(BuildError ex);
 };
 
 } // namespace nix

@@ -46,7 +46,13 @@
 
 namespace nix {
 
-MakeError(NotDeterministic, BuildError);
+struct NotDeterministic : BuildError
+{
+    NotDeterministic(auto &&... args)
+        : BuildError(BuildResult::NotDeterministic, args...)
+    {
+    }
+};
 
 /**
  * This class represents the state for building locally.
@@ -185,7 +191,7 @@ public:
 
     void startBuilder() override;
 
-    std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() override;
+    std::variant<BuildError, SingleDrvOutputs> unprepareBuild() override;
 
 protected:
 
@@ -420,7 +426,7 @@ bool DerivationBuilderImpl::prepareBuild()
     return true;
 }
 
-std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
+std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
 {
     // FIXME: get rid of this, rely on RAII.
     Finally releaseBuildUser([&]() {
@@ -493,7 +499,10 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
             if (diskFull)
                 msg += "\nnote: build failure may have been caused by lack of free disk space";
 
-            throw BuildError(msg);
+            throw BuildError(
+                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure
+                                                          : BuildResult::PermanentFailure,
+                msg);
         }
 
         /* Compute the FS closure of the outputs and register them as
@@ -509,12 +518,7 @@ std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> Derivation
         return std::move(builtOutputs);
 
     } catch (BuildError & e) {
-        BuildResult::Status st = dynamic_cast<NotDeterministic *>(&e)        ? BuildResult::NotDeterministic
-                                 : statusOk(status)                          ? BuildResult::OutputRejected
-                                 : !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure
-                                                                             : BuildResult::PermanentFailure;
-
-        return std::pair{std::move(st), std::move(e)};
+        return std::move(e);
     }
 }
 
@@ -682,7 +686,7 @@ void DerivationBuilderImpl::startBuilder()
                 fmt("\nNote: run `%s` to run programs for x86_64-darwin",
                     Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
-        throw BuildError(msg);
+        throw BuildError(BuildResult::InputRejected, msg);
     }
 
     auto buildDir = store.config->getBuildDir();
@@ -1378,6 +1382,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optSt = maybeLstat(actualPath.c_str());
         if (!optSt)
             throw BuildError(
+                BuildResult::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at '%s'",
                 store.printStorePath(drvPath),
                 outputName,
@@ -1392,6 +1397,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH)))
             || (buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(
+                BuildResult::OutputRejected,
                 "suspicious ownership or permission on '%s' for output '%s'; rejecting this build output",
                 actualPath,
                 outputName);
@@ -1428,7 +1434,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         {[&](const std::string & name) {
             auto orifu = get(outputReferencesIfUnregistered, name);
             if (!orifu)
-                throw BuildError("no output reference for '%s' in build of '%s'", name, store.printStorePath(drvPath));
+                throw BuildError(
+                    BuildResult::OutputRejected,
+                    "no output reference for '%s' in build of '%s'",
+                    name,
+                    store.printStorePath(drvPath));
             return std::visit(
                 overloaded{
                     /* Since we'll use the already installed versions of these, we
@@ -1450,6 +1460,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         {[&](const std::string & path, const std::string & parent) {
             // TODO with more -vvvv also show the temporary paths for manual inspection.
             return BuildError(
+                BuildResult::OutputRejected,
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
                 store.printStorePath(drvPath),
                 path,
@@ -1543,11 +1554,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
             auto st = get(outputStats, outputName);
             if (!st)
-                throw BuildError("output path %1% without valid stats info", actualPath);
+                throw BuildError(BuildResult::OutputRejected, "output path %1% without valid stats info", actualPath);
             if (outputHash.method.getFileIngestionMethod() == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
+                        BuildResult::OutputRejected,
                         "output path '%1%' should be a non-executable regular file "
                         "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
@@ -1649,6 +1661,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                            valid. */
                         miscMethods->noteHashMismatch();
                         delayedException = std::make_exception_ptr(BuildError(
+                            BuildResult::OutputRejected,
                             "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             store.printStorePath(drvPath),
                             wanted.to_string(HashFormat::SRI, true),
@@ -1657,6 +1670,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     if (!newInfo0.references.empty()) {
                         auto numViolations = newInfo.references.size();
                         delayedException = std::make_exception_ptr(BuildError(
+                            BuildResult::OutputRejected,
                             "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
                             store.printStorePath(drvPath),
                             numViolations,

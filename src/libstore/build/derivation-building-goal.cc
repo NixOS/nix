@@ -118,7 +118,7 @@ void DerivationBuildingGoal::timedOut(Error && ex)
     killChild();
     // We're not inside a coroutine, hence we can't use co_return here.
     // Thus we ignore the return value.
-    [[maybe_unused]] Done _ = done(BuildResult::TimedOut, {}, std::move(ex));
+    [[maybe_unused]] Done _ = doneFailure({BuildResult::TimedOut, std::move(ex)});
 }
 
 /**
@@ -258,7 +258,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                 nrFailed,
                 nrFailed == 1 ? "dependency" : "dependencies");
         msg += showKnownOutputs(worker.store, *drv);
-        co_return done(BuildResult::DependencyFailed, {}, Error(msg));
+        co_return doneFailure(BuildError(BuildResult::DependencyFailed, msg));
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -359,9 +359,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             auto resolvedResult = resolvedDrvGoal->buildResult;
 
-            SingleDrvOutputs builtOutputs;
-
             if (resolvedResult.success()) {
+                SingleDrvOutputs builtOutputs;
+
                 auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
                 StorePathSet outputPaths;
@@ -411,13 +411,19 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                 }
 
                 runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+
+                auto status = resolvedResult.status;
+                if (status == BuildResult::AlreadyValid)
+                    status = BuildResult::ResolvesToAlreadyValid;
+
+                co_return doneSuccess(status, std::move(builtOutputs));
+            } else {
+                co_return doneFailure({
+                    BuildResult::DependencyFailed,
+                    "build of resolved derivation '%s' failed",
+                    worker.store.printStorePath(pathResolved),
+                });
             }
-
-            auto status = resolvedResult.status;
-            if (status == BuildResult::AlreadyValid)
-                status = BuildResult::ResolvesToAlreadyValid;
-
-            co_return done(status, std::move(builtOutputs));
         }
 
         /* If we get this far, we know no dynamic drvs inputs */
@@ -542,7 +548,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return done(BuildResult::AlreadyValid, std::move(validOutputs));
+        co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
     }
 
     /* If any of the outputs already exist but are not valid, delete
@@ -752,7 +758,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 worker.permanentFailure = true;
-                co_return done(BuildResult::InputRejected, {}, std::move(e));
+                co_return doneFailure(std::move(e));
             }
 
             /* If we have to wait and retry (see below), then `builder` will
@@ -800,7 +806,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         builder.reset();
         outputLocks.unlock();
         worker.permanentFailure = true;
-        co_return done(BuildResult::InputRejected, {}, std::move(e));
+        co_return doneFailure(std::move(e)); // InputRejected
     }
 
     started();
@@ -812,7 +818,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     // N.B. cannot use `std::visit` with co-routine return
     if (auto * ste = std::get_if<0>(&res)) {
         outputLocks.unlock();
-        co_return done(std::move(ste->first), {}, std::move(ste->second));
+        co_return doneFailure(std::move(*ste));
     } else if (auto * builtOutputs = std::get_if<1>(&res)) {
         StorePathSet outputPaths;
         for (auto & [_, output] : *builtOutputs)
@@ -825,7 +831,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
            (unlinked) lock files. */
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return done(BuildResult::Built, std::move(*builtOutputs));
+        co_return doneSuccess(BuildResult::Built, std::move(*builtOutputs));
     } else {
         unreachable();
     }
@@ -970,7 +976,7 @@ Goal::Co DerivationBuildingGoal::hookDone()
 
         /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-        co_return done(BuildResult::MiscFailure, {}, BuildError(msg));
+        co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
     }
 
     /* Compute the FS closure of the outputs and register them as
@@ -997,7 +1003,7 @@ Goal::Co DerivationBuildingGoal::hookDone()
     outputLocks.setDeletion(true);
     outputLocks.unlock();
 
-    co_return done(BuildResult::Built, std::move(builtOutputs));
+    co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
 }
 
 HookReply DerivationBuildingGoal::tryBuildHook()
@@ -1179,10 +1185,11 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
             killChild();
             // We're not inside a coroutine, hence we can't use co_return here.
             // Thus we ignore the return value.
-            [[maybe_unused]] Done _ = done(
+            [[maybe_unused]] Done _ = doneFailure(BuildError(
                 BuildResult::LogLimitExceeded,
-                {},
-                Error("%s killed after writing more than %d bytes of log output", getName(), settings.maxLogSize));
+                "%s killed after writing more than %d bytes of log output",
+                getName(),
+                settings.maxLogSize));
             return;
         }
 
@@ -1343,13 +1350,27 @@ SingleDrvOutputs DerivationBuildingGoal::assertPathValidity()
     return validOutputs;
 }
 
-Goal::Done
-DerivationBuildingGoal::done(BuildResult::Status status, SingleDrvOutputs builtOutputs, std::optional<Error> ex)
+Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs)
 {
-    outputLocks.unlock();
     buildResult.status = status;
-    if (ex)
-        buildResult.errorMsg = fmt("%s", Uncolored(ex->info().msg));
+
+    assert(buildResult.success());
+
+    mcRunningBuilds.reset();
+
+    buildResult.builtOutputs = std::move(builtOutputs);
+    if (status == BuildResult::Built)
+        worker.doneBuilds++;
+
+    worker.updateProgress();
+
+    return amDone(ecSuccess, std::nullopt);
+}
+
+Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
+{
+    buildResult.status = ex.status;
+    buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
     if (buildResult.status == BuildResult::TimedOut)
         worker.timedOut = true;
     if (buildResult.status == BuildResult::PermanentFailure)
@@ -1357,18 +1378,12 @@ DerivationBuildingGoal::done(BuildResult::Status status, SingleDrvOutputs builtO
 
     mcRunningBuilds.reset();
 
-    if (buildResult.success()) {
-        buildResult.builtOutputs = std::move(builtOutputs);
-        if (status == BuildResult::Built)
-            worker.doneBuilds++;
-    } else {
-        if (status != BuildResult::DependencyFailed)
-            worker.failedBuilds++;
-    }
+    if (ex.status != BuildResult::DependencyFailed)
+        worker.failedBuilds++;
 
     worker.updateProgress();
 
-    return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
+    return amDone(ecFailed, {std::move(ex)});
 }
 
 } // namespace nix

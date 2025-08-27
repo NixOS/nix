@@ -1002,7 +1002,10 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
-                    "cycle detected in the references of '%s' from '%s'", printStorePath(path), printStorePath(parent));
+                    BuildResult::OutputRejected,
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(path),
+                    printStorePath(parent));
             }});
 
         txn.commit();

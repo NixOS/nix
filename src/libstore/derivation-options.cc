@@ -265,7 +265,8 @@ DerivationOptions::getParsedExportReferencesGraph(const StoreDirConfig & store) 
         StorePathSet storePaths;
         for (auto & storePathS : ss) {
             if (!store.isInStore(storePathS))
-                throw BuildError("'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+                throw BuildError(
+                    BuildResult::InputRejected, "'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
             storePaths.insert(store.toStorePath(storePathS).first);
         }
         res.insert_or_assign(fileName, storePaths);
