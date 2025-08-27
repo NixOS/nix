@@ -291,6 +291,194 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
 }
 
 /* ----------------------------------------------------------------------------
+ * parseURLRelative
+ * --------------------------------------------------------------------------*/
+
+TEST(parseURLRelative, resolvesRelativePath)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, baseUrlIpv6AddressWithoutZoneId)
+{
+    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c]/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesRelativePathIpv6AddressWithZoneId)
+{
+    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html");
+    auto parsed = parseURLRelative("subdir/file2.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
+        .path = "/dir/subdir/file2.txt",
+        .query = {},
+        .fragment = "",
+    };
+
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesRelativePathWithDot)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("./subdir/file.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/dir/subdir/file.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, resolvesParentDirectory)
+{
+    ParsedURL base = parseURL("http://example.org:234/dir/page.html");
+    auto parsed = parseURLRelative("../up.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
+        .path = "/up.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, replacesPathWithAbsoluteRelative)
+{
+    ParsedURL base = parseURL("http://example.org/dir/page.html");
+    auto parsed = parseURLRelative("/rooted.txt", base);
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
+        .path = "/rooted.txt",
+        .query = {},
+        .fragment = "",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, keepsQueryAndFragmentFromRelative)
+{
+    // But discard query params on base URL
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?z=3");
+    auto parsed = parseURLRelative("other.html?x=1&y=2#frag", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/other.html",
+        .query = {{"x", "1"}, {"y", "2"}},
+        .fragment = "frag",
+    };
+    ASSERT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, absOverride)
+{
+    ParsedURL base = parseURL("http://example.org/path/page.html");
+    std::string_view abs = "https://127.0.0.1.org/secure";
+    auto parsed = parseURLRelative(abs, base);
+    auto parsedAbs = parseURL(abs);
+    ASSERT_EQ(parsed, parsedAbs);
+}
+
+TEST(parseURLRelative, absOverrideWithZoneId)
+{
+    ParsedURL base = parseURL("http://example.org/path/page.html");
+    std::string_view abs = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar";
+    auto parsed = parseURLRelative(abs, base);
+    auto parsedAbs = parseURL(abs);
+    ASSERT_EQ(parsed, parsedAbs);
+}
+
+TEST(parseURLRelative, bothWithoutAuthority)
+{
+    ParsedURL base = parseURL("mailto:mail-base@bar.baz?bcc=alice@asdf.com");
+    std::string_view over = "mailto:mail-override@foo.bar?subject=url-testing";
+    auto parsed = parseURLRelative(over, base);
+    auto parsedOverride = parseURL(over);
+    ASSERT_EQ(parsed, parsedOverride);
+}
+
+TEST(parseURLRelative, emptyRelative)
+{
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
+    auto parsed = parseURLRelative("", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/index.html",
+        .query = {{"a b", "5 6"}, {"x y", "34"}},
+        .fragment = "",
+    };
+    EXPECT_EQ(base.fragment, "frag");
+    EXPECT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, fragmentRelative)
+{
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
+    auto parsed = parseURLRelative("#frag2", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/index.html",
+        .query = {{"a b", "5 6"}, {"x y", "34"}},
+        .fragment = "frag2",
+    };
+    EXPECT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, queryRelative)
+{
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
+    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/index.html",
+        .query = {{"asdf qwer", "1 2 3"}},
+        .fragment = "",
+    };
+    EXPECT_EQ(parsed, expected);
+}
+
+TEST(parseURLRelative, queryFragmentRelative)
+{
+    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
+    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203#frag2", base);
+    ParsedURL expected{
+        .scheme = "https",
+        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/path/index.html",
+        .query = {{"asdf qwer", "1 2 3"}},
+        .fragment = "frag2",
+    };
+    EXPECT_EQ(parsed, expected);
+}
+
+/* ----------------------------------------------------------------------------
  * decodeQuery
  * --------------------------------------------------------------------------*/
 

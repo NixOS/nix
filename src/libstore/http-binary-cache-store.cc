@@ -154,22 +154,17 @@ protected:
 
     FileTransferRequest makeRequest(const std::string & path)
     {
-        /* FIXME path is not a path, but a full relative or absolute
+        /* Otherwise the last path fragment will get discarded. */
+        auto cacheUriWithTrailingSlash = config->cacheUri;
+        if (!cacheUriWithTrailingSlash.path.empty())
+            cacheUriWithTrailingSlash.path += "/";
+
+        /* path is not a path, but a full relative or absolute
            URL, e.g. we've seen in the wild NARINFO files have a URL
            field which is
            `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
-           (note the query param) and that gets passed here.
-
-           What should actually happen is that we have two parsed URLs
-           (if we support relative URLs), and then we combined them with
-           a URL `operator/` which would be like
-           `std::filesystem::path`'s equivalent operator, which properly
-           combines the the URLs, whether the right is relative or
-           absolute. */
-        return FileTransferRequest(parseURL(
-            hasPrefix(path, "https://") || hasPrefix(path, "http://") || hasPrefix(path, "file://")
-                ? path
-                : config->cacheUri.to_string() + "/" + path));
+           (note the query param) and that gets passed here. */
+        return FileTransferRequest(parseURLRelative(path, cacheUriWithTrailingSlash));
     }
 
     void getFile(const std::string & path, Sink & sink) override

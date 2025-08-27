@@ -108,6 +108,8 @@ static std::string percentEncodeCharSet(std::string_view s, auto charSet)
     return res;
 }
 
+static ParsedURL fromBoostUrlView(boost::urls::url_view url, bool lenient);
+
 ParsedURL parseURL(std::string_view url, bool lenient)
 try {
     /* Account for several non-standard properties of nix urls (for back-compat):
@@ -149,10 +151,15 @@ try {
         }();
     }
 
-    auto urlView = boost::urls::url_view(lenient ? fixedEncodedUrl : url);
+    return fromBoostUrlView(boost::urls::url_view(lenient ? fixedEncodedUrl : url), lenient);
+} catch (boost::system::system_error & e) {
+    throw BadURL("'%s' is not a valid URL: %s", url, e.code().message());
+}
 
+static ParsedURL fromBoostUrlView(boost::urls::url_view urlView, bool lenient)
+{
     if (!urlView.has_scheme())
-        throw BadURL("'%s' doesn't have a scheme", url);
+        throw BadURL("'%s' doesn't have a scheme", urlView.buffer());
 
     auto scheme = urlView.scheme();
     auto authority = [&]() -> std::optional<ParsedURL::Authority> {
@@ -170,7 +177,7 @@ try {
      * scheme considers a missing authority or empty host invalid. */
     auto transportIsFile = parseUrlScheme(scheme).transport == "file";
     if (authority && authority->host.size() && transportIsFile)
-        throw BadURL("file:// URL '%s' has unexpected authority '%s'", url, *authority);
+        throw BadURL("file:// URL '%s' has unexpected authority '%s'", urlView.buffer(), *authority);
 
     auto path = urlView.path();         /* Does pct-decoding */
     auto fragment = urlView.fragment(); /* Does pct-decoding */
@@ -189,8 +196,58 @@ try {
         .query = decodeQuery(query, lenient),
         .fragment = fragment,
     };
-} catch (boost::system::system_error & e) {
-    throw BadURL("'%s' is not a valid URL: %s", url, e.code().message());
+}
+
+ParsedURL parseURLRelative(std::string_view urlS, const ParsedURL & base)
+try {
+
+    boost::urls::url resolved;
+
+    try {
+        resolved.set_scheme(base.scheme);
+        if (base.authority) {
+            auto & authority = *base.authority;
+            resolved.set_host_address(authority.host);
+            if (authority.user)
+                resolved.set_user(*authority.user);
+            if (authority.password)
+                resolved.set_password(*authority.password);
+            if (authority.port)
+                resolved.set_port_number(*authority.port);
+        }
+        resolved.set_path(base.path);
+        resolved.set_encoded_query(encodeQuery(base.query));
+        resolved.set_fragment(base.fragment);
+    } catch (boost::system::system_error & e) {
+        throw BadURL("'%s' is not a valid URL: %s", base.to_string(), e.code().message());
+    }
+
+    boost::urls::url_view url;
+    try {
+        url = urlS;
+        resolved.resolve(url).value();
+    } catch (boost::system::system_error & e) {
+        throw BadURL("'%s' is not a valid URL: %s", urlS, e.code().message());
+    }
+
+    auto ret = fromBoostUrlView(resolved, /*lenient=*/false);
+
+    /* Hack: Boost `url_view` supports Zone IDs, but `url` does not.
+       Just manually take the authority from the original URL to work
+       around it. See https://github.com/boostorg/url/issues/919 for
+       details. */
+    if (!url.has_authority()) {
+        ret.authority = base.authority;
+    }
+
+    /* Hack, work around fragment of base URL improperly being preserved
+       https://github.com/boostorg/url/issues/920 */
+    ret.fragment = url.has_fragment() ? std::string{url.fragment()} : "";
+
+    return ret;
+} catch (BadURL & e) {
+    e.addTrace({}, "while resolving possibly-relative url '%s' against base URL '%s'", urlS, base);
+    throw;
 }
 
 std::string percentDecode(std::string_view in)
@@ -287,17 +344,17 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
-std::string fixGitURL(const std::string & url)
+ParsedURL fixGitURL(const std::string & url)
 {
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        return std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+        return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
     if (hasPrefix(url, "file:"))
-        return url;
+        return parseURL(url);
     if (url.find("://") == std::string::npos) {
-        return (ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = url}).to_string();
+        return (ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = url});
     }
-    return url;
+    return parseURL(url);
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
