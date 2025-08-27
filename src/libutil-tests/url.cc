@@ -204,6 +204,67 @@ TEST(parseURL, parseFileURLWithQueryAndFragment)
     ASSERT_EQ(s, parsed.to_string());
 }
 
+TEST(parseURL, parseFileURL)
+{
+    auto s = "file:/none/of/your/business/";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "file",
+        .authority = std::nullopt,
+        .path = "/none/of/your/business/",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
+}
+
+TEST(parseURL, parseFileURLWithAuthority)
+{
+    auto s = "file://///of/your/business//";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "file",
+        .authority = Authority{.host = ""},
+        .path = "///of/your/business//",
+    };
+
+    ASSERT_EQ(parsed.authority, expected.authority);
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
+}
+
+TEST(parseURL, parseFileURLNoLeadingSlash)
+{
+    auto s = "file:none/of/your/business/";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "file",
+        .authority = std::nullopt,
+        .path = "none/of/your/business/",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ("file:none/of/your/business/", parsed.to_string());
+}
+
+TEST(parseURL, parseHttpTrailingSlash)
+{
+    auto s = "http://example.com/";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = Authority{.host = "example.com"},
+        .path = "/",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
+}
+
 TEST(parseURL, parsedUrlsIsEqualToItself)
 {
     auto s = "http://www.example.org/file.tar.gz";
