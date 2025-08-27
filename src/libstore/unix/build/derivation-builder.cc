@@ -717,7 +717,7 @@ void DerivationBuilderImpl::startBuilder()
 
     /* Create a temporary directory where the build will take
        place. */
-    topTmpDir = createTempDir(buildDir, "nix-build-" + std::string(drvPath.name()), 0700);
+    topTmpDir = createTempDir(buildDir, "nix", 0700);
     setBuildTmpDir();
     assert(!tmpDir.empty());
 
