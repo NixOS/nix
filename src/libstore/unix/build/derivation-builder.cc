@@ -475,12 +475,10 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
             ((double) buildResult.cpuSystem->count()) / 1000000);
     }
 
-    bool diskFull = false;
-
     /* Check the exit status. */
     if (!statusOk(status)) {
 
-        diskFull |= decideWhetherDiskFull();
+        bool diskFull = decideWhetherDiskFull();
 
         cleanupBuild();
 
