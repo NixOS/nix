@@ -17,6 +17,7 @@
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
 
 #include <queue>
 
@@ -992,19 +993,13 @@ void DerivationBuilderImpl::initEnv()
     /* Write the final environment. Note that this is intentionally
        *not* `drv.env`, because we've desugared things like like
        "passAFile", "expandReferencesGraph", structured attrs, etc. */
-    for (const auto & [name, info] : finalEnv) {
-        if (info.nameOfPassAsFile) {
-            auto & fileName = *info.nameOfPassAsFile;
-            writeBuilderFile(fileName, rewriteStrings(info.value, inputRewrites));
-            env[name] = tmpDirInSandbox() + "/" + fileName;
-        } else {
-            env[name] = info.value;
-        }
+    for (const auto & [name, info] : desugaredEnv.variables) {
+        env[name] = info.prependBuildDirectory ? tmpDirInSandbox() + "/" + info.value : info.value;
     }
 
     /* Add extra files, similar to `finalEnv` */
-    for (const auto & [fileName, value] : extraFiles) {
-        writeBuilderFile(fileName, value);
+    for (const auto & [fileName, value] : desugaredEnv.extraFiles) {
+        writeBuilderFile(fileName, rewriteStrings(value, inputRewrites));
     }
 
     /* For convenience, set an environment pointing to the top build

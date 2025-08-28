@@ -8,6 +8,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/restricted-store.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
 
 namespace nix {
 
@@ -73,34 +74,7 @@ struct DerivationBuilderParams
      */
     StringSet systemFeatures;
 
-    struct EnvEntry
-    {
-        /**
-         * Actually, this should be passed as a file, but with a custom
-         * name (rather than hash-derived name for usual "pass as file").
-         */
-        std::optional<std::string> nameOfPassAsFile;
-
-        /**
-         * String value of env var, or contents of the file
-         */
-        std::string value;
-    };
-
-    /**
-     * The final environment variables to additionally set, possibly
-     * indirectly via a file.
-     *
-     * This is used by the caller to desugar the "structured attrs"
-     * mechanism, so `DerivationBuilder` doesn't need to know about it.
-     */
-    std::map<std::string, EnvEntry, std::less<>> finalEnv;
-
-    /**
-     * Inserted in the temp dir, but no file names placed in env, unlike
-     * `EnvEntry::nameOfPassAsFile` above.
-     */
-    StringMap extraFiles;
+    DesugaredEnv desugaredEnv;
 };
 
 /**
