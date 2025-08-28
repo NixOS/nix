@@ -2,8 +2,10 @@
 
 source ./common.sh
 
-requireGit
 TODO_NixOS
+enableFeatures "build-time-fetch-tree"
+restartDaemon
+requireGit
 
 lazy="$TEST_ROOT/lazy"
 createGitRepo "$lazy"
@@ -35,27 +37,27 @@ EOF
 
 cp "${config_nix}" "$repo/"
 git -C "$repo" add flake.nix config.nix
-nix flake lock --extra-experimental-features build-time-fetch-tree "$repo"
+nix flake lock "$repo"
 git -C "$repo" add flake.lock
 git -C "$repo" commit -a -m foo
 
 clearStore
 
-nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo"
+nix build --out-link "$TEST_ROOT/result" -L "$repo"
 [[ $(cat "$TEST_ROOT/result") = world ]]
 
 echo utrecht > "$lazy/who"
 git -C "$lazy" commit -a -m foo
 
-nix flake update --extra-experimental-features build-time-fetch-tree --flake "$repo"
+nix flake update --flake "$repo"
 
 clearStore
 
-nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo"
+nix build --out-link "$TEST_ROOT/result" -L "$repo"
 [[ $(cat "$TEST_ROOT/result") = utrecht ]]
 
 rm -rf "$lazy"
 
 clearStore
 
-expectStderr 1 nix build --extra-experimental-features build-time-fetch-tree --out-link "$TEST_ROOT/result" -L "$repo" | grepQuiet "Cannot build.*source.drv"
+expectStderr 1 nix build --out-link "$TEST_ROOT/result" -L "$repo" | grepQuiet "Cannot build.*source.drv"

@@ -164,6 +164,6 @@ cat > $flakeDir/flake.nix <<EOF
 EOF
 
 # FIXME: error code 100 doesn't get propagated from the daemon.
-if ! isTestOnNixOS; then
+if !isTestOnNixOS && $NIX_REMOTE != daemon; then
     expectStderr 100 nix flake check "$flakeDir" | grepQuiet 'builder failed with exit code 1'
 fi
