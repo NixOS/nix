@@ -197,6 +197,7 @@
         system:
         {
           installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
+          installTests = self.hydraJobs.installTests.${system};
           nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
           rl-next =
             let
