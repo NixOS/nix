@@ -1,7 +1,10 @@
 #pragma once
 ///@file
 
+#include <span>
+
 #include "nix/util/error.hh"
+#include "nix/util/canon-path.hh"
 
 namespace nix {
 
@@ -65,6 +68,7 @@ struct ParsedURL
     };
 
     std::string scheme;
+
     /**
      * Optional parsed authority component of the URL.
      *
@@ -75,16 +79,155 @@ struct ParsedURL
      * part of the URL.
      */
     std::optional<Authority> authority;
-    std::string path;
+
+    /**
+     * @note Unlike Unix paths, URLs provide a way to escape path
+     * separators, in the form of the `%2F` encoding of `/`. That means
+     * that if one percent-decodes the path into a single string, that
+     * decoding will be *lossy*, because `/` and `%2F` both become `/`.
+     * The right thing to do is instead split up the path on `/`, and
+     * then percent decode each part.
+     *
+     * For an example, the path
+     * ```
+     * foo/bar%2Fbaz/quux
+     * ```
+     * is parsed as
+     * ```
+     * {"foo, "bar/baz", "quux"}
+     * ```
+     *
+     * We're doing splitting and joining that assumes the separator (`/` in this case) only goes *between* elements.
+     *
+     * That means the parsed representation will begin with an empty
+     * element to make an initial `/`, and will end with an ementy
+     * element to make a trailing `/`. That means that elements of this
+     * vector mostly, but *not always*, correspond to segments of the
+     * path.
+     *
+     * Examples:
+     *
+     * - ```
+     *   https://foo.com/bar
+     *   ```
+     *   has path
+     *   ```
+     *   {"", "bar"}
+     *   ```
+     *
+     * - ```
+     *   https://foo.com/bar/
+     *   ```
+     *   has path
+     *   ```
+     *   {"", "bar", ""}
+     *   ```
+     *
+     * - ```
+     *   https://foo.com//bar///
+     *   ```
+     *   has path
+     *   ```
+     *   {"", "", "bar", "", "", ""}
+     *   ```
+     *
+     * - ```
+     *   https://foo.com
+     *   ```
+     *   has path
+     *   ```
+     *   {""}
+     *   ```
+     *
+     * - ```
+     *   https://foo.com/
+     *   ```
+     *   has path
+     *   ```
+     *   {"", ""}
+     *   ```
+     *
+     * - ```
+     *   tel:01234
+     *   ```
+     *   has path `{"01234"}` (and no authority)
+     *
+     * - ```
+     *   foo:/01234
+     *   ```
+     *   has path `{"", "01234"}` (and no authority)
+     *
+     * Note that both trailing and leading slashes are, in general,
+     * semantically significant.
+     *
+     * For trailing slashes, the main example affecting many schemes is
+     * that `../baz` resolves against a base URL different depending on
+     * the presence/absence of a trailing slash:
+     *
+     * - `https://foo.com/bar` is `https://foo.com/baz`
+     *
+     * - `https://foo.com/bar/` is `https://foo.com/bar/baz`
+     *
+     * See `parseURLRelative` for more details.
+     *
+     * For leading slashes, there are some requirements to be aware of.
+     *
+     * - When there is an authority, the path *must* start with a leading
+     *   slash. Otherwise the path will not be separated from the
+     *   authority, and will not round trip though the parser:
+     *
+     *   ```
+     *   {.scheme="https", .authority.host = "foo", .path={"bad"}}
+     *   ```
+     *   will render to `https://foobar`. but that would parse back as as
+     *   ```
+     *   {.scheme="https", .authority.host = "foobar", .path={}}
+     *   ```
+     *
+     * - When there is no authority, the path must *not* begin with two
+     *   slashes. Otherwise, there will be another parser round trip
+     *   issue:
+     *
+     *   ```
+     *   {.scheme="https", .path={"", "", "bad"}}
+     *   ```
+     *   will render to `https://bad`. but that would parse back as as
+     *   ```
+     *   {.scheme="https", .authority.host = "bad", .path={}}
+     *   ```
+     *
+     * These invariants will be checked in `to_string` and
+     * `renderAuthorityAndPath`.
+     */
+    std::vector<std::string> path;
+
     StringMap query;
+
     std::string fragment;
 
+    /**
+     * Render just the middle part of a URL, without the `//` which
+     * indicates whether the authority is present.
+     *
+     * @note This is kind of an ad-hoc
+     * operation, but it ends up coming up with some frequency, probably
+     * due to the current design of `StoreReference` in `nix-store`.
+     */
+    std::string renderAuthorityAndPath() const;
+
     std::string to_string() const;
+
+    /**
+     * Render the path to a string.
+     *
+     * @param encode Whether to percent encode path segments.
+     */
+    std::string renderPath(bool encode = false) const;
 
     auto operator<=>(const ParsedURL & other) const noexcept = default;
 
     /**
-     * Remove `.` and `..` path elements.
+     * Remove `.` and `..` path segments.
      */
     ParsedURL canonicalise();
 };
@@ -95,6 +238,22 @@ MakeError(BadURL, Error);
 
 std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep = "");
+
+/**
+ * Get the path part of the URL as an absolute or relative Path.
+ *
+ * @throws if any path component contains an slash (which would have
+ * been escaped `%2F` in the rendered URL). This is because OS file
+ * paths have no escape sequences --- file names cannot contain a
+ * `/`.
+ */
+Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath);
+
+/**
+ * Percent encode path. `%2F` for "interior slashes" is the most
+ * important.
+ */
+std::string encodeUrlPath(std::span<const std::string> urlPath);
 
 /**
  * @param lenient @see parseURL
@@ -114,6 +273,12 @@ std::string encodeQuery(const StringMap & query);
  * @note IPv6 ZoneId literals (RFC4007) are represented in URIs according to RFC6874.
  *
  * @throws BadURL
+ *
+ * The WHATWG specification of the URL constructor in Java Script is
+ * also a useful reference:
+ * https://url.spec.whatwg.org/#concept-basic-url-parser. Note, however,
+ * that it includes various scheme-specific normalizations / extra steps
+ * that we do not implement.
  */
 ParsedURL parseURL(std::string_view url, bool lenient = false);
 
@@ -123,7 +288,11 @@ ParsedURL parseURL(std::string_view url, bool lenient = false);
  *
  * This is specified in [IETF RFC 3986, section 5](https://datatracker.ietf.org/doc/html/rfc3986#section-5)
  *
- * Behavior should also match the `new URL(url, base)` JavaScript constructor.
+ * @throws BadURL
+ *
+ * Behavior should also match the `new URL(url, base)` JavaScript
+ * constructor, except for extra steps specific to the HTTP scheme. See
+ * `parseURL` for link to the relevant WHATWG standard.
  */
 ParsedURL parseURLRelative(std::string_view url, const ParsedURL & base);
 

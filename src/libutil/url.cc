@@ -3,6 +3,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/split.hh"
 #include "nix/util/canon-path.hh"
+#include "nix/util/strings-inline.hh"
 
 #include <boost/url.hpp>
 
@@ -179,11 +180,14 @@ static ParsedURL fromBoostUrlView(boost::urls::url_view urlView, bool lenient)
     if (authority && authority->host.size() && transportIsFile)
         throw BadURL("file:// URL '%s' has unexpected authority '%s'", urlView.buffer(), *authority);
 
-    auto path = urlView.path();         /* Does pct-decoding */
     auto fragment = urlView.fragment(); /* Does pct-decoding */
 
-    if (transportIsFile && path.empty())
-        path = "/";
+    boost::core::string_view encodedPath = urlView.encoded_path();
+    if (transportIsFile && encodedPath.empty())
+        encodedPath = "/";
+
+    auto path = std::views::transform(splitString<std::vector<std::string_view>>(encodedPath, "/"), percentDecode)
+                | std::ranges::to<std::vector<std::string>>();
 
     /* Get the raw query. Store URI supports smuggling doubly nested queries, where
        the inner &/? are pct-encoded. */
@@ -192,7 +196,7 @@ static ParsedURL fromBoostUrlView(boost::urls::url_view urlView, bool lenient)
     return ParsedURL{
         .scheme = scheme,
         .authority = authority,
-        .path = path,
+        .path = std::move(path),
         .query = decodeQuery(query, lenient),
         .fragment = fragment,
     };
@@ -215,7 +219,7 @@ try {
             if (authority.port)
                 resolved.set_port_number(*authority.port);
         }
-        resolved.set_path(base.path);
+        resolved.set_encoded_path(encodeUrlPath(base.path));
         resolved.set_encoded_query(encodeQuery(base.query));
         resolved.set_fragment(base.fragment);
     } catch (boost::system::system_error & e) {
@@ -291,7 +295,15 @@ try {
 }
 
 const static std::string allowedInQuery = ":@/?";
-const static std::string allowedInPath = ":@/";
+const static std::string allowedInPath = ":@";
+
+std::string encodeUrlPath(std::span<const std::string> urlPath)
+{
+    std::vector<std::string> encodedPath;
+    for (auto & p : urlPath)
+        encodedPath.push_back(percentEncode(p, allowedInPath));
+    return concatStringsSep("/", encodedPath);
+}
 
 std::string encodeQuery(const StringMap & ss)
 {
@@ -308,10 +320,62 @@ std::string encodeQuery(const StringMap & ss)
     return res;
 }
 
+Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath)
+{
+    for (const auto & comp : urlPath) {
+        /* This is only really valid for UNIX. Windows has more restrictions. */
+        if (comp.contains('/'))
+            throw BadURL("URL path component '%s' contains '/', which is not allowed in file names", comp);
+        if (comp.contains(char(0)))
+            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", comp);
+    }
+
+    return concatStringsSep("/", urlPath);
+}
+
+std::string ParsedURL::renderPath(bool encode) const
+{
+    if (encode)
+        return encodeUrlPath(path);
+    return concatStringsSep("/", path);
+}
+
+std::string ParsedURL::renderAuthorityAndPath() const
+{
+    std::string res;
+    /* The following assertions correspond to 3.3. Path [rfc3986]. URL parser
+       will never violate these properties, but hand-constructed ParsedURLs might. */
+    if (authority.has_value()) {
+        /* If a URI contains an authority component, then the path component
+           must either be empty or begin with a slash ("/") character. */
+        assert(path.empty() || path.front().empty());
+        res += authority->to_string();
+    } else if (std::ranges::equal(std::views::take(path, 2), std::views::repeat("", 2))) {
+        /* If a URI does not contain an authority component, then the path cannot begin
+           with two slash characters ("//") */
+        unreachable();
+    }
+    res += encodeUrlPath(path);
+    return res;
+}
+
 std::string ParsedURL::to_string() const
 {
-    return scheme + ":" + (authority ? "//" + authority->to_string() : "") + percentEncode(path, allowedInPath)
-           + (query.empty() ? "" : "?" + encodeQuery(query)) + (fragment.empty() ? "" : "#" + percentEncode(fragment));
+    std::string res;
+    res += scheme;
+    res += ":";
+    if (authority.has_value())
+        res += "//";
+    res += renderAuthorityAndPath();
+    if (!query.empty()) {
+        res += "?";
+        res += encodeQuery(query);
+    }
+    if (!fragment.empty()) {
+        res += "#";
+        res += percentEncode(fragment);
+    }
+    return res;
 }
 
 std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
@@ -323,7 +387,7 @@ std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
 ParsedURL ParsedURL::canonicalise()
 {
     ParsedURL res(*this);
-    res.path = CanonPath(res.path).abs();
+    res.path = splitString<std::vector<std::string>>(CanonPath(renderPath()).abs(), "/");
     return res;
 }
 
@@ -352,7 +416,11 @@ ParsedURL fixGitURL(const std::string & url)
     if (hasPrefix(url, "file:"))
         return parseURL(url);
     if (url.find("://") == std::string::npos) {
-        return (ParsedURL{.scheme = "file", .authority = ParsedURL::Authority{}, .path = url});
+        return ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = splitString<std::vector<std::string>>(url, "/"),
+        };
     }
     return parseURL(url);
 }

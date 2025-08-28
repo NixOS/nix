@@ -3,6 +3,9 @@
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"
 #include "nix/util/canon-path.hh"
+#include "nix/util/strings-inline.hh"
+
+#include <ranges>
 
 namespace nix {
 
@@ -24,10 +27,6 @@ try {
         || parsed.authority->hostType != ParsedURL::Authority::HostType::Name)
         throw BadURL("URI has a missing or invalid bucket name");
 
-    std::string_view key = parsed.path;
-    /* Make the key a relative path. */
-    splitPrefix(key, "/");
-
     /* TODO: Validate the key against:
      * https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html#object-key-guidelines
      */
@@ -41,10 +40,14 @@ try {
     };
 
     auto endpoint = getOptionalParam("endpoint");
+    if (parsed.path.size() <= 1 || !parsed.path.front().empty())
+        throw BadURL("URI has a missing or invalid key");
+
+    auto path = std::views::drop(parsed.path, 1) | std::ranges::to<std::vector<std::string>>();
 
     return ParsedS3URL{
         .bucket = parsed.authority->host,
-        .key = std::string{key},
+        .key = std::move(path),
         .profile = getOptionalParam("profile"),
         .region = getOptionalParam("region"),
         .scheme = getOptionalParam("scheme"),
@@ -78,26 +81,35 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
         overloaded{
             [&](const std::monostate &) {
                 // No custom endpoint, use standard AWS S3 endpoint
+                std::vector<std::string> path{""};
+                path.push_back(bucket);
+                path.insert(path.end(), key.begin(), key.end());
                 return ParsedURL{
                     .scheme = std::string{schemeStr},
                     .authority = ParsedURL::Authority{.host = "s3." + regionStr + ".amazonaws.com"},
-                    .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
+                    .path = std::move(path),
                 };
             },
             [&](const ParsedURL::Authority & auth) {
                 // Endpoint is just an authority (hostname/port)
+                std::vector<std::string> path{""};
+                path.push_back(bucket);
+                path.insert(path.end(), key.begin(), key.end());
                 return ParsedURL{
                     .scheme = std::string{schemeStr},
                     .authority = auth,
-                    .path = (CanonPath::root / bucket / CanonPath(key)).abs(),
+                    .path = std::move(path),
                 };
             },
             [&](const ParsedURL & endpointUrl) {
                 // Endpoint is already a ParsedURL (e.g., http://server:9000)
+                auto path = endpointUrl.path;
+                path.push_back(bucket);
+                path.insert(path.end(), key.begin(), key.end());
                 return ParsedURL{
                     .scheme = endpointUrl.scheme,
                     .authority = endpointUrl.authority,
-                    .path = (CanonPath(endpointUrl.path) / bucket / CanonPath(key)).abs(),
+                    .path = std::move(path),
                 };
             },
         },

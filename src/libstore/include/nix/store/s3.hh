@@ -54,7 +54,12 @@ struct S3Helper
 struct ParsedS3URL
 {
     std::string bucket;
-    std::string key;
+    /**
+     * @see ParsedURL::path. This is a vector for the same reason.
+     * Unlike ParsedURL::path this doesn't include the leading empty segment,
+     * since the bucket name is necessary.
+     */
+    std::vector<std::string> key;
     std::optional<std::string> profile;
     std::optional<std::string> region;
     std::optional<std::string> scheme;
