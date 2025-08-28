@@ -84,22 +84,8 @@ void DerivationBuildingGoal::killChild()
     hook.reset();
 #endif
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder && builder->pid != -1) {
+    if (builder && builder->killChild())
         worker.childTerminated(this);
-
-        // FIXME: move this into DerivationBuilder.
-
-        /* If we're using a build user, then there is a tricky race
-           condition: if we kill the build user before the child has
-           done its setuid() to the build user uid, then it won't be
-           killed, and we'll potentially lock up in pid.wait().  So
-           also send a conventional kill to the child. */
-        ::kill(-builder->pid, SIGKILL); /* ignore the result */
-
-        builder->killSandbox(true);
-
-        builder->pid.wait();
-    }
 #endif
 }
 

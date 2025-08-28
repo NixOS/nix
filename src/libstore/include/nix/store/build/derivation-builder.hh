@@ -193,10 +193,12 @@ struct DerivationBuilder : RestrictionContext
     virtual SingleDrvOutputs unprepareBuild() = 0;
 
     /**
-     * Kill any processes running under the build user UID or in the
-     * cgroup of the build.
+     * Forcibly kill the child process, if any.
+     *
+     * @returns whether the child was still alive and needed to be
+     * killed.
      */
-    virtual void killSandbox(bool getStats) = 0;
+    virtual bool killChild() = 0;
 };
 
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows

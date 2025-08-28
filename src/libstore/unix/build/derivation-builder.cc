@@ -370,9 +370,15 @@ protected:
      */
     virtual void cleanupBuild(bool force);
 
+    /**
+     * Kill any processes running under the build user UID or in the
+     * cgroup of the build.
+     */
+    virtual void killSandbox(bool getStats);
+
 public:
 
-    void killSandbox(bool getStats) override;
+    bool killChild() override;
 
 private:
 
@@ -433,6 +439,24 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
         assert(uid != 0);
         killUser(uid);
     }
+}
+
+bool DerivationBuilderImpl::killChild()
+{
+    bool ret = pid != -1;
+    if (ret) {
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-pid, SIGKILL); /* ignore the result */
+
+        killSandbox(true);
+
+        pid.wait();
+    }
+    return ret;
 }
 
 bool DerivationBuilderImpl::prepareBuild()
