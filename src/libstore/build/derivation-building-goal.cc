@@ -1368,13 +1368,6 @@ DerivationBuildingGoal::done(BuildResult::Status status, SingleDrvOutputs builtO
 
     worker.updateProgress();
 
-    auto traceBuiltOutputsFile = getEnv("_NIX_TRACE_BUILT_OUTPUTS").value_or("");
-    if (traceBuiltOutputsFile != "") {
-        std::fstream fs;
-        fs.open(traceBuiltOutputsFile, std::fstream::out);
-        fs << worker.store.printStorePath(drvPath) << "\t" << buildResult.toString() << std::endl;
-    }
-
     return amDone(buildResult.success() ? ecSuccess : ecFailed, std::move(ex));
 }
 
