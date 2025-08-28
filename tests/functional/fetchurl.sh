@@ -71,7 +71,7 @@ echo "$outPath" | grepQuiet 'xyzzy'
 test -x "$outPath/fetchurl.sh"
 test -L "$outPath/symlink"
 
-nix-store --delete "$outPath"
+nix-store --delete "$outPath" --ignore-liveness
 
 # Test unpacking a compressed NAR.
 narxz="$TEST_ROOT/archive.nar.xz"

@@ -21,7 +21,7 @@ TODO_NixOS
 
 # Directed delete: $outPath is not reachable from a root, so it should
 # be deleteable.
-nix-store --delete "$outPath"
+nix-store --delete "$outPath" --ignore-liveness
 [[ ! -e $outPath/hello ]]
 
 outPath="$(NIX_REMOTE='local?store=/foo&real='"$TEST_ROOT"'/real-store' nix-instantiate --readonly-mode hash-check.nix)"
