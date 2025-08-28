@@ -22,6 +22,7 @@
 #include <list>
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -306,16 +307,9 @@ void panic(std::string_view msg);
 
 /**
  * Print a basic error message with source position and std::terminate().
- * Use the unreachable() macro to call this.
- */
-[[noreturn]]
-void panic(const char * file, int line, const char * func);
-
-/**
- * Print a basic error message with source position and std::terminate().
  *
  * @note: This assumes that the logger is operational
  */
-#define unreachable() (::nix::panic(__FILE__, __LINE__, __func__))
+[[gnu::noinline, gnu::cold, noreturn]] void unreachable(std::source_location loc = std::source_location::current());
 
 } // namespace nix
