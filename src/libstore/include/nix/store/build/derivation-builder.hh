@@ -134,9 +134,6 @@ struct DerivationBuilderCallbacks
      */
     virtual void childTerminated() = 0;
 
-    virtual void noteHashMismatch(void) = 0;
-    virtual void noteCheckMismatch(void) = 0;
-
     virtual void markContentsGood(const StorePath & path) = 0;
 };
 

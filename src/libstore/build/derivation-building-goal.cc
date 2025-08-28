@@ -652,16 +652,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                void noteHashMismatch() override
-                {
-                    goal.worker.hashMismatch = true;
-                }
-
-                void noteCheckMismatch() override
-                {
-                    goal.worker.checkMismatch = true;
-                }
-
                 void markContentsGood(const StorePath & path) override
                 {
                     goal.worker.markContentsGood(path);
@@ -818,6 +808,26 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     // N.B. cannot use `std::visit` with co-routine return
     if (auto * ste = std::get_if<0>(&res)) {
         outputLocks.unlock();
+// Allow selecting a subset of enum values
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (ste->status) {
+        case BuildResult::HashMismatch:
+            worker.hashMismatch = true;
+            /* See header, the protocols don't know about `HashMismatch`
+               yet, so change it to `OutputRejected`, which they expect
+               for this case (hash mismatch is a type of output
+               rejection). */
+            ste->status = BuildResult::OutputRejected;
+            break;
+        case BuildResult::NotDeterministic:
+            worker.checkMismatch = true;
+            break;
+        default:
+            /* Other statuses need no adjusting */
+            break;
+        }
+#  pragma GCC diagnostic pop
         co_return doneFailure(std::move(*ste));
     } else if (auto * builtOutputs = std::get_if<1>(&res)) {
         StorePathSet outputPaths;

@@ -1659,9 +1659,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     if (wanted != got) {
                         /* Throw an error after registering the path as
                            valid. */
-                        miscMethods->noteHashMismatch();
                         delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
+                            BuildResult::HashMismatch,
                             "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                             store.printStorePath(drvPath),
                             wanted.to_string(HashFormat::SRI, true),
@@ -1670,7 +1669,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     if (!newInfo0.references.empty()) {
                         auto numViolations = newInfo.references.size();
                         delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
+                            BuildResult::HashMismatch,
                             "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
                             store.printStorePath(drvPath),
                             numViolations,
@@ -1746,7 +1745,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 continue;
             ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
             if (newInfo.narHash != oldInfo.narHash) {
-                miscMethods->noteCheckMismatch();
                 if (settings.runDiffHook || settings.keepFailed) {
                     auto dst = store.toRealPath(finalDestPath + ".check");
                     deletePath(dst);
