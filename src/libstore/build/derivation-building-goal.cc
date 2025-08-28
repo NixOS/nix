@@ -804,21 +804,22 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     trace("build done");
 
-    auto res = builder->unprepareBuild();
-    // N.B. cannot use `std::visit` with co-routine return
-    if (auto * ste = std::get_if<0>(&res)) {
+    SingleDrvOutputs builtOutputs;
+    try {
+        builtOutputs = builder->unprepareBuild();
+    } catch (BuildError & e) {
         outputLocks.unlock();
 // Allow selecting a subset of enum values
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (ste->status) {
+        switch (e.status) {
         case BuildResult::HashMismatch:
             worker.hashMismatch = true;
             /* See header, the protocols don't know about `HashMismatch`
                yet, so change it to `OutputRejected`, which they expect
                for this case (hash mismatch is a type of output
                rejection). */
-            ste->status = BuildResult::OutputRejected;
+            e.status = BuildResult::OutputRejected;
             break;
         case BuildResult::NotDeterministic:
             worker.checkMismatch = true;
@@ -828,10 +829,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             break;
         }
 #  pragma GCC diagnostic pop
-        co_return doneFailure(std::move(*ste));
-    } else if (auto * builtOutputs = std::get_if<1>(&res)) {
+        co_return doneFailure(std::move(e));
+    }
+    {
         StorePathSet outputPaths;
-        for (auto & [_, output] : *builtOutputs)
+        for (auto & [_, output] : builtOutputs)
             outputPaths.insert(output.outPath);
         runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
 
@@ -841,9 +843,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
            (unlinked) lock files. */
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return doneSuccess(BuildResult::Built, std::move(*builtOutputs));
-    } else {
-        unreachable();
+        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
     }
 #endif
 }

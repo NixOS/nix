@@ -187,8 +187,10 @@ struct DerivationBuilder : RestrictionContext
      * processing. A status code and exception are returned, providing
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
+     *
+     * @throws BuildError
      */
-    virtual std::variant<BuildError, SingleDrvOutputs> unprepareBuild() = 0;
+    virtual SingleDrvOutputs unprepareBuild() = 0;
 
     /**
      * Stop the in-process nix daemon thread.

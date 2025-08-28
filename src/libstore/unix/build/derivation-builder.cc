@@ -191,7 +191,7 @@ public:
 
     void startBuilder() override;
 
-    std::variant<BuildError, SingleDrvOutputs> unprepareBuild() override;
+    SingleDrvOutputs unprepareBuild() override;
 
 protected:
 
@@ -426,7 +426,7 @@ bool DerivationBuilderImpl::prepareBuild()
     return true;
 }
 
-std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
+SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
     // FIXME: get rid of this, rely on RAII.
     Finally releaseBuildUser([&]() {
@@ -477,49 +477,42 @@ std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild
 
     bool diskFull = false;
 
-    try {
+    /* Check the exit status. */
+    if (!statusOk(status)) {
 
-        /* Check the exit status. */
-        if (!statusOk(status)) {
+        diskFull |= decideWhetherDiskFull();
 
-            diskFull |= decideWhetherDiskFull();
+        cleanupBuild();
 
-            cleanupBuild();
+        auto msg =
+            fmt("Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+                Magenta(store.printStorePath(drvPath)),
+                statusToString(status));
 
-            auto msg =
-                fmt("Cannot build '%s'.\n"
-                    "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                    Magenta(store.printStorePath(drvPath)),
-                    statusToString(status));
+        msg += showKnownOutputs(store, drv);
 
-            msg += showKnownOutputs(store, drv);
+        miscMethods->appendLogTailErrorMsg(msg);
 
-            miscMethods->appendLogTailErrorMsg(msg);
+        if (diskFull)
+            msg += "\nnote: build failure may have been caused by lack of free disk space";
 
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-            throw BuildError(
-                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure
-                                                          : BuildResult::PermanentFailure,
-                msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs = registerOutputs();
-
-        /* Delete unused redirected outputs (when doing hash rewriting). */
-        for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
-
-        deleteTmpDir(true);
-
-        return std::move(builtOutputs);
-
-    } catch (BuildError & e) {
-        return std::move(e);
+        throw BuildError(
+            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            msg);
     }
+
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs = registerOutputs();
+
+    /* Delete unused redirected outputs (when doing hash rewriting). */
+    for (auto & i : redirectedOutputs)
+        deletePath(store.Store::toRealPath(i.second));
+
+    deleteTmpDir(true);
+
+    return builtOutputs;
 }
 
 void DerivationBuilderImpl::cleanupBuild()
