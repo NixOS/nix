@@ -350,7 +350,7 @@ public:
 
 protected:
 
-    virtual void cleanupBuild();
+    virtual void cleanupBuild(bool force);
 
 private:
 
@@ -480,7 +480,7 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 
         bool diskFull = decideWhetherDiskFull();
 
-        cleanupBuild();
+        cleanupBuild(false);
 
         auto msg =
             fmt("Cannot build '%s'.\n"
@@ -508,14 +508,14 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     for (auto & i : redirectedOutputs)
         deletePath(store.Store::toRealPath(i.second));
 
-    deleteTmpDir(true);
+    cleanupBuild(true);
 
     return builtOutputs;
 }
 
-void DerivationBuilderImpl::cleanupBuild()
+void DerivationBuilderImpl::cleanupBuild(bool force)
 {
-    deleteTmpDir(false);
+    deleteTmpDir(force);
 }
 
 static void chmod_(const Path & path, mode_t mode)

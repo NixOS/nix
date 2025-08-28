@@ -166,9 +166,12 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         return !needsHashRewrite() ? chrootRootDir + p : store.toRealPath(p);
     }
 
-    void cleanupBuild() override
+    void cleanupBuild(bool force) override
     {
-        DerivationBuilderImpl::cleanupBuild();
+        DerivationBuilderImpl::cleanupBuild(force);
+
+        if (force)
+            return;
 
         /* Move paths out of the chroot for easier debugging of
            build failures. */
