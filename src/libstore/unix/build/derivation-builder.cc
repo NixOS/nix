@@ -344,13 +344,9 @@ private:
 
 public:
 
-    void deleteTmpDir(bool force) override;
+    void cleanupBuild(bool force) override;
 
     void killSandbox(bool getStats) override;
-
-protected:
-
-    virtual void cleanupBuild(bool force);
 
 private:
 
@@ -511,11 +507,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     cleanupBuild(true);
 
     return builtOutputs;
-}
-
-void DerivationBuilderImpl::cleanupBuild(bool force)
-{
-    deleteTmpDir(force);
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -1821,7 +1812,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
-void DerivationBuilderImpl::deleteTmpDir(bool force)
+void DerivationBuilderImpl::cleanupBuild(bool force)
 {
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to

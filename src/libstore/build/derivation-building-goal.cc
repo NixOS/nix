@@ -66,7 +66,7 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
             ignoreExceptionInDestructor();
         }
         try {
-            builder->deleteTmpDir(false);
+            builder->cleanupBuild(false);
         } catch (...) {
             ignoreExceptionInDestructor();
         }

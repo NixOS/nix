@@ -200,8 +200,11 @@ struct DerivationBuilder : RestrictionContext
 
     /**
      * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build suceeded, so don't attempt to
+     * preseve anything for debugging.
      */
-    virtual void deleteTmpDir(bool force) = 0;
+    virtual void cleanupBuild(bool force) = 0;
 
     /**
      * Kill any processes running under the build user UID or in the
