@@ -133,8 +133,6 @@ struct DerivationBuilderCallbacks
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
-
-    virtual void markContentsGood(const StorePath & path) = 0;
 };
 
 /**

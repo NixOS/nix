@@ -1804,7 +1804,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
 
             store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-            miscMethods->markContentsGood(newInfo.path);
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;

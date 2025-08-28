@@ -623,11 +623,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                void markContentsGood(const StorePath & path) override
-                {
-                    goal.worker.markContentsGood(path);
-                }
-
                 Path openLogFile() override
                 {
                     return goal.openLogFile();
@@ -804,8 +799,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     }
     {
         StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
+        for (auto & [_, output] : builtOutputs) {
+            // for sake of `bmRepair`
+            worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
+        }
         runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
