@@ -62,7 +62,7 @@ struct AsyncPathWriterImpl : AsyncPathWriter
         });
     }
 
-    ~AsyncPathWriterImpl()
+    virtual ~AsyncPathWriterImpl()
     {
         state_.lock()->quit = true;
         wakeupCV.notify_all();
