@@ -95,6 +95,11 @@ public:
         /* Careful: we should never ever throw an exception from a
            destructor. */
         try {
+            killChild();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
             stopDaemon();
         } catch (...) {
             ignoreExceptionInDestructor();

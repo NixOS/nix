@@ -53,11 +53,6 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try {
-        killChild();
-    } catch (...) {
-        ignoreExceptionInDestructor();
-    }
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
     if (builder)
         builder.reset();
