@@ -150,11 +150,6 @@ struct DerivationBuilderCallbacks
  */
 struct DerivationBuilder : RestrictionContext
 {
-    /**
-     * The process ID of the builder.
-     */
-    Pid pid;
-
     DerivationBuilder() = default;
     virtual ~DerivationBuilder() = default;
 

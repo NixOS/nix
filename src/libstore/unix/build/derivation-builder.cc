@@ -70,6 +70,11 @@ class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilder
 {
 protected:
 
+    /**
+     * The process ID of the builder.
+     */
+    Pid pid;
+
     LocalStore & store;
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
