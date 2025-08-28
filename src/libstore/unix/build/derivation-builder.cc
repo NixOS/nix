@@ -534,26 +534,16 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     /* Check the exit status. */
     if (!statusOk(status)) {
 
+        /* Check *before* cleaning up. */
         bool diskFull = decideWhetherDiskFull();
 
         cleanupBuild(false);
 
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                Magenta(store.printStorePath(drvPath)),
-                statusToString(status));
-
-        msg += showKnownOutputs(store, drv);
-
-        miscMethods->appendLogTailErrorMsg(msg);
-
-        if (diskFull)
-            msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-        throw BuildError(
+        throw BuilderFailureError{
             !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
-            msg);
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        };
     }
 
     /* Compute the FS closure of the outputs and register them as

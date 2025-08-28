@@ -632,11 +632,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 {
                     goal.closeLogFile();
                 }
-
-                void appendLogTailErrorMsg(std::string & msg) override
-                {
-                    goal.appendLogTailErrorMsg(msg);
-                }
             };
 
             auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
@@ -773,6 +768,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     SingleDrvOutputs builtOutputs;
     try {
         builtOutputs = builder->unprepareBuild();
+    } catch (BuilderFailureError & e) {
+        outputLocks.unlock();
+        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e)));
     } catch (BuildError & e) {
         outputLocks.unlock();
 // Allow selecting a subset of enum values
@@ -883,8 +881,16 @@ static void runPostBuildHook(
     });
 }
 
-void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
+BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e)
 {
+    auto msg =
+        fmt("Cannot build '%s'.\n"
+            "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+            Magenta(worker.store.printStorePath(drvPath)),
+            statusToString(e.builderStatus));
+
+    msg += showKnownOutputs(worker.store, *drv);
+
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt("\nLast %d log lines:\n", logTail.size());
         for (auto & line : logTail) {
@@ -901,6 +907,10 @@ void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
                 nixLogCommand,
                 worker.store.printStorePath(drvPath));
     }
+
+    msg += e.extraMsgAfter;
+
+    return BuildError{e.status, msg};
 }
 
 Goal::Co DerivationBuildingGoal::hookDone()
@@ -941,21 +951,13 @@ Goal::Co DerivationBuildingGoal::hookDone()
 
     /* Check the exit status. */
     if (!statusOk(status)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-        msg += showKnownOutputs(worker.store, *drv);
-
-        appendLogTailErrorMsg(msg);
+        auto e = fixupBuilderFailureErrorMessage({BuildResult::MiscFailure, status, ""});
 
         outputLocks.unlock();
 
         /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-        co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
+        co_return doneFailure(std::move(e));
     }
 
     /* Compute the FS closure of the outputs and register them as
