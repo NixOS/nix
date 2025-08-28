@@ -113,13 +113,13 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.3 -->
 
-* Add an `external-builders` experimental feature by @cole-h in [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
+* Add an `external-builders` experimental feature [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
 
-* Add support for external builders by @edolstra in [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
+* Add support for external builders [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
 
 <!-- Determinate Nix version 3.8.4 -->
 
-* Revert "Use WAL mode for SQLite cache databases" by @grahamc in [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
+* Revert "Use WAL mode for SQLite cache databases" [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
 
 <!-- Determinate Nix version 3.8.5 -->
 
@@ -139,10 +139,8 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.9.0 -->
 
-* Build-time flake inputs by @edolstra in [DeterminateSystems/nix-src#49](https://github.com/DeterminateSystems/nix-src/pull/49)
+* Build-time flake inputs [DeterminateSystems/nix-src#49](https://github.com/DeterminateSystems/nix-src/pull/49)
 
 <!-- Determinate Nix version 3.9.1 -->
 
-* Change reference for default template flake by @lucperkins in [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
-
-* Fix HUP detection on macOS by @edolstra in [DeterminateSystems/nix-src#184](https://github.com/DeterminateSystems/nix-src/pull/184)
+* The default `nix flake init` template is much more useful [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
