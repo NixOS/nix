@@ -193,20 +193,6 @@ struct DerivationBuilder : RestrictionContext
     virtual SingleDrvOutputs unprepareBuild() = 0;
 
     /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
-     */
-    virtual void stopDaemon() = 0;
-
-    /**
-     * Delete the temporary directory, if we have one.
-     *
-     * @param force We know the build suceeded, so don't attempt to
-     * preseve anything for debugging.
-     */
-    virtual void cleanupBuild(bool force) = 0;
-
-    /**
      * Kill any processes running under the build user UID or in the
      * cgroup of the build.
      */

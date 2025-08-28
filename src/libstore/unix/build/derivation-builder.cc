@@ -85,6 +85,22 @@ public:
     {
     }
 
+    ~DerivationBuilderImpl()
+    {
+        /* Careful: we should never ever throw an exception from a
+           destructor. */
+        try {
+            stopDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            cleanupBuild(false);
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+    }
+
 protected:
 
     /**
@@ -285,9 +301,11 @@ private:
      */
     void startDaemon();
 
-public:
-
-    void stopDaemon() override;
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
+    void stopDaemon();
 
 protected:
 
@@ -342,9 +360,17 @@ private:
      */
     SingleDrvOutputs registerOutputs();
 
-public:
+protected:
 
-    void cleanupBuild(bool force) override;
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build suceeded, so don't attempt to
+     * preseve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force);
+
+public:
 
     void killSandbox(bool getStats) override;
 

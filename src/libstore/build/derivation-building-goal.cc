@@ -59,18 +59,8 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
         ignoreExceptionInDestructor();
     }
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder) {
-        try {
-            builder->stopDaemon();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
-            builder->cleanupBuild(false);
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-    }
+    if (builder)
+        builder.reset();
 #endif
     try {
         closeLogFile();
