@@ -10,6 +10,7 @@ namespace nix {
 void checkOutputs(
     Store & store,
     const StorePath & drvPath,
+    const decltype(Derivation::outputs) & drvOutputs,
     const decltype(DerivationOptions::outputChecks) & outputChecks,
     const std::map<std::string, ValidPathInfo> & outputs)
 {
@@ -17,9 +18,37 @@ void checkOutputs(
     for (auto & output : outputs)
         outputsByPath.emplace(store.printStorePath(output.second.path), output.second);
 
-    for (auto & output : outputs) {
-        auto & outputName = output.first;
-        auto & info = output.second;
+    for (auto & [outputName, info] : outputs) {
+
+        auto * outputSpec = get(drvOutputs, outputName);
+        assert(outputSpec);
+
+        if (const auto * dof = std::get_if<DerivationOutput::CAFixed>(&outputSpec->raw)) {
+            auto & wanted = dof->ca.hash;
+
+            /* Check wanted hash */
+            assert(info.ca);
+            auto & got = info.ca->hash;
+            if (wanted != got) {
+                /* Throw an error after registering the path as
+                   valid. */
+                throw BuildError(
+                    BuildResult::HashMismatch,
+                    "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
+                    store.printStorePath(drvPath),
+                    wanted.to_string(HashFormat::SRI, true),
+                    got.to_string(HashFormat::SRI, true));
+            }
+            if (!info.references.empty()) {
+                auto numViolations = info.references.size();
+                throw BuildError(
+                    BuildResult::HashMismatch,
+                    "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                    store.printStorePath(drvPath),
+                    numViolations,
+                    store.printStorePath(*info.references.begin()));
+            }
+        }
 
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely
