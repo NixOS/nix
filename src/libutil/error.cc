@@ -436,7 +436,7 @@ void panic(std::string_view msg)
     writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL);
     writeErr(msg);
     writeErr("\n");
-    abort();
+    std::terminate();
 }
 
 void panic(const char * file, int line, const char * func)
