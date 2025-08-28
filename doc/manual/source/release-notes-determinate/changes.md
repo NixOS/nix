@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.9.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.9.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -140,3 +140,9 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 <!-- Determinate Nix version 3.9.0 -->
 
 * Build-time flake inputs by @edolstra in [DeterminateSystems/nix-src#49](https://github.com/DeterminateSystems/nix-src/pull/49)
+
+<!-- Determinate Nix version 3.9.1 -->
+
+* Change reference for default template flake by @lucperkins in [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
+
+* Fix HUP detection on macOS by @edolstra in [DeterminateSystems/nix-src#184](https://github.com/DeterminateSystems/nix-src/pull/184)
