@@ -44,11 +44,6 @@ struct DerivationBuildingGoal : public Goal
      */
 
     /**
-     * Locks on (fixed) output paths.
-     */
-    PathLocks outputLocks;
-
-    /**
      * All input paths (that is, the union of FS closures of the
      * immediate input paths).
      */

@@ -475,6 +475,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
      */
     std::unique_ptr<Activity> actLock;
 
+    /**
+     * Locks on (fixed) output paths.
+     */
+    PathLocks outputLocks;
+
     bool useHook;
 
     while (true) {
@@ -1301,7 +1306,6 @@ SingleDrvOutputs DerivationBuildingGoal::assertPathValidity()
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs)
 {
-    outputLocks.unlock();
     buildResult.status = status;
 
     assert(buildResult.success());
@@ -1319,7 +1323,6 @@ Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, Singl
 
 Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
-    outputLocks.unlock();
     buildResult.status = ex.status;
     buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
     if (buildResult.status == BuildResult::TimedOut)
