@@ -48,7 +48,16 @@ jobs:
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
-      if: ${{ github.event_name != 'pull_request' }}
+      if: ${{
+            github.event_name != 'pull_request'
+            || (
+              github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+              && (
+                (github.event.action == 'labeled' && github.event.label.name == 'upload to s3')
+                || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'upload to s3'))
+              )
+            )
+          }}
       system: aarch64-linux
       runner: UbuntuLatest32Cores128GArm
       runner_for_virt: UbuntuLatest32Cores128GArm
@@ -57,7 +66,16 @@ jobs:
   build_x86_64-darwin:
     uses: ./.github/workflows/build.yml
     with:
-      if: ${{ github.event_name != 'pull_request' }}
+      if: ${{
+            github.event_name != 'pull_request'
+            || (
+              github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+              && (
+                (github.event.action == 'labeled' && github.event.label.name == 'upload to s3')
+                || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'upload to s3'))
+              )
+            )
+          }}
       system: x86_64-darwin
       runner: macos-latest-large
       runner_for_virt: macos-latest-large
@@ -111,7 +129,16 @@ jobs:
           done
 
       - name: Build fallback-paths.nix
-        if: ${{ github.event_name != 'pull_request' }}
+        if: ${{
+              github.event_name != 'pull_request'
+              || (
+                github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
+                && (
+                  (github.event.action == 'labeled' && github.event.label.name == 'upload to s3')
+                  || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'upload to s3'))
+                )
+              )
+            }}
         run: |
           nix build .#fallbackPathsNix --out-link fallback
           cat fallback > ./artifacts/fallback-paths.nix
@@ -149,4 +176,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          gh release edit "$TAG_NAME" --notes-file doc/manual/source/release-notes-determinate/v"$TAG_NAME".md || true
+          gh release edit "$TAG_NAME" --notes-file doc/manual/source/release-notes-determinate/"$TAG_NAME".md || true

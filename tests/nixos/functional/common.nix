@@ -24,6 +24,7 @@ in
       ];
 
       nix.settings.substituters = lib.mkForce [ ];
+      systemd.services.nix-daemon.environment._NIX_IN_TEST = "1";
 
       environment.systemPackages =
         let

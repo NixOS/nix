@@ -215,4 +215,20 @@ in
     pkgs = nixpkgsFor.x86_64-linux.native;
     nixpkgs = nixpkgs-regression;
   };
+
+  installTests = forAllSystems (
+    system:
+    let
+      pkgs = nixpkgsFor.${system}.native;
+    in
+    pkgs.runCommand "install-tests" {
+      againstSelf = testNixVersions pkgs pkgs.nix;
+      #againstCurrentLatest =
+      #  # FIXME: temporarily disable this on macOS because of #3605.
+      #  if system == "x86_64-linux" then testNixVersions pkgs pkgs.nixVersions.latest else null;
+      # Disabled because the latest stable version doesn't handle
+      # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
+      # againstLatestStable = testNixVersions pkgs pkgs.nixStable;
+    } "touch $out"
+  );
 }

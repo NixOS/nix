@@ -745,7 +745,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            {
+            static bool inTest = getEnv("_NIX_IN_TEST").has_value();
+            if (!(inTest && options.ignoreLiveness)) {
                 auto hashPart = std::string(path->hashPart());
                 auto shared(_shared.lock());
                 if (auto i = shared->tempRoots.find(hashPart); i != shared->tempRoots.end()) {

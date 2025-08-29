@@ -798,6 +798,8 @@ struct CmdFlakeCheck : FlakeCommand
         if (build && !drvPaths.empty()) {
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", drvPaths.size()));
 
+            state->waitForAllPaths();
+
             auto missing = store->queryMissing(drvPaths);
 
             /* This command doesn't need to actually substitute
@@ -810,7 +812,8 @@ struct CmdFlakeCheck : FlakeCommand
                     overloaded{
                         [&](const DerivedPath::Built & bfd) {
                             auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
-                            if (!drvPathP || missing.willBuild.contains(drvPathP->path))
+                            if (!drvPathP || missing.willBuild.contains(drvPathP->path)
+                                || missing.unknown.contains(drvPathP->path))
                                 toBuild.push_back(path);
                         },
                         [&](const DerivedPath::Opaque & bo) {
@@ -842,7 +845,7 @@ static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate
 
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
-    std::string templateUrl = "templates";
+    std::string templateUrl = "https://flakehub.com/f/DeterminateSystems/flake-templates/0.1";
     Path destDir;
 
     const LockFlags lockFlags{.writeLockFile = false};
