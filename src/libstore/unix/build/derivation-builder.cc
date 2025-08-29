@@ -542,10 +542,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
        being valid. */
     auto builtOutputs = registerOutputs();
 
-    /* Delete unused redirected outputs (when doing hash rewriting). */
-    for (auto & i : redirectedOutputs)
-        deletePath(store.Store::toRealPath(i.second));
-
     cleanupBuild(true);
 
     return builtOutputs;
@@ -1855,6 +1851,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
 void DerivationBuilderImpl::cleanupBuild(bool force)
 {
+    if (force) {
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        for (auto & i : redirectedOutputs)
+            deletePath(store.Store::toRealPath(i.second));
+    }
+
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to
          * clean up, the `tmpDir` will be chowned as if we were to move
