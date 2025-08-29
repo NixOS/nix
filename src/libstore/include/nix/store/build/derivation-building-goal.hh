@@ -29,6 +29,12 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
+    DerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
+    ~DerivationBuildingGoal();
+
+private:
+
     /** The path of the derivation. */
     StorePath drvPath;
 
@@ -93,10 +99,6 @@ struct DerivationBuildingGoal : public Goal
      * The remote machine on which we're building.
      */
     std::string machineName;
-
-    DerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
-    ~DerivationBuildingGoal();
 
     void timedOut(Error && ex) override;
 
