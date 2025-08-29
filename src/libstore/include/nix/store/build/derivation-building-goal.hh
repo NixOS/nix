@@ -112,7 +112,6 @@ struct DerivationBuildingGoal : public Goal
      */
     Co gaveUpOnSubstitution();
     Co tryToBuild();
-    Co hookDone();
 
     /**
      * Is the build hook willing to perform the build?
