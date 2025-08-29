@@ -217,7 +217,7 @@ public:
 
     std::optional<Descriptor> startBuild() override;
 
-    SingleDrvOutputs unprepareBuild() override;
+    std::pair<int, bool> unprepareBuild() override;
 
 protected:
 
@@ -459,7 +459,7 @@ bool DerivationBuilderImpl::killChild()
     return ret;
 }
 
-SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
+std::pair<int, bool> DerivationBuilderImpl::unprepareBuild()
 {
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -501,28 +501,12 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     }
 
     /* Check the exit status. */
-    if (!statusOk(status)) {
-
+    if (statusOk(status)) {
+        return {status, false};
+    } else {
         /* Check *before* cleaning up. */
-        bool diskFull = decideWhetherDiskFull();
-
-        cleanupBuild(false);
-
-        throw BuilderFailureError{
-            !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
-                                                      : BuildResult::Failure::PermanentFailure,
-            status,
-            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
-        };
+        return {status, decideWhetherDiskFull()};
     }
-
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs = registerOutputs();
-
-    cleanupBuild(true);
-
-    return builtOutputs;
 }
 
 static void chmod_(const Path & path, mode_t mode)

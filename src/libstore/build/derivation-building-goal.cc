@@ -643,9 +643,27 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     trace("build done");
 
+    auto [status, diskFull] = builder->unprepareBuild();
+
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+
+        builder->cleanupBuild(false);
+        builder.reset();
+        outputLocks.unlock();
+        co_return doneFailure(fixupBuilderFailureErrorMessage({
+            !drv->type().isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        }));
+    }
+
     SingleDrvOutputs builtOutputs;
     try {
-        builtOutputs = builder->unprepareBuild();
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        builtOutputs = builder->registerOutputs();
+        builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();

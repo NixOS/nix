@@ -168,10 +168,8 @@ struct DerivationBuilder : RestrictionContext
      * processing. A status code and exception are returned, providing
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
-     *
-     * @throws BuildError
      */
-    virtual SingleDrvOutputs unprepareBuild() = 0;
+    virtual std::pair<int, bool> unprepareBuild() = 0;
 
     /**
      * Check that the derivation outputs all exist and register them
