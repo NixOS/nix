@@ -769,9 +769,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     try {
         builtOutputs = builder->unprepareBuild();
     } catch (BuilderFailureError & e) {
+        builder.reset();
         outputLocks.unlock();
         co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e)));
     } catch (BuildError & e) {
+        builder.reset();
         outputLocks.unlock();
 // Allow selecting a subset of enum values
 #  pragma GCC diagnostic push
@@ -796,6 +798,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         co_return doneFailure(std::move(e));
     }
     {
+        builder.reset();
         StorePathSet outputPaths;
         for (auto & [_, output] : builtOutputs) {
             // for sake of `bmRepair`

@@ -484,14 +484,6 @@ bool DerivationBuilderImpl::prepareBuild()
 
 SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
-    // FIXME: get rid of this, rely on RAII.
-    Finally releaseBuildUser([&]() {
-        /* Release the build user at the end of this function. We don't do
-           it right away because we don't want another build grabbing this
-           uid and then messing around with our output. */
-        buildUser.reset();
-    });
-
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
