@@ -165,7 +165,7 @@ struct DerivationBuilder : RestrictionContext
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
      */
-    virtual std::variant<std::pair<BuildResult::Status, Error>, SingleDrvOutputs> unprepareBuild() = 0;
+    virtual std::variant<BuildError, SingleDrvOutputs> unprepareBuild() = 0;
 
     /**
      * Stop the in-process nix daemon thread.

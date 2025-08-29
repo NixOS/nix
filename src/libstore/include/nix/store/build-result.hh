@@ -1,12 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/store/realisation.hh"
-#include "nix/store/derived-path.hh"
-
 #include <string>
 #include <chrono>
 #include <optional>
+
+#include "nix/store/derived-path.hh"
+#include "nix/store/realisation.hh"
 
 namespace nix {
 
@@ -87,6 +87,26 @@ struct BuildResult
     void rethrow()
     {
         throw Error("%s", errorMsg);
+    }
+};
+
+/**
+ * denotes a permanent build failure
+ */
+struct BuildError : public Error
+{
+    BuildResult::Status status;
+
+    BuildError(BuildResult::Status status, BuildError && error)
+        : Error{std::move(error)}
+        , status{status}
+    {
+    }
+
+    BuildError(BuildResult::Status status, auto &&... args)
+        : Error{args...}
+        , status{status}
+    {
     }
 };
 

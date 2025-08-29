@@ -1,6 +1,7 @@
 #include <queue>
 
 #include "nix/store/store-api.hh"
+#include "nix/store/build-result.hh"
 
 #include "derivation-check.hh"
 
@@ -54,6 +55,7 @@ void checkOutputs(
         auto applyChecks = [&](const DerivationOptions::OutputChecks & checks) {
             if (checks.maxSize && info.narSize > *checks.maxSize)
                 throw BuildError(
+                    BuildResult::OutputRejected,
                     "path '%s' is too large at %d bytes; limit is %d bytes",
                     store.printStorePath(info.path),
                     info.narSize,
@@ -63,6 +65,7 @@ void checkOutputs(
                 uint64_t closureSize = getClosure(info.path).second;
                 if (closureSize > *checks.maxClosureSize)
                     throw BuildError(
+                        BuildResult::OutputRejected,
                         "closure of path '%s' is too large at %d bytes; limit is %d bytes",
                         store.printStorePath(info.path),
                         closureSize,
@@ -83,6 +86,7 @@ void checkOutputs(
                         std::string outputsListing =
                             concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
                         throw BuildError(
+                            BuildResult::OutputRejected,
                             "derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
                             " expected store path or output name (one of [%s])",
                             store.printStorePath(drvPath),
@@ -115,6 +119,7 @@ void checkOutputs(
                         badPathsStr += store.printStorePath(i);
                     }
                     throw BuildError(
+                        BuildResult::OutputRejected,
                         "output '%s' is not allowed to refer to the following paths:%s",
                         store.printStorePath(info.path),
                         badPathsStr);

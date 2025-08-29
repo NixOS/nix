@@ -170,7 +170,9 @@ struct DerivationBuildingGoal : public Goal
 
     void started();
 
-    Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
+    Done doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs);
+
+    Done doneFailure(BuildError ex);
 
     void appendLogTailErrorMsg(std::string & msg);
 
