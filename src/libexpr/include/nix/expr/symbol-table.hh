@@ -239,10 +239,7 @@ public:
 
     SymbolStr operator[](Symbol s) const
     {
-#if 0
-        if (s.id == 0 || s.id > arena.size)
-            unreachable();
-#endif
+        assert(s.id);
         return SymbolStr(*reinterpret_cast<const SymbolValue *>(arena.data + s.id));
     }
 
