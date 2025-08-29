@@ -439,37 +439,36 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
     co_return tryToBuild();
 }
 
-void DerivationBuildingGoal::started()
-{
-    auto msg =
-        fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
-            : buildMode == bmCheck ? "checking outputs of '%s'"
-                                   : "building '%s'",
-            worker.store.printStorePath(drvPath));
-    fmt("building '%s'", worker.store.printStorePath(drvPath));
-#ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook)
-        msg += fmt(" on '%s'", machineName);
-#endif
-    act = std::make_unique<Activity>(
-        *logger,
-        lvlInfo,
-        actBuild,
-        msg,
-        Logger::Fields{
-            worker.store.printStorePath(drvPath),
-#ifndef _WIN32 // TODO enable build hook on Windows
-            hook ? machineName :
-#endif
-                 "",
-            1,
-            1});
-    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-    worker.updateProgress();
-}
-
 Goal::Co DerivationBuildingGoal::tryToBuild()
 {
+    auto started = [&]() {
+        auto msg =
+            fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
+                : buildMode == bmCheck ? "checking outputs of '%s'"
+                                       : "building '%s'",
+                worker.store.printStorePath(drvPath));
+        fmt("building '%s'", worker.store.printStorePath(drvPath));
+#ifndef _WIN32 // TODO enable build hook on Windows
+        if (hook)
+            msg += fmt(" on '%s'", machineName);
+#endif
+        act = std::make_unique<Activity>(
+            *logger,
+            lvlInfo,
+            actBuild,
+            msg,
+            Logger::Fields{
+                worker.store.printStorePath(drvPath),
+#ifndef _WIN32 // TODO enable build hook on Windows
+                hook ? machineName :
+#endif
+                     "",
+                1,
+                1});
+        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+        worker.updateProgress();
+    };
+
     /**
      * Activity that denotes waiting for a lock.
      */
