@@ -71,17 +71,16 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     # We use this shell with the local checkout, not unpackPhase.
     src = null;
 
-    env =
-      {
-        # For `make format`, to work without installing pre-commit
-        _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
-          modular.pre-commit.settings.rawConfig
-        }";
-      }
-      // lib.optionalAttrs stdenv.hostPlatform.isLinux {
-        CC_LD = "mold";
-        CXX_LD = "mold";
-      };
+    env = {
+      # For `make format`, to work without installing pre-commit
+      _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
+        modular.pre-commit.settings.rawConfig
+      }";
+    }
+    // lib.optionalAttrs stdenv.hostPlatform.isLinux {
+      CC_LD = "mold";
+      CXX_LD = "mold";
+    };
 
     mesonFlags =
       map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
@@ -119,22 +118,25 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
         modular.pre-commit.settings.package
         (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
         pkgs.buildPackages.nixfmt-rfc-style
+        pkgs.buildPackages.gdb
       ]
       ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
         lib.hiPrio pkgs.buildPackages.clang-tools
       )
       ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
 
-    buildInputs =
-      attrs.buildInputs or [ ]
-      ++ pkgs.nixComponents2.nix-util.buildInputs
-      ++ pkgs.nixComponents2.nix-store.buildInputs
-      ++ pkgs.nixComponents2.nix-store-tests.externalBuildInputs
-      ++ pkgs.nixComponents2.nix-fetchers.buildInputs
-      ++ pkgs.nixComponents2.nix-expr.buildInputs
-      ++ pkgs.nixComponents2.nix-expr.externalPropagatedBuildInputs
-      ++ pkgs.nixComponents2.nix-cmd.buildInputs
-      ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.externalBuildInputs
-      ++ lib.optional havePerl pkgs.perl;
+    buildInputs = [
+      pkgs.gbenchmark
+    ]
+    ++ attrs.buildInputs or [ ]
+    ++ pkgs.nixComponents2.nix-util.buildInputs
+    ++ pkgs.nixComponents2.nix-store.buildInputs
+    ++ pkgs.nixComponents2.nix-store-tests.externalBuildInputs
+    ++ pkgs.nixComponents2.nix-fetchers.buildInputs
+    ++ pkgs.nixComponents2.nix-expr.buildInputs
+    ++ pkgs.nixComponents2.nix-expr.externalPropagatedBuildInputs
+    ++ pkgs.nixComponents2.nix-cmd.buildInputs
+    ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.externalBuildInputs
+    ++ lib.optional havePerl pkgs.perl;
   }
 )

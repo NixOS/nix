@@ -74,9 +74,19 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
 
     LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    bool getDefaultRequireSigs();
+
+public:
+
     Setting<bool> requireSigs{
         this,
-        settings.requireSigs,
+        getDefaultRequireSigs(),
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
@@ -111,6 +121,8 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    StoreReference getReference() const override;
 };
 
 class LocalStore : public virtual IndirectRootStore, public virtual GcStore
@@ -195,8 +207,6 @@ public:
     /**
      * Implementations of abstract store API methods.
      */
-
-    std::string getUri() override;
 
     bool isValidPathUncached(const StorePath & path) override;
 
@@ -442,7 +452,6 @@ private:
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     friend struct PathSubstitutionGoal;
-    friend struct SubstitutionGoal;
     friend struct DerivationGoal;
 };
 

@@ -7,7 +7,7 @@
 
 namespace nix {
 
-class Store;
+struct StoreDirConfig;
 
 struct NarInfo : ValidPathInfo
 {
@@ -18,7 +18,7 @@ struct NarInfo : ValidPathInfo
 
     NarInfo() = delete;
 
-    NarInfo(const Store & store, std::string name, ContentAddressWithReferences ca, Hash narHash)
+    NarInfo(const StoreDirConfig & store, std::string name, ContentAddressWithReferences ca, Hash narHash)
         : ValidPathInfo(store, std::move(name), std::move(ca), narHash)
     {
     }
@@ -33,16 +33,16 @@ struct NarInfo : ValidPathInfo
     {
     }
 
-    NarInfo(const Store & store, const std::string & s, const std::string & whence);
+    NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence);
 
     bool operator==(const NarInfo &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::optional::operator <=>`, can't do yet
     // auto operator <=>(const NarInfo &) const = default;
 
-    std::string to_string(const Store & store) const;
+    std::string to_string(const StoreDirConfig & store) const;
 
-    nlohmann::json toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const override;
-    static NarInfo fromJSON(const Store & store, const StorePath & path, const nlohmann::json & json);
+    nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const override;
+    static NarInfo fromJSON(const StoreDirConfig & store, const StorePath & path, const nlohmann::json & json);
 };
 
 } // namespace nix

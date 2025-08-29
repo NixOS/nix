@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ lib, nixComponents, ... }:
 
 let
   # FIXME (roberth) reference issue
@@ -50,11 +50,11 @@ in
 
               cd ~
 
-              cp -r ${pkgs.nixComponents2.nix-functional-tests.src} nix
+              cp -r ${nixComponents.nix-functional-tests.src} nix
               chmod -R +w nix
 
               chmod u+w nix/.version
-              echo ${pkgs.nixComponents2.version} > nix/.version
+              echo ${nixComponents.version} > nix/.version
 
               export isTestOnNixOS=1
 

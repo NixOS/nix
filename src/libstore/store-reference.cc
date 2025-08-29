@@ -18,7 +18,7 @@ static bool isNonUriPath(const std::string & spec)
         && spec.find("/") != std::string::npos;
 }
 
-std::string StoreReference::render() const
+std::string StoreReference::render(bool withParams) const
 {
     std::string res;
 
@@ -33,7 +33,7 @@ std::string StoreReference::render() const
         },
         variant);
 
-    if (!params.empty()) {
+    if (withParams && !params.empty()) {
         res += "?";
         res += encodeQuery(params);
     }
@@ -45,10 +45,10 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
 {
     auto params = extraParams;
     try {
-        auto parsedUri = parseURL(uri);
+        auto parsedUri = parseURL(uri, /*lenient=*/true);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
 
-        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
+        auto baseURI = parsedUri.authority.value_or(ParsedURL::Authority{}).to_string() + parsedUri.path;
 
         return {
             .variant =
@@ -107,7 +107,7 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
     StoreReference::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
-        params = decodeQuery(uri.substr(q + 1));
+        params = decodeQuery(uri.substr(q + 1), /*lenient=*/true);
         uri = uri_.substr(0, q);
     }
     return {uri, params};

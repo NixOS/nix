@@ -8,6 +8,7 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/store/names.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/store/globals.hh"
 #include "self-exe.hh"
 
 using namespace nix;

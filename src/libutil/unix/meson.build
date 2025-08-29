@@ -5,7 +5,7 @@ configdata_unix = configuration_data()
 configdata_unix.set(
   'HAVE_DECL_AT_SYMLINK_NOFOLLOW',
   cxx.has_header_symbol('fcntl.h', 'AT_SYMLINK_NOFOLLOW').to_int(),
-  description : 'Optionally used for changing the files and symlinks.'
+  description : 'Optionally used for changing the files and symlinks.',
 )
 
 # Check for each of these functions, and create a define like `#define
@@ -39,7 +39,7 @@ check_funcs_unix = [
 foreach funcspec : check_funcs_unix
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
   define_value = cxx.has_function(funcspec[0]).to_int()
-  configdata_unix.set(define_name, define_value, description: funcspec[1])
+  configdata_unix.set(define_name, define_value, description : funcspec[1])
 endforeach
 
 config_unix_priv_h = configure_file(

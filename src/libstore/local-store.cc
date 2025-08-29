@@ -7,7 +7,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/nar-info.hh"
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/util/finally.hh"
@@ -16,6 +16,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
+#include "nix/util/url.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
@@ -83,6 +84,11 @@ Path LocalBuildStoreConfig::getBuildDir() const
 ref<Store> LocalStore::Config::openStore() const
 {
     return make_ref<LocalStore>(ref{shared_from_this()});
+}
+
+bool LocalStoreConfig::getDefaultRequireSigs()
+{
+    return settings.requireSigs;
 }
 
 struct LocalStore::State::Stmts
@@ -227,7 +233,17 @@ LocalStore::LocalStore(ref<const Config> config)
        schema upgrade is in progress. */
     if (!config->readOnly) {
         Path globalLockPath = dbDir + "/big-lock";
-        globalLock = openLockFile(globalLockPath.c_str(), true);
+        try {
+            globalLock = openLockFile(globalLockPath.c_str(), true);
+        } catch (SysError & e) {
+            if (e.errNo == EACCES || e.errNo == EPERM) {
+                e.addTrace(
+                    {},
+                    "This command may have been run as non-root in a single-user Nix installation,\n"
+                    "or the Nix daemon may have crashed.");
+            }
+            throw;
+        }
     }
 
     if (!config->readOnly && !lockFile(globalLock.get(), ltRead, false)) {
@@ -438,9 +454,15 @@ LocalStore::~LocalStore()
     }
 }
 
-std::string LocalStore::getUri()
+StoreReference LocalStoreConfig::getReference() const
 {
-    return "local";
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+        .params = getQueryParams(),
+    };
 }
 
 int LocalStore::getSchema()
@@ -1071,19 +1093,19 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 auto hashResult = hashSink.finish();
 
-                if (hashResult.first != info.narHash)
+                if (hashResult.hash != info.narHash)
                     throw Error(
                         "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
                         info.narHash.to_string(HashFormat::Nix32, true),
-                        hashResult.first.to_string(HashFormat::Nix32, true));
+                        hashResult.hash.to_string(HashFormat::Nix32, true));
 
-                if (hashResult.second != info.narSize)
+                if (hashResult.numBytesDigested != info.narSize)
                     throw Error(
                         "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
                         info.narSize,
-                        hashResult.second);
+                        hashResult.numBytesDigested);
 
                 if (info.ca) {
                     auto & specified = *info.ca;
@@ -1100,7 +1122,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                                 std::string{info.path.hashPart()},
                             };
                             dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                            h = caSink.finish().first;
+                            h = caSink.finish().hash;
                             break;
                         }
                         case FileIngestionMethod::Git:
@@ -1278,7 +1300,7 @@ StorePath LocalStore::addToStoreFromDump(
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
                is the same as the store hash, so no need to do it again. */
-            auto narHash = std::pair{dumpHash, size};
+            HashResult narHash = {dumpHash, size};
             if (dumpMethod != FileSerialisationMethod::NixArchive || hashAlgo != HashAlgorithm::SHA256) {
                 HashSink narSink{HashAlgorithm::SHA256};
                 dumpPath(realPath, narSink);
@@ -1294,8 +1316,8 @@ StorePath LocalStore::addToStoreFromDump(
                 syncParent(realPath);
             }
 
-            ValidPathInfo info{*this, name, std::move(desc), narHash.first};
-            info.narSize = narHash.second;
+            ValidPathInfo info{*this, name, std::move(desc), narHash.hash};
+            info.narSize = narHash.numBytesDigested;
             registerValidPath(info);
         }
 
@@ -1401,12 +1423,12 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 dumpPath(Store::toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
-                if (info->narHash != nullHash && info->narHash != current.first) {
+                if (info->narHash != nullHash && info->narHash != current.hash) {
                     printError(
                         "path '%s' was modified! expected hash '%s', got '%s'",
                         printStorePath(i),
                         info->narHash.to_string(HashFormat::Nix32, true),
-                        current.first.to_string(HashFormat::Nix32, true));
+                        current.hash.to_string(HashFormat::Nix32, true));
                     if (repair)
                         repairPath(i);
                     else
@@ -1418,14 +1440,14 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     /* Fill in missing hashes. */
                     if (info->narHash == nullHash) {
                         printInfo("fixing missing hash on '%s'", printStorePath(i));
-                        info->narHash = current.first;
+                        info->narHash = current.hash;
                         update = true;
                     }
 
                     /* Fill in missing narSize fields (from old stores). */
                     if (info->narSize == 0) {
-                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.second);
-                        info->narSize = current.second;
+                        printInfo("updating size field on '%s' to %s", printStorePath(i), current.numBytesDigested);
+                        info->narSize = current.numBytesDigested;
                         update = true;
                     }
 

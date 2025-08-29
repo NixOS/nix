@@ -1,7 +1,9 @@
-project('nix-flake', 'cpp',
+project(
+  'nix-flake',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -14,8 +16,7 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -40,10 +41,10 @@ endforeach
 
 sources = files(
   'config.cc',
+  'flake-primops.cc',
   'flake.cc',
   'flakeref.cc',
   'lockfile.cc',
-  'flake-primops.cc',
   'settings.cc',
   'url-name.cc',
 )
@@ -59,7 +60,7 @@ this_library = library(
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

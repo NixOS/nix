@@ -23,6 +23,16 @@ ref<Store> LocalOverlayStoreConfig::openStore() const
         ref{std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())});
 }
 
+StoreReference LocalOverlayStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+    };
+}
+
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
     return upperLayer + "/" + path.to_string();

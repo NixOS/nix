@@ -1,7 +1,7 @@
 suites += {
-  'name': 'flakes',
-  'deps': [],
-  'tests': [
+  'name' : 'flakes',
+  'deps' : [],
+  'tests' : [
     'flakes.sh',
     'develop.sh',
     'edit.sh',
@@ -36,5 +36,5 @@ suites += {
     'trace-ifd.sh',
     'build-time-flake-inputs.sh',
   ],
-  'workdir': meson.current_source_dir(),
+  'workdir' : meson.current_source_dir(),
 }

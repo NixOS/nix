@@ -224,5 +224,25 @@
         """)
 
     client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs}/beeg >&2")
+
+
+    with subtest("Ensure fetching with SSH generates the same output"):
+      client.succeed(f"{repo.git} push origin-ssh main >&2")
+      client.succeed("rm -rf ~/.cache/nix") # Avoid using the cached output of the http fetch
+
+      fetchGit_ssh_expr = f"""
+        builtins.fetchGit {{
+          url = "{repo.remote_ssh}";
+          rev = "{lfs_file_rev}";
+          ref = "main";
+          lfs = true;
+        }}
+      """
+      fetched_ssh = client.succeed(f"""
+        nix eval --debug --impure --raw --expr '({fetchGit_ssh_expr}).outPath'
+      """)
+
+      assert fetched_ssh == fetched_lfs, \
+        f"fetching with ssh (store path {fetched_ssh}) yielded a different result than using http (store path {fetched_lfs})"
   '';
 }

@@ -798,22 +798,6 @@ struct curlFileTransfer : public FileTransfer
 #endif
     }
 
-#if NIX_WITH_S3_SUPPORT
-    std::tuple<std::string, std::string, Store::Config::Params> parseS3Uri(std::string uri)
-    {
-        auto [path, params] = splitUriAndParams(uri);
-
-        auto slash = path.find('/', 5); // 5 is the length of "s3://" prefix
-        if (slash == std::string::npos)
-            throw nix::Error("bad S3 URI '%s'", path);
-
-        std::string bucketName(path, 5, slash - 5);
-        std::string key(path, slash + 1);
-
-        return {bucketName, key, params};
-    }
-#endif
-
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
@@ -821,17 +805,17 @@ struct curlFileTransfer : public FileTransfer
             // FIXME: do this on a worker thread
             try {
 #if NIX_WITH_S3_SUPPORT
-                auto [bucketName, key, params] = parseS3Uri(request.uri);
+                auto parsed = ParsedS3URL::parse(request.uri);
 
-                std::string profile = getOr(params, "profile", "");
-                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
-                std::string scheme = getOr(params, "scheme", "");
-                std::string endpoint = getOr(params, "endpoint", "");
+                std::string profile = parsed.profile.value_or("");
+                std::string region = parsed.region.value_or(Aws::Region::US_EAST_1);
+                std::string scheme = parsed.scheme.value_or("");
+                std::string endpoint = parsed.getEncodedEndpoint().value_or("");
 
                 S3Helper s3Helper(profile, region, scheme, endpoint);
 
                 // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(bucketName, key);
+                auto s3Res = s3Helper.getObject(parsed.bucket, parsed.key);
                 FileTransferResult res;
                 if (!s3Res.data)
                     throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);

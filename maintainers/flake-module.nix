@@ -37,118 +37,29 @@
               fi
             ''}";
           };
-          meson-format = {
-            enable = true;
-            files = "(meson.build|meson.options)$";
-            entry = "${pkgs.writeScript "format-meson" ''
-              #!${pkgs.runtimeShell}
-              for file in "$@"; do
-                ${lib.getExe pkgs.meson} format -ic ${../meson.format} "$file"
-              done
-            ''}";
-            excludes = [
-              # We haven't applied formatting to these files yet
-              ''^doc/manual/meson.build$''
-              ''^doc/manual/source/command-ref/meson.build$''
-              ''^doc/manual/source/development/meson.build$''
-              ''^doc/manual/source/language/meson.build$''
-              ''^doc/manual/source/meson.build$''
-              ''^doc/manual/source/release-notes/meson.build$''
-              ''^doc/manual/source/store/meson.build$''
-              ''^misc/bash/meson.build$''
-              ''^misc/fish/meson.build$''
-              ''^misc/launchd/meson.build$''
-              ''^misc/meson.build$''
-              ''^misc/systemd/meson.build$''
-              ''^misc/zsh/meson.build$''
-              ''^nix-meson-build-support/$''
-              ''^nix-meson-build-support/big-objs/meson.build$''
-              ''^nix-meson-build-support/common/meson.build$''
-              ''^nix-meson-build-support/deps-lists/meson.build$''
-              ''^nix-meson-build-support/export/meson.build$''
-              ''^nix-meson-build-support/export-all-symbols/meson.build$''
-              ''^nix-meson-build-support/generate-header/meson.build$''
-              ''^nix-meson-build-support/libatomic/meson.build$''
-              ''^nix-meson-build-support/subprojects/meson.build$''
-              ''^scripts/meson.build$''
-              ''^src/external-api-docs/meson.build$''
-              ''^src/internal-api-docs/meson.build$''
-              ''^src/libcmd/include/nix/cmd/meson.build$''
-              ''^src/libcmd/meson.build$''
-              ''^src/libcmd/nix-meson-build-support$''
-              ''^src/libexpr/include/nix/expr/meson.build$''
-              ''^src/libexpr/meson.build$''
-              ''^src/libexpr/nix-meson-build-support$''
-              ''^src/libexpr-c/meson.build$''
-              ''^src/libexpr-c/nix-meson-build-support$''
-              ''^src/libexpr-test-support/meson.build$''
-              ''^src/libexpr-test-support/nix-meson-build-support$''
-              ''^src/libexpr-tests/meson.build$''
-              ''^src/libexpr-tests/nix-meson-build-support$''
-              ''^src/libfetchers/include/nix/fetchers/meson.build$''
-              ''^src/libfetchers/meson.build$''
-              ''^src/libfetchers/nix-meson-build-support$''
-              ''^src/libfetchers-c/meson.build$''
-              ''^src/libfetchers-c/nix-meson-build-support$''
-              ''^src/libfetchers-tests/meson.build$''
-              ''^src/libfetchers-tests/nix-meson-build-support$''
-              ''^src/libflake/include/nix/flake/meson.build$''
-              ''^src/libflake/meson.build$''
-              ''^src/libflake/nix-meson-build-support$''
-              ''^src/libflake-c/meson.build$''
-              ''^src/libflake-c/nix-meson-build-support$''
-              ''^src/libflake-tests/meson.build$''
-              ''^src/libflake-tests/nix-meson-build-support$''
-              ''^src/libmain/include/nix/main/meson.build$''
-              ''^src/libmain/meson.build$''
-              ''^src/libmain/nix-meson-build-support$''
-              ''^src/libmain-c/meson.build$''
-              ''^src/libmain-c/nix-meson-build-support$''
-              ''^src/libstore/include/nix/store/meson.build$''
-              ''^src/libstore/meson.build$''
-              ''^src/libstore/nix-meson-build-support$''
-              ''^src/libstore/unix/include/nix/store/meson.build$''
-              ''^src/libstore/unix/meson.build$''
-              ''^src/libstore/windows/meson.build$''
-              ''^src/libstore-c/meson.build$''
-              ''^src/libstore-c/nix-meson-build-support$''
-              ''^src/libstore-test-support/include/nix/store/tests/meson.build$''
-              ''^src/libstore-test-support/meson.build$''
-              ''^src/libstore-test-support/nix-meson-build-support$''
-              ''^src/libstore-tests/meson.build$''
-              ''^src/libstore-tests/nix-meson-build-support$''
-              ''^src/libutil/meson.build$''
-              ''^src/libutil/nix-meson-build-support$''
-              ''^src/libutil/unix/include/nix/util/meson.build$''
-              ''^src/libutil/unix/meson.build$''
-              ''^src/libutil/windows/meson.build$''
-              ''^src/libutil-c/meson.build$''
-              ''^src/libutil-c/nix-meson-build-support$''
-              ''^src/libutil-test-support/include/nix/util/tests/meson.build$''
-              ''^src/libutil-test-support/meson.build$''
-              ''^src/libutil-test-support/nix-meson-build-support$''
-              ''^src/libutil-tests/meson.build$''
-              ''^src/libutil-tests/nix-meson-build-support$''
-              ''^src/nix/meson.build$''
-              ''^src/nix/nix-meson-build-support$''
-              ''^src/perl/lib/Nix/meson.build$''
-              ''^src/perl/meson.build$''
-              ''^tests/functional/ca/meson.build$''
-              ''^tests/functional/common/meson.build$''
-              ''^tests/functional/dyn-drv/meson.build$''
-              ''^tests/functional/flakes/meson.build$''
-              ''^tests/functional/git-hashing/meson.build$''
-              ''^tests/functional/local-overlay-store/meson.build$''
-              ''^tests/functional/meson.build$''
-              ''^src/libcmd/meson.options$''
-              ''^src/libexpr/meson.options$''
-              ''^src/libstore/meson.options$''
-              ''^src/libutil/meson.options$''
-              ''^src/libutil-c/meson.options$''
-              ''^src/nix/meson.options$''
-              ''^src/perl/meson.options$''
-            ];
-          };
+          meson-format =
+            let
+              meson = pkgs.meson.overrideAttrs {
+                doCheck = false;
+                doInstallCheck = false;
+                patches = [
+                  (pkgs.fetchpatch {
+                    url = "https://github.com/mesonbuild/meson/commit/38d29b4dd19698d5cad7b599add2a69b243fd88a.patch";
+                    hash = "sha256-PgPBvGtCISKn1qQQhzBW5XfknUe91i5XGGBcaUK4yeE=";
+                  })
+                ];
+              };
+            in
+            {
+              enable = true;
+              files = "(meson.build|meson.options)$";
+              entry = "${pkgs.writeScript "format-meson" ''
+                #!${pkgs.runtimeShell}
+                for file in "$@"; do
+                  ${lib.getExe meson} format -ic ${../meson.format} "$file"
+                done
+              ''}";
+            };
           nixfmt-rfc-style = {
             enable = true;
             excludes = [
@@ -262,8 +173,6 @@
               ''^tests/functional/gc-concurrent\.sh$''
               ''^tests/functional/gc-concurrent2\.builder\.sh$''
               ''^tests/functional/gc-non-blocking\.sh$''
-              ''^tests/functional/git-hashing/common\.sh$''
-              ''^tests/functional/git-hashing/simple\.sh$''
               ''^tests/functional/hash-convert\.sh$''
               ''^tests/functional/impure-derivations\.sh$''
               ''^tests/functional/impure-eval\.sh$''
@@ -339,7 +248,6 @@
               ''^tests/functional/user-envs\.builder\.sh$''
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
-              ''^src/libutil-tests/data/git/check-data\.sh$''
             ];
           };
         };

@@ -26,6 +26,8 @@ struct LocalBinaryCacheStoreConfig : std::enable_shared_from_this<LocalBinaryCac
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    StoreReference getReference() const override;
 };
 
 } // namespace nix

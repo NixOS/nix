@@ -53,7 +53,7 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
 
 // instantiations
 
-#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-trampoline-goal.hh"
 
 namespace nix {
 
@@ -71,6 +71,6 @@ std::strong_ordering DerivedPathMap<StringSet>::ChildNode::operator <=> (
 template struct DerivedPathMap<StringSet>::ChildNode;
 template struct DerivedPathMap<StringSet>;
 
-template struct DerivedPathMap<std::weak_ptr<DerivationGoal>>;
+template struct DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>>;
 
 }; // namespace nix

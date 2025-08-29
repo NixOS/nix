@@ -73,9 +73,9 @@ struct StoreReference
     bool operator==(const StoreReference & rhs) const = default;
 
     /**
-     * Render the whole store reference as a URI, including parameters.
+     * Render the whole store reference as a URI, optionally including parameters.
      */
-    std::string render() const;
+    std::string render(bool withParams = true) const;
 
     /**
      * Parse a URI into a store reference.

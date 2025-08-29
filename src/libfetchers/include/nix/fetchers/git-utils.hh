@@ -155,4 +155,11 @@ struct Setter
     }
 };
 
+/**
+ * Checks that the git reference is valid and normalized.
+ *
+ * Accepts shorthand references (one-level refnames are allowed).
+ */
+bool isLegalRefName(const std::string & refName);
+
 } // namespace nix

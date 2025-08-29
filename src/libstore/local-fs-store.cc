@@ -8,6 +8,16 @@
 
 namespace nix {
 
+Path LocalFSStoreConfig::getDefaultStateDir()
+{
+    return settings.nixStateDir;
+}
+
+Path LocalFSStoreConfig::getDefaultLogDir()
+{
+    return settings.nixLogDir;
+}
+
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
     : StoreConfig(params)
     // Default `?root` from `rootDir` if non set

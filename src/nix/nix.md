@@ -44,7 +44,7 @@ R""(
 Nix is a tool for building software, configurations and other
 artifacts in a reproducible and declarative way. For more information,
 see the [Nix homepage](https://nixos.org/) or the [Nix
-manual](https://nixos.org/manual/nix/stable/).
+manual](https://nix.dev/manual/nix/stable/).
 
 # Installables
 

@@ -47,24 +47,23 @@ mkMesonDerivation (finalAttrs: {
   ];
 
   # Hack for sake of the dev shell
-  passthru.externalNativeBuildInputs =
-    [
-      meson
-      ninja
-      (lib.getBin lowdown-unsandboxed)
-      mdbook
-      mdbook-linkcheck
-      jq
-      python3
-      rsync
-      changelog-d
-    ]
-    ++ lib.optionals (!officialRelease) [
-      # When not an official release, we likely have changelog entries that have
-      # yet to be rendered.
-      # When released, these are rendered into a committed file to save a dependency.
-      changelog-d
-    ];
+  passthru.externalNativeBuildInputs = [
+    meson
+    ninja
+    (lib.getBin lowdown-unsandboxed)
+    mdbook
+    mdbook-linkcheck
+    jq
+    python3
+    rsync
+    changelog-d
+  ]
+  ++ lib.optionals (!officialRelease) [
+    # When not an official release, we likely have changelog entries that have
+    # yet to be rendered.
+    # When released, these are rendered into a committed file to save a dependency.
+    changelog-d
+  ];
 
   nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
     nix-cli

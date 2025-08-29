@@ -53,6 +53,27 @@ rm -rf $TEST_HOME/.cache/nix
 path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
 [[ $(cat $path/hello) = world ]]
 
+# Fetch again. This should be cached.
+# NOTE: This has to be done before the test case below which tries to pack-refs
+# the reason being that the lookup on the cache uses the ref-file `/refs/heads/master`
+# which does not exist after packing.
+mv $repo ${repo}-tmp
+path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+[[ $path = $path2 ]]
+
+[[ $(nix eval --impure --expr "(builtins.fetchGit file://$repo).revCount") = 2 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).shortRev") = ${rev2:0:7} ]]
+
+# Fetching with a explicit hash should succeed.
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+[[ $path = $path2 ]]
+
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
+[[ $(cat $path2/hello) = utrecht ]]
+
+mv ${repo}-tmp $repo
+
 # Fetch when the cache has packed-refs
 # Regression test of #8822
 git -C $TEST_HOME/.cache/nix/gitv3/*/ pack-refs --all
@@ -82,24 +103,6 @@ path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"
 
 # But without a hash, it fails.
 expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' doesn't fetch unlocked input"
-
-# Fetch again. This should be cached.
-mv $repo ${repo}-tmp
-path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
-[[ $path = $path2 ]]
-
-[[ $(nix eval --impure --expr "(builtins.fetchGit file://$repo).revCount") = 2 ]]
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = $rev2 ]]
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).shortRev") = ${rev2:0:7} ]]
-
-# Fetching with a explicit hash should succeed.
-path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
-[[ $path = $path2 ]]
-
-path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
-[[ $(cat $path2/hello) = utrecht ]]
-
-mv ${repo}-tmp $repo
 
 # Using a clean working tree should produce the same result.
 path2=$(nix eval --impure --raw --expr "(builtins.fetchGit $repo).outPath")
@@ -233,10 +236,10 @@ path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rep
 # Specifying a ref without a rev shouldn't pick a cached rev for a different ref
 export _NIX_FORCE_HTTP=1
 rev_tag1_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag1\"; }).rev")
-rev_tag1=$(git -C $repo rev-parse refs/tags/tag1)
+rev_tag1=$(git -C $repo rev-parse refs/tags/tag1^{commit})
 [[ $rev_tag1_nix = $rev_tag1 ]]
 rev_tag2_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"refs/tags/tag2\"; }).rev")
-rev_tag2=$(git -C $repo rev-parse refs/tags/tag2)
+rev_tag2=$(git -C $repo rev-parse refs/tags/tag2^{commit})
 [[ $rev_tag2_nix = $rev_tag2 ]]
 unset _NIX_FORCE_HTTP
 
