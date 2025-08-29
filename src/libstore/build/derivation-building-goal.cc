@@ -504,6 +504,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
      */
     std::unique_ptr<Activity> actLock;
 
+    /**
+     * Locks on (fixed) output paths.
+     */
+    PathLocks outputLocks;
+
     bool useHook;
 
     while (true) {
