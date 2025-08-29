@@ -362,23 +362,13 @@ protected:
      */
     virtual void execBuilder(const Strings & args, const Strings & envStrs);
 
-private:
+public:
 
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     */
-    SingleDrvOutputs registerOutputs();
+    SingleDrvOutputs registerOutputs() override;
+
+    void cleanupBuild(bool force) override;
 
 protected:
-
-    /**
-     * Delete the temporary directory, if we have one.
-     *
-     * @param force We know the build suceeded, so don't attempt to
-     * preseve anything for debugging.
-     */
-    virtual void cleanupBuild(bool force);
 
     /**
      * Kill any processes running under the build user UID or in the
