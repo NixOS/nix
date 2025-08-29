@@ -672,7 +672,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             throw SysError("setuid failed");
     }
 
-    SingleDrvOutputs unprepareBuild() override
+    std::pair<int, bool> unprepareBuild() override
     {
         sandboxMountNamespace = -1;
         sandboxUserNamespace = -1;
