@@ -412,11 +412,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-    co_return tryToBuild();
-}
 
-Goal::Co DerivationBuildingGoal::tryToBuild()
-{
+tryToBuild:
+
     std::map<std::string, InitialOutput> initialOutputs;
 
     /* Recheck at this point. In particular, whereas before we were
@@ -698,7 +696,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (curBuilds >= settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild();
+            goto tryToBuild;
         }
 
         if (!builder) {
