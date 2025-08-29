@@ -602,11 +602,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
     throw UnimplementedError("building derivations is not yet implemented on Windows");
 #else
+    assert(!hook);
 
     // Will continue here while waiting for a build user below
     while (true) {
-
-        assert(!hook);
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
         if (curBuilds >= settings.maxBuildJobs) {
