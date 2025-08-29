@@ -55,8 +55,6 @@ private:
      */
     StorePathSet inputPaths;
 
-    std::map<std::string, InitialOutput> initialOutputs;
-
     /**
      * File descriptor for the log file.
      */
@@ -108,7 +106,7 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook();
+    HookReply tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Open a log file and a pipe to it.
@@ -142,13 +140,7 @@ private:
      * whether all outputs are valid and non-corrupt, and a
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
-
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     */
-    SingleDrvOutputs assertPathValidity();
+    std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Forcibly kill the child process, if any.
