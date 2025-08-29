@@ -120,7 +120,7 @@ static DownloadTarballResult downloadTarball_(
             throw Error("tarball '%s' does not exist.", localPath);
         }
         if (is_directory(localPath)) {
-            if (std::filesystem::exists(localPath + "/.git")) {
+            if (exists(localPath / ".git")) {
                 throw Error(
                     "tarball '%s' is a git repository, not a tarball. Please use `git+file` as the scheme.", localPath);
             }
