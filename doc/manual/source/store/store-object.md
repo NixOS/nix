@@ -20,7 +20,7 @@ The graph of references excluding self-references thus forms a [directed acyclic
 
 [directed acyclic graph]: @docroot@/glossary.md#gloss-directed-acyclic-graph
 
-We can take the [transitive closure] of the references graph, which any pair of store objects have an edge not if there is a single reference from the first to the second, but a path of one or more references from the first to the second.
+We can take the [transitive closure] of the references graph, in which any pair of store objects have an edge: either there is a single reference from the first to the second, or a path of one or more references exists from the first to the second.
 The *requisites* of a store object are all store objects reachable by paths of references which start with given store object's references.
 
 [transitive closure]: https://en.wikipedia.org/wiki/Transitive_closure
