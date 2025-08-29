@@ -613,7 +613,85 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         buildResult.startTime = time(0); // inexact
         started();
         co_await Suspend{};
-        co_return hookDone();
+
+#ifndef _WIN32
+        assert(hook);
+#endif
+
+        trace("hook build done");
+
+        /* Since we got an EOF on the logger pipe, the builder is presumed
+           to have terminated.  In fact, the builder could also have
+           simply have closed its end of the pipe, so just to be sure,
+           kill it. */
+        int status =
+#ifndef _WIN32 // TODO enable build hook on Windows
+            hook->pid.kill();
+#else
+            0;
+#endif
+
+        debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
+
+        buildResult.timesBuilt++;
+        buildResult.stopTime = time(0);
+
+        /* So the child is gone now. */
+        worker.childTerminated(this);
+
+        /* Close the read side of the logger pipe. */
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook->builderOut.readSide.close();
+        hook->fromHook.readSide.close();
+#endif
+
+        /* Close the log file. */
+        closeLogFile();
+
+        /* Check the exit status. */
+        if (!statusOk(status)) {
+            auto msg =
+                fmt("Cannot build '%s'.\n"
+                    "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+                    Magenta(worker.store.printStorePath(drvPath)),
+                    statusToString(status));
+
+            msg += showKnownOutputs(worker.store, *drv);
+
+            appendLogTailErrorMsg(msg);
+
+            outputLocks.unlock();
+
+            /* TODO (once again) support fine-grained error codes, see issue #12641. */
+
+            co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
+        }
+
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        auto builtOutputs =
+            /* When using a build hook, the build hook can register the output
+               as valid (by doing `nix-store --import').  If so we don't have
+               to do anything here.
+
+               We can only early return when the outputs are known a priori. For
+               floating content-addressing derivations this isn't the case.
+             */
+            assertPathValidity();
+
+        StorePathSet outputPaths;
+        for (auto & [_, output] : builtOutputs)
+            outputPaths.insert(output.outPath);
+        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+
+        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
     }
 
     co_await yield();
@@ -891,88 +969,6 @@ void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
                 nixLogCommand,
                 worker.store.printStorePath(drvPath));
     }
-}
-
-Goal::Co DerivationBuildingGoal::hookDone()
-{
-#ifndef _WIN32
-    assert(hook);
-#endif
-
-    trace("hook build done");
-
-    /* Since we got an EOF on the logger pipe, the builder is presumed
-       to have terminated.  In fact, the builder could also have
-       simply have closed its end of the pipe, so just to be sure,
-       kill it. */
-    int status =
-#ifndef _WIN32 // TODO enable build hook on Windows
-        hook->pid.kill();
-#else
-        0;
-#endif
-
-    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
-
-    buildResult.timesBuilt++;
-    buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
-
-    /* Close the read side of the logger pipe. */
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook->builderOut.readSide.close();
-    hook->fromHook.readSide.close();
-#endif
-
-    /* Close the log file. */
-    closeLogFile();
-
-    /* Check the exit status. */
-    if (!statusOk(status)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-        msg += showKnownOutputs(worker.store, *drv);
-
-        appendLogTailErrorMsg(msg);
-
-        outputLocks.unlock();
-
-        /* TODO (once again) support fine-grained error codes, see issue #12641. */
-
-        co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
-    }
-
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs =
-        /* When using a build hook, the build hook can register the output
-           as valid (by doing `nix-store --import').  If so we don't have
-           to do anything here.
-
-           We can only early return when the outputs are known a priori. For
-           floating content-addressing derivations this isn't the case.
-         */
-        assertPathValidity();
-
-    StorePathSet outputPaths;
-    for (auto & [_, output] : builtOutputs)
-        outputPaths.insert(output.outPath);
-    runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
-
-    /* It is now safe to delete the lock files, since all future
-       lockers will see that the output paths are valid; they will
-       not create new lock files with the same names as the old
-       (unlinked) lock files. */
-    outputLocks.setDeletion(true);
-    outputLocks.unlock();
-
-    co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
 }
 
 HookReply DerivationBuildingGoal::tryBuildHook()
