@@ -157,8 +157,6 @@ struct DerivationBuildingGoal : public Goal
      */
     void killChild();
 
-    void started();
-
     Done doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs);
 
     Done doneFailure(BuildError ex);
