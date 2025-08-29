@@ -105,7 +105,6 @@ struct DerivationBuildingGoal : public Goal
      * The states.
      */
     Co gaveUpOnSubstitution();
-    Co tryToBuild();
 
     /**
      * Is the build hook willing to perform the build?
