@@ -24,7 +24,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BuildTimeFetchTree);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::ParallelEval);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -309,6 +309,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "build-time-fetch-tree",
         .description = R"(
             Enable the built-in derivation `builtin:fetch-tree`, as well as the flake input attribute `buildTime`.
+        )",
+        .trackingUrl = "",
+    },
+    {
+        .tag = Xp::ParallelEval,
+        .name = "parallel-eval",
+        .description = R"(
+            Enable built-in functions for parallel evaluation.
         )",
         .trackingUrl = "",
     },

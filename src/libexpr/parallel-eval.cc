@@ -269,6 +269,15 @@ static void prim_parallel(EvalState & state, const PosIdx pos, Value ** args, Va
 }
 
 // FIXME: gate this behind an experimental feature.
-static RegisterPrimOp r_parallel({.name = "__parallel", .arity = 2, .fun = prim_parallel});
+static RegisterPrimOp r_parallel({
+    .name = "__parallel",
+    .args = {"xs", "x"},
+    .arity = 2,
+    .doc = R"(
+      Start evaluation of the values `xs` in the background and return `x`.
+    )",
+    .fun = prim_parallel,
+    .experimentalFeature = Xp::ParallelEval,
+});
 
 } // namespace nix
