@@ -12,8 +12,8 @@ using HostType = Authority::HostType;
 
 struct FixGitURLParam
 {
-    std::string input;
-    std::string expected;
+    std::string_view input;
+    std::string_view expected;
 };
 
 std::ostream & operator<<(std::ostream & os, const FixGitURLParam & param)
@@ -49,9 +49,23 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
 {
-    auto [input, expected] = GetParam();
-    std::string actual = fixGitURL(input).to_string();
-    EXPECT_EQ(actual, expected);
+    auto & p = GetParam();
+    auto actual = fixGitURL(p.input).to_string();
+    EXPECT_EQ(actual, p.expected);
+}
+
+TEST_P(FixGitURLTestSuite, fixGitIsIdempotent)
+{
+    auto & p = GetParam();
+    auto actual = fixGitURL(p.expected).to_string();
+    EXPECT_EQ(actual, p.expected);
+}
+
+TEST_P(FixGitURLTestSuite, fixGitOutputParses)
+{
+    auto & p = GetParam();
+    auto parsed = fixGitURL(p.expected);
+    EXPECT_EQ(parseURL(parsed.to_string()), parsed);
 }
 
 TEST(parseURL, parsesSimpleHttpUrl)

@@ -328,7 +328,7 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme);
  *  If the url does not start with a leading slash, one will be added since there are no
  *  relative path URIs.
  */
-ParsedURL fixGitURL(const std::string & url);
+ParsedURL fixGitURL(std::string_view url);
 
 /**
  * Whether a string is valid as RFC 3986 scheme name.

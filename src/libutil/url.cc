@@ -411,7 +411,7 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 struct ScpLike
 {
     ParsedURL::Authority authority;
-    std::string path;
+    std::string_view path;
 };
 
 /**
@@ -440,14 +440,13 @@ static std::optional<ScpLike> parseScp(std::string_view s) noexcept
     if (head.empty())
         return std::nullopt;
 
-    ScpLike out{};
-
-    out.authority = ParsedURL::Authority::parse(head);
-    out.path = path;
-    return out;
+    return ScpLike{
+        .authority = ParsedURL::Authority::parse(head),
+        .path = std::move(path),
+    };
 }
 
-ParsedURL fixGitURL(const std::string & url)
+ParsedURL fixGitURL(std::string_view url)
 {
     if (auto r = boost::urls::parse_uri(url); r && r->has_scheme() && r->has_authority()) {
         return parseURL(url);
@@ -457,14 +456,15 @@ ParsedURL fixGitURL(const std::string & url)
         return parseURL(url);
 
     if (auto scp = parseScp(url)) {
-        auto [authority, path] = *scp;
-        if (!hasPrefix(path, "/")) {
-            path = '/' + path;
+        std::vector<std::string> path;
+        if (!hasPrefix(scp->path, "/")) {
+            path.push_back("");
         }
+        splitStringInto(path, scp->path, "/");
         return ParsedURL{
             .scheme = "ssh",
-            .authority = authority,
-            .path = splitString<std::vector<std::string>>(path, "/"),
+            .authority = std::move(scp->authority),
+            .path = std::move(path),
         };
     }
 
