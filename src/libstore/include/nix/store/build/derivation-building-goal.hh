@@ -110,7 +110,6 @@ private:
      * The states.
      */
     Co gaveUpOnSubstitution(bool storeDerivation);
-    Co tryToBuild();
 
     /**
      * Is the build hook willing to perform the build?
