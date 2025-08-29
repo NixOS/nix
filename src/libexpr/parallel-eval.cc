@@ -24,7 +24,7 @@ Executor::Executor(const EvalSettings & evalSettings)
 
 Executor::~Executor()
 {
-    std::vector<std::thread> threads;
+    std::vector<boost::thread> threads;
     {
         auto state(state_.lock());
         quit = true;
@@ -40,7 +40,9 @@ Executor::~Executor()
 
 void Executor::createWorker(State & state)
 {
-    state.threads.push_back(std::thread([&]() {
+    boost::thread::attributes attrs;
+    attrs.set_stack_size(evalStackSize);
+    state.threads.push_back(boost::thread(attrs, [&]() {
 #if NIX_USE_BOEHMGC
         GC_stack_base sb;
         GC_get_stack_base(&sb);

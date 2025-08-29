@@ -567,13 +567,15 @@ void mainWrapped(int argc, char ** argv)
 
 int main(int argc, char ** argv)
 {
+    using namespace nix;
+
     // The CLI has a more detailed version than the libraries; see nixVersion.
-    nix::nixVersion = NIX_CLI_VERSION;
+    nixVersion = NIX_CLI_VERSION;
 #ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    nix::setStackSize(64 * 1024 * 1024);
+    setStackSize(evalStackSize);
 #endif
 
-    return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });
+    return handleExceptions(argv[0], [&]() { mainWrapped(argc, argv); });
 }

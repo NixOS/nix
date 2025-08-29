@@ -39,7 +39,7 @@ endforeach
 
 boost = dependency(
   'boost',
-  modules : ['container', 'context'],
+  modules : ['container', 'context', 'thread'],
   include_type: 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we

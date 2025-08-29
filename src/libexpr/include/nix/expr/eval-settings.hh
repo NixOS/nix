@@ -364,4 +364,9 @@ struct EvalSettings : Config
  */
 Path getNixDefExpr();
 
+/**
+ * Stack size for evaluator threads.
+ */
+constexpr size_t evalStackSize = 64 * 1024 * 1024;
+
 } // namespace nix

@@ -5,6 +5,8 @@
 #include <future>
 #include <random>
 
+#include <boost/thread/thread.hpp>
+
 #include "nix/util/sync.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/environment-variables.hh"
@@ -30,7 +32,7 @@ struct Executor
     struct State
     {
         std::multimap<uint64_t, Item> queue;
-        std::vector<std::thread> threads;
+        std::vector<boost::thread> threads;
     };
 
     std::atomic_bool quit{false};
