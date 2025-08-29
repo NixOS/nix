@@ -470,6 +470,8 @@ void DerivationBuildingGoal::started()
 
 Goal::Co DerivationBuildingGoal::tryToBuild()
 {
+    bool useHook;
+
     trace("trying to build");
 
     /* Obtain locks on all output paths, if the paths are known a priori.
@@ -539,16 +541,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     bool buildLocally =
         (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv)) && settings.maxBuildJobs.get() != 0;
 
-    if (!buildLocally) {
+    if (buildLocally) {
+        useHook = false;
+    } else {
         switch (tryBuildHook()) {
         case rpAccept:
             /* Yes, it has started doing so.  Wait until we get
                EOF from the hook. */
-            actLock.reset();
-            buildResult.startTime = time(0); // inexact
-            started();
-            co_await Suspend{};
-            co_return hookDone();
+            useHook = true;
+            break;
         case rpPostpone:
             /* Not now; wait until at least one child finishes or
                the wake-up timeout expires. */
@@ -563,11 +564,19 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             co_return tryToBuild();
         case rpDecline:
             /* We should do it ourselves. */
+            useHook = false;
             break;
         }
     }
 
     actLock.reset();
+
+    if (useHook) {
+        buildResult.startTime = time(0); // inexact
+        started();
+        co_await Suspend{};
+        co_return hookDone();
+    }
 
     co_await yield();
 
