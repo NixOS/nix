@@ -472,101 +472,105 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 {
     bool useHook;
 
-    trace("trying to build");
+    while (true) {
+        trace("trying to build");
 
-    /* Obtain locks on all output paths, if the paths are known a priori.
+        /* Obtain locks on all output paths, if the paths are known a priori.
 
-       The locks are automatically released when we exit this function or Nix
-       crashes.  If we can't acquire the lock, then continue; hopefully some
-       other goal can start a build, and if not, the main loop will sleep a few
-       seconds and then retry this goal. */
-    PathSet lockFiles;
-    /* FIXME: Should lock something like the drv itself so we don't build same
-       CA drv concurrently */
-    if (dynamic_cast<LocalStore *>(&worker.store)) {
-        /* If we aren't a local store, we might need to use the local store as
-           a build remote, but that would cause a deadlock. */
-        /* FIXME: Make it so we can use ourselves as a build remote even if we
-           are the local store (separate locking for building vs scheduling? */
-        /* FIXME: find some way to lock for scheduling for the other stores so
-           a forking daemon with --store still won't farm out redundant builds.
-           */
-        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-            if (i.second.second)
-                lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
-            else
-                lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+           The locks are automatically released when we exit this function or Nix
+           crashes.  If we can't acquire the lock, then continue; hopefully some
+           other goal can start a build, and if not, the main loop will sleep a few
+           seconds and then retry this goal. */
+        PathSet lockFiles;
+        /* FIXME: Should lock something like the drv itself so we don't build same
+           CA drv concurrently */
+        if (dynamic_cast<LocalStore *>(&worker.store)) {
+            /* If we aren't a local store, we might need to use the local store as
+               a build remote, but that would cause a deadlock. */
+            /* FIXME: Make it so we can use ourselves as a build remote even if we
+               are the local store (separate locking for building vs scheduling? */
+            /* FIXME: find some way to lock for scheduling for the other stores so
+               a forking daemon with --store still won't farm out redundant builds.
+               */
+            for (auto & i : drv->outputsAndOptPaths(worker.store)) {
+                if (i.second.second)
+                    lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+                else
+                    lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+            }
         }
-    }
 
-    if (!outputLocks.lockPaths(lockFiles, "", false)) {
-        Activity act(*logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+        if (!outputLocks.lockPaths(lockFiles, "", false)) {
+            Activity act(
+                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
 
-        /* Wait then try locking again, repeat until success (returned
-           boolean is true). */
-        do {
-            co_await waitForAWhile();
-        } while (!outputLocks.lockPaths(lockFiles, "", false));
-    }
+            /* Wait then try locking again, repeat until success (returned
+               boolean is true). */
+            do {
+                co_await waitForAWhile();
+            } while (!outputLocks.lockPaths(lockFiles, "", false));
+        }
 
-    /* Now check again whether the outputs are valid.  This is because
-       another process may have started building in parallel.  After
-       it has finished and released the locks, we can (and should)
-       reuse its results.  (Strictly speaking the first check can be
-       omitted, but that would be less efficient.)  Note that since we
-       now hold the locks on the output paths, no other process can
-       build this derivation, so no further checks are necessary. */
-    auto [allValid, validOutputs] = checkPathValidity();
+        /* Now check again whether the outputs are valid.  This is because
+           another process may have started building in parallel.  After
+           it has finished and released the locks, we can (and should)
+           reuse its results.  (Strictly speaking the first check can be
+           omitted, but that would be less efficient.)  Note that since we
+           now hold the locks on the output paths, no other process can
+           build this derivation, so no further checks are necessary. */
+        auto [allValid, validOutputs] = checkPathValidity();
 
-    if (buildMode != bmCheck && allValid) {
-        debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-        co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
-    }
-
-    /* If any of the outputs already exist but are not valid, delete
-       them. */
-    for (auto & [_, status] : initialOutputs) {
-        if (!status.known || status.known->isValid())
-            continue;
-        auto storePath = status.known->path;
-        debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-        deletePath(worker.store.Store::toRealPath(storePath));
-    }
-
-    /* Don't do a remote build if the derivation has the attribute
-       `preferLocalBuild' set.  Also, check and repair modes are only
-       supported for local builds. */
-    bool buildLocally =
-        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv)) && settings.maxBuildJobs.get() != 0;
-
-    if (buildLocally) {
-        useHook = false;
-    } else {
-        switch (tryBuildHook()) {
-        case rpAccept:
-            /* Yes, it has started doing so.  Wait until we get
-               EOF from the hook. */
-            useHook = true;
-            break;
-        case rpPostpone:
-            /* Not now; wait until at least one child finishes or
-               the wake-up timeout expires. */
-            if (!actLock)
-                actLock = std::make_unique<Activity>(
-                    *logger,
-                    lvlWarn,
-                    actBuildWaiting,
-                    fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+        if (buildMode != bmCheck && allValid) {
+            debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
+            outputLocks.setDeletion(true);
             outputLocks.unlock();
-            co_await waitForAWhile();
-            co_return tryToBuild();
-        case rpDecline:
-            /* We should do it ourselves. */
-            useHook = false;
-            break;
+            co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
         }
+
+        /* If any of the outputs already exist but are not valid, delete
+           them. */
+        for (auto & [_, status] : initialOutputs) {
+            if (!status.known || status.known->isValid())
+                continue;
+            auto storePath = status.known->path;
+            debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
+            deletePath(worker.store.Store::toRealPath(storePath));
+        }
+
+        /* Don't do a remote build if the derivation has the attribute
+           `preferLocalBuild' set.  Also, check and repair modes are only
+           supported for local builds. */
+        bool buildLocally = (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv))
+                            && settings.maxBuildJobs.get() != 0;
+
+        if (buildLocally) {
+            useHook = false;
+        } else {
+            switch (tryBuildHook()) {
+            case rpAccept:
+                /* Yes, it has started doing so.  Wait until we get
+                   EOF from the hook. */
+                useHook = true;
+                break;
+            case rpPostpone:
+                /* Not now; wait until at least one child finishes or
+                   the wake-up timeout expires. */
+                if (!actLock)
+                    actLock = std::make_unique<Activity>(
+                        *logger,
+                        lvlWarn,
+                        actBuildWaiting,
+                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+                outputLocks.unlock();
+                co_await waitForAWhile();
+                continue;
+            case rpDecline:
+                /* We should do it ourselves. */
+                useHook = false;
+                break;
+            }
+        }
+        break;
     }
 
     actLock.reset();
