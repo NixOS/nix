@@ -442,18 +442,16 @@ static std::optional<ScpLike> parseScp(std::string_view s) noexcept
 
     return ScpLike{
         .authority = ParsedURL::Authority::parse(head),
-        .path = std::move(path),
+        .path = path,
     };
 }
 
 ParsedURL fixGitURL(std::string_view url)
 {
-    if (auto r = boost::urls::parse_uri(url); r && r->has_scheme() && r->has_authority()) {
+    try {
         return parseURL(url);
+    } catch (BadURL &) {
     }
-
-    if (hasPrefix(url, "file:"))
-        return parseURL(url);
 
     if (auto scp = parseScp(url)) {
         std::vector<std::string> path;
@@ -469,14 +467,17 @@ ParsedURL fixGitURL(std::string_view url)
     }
 
     // if the url does not start with forward slash, add one
-    auto modifiedUrl = url;
+    std::vector<std::string> path;
     if (!hasPrefix(url, "/")) {
-        modifiedUrl = "/" + url;
+        path.push_back("");
     }
+    splitStringInto(path, url, "/");
+
     return ParsedURL{
         .scheme = "file",
         .authority = ParsedURL::Authority{},
-        .path = splitString<std::vector<std::string>>(modifiedUrl, "/")};
+        .path = std::move(path),
+    };
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
