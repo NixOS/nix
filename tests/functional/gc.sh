@@ -13,7 +13,7 @@ outPath=$(nix-store -rvv "$drvPath")
 rm -f "$NIX_STATE_DIR/gcroots/foo"
 ln -sf "$outPath" "$NIX_STATE_DIR/gcroots/foo"
 
-[ "$(nix-store -q --roots "$outPath")" = "$NIX_STATE_DIR/gcroots/foo -> $outPath" ]
+expectStderr 0 nix-store -q --roots "$outPath" | grepQuiet "$NIX_STATE_DIR/gcroots/foo -> $outPath"
 
 nix-store --gc --print-roots | grep "$outPath"
 nix-store --gc --print-live | grep "$outPath"
