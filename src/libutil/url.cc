@@ -422,7 +422,7 @@ struct ScpLike
  * A good reference is libgit2 also allows scp style
  * https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/util/net.c#L806
  */
-static std::optional<ScpLike> parseScp(std::string_view s) noexcept
+static std::optional<ScpLike> parseScp(const std::string_view s) noexcept
 {
     if (s.empty() || s.front() == '/')
         return std::nullopt;
@@ -448,15 +448,17 @@ static std::optional<ScpLike> parseScp(std::string_view s) noexcept
 
 ParsedURL fixGitURL(std::string_view url)
 {
-    try {
+    if (auto r = boost::urls::parse_uri(url); r && r->has_scheme() && r->has_authority()) {
         return parseURL(url);
-    } catch (BadURL &) {
     }
+
+    if (hasPrefix(url, "file:"))
+        return parseURL(url);
 
     if (auto scp = parseScp(url)) {
         std::vector<std::string> path;
         if (!hasPrefix(scp->path, "/")) {
-            path.push_back("");
+            path.emplace_back("");
         }
         splitStringInto(path, scp->path, "/");
         return ParsedURL{
@@ -469,7 +471,7 @@ ParsedURL fixGitURL(std::string_view url)
     // if the url does not start with forward slash, add one
     std::vector<std::string> path;
     if (!hasPrefix(url, "/")) {
-        path.push_back("");
+        path.emplace_back("");
     }
     splitStringInto(path, url, "/");
 
