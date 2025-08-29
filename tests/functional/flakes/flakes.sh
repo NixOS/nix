@@ -425,7 +425,7 @@ nix flake metadata "$flake3Dir" --json | jq .
 rm -rf $badFlakeDir
 mkdir $badFlakeDir
 echo INVALID > $badFlakeDir/flake.nix
-nix store delete $(nix store add-path $badFlakeDir)
+nix store delete --ignore-liveness $(nix store add-path $badFlakeDir)
 
 [[ $(nix path-info      $(nix store add-path $flake1Dir)) =~ flake1 ]]
 [[ $(nix path-info path:$(nix store add-path $flake1Dir)) =~ simple ]]

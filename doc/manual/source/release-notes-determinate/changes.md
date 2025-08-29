@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.8.6.<!-- differences -->
+This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.9.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -113,13 +113,13 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.3 -->
 
-* Add an `external-builders` experimental feature by @cole-h in [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
+* Add an `external-builders` experimental feature [DeterminateSystems/nix-src#141](https://github.com/DeterminateSystems/nix-src/pull/141)
 
-* Add support for external builders by @edolstra in [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
+* Add support for external builders [DeterminateSystems/nix-src#78](https://github.com/DeterminateSystems/nix-src/pull/78)
 
 <!-- Determinate Nix version 3.8.4 -->
 
-* Revert "Use WAL mode for SQLite cache databases" by @grahamc in [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
+* Revert "Use WAL mode for SQLite cache databases" [DeterminateSystems/nix-src#155](https://github.com/DeterminateSystems/nix-src/pull/155)
 
 <!-- Determinate Nix version 3.8.5 -->
 
@@ -133,14 +133,14 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 
 <!-- Determinate Nix version 3.8.6 -->
 
-* Auto update release notes by @grahamc in [DeterminateSystems/nix-src#170](https://github.com/DeterminateSystems/nix-src/pull/170)
+* Use WAL mode for SQLite cache databases (2nd attempt) [DeterminateSystems/nix-src#167](https://github.com/DeterminateSystems/nix-src/pull/167)
 
-* Use WAL mode for SQLite cache databases (2nd attempt) by @edolstra in [DeterminateSystems/nix-src#167](https://github.com/DeterminateSystems/nix-src/pull/167)
+* Enable parallel marking in boehm-gc [DeterminateSystems/nix-src#168](https://github.com/DeterminateSystems/nix-src/pull/168)
 
-* Enable parallel marking in boehm-gc by @edolstra in [DeterminateSystems/nix-src#168](https://github.com/DeterminateSystems/nix-src/pull/168)
+<!-- Determinate Nix version 3.9.0 -->
 
-* BasicClientConnection::queryPathInfo(): Don't throw exception for invalid paths by @edolstra in [DeterminateSystems/nix-src#172](https://github.com/DeterminateSystems/nix-src/pull/172)
+* Build-time flake inputs [DeterminateSystems/nix-src#49](https://github.com/DeterminateSystems/nix-src/pull/49)
 
-* Fix queryPathInfo() negative caching by @edolstra in [DeterminateSystems/nix-src#173](https://github.com/DeterminateSystems/nix-src/pull/173)
+<!-- Determinate Nix version 3.9.1 -->
 
-* forceDerivation(): Wait for async path write after forcing value by @edolstra in [DeterminateSystems/nix-src#176](https://github.com/DeterminateSystems/nix-src/pull/176)
+* The default `nix flake init` template is much more useful [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
