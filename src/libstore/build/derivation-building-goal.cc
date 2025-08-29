@@ -156,6 +156,8 @@ static void runPostBuildHook(
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
+    std::map<std::string, InitialOutput> initialOutputs;
+
     /* Recheck at goal start. In particular, whereas before we were
        given this information by the downstream goal, that cannot happen
        anymore if the downstream goal only cares about one output, but
@@ -179,7 +181,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
             std::move(v),
         });
     }
-    checkPathValidity();
+    checkPathValidity(initialOutputs);
 
     Goals waitees;
 
@@ -560,7 +562,7 @@ tryToBuild:
            omitted, but that would be less efficient.)  Note that since we
            now hold the locks on the output paths, no other process can
            build this derivation, so no further checks are necessary. */
-        auto [allValid, validOutputs] = checkPathValidity();
+        auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
 
         if (buildMode != bmCheck && allValid) {
             debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
@@ -588,7 +590,7 @@ tryToBuild:
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(inputPaths)) {
+            switch (tryBuildHook(inputPaths, initialOutputs)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -684,8 +686,16 @@ tryToBuild:
 
                We can only early return when the outputs are known a priori. For
                floating content-addressing derivations this isn't the case.
+
+               Aborts if any output is not valid or corrupt, and otherwise
+               returns a 'SingleDrvOutputs' structure containing all outputs.
              */
-            assertPathValidity();
+            [&] {
+                auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
+                if (!allValid)
+                    throw Error("some outputs are unexpectedly invalid");
+                return validOutputs;
+            }();
 
         StorePathSet outputPaths;
         for (auto & [_, output] : builtOutputs)
@@ -979,7 +989,8 @@ void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
     }
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const StorePathSet & inputPaths)
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1258,7 +1269,8 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
     return res;
 }
 
-std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
+std::pair<bool, SingleDrvOutputs>
+DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs)
 {
     if (drv->type().isImpure())
         return {false, {}};
@@ -1313,14 +1325,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
     }
 
     return {allValid, validOutputs};
-}
-
-SingleDrvOutputs DerivationBuildingGoal::assertPathValidity()
-{
-    auto [allValid, validOutputs] = checkPathValidity();
-    if (!allValid)
-        throw Error("some outputs are unexpectedly invalid");
-    return validOutputs;
 }
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs)

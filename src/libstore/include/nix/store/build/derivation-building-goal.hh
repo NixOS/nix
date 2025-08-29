@@ -42,8 +42,6 @@ struct DerivationBuildingGoal : public Goal
      * The remainder is state held during the build.
      */
 
-    std::map<std::string, InitialOutput> initialOutputs;
-
     /**
      * File descriptor for the log file.
      */
@@ -103,7 +101,8 @@ struct DerivationBuildingGoal : public Goal
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const StorePathSet & inputPaths);
+    HookReply
+    tryBuildHook(const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Open a log file and a pipe to it.
@@ -137,13 +136,7 @@ struct DerivationBuildingGoal : public Goal
      * whether all outputs are valid and non-corrupt, and a
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
-
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     */
-    SingleDrvOutputs assertPathValidity();
+    std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Forcibly kill the child process, if any.
