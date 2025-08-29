@@ -450,7 +450,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         fmt("building '%s'", worker.store.printStorePath(drvPath));
 #ifndef _WIN32 // TODO enable build hook on Windows
         if (hook)
-            msg += fmt(" on '%s'", machineName);
+            msg += fmt(" on '%s'", hook->machineName);
 #endif
         act = std::make_unique<Activity>(
             *logger,
@@ -460,7 +460,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             Logger::Fields{
                 worker.store.printStorePath(drvPath),
 #ifndef _WIN32 // TODO enable build hook on Windows
-                hook ? machineName :
+                hook ? hook->machineName :
 #endif
                      "",
                 1,
@@ -1027,7 +1027,7 @@ HookReply DerivationBuildingGoal::tryBuildHook()
     hook = std::move(worker.hook);
 
     try {
-        machineName = readLine(hook->fromHook.readSide.get());
+        hook->machineName = readLine(hook->fromHook.readSide.get());
     } catch (Error & e) {
         e.addTrace({}, "while reading the machine name from the build hook");
         throw;

@@ -95,11 +95,6 @@ private:
 
     std::map<ActivityId, Activity> builderActivities;
 
-    /**
-     * The remote machine on which we're building.
-     */
-    std::string machineName;
-
     void timedOut(Error && ex) override;
 
     std::string key() override;
