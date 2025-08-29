@@ -198,7 +198,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
     if (std::regex_match(url, match, flakeRegex)) {
         auto parsedURL = ParsedURL{
             .scheme = "flake",
-            .authority = ParsedURL::Authority{},
+            .authority = std::nullopt,
             .path = splitString<std::vector<std::string>>(match[1].str(), "/"),
         };
 
