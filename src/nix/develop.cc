@@ -647,7 +647,7 @@ struct CmdDevelop : Common, MixEnvironment
                 nixpkgs = i->nixpkgsFlakeRef();
 
             auto bashInstallable = make_ref<InstallableFlake>(
-                this,
+                nullptr, //< Don't barf when the command is run with --arg/--argstr
                 state,
                 std::move(nixpkgs),
                 "bashInteractive",
