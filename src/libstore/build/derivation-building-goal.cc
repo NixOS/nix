@@ -155,6 +155,12 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
 
     /* Determine the full set of input paths. */
 
+    /**
+     * All input paths (that is, the union of FS closures of the
+     * immediate input paths).
+     */
+    StorePathSet inputPaths;
+
     if (storeDerivation) {
         assert(drv->inputDrvs.map.empty());
         /* Store the resolved derivation, as part of the record of
@@ -348,7 +354,7 @@ tryToBuild:
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(initialOutputs)) {
+            switch (tryBuildHook(inputPaths, initialOutputs)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -801,7 +807,8 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs)
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
