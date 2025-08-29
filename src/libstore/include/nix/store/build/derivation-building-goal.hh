@@ -92,11 +92,6 @@ struct DerivationBuildingGoal : public Goal
 
     std::unique_ptr<Activity> act;
 
-    /**
-     * Activity that denotes waiting for a lock.
-     */
-    std::unique_ptr<Activity> actLock;
-
     std::map<ActivityId, Activity> builderActivities;
 
     /**

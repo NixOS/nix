@@ -470,6 +470,11 @@ void DerivationBuildingGoal::started()
 
 Goal::Co DerivationBuildingGoal::tryToBuild()
 {
+    /**
+     * Activity that denotes waiting for a lock.
+     */
+    std::unique_ptr<Activity> actLock;
+
     bool useHook;
 
     while (true) {
