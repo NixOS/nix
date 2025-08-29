@@ -42,12 +42,6 @@ struct DerivationBuildingGoal : public Goal
      * The remainder is state held during the build.
      */
 
-    /**
-     * All input paths (that is, the union of FS closures of the
-     * immediate input paths).
-     */
-    StorePathSet inputPaths;
-
     std::map<std::string, InitialOutput> initialOutputs;
 
     /**
@@ -109,7 +103,7 @@ struct DerivationBuildingGoal : public Goal
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook();
+    HookReply tryBuildHook(const StorePathSet & inputPaths);
 
     /**
      * Open a log file and a pipe to it.
