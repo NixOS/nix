@@ -1322,8 +1322,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    std::exception_ptr delayedException;
-
     /* The paths that can be referenced are the input closures, the
        output paths, and any paths that have been built via recursive
        Nix calls. */
@@ -1642,37 +1640,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
-                    auto newInfo0 = newInfoFromCA(
+                    return newInfoFromCA(
                         DerivationOutput::CAFloating{
                             .method = dof.ca.method,
                             .hashAlgo = wanted.algo,
                         });
-
-                    /* Check wanted hash */
-                    assert(newInfo0.ca);
-                    auto & got = newInfo0.ca->hash;
-                    if (wanted != got) {
-                        /* Throw an error after registering the path as
-                           valid. */
-                        miscMethods->noteHashMismatch();
-                        delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
-                            "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
-                            store.printStorePath(drvPath),
-                            wanted.to_string(HashFormat::SRI, true),
-                            got.to_string(HashFormat::SRI, true)));
-                    }
-                    if (!newInfo0.references.empty()) {
-                        auto numViolations = newInfo.references.size();
-                        delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
-                            "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
-                            store.printStorePath(drvPath),
-                            numViolations,
-                            store.printStorePath(*newInfo.references.begin())));
-                    }
-
-                    return newInfo0;
                 },
 
                 [&](const DerivationOutput::CAFloating & dof) { return newInfoFromCA(dof); },
@@ -1736,84 +1708,90 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         }
 
         if (buildMode == bmCheck) {
+            /* Check against already registered outputs */
 
-            if (!store.isValidPath(newInfo.path))
-                continue;
-            ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
-            if (newInfo.narHash != oldInfo.narHash) {
-                miscMethods->noteCheckMismatch();
-                if (settings.runDiffHook || settings.keepFailed) {
-                    auto dst = store.toRealPath(finalDestPath + ".check");
-                    deletePath(dst);
-                    movePath(actualPath, dst);
+            if (store.isValidPath(newInfo.path)) {
+                ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
+                if (newInfo.narHash != oldInfo.narHash) {
+                    if (settings.runDiffHook || settings.keepFailed) {
+                        auto dst = store.toRealPath(finalDestPath + ".check");
+                        deletePath(dst);
+                        movePath(actualPath, dst);
 
-                    handleDiffHook(
-                        buildUser ? buildUser->getUID() : getuid(),
-                        buildUser ? buildUser->getGID() : getgid(),
-                        finalDestPath,
-                        dst,
-                        store.printStorePath(drvPath),
-                        tmpDir);
+                        handleDiffHook(
+                            buildUser ? buildUser->getUID() : getuid(),
+                            buildUser ? buildUser->getGID() : getgid(),
+                            finalDestPath,
+                            dst,
+                            store.printStorePath(drvPath),
+                            tmpDir);
 
-                    throw NotDeterministic(
-                        "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        store.printStorePath(drvPath),
-                        store.toRealPath(finalDestPath),
-                        dst);
-                } else
-                    throw NotDeterministic(
-                        "derivation '%s' may not be deterministic: output '%s' differs",
-                        store.printStorePath(drvPath),
-                        store.toRealPath(finalDestPath));
+                        throw NotDeterministic(
+                            "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
+                            store.printStorePath(drvPath),
+                            store.toRealPath(finalDestPath),
+                            dst);
+                    } else
+                        throw NotDeterministic(
+                            "derivation '%s' may not be deterministic: output '%s' differs",
+                            store.printStorePath(drvPath),
+                            store.toRealPath(finalDestPath));
+                }
+
+                /* Since we verified the build, it's now ultimately trusted. */
+                if (!oldInfo.ultimate) {
+                    oldInfo.ultimate = true;
+                    store.signPathInfo(oldInfo);
+                    store.registerValidPaths({{oldInfo.path, oldInfo}});
+                }
+            }
+        } else {
+            /* do tasks relating to registering these outputs */
+
+            /* For debugging, print out the referenced and unreferenced paths. */
+            for (auto & i : inputPaths) {
+                if (references.count(i))
+                    debug("referenced input: '%1%'", store.printStorePath(i));
+                else
+                    debug("unreferenced input: '%1%'", store.printStorePath(i));
             }
 
-            /* Since we verified the build, it's now ultimately trusted. */
-            if (!oldInfo.ultimate) {
-                oldInfo.ultimate = true;
-                store.signPathInfo(oldInfo);
-                store.registerValidPaths({{oldInfo.path, oldInfo}});
-            }
+            store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+            miscMethods->markContentsGood(newInfo.path);
 
-            continue;
+            newInfo.deriver = drvPath;
+            newInfo.ultimate = true;
+            store.signPathInfo(newInfo);
+
+            finish(newInfo.path);
+
+            /* If it's a CA path, register it right away. This is necessary if it
+               isn't statically known so that we can safely unlock the path before
+               the next iteration
+
+               This is also good so that if a fixed-output produces the
+               wrong path, we still store the result (just don't consider
+               the derivation sucessful, so if someone fixes the problem by
+               just changing the wanted hash, the redownload (or whateer
+               possibly quite slow thing it was) doesn't have to be done
+               again. */
+            if (newInfo.ca)
+                store.registerValidPaths({{newInfo.path, newInfo}});
         }
 
-        /* For debugging, print out the referenced and unreferenced paths. */
-        for (auto & i : inputPaths) {
-            if (references.count(i))
-                debug("referenced input: '%1%'", store.printStorePath(i));
-            else
-                debug("unreferenced input: '%1%'", store.printStorePath(i));
-        }
-
-        store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-        miscMethods->markContentsGood(newInfo.path);
-
-        newInfo.deriver = drvPath;
-        newInfo.ultimate = true;
-        store.signPathInfo(newInfo);
-
-        finish(newInfo.path);
-
-        /* If it's a CA path, register it right away. This is necessary if it
-           isn't statically known so that we can safely unlock the path before
-           the next iteration */
-        if (newInfo.ca)
-            store.registerValidPaths({{newInfo.path, newInfo}});
-
+        /* Do this in both the check and non-check cases, because we
+           want `checkOutputs` below to work, which needs these path
+           infos. */
         infos.emplace(outputName, std::move(newInfo));
     }
 
+    /* Apply output checks. This includes checking of the wanted vs got
+       hash of fixed-outputs. */
+    checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
+
     if (buildMode == bmCheck) {
-        /* In case of fixed-output derivations, if there are
-           mismatches on `--check` an error must be thrown as this is
-           also a source for non-determinism. */
-        if (delayedException)
-            std::rethrow_exception(delayedException);
         return {};
     }
-
-    /* Apply output checks. */
-    checkOutputs(store, drvPath, drvOptions.outputChecks, infos);
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
@@ -1826,16 +1804,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         store.registerValidPaths(infos2);
     }
 
-    /* In case of a fixed-output derivation hash mismatch, throw an
-       exception now that we have registered the output as valid. */
-    if (delayedException)
-        std::rethrow_exception(delayedException);
-
-    /* If we made it this far, we are sure the output matches the derivation
-       (since the delayedException would be a fixed output CA mismatch). That
-       means it's safe to link the derivation to the output hash. We must do
-       that for floating CA derivations, which otherwise couldn't be cached,
-       but it's fine to do in all cases. */
+    /* If we made it this far, we are sure the output matches the
+       derivation That means it's safe to link the derivation to the
+       output hash. We must do that for floating CA derivations, which
+       otherwise couldn't be cached, but it's fine to do in all cases.
+       */
     SingleDrvOutputs builtOutputs;
 
     for (auto & [outputName, newInfo] : infos) {

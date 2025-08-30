@@ -36,6 +36,10 @@ struct BuildResult
         NotDeterministic,
         ResolvesToAlreadyValid,
         NoSubstituters,
+        /// A certain type of `OutputRejected`. The protocols do not yet
+        /// know about this one, so change it back to `OutputRejected`
+        /// before serialization.
+        HashMismatch,
     } status = MiscFailure;
 
     /**
