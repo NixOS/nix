@@ -49,22 +49,22 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
 {
-    const auto & [input, expected] = GetParam();
-    const auto actual = fixGitURL(input).to_string();
-    EXPECT_EQ(actual, expected);
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.input).to_string();
+    EXPECT_EQ(actual, p.expected);
 }
 
 TEST_P(FixGitURLTestSuite, fixGitIsIdempotent)
 {
     auto & p = GetParam();
-    auto actual = fixGitURL(p.expected).to_string();
+    const auto actual = fixGitURL(p.expected).to_string();
     EXPECT_EQ(actual, p.expected);
 }
 
 TEST_P(FixGitURLTestSuite, fixGitOutputParses)
 {
-    const auto & [input, expected] = GetParam();
-    const auto parsed = fixGitURL(expected);
+    auto & p = GetParam();
+    const auto parsed = fixGitURL(p.expected);
     EXPECT_EQ(parseURL(parsed.to_string()), parsed);
 }
 
