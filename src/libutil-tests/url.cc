@@ -12,6 +12,64 @@ namespace nix {
 using Authority = ParsedURL::Authority;
 using HostType = Authority::HostType;
 
+struct FixGitURLParam
+{
+    std::string_view input;
+    std::string_view expected;
+};
+
+std::ostream & operator<<(std::ostream & os, const FixGitURLParam & param)
+{
+    return os << "Input: \"" << param.input << "\", Expected: \"" << param.expected << "\"";
+}
+
+class FixGitURLTestSuite : public ::testing::TestWithParam<FixGitURLParam>
+{};
+
+INSTANTIATE_TEST_SUITE_P(
+    FixGitURLs,
+    FixGitURLTestSuite,
+    ::testing::Values(
+        // https://github.com/NixOS/nix/issues/5958
+        // Already proper URL with git+ssh
+        FixGitURLParam{"git+ssh://user@domain:1234/path", "git+ssh://user@domain:1234/path"},
+        // SCP-like URL (rewritten to ssh://)
+        FixGitURLParam{"git@github.com:owner/repo.git", "ssh://git@github.com/owner/repo.git"},
+        // SCP-like URL (no user)
+        FixGitURLParam{"github.com:owner/repo.git", "ssh://github.com/owner/repo.git"},
+        // SCP-like URL (leading slash)
+        FixGitURLParam{"github.com:/owner/repo.git", "ssh://github.com/owner/repo.git"},
+        // Absolute path (becomes file:)
+        FixGitURLParam{"/home/me/repo", "file:///home/me/repo"},
+        // Relative path (becomes file:// absolute)
+        FixGitURLParam{"relative/repo", "file:///relative/repo"},
+        // Already file: scheme
+        // NOTE: This is not valid technically as it's not absolute
+        FixGitURLParam{"file:/var/repos/x", "file:/var/repos/x"},
+        // IPV6 test case
+        FixGitURLParam{"user@[2001:db8:1::2]:/home/file", "ssh://user@[2001:db8:1::2]/home/file"}));
+
+TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
+{
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.input).to_string();
+    EXPECT_EQ(actual, p.expected);
+}
+
+TEST_P(FixGitURLTestSuite, fixGitIsIdempotent)
+{
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.expected).to_string();
+    EXPECT_EQ(actual, p.expected);
+}
+
+TEST_P(FixGitURLTestSuite, fixGitOutputParses)
+{
+    auto & p = GetParam();
+    const auto parsed = fixGitURL(p.expected);
+    EXPECT_EQ(parseURL(parsed.to_string()), parsed);
+}
+
 TEST(parseURL, parsesSimpleHttpUrl)
 {
     auto s = "http://www.example.org/file.tar.gz";

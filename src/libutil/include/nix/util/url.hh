@@ -327,10 +327,23 @@ struct ParsedUrlScheme
 
 ParsedUrlScheme parseUrlScheme(std::string_view scheme);
 
-/* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
-   them by removing the `:` and assuming a scheme of `ssh://`. Also
-   changes absolute paths into file:// URLs. */
-ParsedURL fixGitURL(const std::string & url);
+/**
+ * Normalize a Git remote string from various styles into a URL-like form.
+ * Input forms handled:
+ *   1) SCP-style SSH syntax:    "[user@]host:path"      -> "ssh://user@host/path"
+ *   2) Already "file:" URLs:    "file:/abs/or/rel"      -> unchanged
+ *   3) Bare paths / filenames:  "src/repo" or "/abs"    -> "file:src/repo" or "file:/abs"
+ *   4) Anything with "://":     treated as a proper URL -> unchanged
+ *
+ *  Note: for the scp-style, as they are converted to ssh-form, all paths are assumed to
+ *  then be absolute whereas in programs like git, they retain the scp form which allows
+ *  relative paths.
+ *
+ *  Additionally, if no url can be determined, it is returned as a file:// URI.
+ *  If the url does not start with a leading slash, one will be added since there are no
+ *  relative path URIs.
+ */
+ParsedURL fixGitURL(std::string_view url);
 
 /**
  * Whether a string is valid as RFC 3986 scheme name.
