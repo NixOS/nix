@@ -55,9 +55,16 @@ public:
                 // https://github.com/apple-oss-distributions/xnu/commit/e13b1fa57645afc8a7b2e7d868fe9845c6b08c40#diff-a5aa0b0e7f4d866ca417f60702689fc797e9cdfe33b601b05ccf43086c35d395R1468
                 // That means added in 2007 or earlier. Should be good enough
                 // for us.
+                //
+                // Update: as of macOS 15.4, passing 0 or POLLHUP
+                // doesn't seem to work at all for sockets any more
+                // (though it does work for `notifyPipe`). As a
+                // workaround, also pass POLLIN. That does cause us to
+                // receive a bunch of POLLIN events we don't care
+                // about, so we sleep for a bit when receiving POLLIN.
                 short hangup_events =
 #ifdef __APPLE__
-                    POLLHUP
+                    POLLIN | POLLHUP
 #else
                     0
 #endif
@@ -97,6 +104,12 @@ public:
                 }
                 if (fds[1].revents & POLLHUP) {
                     break;
+                }
+                if (fds[0].revents & POLLIN) {
+                    /* macOS only: we have to pass POLLIN to receive
+                       POLLHUP, but we don't care about POLLIN. To
+                       avoid a lot of wakeups, sleep for a bit. */
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 }
                 // On macOS, (jade thinks that) it is possible (although not
                 // observed on macOS 14.5) that in some limited cases on buggy
