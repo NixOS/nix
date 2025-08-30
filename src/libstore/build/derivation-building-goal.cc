@@ -156,6 +156,8 @@ static void runPostBuildHook(
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
+    std::map<std::string, InitialOutput> initialOutputs;
+
     /* Recheck at goal start. In particular, whereas before we were
        given this information by the downstream goal, that cannot happen
        anymore if the downstream goal only cares about one output, but
@@ -179,7 +181,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
             std::move(v),
         });
     }
-    checkPathValidity();
+    checkPathValidity(initialOutputs);
 
     Goals waitees;
 
@@ -266,6 +268,12 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        running the build hook. */
 
     /* Determine the full set of input paths. */
+
+    /**
+     * All input paths (that is, the union of FS closures of the
+     * immediate input paths).
+     */
+    StorePathSet inputPaths;
 
     /* First, the input derivations. */
     {
@@ -465,138 +473,244 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-    co_return tryToBuild();
-}
 
-void DerivationBuildingGoal::started()
-{
-    auto msg =
-        fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
-            : buildMode == bmCheck ? "checking outputs of '%s'"
-                                   : "building '%s'",
-            worker.store.printStorePath(drvPath));
-    fmt("building '%s'", worker.store.printStorePath(drvPath));
+tryToBuild:
+
+    auto started = [&]() {
+        auto msg =
+            fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
+                : buildMode == bmCheck ? "checking outputs of '%s'"
+                                       : "building '%s'",
+                worker.store.printStorePath(drvPath));
+        fmt("building '%s'", worker.store.printStorePath(drvPath));
 #ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook)
-        msg += fmt(" on '%s'", machineName);
+        if (hook)
+            msg += fmt(" on '%s'", hook->machineName);
 #endif
-    act = std::make_unique<Activity>(
-        *logger,
-        lvlInfo,
-        actBuild,
-        msg,
-        Logger::Fields{
-            worker.store.printStorePath(drvPath),
+        act = std::make_unique<Activity>(
+            *logger,
+            lvlInfo,
+            actBuild,
+            msg,
+            Logger::Fields{
+                worker.store.printStorePath(drvPath),
 #ifndef _WIN32 // TODO enable build hook on Windows
-            hook ? machineName :
+                hook ? hook->machineName :
 #endif
-                 "",
-            1,
-            1});
-    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-    worker.updateProgress();
-}
+                     "",
+                1,
+                1});
+        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+        worker.updateProgress();
+    };
 
-Goal::Co DerivationBuildingGoal::tryToBuild()
-{
-    trace("trying to build");
+    /**
+     * Activity that denotes waiting for a lock.
+     */
+    std::unique_ptr<Activity> actLock;
 
-    /* Obtain locks on all output paths, if the paths are known a priori.
+    /**
+     * Locks on (fixed) output paths.
+     */
+    PathLocks outputLocks;
 
-       The locks are automatically released when we exit this function or Nix
-       crashes.  If we can't acquire the lock, then continue; hopefully some
-       other goal can start a build, and if not, the main loop will sleep a few
-       seconds and then retry this goal. */
-    PathSet lockFiles;
-    /* FIXME: Should lock something like the drv itself so we don't build same
-       CA drv concurrently */
-    if (dynamic_cast<LocalStore *>(&worker.store)) {
-        /* If we aren't a local store, we might need to use the local store as
-           a build remote, but that would cause a deadlock. */
-        /* FIXME: Make it so we can use ourselves as a build remote even if we
-           are the local store (separate locking for building vs scheduling? */
-        /* FIXME: find some way to lock for scheduling for the other stores so
-           a forking daemon with --store still won't farm out redundant builds.
-           */
-        for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-            if (i.second.second)
-                lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
-            else
-                lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+    bool useHook;
+
+    while (true) {
+        trace("trying to build");
+
+        /* Obtain locks on all output paths, if the paths are known a priori.
+
+           The locks are automatically released when we exit this function or Nix
+           crashes.  If we can't acquire the lock, then continue; hopefully some
+           other goal can start a build, and if not, the main loop will sleep a few
+           seconds and then retry this goal. */
+        PathSet lockFiles;
+        /* FIXME: Should lock something like the drv itself so we don't build same
+           CA drv concurrently */
+        if (dynamic_cast<LocalStore *>(&worker.store)) {
+            /* If we aren't a local store, we might need to use the local store as
+               a build remote, but that would cause a deadlock. */
+            /* FIXME: Make it so we can use ourselves as a build remote even if we
+               are the local store (separate locking for building vs scheduling? */
+            /* FIXME: find some way to lock for scheduling for the other stores so
+               a forking daemon with --store still won't farm out redundant builds.
+               */
+            for (auto & i : drv->outputsAndOptPaths(worker.store)) {
+                if (i.second.second)
+                    lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+                else
+                    lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+            }
         }
-    }
 
-    if (!outputLocks.lockPaths(lockFiles, "", false)) {
-        Activity act(*logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+        if (!outputLocks.lockPaths(lockFiles, "", false)) {
+            Activity act(
+                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
 
-        /* Wait then try locking again, repeat until success (returned
-           boolean is true). */
-        do {
-            co_await waitForAWhile();
-        } while (!outputLocks.lockPaths(lockFiles, "", false));
-    }
+            /* Wait then try locking again, repeat until success (returned
+               boolean is true). */
+            do {
+                co_await waitForAWhile();
+            } while (!outputLocks.lockPaths(lockFiles, "", false));
+        }
 
-    /* Now check again whether the outputs are valid.  This is because
-       another process may have started building in parallel.  After
-       it has finished and released the locks, we can (and should)
-       reuse its results.  (Strictly speaking the first check can be
-       omitted, but that would be less efficient.)  Note that since we
-       now hold the locks on the output paths, no other process can
-       build this derivation, so no further checks are necessary. */
-    auto [allValid, validOutputs] = checkPathValidity();
+        /* Now check again whether the outputs are valid.  This is because
+           another process may have started building in parallel.  After
+           it has finished and released the locks, we can (and should)
+           reuse its results.  (Strictly speaking the first check can be
+           omitted, but that would be less efficient.)  Note that since we
+           now hold the locks on the output paths, no other process can
+           build this derivation, so no further checks are necessary. */
+        auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
 
-    if (buildMode != bmCheck && allValid) {
-        debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-        co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
-    }
-
-    /* If any of the outputs already exist but are not valid, delete
-       them. */
-    for (auto & [_, status] : initialOutputs) {
-        if (!status.known || status.known->isValid())
-            continue;
-        auto storePath = status.known->path;
-        debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-        deletePath(worker.store.Store::toRealPath(storePath));
-    }
-
-    /* Don't do a remote build if the derivation has the attribute
-       `preferLocalBuild' set.  Also, check and repair modes are only
-       supported for local builds. */
-    bool buildLocally =
-        (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv)) && settings.maxBuildJobs.get() != 0;
-
-    if (!buildLocally) {
-        switch (tryBuildHook()) {
-        case rpAccept:
-            /* Yes, it has started doing so.  Wait until we get
-               EOF from the hook. */
-            actLock.reset();
-            buildResult.startTime = time(0); // inexact
-            started();
-            co_await Suspend{};
-            co_return hookDone();
-        case rpPostpone:
-            /* Not now; wait until at least one child finishes or
-               the wake-up timeout expires. */
-            if (!actLock)
-                actLock = std::make_unique<Activity>(
-                    *logger,
-                    lvlWarn,
-                    actBuildWaiting,
-                    fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+        if (buildMode != bmCheck && allValid) {
+            debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
+            outputLocks.setDeletion(true);
             outputLocks.unlock();
-            co_await waitForAWhile();
-            co_return tryToBuild();
-        case rpDecline:
-            /* We should do it ourselves. */
-            break;
+            co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
         }
+
+        /* If any of the outputs already exist but are not valid, delete
+           them. */
+        for (auto & [_, status] : initialOutputs) {
+            if (!status.known || status.known->isValid())
+                continue;
+            auto storePath = status.known->path;
+            debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
+            deletePath(worker.store.Store::toRealPath(storePath));
+        }
+
+        /* Don't do a remote build if the derivation has the attribute
+           `preferLocalBuild' set.  Also, check and repair modes are only
+           supported for local builds. */
+        bool buildLocally = (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv))
+                            && settings.maxBuildJobs.get() != 0;
+
+        if (buildLocally) {
+            useHook = false;
+        } else {
+            switch (tryBuildHook(inputPaths, initialOutputs)) {
+            case rpAccept:
+                /* Yes, it has started doing so.  Wait until we get
+                   EOF from the hook. */
+                useHook = true;
+                break;
+            case rpPostpone:
+                /* Not now; wait until at least one child finishes or
+                   the wake-up timeout expires. */
+                if (!actLock)
+                    actLock = std::make_unique<Activity>(
+                        *logger,
+                        lvlWarn,
+                        actBuildWaiting,
+                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+                outputLocks.unlock();
+                co_await waitForAWhile();
+                continue;
+            case rpDecline:
+                /* We should do it ourselves. */
+                useHook = false;
+                break;
+            }
+        }
+        break;
     }
 
     actLock.reset();
+
+    if (useHook) {
+        buildResult.startTime = time(0); // inexact
+        started();
+        co_await Suspend{};
+
+#ifndef _WIN32
+        assert(hook);
+#endif
+
+        trace("hook build done");
+
+        /* Since we got an EOF on the logger pipe, the builder is presumed
+           to have terminated.  In fact, the builder could also have
+           simply have closed its end of the pipe, so just to be sure,
+           kill it. */
+        int status =
+#ifndef _WIN32 // TODO enable build hook on Windows
+            hook->pid.kill();
+#else
+            0;
+#endif
+
+        debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
+
+        buildResult.timesBuilt++;
+        buildResult.stopTime = time(0);
+
+        /* So the child is gone now. */
+        worker.childTerminated(this);
+
+        /* Close the read side of the logger pipe. */
+#ifndef _WIN32 // TODO enable build hook on Windows
+        hook->builderOut.readSide.close();
+        hook->fromHook.readSide.close();
+#endif
+
+        /* Close the log file. */
+        closeLogFile();
+
+        /* Check the exit status. */
+        if (!statusOk(status)) {
+            auto msg =
+                fmt("Cannot build '%s'.\n"
+                    "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+                    Magenta(worker.store.printStorePath(drvPath)),
+                    statusToString(status));
+
+            msg += showKnownOutputs(worker.store, *drv);
+
+            appendLogTailErrorMsg(msg);
+
+            outputLocks.unlock();
+
+            /* TODO (once again) support fine-grained error codes, see issue #12641. */
+
+            co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
+        }
+
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        auto builtOutputs =
+            /* When using a build hook, the build hook can register the output
+               as valid (by doing `nix-store --import').  If so we don't have
+               to do anything here.
+
+               We can only early return when the outputs are known a priori. For
+               floating content-addressing derivations this isn't the case.
+
+               Aborts if any output is not valid or corrupt, and otherwise
+               returns a 'SingleDrvOutputs' structure containing all outputs.
+             */
+            [&] {
+                auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
+                if (!allValid)
+                    throw Error("some outputs are unexpectedly invalid");
+                return validOutputs;
+            }();
+
+        StorePathSet outputPaths;
+        for (auto & [_, output] : builtOutputs)
+            outputPaths.insert(output.outPath);
+        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+
+        /* It is now safe to delete the lock files, since all future
+           lockers will see that the output paths are valid; they will
+           not create new lock files with the same names as the old
+           (unlinked) lock files. */
+        outputLocks.setDeletion(true);
+        outputLocks.unlock();
+
+        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
+    }
 
     co_await yield();
 
@@ -613,17 +727,16 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
     throw UnimplementedError("building derivations is not yet implemented on Windows");
 #else
+    assert(!hook);
 
     // Will continue here while waiting for a build user below
     while (true) {
-
-        assert(!hook);
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
         if (curBuilds >= settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild();
+            goto tryToBuild;
         }
 
         if (!builder) {
@@ -876,89 +989,8 @@ void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
     }
 }
 
-Goal::Co DerivationBuildingGoal::hookDone()
-{
-#ifndef _WIN32
-    assert(hook);
-#endif
-
-    trace("hook build done");
-
-    /* Since we got an EOF on the logger pipe, the builder is presumed
-       to have terminated.  In fact, the builder could also have
-       simply have closed its end of the pipe, so just to be sure,
-       kill it. */
-    int status =
-#ifndef _WIN32 // TODO enable build hook on Windows
-        hook->pid.kill();
-#else
-        0;
-#endif
-
-    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
-
-    buildResult.timesBuilt++;
-    buildResult.stopTime = time(0);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
-
-    /* Close the read side of the logger pipe. */
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook->builderOut.readSide.close();
-    hook->fromHook.readSide.close();
-#endif
-
-    /* Close the log file. */
-    closeLogFile();
-
-    /* Check the exit status. */
-    if (!statusOk(status)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-        msg += showKnownOutputs(worker.store, *drv);
-
-        appendLogTailErrorMsg(msg);
-
-        outputLocks.unlock();
-
-        /* TODO (once again) support fine-grained error codes, see issue #12641. */
-
-        co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
-    }
-
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs =
-        /* When using a build hook, the build hook can register the output
-           as valid (by doing `nix-store --import').  If so we don't have
-           to do anything here.
-
-           We can only early return when the outputs are known a priori. For
-           floating content-addressing derivations this isn't the case.
-         */
-        assertPathValidity();
-
-    StorePathSet outputPaths;
-    for (auto & [_, output] : builtOutputs)
-        outputPaths.insert(output.outPath);
-    runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
-
-    /* It is now safe to delete the lock files, since all future
-       lockers will see that the output paths are valid; they will
-       not create new lock files with the same names as the old
-       (unlinked) lock files. */
-    outputLocks.setDeletion(true);
-    outputLocks.unlock();
-
-    co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
-}
-
-HookReply DerivationBuildingGoal::tryBuildHook()
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1026,7 +1058,7 @@ HookReply DerivationBuildingGoal::tryBuildHook()
     hook = std::move(worker.hook);
 
     try {
-        machineName = readLine(hook->fromHook.readSide.get());
+        hook->machineName = readLine(hook->fromHook.readSide.get());
     } catch (Error & e) {
         e.addTrace({}, "while reading the machine name from the build hook");
         throw;
@@ -1237,7 +1269,8 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
     return res;
 }
 
-std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
+std::pair<bool, SingleDrvOutputs>
+DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs)
 {
     if (drv->type().isImpure())
         return {false, {}};
@@ -1292,14 +1325,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
     }
 
     return {allValid, validOutputs};
-}
-
-SingleDrvOutputs DerivationBuildingGoal::assertPathValidity()
-{
-    auto [allValid, validOutputs] = checkPathValidity();
-    if (!allValid)
-        throw Error("some outputs are unexpectedly invalid");
-    return validOutputs;
 }
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs)
