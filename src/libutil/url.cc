@@ -446,14 +446,13 @@ static std::optional<ScpLike> parseScp(const std::string_view s) noexcept
     };
 }
 
-ParsedURL fixGitURL(std::string_view url)
+ParsedURL fixGitURL(const std::string_view url)
 {
-    if (auto r = boost::urls::parse_uri(url); r && r->has_scheme() && r->has_authority()) {
-        return parseURL(url);
+    try {
+        if (auto parsed = parseURL(url); parsed.scheme == "file" || parsed.authority)
+            return parsed;
+    } catch (BadURL &) {
     }
-
-    if (hasPrefix(url, "file:"))
-        return parseURL(url);
 
     if (auto scp = parseScp(url)) {
         std::vector<std::string> path;

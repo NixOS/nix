@@ -56,9 +56,9 @@ TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
 
 TEST_P(FixGitURLTestSuite, fixGitIsIdempotent)
 {
-    const auto & [input, expected] = GetParam();
-    const auto actual = fixGitURL(expected).to_string();
-    EXPECT_EQ(actual, expected);
+    auto & p = GetParam();
+    auto actual = fixGitURL(p.expected).to_string();
+    EXPECT_EQ(actual, p.expected);
 }
 
 TEST_P(FixGitURLTestSuite, fixGitOutputParses)
