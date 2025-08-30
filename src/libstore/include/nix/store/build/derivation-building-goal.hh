@@ -14,6 +14,7 @@ namespace nix {
 
 using std::map;
 
+struct BuilderFailureError;
 #ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
 struct DerivationBuilder;
@@ -174,7 +175,7 @@ struct DerivationBuildingGoal : public Goal
 
     Done doneFailure(BuildError ex);
 
-    void appendLogTailErrorMsg(std::string & msg);
+    BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg);
 
     JobCategory jobCategory() const override
     {

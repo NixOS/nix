@@ -54,24 +54,9 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-    try {
-        killChild();
-    } catch (...) {
-        ignoreExceptionInDestructor();
-    }
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder) {
-        try {
-            builder->stopDaemon();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
-            builder->deleteTmpDir(false);
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-    }
+    if (builder)
+        builder.reset();
 #endif
     try {
         closeLogFile();
@@ -95,22 +80,8 @@ void DerivationBuildingGoal::killChild()
     hook.reset();
 #endif
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder && builder->pid != -1) {
+    if (builder && builder->killChild())
         worker.childTerminated(this);
-
-        // FIXME: move this into DerivationBuilder.
-
-        /* If we're using a build user, then there is a tricky race
-           condition: if we kill the build user before the child has
-           done its setuid() to the build user uid, then it won't be
-           killed, and we'll potentially lock up in pid.wait().  So
-           also send a conventional kill to the child. */
-        ::kill(-builder->pid, SIGKILL); /* ignore the result */
-
-        builder->killSandbox(true);
-
-        builder->pid.wait();
-    }
 #endif
 }
 
@@ -653,21 +624,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                void noteHashMismatch() override
-                {
-                    goal.worker.hashMismatch = true;
-                }
-
-                void noteCheckMismatch() override
-                {
-                    goal.worker.checkMismatch = true;
-                }
-
-                void markContentsGood(const StorePath & path) override
-                {
-                    goal.worker.markContentsGood(path);
-                }
-
                 Path openLogFile() override
                 {
                     return goal.openLogFile();
@@ -676,11 +632,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 void closeLogFile() override
                 {
                     goal.closeLogFile();
-                }
-
-                void appendLogTailErrorMsg(std::string & msg) override
-                {
-                    goal.appendLogTailErrorMsg(msg);
                 }
             };
 
@@ -766,15 +717,43 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     trace("build done");
 
-    auto res = builder->unprepareBuild();
-    // N.B. cannot use `std::visit` with co-routine return
-    if (auto * ste = std::get_if<0>(&res)) {
+    SingleDrvOutputs builtOutputs;
+    try {
+        builtOutputs = builder->unprepareBuild();
+    } catch (BuilderFailureError & e) {
         outputLocks.unlock();
-        co_return doneFailure(std::move(*ste));
-    } else if (auto * builtOutputs = std::get_if<1>(&res)) {
+        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e)));
+    } catch (BuildError & e) {
+        outputLocks.unlock();
+// Allow selecting a subset of enum values
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (e.status) {
+        case BuildResult::HashMismatch:
+            worker.hashMismatch = true;
+            /* See header, the protocols don't know about `HashMismatch`
+               yet, so change it to `OutputRejected`, which they expect
+               for this case (hash mismatch is a type of output
+               rejection). */
+            e.status = BuildResult::OutputRejected;
+            break;
+        case BuildResult::NotDeterministic:
+            worker.checkMismatch = true;
+            break;
+        default:
+            /* Other statuses need no adjusting */
+            break;
+        }
+#  pragma GCC diagnostic pop
+        co_return doneFailure(std::move(e));
+    }
+    {
         StorePathSet outputPaths;
-        for (auto & [_, output] : *builtOutputs)
+        for (auto & [_, output] : builtOutputs) {
+            // for sake of `bmRepair`
+            worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
+        }
         runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
@@ -783,9 +762,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
            (unlinked) lock files. */
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return doneSuccess(BuildResult::Built, std::move(*builtOutputs));
-    } else {
-        unreachable();
+        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
     }
 #endif
 }
@@ -856,8 +833,16 @@ static void runPostBuildHook(
     });
 }
 
-void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
+BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e)
 {
+    auto msg =
+        fmt("Cannot build '%s'.\n"
+            "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+            Magenta(worker.store.printStorePath(drvPath)),
+            statusToString(e.builderStatus));
+
+    msg += showKnownOutputs(worker.store, *drv);
+
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt("\nLast %d log lines:\n", logTail.size());
         for (auto & line : logTail) {
@@ -874,6 +859,10 @@ void DerivationBuildingGoal::appendLogTailErrorMsg(std::string & msg)
                 nixLogCommand,
                 worker.store.printStorePath(drvPath));
     }
+
+    msg += e.extraMsgAfter;
+
+    return BuildError{e.status, msg};
 }
 
 Goal::Co DerivationBuildingGoal::hookDone()
@@ -914,21 +903,13 @@ Goal::Co DerivationBuildingGoal::hookDone()
 
     /* Check the exit status. */
     if (!statusOk(status)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                statusToString(status));
-
-        msg += showKnownOutputs(worker.store, *drv);
-
-        appendLogTailErrorMsg(msg);
+        auto e = fixupBuilderFailureErrorMessage({BuildResult::MiscFailure, status, ""});
 
         outputLocks.unlock();
 
         /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-        co_return doneFailure(BuildError{BuildResult::MiscFailure, msg});
+        co_return doneFailure(std::move(e));
     }
 
     /* Compute the FS closure of the outputs and register them as
