@@ -3,6 +3,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <ranges>
+
 namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
@@ -686,7 +688,102 @@ TEST(parseURL, gitlabNamespacedProjectUrls)
     ASSERT_EQ(s, parsed.to_string());
 }
 
+/* ----------------------------------------------------------------------------
+ * pathSegments
+ * --------------------------------------------------------------------------*/
+
+struct ParsedURLPathSegmentsTestCase
+{
+    std::string url;
+    std::vector<std::string> segments;
+    std::string path;
+    bool skipEmpty;
+    std::string description;
+};
+
+class ParsedURLPathSegmentsTest : public ::testing::TestWithParam<ParsedURLPathSegmentsTestCase>
+{};
+
+TEST_P(ParsedURLPathSegmentsTest, segmentsAreCorrect)
+{
+    const auto & testCase = GetParam();
+    auto segments = parseURL(testCase.url).pathSegments(/*skipEmpty=*/testCase.skipEmpty)
+                    | std::ranges::to<decltype(testCase.segments)>();
+    EXPECT_EQ(segments, testCase.segments);
+    EXPECT_EQ(encodeUrlPath(segments), testCase.path);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ParsedURL,
+    ParsedURLPathSegmentsTest,
+    ::testing::Values(
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme:",
+            .segments = {""},
+            .path = "",
+            .skipEmpty = false,
+            .description = "no_authority_empty_path",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme://",
+            .segments = {""},
+            .path = "",
+            .skipEmpty = false,
+            .description = "empty_authority_empty_path",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme:///",
+            .segments = {"", ""},
+            .path = "/",
+            .skipEmpty = false,
+            .description = "empty_authority_empty_path_trailing",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme://example.com/",
+            .segments = {"", ""},
+            .path = "/",
+            .skipEmpty = false,
+            .description = "non_empty_authority_empty_path",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme://example.com//",
+            .segments = {"", "", ""},
+            .path = "//",
+            .skipEmpty = false,
+            .description = "non_empty_authority_non_empty_path",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme://example.com///path///with//strange/empty///segments////",
+            .segments = {"path", "with", "strange", "empty", "segments"},
+            .path = "path/with/strange/empty/segments",
+            .skipEmpty = true,
+            .description = "skip_all_empty_segments_with_authority",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme://example.com///lots///empty///",
+            .segments = {"", "", "", "lots", "", "", "empty", "", "", ""},
+            .path = "///lots///empty///",
+            .skipEmpty = false,
+            .description = "empty_segments_with_authority",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme:/path///with//strange/empty///segments////",
+            .segments = {"path", "with", "strange", "empty", "segments"},
+            .path = "path/with/strange/empty/segments",
+            .skipEmpty = true,
+            .description = "skip_all_empty_segments_no_authority_starts_with_slash",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "scheme:path///with//strange/empty///segments////",
+            .segments = {"path", "with", "strange", "empty", "segments"},
+            .path = "path/with/strange/empty/segments",
+            .skipEmpty = true,
+            .description = "skip_all_empty_segments_no_authority_doesnt_start_with_slash",
+        }),
+    [](const auto & info) { return info.param.description; });
+
 TEST(nix, isValidSchemeName)
+
 {
     ASSERT_TRUE(isValidSchemeName("http"));
     ASSERT_TRUE(isValidSchemeName("https"));

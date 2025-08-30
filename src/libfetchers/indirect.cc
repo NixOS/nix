@@ -14,7 +14,8 @@ struct IndirectInputScheme : InputScheme
         if (url.scheme != "flake")
             return {};
 
-        const auto & path = url.path;
+        /* This ignores empty path segments for back-compat. Older versions used a tokenizeString here. */
+        auto path = url.pathSegments(/*skipEmpty=*/true) | std::ranges::to<std::vector<std::string>>();
 
         std::optional<Hash> rev;
         std::optional<std::string> ref;
