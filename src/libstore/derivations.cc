@@ -498,28 +498,33 @@ Derivation parseDerivation(
  */
 static void printString(std::string & res, std::string_view s)
 {
-    boost::container::small_vector<char, 64 * 1024> buffer;
-    buffer.reserve(s.size() * 2 + 2);
-    char * buf = buffer.data();
-    char * p = buf;
-    *p++ = '"';
-    for (auto c : s)
-        if (c == '\"' || c == '\\') {
-            *p++ = '\\';
-            *p++ = c;
-        } else if (c == '\n') {
-            *p++ = '\\';
-            *p++ = 'n';
-        } else if (c == '\r') {
-            *p++ = '\\';
-            *p++ = 'r';
-        } else if (c == '\t') {
-            *p++ = '\\';
-            *p++ = 't';
-        } else
-            *p++ = c;
-    *p++ = '"';
-    res.append(buf, p - buf);
+    res.reserve(res.size() + s.size() * 2 + 2);
+    res += '"';
+    static constexpr auto chunkSize = 1024;
+    std::array<char, 2 * chunkSize + 2> buffer;
+    while (!s.empty()) {
+        auto chunk = s.substr(0, /*n=*/chunkSize);
+        s.remove_prefix(chunk.size());
+        char * buf = buffer.data();
+        char * p = buf;
+        for (auto c : chunk)
+            if (c == '\"' || c == '\\') {
+                *p++ = '\\';
+                *p++ = c;
+            } else if (c == '\n') {
+                *p++ = '\\';
+                *p++ = 'n';
+            } else if (c == '\r') {
+                *p++ = '\\';
+                *p++ = 'r';
+            } else if (c == '\t') {
+                *p++ = '\\';
+                *p++ = 't';
+            } else
+                *p++ = c;
+        res.append(buf, p - buf);
+    }
+    res += '"';
 }
 
 static void printUnquotedString(std::string & res, std::string_view s)
