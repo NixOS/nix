@@ -71,6 +71,11 @@ class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilder
 {
 protected:
 
+    /**
+     * The process ID of the builder.
+     */
+    Pid pid;
+
     LocalStore & store;
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
@@ -84,6 +89,27 @@ public:
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
+    }
+
+    ~DerivationBuilderImpl()
+    {
+        /* Careful: we should never ever throw an exception from a
+           destructor. */
+        try {
+            killChild();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            stopDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            cleanupBuild(false);
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
     }
 
 protected:
@@ -192,7 +218,7 @@ public:
 
     void startBuilder() override;
 
-    std::variant<BuildError, SingleDrvOutputs> unprepareBuild() override;
+    SingleDrvOutputs unprepareBuild() override;
 
 protected:
 
@@ -286,9 +312,11 @@ private:
      */
     void startDaemon();
 
-public:
-
-    void stopDaemon() override;
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
+    void stopDaemon();
 
 protected:
 
@@ -343,15 +371,25 @@ private:
      */
     SingleDrvOutputs registerOutputs();
 
-public:
-
-    void deleteTmpDir(bool force) override;
-
-    void killSandbox(bool getStats) override;
-
 protected:
 
-    virtual void cleanupBuild();
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build suceeded, so don't attempt to
+     * preseve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force);
+
+    /**
+     * Kill any processes running under the build user UID or in the
+     * cgroup of the build.
+     */
+    virtual void killSandbox(bool getStats);
+
+public:
+
+    bool killChild() override;
 
 private:
 
@@ -414,6 +452,24 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
     }
 }
 
+bool DerivationBuilderImpl::killChild()
+{
+    bool ret = pid != -1;
+    if (ret) {
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-pid, SIGKILL); /* ignore the result */
+
+        killSandbox(true);
+
+        pid.wait();
+    }
+    return ret;
+}
+
 bool DerivationBuilderImpl::prepareBuild()
 {
     if (useBuildUsers()) {
@@ -427,16 +483,8 @@ bool DerivationBuilderImpl::prepareBuild()
     return true;
 }
 
-std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
+SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
-    // FIXME: get rid of this, rely on RAII.
-    Finally releaseBuildUser([&]() {
-        /* Release the build user at the end of this function. We don't do
-           it right away because we don't want another build grabbing this
-           uid and then messing around with our output. */
-        buildUser.reset();
-    });
-
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
@@ -476,56 +524,28 @@ std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild
             ((double) buildResult.cpuSystem->count()) / 1000000);
     }
 
-    bool diskFull = false;
+    /* Check the exit status. */
+    if (!statusOk(status)) {
 
-    try {
+        /* Check *before* cleaning up. */
+        bool diskFull = decideWhetherDiskFull();
 
-        /* Check the exit status. */
-        if (!statusOk(status)) {
+        cleanupBuild(false);
 
-            diskFull |= decideWhetherDiskFull();
-
-            cleanupBuild();
-
-            auto msg =
-                fmt("Cannot build '%s'.\n"
-                    "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                    Magenta(store.printStorePath(drvPath)),
-                    statusToString(status));
-
-            msg += showKnownOutputs(store, drv);
-
-            miscMethods->appendLogTailErrorMsg(msg);
-
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-            throw BuildError(
-                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure
-                                                          : BuildResult::PermanentFailure,
-                msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs = registerOutputs();
-
-        /* Delete unused redirected outputs (when doing hash rewriting). */
-        for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
-
-        deleteTmpDir(true);
-
-        return std::move(builtOutputs);
-
-    } catch (BuildError & e) {
-        return std::move(e);
+        throw BuilderFailureError{
+            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        };
     }
-}
 
-void DerivationBuilderImpl::cleanupBuild()
-{
-    deleteTmpDir(false);
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs = registerOutputs();
+
+    cleanupBuild(true);
+
+    return builtOutputs;
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -1322,8 +1342,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
        outputs to allow hard links between outputs. */
     InodesSeen inodesSeen;
 
-    std::exception_ptr delayedException;
-
     /* The paths that can be referenced are the input closures, the
        output paths, and any paths that have been built via recursive
        Nix calls. */
@@ -1642,37 +1660,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
-                    auto newInfo0 = newInfoFromCA(
+                    return newInfoFromCA(
                         DerivationOutput::CAFloating{
                             .method = dof.ca.method,
                             .hashAlgo = wanted.algo,
                         });
-
-                    /* Check wanted hash */
-                    assert(newInfo0.ca);
-                    auto & got = newInfo0.ca->hash;
-                    if (wanted != got) {
-                        /* Throw an error after registering the path as
-                           valid. */
-                        miscMethods->noteHashMismatch();
-                        delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
-                            "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
-                            store.printStorePath(drvPath),
-                            wanted.to_string(HashFormat::SRI, true),
-                            got.to_string(HashFormat::SRI, true)));
-                    }
-                    if (!newInfo0.references.empty()) {
-                        auto numViolations = newInfo.references.size();
-                        delayedException = std::make_exception_ptr(BuildError(
-                            BuildResult::OutputRejected,
-                            "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
-                            store.printStorePath(drvPath),
-                            numViolations,
-                            store.printStorePath(*newInfo.references.begin())));
-                    }
-
-                    return newInfo0;
                 },
 
                 [&](const DerivationOutput::CAFloating & dof) { return newInfoFromCA(dof); },
@@ -1736,84 +1728,89 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         }
 
         if (buildMode == bmCheck) {
+            /* Check against already registered outputs */
 
-            if (!store.isValidPath(newInfo.path))
-                continue;
-            ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
-            if (newInfo.narHash != oldInfo.narHash) {
-                miscMethods->noteCheckMismatch();
-                if (settings.runDiffHook || settings.keepFailed) {
-                    auto dst = store.toRealPath(finalDestPath + ".check");
-                    deletePath(dst);
-                    movePath(actualPath, dst);
+            if (store.isValidPath(newInfo.path)) {
+                ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
+                if (newInfo.narHash != oldInfo.narHash) {
+                    if (settings.runDiffHook || settings.keepFailed) {
+                        auto dst = store.toRealPath(finalDestPath + ".check");
+                        deletePath(dst);
+                        movePath(actualPath, dst);
 
-                    handleDiffHook(
-                        buildUser ? buildUser->getUID() : getuid(),
-                        buildUser ? buildUser->getGID() : getgid(),
-                        finalDestPath,
-                        dst,
-                        store.printStorePath(drvPath),
-                        tmpDir);
+                        handleDiffHook(
+                            buildUser ? buildUser->getUID() : getuid(),
+                            buildUser ? buildUser->getGID() : getgid(),
+                            finalDestPath,
+                            dst,
+                            store.printStorePath(drvPath),
+                            tmpDir);
 
-                    throw NotDeterministic(
-                        "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
-                        store.printStorePath(drvPath),
-                        store.toRealPath(finalDestPath),
-                        dst);
-                } else
-                    throw NotDeterministic(
-                        "derivation '%s' may not be deterministic: output '%s' differs",
-                        store.printStorePath(drvPath),
-                        store.toRealPath(finalDestPath));
+                        throw NotDeterministic(
+                            "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
+                            store.printStorePath(drvPath),
+                            store.toRealPath(finalDestPath),
+                            dst);
+                    } else
+                        throw NotDeterministic(
+                            "derivation '%s' may not be deterministic: output '%s' differs",
+                            store.printStorePath(drvPath),
+                            store.toRealPath(finalDestPath));
+                }
+
+                /* Since we verified the build, it's now ultimately trusted. */
+                if (!oldInfo.ultimate) {
+                    oldInfo.ultimate = true;
+                    store.signPathInfo(oldInfo);
+                    store.registerValidPaths({{oldInfo.path, oldInfo}});
+                }
+            }
+        } else {
+            /* do tasks relating to registering these outputs */
+
+            /* For debugging, print out the referenced and unreferenced paths. */
+            for (auto & i : inputPaths) {
+                if (references.count(i))
+                    debug("referenced input: '%1%'", store.printStorePath(i));
+                else
+                    debug("unreferenced input: '%1%'", store.printStorePath(i));
             }
 
-            /* Since we verified the build, it's now ultimately trusted. */
-            if (!oldInfo.ultimate) {
-                oldInfo.ultimate = true;
-                store.signPathInfo(oldInfo);
-                store.registerValidPaths({{oldInfo.path, oldInfo}});
-            }
+            store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
 
-            continue;
+            newInfo.deriver = drvPath;
+            newInfo.ultimate = true;
+            store.signPathInfo(newInfo);
+
+            finish(newInfo.path);
+
+            /* If it's a CA path, register it right away. This is necessary if it
+               isn't statically known so that we can safely unlock the path before
+               the next iteration
+
+               This is also good so that if a fixed-output produces the
+               wrong path, we still store the result (just don't consider
+               the derivation sucessful, so if someone fixes the problem by
+               just changing the wanted hash, the redownload (or whateer
+               possibly quite slow thing it was) doesn't have to be done
+               again. */
+            if (newInfo.ca)
+                store.registerValidPaths({{newInfo.path, newInfo}});
         }
 
-        /* For debugging, print out the referenced and unreferenced paths. */
-        for (auto & i : inputPaths) {
-            if (references.count(i))
-                debug("referenced input: '%1%'", store.printStorePath(i));
-            else
-                debug("unreferenced input: '%1%'", store.printStorePath(i));
-        }
-
-        store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-        miscMethods->markContentsGood(newInfo.path);
-
-        newInfo.deriver = drvPath;
-        newInfo.ultimate = true;
-        store.signPathInfo(newInfo);
-
-        finish(newInfo.path);
-
-        /* If it's a CA path, register it right away. This is necessary if it
-           isn't statically known so that we can safely unlock the path before
-           the next iteration */
-        if (newInfo.ca)
-            store.registerValidPaths({{newInfo.path, newInfo}});
-
+        /* Do this in both the check and non-check cases, because we
+           want `checkOutputs` below to work, which needs these path
+           infos. */
         infos.emplace(outputName, std::move(newInfo));
     }
 
+    /* Apply output checks. This includes checking of the wanted vs got
+       hash of fixed-outputs. */
+    checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
+
     if (buildMode == bmCheck) {
-        /* In case of fixed-output derivations, if there are
-           mismatches on `--check` an error must be thrown as this is
-           also a source for non-determinism. */
-        if (delayedException)
-            std::rethrow_exception(delayedException);
         return {};
     }
-
-    /* Apply output checks. */
-    checkOutputs(store, drvPath, drvOptions.outputChecks, infos);
 
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
@@ -1826,16 +1823,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         store.registerValidPaths(infos2);
     }
 
-    /* In case of a fixed-output derivation hash mismatch, throw an
-       exception now that we have registered the output as valid. */
-    if (delayedException)
-        std::rethrow_exception(delayedException);
-
-    /* If we made it this far, we are sure the output matches the derivation
-       (since the delayedException would be a fixed output CA mismatch). That
-       means it's safe to link the derivation to the output hash. We must do
-       that for floating CA derivations, which otherwise couldn't be cached,
-       but it's fine to do in all cases. */
+    /* If we made it this far, we are sure the output matches the
+       derivation That means it's safe to link the derivation to the
+       output hash. We must do that for floating CA derivations, which
+       otherwise couldn't be cached, but it's fine to do in all cases.
+       */
     SingleDrvOutputs builtOutputs;
 
     for (auto & [outputName, newInfo] : infos) {
@@ -1852,8 +1844,14 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
-void DerivationBuilderImpl::deleteTmpDir(bool force)
+void DerivationBuilderImpl::cleanupBuild(bool force)
 {
+    if (force) {
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        for (auto & i : redirectedOutputs)
+            deletePath(store.Store::toRealPath(i.second));
+    }
+
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to
          * clean up, the `tmpDir` will be chowned as if we were to move

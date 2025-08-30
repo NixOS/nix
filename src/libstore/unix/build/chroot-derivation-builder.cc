@@ -22,13 +22,6 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
     PathsInChroot pathsInChroot;
 
-    void deleteTmpDir(bool force) override
-    {
-        autoDelChroot.reset(); /* this runs the destructor */
-
-        DerivationBuilderImpl::deleteTmpDir(force);
-    }
-
     bool needsHashRewrite() override
     {
         return false;
@@ -166,13 +159,13 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         return !needsHashRewrite() ? chrootRootDir + p : store.toRealPath(p);
     }
 
-    void cleanupBuild() override
+    void cleanupBuild(bool force) override
     {
-        DerivationBuilderImpl::cleanupBuild();
+        DerivationBuilderImpl::cleanupBuild(force);
 
         /* Move paths out of the chroot for easier debugging of
            build failures. */
-        if (buildMode == bmNormal)
+        if (!force && buildMode == bmNormal)
             for (auto & [_, status] : initialOutputs) {
                 if (!status.known)
                     continue;
@@ -182,6 +175,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                 if (pathExists(chrootRootDir + p))
                     std::filesystem::rename((chrootRootDir + p), p);
             }
+
+        autoDelChroot.reset(); /* this runs the destructor */
     }
 
     std::pair<Path, Path> addDependencyPrep(const StorePath & path)
