@@ -172,6 +172,74 @@ INSTANTIATE_TEST_SUITE_P(
                 },
             .description = "flake_id_ref_branch_trailing_slash",
             .expectedUrl = "flake:nixpkgs/branch/2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+        },
+        // The following tests are for back-compat with lax parsers in older versions
+        // that used `tokenizeString` for splitting path segments, which ignores empty
+        // strings.
+        InputFromURLTestCase{
+            .url = "nixpkgs/branch////",
+            .attrs =
+                {
+                    {"id", Attr("nixpkgs")},
+                    {"type", Attr("indirect")},
+                    {"ref", Attr("branch")},
+                },
+            .description = "flake_id_ref_branch_ignore_empty_trailing_segments",
+            .expectedUrl = "flake:nixpkgs/branch",
+        },
+        InputFromURLTestCase{
+            .url = "nixpkgs/branch///2aae6c35c94fcfb415dbe95f408b9ce91ee846ed///",
+            .attrs =
+                {
+                    {"id", Attr("nixpkgs")},
+                    {"type", Attr("indirect")},
+                    {"ref", Attr("branch")},
+                    {"rev", Attr("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")},
+                },
+            .description = "flake_id_ref_branch_ignore_empty_segments_ref_rev",
+            .expectedUrl = "flake:nixpkgs/branch/2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+        },
+        InputFromURLTestCase{
+            // Note that this is different from above because the "flake id" shorthand
+            // doesn't allow this.
+            .url = "flake:/nixpkgs///branch////",
+            .attrs =
+                {
+                    {"id", Attr("nixpkgs")},
+                    {"type", Attr("indirect")},
+                    {"ref", Attr("branch")},
+                },
+            .description = "indirect_branch_empty_segments_everywhere",
+            .expectedUrl = "flake:nixpkgs/branch",
+        },
+        InputFromURLTestCase{
+            // TODO: Technically this has an empty authority, but it's ignored
+            // for now. Yes, this is what all versions going back to at least
+            // 2.18 did and yes, this should not be allowed.
+            .url = "github://////owner%42/////repo%41///branch%43////",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("ownerB")},
+                    {"repo", Attr("repoA")},
+                    {"ref", Attr("branchC")},
+                },
+            .description = "github_ref_slashes_in_path_everywhere",
+            .expectedUrl = "github:ownerB/repoA/branchC",
+        },
+        InputFromURLTestCase{
+            // FIXME: Subgroups in gitlab URLs are busted. This double-encoding
+            // behavior exists since 2.18. See issue #9161 and PR #8845.
+            .url = "gitlab:/owner%252Fsubgroup/////repo%41///branch%43////",
+            .attrs =
+                {
+                    {"type", Attr("gitlab")},
+                    {"owner", Attr("owner%2Fsubgroup")},
+                    {"repo", Attr("repoA")},
+                    {"ref", Attr("branchC")},
+                },
+            .description = "gitlab_ref_slashes_in_path_everywhere_with_pct_encoding",
+            .expectedUrl = "gitlab:owner%252Fsubgroup/repoA/branchC",
         }),
     [](const ::testing::TestParamInfo<InputFromURLTestCase> & info) { return info.param.description; });
 

@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <ranges>
 #include <span>
 
 #include "nix/util/error.hh"
@@ -230,6 +231,20 @@ struct ParsedURL
      * Remove `.` and `..` path segments.
      */
     ParsedURL canonicalise();
+
+    /**
+     * Get a range of path segments (the substrings separated by '/' characters).
+     *
+     * @param skipEmpty Skip all empty path segments
+     */
+    auto pathSegments(bool skipEmpty) const &
+    {
+        return std::views::filter(path, [skipEmpty](std::string_view segment) {
+            if (skipEmpty)
+                return !segment.empty();
+            return true;
+        });
+    }
 };
 
 std::ostream & operator<<(std::ostream & os, const ParsedURL & url);
