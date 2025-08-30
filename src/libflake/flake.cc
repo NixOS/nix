@@ -325,7 +325,7 @@ static FlakeRef applySelfAttrs(const FlakeRef & ref, const Flake & flake)
     for (auto & attr : flake.selfAttrs) {
         if (!allowedAttrs.contains(attr.first))
             throw Error("flake 'self' attribute '%s' is not supported", attr.first);
-        newRef.input.attrs.insert_or_assign(attr.first, attr.second);
+        newRef.input.attrs.try_emplace(attr.first, attr.second);
     }
 
     return newRef;
