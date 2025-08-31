@@ -71,7 +71,7 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 struct FileTransferRequest
 {
-    ParsedURL uri;
+    ValidURL uri;
     Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
@@ -85,8 +85,8 @@ struct FileTransferRequest
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(ParsedURL uri)
-        : uri(uri)
+    FileTransferRequest(ValidURL uri)
+        : uri(std::move(uri))
         , parentAct(getCurActivity())
     {
     }

@@ -88,3 +88,8 @@ requireDaemonNewerThan "2.20"
 expected=100
 if [[ -v NIX_DAEMON_PACKAGE ]]; then expected=1; fi # work around the daemon not returning a 100 status correctly
 expectStderr $expected nix-build --expr '{ url }: builtins.derivation { name = "nix-cache-info"; system = "x86_64-linux"; builder = "builtin:fetchurl"; inherit url; outputHashMode = "flat"; }' --argstr url "file://$narxz" 2>&1 | grep 'must be a fixed-output or impure derivation'
+
+requireDaemonNewerThan "2.32.0pre20250831"
+
+expect 1 nix-build --expr 'import <nix/fetchurl.nix>' --argstr name 'name' --argstr url "file://authority.not.allowed/fetchurl.sh?a=1&a=2" --no-out-link |&
+        grepQuiet "error: file:// URL 'file://authority.not.allowed/fetchurl.sh?a=1&a=2' has unexpected authority 'authority.not.allowed'"

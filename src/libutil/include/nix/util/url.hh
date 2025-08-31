@@ -341,4 +341,63 @@ ParsedURL fixGitURL(const std::string & url);
  */
 bool isValidSchemeName(std::string_view scheme);
 
+/**
+ * Either a ParsedURL or a verbatim string, but the string must be a valid
+ * ParsedURL. This is necessary because in certain cases URI must be passed
+ * verbatim (e.g. in builtin fetchers), since those are specified by the user.
+ * In those cases normalizations performed by the ParsedURL might be surprising
+ * and undesirable, since Nix must be a universal client that has to work with
+ * various broken services that might interpret URLs in quirky and non-standard ways.
+ *
+ * One of those examples is space-as-plus encoding that is very widespread, but it's
+ * not strictly RFC3986 compliant. We must preserve that information verbatim.
+ *
+ * Though we perform parsing and validation for internal needs.
+ */
+struct ValidURL : private ParsedURL
+{
+    std::optional<std::string> encoded;
+
+    ValidURL(std::string str)
+        : ParsedURL(parseURL(str, /*lenient=*/false))
+        , encoded(std::move(str))
+    {
+    }
+
+    ValidURL(std::string_view str)
+        : ValidURL(std::string{str})
+    {
+    }
+
+    ValidURL(ParsedURL parsed)
+        : ParsedURL{std::move(parsed)}
+    {
+    }
+
+    /**
+     * Get the encoded URL (if specified) verbatim or encode the parsed URL.
+     */
+    std::string to_string() const
+    {
+        return encoded.or_else([&]() -> std::optional<std::string> { return ParsedURL::to_string(); }).value();
+    }
+
+    const ParsedURL & parsed() const &
+    {
+        return *this;
+    }
+
+    std::string_view scheme() const &
+    {
+        return ParsedURL::scheme;
+    }
+
+    const auto & path() const &
+    {
+        return ParsedURL::path;
+    }
+};
+
+std::ostream & operator<<(std::ostream & os, const ValidURL & url);
+
 } // namespace nix

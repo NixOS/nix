@@ -434,4 +434,10 @@ bool isValidSchemeName(std::string_view s)
     return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
+std::ostream & operator<<(std::ostream & os, const ValidURL & url)
+{
+    os << url.to_string();
+    return os;
+}
+
 } // namespace nix

@@ -784,7 +784,7 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && item->request.uri.scheme != "http" && item->request.uri.scheme != "https")
+        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https")
             throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
@@ -801,11 +801,11 @@ struct curlFileTransfer : public FileTransfer
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Ugly hack to support s3:// URIs. */
-        if (request.uri.scheme == "s3") {
+        if (request.uri.scheme() == "s3") {
             // FIXME: do this on a worker thread
             try {
 #if NIX_WITH_S3_SUPPORT
-                auto parsed = ParsedS3URL::parse(request.uri);
+                auto parsed = ParsedS3URL::parse(request.uri.parsed());
 
                 std::string profile = parsed.profile.value_or("");
                 std::string region = parsed.region.value_or(Aws::Region::US_EAST_1);
