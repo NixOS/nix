@@ -21,7 +21,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
     if (!(ctx.drv.type().isFixed() || ctx.drv.type().isImpure()))
         throw Error("'builtin:fetch-tree' must be a fixed-output or impure derivation");
 
-    if (!ctx.parsedDrv)
+    if (!ctx.drv.structuredAttrs)
         throw Error("'builtin:fetch-tree' must have '__structuredAttrs = true'");
 
     setenv("NIX_CACHE_HOME", ctx.tmpDirInSandbox.c_str(), 1);
@@ -39,7 +39,7 @@ static void builtinFetchTree(const BuiltinBuilderContext & ctx)
 
     // FIXME: disable use of the git/tarball cache
 
-    auto input = Input::fromAttrs(myFetchSettings, jsonToAttrs(ctx.parsedDrv->structuredAttrs["input"]));
+    auto input = Input::fromAttrs(myFetchSettings, jsonToAttrs(ctx.drv.structuredAttrs->structuredAttrs["input"]));
 
     std::cerr << fmt("fetching '%s'...\n", input.to_string());
 

@@ -5,6 +5,8 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/cmd/installable-derived-path.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/store/globals.hh"
+
 #include "run.hh"
 
 using namespace nix;

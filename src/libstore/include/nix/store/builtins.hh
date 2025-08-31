@@ -16,7 +16,6 @@ struct BuiltinBuilderContext
     std::string netrcData;
     std::string caFileData;
     Path tmpDirInSandbox;
-    const StructuredAttrs * parsedDrv;
 };
 
 using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;

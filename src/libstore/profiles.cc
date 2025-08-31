@@ -1,5 +1,6 @@
 #include "nix/store/profiles.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"

@@ -1,6 +1,7 @@
 #include "nix/util/signature/local-keys.hh"
 
 #include "nix/util/file-system.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/util.hh"
 #include <sodium.h>
 
@@ -25,7 +26,7 @@ Key::Key(std::string_view s, bool sensitiveValue)
         if (name == "" || key == "")
             throw FormatError("key is corrupt");
 
-        key = base64Decode(key);
+        key = base64::decode(key);
     } catch (Error & e) {
         std::string extra;
         if (!sensitiveValue)
@@ -37,7 +38,7 @@ Key::Key(std::string_view s, bool sensitiveValue)
 
 std::string Key::to_string() const
 {
-    return name + ":" + base64Encode(key);
+    return name + ":" + base64::encode(std::as_bytes(std::span<const char>{key}));
 }
 
 SecretKey::SecretKey(std::string_view s)
@@ -52,7 +53,7 @@ std::string SecretKey::signDetached(std::string_view data) const
     unsigned char sig[crypto_sign_BYTES];
     unsigned long long sigLen;
     crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
-    return name + ":" + base64Encode(std::string((char *) sig, sigLen));
+    return name + ":" + base64::encode(std::as_bytes(std::span<const unsigned char>(sig, sigLen)));
 }
 
 PublicKey SecretKey::toPublicKey() const
@@ -93,7 +94,7 @@ bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) 
 {
     std::string sig2;
     try {
-        sig2 = base64Decode(sig);
+        sig2 = base64::decode(sig);
     } catch (Error & e) {
         e.addTrace({}, "while decoding signature '%s'", sig);
     }

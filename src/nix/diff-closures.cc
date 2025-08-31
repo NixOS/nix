@@ -10,10 +10,14 @@
 
 namespace nix {
 
+namespace {
+
 struct Info
 {
     std::string outputName;
 };
+
+} // namespace
 
 // name -> version -> store paths
 typedef std::map<std::string, std::map<std::string, std::map<StorePath, Info>>> GroupedPaths;

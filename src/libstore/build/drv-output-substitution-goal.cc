@@ -4,6 +4,7 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -98,7 +99,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
                         "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
                         "Local:  %s\n"
                         "Remote: %s",
-                        sub->getUri(),
+                        sub->config.getHumanReadableURI(),
                         depId.to_string(),
                         worker.store.printStorePath(localOutputInfo->outPath),
                         worker.store.printStorePath(depPath));

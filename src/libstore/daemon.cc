@@ -16,6 +16,7 @@
 #include "nix/util/args.hh"
 #include "nix/util/git.hh"
 #include "nix/util/logging.hh"
+#include "nix/store/globals.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"

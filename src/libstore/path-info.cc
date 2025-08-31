@@ -22,7 +22,7 @@ GENERATE_CMP_EXT(
     me->sigs,
     me->ca);
 
-std::string ValidPathInfo::fingerprint(const Store & store) const
+std::string ValidPathInfo::fingerprint(const StoreDirConfig & store) const
 {
     if (narSize == 0)
         throw Error(
@@ -81,7 +81,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
     }
 }
 
-bool ValidPathInfo::isContentAddressed(const Store & store) const
+bool ValidPathInfo::isContentAddressed(const StoreDirConfig & store) const
 {
     auto fullCaOpt = contentAddressWithReferences();
 
@@ -98,7 +98,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     return res;
 }
 
-size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
+size_t ValidPathInfo::checkSignatures(const StoreDirConfig & store, const PublicKeys & publicKeys) const
 {
     if (isContentAddressed(store))
         return maxSigs;
@@ -110,7 +110,8 @@ size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & pu
     return good;
 }
 
-bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
+bool ValidPathInfo::checkSignature(
+    const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -124,7 +125,7 @@ Strings ValidPathInfo::shortRefs() const
 }
 
 ValidPathInfo::ValidPathInfo(
-    const Store & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
+    const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
     : UnkeyedValidPathInfo(narHash)
     , path(store.makeFixedOutputPathFromCA(name, ca))
 {
@@ -144,7 +145,8 @@ ValidPathInfo::ValidPathInfo(
         std::move(ca).raw);
 }
 
-nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json
+UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
 {
     using nlohmann::json;
 
@@ -176,7 +178,7 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImp
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const Store & store, const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store, const nlohmann::json & _json)
 {
     UnkeyedValidPathInfo res{
         Hash(Hash::dummy),

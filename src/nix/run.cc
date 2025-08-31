@@ -11,6 +11,8 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/util.hh"
+#include "nix/store/globals.hh"
+
 #include <filesystem>
 
 #ifdef __linux__
@@ -77,7 +79,9 @@ void execProgramInStore(
     auto store2 = store.dynamic_pointer_cast<LocalFSStore>();
 
     if (!store2)
-        throw Error("store '%s' is not a local store so it does not support command execution", store->getUri());
+        throw Error(
+            "store '%s' is not a local store so it does not support command execution",
+            store->config.getHumanReadableURI());
 
     if (store->storeDir != store2->getRealStoreDir()) {
         Strings helperArgs = {

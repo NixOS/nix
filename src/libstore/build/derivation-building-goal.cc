@@ -1,5 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
-#include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -12,6 +12,7 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/store/globals.hh"
 
 #include <fstream>
 #include <sys/types.h>
@@ -32,12 +33,9 @@ DerivationBuildingGoal::DerivationBuildingGoal(
 {
     drv = std::make_unique<Derivation>(drv_);
 
-    if (auto parsedOpt = StructuredAttrs::tryParse(drv->env)) {
-        parsedDrv = std::make_unique<StructuredAttrs>(*parsedOpt);
-    }
     try {
         drvOptions =
-            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, parsedDrv.get()));
+            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs));
     } catch (Error & e) {
         e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
         throw;
@@ -86,7 +84,7 @@ std::string DerivationBuildingGoal::key()
     /* Ensure that derivations get built in order of their name,
        i.e. a derivation named "aardvark" always comes before
        "baboon". And substitution goals always happen before
-       derivation goals (due to "b$"). */
+       derivation goals (due to "bd$"). */
     return "bd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
@@ -135,7 +133,7 @@ struct value_comparison
     }
 };
 
-std::string showKnownOutputs(Store & store, const Derivation & drv)
+std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
@@ -154,6 +152,31 @@ std::string showKnownOutputs(Store & store, const Derivation & drv)
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
+    /* Recheck at goal start. In particular, whereas before we were
+       given this information by the downstream goal, that cannot happen
+       anymore if the downstream goal only cares about one output, but
+       we care about all outputs. */
+    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+    for (auto & [outputName, outputHash] : outputHashes) {
+        InitialOutput v{.outputHash = outputHash};
+
+        /* TODO we might want to also allow randomizing the paths
+           for regular CA derivations, e.g. for sake of checking
+           determinism. */
+        if (drv->type().isImpure()) {
+            v.known = InitialOutputStatus{
+                .path = StorePath::random(outputPathName(drv->name, outputName)),
+                .status = PathStatus::Absent,
+            };
+        }
+
+        initialOutputs.insert({
+            outputName,
+            std::move(v),
+        });
+    }
+    checkPathValidity();
+
     Goals waitees;
 
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
@@ -282,8 +305,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                     if (!mEntry)
                         return std::nullopt;
 
-                    auto buildResult =
-                        (*mEntry)->getBuildResult(DerivedPath::Built{drvPath, OutputsSpec::Names{outputName}});
+                    auto & buildResult = (*mEntry)->buildResult;
                     if (!buildResult.success())
                         return std::nullopt;
 
@@ -320,9 +342,11 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                     worker.store.printStorePath(pathResolved),
                 });
 
-            // FIXME wanted outputs
+            /* TODO https://github.com/NixOS/nix/issues/13247 we should
+               let the calling goal do this, so it has a change to pass
+               just the output(s) it cares about. */
             auto resolvedDrvGoal =
-                worker.makeDerivationGoal(makeConstantStorePathRef(pathResolved), OutputsSpec::All{}, buildMode);
+                worker.makeDerivationTrampolineGoal(pathResolved, OutputsSpec::All{}, drvResolved, buildMode);
             {
                 Goals waitees{resolvedDrvGoal};
                 co_await await(std::move(waitees));
@@ -330,21 +354,16 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             trace("resolved derivation finished");
 
-            auto resolvedDrv = *resolvedDrvGoal->drv;
-            auto resolvedResult = resolvedDrvGoal->getBuildResult(
-                DerivedPath::Built{
-                    .drvPath = makeConstantStorePathRef(pathResolved),
-                    .outputs = OutputsSpec::All{},
-                });
+            auto resolvedResult = resolvedDrvGoal->buildResult;
 
             SingleDrvOutputs builtOutputs;
 
             if (resolvedResult.success()) {
-                auto resolvedHashes = staticOutputHashes(worker.store, resolvedDrv);
+                auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
                 StorePathSet outputPaths;
 
-                for (auto & outputName : resolvedDrv.outputNames()) {
+                for (auto & outputName : drvResolved.outputNames()) {
                     auto initialOutput = get(initialOutputs, outputName);
                     auto resolvedHash = get(resolvedHashes, outputName);
                     if ((!initialOutput) || (!resolvedHash))
@@ -368,7 +387,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                         throw Error(
                             "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
-                            resolvedDrvGoal->drvReq->to_string(worker.store),
+                            worker.store.printStorePath(pathResolved),
                             outputName);
                     }();
 
@@ -655,21 +674,102 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 }
             };
 
+            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+            assert(localStoreP);
+
+            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
+            decltype(DerivationBuilderParams::finalEnv) finalEnv;
+            decltype(DerivationBuilderParams::extraFiles) extraFiles;
+
+            /* Add the closure of store paths to the chroot. */
+            StorePathSet closure;
+            for (auto & i : defaultPathsInChroot)
+                try {
+                    if (worker.store.isInStore(i.second.source))
+                        worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
+                } catch (InvalidPath & e) {
+                } catch (Error & e) {
+                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    throw;
+                }
+            for (auto & i : closure) {
+                auto p = worker.store.printStorePath(i);
+                defaultPathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
+            }
+
+            try {
+                if (drv->structuredAttrs) {
+                    auto json = drv->structuredAttrs->prepareStructuredAttrs(
+                        worker.store, *drvOptions, inputPaths, drv->outputs);
+
+                    finalEnv.insert_or_assign(
+                        "NIX_ATTRS_SH_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.sh",
+                            .value = StructuredAttrs::writeShell(json),
+                        });
+                    finalEnv.insert_or_assign(
+                        "NIX_ATTRS_JSON_FILE",
+                        DerivationBuilderParams::EnvEntry{
+                            .nameOfPassAsFile = ".attrs.json",
+                            .value = json.dump(),
+                        });
+                } else {
+                    /* In non-structured mode, set all bindings either directory in the
+                       environment or via a file, as specified by
+                       `DerivationOptions::passAsFile`. */
+                    for (auto & [envName, envValue] : drv->env) {
+                        if (drvOptions->passAsFile.find(envName) == drvOptions->passAsFile.end()) {
+                            finalEnv.insert_or_assign(
+                                envName,
+                                DerivationBuilderParams::EnvEntry{
+                                    .nameOfPassAsFile = std::nullopt,
+                                    .value = envValue,
+                                });
+                        } else {
+                            auto hash = hashString(HashAlgorithm::SHA256, envName);
+                            finalEnv.insert_or_assign(
+                                envName + "Path",
+                                DerivationBuilderParams::EnvEntry{
+                                    .nameOfPassAsFile = ".attr-" + hash.to_string(HashFormat::Nix32, false),
+                                    .value = envValue,
+                                });
+                        }
+                    }
+
+                    /* Handle exportReferencesGraph(), if set. */
+                    for (auto & [fileName, storePaths] : drvOptions->getParsedExportReferencesGraph(worker.store)) {
+                        /* Write closure info to <fileName>. */
+                        extraFiles.insert_or_assign(
+                            fileName,
+                            worker.store.makeValidityRegistration(
+                                worker.store.exportReferences(storePaths, inputPaths), false, false));
+                    }
+                }
+            } catch (BuildError & e) {
+                outputLocks.unlock();
+                worker.permanentFailure = true;
+                co_return done(BuildResult::InputRejected, {}, std::move(e));
+            }
+
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
-                worker.store,
+                *localStoreP,
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
                     drvPath,
                     buildMode,
                     buildResult,
                     *drv,
-                    parsedDrv.get(),
                     *drvOptions,
                     inputPaths,
                     initialOutputs,
-                    act});
+                    std::move(defaultPathsInChroot),
+                    std::move(finalEnv),
+                    std::move(extraFiles),
+                    act,
+                });
         }
 
         if (!builder->prepareBuild()) {
@@ -724,7 +824,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
 }
 
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
+void runPostBuildHook(
+    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
 {
     auto hook = settings.postBuildHook;
     if (hook == "")
@@ -1183,7 +1284,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
             // this is an invalid output, gets caught with (!wantedOutputsLeft.empty())
             continue;
         auto & info = *initialOutput;
-        info.wanted = true;
         if (i.second) {
             auto outputPath = *i.second;
             info.known = {
@@ -1218,8 +1318,6 @@ std::pair<bool, SingleDrvOutputs> DerivationBuildingGoal::checkPathValidity()
 
     bool allValid = true;
     for (auto & [_, status] : initialOutputs) {
-        if (!status.wanted)
-            continue;
         if (!status.known || !status.known->isValid()) {
             allValid = false;
             break;

@@ -229,10 +229,8 @@ struct GitInputScheme : InputScheme
 
         maybeGetBoolAttr(attrs, "verifyCommit");
 
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-        }
+        if (auto ref = maybeGetStrAttr(attrs, "ref"); ref && !isLegalRefName(*ref))
+            throw BadURL("invalid Git branch/tag name '%s'", *ref);
 
         Input input{settings};
         input.attrs = attrs;
@@ -464,7 +462,10 @@ struct GitInputScheme : InputScheme
         // repo, treat as a remote URI to force a clone.
         static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1"; // for testing
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        bool isBareRepository = url.scheme == "file" && !pathExists(url.path + "/.git");
+
+        // Why are we checking for bare repository?
+        // well if it's a bare repository we want to force a git fetch rather than copying the folder
+        bool isBareRepository = url.scheme == "file" && pathExists(url.path) && !pathExists(url.path + "/.git");
         //
         // FIXME: here we turn a possibly relative path into an absolute path.
         // This allows relative git flake inputs to be resolved against the
@@ -481,6 +482,12 @@ struct GitInputScheme : InputScheme
                     "This is not supported and will stop working in a future release. "
                     "See https://github.com/NixOS/nix/issues/12281 for details.",
                     url);
+            }
+
+            // If we don't check here for the path existence, then we can give libgit2 any directory
+            // and it will initialize them as git directories.
+            if (!pathExists(url.path)) {
+                throw Error("The path '%s' does not exist.", url.path);
             }
             repoInfo.location = std::filesystem::absolute(url.path);
         } else {
@@ -622,7 +629,7 @@ struct GitInputScheme : InputScheme
 
             auto localRefFile = ref.compare(0, 5, "refs/") == 0 ? cacheDir / ref : cacheDir / "refs/heads" / ref;
 
-            bool doFetch;
+            bool doFetch = false;
             time_t now = time(0);
 
             /* If a rev was specified, we need to fetch if it's not in the
@@ -733,8 +740,16 @@ struct GitInputScheme : InputScheme
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", resolved);
-                if (submodule.branch != "")
-                    attrs.insert_or_assign("ref", submodule.branch);
+                if (submodule.branch != "") {
+                    // A special value of . is used to indicate that the name of the branch in the submodule
+                    // should be the same name as the current branch in the current repository.
+                    // https://git-scm.com/docs/gitmodules
+                    if (submodule.branch == ".") {
+                        attrs.insert_or_assign("ref", ref);
+                    } else {
+                        attrs.insert_or_assign("ref", submodule.branch);
+                    }
+                }
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{exportIgnore});
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
@@ -892,7 +907,7 @@ struct GitInputScheme : InputScheme
                     writeString(file.abs(), hashSink);
                 }
                 return makeFingerprint(repoInfo.workdirInfo.headRev.value_or(nullRev))
-                       + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+                       + ";d=" + hashSink.finish().hash.to_string(HashFormat::Base16, false);
             }
             return std::nullopt;
         }

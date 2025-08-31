@@ -328,6 +328,21 @@ struct EvalSettings : Config
           This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
 
+    Setting<bool> warnShortPathLiterals{
+        this,
+        false,
+        "warn-short-path-literals",
+        R"(
+          If set to true, the Nix evaluator will warn when encountering relative path literals
+          that don't start with `./` or `../`.
+
+          For example, with this setting enabled, `foo/bar` would emit a warning
+          suggesting to use `./foo/bar` instead.
+
+          This is useful for improving code readability and making path literals
+          more explicit.
+    )"};
+
     Setting<bool> lazyTrees{
         this,
         false,

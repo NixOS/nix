@@ -1,4 +1,3 @@
-#include "flake-command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
@@ -17,6 +16,7 @@
 #include "nix/util/users.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/store/globals.hh"
 #include "nix/expr/parallel-eval.hh"
 
 #include <filesystem>
@@ -24,6 +24,9 @@
 #include <iomanip>
 
 #include "nix/util/strings-inline.hh"
+
+// FIXME is this supposed to be private or not?
+#include "flake-command.hh"
 
 namespace nix::fs {
 using namespace std::filesystem;

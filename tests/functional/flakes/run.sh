@@ -41,11 +41,13 @@ nix run -f shell-hello.nix env > $TEST_ROOT/actual-env
 # - we unset TMPDIR on macOS if it contains /var/folders. bad. https://github.com/NixOS/nix/issues/7731
 # - _ is set by bash and is expected to differ because it contains the original command
 # - __CF_USER_TEXT_ENCODING is set by macOS and is beyond our control
+# - __LLVM_PROFILE_RT_INIT_ONCE - implementation detail of LLVM source code coverage collection
 sed -i \
   -e 's/PATH=.*/PATH=.../' \
   -e 's/_=.*/_=.../' \
   -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
+  -e '/^__LLVM_PROFILE_RT_INIT_ONCE=.*$/d' \
   $TEST_ROOT/expected-env $TEST_ROOT/actual-env
 sort $TEST_ROOT/expected-env | uniq > $TEST_ROOT/expected-env.sorted
 # nix run appears to clear _. I don't understand why. Is this ok?

@@ -1,5 +1,6 @@
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/worker.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -109,29 +110,6 @@ bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
     std::string s1 = a->key();
     std::string s2 = b->key();
     return s1 < s2;
-}
-
-BuildResult Goal::getBuildResult(const DerivedPath & req) const
-{
-    BuildResult res{buildResult};
-
-    if (auto pbp = std::get_if<DerivedPath::Built>(&req)) {
-        auto & bp = *pbp;
-
-        /* Because goals are in general shared between derived paths
-           that share the same derivation, we need to filter their
-           results to get back just the results we care about.
-         */
-
-        for (auto it = res.builtOutputs.begin(); it != res.builtOutputs.end();) {
-            if (bp.outputs.contains(it->first))
-                ++it;
-            else
-                it = res.builtOutputs.erase(it);
-        }
-    }
-
-    return res;
 }
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p)

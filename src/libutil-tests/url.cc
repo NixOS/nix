@@ -1,24 +1,14 @@
 #include "nix/util/url.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 namespace nix {
 
 /* ----------- tests for url.hh --------------------------------------------------*/
 
-std::string print_map(StringMap m)
-{
-    StringMap::iterator it;
-    std::string s = "{ ";
-    for (it = m.begin(); it != m.end(); ++it) {
-        s += "{ ";
-        s += it->first;
-        s += " = ";
-        s += it->second;
-        s += " } ";
-    }
-    s += "}";
-    return s;
-}
+using Authority = ParsedURL::Authority;
+using HostType = Authority::HostType;
 
 TEST(parseURL, parsesSimpleHttpUrl)
 {
@@ -27,13 +17,14 @@ TEST(parseURL, parsesSimpleHttpUrl)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "www.example.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
         .path = "/file.tar.gz",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsesSimpleHttpsUrl)
@@ -43,13 +34,14 @@ TEST(parseURL, parsesSimpleHttpsUrl)
 
     ParsedURL expected{
         .scheme = "https",
-        .authority = "www.example.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
         .path = "/file.tar.gz",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsesSimpleHttpUrlWithQueryAndFragment)
@@ -59,13 +51,14 @@ TEST(parseURL, parsesSimpleHttpUrlWithQueryAndFragment)
 
     ParsedURL expected{
         .scheme = "https",
-        .authority = "www.example.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
         .path = "/file.tar.gz",
         .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
         .fragment = "hello",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
@@ -75,7 +68,7 @@ TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "www.example.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
         .path = "/file.tar.gz",
         .query = (StringMap) {{"field", "value"}},
         .fragment = "?foo=bar#",
@@ -91,13 +84,14 @@ TEST(parseURL, parsesFilePlusHttpsUrl)
 
     ParsedURL expected{
         .scheme = "file+https",
-        .authority = "www.example.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
         .path = "/video.mp4",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation)
@@ -113,29 +107,31 @@ TEST(parseURL, parseIPv4Address)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "127.0.0.1:8080",
+        .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
         .path = "/file.tar.gz",
         .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
         .fragment = "hello",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
-TEST(parseURL, parseScopedRFC4007IPv6Address)
+TEST(parseURL, parseScopedRFC6874IPv6Address)
 {
-    auto s = "http://[fe80::818c:da4d:8975:415c\%enp0s25]:8080";
+    auto s = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080";
     auto parsed = parseURL(s);
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "[fe80::818c:da4d:8975:415c\%enp0s25]:8080",
+        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
         .path = "",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parseIPv6Address)
@@ -145,13 +141,19 @@ TEST(parseURL, parseIPv6Address)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
+        .authority =
+            Authority{
+                .hostType = HostType::IPv6,
+                .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
+                .port = 8080,
+            },
         .path = "",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parseEmptyQueryParams)
@@ -168,13 +170,21 @@ TEST(parseURL, parseUserPassword)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = "user:pass@www.example.org:8080",
+        .authority =
+            Authority{
+                .hostType = HostType::Name,
+                .host = "www.example.org",
+                .user = "user",
+                .password = "pass",
+                .port = 8080,
+            },
         .path = "/file.tar.gz",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parseFileURLWithQueryAndFragment)
@@ -184,13 +194,14 @@ TEST(parseURL, parseFileURLWithQueryAndFragment)
 
     ParsedURL expected{
         .scheme = "file",
-        .authority = "",
+        .authority = Authority{},
         .path = "/none/of//your/business",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsedUrlsIsEqualToItself)
@@ -201,6 +212,31 @@ TEST(parseURL, parsedUrlsIsEqualToItself)
     ASSERT_TRUE(url == url);
 }
 
+TEST(parseURL, parsedUrlsWithUnescapedChars)
+{
+    /* Test for back-compat. Behavior is rather questionable, but
+     * is ingrained pretty deep into how URL parsing is shared between
+     * flakes and libstore.
+     * 1. Unescaped spaces, quotes and shevron (^) in fragment.
+     * 2. Unescaped spaces and quotes in query.
+     */
+    auto s = "http://www.example.org/file.tar.gz?query \"= 123\"#shevron^quote\"space ";
+
+    /* Without leniency for back compat, this should throw. */
+    EXPECT_THROW(parseURL(s), Error);
+
+    /* With leniency for back compat, this should parse. */
+    auto url = parseURL(s, /*lenient=*/true);
+
+    EXPECT_EQ(url.fragment, "shevron^quote\"space ");
+
+    auto query = StringMap{
+        {"query \"", " 123\""},
+    };
+
+    EXPECT_EQ(url.query, query);
+}
+
 TEST(parseURL, parseFTPUrl)
 {
     auto s = "ftp://ftp.nixos.org/downloads/nixos.iso";
@@ -208,25 +244,28 @@ TEST(parseURL, parseFTPUrl)
 
     ParsedURL expected{
         .scheme = "ftp",
-        .authority = "ftp.nixos.org",
+        .authority = Authority{.hostType = HostType::Name, .host = "ftp.nixos.org"},
         .path = "/downloads/nixos.iso",
         .query = (StringMap) {},
         .fragment = "",
     };
 
     ASSERT_EQ(parsed, expected);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsesAnythingInUriFormat)
 {
     auto s = "whatever://github.com/NixOS/nixpkgs.git";
     auto parsed = parseURL(s);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parsesAnythingInUriFormatWithoutDoubleSlash)
 {
     auto s = "whatever:github.com/NixOS/nixpkgs.git";
     auto parsed = parseURL(s);
+    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, emptyStringIsInvalidURL)
@@ -287,6 +326,14 @@ TEST(percentDecode, trailingPercent)
     std::string d = percentDecode("%3D%3D%40%3D%3D%25");
 
     ASSERT_EQ(d, s);
+}
+
+TEST(percentDecode, incompleteEncoding)
+{
+    ASSERT_THAT(
+        []() { percentDecode("%1"); },
+        ::testing::ThrowsMessage<BadURL>(
+            testing::HasSubstrIgnoreANSIMatcher("error: invalid URI parameter '%1': incomplete pct-encoding")));
 }
 
 /* ----------------------------------------------------------------------------

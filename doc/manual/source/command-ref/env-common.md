@@ -75,7 +75,7 @@ Most Nix commands interpret the following environment variables:
 - <span id="env-NIX_CONF_DIR">[`NIX_CONF_DIR`](#env-NIX_CONF_DIR)</span>
 
   Overrides the location of the system Nix configuration directory
-  (default `prefix/etc/nix`).
+  (default `sysconfdir/nix`, i.e. `/etc/nix` on most systems).
 
 - <span id="env-NIX_CONFIG">[`NIX_CONFIG`](#env-NIX_CONFIG)</span>
 

@@ -8,7 +8,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/configuration.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/repair-flag.hh"
@@ -82,6 +81,35 @@ struct MissingPaths
 };
 
 /**
+ * Need to make this a separate class so I can get the right
+ * initialization order in the constructor for `StoreConfig`.
+ */
+struct StoreConfigBase : Config
+{
+    using Config::Config;
+
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultNixStoreDir();
+
+public:
+
+    const PathSetting storeDir_{
+        this,
+        getDefaultNixStoreDir(),
+        "store",
+        R"(
+          Logical location of the Nix store, usually
+          `/nix/store`. Note that you can only copy store paths
+          between stores if they have the same `store` setting.
+        )"};
+};
+
+/**
  * About the class hierarchy of the store types:
  *
  * Each store type `Foo` consists of two classes:
@@ -107,10 +135,17 @@ struct MissingPaths
  * ```
  * cpp static RegisterStoreImplementation<FooConfig> regStore;
  * ```
+ *
+ * @note The order of `StoreConfigBase` and then `StorerConfig` is
+ * very important. This ensures that `StoreConfigBase::storeDir_`
+ * is initialized before we have our one chance (because references are
+ * immutable) to initialize `StoreConfig::storeDir`.
  */
-struct StoreConfig : public StoreDirConfig
+struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
-    using StoreDirConfig::StoreDirConfig;
+    using Params = StoreReference::Params;
+
+    StoreConfig(const Params & params);
 
     StoreConfig() = delete;
 
@@ -124,6 +159,19 @@ struct StoreConfig : public StoreDirConfig
     static std::string doc()
     {
         return "";
+    }
+
+    /**
+     * Get overridden store reference query parameters.
+     */
+    StringMap getQueryParams() const
+    {
+        auto queryParams = std::map<std::string, AbstractConfig::SettingInfo>{};
+        getSettings(queryParams, /*overriddenOnly=*/true);
+        StringMap res;
+        for (const auto & [name, info] : queryParams)
+            res.insert({name, info.value});
+        return res;
     }
 
     /**
@@ -184,6 +232,29 @@ struct StoreConfig : public StoreDirConfig
      * type.
      */
     virtual ref<Store> openStore() const = 0;
+
+    /**
+     * Render the config back to a `StoreReference`. It should round-trip
+     * with `resolveStoreConfig` (for stores configs that are
+     * registered).
+     */
+    virtual StoreReference getReference() const;
+
+    /**
+     * Get a textual representation of the store reference.
+     *
+     * @warning This is only suitable for logging or error messages.
+     * This will not roundtrip when parsed as a StoreReference.
+     * Must NOT be used as a cache key or otherwise be relied upon to
+     * be stable.
+     *
+     * Can be implemented by subclasses to make the URI more legible,
+     * e.g. when some query parameters are necessary to make sense of the URI.
+     */
+    virtual std::string getHumanReadableURI() const
+    {
+        return getReference().render(/*withParams=*/false);
+    }
 };
 
 /**
@@ -197,7 +268,7 @@ struct StoreConfig : public StoreDirConfig
  * underlying resource, which could be an external process (daemon
  * server), file system state, etc.
  */
-class Store : public std::enable_shared_from_this<Store>, public MixStoreDirMethods
+class Store : public std::enable_shared_from_this<Store>, public StoreDirConfig
 {
 public:
 
@@ -265,12 +336,6 @@ public:
     virtual void init() {};
 
     virtual ~Store() {}
-
-    /**
-     * @todo move to `StoreConfig` one we store enough information in
-     * those to recover the scheme and authority in all cases.
-     */
-    virtual std::string getUri() = 0;
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.
@@ -870,7 +935,7 @@ protected:
      */
     [[noreturn]] void unsupported(const std::string & op)
     {
-        throw Unsupported("operation '%s' is not supported by store '%s'", op, getUri());
+        throw Unsupported("operation '%s' is not supported by store '%s'", op, config.getHumanReadableURI());
     }
 };
 

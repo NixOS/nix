@@ -1,5 +1,6 @@
 #include <regex>
 
+#include <exception> // Needed by rapidcheck on Darwin
 #include <rapidcheck.h>
 
 #include "nix/util/hash.hh"

@@ -52,7 +52,8 @@ mkMesonLibrary (finalAttrs: {
     libblake3
     libsodium
     openssl
-  ] ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
+  ]
+  ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
     boost

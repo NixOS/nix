@@ -15,7 +15,7 @@ struct PathInputScheme : InputScheme
         if (url.scheme != "path")
             return {};
 
-        if (url.authority && *url.authority != "")
+        if (url.authority && url.authority->host.size())
             throw Error("path URL '%s' should not have an authority ('%s')", url, *url.authority);
 
         Input input{settings};

@@ -37,8 +37,16 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
         .vmargin = 0,
 #  endif
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
-        .oflags = LOWDOWN_TERM_NOLINK,
+        .oflags =
+#  if HAVE_LOWDOWN_1_4
+            LOWDOWN_TERM_NORELLINK // To render full links while skipping relative ones
+#  else
+            LOWDOWN_TERM_NOLINK
+#  endif
     };
+
+    if (!isTTY())
+        opts.oflags |= LOWDOWN_TERM_NOANSI;
 
     auto doc = lowdown_doc_new(&opts);
     if (!doc)
@@ -65,7 +73,7 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return filterANSIEscapes(std::string(buf->data, buf->size), !isTTY());
+    return std::string(buf->data, buf->size);
 }
 
 std::string renderMarkdownToTerminal(std::string_view markdown)

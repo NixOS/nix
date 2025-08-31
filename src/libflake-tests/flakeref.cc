@@ -46,6 +46,44 @@ TEST(parseFlakeRef, path)
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar?revCount=123");
         ASSERT_EQ(fragment, "bla");
     }
+
+    {
+        auto s = "/foo bar/baz?dir=bla space";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "path:/foo%20bar/baz?dir=bla%20space");
+        ASSERT_EQ(flakeref.toAttrs().at("dir"), fetchers::Attr("bla space"));
+    }
+}
+
+TEST(parseFlakeRef, GitArchiveInput)
+{
+    fetchers::Settings fetchSettings;
+
+    {
+        auto s = "github:foo/bar/branch%23"; // branch name with `#`
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
+    }
+
+    {
+        auto s = "github:foo/bar?ref=branch%23"; // branch name with `#`
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
+    }
+
+    {
+        auto s = "github:foo/bar?ref=branch#\"name.with.dot\""; // unescaped quotes `"`
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        ASSERT_EQ(fragment, "\"name.with.dot\"");
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch");
+    }
+
+    {
+        auto s = "github:foo/bar#\"name.with.dot\""; // unescaped quotes `"`
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        ASSERT_EQ(fragment, "\"name.with.dot\"");
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar");
+    }
 }
 
 TEST(to_string, doesntReencodeUrl)

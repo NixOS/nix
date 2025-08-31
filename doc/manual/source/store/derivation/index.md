@@ -9,7 +9,7 @@ This is where Nix distinguishes itself.
 
 ## Store Derivation {#store-derivation}
 
-A derivation is a specification for running an executable on precisely defined input to produce on more [store objects][store object].
+A derivation is a specification for running an executable on precisely defined input to produce one or more [store objects][store object].
 These store objects are known as the derivation's *outputs*.
 
 Derivations are *built*, in which case the process is spawned according to the spec, and when it exits, required to leave behind files which will (after post-processing) become the outputs of the derivation.

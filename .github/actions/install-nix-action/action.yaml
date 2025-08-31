@@ -1,0 +1,50 @@
+name: "Install Nix"
+description: "Helper action for installing Nix with support for dogfooding from master"
+inputs:
+  dogfood:
+    description: "Whether to use Nix installed from the latest artifact from master branch"
+    required: true # Be explicit about the fact that we are using unreleased artifacts
+  extra_nix_config:
+    description: "Gets appended to `/etc/nix/nix.conf` if passed."
+  install_url:
+    description: "URL of the Nix installer"
+    required: false
+    default: "https://releases.nixos.org/nix/nix-2.30.2/install"
+  github_token:
+    description: "Github token"
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: "Download nix install artifact from master"
+      shell: bash
+      id: download-nix-installer
+      if: inputs.dogfood == 'true'
+      run: |
+        RUN_ID=$(gh run list --repo "$DOGFOOD_REPO" --workflow ci.yml --branch master --status success --json databaseId --jq ".[0].databaseId")
+
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          INSTALLER_ARTIFACT="installer-linux"
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          INSTALLER_ARTIFACT="installer-darwin"
+        else
+          echo "::error ::Unsupported RUNNER_OS: $RUNNER_OS"
+          exit 1
+        fi
+
+        INSTALLER_DOWNLOAD_DIR="$GITHUB_WORKSPACE/$INSTALLER_ARTIFACT"
+        mkdir -p "$INSTALLER_DOWNLOAD_DIR"
+
+        gh run download "$RUN_ID" --repo "$DOGFOOD_REPO" -n "$INSTALLER_ARTIFACT" -D "$INSTALLER_DOWNLOAD_DIR"
+        echo "installer-path=file://$INSTALLER_DOWNLOAD_DIR" >> "$GITHUB_OUTPUT"
+
+        echo "::notice ::Dogfooding Nix installer from master (https://github.com/$DOGFOOD_REPO/actions/runs/$RUN_ID)"
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        DOGFOOD_REPO: "NixOS/nix"
+    - uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31.5.1
+      with:
+        # Ternary operator in GHA: https://www.github.com/actions/runner/issues/409#issuecomment-752775072
+        install_url: ${{ inputs.dogfood == 'true' && format('{0}/install', steps.download-nix-installer.outputs.installer-path) || inputs.install_url }}
+        install_options: ${{ inputs.dogfood == 'true' && format('--tarball-url-prefix {0}', steps.download-nix-installer.outputs.installer-path) || '' }}
+        extra_nix_config: ${{ inputs.extra_nix_config }}

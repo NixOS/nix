@@ -2,16 +2,15 @@ with import ./lib.nix;
 
 let
 
-  attrs =
-    {
-      y = "y";
-      x = "x";
-      foo = "foo";
-    }
-    // rec {
-      x = "newx";
-      bar = x;
-    };
+  attrs = {
+    y = "y";
+    x = "x";
+    foo = "foo";
+  }
+  // rec {
+    x = "newx";
+    bar = x;
+  };
 
   names = builtins.attrNames attrs;
 

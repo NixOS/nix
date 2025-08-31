@@ -1,7 +1,9 @@
-project('nix-store-tests', 'cpp',
+project(
+  'nix-store-tests',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -21,8 +23,7 @@ deps_private_maybe_subproject = [
   dependency('nix-store-c'),
   dependency('nix-store-test-support'),
 ]
-deps_public_maybe_subproject = [
-]
+deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
 subdir('nix-meson-build-support/export-all-symbols')
@@ -73,6 +74,7 @@ sources = files(
   'path.cc',
   'references.cc',
   's3-binary-cache-store.cc',
+  's3.cc',
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
@@ -80,7 +82,7 @@ sources = files(
   'worker-protocol.cc',
 )
 
-include_dirs = [include_directories('.')]
+include_dirs = [ include_directories('.') ]
 
 
 this_exe = executable(
@@ -90,17 +92,48 @@ this_exe = executable(
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
-  link_args: linker_export_flags + ['-lrapidcheck'],
+  link_args : linker_export_flags + [ '-lrapidcheck' ],
   # get main from gtest
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 test(
   meson.project_name(),
   this_exe,
   env : {
-    '_NIX_TEST_UNIT_DATA': meson.current_source_dir() / 'data',
-    'HOME': meson.current_build_dir() / 'test-home',
+    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+    'HOME' : meson.current_build_dir() / 'test-home',
+    'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store',
   },
   protocol : 'gtest',
 )
+
+# Build benchmarks if enabled
+if get_option('benchmarks')
+  gbenchmark = dependency('benchmark', required : true)
+
+  benchmark_sources = files(
+    'bench-main.cc',
+    'derivation-parser-bench.cc',
+    'ref-scan-bench.cc',
+  )
+
+  benchmark_exe = executable(
+    'nix-store-benchmarks',
+    benchmark_sources,
+    config_priv_h,
+    dependencies : deps_private_subproject + deps_private + deps_other + [
+      gbenchmark,
+    ],
+    include_directories : include_dirs,
+    link_args : linker_export_flags,
+    install : true,
+    cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
+    cpp_args : [
+      '-DNIX_UNIT_TEST_DATA="' + meson.current_source_dir() + '/data"',
+    ],
+  )
+
+  benchmark('nix-store-benchmarks', benchmark_exe)
+endif

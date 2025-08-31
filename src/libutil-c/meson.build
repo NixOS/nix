@@ -1,7 +1,9 @@
-project('nix-util-c', 'cpp',
+project(
+  'nix-util-c',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -19,8 +21,7 @@ configdata = configuration_data()
 deps_private_maybe_subproject = [
   dependency('nix-util'),
 ]
-deps_public_maybe_subproject = [
-]
+deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -36,7 +37,7 @@ sources = files(
   'nix_api_util.cc',
 )
 
-include_dirs = [include_directories('.')]
+include_dirs = [ include_directories('.') ]
 
 headers = files(
   'nix_api_util.h',
@@ -54,7 +55,7 @@ this_library = library(
   config_priv_h,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

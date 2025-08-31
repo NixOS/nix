@@ -1,6 +1,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 

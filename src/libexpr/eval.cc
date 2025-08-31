@@ -6,6 +6,7 @@
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
@@ -1856,7 +1857,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
 Nix attempted to evaluate a function as a top level expression; in
 this case it must have its arguments supplied either by default
 values, or passed explicitly with '--arg' or '--argstr'. See
-https://nixos.org/manual/nix/stable/language/constructs.html#functions.)",
+https://nix.dev/manual/nix/stable/language/syntax.html#functions.)",
                     symbols[i.name])
                     .atPos(i.pos)
                     .withFrame(*fun.lambda().env, *fun.lambda().fun)

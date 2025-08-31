@@ -1,7 +1,9 @@
-project('nix-store-c', 'cpp',
+project(
+  'nix-store-c',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -29,7 +31,7 @@ sources = files(
   'nix_api_store.cc',
 )
 
-include_dirs = [include_directories('.')]
+include_dirs = [ include_directories('.') ]
 
 headers = files(
   'nix_api_store.h',
@@ -46,7 +48,7 @@ this_library = library(
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )

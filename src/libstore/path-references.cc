@@ -43,14 +43,6 @@ StorePathSet PathRefScanSink::getResultPaths()
     return found;
 }
 
-std::pair<StorePathSet, HashResult> scanForReferences(const std::string & path, const StorePathSet & refs)
-{
-    HashSink hashSink{HashAlgorithm::SHA256};
-    auto found = scanForReferences(hashSink, path, refs);
-    auto hash = hashSink.finish();
-    return std::pair<StorePathSet, HashResult>(found, hash);
-}
-
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs)
 {
     PathRefScanSink refsSink = PathRefScanSink::fromPaths(refs);

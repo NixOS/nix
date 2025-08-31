@@ -1,8 +1,8 @@
 #pragma once
 ///@file
 
-#include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/outputs-spec.hh"
@@ -21,11 +21,10 @@ struct DerivationBuilder;
 
 typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
 
-/** Used internally */
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
- * A goal for building some or all of the outputs of a derivation.
+ * A goal for building a derivation. Substitution, (or any other method of
+ * obtaining the outputs) will not be attempted, so it is the calling goal's
+ * responsibility to try to substitute first.
  */
 struct DerivationBuildingGoal : public Goal
 {
@@ -37,7 +36,6 @@ struct DerivationBuildingGoal : public Goal
      */
     std::unique_ptr<Derivation> drv;
 
-    std::unique_ptr<StructuredAttrs> parsedDrv;
     std::unique_ptr<DerivationOptions> drvOptions;
 
     /**
@@ -175,8 +173,6 @@ struct DerivationBuildingGoal : public Goal
     Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
 
     void appendLogTailErrorMsg(std::string & msg);
-
-    StorePathSet exportReferences(const StorePathSet & storePaths);
 
     JobCategory jobCategory() const override
     {

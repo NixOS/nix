@@ -1,7 +1,9 @@
-project('nix-fetchers', 'cpp',
+project(
+  'nix-fetchers',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -16,8 +18,7 @@ subdir('nix-meson-build-support/deps-lists')
 
 configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -27,7 +28,7 @@ subdir('nix-meson-build-support/subprojects')
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-libgit2 = dependency('libgit2')
+libgit2 = dependency('libgit2', version : '>= 1.9')
 deps_private += libgit2
 
 subdir('nix-meson-build-support/common')
@@ -63,9 +64,10 @@ this_library = library(
   sources,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/fetchers', preserve_path : true)
