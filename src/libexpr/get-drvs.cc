@@ -45,7 +45,7 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
 std::string PackageInfo::queryName() const
 {
     if (name == "" && attrs) {
-        auto i = attrs->find(state->sName);
+        auto i = attrs->find(state->s.name);
         if (i == attrs->end())
             state->error<TypeError>("derivation name missing").debugThrow();
         name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
@@ -56,7 +56,7 @@ std::string PackageInfo::queryName() const
 std::string PackageInfo::querySystem() const
 {
     if (system == "" && attrs) {
-        auto i = attrs->find(state->sSystem);
+        auto i = attrs->find(state->s.system);
         system =
             i == attrs->end()
                 ? "unknown"
@@ -68,7 +68,7 @@ std::string PackageInfo::querySystem() const
 std::optional<StorePath> PackageInfo::queryDrvPath() const
 {
     if (!drvPath && attrs) {
-        if (auto i = attrs->get(state->sDrvPath)) {
+        if (auto i = attrs->get(state->s.drvPath)) {
             NixStringContext context;
             auto found = state->coerceToStorePath(
                 i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
@@ -95,7 +95,7 @@ StorePath PackageInfo::requireDrvPath() const
 StorePath PackageInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
-        auto i = attrs->find(state->sOutPath);
+        auto i = attrs->find(state->s.outPath);
         NixStringContext context;
         if (i != attrs->end())
             outPath = state->coerceToStorePath(
@@ -111,7 +111,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
     if (outputs.empty()) {
         /* Get the ‘outputs’ list. */
         const Attr * i;
-        if (attrs && (i = attrs->get(state->sOutputs))) {
+        if (attrs && (i = attrs->get(state->s.outputs))) {
             state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
 
             /* For each output... */
@@ -127,7 +127,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
                     state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
-                    auto outPath = out->value->attrs()->get(state->sOutPath);
+                    auto outPath = out->value->attrs()->get(state->s.outPath);
                     if (!outPath)
                         continue; // FIXME: throw error?
                     NixStringContext context;
@@ -146,7 +146,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         return outputs;
 
     const Attr * i;
-    if (attrs && (i = attrs->get(state->sOutputSpecified))
+    if (attrs && (i = attrs->get(state->s.outputSpecified))
         && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
         Outputs result;
         auto out = outputs.find(queryOutputName());
@@ -181,7 +181,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
 std::string PackageInfo::queryOutputName() const
 {
     if (outputName == "" && attrs) {
-        auto i = attrs->get(state->sOutputName);
+        auto i = attrs->get(state->s.outputName);
         outputName =
             i ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
     }
@@ -194,7 +194,7 @@ const Bindings * PackageInfo::getMeta()
         return meta;
     if (!attrs)
         return 0;
-    auto a = attrs->get(state->sMeta);
+    auto a = attrs->get(state->s.meta);
     if (!a)
         return 0;
     state->forceAttrs(*a->value, a->pos, "while evaluating the 'meta' attribute of a derivation");
@@ -221,7 +221,7 @@ bool PackageInfo::checkMeta(Value & v)
                 return false;
         return true;
     } else if (v.type() == nAttrs) {
-        if (v.attrs()->get(state->sOutPath))
+        if (v.attrs()->get(state->s.outPath))
             return false;
         for (auto & i : *v.attrs())
             if (!checkMeta(*i.value))
@@ -411,7 +411,7 @@ static void getDerivations(
                     should we recurse into it?  => Only if it has a
                     `recurseForDerivations = true' attribute. */
                     if (i->value->type() == nAttrs) {
-                        auto j = i->value->attrs()->get(state.sRecurseForDerivations);
+                        auto j = i->value->attrs()->get(state.s.recurseForDerivations);
                         if (j
                             && state.forceBool(
                                 *j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))

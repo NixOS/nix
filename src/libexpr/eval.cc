@@ -203,124 +203,65 @@ EvalState::EvalState(
     std::shared_ptr<Store> buildStore)
     : fetchSettings{fetchSettings}
     , settings{settings}
-    , sWith(symbols.create("<with>"))
-    , sOutPath(symbols.create("outPath"))
-    , sDrvPath(symbols.create("drvPath"))
-    , sType(symbols.create("type"))
-    , sMeta(symbols.create("meta"))
-    , sName(symbols.create("name"))
-    , sValue(symbols.create("value"))
-    , sSystem(symbols.create("system"))
-    , sOverrides(symbols.create("__overrides"))
-    , sOutputs(symbols.create("outputs"))
-    , sOutputName(symbols.create("outputName"))
-    , sIgnoreNulls(symbols.create("__ignoreNulls"))
-    , sFile(symbols.create("file"))
-    , sLine(symbols.create("line"))
-    , sColumn(symbols.create("column"))
-    , sFunctor(symbols.create("__functor"))
-    , sToString(symbols.create("__toString"))
-    , sRight(symbols.create("right"))
-    , sWrong(symbols.create("wrong"))
-    , sStructuredAttrs(symbols.create("__structuredAttrs"))
-    , sJson(symbols.create("__json"))
-    , sAllowedReferences(symbols.create("allowedReferences"))
-    , sAllowedRequisites(symbols.create("allowedRequisites"))
-    , sDisallowedReferences(symbols.create("disallowedReferences"))
-    , sDisallowedRequisites(symbols.create("disallowedRequisites"))
-    , sMaxSize(symbols.create("maxSize"))
-    , sMaxClosureSize(symbols.create("maxClosureSize"))
-    , sBuilder(symbols.create("builder"))
-    , sArgs(symbols.create("args"))
-    , sContentAddressed(symbols.create("__contentAddressed"))
-    , sImpure(symbols.create("__impure"))
-    , sOutputHash(symbols.create("outputHash"))
-    , sOutputHashAlgo(symbols.create("outputHashAlgo"))
-    , sOutputHashMode(symbols.create("outputHashMode"))
-    , sRecurseForDerivations(symbols.create("recurseForDerivations"))
-    , sDescription(symbols.create("description"))
-    , sSelf(symbols.create("self"))
-    , sEpsilon(symbols.create(""))
-    , sStartSet(symbols.create("startSet"))
-    , sOperator(symbols.create("operator"))
-    , sKey(symbols.create("key"))
-    , sPath(symbols.create("path"))
-    , sPrefix(symbols.create("prefix"))
-    , sOutputSpecified(symbols.create("outputSpecified"))
-    , exprSymbols{
-        .sub = symbols.create("__sub"),
-        .lessThan = symbols.create("__lessThan"),
-        .mul = symbols.create("__mul"),
-        .div = symbols.create("__div"),
-        .or_ = symbols.create("or"),
-        .findFile = symbols.create("__findFile"),
-        .nixPath = symbols.create("__nixPath"),
-        .body = symbols.create("body"),
-    }
+    , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
     , emptyBindings(0)
-    , storeFS(
-        makeMountedSourceAccessor(
-            {
-                {CanonPath::root, makeEmptySourceAccessor()},
-                /* In the pure eval case, we can simply require
-                   valid paths. However, in the *impure* eval
-                   case this gets in the way of the union
-                   mechanism, because an invalid access in the
-                   upper layer will *not* be caught by the union
-                   source accessor, but instead abort the entire
-                   lookup.
+    , storeFS(makeMountedSourceAccessor({
+          {CanonPath::root, makeEmptySourceAccessor()},
+          /* In the pure eval case, we can simply require
+             valid paths. However, in the *impure* eval
+             case this gets in the way of the union
+             mechanism, because an invalid access in the
+             upper layer will *not* be caught by the union
+             source accessor, but instead abort the entire
+             lookup.
 
-                   This happens when the store dir in the
-                   ambient file system has a path (e.g. because
-                   another Nix store there), but the relocated
-                   store does not.
+             This happens when the store dir in the
+             ambient file system has a path (e.g. because
+             another Nix store there), but the relocated
+             store does not.
 
-                   TODO make the various source accessors doing
-                   access control all throw the same type of
-                   exception, and make union source accessor
-                   catch it, so we don't need to do this hack.
-                 */
-                {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
-            }))
-    , rootFS(
-        ({
-            /* In pure eval mode, we provide a filesystem that only
-               contains the Nix store.
+             TODO make the various source accessors doing
+             access control all throw the same type of
+             exception, and make union source accessor
+             catch it, so we don't need to do this hack.
+           */
+          {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
+      }))
+    , rootFS(({
+        /* In pure eval mode, we provide a filesystem that only
+           contains the Nix store.
 
-               If we have a chroot store and pure eval is not enabled,
-               use a union accessor to make the chroot store available
-               at its logical location while still having the
-               underlying directory available. This is necessary for
-               instance if we're evaluating a file from the physical
-               /nix/store while using a chroot store. */
-            auto accessor = getFSSourceAccessor();
+           If we have a chroot store and pure eval is not enabled,
+           use a union accessor to make the chroot store available
+           at its logical location while still having the
+           underlying directory available. This is necessary for
+           instance if we're evaluating a file from the physical
+           /nix/store while using a chroot store. */
+        auto accessor = getFSSourceAccessor();
 
-            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-            if (settings.pureEval || store->storeDir != realStoreDir) {
-                accessor = settings.pureEval
-                    ? storeFS
-                    : makeUnionSourceAccessor({accessor, storeFS});
-            }
+        auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+        if (settings.pureEval || store->storeDir != realStoreDir) {
+            accessor = settings.pureEval ? storeFS : makeUnionSourceAccessor({accessor, storeFS});
+        }
 
-            /* Apply access control if needed. */
-            if (settings.restrictEval || settings.pureEval)
-                accessor = AllowListSourceAccessor::create(accessor, {}, {},
-                    [&settings](const CanonPath & path) -> RestrictedPathError {
-                        auto modeInformation = settings.pureEval
-                            ? "in pure evaluation mode (use '--impure' to override)"
-                            : "in restricted mode";
-                        throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-                    });
+        /* Apply access control if needed. */
+        if (settings.restrictEval || settings.pureEval)
+            accessor = AllowListSourceAccessor::create(
+                accessor, {}, {}, [&settings](const CanonPath & path) -> RestrictedPathError {
+                    auto modeInformation = settings.pureEval ? "in pure evaluation mode (use '--impure' to override)"
+                                                             : "in restricted mode";
+                    throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
+                });
 
-            accessor;
-        }))
+        accessor;
+    }))
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
-        CanonPath("derivation-internal.nix"),
+          CanonPath("derivation-internal.nix"),
 #include "primops/derivation.nix.gen.hh"
-    )}
+          )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , inputCache(fetchers::InputCache::create())
@@ -654,7 +595,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     }
     if (isFunctor(v)) {
         try {
-            Value & functor = *v.attrs()->find(sFunctor)->value;
+            Value & functor = *v.attrs()->find(s.functor)->value;
             Value * vp[] = {&v};
             Value partiallyApplied;
             // The first parameter is not user-provided, and may be
@@ -978,8 +919,8 @@ void EvalState::mkPos(Value & v, PosIdx p)
     auto origin = positions.originOf(p);
     if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
-        attrs.alloc(sFile).mkString(path->path.abs());
-        makePositionThunks(*this, p, attrs.alloc(sLine), attrs.alloc(sColumn));
+        attrs.alloc(s.file).mkString(path->path.abs());
+        makePositionThunks(*this, p, attrs.alloc(s.line), attrs.alloc(s.column));
         v.mkAttrs(attrs);
     } else
         v.mkNull();
@@ -1245,7 +1186,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         dynamicEnv = &env2;
         Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
 
-        AttrDefs::iterator overrides = attrs.find(state.sOverrides);
+        AttrDefs::iterator overrides = attrs.find(state.s.overrides);
         bool hasOverrides = overrides != attrs.end();
 
         /* The recursive attributes are evaluated in the new
@@ -1717,7 +1658,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             }
         }
 
-        else if (vCur.type() == nAttrs && (functor = vCur.attrs()->get(sFunctor))) {
+        else if (vCur.type() == nAttrs && (functor = vCur.attrs()->get(s.functor))) {
             /* 'vCur' may be allocated on the stack of the calling
                function, but for functors we may keep a reference, so
                heap-allocate a copy and use that instead. */
@@ -1779,7 +1720,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
     forceValue(fun, pos);
 
     if (fun.type() == nAttrs) {
-        auto found = fun.attrs()->find(sFunctor);
+        auto found = fun.attrs()->find(s.functor);
         if (found != fun.attrs()->end()) {
             Value * v = allocValue();
             callFunction(*found->value, fun, *v, pos);
@@ -2241,7 +2182,7 @@ Bindings::const_iterator EvalState::getAttr(Symbol attrSym, const Bindings * att
 
 bool EvalState::isFunctor(const Value & fun) const
 {
-    return fun.type() == nAttrs && fun.attrs()->find(sFunctor) != fun.attrs()->end();
+    return fun.type() == nAttrs && fun.attrs()->find(s.functor) != fun.attrs()->end();
 }
 
 void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx)
@@ -2310,7 +2251,7 @@ bool EvalState::isDerivation(Value & v)
 {
     if (v.type() != nAttrs)
         return false;
-    auto i = v.attrs()->get(sType);
+    auto i = v.attrs()->get(s.type);
     if (!i)
         return false;
     forceValue(*i->value, i->pos);
@@ -2322,7 +2263,7 @@ bool EvalState::isDerivation(Value & v)
 std::optional<std::string>
 EvalState::tryAttrsToString(const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore, bool copyToStore)
 {
-    auto i = v.attrs()->find(sToString);
+    auto i = v.attrs()->find(s.toString);
     if (i != v.attrs()->end()) {
         Value v1;
         callFunction(*i->value, v, v1, pos);
@@ -2368,7 +2309,7 @@ BackedStringView EvalState::coerceToString(
         auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
         if (maybeString)
             return std::move(*maybeString);
-        auto i = v.attrs()->find(sOutPath);
+        auto i = v.attrs()->find(s.outPath);
         if (i == v.attrs()->end()) {
             error<TypeError>(
                 "cannot coerce %1% to a string: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
@@ -2475,7 +2416,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     /* Similarly, handle __toString where the result may be a path
        value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs()->find(sToString);
+        auto i = v.attrs()->find(s.toString);
         if (i != v.attrs()->end()) {
             Value v1;
             callFunction(*i->value, v, v1, pos);
@@ -2665,8 +2606,8 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
 
     case nAttrs: {
         if (isDerivation(v1) && isDerivation(v2)) {
-            auto i = v1.attrs()->get(sOutPath);
-            auto j = v2.attrs()->get(sOutPath);
+            auto i = v1.attrs()->get(s.outPath);
+            auto j = v2.attrs()->get(s.outPath);
             if (i && j) {
                 try {
                     assertEqValues(*i->value, *j->value, pos, errorCtx);
@@ -2819,8 +2760,8 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         /* If both sets denote a derivation (type = "derivation"),
            then compare their outPaths. */
         if (isDerivation(v1) && isDerivation(v2)) {
-            auto i = v1.attrs()->get(sOutPath);
-            auto j = v2.attrs()->get(sOutPath);
+            auto i = v1.attrs()->get(s.outPath);
+            auto j = v2.attrs()->get(s.outPath);
             if (i && j)
                 return eqValues(*i->value, *j->value, pos, errorCtx);
         }
@@ -3196,8 +3137,7 @@ Expr * EvalState::parse(
         docComments = &it->second;
     }
 
-    auto result = parseExprFromBuf(
-        text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS, exprSymbols);
+    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS);
 
     result->bindVars(*this, staticEnv);
 

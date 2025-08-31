@@ -68,8 +68,7 @@ Expr * parseExprFromBuf(
     const EvalSettings & settings,
     PosTable & positions,
     DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS,
-    const Expr::AstSymbols & astSymbols);
+    const ref<SourceAccessor> rootFS);
 
 }
 
@@ -542,8 +541,7 @@ Expr * parseExprFromBuf(
     const EvalSettings & settings,
     PosTable & positions,
     DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS,
-    const Expr::AstSymbols & astSymbols)
+    const ref<SourceAccessor> rootFS)
 {
     yyscan_t scanner;
     LexerState lexerState {
@@ -558,7 +556,6 @@ Expr * parseExprFromBuf(
         .basePath = basePath,
         .origin = lexerState.origin,
         .rootFS = rootFS,
-        .s = astSymbols,
         .settings = settings,
     };
 
