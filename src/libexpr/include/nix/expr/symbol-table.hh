@@ -61,6 +61,15 @@ public:
         return id > 0;
     }
 
+    /**
+     * The ID is a private implementation detail that should generally not be observed. However, we expose here just for
+     * sake of `switch...case`, which needs to dispatch on numbers. */
+    [[gnu::always_inline]]
+    constexpr uint32_t getId() const noexcept
+    {
+        return id;
+    }
+
     constexpr auto operator<=>(const Symbol & other) const noexcept = default;
 
     friend class std::hash<Symbol>;

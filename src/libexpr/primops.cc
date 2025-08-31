@@ -1454,19 +1454,22 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     continue;
             }
 
-            if (i->name == state.s.contentAddressed && state.forceBool(*i->value, pos, context_below)) {
-                contentAddressed = true;
-                experimentalFeatureSettings.require(Xp::CaDerivations);
-            }
-
-            else if (i->name == state.s.impure && state.forceBool(*i->value, pos, context_below)) {
-                isImpure = true;
-                experimentalFeatureSettings.require(Xp::ImpureDerivations);
-            }
-
+            switch (i->name.getId()) {
+            case EvalState::s.contentAddressed.getId():
+                if (state.forceBool(*i->value, pos, context_below)) {
+                    contentAddressed = true;
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
+                }
+                break;
+            case EvalState::s.impure.getId():
+                if (state.forceBool(*i->value, pos, context_below)) {
+                    isImpure = true;
+                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
+                }
+                break;
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            else if (i->name == state.s.args) {
+            case EvalState::s.args.getId():
                 state.forceList(*i->value, pos, context_below);
                 for (auto elem : i->value->listView()) {
                     auto s = state
@@ -1475,11 +1478,10 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                                  .toOwned();
                     drv.args.push_back(s);
                 }
-            }
-
+                break;
             /* All other attributes are passed to the builder through
                the environment. */
-            else {
+            default:
 
                 if (jsonObject) {
 
@@ -1488,49 +1490,69 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
                     jsonObject->structuredAttrs.emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
 
-                    if (i->name == state.s.builder)
+                    switch (i->name.getId()) {
+                    case EvalState::s.builder.getId():
                         drv.builder = state.forceString(*i->value, context, pos, context_below);
-                    else if (i->name == state.s.system)
+                        break;
+                    case EvalState::s.system.getId():
                         drv.platform = state.forceStringNoCtx(*i->value, pos, context_below);
-                    else if (i->name == state.s.outputHash)
+                        break;
+                    case EvalState::s.outputHash.getId():
                         outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
-                    else if (i->name == state.s.outputHashAlgo)
+                        break;
+                    case EvalState::s.outputHashAlgo.getId():
                         outputHashAlgo = parseHashAlgoOpt(state.forceStringNoCtx(*i->value, pos, context_below));
-                    else if (i->name == state.s.outputHashMode)
+                        break;
+                    case EvalState::s.outputHashMode.getId():
                         handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
-                    else if (i->name == state.s.outputs) {
-                        /* Require ‘outputs’ to be a list of strings. */
+                        break;
+                    case EvalState::s.outputs.getId(): {
+                        /* Require 'outputs' to be a list of strings. */
                         state.forceList(*i->value, pos, context_below);
                         Strings ss;
                         for (auto elem : i->value->listView())
                             ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         handleOutputs(ss);
+                        break;
+                    }
+                    default:
+                        break;
                     }
 
-                    if (i->name == state.s.allowedReferences)
+                    switch (i->name.getId()) {
+                    case EvalState::s.allowedReferences.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead",
                             drvName);
-                    if (i->name == state.s.allowedRequisites)
+                        break;
+                    case EvalState::s.allowedRequisites.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead",
                             drvName);
-                    if (i->name == state.s.disallowedReferences)
+                        break;
+                    case EvalState::s.disallowedReferences.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead",
                             drvName);
-                    if (i->name == state.s.disallowedRequisites)
+                        break;
+                    case EvalState::s.disallowedRequisites.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead",
                             drvName);
-                    if (i->name == state.s.maxSize)
+                        break;
+                    case EvalState::s.maxSize.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead",
                             drvName);
-                    if (i->name == state.s.maxClosureSize)
+                        break;
+                    case EvalState::s.maxClosureSize.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead",
                             drvName);
+                        break;
+                    default:
+                        break;
+                    }
 
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
@@ -1541,20 +1563,31 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                         drv.structuredAttrs = StructuredAttrs::parse(s);
                     } else {
                         drv.env.emplace(key, s);
-                        if (i->name == state.s.builder)
+                        switch (i->name.getId()) {
+                        case EvalState::s.builder.getId():
                             drv.builder = std::move(s);
-                        else if (i->name == state.s.system)
+                            break;
+                        case EvalState::s.system.getId():
                             drv.platform = std::move(s);
-                        else if (i->name == state.s.outputHash)
+                            break;
+                        case EvalState::s.outputHash.getId():
                             outputHash = std::move(s);
-                        else if (i->name == state.s.outputHashAlgo)
+                            break;
+                        case EvalState::s.outputHashAlgo.getId():
                             outputHashAlgo = parseHashAlgoOpt(s);
-                        else if (i->name == state.s.outputHashMode)
+                            break;
+                        case EvalState::s.outputHashMode.getId():
                             handleHashMode(s);
-                        else if (i->name == state.s.outputs)
+                            break;
+                        case EvalState::s.outputs.getId():
                             handleOutputs(tokenizeString<Strings>(s));
+                            break;
+                        default:
+                            break;
+                        }
                     }
                 }
+                break;
             }
 
         } catch (Error & e) {
