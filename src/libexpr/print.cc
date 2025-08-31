@@ -272,7 +272,7 @@ private:
     void printDerivation(Value & v)
     {
         std::optional<StorePath> storePath;
-        if (auto i = v.attrs()->get(state.sDrvPath)) {
+        if (auto i = v.attrs()->get(state.s.drvPath)) {
             NixStringContext context;
             storePath =
                 state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");

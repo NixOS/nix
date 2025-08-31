@@ -393,7 +393,7 @@ TEST_F(ValuePrintingTests, ansiColorsDerivation)
     vDerivation.mkString("derivation");
 
     BindingsBuilder builder(state, state.allocBindings(10));
-    builder.insert(state.sType, &vDerivation);
+    builder.insert(state.s.type, &vDerivation);
 
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
@@ -438,8 +438,8 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
     vDerivation.mkString("derivation");
 
     BindingsBuilder builder(state, state.allocBindings(10));
-    builder.insert(state.sType, &vDerivation);
-    builder.insert(state.sDrvPath, &vError);
+    builder.insert(state.s.type, &vDerivation);
+    builder.insert(state.s.drvPath, &vError);
 
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());

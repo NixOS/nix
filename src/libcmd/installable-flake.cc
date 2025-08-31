@@ -105,8 +105,8 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
     std::optional<NixInt::Inner> priority;
 
-    if (attr->maybeGetAttr(state->sOutputSpecified)) {
-    } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+    if (attr->maybeGetAttr(state->s.outputSpecified)) {
+    } else if (auto aMeta = attr->maybeGetAttr(state->s.meta)) {
         if (auto aPriority = aMeta->maybeGetAttr("priority"))
             priority = aPriority->getInt().value;
     }
@@ -119,12 +119,12 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                     overloaded{
                         [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
                             StringSet outputsToInstall;
-                            if (auto aOutputSpecified = attr->maybeGetAttr(state->sOutputSpecified)) {
+                            if (auto aOutputSpecified = attr->maybeGetAttr(state->s.outputSpecified)) {
                                 if (aOutputSpecified->getBool()) {
                                     if (auto aOutputName = attr->maybeGetAttr("outputName"))
                                         outputsToInstall = {aOutputName->getString()};
                                 }
-                            } else if (auto aMeta = attr->maybeGetAttr(state->sMeta)) {
+                            } else if (auto aMeta = attr->maybeGetAttr(state->s.meta)) {
                                 if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
                                     for (auto & s : aOutputsToInstall->getListOfStrings())
                                         outputsToInstall.insert(s);

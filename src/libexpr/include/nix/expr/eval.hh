@@ -213,22 +213,99 @@ struct DebugTrace
     }
 };
 
+struct StaticEvalSymbols
+{
+    Symbol with, outPath, drvPath, type, meta, name, value, system, overrides, outputs, outputName, ignoreNulls, file,
+        line, column, functor, toString, right, wrong, structuredAttrs, json, allowedReferences, allowedRequisites,
+        disallowedReferences, disallowedRequisites, maxSize, maxClosureSize, builder, args, contentAddressed, impure,
+        outputHash, outputHashAlgo, outputHashMode, recurseForDerivations, description, self, epsilon, startSet,
+        operator_, key, path, prefix, outputSpecified;
+
+    Expr::AstSymbols exprSymbols;
+
+    static constexpr auto preallocate()
+    {
+        StaticSymbolTable alloc;
+
+        StaticEvalSymbols staticSymbols = {
+            .with = alloc.create("<with>"),
+            .outPath = alloc.create("outPath"),
+            .drvPath = alloc.create("drvPath"),
+            .type = alloc.create("type"),
+            .meta = alloc.create("meta"),
+            .name = alloc.create("name"),
+            .value = alloc.create("value"),
+            .system = alloc.create("system"),
+            .overrides = alloc.create("__overrides"),
+            .outputs = alloc.create("outputs"),
+            .outputName = alloc.create("outputName"),
+            .ignoreNulls = alloc.create("__ignoreNulls"),
+            .file = alloc.create("file"),
+            .line = alloc.create("line"),
+            .column = alloc.create("column"),
+            .functor = alloc.create("__functor"),
+            .toString = alloc.create("__toString"),
+            .right = alloc.create("right"),
+            .wrong = alloc.create("wrong"),
+            .structuredAttrs = alloc.create("__structuredAttrs"),
+            .json = alloc.create("__json"),
+            .allowedReferences = alloc.create("allowedReferences"),
+            .allowedRequisites = alloc.create("allowedRequisites"),
+            .disallowedReferences = alloc.create("disallowedReferences"),
+            .disallowedRequisites = alloc.create("disallowedRequisites"),
+            .maxSize = alloc.create("maxSize"),
+            .maxClosureSize = alloc.create("maxClosureSize"),
+            .builder = alloc.create("builder"),
+            .args = alloc.create("args"),
+            .contentAddressed = alloc.create("__contentAddressed"),
+            .impure = alloc.create("__impure"),
+            .outputHash = alloc.create("outputHash"),
+            .outputHashAlgo = alloc.create("outputHashAlgo"),
+            .outputHashMode = alloc.create("outputHashMode"),
+            .recurseForDerivations = alloc.create("recurseForDerivations"),
+            .description = alloc.create("description"),
+            .self = alloc.create("self"),
+            .epsilon = alloc.create(""),
+            .startSet = alloc.create("startSet"),
+            .operator_ = alloc.create("operator"),
+            .key = alloc.create("key"),
+            .path = alloc.create("path"),
+            .prefix = alloc.create("prefix"),
+            .outputSpecified = alloc.create("outputSpecified"),
+            .exprSymbols = {
+                .sub = alloc.create("__sub"),
+                .lessThan = alloc.create("__lessThan"),
+                .mul = alloc.create("__mul"),
+                .div = alloc.create("__div"),
+                .or_ = alloc.create("or"),
+                .findFile = alloc.create("__findFile"),
+                .nixPath = alloc.create("__nixPath"),
+                .body = alloc.create("body"),
+            }};
+
+        return std::pair{staticSymbols, alloc};
+    }
+
+    static consteval StaticEvalSymbols create()
+    {
+        return preallocate().first;
+    }
+
+    static constexpr StaticSymbolTable staticSymbolTable()
+    {
+        return preallocate().second;
+    }
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    static constexpr StaticEvalSymbols s = StaticEvalSymbols::create();
+
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
-
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue, sSystem, sOverrides, sOutputs, sOutputName,
-        sIgnoreNulls, sFile, sLine, sColumn, sFunctor, sToString, sRight, sWrong, sStructuredAttrs, sJson,
-        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites, sMaxSize, sMaxClosureSize,
-        sBuilder, sArgs, sContentAddressed, sImpure, sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sRecurseForDerivations, sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath, sPrefix,
-        sOutputSpecified;
-
-    const Expr::AstSymbols exprSymbols;
 
     /**
      * If set, force copying files to the Nix store even if they

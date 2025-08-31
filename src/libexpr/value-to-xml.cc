@@ -98,14 +98,14 @@ static void printValueAsXML(
             XMLAttrs xmlAttrs;
 
             Path drvPath;
-            if (auto a = v.attrs()->get(state.sDrvPath)) {
+            if (auto a = v.attrs()->get(state.s.drvPath)) {
                 if (strict)
                     state.forceValue(*a->value, a->pos);
                 if (a->value->type() == nString)
                     xmlAttrs["drvPath"] = drvPath = a->value->c_str();
             }
 
-            if (auto a = v.attrs()->get(state.sOutPath)) {
+            if (auto a = v.attrs()->get(state.s.outPath)) {
                 if (strict)
                     state.forceValue(*a->value, a->pos);
                 if (a->value->type() == nString)

@@ -88,7 +88,7 @@ struct ParserState
     SourcePath basePath;
     PosTable::Origin origin;
     const ref<SourceAccessor> rootFS;
-    const Expr::AstSymbols & s;
+    static constexpr Expr::AstSymbols s = StaticEvalSymbols::create().exprSymbols;
     const EvalSettings & settings;
 
     void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
