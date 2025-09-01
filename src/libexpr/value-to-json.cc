@@ -94,7 +94,7 @@ json printValueAsJSON(
                 res = json::object();
                 for (auto & a : v.attrs()->lexicographicOrder(state.symbols)) {
                     json & j = res.emplace(state.symbols[a->name], json()).first.value();
-                    spawn([&, copyToStore, a]() {
+                    spawn([&, a]() {
                         try {
                             recurse(j, *a->value, a->pos);
                         } catch (Error & e) {
