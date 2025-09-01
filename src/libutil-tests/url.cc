@@ -127,6 +127,15 @@ TEST(FixGitURLTestSuite, scpLikeNoUserParsesPoorly)
         }));
 }
 
+TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
+{
+    /* From the underlying `parseURL` validations. */
+    EXPECT_THAT(
+        []() { fixGitURL("file://var/repos/x"); },
+        ::testing::ThrowsMessage<BadURL>(
+            testing::HasSubstrIgnoreANSIMatcher("file:// URL 'file://var/repos/x' has unexpected authority 'var'")));
+}
+
 TEST(FixGitURLTestSuite, scpLikePathLeadingSlashParsesPoorly)
 {
     // SCP-like URL (no user)
@@ -246,8 +255,10 @@ TEST(parseURL, parsesFilePlusHttpsUrl)
 
 TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation)
 {
-    auto s = "file://www.example.org/video.mp4";
-    ASSERT_THROW(parseURL(s), Error);
+    EXPECT_THAT(
+        []() { parseURL("file://www.example.org/video.mp4"); },
+        ::testing::ThrowsMessage<BadURL>(
+            testing::HasSubstrIgnoreANSIMatcher("has unexpected authority 'www.example.org'")));
 }
 
 TEST(parseURL, parseIPv4Address)
