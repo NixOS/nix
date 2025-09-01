@@ -807,6 +807,12 @@ private:
     void notifyWaiters();
 };
 
+template<>
+void ValueStorage<sizeof(void *)>::notifyWaiters();
+
+template<>
+ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOnThunk(EvalState & state, bool awaited);
+
 /**
  * View into a list of Value * that is itself immutable.
  *
