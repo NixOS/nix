@@ -20,6 +20,7 @@ namespace nix {
 void checkOutputs(
     Store & store,
     const StorePath & drvPath,
+    const decltype(Derivation::outputs) & drvOutputs,
     const decltype(DerivationOptions::outputChecks) & drvOptions,
     const std::map<std::string, ValidPathInfo> & outputs);
 
