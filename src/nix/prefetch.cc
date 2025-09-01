@@ -105,7 +105,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             FdSink sink(fd.get());
 
-            FileTransferRequest req(parseURL(url));
+            FileTransferRequest req(ValidURL{url});
             req.decompress = false;
             getFileTransfer()->download(std::move(req), sink);
         }

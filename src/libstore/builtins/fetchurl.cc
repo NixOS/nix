@@ -37,7 +37,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
     auto fetch = [&](const std::string & url) {
         auto source = sinkToSource([&](Sink & sink) {
-            FileTransferRequest request(parseURL(url));
+            FileTransferRequest request(ValidURL{url});
             request.decompress = false;
 
             auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
