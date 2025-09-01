@@ -408,77 +408,21 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
-struct ScpLike
+ParsedURL fixGitURL(const std::string & url)
 {
-    ParsedURL::Authority authority;
-    std::string_view path;
-};
-
-/**
- * Parse a scp url. This is a helper struct for fixGitURL.
- * This is needed since we support scp-style urls for git urls.
- * https://git-scm.com/book/ms/v2/Git-on-the-Server-The-Protocols
- *
- * A good reference is libgit2 also allows scp style
- * https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/util/net.c#L806
- */
-static std::optional<ScpLike> parseScp(const std::string_view s) noexcept
-{
-    if (s.empty() || s.front() == '/')
-        return std::nullopt;
-
-    // Find the colon that separates host from path.
-    // Find the right-most since ipv6 has colons
-    const auto colon = s.rfind(':');
-    if (colon == std::string_view::npos)
-        return std::nullopt;
-
-    // Split head:[path]
-    const auto head = s.substr(0, colon);
-    const auto path = s.substr(colon + 1);
-
-    if (head.empty())
-        return std::nullopt;
-
-    return ScpLike{
-        .authority = ParsedURL::Authority::parse(head),
-        .path = path,
-    };
-}
-
-ParsedURL fixGitURL(const std::string_view url)
-{
-    try {
-        if (auto parsed = parseURL(url); parsed.scheme == "file" || parsed.authority)
-            return parsed;
-    } catch (BadURL &) {
-    }
-
-    // if the url does not start with forward slash, add one
-    auto splitMakeAbs = [&](std::string_view pathS) {
-        std::vector<std::string> path;
-
-        if (!hasPrefix(pathS, "/")) {
-            path.emplace_back("");
-        }
-        splitStringInto(path, pathS, "/");
-
-        return path;
-    };
-
-    if (auto scp = parseScp(url)) {
+    std::regex scpRegex("([^/]*)@(.*):(.*)");
+    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
+        return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
+    if (hasPrefix(url, "file:"))
+        return parseURL(url);
+    if (url.find("://") == std::string::npos) {
         return ParsedURL{
-            .scheme = "ssh",
-            .authority = std::move(scp->authority),
-            .path = splitMakeAbs(scp->path),
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = splitString<std::vector<std::string>>(url, "/"),
         };
     }
-
-    return ParsedURL{
-        .scheme = "file",
-        .authority = ParsedURL::Authority{},
-        .path = splitMakeAbs(url),
-    };
+    return parseURL(url);
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1
