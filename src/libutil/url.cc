@@ -413,8 +413,15 @@ ParsedURL fixGitURL(const std::string & url)
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
         return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
-    if (hasPrefix(url, "file:"))
-        return parseURL(url);
+    std::string_view path = url;
+    if (splitPrefix(path, "file:")) {
+        if (hasPrefix(url, "file://"))
+            return parseURL(url);
+        throw BadURL(
+            "URL '%s' would parse as SCP authority = 'file', path = '%s' but this is also a valid `file:..` URL, and so we choose to disallow it",
+            url,
+            path);
+    }
     if (url.find("://") == std::string::npos) {
         return ParsedURL{
             .scheme = "file",

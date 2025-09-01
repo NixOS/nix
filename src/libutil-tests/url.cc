@@ -74,19 +74,6 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "home", "me", "repo"},
                 },
         },
-        // Already file: scheme
-        // NOTE: Git/SCP treat this as a `<hostname>:<path>`, so we are
-        // failing to "fix up" this case.
-        FixGitURLParam{
-            .input = "file:/var/repos/x",
-            .expected = "file:/var/repos/x",
-            .parsed =
-                ParsedURL{
-                    .scheme = "file",
-                    .authority = std::nullopt,
-                    .path = {"", "var", "repos", "x"},
-                },
-        },
         // IPV6 test case
         FixGitURLParam{
             .input = "user@[2001:db8:1::2]:/home/file",
@@ -134,6 +121,17 @@ TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
         []() { fixGitURL("file://var/repos/x"); },
         ::testing::ThrowsMessage<BadURL>(
             testing::HasSubstrIgnoreANSIMatcher("file:// URL 'file://var/repos/x' has unexpected authority 'var'")));
+}
+
+TEST(FixGitURLTestSuite, ambiguousScpLikeOrFileURL)
+{
+    /* Git/SCP treat this as a `<hostname>:<path>`, but under IETF RFC
+       8089 it is a valid (if sloppy) file URL. Rather than decide who
+       is right, we just make it an error. */
+    EXPECT_THAT(
+        []() { fixGitURL("file:/var/repos/x"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher(
+            "URL 'file:/var/repos/x' would parse as SCP authority = 'file', path = '/var/repos/x' but this is also a valid `file:..` URL, and so we choose to disallow it")));
 }
 
 TEST(FixGitURLTestSuite, scpLikePathLeadingSlashParsesPoorly)
