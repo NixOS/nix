@@ -485,14 +485,6 @@ bool DerivationBuilderImpl::prepareBuild()
 
 SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
-    // FIXME: get rid of this, rely on RAII.
-    Finally releaseBuildUser([&]() {
-        /* Release the build user at the end of this function. We don't do
-           it right away because we don't want another build grabbing this
-           uid and then messing around with our output. */
-        buildUser.reset();
-    });
-
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
        simply have closed its end of the pipe, so just to be sure,
@@ -550,10 +542,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     /* Compute the FS closure of the outputs and register them as
        being valid. */
     auto builtOutputs = registerOutputs();
-
-    /* Delete unused redirected outputs (when doing hash rewriting). */
-    for (auto & i : redirectedOutputs)
-        deletePath(store.Store::toRealPath(i.second));
 
     cleanupBuild(true);
 
@@ -1858,6 +1846,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
 void DerivationBuilderImpl::cleanupBuild(bool force)
 {
+    if (force) {
+        /* Delete unused redirected outputs (when doing hash rewriting). */
+        for (auto & i : redirectedOutputs)
+            deletePath(store.Store::toRealPath(i.second));
+    }
+
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to
          * clean up, the `tmpDir` will be chowned as if we were to move
