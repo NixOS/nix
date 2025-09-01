@@ -13,6 +13,29 @@
 namespace nix {
 
 /**
+ * Denotes a build failure that stemmed from the builder exiting with a
+ * failing exist status.
+ */
+struct BuilderFailureError : BuildError
+{
+    int builderStatus;
+
+    std::string extraMsgAfter;
+
+    BuilderFailureError(BuildResult::Status status, int builderStatus, std::string extraMsgAfter)
+        : BuildError{
+            status,
+              /* No message for now, because the caller will make for
+                 us, with extra context */
+              "",
+          }
+        , builderStatus{std::move(builderStatus)}
+        , extraMsgAfter{std::move(extraMsgAfter)}
+    {
+    }
+};
+
+/**
  * Stuff we need to pass to initChild().
  */
 struct ChrootPath
@@ -93,8 +116,6 @@ struct DerivationBuilderCallbacks
      * Close the log file.
      */
     virtual void closeLogFile() = 0;
-
-    virtual void appendLogTailErrorMsg(std::string & msg) = 0;
 
     /**
      * Hook up `builderOut` to some mechanism to ingest the log
