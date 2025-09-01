@@ -71,6 +71,11 @@ class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilder
 {
 protected:
 
+    /**
+     * The process ID of the builder.
+     */
+    Pid pid;
+
     LocalStore & store;
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
@@ -84,6 +89,27 @@ public:
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
+    }
+
+    ~DerivationBuilderImpl()
+    {
+        /* Careful: we should never ever throw an exception from a
+           destructor. */
+        try {
+            killChild();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            stopDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            cleanupBuild(false);
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
     }
 
 protected:
@@ -192,7 +218,7 @@ public:
 
     void startBuilder() override;
 
-    std::variant<BuildError, SingleDrvOutputs> unprepareBuild() override;
+    SingleDrvOutputs unprepareBuild() override;
 
 protected:
 
@@ -286,9 +312,11 @@ private:
      */
     void startDaemon();
 
-public:
-
-    void stopDaemon() override;
+    /**
+     * Stop the in-process nix daemon thread.
+     * @see startDaemon
+     */
+    void stopDaemon();
 
 protected:
 
@@ -343,15 +371,25 @@ private:
      */
     SingleDrvOutputs registerOutputs();
 
-public:
-
-    void deleteTmpDir(bool force) override;
-
-    void killSandbox(bool getStats) override;
-
 protected:
 
-    virtual void cleanupBuild();
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build suceeded, so don't attempt to
+     * preseve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force);
+
+    /**
+     * Kill any processes running under the build user UID or in the
+     * cgroup of the build.
+     */
+    virtual void killSandbox(bool getStats);
+
+public:
+
+    bool killChild() override;
 
 private:
 
@@ -414,6 +452,24 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
     }
 }
 
+bool DerivationBuilderImpl::killChild()
+{
+    bool ret = pid != -1;
+    if (ret) {
+        /* If we're using a build user, then there is a tricky race
+           condition: if we kill the build user before the child has
+           done its setuid() to the build user uid, then it won't be
+           killed, and we'll potentially lock up in pid.wait().  So
+           also send a conventional kill to the child. */
+        ::kill(-pid, SIGKILL); /* ignore the result */
+
+        killSandbox(true);
+
+        pid.wait();
+    }
+    return ret;
+}
+
 bool DerivationBuilderImpl::prepareBuild()
 {
     if (useBuildUsers()) {
@@ -427,7 +483,7 @@ bool DerivationBuilderImpl::prepareBuild()
     return true;
 }
 
-std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild()
+SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
     // FIXME: get rid of this, rely on RAII.
     Finally releaseBuildUser([&]() {
@@ -476,56 +532,42 @@ std::variant<BuildError, SingleDrvOutputs> DerivationBuilderImpl::unprepareBuild
             ((double) buildResult.cpuSystem->count()) / 1000000);
     }
 
-    bool diskFull = false;
+    /* Check the exit status. */
+    if (!statusOk(status)) {
 
-    try {
+        bool diskFull = decideWhetherDiskFull();
 
-        /* Check the exit status. */
-        if (!statusOk(status)) {
+        cleanupBuild(false);
 
-            diskFull |= decideWhetherDiskFull();
+        auto msg =
+            fmt("Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
+                Magenta(store.printStorePath(drvPath)),
+                statusToString(status));
 
-            cleanupBuild();
+        msg += showKnownOutputs(store, drv);
 
-            auto msg =
-                fmt("Cannot build '%s'.\n"
-                    "Reason: " ANSI_RED "builder %s" ANSI_NORMAL ".",
-                    Magenta(store.printStorePath(drvPath)),
-                    statusToString(status));
+        miscMethods->appendLogTailErrorMsg(msg);
 
-            msg += showKnownOutputs(store, drv);
+        if (diskFull)
+            msg += "\nnote: build failure may have been caused by lack of free disk space";
 
-            miscMethods->appendLogTailErrorMsg(msg);
-
-            if (diskFull)
-                msg += "\nnote: build failure may have been caused by lack of free disk space";
-
-            throw BuildError(
-                !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure
-                                                          : BuildResult::PermanentFailure,
-                msg);
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs = registerOutputs();
-
-        /* Delete unused redirected outputs (when doing hash rewriting). */
-        for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
-
-        deleteTmpDir(true);
-
-        return std::move(builtOutputs);
-
-    } catch (BuildError & e) {
-        return std::move(e);
+        throw BuildError(
+            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            msg);
     }
-}
 
-void DerivationBuilderImpl::cleanupBuild()
-{
-    deleteTmpDir(false);
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs = registerOutputs();
+
+    /* Delete unused redirected outputs (when doing hash rewriting). */
+    for (auto & i : redirectedOutputs)
+        deletePath(store.Store::toRealPath(i.second));
+
+    cleanupBuild(true);
+
+    return builtOutputs;
 }
 
 static void chmod_(const Path & path, mode_t mode)
@@ -1757,7 +1799,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
 
             store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
-            miscMethods->markContentsGood(newInfo.path);
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
@@ -1825,7 +1866,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
-void DerivationBuilderImpl::deleteTmpDir(bool force)
+void DerivationBuilderImpl::cleanupBuild(bool force)
 {
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to

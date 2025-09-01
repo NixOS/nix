@@ -107,8 +107,6 @@ struct DerivationBuilderCallbacks
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
-
-    virtual void markContentsGood(const StorePath & path) = 0;
 };
 
 /**
@@ -124,11 +122,6 @@ struct DerivationBuilderCallbacks
  */
 struct DerivationBuilder : RestrictionContext
 {
-    /**
-     * The process ID of the builder.
-     */
-    Pid pid;
-
     DerivationBuilder() = default;
     virtual ~DerivationBuilder() = default;
 
@@ -161,25 +154,18 @@ struct DerivationBuilder : RestrictionContext
      * processing. A status code and exception are returned, providing
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
+     *
+     * @throws BuildError
      */
-    virtual std::variant<BuildError, SingleDrvOutputs> unprepareBuild() = 0;
+    virtual SingleDrvOutputs unprepareBuild() = 0;
 
     /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
+     * Forcibly kill the child process, if any.
+     *
+     * @returns whether the child was still alive and needed to be
+     * killed.
      */
-    virtual void stopDaemon() = 0;
-
-    /**
-     * Delete the temporary directory, if we have one.
-     */
-    virtual void deleteTmpDir(bool force) = 0;
-
-    /**
-     * Kill any processes running under the build user UID or in the
-     * cgroup of the build.
-     */
-    virtual void killSandbox(bool getStats) = 0;
+    virtual bool killChild() = 0;
 };
 
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
