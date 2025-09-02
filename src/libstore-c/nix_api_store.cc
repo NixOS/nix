@@ -7,6 +7,8 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/build/derivation-builder.hh"
+#include "nix/store/build/derivation-env-desugar.hh"
 
 #include "nix/store/globals.hh"
 
@@ -126,6 +128,28 @@ StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const c
     NIXC_CATCH_ERRS_NULL
 }
 
+StorePath * nix_store_parse_path2(nix_c_context * context, StoreDir store_dir, const char * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::Path sdInner = store_dir.store_directory;
+        nix::StoreDirConfig sd{sdInner};
+        nix::StorePath s = sd.parseStorePath(path);
+        return new StorePath{std::move(s)};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+void
+nix_print_store_path(StoreDir store_dir, const StorePath * path, nix_get_string_callback callback, void * user_data)
+{
+    nix::Path sdInner = store_dir.store_directory;
+    nix::StoreDirConfig sd{sdInner};
+    std::string s = sd.printStorePath(path->path);
+    callback(s.c_str(), s.size(), user_data);
+}
+
 nix_err nix_store_realise(
     nix_c_context * context,
     Store * store,
@@ -178,16 +202,16 @@ StorePath * nix_store_path_clone(const StorePath * p)
     return new StorePath{p->path};
 }
 
-nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
+nix_derivation * nix_derivation_from_json(nix_c_context * context, StoreDir store_dir, const char * json)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto drv = static_cast<nix::Derivation>(nlohmann::json::parse(json));
 
-        auto drvPath = nix::writeDerivation(*store->ptr, drv, nix::NoRepair, /* read only */ true);
-
-        drv.checkInvariants(*store->ptr, drvPath);
+        // auto drvPath = nix::writeDerivation(*store->ptr, drv, nix::NoRepair, /* read only */ true);
+        //
+        // drv.checkInvariants(*store->ptr, drvPath);
 
         return new nix_derivation{drv};
     }
@@ -216,6 +240,137 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
         nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
     }
     NIXC_CATCH_ERRS
+}
+
+struct nix_derivation_builder
+{
+    nix::BuildResult buildResult;
+    nix::DerivationOptions drvOptions;
+    const nix::StorePathSet inputPaths;
+    std::map<std::string, nix::InitialOutput> initialOutputs;
+    nix::AutoCloseFD builderOut;
+    std::unique_ptr<nix::DerivationBuilder> builder;
+};
+
+nix_derivation_builder * nix_make_derivation_builder(
+    nix_c_context * context,
+    StoreDir storeDir,
+    const char * buildDir,
+    const nix_derivation * drv,
+    const StorePath * drvPath,
+    const StorePath * inputPaths[])
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        struct CBuildingStore : nix::BuildingStore
+        {
+            nix::Path storeDir;
+            nix::Path buildDir;
+
+            CBuildingStore(StoreDir storeDir_, const char * buildDir_)
+                : nix::BuildingStore{this->storeDir}
+                , storeDir{storeDir_.store_directory}
+                , buildDir{buildDir_}
+            {
+            }
+
+            virtual nix::Path getRealStoreDir() const override
+            {
+                return storeDir;
+            }
+
+            virtual nix::Path getBuildDir() const override
+            {
+                return buildDir;
+            }
+
+            std::thread startDaemon(
+                nix::Descriptor daemonListeningSocket,
+                nix::RestrictionContext & ctx,
+                std::vector<std::thread> & daemonWorkerThreads) override
+            {
+                throw nix::Unsupported("Recursive Nix is not yet supported from C builder interface");
+            }
+        };
+
+        void * p = ::operator new(sizeof(nix_derivation_builder));
+        auto & ref = *static_cast<nix_derivation_builder *>(p);
+        return new (p) nix_derivation_builder{
+            .builder = nix::makeDerivationBuilder(
+                std::make_unique<CBuildingStore>(storeDir, buildDir),
+                std::make_unique<nix::DerivationBuilderCallbacks>(),
+                nix::DerivationBuilderParams{
+                    .drvPath{drvPath->path},
+                    .buildResult = ref.buildResult,
+                    .drv = drv->drv,
+                    .drvOptions = ref.drvOptions,
+                    .inputPaths = ref.inputPaths,
+                    .initialOutputs = ref.initialOutputs,
+                    .buildMode = nix::bmNormal,
+                    // TODO
+                    .defaultPathsInChroot{nix::settings.sandboxPaths.get()},
+                    // TODO
+                    .desugaredEnv{[&] {
+                        nix::DesugaredEnv res;
+                        for (auto & [n, v] : drv->drv.env) {
+                            res.variables.insert_or_assign(n, nix::DesugaredEnv::EnvEntry{.value = v});
+                        }
+                        return res;
+                    }()},
+                }),
+        };
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_derivation_builder_start(nix_c_context * context, nix_derivation_builder * builder)
+{
+    try {
+        if (auto optD = builder->builder->startBuild())
+            builder->builderOut = *std::move(optD);
+        else
+            throw nix::Error("Could not get build user");
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_builder_finish(
+    nix_c_context * context,
+    nix_derivation_builder * builder,
+    void * userdata,
+    void (*callback)(void * userdata, const char * outname, const StorePath * out))
+{
+    try {
+        nix::StringSink sink;
+        try {
+            nix::drainFD(builder->builderOut.get(), sink);
+        } catch (nix::SysError &) {
+            if (errno == EIO)
+                builder->builderOut.release();
+            else
+                throw;
+        }
+
+        std::cout << sink.s;
+
+        auto [status, diskFull] = builder->builder->unprepareBuild();
+
+        nix::warn("RESULT: %s", nix::statusToString(status));
+
+        if (callback) {
+            for (const auto & [outputName, realisation] : builder->buildResult.builtOutputs) {
+                StorePath p{realisation.outPath};
+                callback(userdata, outputName.c_str(), &p);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+void nix_derivation_builder_free(nix_derivation_builder * builder)
+{
+    delete builder;
 }
 
 } // extern "C"

@@ -108,19 +108,19 @@ struct DerivationBuilderCallbacks
     virtual ~DerivationBuilderCallbacks() = default;
 
     /**
-     * Open a log file and a pipe to it.
+     * Builder tells caller it is time to open a log file and a pipe to it, if they would like to capture logs
      */
-    virtual Path openLogFile() = 0;
+    virtual void openLogFile() {}
 
     /**
-     * Close the log file.
+     *  Builder tells caller it is time to Close the log file.
      */
-    virtual void closeLogFile() = 0;
+    virtual void closeLogFile() {}
 
     /**
      * @todo this should be reworked
      */
-    virtual void childTerminated() = 0;
+    virtual void childTerminated() {}
 };
 
 /**
