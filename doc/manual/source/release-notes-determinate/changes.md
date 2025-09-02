@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.31 and Determinate Nix 3.10.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.31 and Determinate Nix 3.10.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -146,3 +146,7 @@ This section lists the differences between upstream Nix 2.31 and Determinate Nix
 * The default `nix flake init` template is much more useful [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
 
 <!-- Determinate Nix version 3.10.0 -->
+
+<!-- Determinate Nix version 3.10.1 -->
+
+* Sync with 2.31.1 by @edolstra in [DeterminateSystems/nix-src#189](https://github.com/DeterminateSystems/nix-src/pull/189)
