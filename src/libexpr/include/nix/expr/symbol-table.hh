@@ -113,12 +113,12 @@ public:
         // for multi-threaded implementations: lock store and allocator here
         const auto & [v, idx] = key.store.add(SymbolValue{});
         if (size == 0) {
-            v.mkString("", nullptr);
+            v.mkStringNoCopy("", nullptr);
         } else {
             auto s = key.alloc.allocate(size + 1);
             memcpy(s, key.s.data(), size);
             s[size] = '\0';
-            v.mkString(s, nullptr);
+            v.mkStringNoCopy(s, nullptr);
         }
         v.size_ = size;
         v.idx = idx;

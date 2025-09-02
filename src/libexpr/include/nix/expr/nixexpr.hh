@@ -158,7 +158,7 @@ struct ExprString : Expr
     ExprString(std::string && s)
         : s(std::move(s))
     {
-        v.mkString(this->s.data());
+        v.mkStringNoCopy(this->s.data());
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;

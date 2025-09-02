@@ -483,42 +483,40 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    std::string t;
     switch (args[0]->type()) {
     case nInt:
-        t = "int";
+        v.mkStringNoCopy("int");
         break;
     case nBool:
-        t = "bool";
+        v.mkStringNoCopy("bool");
         break;
     case nString:
-        t = "string";
+        v.mkStringNoCopy("string");
         break;
     case nPath:
-        t = "path";
+        v.mkStringNoCopy("path");
         break;
     case nNull:
-        t = "null";
+        v.mkStringNoCopy("null");
         break;
     case nAttrs:
-        t = "set";
+        v.mkStringNoCopy("set");
         break;
     case nList:
-        t = "list";
+        v.mkStringNoCopy("list");
         break;
     case nFunction:
-        t = "lambda";
+        v.mkStringNoCopy("lambda");
         break;
     case nExternal:
-        t = args[0]->external()->typeOf();
+        v.mkString(args[0]->external()->typeOf());
         break;
     case nFloat:
-        t = "float";
+        v.mkStringNoCopy("float");
         break;
     case nThunk:
         unreachable();
     }
-    v.mkString(t);
 }
 
 static RegisterPrimOp primop_typeOf({
@@ -4349,7 +4347,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
-            v.mkString("", args[2]->context());
+            v.mkStringNoCopy("", args[2]->context());
             return;
         }
     }
