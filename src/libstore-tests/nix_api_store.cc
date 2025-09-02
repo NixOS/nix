@@ -1,7 +1,10 @@
+#include <fstream>
+
 #include "nix_api_util.h"
 #include "nix_api_store.h"
 
 #include "nix/store/tests/nix_api_store.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/url.hh"
 
@@ -195,6 +198,62 @@ TEST_F(nix_api_util_context, nix_store_real_path_binary_cache)
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
     ASSERT_STREQ(path_raw.c_str(), rp.c_str());
+}
+
+template<typename F>
+struct LambdaAdapter
+{
+    F fun;
+
+    template<typename... Args>
+    static inline auto call(LambdaAdapter<F> * ths, Args... args)
+    {
+        return ths->fun(args...);
+    }
+
+    template<typename... Args>
+    static auto call_void(void * ths, Args... args)
+    {
+        return call(static_cast<LambdaAdapter<F> *>(ths), args...);
+    }
+};
+
+TEST_F(nix_api_store_test_base, build_from_json)
+{
+    // FIXME get rid of these
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.substituters = {};
+
+    auto * store = open_local_store();
+
+    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+
+    std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    auto * drv = nix_derivation_from_json(ctx, store, buffer.str().c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) {
+        auto is_valid_path = nix_store_is_valid_path(ctx, store, outPath);
+        ASSERT_EQ(is_valid_path, true);
+    }};
+
+    auto ret = nix_store_realise(
+        ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Clean up
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
 }
 
 } // namespace nixC

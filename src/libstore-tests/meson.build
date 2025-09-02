@@ -66,6 +66,7 @@ sources = files(
   'local-overlay-store.cc',
   'local-store.cc',
   'machines.cc',
+  'main.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
   'nix_api_store.cc',
