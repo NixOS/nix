@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.30 and Determinate Nix 3.9.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.31 and Determinate Nix 3.10.0.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -144,3 +144,11 @@ This section lists the differences between upstream Nix 2.30 and Determinate Nix
 <!-- Determinate Nix version 3.9.1 -->
 
 * The default `nix flake init` template is much more useful [DeterminateSystems/nix-src#180](https://github.com/DeterminateSystems/nix-src/pull/180)
+
+<!-- Determinate Nix version 3.10.0 -->
+
+* Restore testing against the Nix daemon by @edolstra in [DeterminateSystems/nix-src#186](https://github.com/DeterminateSystems/nix-src/pull/186)
+
+* fixup: make "upload to s3" PRs usable by @cole-h in [DeterminateSystems/nix-src#187](https://github.com/DeterminateSystems/nix-src/pull/187)
+
+* Sync with upstream 2.31.0 by @edolstra in [DeterminateSystems/nix-src#181](https://github.com/DeterminateSystems/nix-src/pull/181)
