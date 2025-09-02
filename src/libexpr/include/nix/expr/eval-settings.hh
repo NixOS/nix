@@ -368,7 +368,13 @@ struct EvalSettings : Config
         1,
         "eval-cores",
         R"(
-          The number of threads used to evaluate Nix expressions.
+          The number of threads used to evaluate Nix expressions. This currently affects the following commands:
+
+          * `nix search`
+          * `nix flake check`
+          * `nix flake show`
+          * `nix eval --json`
+          * Any evaluation that uses `builtins.parallel`
 
           The value `0` causes Nix to use all available CPU cores in the system.
         )"};
