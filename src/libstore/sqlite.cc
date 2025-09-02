@@ -64,10 +64,12 @@ static void traceSQL(void * x, const char * sql)
 
 SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
 {
-#ifdef __linux__
     // Work around a ZFS issue where SQLite's truncate() call on
     // db.sqlite-shm can randomly take up to a few seconds. See
     // https://github.com/openzfs/zfs/issues/14290#issuecomment-3074672917.
+    // Remove this workaround when a fix is widely installed, perhaps 2027? Candidate:
+    // https://github.com/search?q=repo%3Aopenzfs%2Fzfs+%22Linux%3A+zfs_putpage%3A+complete+async+page+writeback+immediately%22&type=commits
+#ifdef __linux__
     try {
         auto shmFile = path;
         shmFile += "-shm";

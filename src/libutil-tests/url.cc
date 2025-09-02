@@ -273,6 +273,23 @@ TEST(parseURL, emptyStringIsInvalidURL)
     ASSERT_THROW(parseURL(""), Error);
 }
 
+TEST(parseURL, parsesHttpUrlWithEmptyPort)
+{
+    auto s = "http://www.example.org:/file.tar.gz?foo=bar";
+    auto parsed = parseURL(s);
+
+    ParsedURL expected{
+        .scheme = "http",
+        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .path = "/file.tar.gz",
+        .query = (StringMap) {{"foo", "bar"}},
+        .fragment = "",
+    };
+
+    ASSERT_EQ(parsed, expected);
+    ASSERT_EQ("http://www.example.org/file.tar.gz?foo=bar", parsed.to_string());
+}
+
 /* ----------------------------------------------------------------------------
  * decodeQuery
  * --------------------------------------------------------------------------*/
