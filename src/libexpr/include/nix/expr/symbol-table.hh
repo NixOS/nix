@@ -268,7 +268,7 @@ public:
             callback(sym);
             // skip alignment padding
             auto n = sym.size() + 1;
-            left = left.substr(n + (n % 8 ? 8 - (n % 8) : 0));
+            left = left.substr(n + (n % alignment ? alignment - (n % alignment) : 0));
         }
     }
 };
