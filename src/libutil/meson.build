@@ -56,8 +56,19 @@ deps_private += blake3
 
 boost = dependency(
   'boost',
+<<<<<<< HEAD
   modules : ['context', 'coroutine'],
   include_type: 'system',
+=======
+  modules : [
+    'context',
+    'coroutine',
+    'iostreams',
+    'url',
+  ],
+  include_type : 'system',
+  version : '>=1.82.0',
+>>>>>>> 6bdb5e8e0 (Fix downstream MinGW build by not looking for Boost Regex)
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
