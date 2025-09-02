@@ -101,13 +101,8 @@ void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
 #    ifdef HAVE_PTHREAD_GETATTR_NP
     if (pthread_getattr_np(pthread_id, &pattr))
         throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
-#    elif HAVE_PTHREAD_ATTR_GET_NP
-    if (!pthread_attr_init(&pattr))
-        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
-    if (!pthread_attr_get_np(pthread_id, &pattr))
-        throw Error("fixupBoehmStackPointer: pthread_attr_get_np failed");
 #    else
-#      error "Need one of `pthread_attr_get_np` or `pthread_getattr_np`"
+#      error "Need  `pthread_attr_get_np`"
 #    endif
     if (pthread_attr_getstack(&pattr, (void **) &osStackLo, &osStackSize))
         throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");

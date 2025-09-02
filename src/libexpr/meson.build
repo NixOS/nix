@@ -54,7 +54,6 @@ bdw_gc = dependency('bdw-gc', required : get_option('gc'))
 if bdw_gc.found()
   deps_public += bdw_gc
   foreach funcspec : [
-    'pthread_attr_get_np',
     'pthread_getattr_np',
   ]
     define_name = 'HAVE_' + funcspec.underscorify().to_upper()
