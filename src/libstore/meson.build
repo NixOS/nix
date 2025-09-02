@@ -96,8 +96,17 @@ subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
+<<<<<<< HEAD
   modules : ['container', 'regex'],
   include_type: 'system',
+=======
+  modules : [
+    'container',
+    # Shouldn't list, because can header-only, and Meson currently looks for libs
+    #'regex',
+  ],
+  include_type : 'system',
+>>>>>>> 6bdb5e8e0 (Fix downstream MinGW build by not looking for Boost Regex)
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
