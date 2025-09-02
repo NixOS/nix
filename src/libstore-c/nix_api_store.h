@@ -268,11 +268,7 @@ nix_derivation_builder * nix_make_derivation_builder(
 
 nix_err nix_derivation_builder_start(nix_c_context * context, nix_derivation_builder * builder);
 
-nix_err nix_derivation_builder_finish(
-    nix_c_context * context,
-    nix_derivation_builder * builder,
-    void * userdata,
-    void (*callback)(void * userdata, const char * outname, const StorePath * out));
+nix_err nix_derivation_builder_finish(nix_c_context * context, nix_derivation_builder * builder);
 
 void nix_derivation_builder_free(nix_derivation_builder * builder);
 
