@@ -149,4 +149,3 @@ This section lists the differences between upstream Nix 2.31 and Determinate Nix
 
 <!-- Determinate Nix version 3.10.1 -->
 
-* Sync with 2.31.1 by @edolstra in [DeterminateSystems/nix-src#189](https://github.com/DeterminateSystems/nix-src/pull/189)
