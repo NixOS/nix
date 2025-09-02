@@ -26,6 +26,11 @@ typedef struct StorePath StorePath;
 /** @brief Nix Derivation */
 typedef struct nix_derivation nix_derivation;
 
+typedef struct StoreDir
+{
+    const char * store_directory;
+} StoreDir;
+
 /**
  * @brief Initializes the Nix store library
  *
@@ -117,6 +122,11 @@ nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_ca
  * @return owned store path, NULL on error
  */
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
+
+StorePath * nix_store_parse_path2(nix_c_context * context, StoreDir store_dir, const char * path);
+
+void nix_print_store_path(
+    StoreDir store_dir, const StorePath * path, nix_get_string_callback callback, void * user_data);
 
 /**
  * @brief Get the path name (e.g. "name" in /nix/store/...-name)
@@ -216,7 +226,7 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
  * @param[in] store nix store reference.
  * @param[in] json JSON of the derivation as a string.
  */
-nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json);
+nix_derivation * nix_derivation_from_json(nix_c_context * context, StoreDir storeDir, const char * json);
 
 /**
  * @brief Add the given `nix_derivation` to the given store
@@ -244,6 +254,27 @@ void nix_derivation_free(nix_derivation * drv);
  * @param[in] path Path to copy
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
+
+/** @brief Nix Derivation */
+typedef struct nix_derivation_builder nix_derivation_builder;
+
+nix_derivation_builder * nix_make_derivation_builder(
+    nix_c_context * context,
+    StoreDir storeDir,
+    const char * buildDir,
+    const nix_derivation * drv,
+    const StorePath * drvPath,
+    const StorePath * inputPaths[]);
+
+nix_err nix_derivation_builder_start(nix_c_context * context, nix_derivation_builder * builder);
+
+nix_err nix_derivation_builder_finish(
+    nix_c_context * context,
+    nix_derivation_builder * builder,
+    void * userdata,
+    void (*callback)(void * userdata, const char * outname, const StorePath * out));
+
+void nix_derivation_builder_free(nix_derivation_builder * builder);
 
 // cffi end
 #ifdef __cplusplus

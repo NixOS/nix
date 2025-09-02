@@ -19,6 +19,25 @@ public:
     nix_api_store_test_base()
     {
         nix_libstore_init(ctx);
+
+#ifdef _WIN32
+        // no `mkdtemp` with MinGW
+        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
+        for (size_t i = 0; true; ++i) {
+            nixDir = tmpl + std::string{i};
+            if (std::filesystem::create_directory(nixDir))
+                break;
+        }
+#else
+        // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
+        // because this is not allowed for a nix store.
+        auto tmpl = nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", true);
+        nixDir = mkdtemp((char *) tmpl.c_str());
+#endif
+
+        nixStoreDir = nixDir + "/my_nix_store";
+        nixStateDir = nixDir + "/my_state";
+        nixLogDir = nixDir + "/my_log";
     };
 
     ~nix_api_store_test_base() override
@@ -39,25 +58,6 @@ public:
 protected:
     Store * open_local_store()
     {
-#ifdef _WIN32
-        // no `mkdtemp` with MinGW
-        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
-        for (size_t i = 0; true; ++i) {
-            nixDir = tmpl + std::string{i};
-            if (std::filesystem::create_directory(nixDir))
-                break;
-        }
-#else
-        // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
-        // because this is not allowed for a nix store.
-        auto tmpl = nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", true);
-        nixDir = mkdtemp((char *) tmpl.c_str());
-#endif
-
-        nixStoreDir = nixDir + "/my_nix_store";
-        nixStateDir = nixDir + "/my_state";
-        nixLogDir = nixDir + "/my_log";
-
         // Options documented in `nix help-stores`
         const char * p1[] = {"store", nixStoreDir.c_str()};
         const char * p2[] = {"state", nixStateDir.c_str()};
