@@ -169,55 +169,124 @@ TEST(FixGitURLTestSuite, relativePathParsesPoorly)
             .path = {"relative", "repo"}}));
 }
 
-TEST(parseURL, parsesSimpleHttpUrl)
+struct ParseURLSuccessCase
 {
-    auto s = "http://www.example.org/file.tar.gz";
-    auto parsed = parseURL(s);
+    std::string_view input;
+    ParsedURL expected;
+};
 
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "file.tar.gz"},
-        .query = (StringMap) {},
-        .fragment = "",
-    };
+class ParseURLSuccess : public ::testing::TestWithParam<ParseURLSuccessCase>
+{};
 
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
+INSTANTIATE_TEST_SUITE_P(
+    ParseURLSuccessCases,
+    ParseURLSuccess,
+    ::testing::Values(
+        ParseURLSuccessCase{
+            .input = "http://www.example.org/file.tar.gz",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .path = {"", "file.tar.gz"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "https://www.example.org/file.tar.gz",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .path = {"", "file.tar.gz"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "https://www.example.org/file.tar.gz?download=fast&when=now#hello",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .path = {"", "file.tar.gz"},
+                    .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
+                    .fragment = "hello",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "file+https://www.example.org/video.mp4",
+            .expected =
+                ParsedURL{
+                    .scheme = "file+https",
+                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .path = {"", "video.mp4"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "http://127.0.0.1:8080/file.tar.gz?download=fast&when=now#hello",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
+                    .path = {"", "file.tar.gz"},
+                    .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
+                    .fragment = "hello",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
+                    .path = {""},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+
+        },
+        ParseURLSuccessCase{
+            .input = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
+                            .port = 8080,
+                        },
+                    .path = {""},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        }));
+
+TEST_P(ParseURLSuccess, parsesAsExpected)
+{
+    auto & p = GetParam();
+    const auto parsed = parseURL(p.input);
+    EXPECT_EQ(parsed, p.expected);
 }
 
-TEST(parseURL, parsesSimpleHttpsUrl)
+TEST_P(ParseURLSuccess, toStringRoundTrips)
 {
-    auto s = "https://www.example.org/file.tar.gz";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "file.tar.gz"},
-        .query = (StringMap) {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
+    auto & p = GetParam();
+    const auto parsed = parseURL(p.input);
+    EXPECT_EQ(p.input, parsed.to_string());
 }
 
-TEST(parseURL, parsesSimpleHttpUrlWithQueryAndFragment)
+TEST_P(ParseURLSuccess, makeSureFixGitURLDoesNotModify)
 {
-    auto s = "https://www.example.org/file.tar.gz?download=fast&when=now#hello";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "file.tar.gz"},
-        .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
-        .fragment = "hello",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
+    auto & p = GetParam();
+    const auto parsed = fixGitURL(std::string{p.input});
+    EXPECT_EQ(p.input, parsed.to_string());
 }
 
 TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
@@ -236,85 +305,12 @@ TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
     ASSERT_EQ(parsed, expected);
 }
 
-TEST(parseURL, parsesFilePlusHttpsUrl)
-{
-    auto s = "file+https://www.example.org/video.mp4";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "file+https",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "video.mp4"},
-        .query = (StringMap) {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
-}
-
 TEST(parseURL, rejectsAuthorityInUrlsWithFileTransportation)
 {
     EXPECT_THAT(
         []() { parseURL("file://www.example.org/video.mp4"); },
         ::testing::ThrowsMessage<BadURL>(
             testing::HasSubstrIgnoreANSIMatcher("has unexpected authority 'www.example.org'")));
-}
-
-TEST(parseURL, parseIPv4Address)
-{
-    auto s = "http://127.0.0.1:8080/file.tar.gz?download=fast&when=now#hello";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
-        .path = {"", "file.tar.gz"},
-        .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
-        .fragment = "hello",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
-}
-
-TEST(parseURL, parseScopedRFC6874IPv6Address)
-{
-    auto s = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
-        .path = {""},
-        .query = (StringMap) {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
-}
-
-TEST(parseURL, parseIPv6Address)
-{
-    auto s = "http://[2a02:8071:8192:c100:311d:192d:81ac:11ea]:8080";
-    auto parsed = parseURL(s);
-
-    ParsedURL expected{
-        .scheme = "http",
-        .authority =
-            Authority{
-                .hostType = HostType::IPv6,
-                .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
-                .port = 8080,
-            },
-        .path = {""},
-        .query = (StringMap) {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
-    ASSERT_EQ(s, parsed.to_string());
 }
 
 TEST(parseURL, parseEmptyQueryParams)
