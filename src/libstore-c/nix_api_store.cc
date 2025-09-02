@@ -141,8 +141,8 @@ StorePath * nix_store_parse_path2(nix_c_context * context, StoreDir store_dir, c
     NIXC_CATCH_ERRS_NULL
 }
 
-void
-nix_print_store_path(StoreDir store_dir, const StorePath * path, nix_get_string_callback callback, void * user_data)
+void nix_print_store_path(
+    StoreDir store_dir, const StorePath * path, nix_get_string_callback callback, void * user_data)
 {
     nix::Path sdInner = store_dir.store_directory;
     nix::StoreDirConfig sd{sdInner};
@@ -335,11 +335,7 @@ nix_err nix_derivation_builder_start(nix_c_context * context, nix_derivation_bui
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_derivation_builder_finish(
-    nix_c_context * context,
-    nix_derivation_builder * builder,
-    void * userdata,
-    void (*callback)(void * userdata, const char * outname, const StorePath * out))
+nix_err nix_derivation_builder_finish(nix_c_context * context, nix_derivation_builder * builder)
 {
     try {
         nix::StringSink sink;
@@ -357,13 +353,6 @@ nix_err nix_derivation_builder_finish(
         auto [status, diskFull] = builder->builder->unprepareBuild();
 
         nix::warn("RESULT: %s", nix::statusToString(status));
-
-        if (callback) {
-            for (const auto & [outputName, realisation] : builder->buildResult.builtOutputs) {
-                StorePath p{realisation.outPath};
-                callback(userdata, outputName.c_str(), &p);
-            }
-        }
     }
     NIXC_CATCH_ERRS
 }

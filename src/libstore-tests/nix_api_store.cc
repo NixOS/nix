@@ -318,28 +318,9 @@ TEST_F(nix_api_store_test_base, build_using_builder)
     assert_ctx_ok();
     ASSERT_EQ(ret, NIX_OK);
 
-    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) {
-        auto cb2 = LambdaAdapter{.fun = [&](const char * str, unsigned int) {
-            nix::warn("WE JUST MADE THIS %s", str);
-            bool ret = exists(std::filesystem::path{str});
-            EXPECT_TRUE(ret);
-            assert(ret);
-        }};
-
-        nix_print_store_path(
-            sd,
-            outPath,
-            decltype(cb2)::call2_void<const char *, unsigned int>,
-            static_cast<void *>(&cb2));
-    }};
-
     // Finish the build, i.e. cleanup (TODO expose pipe, so rather than just blocking,
     // the caller do its own event loop before calling this)
-    ret = nix_derivation_builder_finish(
-        ctx,
-        builder,
-        static_cast<void *>(&cb),
-        decltype(cb)::call_void<const char *, const StorePath *>);
+    ret = nix_derivation_builder_finish(ctx, builder);
     assert_ctx_ok();
     ASSERT_EQ(ret, NIX_OK);
 
