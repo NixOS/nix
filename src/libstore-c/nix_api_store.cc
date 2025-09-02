@@ -93,7 +93,7 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
     NIXC_CATCH_ERRS
 }
 
-bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path)
+bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path)
 {
     if (context)
         context->last_err_code = NIX_OK;
