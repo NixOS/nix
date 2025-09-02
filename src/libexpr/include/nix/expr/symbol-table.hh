@@ -123,6 +123,8 @@ public:
         const auto & [v, idx] = key.store.add(SymbolValue{});
         if (size == 0) {
             v.mkStringNoCopy("", nullptr);
+        } else if (size <= Value::maxSmallStringSize) {
+            v.mkString(key.s);
         } else {
             auto s = key.alloc.allocate(size + 1);
             memcpy(s, key.s.data(), size);
