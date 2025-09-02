@@ -209,6 +209,12 @@ struct LambdaAdapter
     {
         return ths->fun(args...);
     }
+
+    template<typename... Args>
+    static auto call2(Args... args, LambdaAdapter<F> * ths)
+    {
+        return ths->fun(args...);
+    }
 };
 
 TEST_F(nix_api_store_test_base, build_from_json)
@@ -218,13 +224,15 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
     auto * store = open_local_store();
 
+    StoreDir sd{.store_directory = nixStoreDir.c_str()};
+
     std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
 
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
 
-    auto * drv = nix_derivation_from_json(ctx, store, buffer.str().c_str());
+    auto * drv = nix_derivation_from_json(ctx, sd, buffer.str().c_str());
     assert_ctx_ok();
     ASSERT_NE(drv, nullptr);
 
@@ -252,6 +260,90 @@ TEST_F(nix_api_store_test_base, build_from_json)
     nix_store_path_free(drvPath);
     nix_derivation_free(drv);
     nix_store_free(store);
+}
+
+TEST_F(nix_api_store_test_base, build_using_builder)
+{
+    // FIXME get rid of this
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+
+    // Get a JSON string for the derivation
+    auto drv_json = [&] {
+        std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+
+        std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+        std::stringstream buffer;
+        buffer << t.rdbuf();
+        return std::move(buffer).str();
+    }();
+
+    // Make "store directory" configuration object
+    StoreDir sd{.store_directory = nixStoreDir.c_str()};
+
+    // Parse the derivation JSON into an in-memory (opaque to us, users
+    // of the C API) derivation.
+    auto * drv = nix_derivation_from_json(ctx, sd, drv_json.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    // Create the store dir, because the build will end up placing
+    // things here
+    nix::createDirs(nixStoreDir);
+
+    // Our derivation has no (pure) inputs in its closure, so this is an
+    // empty (null-terminated) array.
+    const StorePath * inputPaths[1] = {nullptr};
+
+    // We can use this location for the build
+    auto nixBuildDir = nixStateDir + "/build";
+
+    // nonsense path, it doesn't matter! Just used for diagnostics.
+    auto * drvPath =
+        nix_store_parse_path2(ctx, sd, (nixStoreDir + "/j56sf12rxpcv5swr14vsjn5cwm6bj03h-nyname.drv").c_str());
+
+    // Create the "builder" -- (C API correspondent of the) Nix
+    // abstraction for performing builds
+    auto * builder = nix_make_derivation_builder(ctx, sd, nixBuildDir.c_str(), drv, drvPath, inputPaths);
+
+    // Start the build
+    auto ret = nix_derivation_builder_start(ctx, builder);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) {
+        auto cb2 = LambdaAdapter{.fun = [&](const char * str, unsigned int) {
+            nix::warn("WE JUST MADE THIS %s", str);
+            bool ret = exists(std::filesystem::path{str});
+            EXPECT_TRUE(ret);
+            assert(ret);
+        }};
+
+        void (*fp2)(const char *, unsigned int, decltype(cb2) *) = decltype(cb2)::call2<const char *, unsigned int>;
+        nix_print_store_path(
+            sd,
+            outPath,
+            reinterpret_cast<void (*)(const char *, unsigned int, void *)>(fp2),
+            static_cast<void *>(&cb2));
+    }};
+
+    void (*fp)(decltype(cb) *, const char *, const StorePath *) = decltype(cb)::call<const char *, const StorePath *>;
+
+    // Finish the build, i.e. cleanup (TODO expose pipe, so rather than just blocking,
+    // the caller do its own event loop before calling this)
+    ret = nix_derivation_builder_finish(
+        ctx,
+        builder,
+        static_cast<void *>(&cb),
+        reinterpret_cast<void (*)(void *, const char *, const StorePath *)>(fp));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // TODO register outputs!
+
+    // Clean up
+    nix_derivation_builder_free(builder);
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
 }
 
 } // namespace nixC

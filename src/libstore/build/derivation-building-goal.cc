@@ -757,9 +757,9 @@ tryToBuild:
                     goal.worker.childTerminated(&goal);
                 }
 
-                Path openLogFile() override
+                void openLogFile() override
                 {
-                    return goal.openLogFile();
+                    [[maybe_unused]] Path logFile = goal.openLogFile();
                 }
 
                 void closeLogFile() override
@@ -1106,7 +1106,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    [[maybe_unused]] Path logFile = openLogFile();
+    openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
