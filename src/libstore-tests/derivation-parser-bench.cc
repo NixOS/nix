@@ -51,18 +51,10 @@ static void BM_UnparseRealDerivationFile(benchmark::State & state, const std::st
 
 // Register benchmarks for actual test derivation files if they exist
 BENCHMARK_CAPTURE(
-    BM_ParseRealDerivationFile,
-    hello,
-    getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value_or(NIX_UNIT_TEST_DATA) + "/derivation/hello.drv");
+    BM_ParseRealDerivationFile, hello, getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value() + "/derivation/hello.drv");
 BENCHMARK_CAPTURE(
-    BM_ParseRealDerivationFile,
-    firefox,
-    getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value_or(NIX_UNIT_TEST_DATA) + "/derivation/firefox.drv");
+    BM_ParseRealDerivationFile, firefox, getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value() + "/derivation/firefox.drv");
 BENCHMARK_CAPTURE(
-    BM_UnparseRealDerivationFile,
-    hello,
-    getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value_or(NIX_UNIT_TEST_DATA) + "/derivation/hello.drv");
+    BM_UnparseRealDerivationFile, hello, getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value() + "/derivation/hello.drv");
 BENCHMARK_CAPTURE(
-    BM_UnparseRealDerivationFile,
-    firefox,
-    getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value_or(NIX_UNIT_TEST_DATA) + "/derivation/firefox.drv");
+    BM_UnparseRealDerivationFile, firefox, getEnvNonEmpty("_NIX_TEST_UNIT_DATA").value() + "/derivation/firefox.drv");
