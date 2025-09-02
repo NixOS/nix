@@ -62,8 +62,8 @@ static size_t getFreeMem()
     /* On non-Linux systems, conservatively assume that 25% of memory is free. */
     long pageSize = sysconf(_SC_PAGESIZE);
     long pages = sysconf(_SC_PHYS_PAGES);
-    if (pageSize != -1)
-        return (pageSize * pages) / 4;
+    if (pageSize > 0 && pages > 0)
+        return (static_cast<size_t>(pageSize) * static_cast<size_t>(pages)) / 4;
     return 0;
 }
 

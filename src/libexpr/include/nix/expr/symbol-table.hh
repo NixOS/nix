@@ -214,7 +214,7 @@ private:
 
 public:
 
-    constexpr static size_t alignment = 8;
+    constexpr static size_t alignment = alignof(SymbolValue);
 
     SymbolTable()
         : arena(1 << 30)
@@ -240,6 +240,8 @@ public:
     SymbolStr operator[](Symbol s) const
     {
         assert(s.id);
+        // Note: we don't check arena.size here to avoid a dependency
+        // on other threads creating new symbols.
         return SymbolStr(*reinterpret_cast<const SymbolValue *>(arena.data + s.id));
     }
 

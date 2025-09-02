@@ -535,10 +535,8 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
             // Slow path: wake up the threads that are waiting on this
             // thunk.
             notifyWaiters();
-        else if (pd == pdThunk) {
-            printError("BAD FINISH %x", this);
+        else if (pd == pdThunk)
             unreachable();
-        }
     }
 
     template<InternalType type>
@@ -582,7 +580,7 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
         assertAligned(firstFieldPayload);
         // Note: awaited values can never become a thunk, so no need
         // to check for waiters.
-        p0.store(static_cast<int>(pdThunk) | firstFieldPayload, std::memory_order_relaxed);
+        p0.store(static_cast<int>(pdThunk) | firstFieldPayload, std::memory_order_release);
     }
 
     template<typename T, typename U>
@@ -765,13 +763,11 @@ protected:
      */
     ValueStorage & operator=(const ValueStorage & v)
     {
-        auto p1_ = v.p1;
         auto p0_ = v.p0.load(std::memory_order_acquire);
+        auto p1_ = v.p1; // must be loaded after p0
         auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
-        if (pd == pdThunk || pd == pdPending || pd == pdAwaited) {
-            printError("UNFINISHED %x %08x %08x", this, p0_, p1_);
+        if (pd == pdThunk || pd == pdPending || pd == pdAwaited)
             unreachable();
-        }
         finish(p0_, p1_);
         return *this;
     }
