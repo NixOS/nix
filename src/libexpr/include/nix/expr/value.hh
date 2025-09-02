@@ -303,7 +303,7 @@ struct ValueBase
         Value * const * elems;
     };
 
-    struct Failed
+    struct Failed : gc
     {
         std::exception_ptr ex;
     };
