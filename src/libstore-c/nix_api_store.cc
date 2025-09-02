@@ -131,7 +131,7 @@ nix_err nix_store_realise(
     Store * store,
     StorePath * path,
     void * userdata,
-    void (*callback)(void * userdata, const char *, const char *))
+    void (*callback)(void * userdata, const char *, const StorePath *))
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -146,8 +146,8 @@ nix_err nix_store_realise(
         if (callback) {
             for (const auto & result : results) {
                 for (const auto & [outputName, realisation] : result.builtOutputs) {
-                    auto op = store->ptr->printStorePath(realisation.outPath);
-                    callback(userdata, outputName.c_str(), op.c_str());
+                    StorePath p{realisation.outPath};
+                    callback(userdata, outputName.c_str(), &p);
                 }
             }
         }

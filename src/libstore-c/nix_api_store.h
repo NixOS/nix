@@ -190,7 +190,7 @@ nix_err nix_store_realise(
     Store * store,
     StorePath * path,
     void * userdata,
-    void (*callback)(void * userdata, const char * outname, const char * out));
+    void (*callback)(void * userdata, const char * outname, const StorePath * out));
 
 /**
  * @brief get the version of a nix store.
