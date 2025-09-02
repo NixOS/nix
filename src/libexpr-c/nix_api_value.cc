@@ -111,6 +111,8 @@ static void nix_c_primop_wrapper(
     v = vTmp;
 }
 
+extern "C" {
+
 PrimOp * nix_alloc_primop(
     nix_c_context * context,
     PrimOpFun fun,
@@ -651,3 +653,5 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * s, si
 {
     return &s->storePaths[i];
 }
+
+} // extern "C"

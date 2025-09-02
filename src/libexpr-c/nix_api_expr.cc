@@ -40,6 +40,8 @@ static T * unsafe_new_with_self(F && init)
     return new (p) T(init(static_cast<T *>(p)));
 }
 
+extern "C" {
+
 nix_err nix_libexpr_init(nix_c_context * context)
 {
     if (context)
@@ -287,3 +289,5 @@ void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * o
     GC_REGISTER_FINALIZER(obj, finalizer, cd, 0, 0);
 #endif
 }
+
+} // extern "C"

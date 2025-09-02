@@ -10,6 +10,8 @@
 
 #include "nix/store/globals.hh"
 
+extern "C" {
+
 nix_err nix_libstore_init(nix_c_context * context)
 {
     if (context)
@@ -180,3 +182,5 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
     }
     NIXC_CATCH_ERRS
 }
+
+} // extern "C"
