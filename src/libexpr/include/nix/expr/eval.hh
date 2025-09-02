@@ -399,6 +399,7 @@ private:
 
     LookupPath lookupPath;
 
+    // FIXME: make thread-safe.
     std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
@@ -977,6 +978,7 @@ public:
 private:
     bool countCalls;
 
+    // FIXME: make thread-safe.
     typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
@@ -988,6 +990,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
+    // FIXME: make thread-safe.
     typedef std::map<PosIdx, size_t> AttrSelects;
     AttrSelects attrSelects;
 
