@@ -129,6 +129,7 @@ jobs:
         nix_config:
           - "lazy-trees = true"
           - "lazy-trees = false"
+          - "eval-cores = 24"
         glob:
           - "[0-d]*"
           - "[e-l]*"
@@ -151,23 +152,34 @@ jobs:
           path: flake-regressions/tests
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - env:
-          PARALLEL: "-P 50%"
+      - name: Run flake regression tests
+        env:
+          #PARALLEL: ${{ !contains(matrix.nix_config, 'eval-cores') && '-P 50%' || '-P 1' }}
+          PARALLEL: '-P 1'
           FLAKE_REGRESSION_GLOB: ${{ matrix.glob }}
           NIX_CONFIG: ${{ matrix.nix_config }}
+          PREFETCH: "1"
         run: |
           set -x
+          echo "PARALLEL: $PARALLEL"
+          echo "NIX_CONFIG: $NIX_CONFIG"
           if [ ! -z "${NSC_CACHE_PATH:-}" ]; then
             mkdir -p "${NSC_CACHE_PATH}/nix/xdg-cache"
             export XDG_CACHE_HOME="${NSC_CACHE_PATH}/nix/xdg-cache"
           fi
           nix build -L --out-link ./new-nix
           export PATH=$(pwd)/new-nix/bin:$PATH
+          [[ $(type -p nix) = $(pwd)/new-nix/bin/nix ]]
+
+          nix config show lazy-trees
+          nix config show eval-cores
+          lscpu
+          nproc
 
           if ! flake-regressions/eval-all.sh; then
             echo "Some failed, trying again"
             printf "\n\n\n\n\n\n\n\n"
-            flake-regressions/eval-all.sh
+            NIX_REMOTE=/tmp/nix flake-regressions/eval-all.sh
           fi
 
   manual:

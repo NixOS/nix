@@ -2,12 +2,13 @@
 ///@file
 
 #include <memory_resource>
+
 #include "nix/expr/value.hh"
-#include "nix/util/chunked-vector.hh"
 #include "nix/util/error.hh"
+#include "nix/util/sync.hh"
 
 #include <boost/version.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 namespace nix {
 
@@ -16,16 +17,26 @@ class SymbolValue : protected Value
     friend class SymbolStr;
     friend class SymbolTable;
 
-    uint32_t size_;
-    uint32_t idx;
-
-    SymbolValue() = default;
-
-public:
     operator std::string_view() const noexcept
     {
-        return {c_str(), size_};
+        // The actual string is stored directly after the value.
+        return reinterpret_cast<const char *>(this + 1);
     }
+};
+
+struct ContiguousArena
+{
+    const char * data;
+    const size_t maxSize;
+
+    // Put this in a separate cache line to ensure that a thread
+    // adding a symbol doesn't slow down threads dereferencing symbols
+    // by invalidating the read-only `data` field.
+    std::atomic<size_t> size __attribute__((aligned(64))){0};
+
+    ContiguousArena(size_t maxSize);
+
+    size_t allocate(size_t bytes);
 };
 
 /**
@@ -39,6 +50,7 @@ class Symbol
     friend class SymbolTable;
 
 private:
+    /// The offset of the symbol in `SymbolTable::arena`.
     uint32_t id;
 
     explicit Symbol(uint32_t id) noexcept
@@ -80,25 +92,20 @@ class SymbolStr
 {
     friend class SymbolTable;
 
-    constexpr static size_t chunkSize{8192};
-    using SymbolValueStore = ChunkedVector<SymbolValue, chunkSize>;
-
     const SymbolValue * s;
 
     struct Key
     {
         using HashType = boost::hash<std::string_view>;
 
-        SymbolValueStore & store;
         std::string_view s;
         std::size_t hash;
-        std::pmr::polymorphic_allocator<char> & alloc;
+        ContiguousArena & arena;
 
-        Key(SymbolValueStore & store, std::string_view s, std::pmr::polymorphic_allocator<char> & stringAlloc)
-            : store(store)
-            , s(s)
+        Key(std::string_view s, ContiguousArena & arena)
+            : s(s)
             , hash(HashType{}(s))
-            , alloc(stringAlloc)
+            , arena(arena)
         {
         }
     };
@@ -109,26 +116,7 @@ public:
     {
     }
 
-    SymbolStr(const Key & key)
-    {
-        auto size = key.s.size();
-        if (size >= std::numeric_limits<uint32_t>::max()) {
-            throw Error("Size of symbol exceeds 4GiB and cannot be stored");
-        }
-        // for multi-threaded implementations: lock store and allocator here
-        const auto & [v, idx] = key.store.add(SymbolValue{});
-        if (size == 0) {
-            v.mkString("", nullptr);
-        } else {
-            auto s = key.alloc.allocate(size + 1);
-            memcpy(s, key.s.data(), size);
-            s[size] = '\0';
-            v.mkString(s, nullptr);
-        }
-        v.size_ = size;
-        v.idx = idx;
-        this->s = &v;
-    }
+    SymbolStr(const Key & key);
 
     bool operator==(std::string_view s2) const noexcept
     {
@@ -151,24 +139,19 @@ public:
     [[gnu::always_inline]]
     bool empty() const noexcept
     {
-        return s->size_ == 0;
+        return static_cast<std::string_view>(*s).empty();
     }
 
     [[gnu::always_inline]]
     size_t size() const noexcept
     {
-        return s->size_;
+        return static_cast<std::string_view>(*s).size();
     }
 
     [[gnu::always_inline]]
     const Value * valuePtr() const noexcept
     {
         return s;
-    }
-
-    explicit operator Symbol() const noexcept
-    {
-        return Symbol{s->idx + 1};
     }
 
     struct Hash
@@ -221,58 +204,74 @@ private:
      * SymbolTable is an append only data structure.
      * During its lifetime the monotonic buffer holds all strings and nodes, if the symbol set is node based.
      */
-    std::pmr::monotonic_buffer_resource buffer;
-    std::pmr::polymorphic_allocator<char> stringAlloc{&buffer};
-    SymbolStr::SymbolValueStore store{16};
+    ContiguousArena arena;
 
     /**
-     * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
-     * ChunkedVector references are never invalidated.
+     * Transparent lookup of string view for a pointer to a
+     * SymbolValue in the arena.
      */
-    boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
+    boost::concurrent_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols;
 
 public:
+
+    constexpr static size_t alignment = alignof(SymbolValue);
+
+    SymbolTable()
+        : arena(1 << 30)
+    {
+        // Reserve symbol ID 0 and ensure alignment of the first allocation.
+        arena.allocate(alignment);
+    }
 
     /**
      * Converts a string into a symbol.
      */
-    Symbol create(std::string_view s)
-    {
-        // Most symbols are looked up more than once, so we trade off insertion performance
-        // for lookup performance.
-        // FIXME: make this thread-safe.
-        return Symbol(*symbols.insert(SymbolStr::Key{store, s, stringAlloc}).first);
-    }
+    Symbol create(std::string_view s);
 
     std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());
-        for (auto sym : symbols)
+        for (auto & sym : symbols)
             result.push_back((*this)[sym]);
         return result;
     }
 
     SymbolStr operator[](Symbol s) const
     {
-        uint32_t idx = s.id - uint32_t(1);
-        if (idx >= store.size())
-            unreachable();
-        return store[idx];
+        assert(s.id);
+        // Note: we don't check arena.size here to avoid a dependency
+        // on other threads creating new symbols.
+        return SymbolStr(*reinterpret_cast<const SymbolValue *>(arena.data + s.id));
     }
 
-    [[gnu::always_inline]]
     size_t size() const noexcept
     {
-        return store.size();
+        return symbols.size();
     }
 
-    size_t totalSize() const;
+    size_t totalSize() const
+    {
+        return arena.size;
+    }
 
     template<typename T>
     void dump(T callback) const
     {
-        store.forEach(callback);
+        std::string_view left{arena.data, arena.size};
+        left = left.substr(alignment);
+        while (true) {
+            if (left.empty())
+                break;
+            left = left.substr(sizeof(Value));
+            auto p = left.find('\0');
+            assert(p != left.npos);
+            auto sym = left.substr(0, p);
+            callback(sym);
+            // skip alignment padding
+            auto n = sym.size() + 1;
+            left = left.substr(n + (n % alignment ? alignment - (n % alignment) : 0));
+        }
     }
 };
 

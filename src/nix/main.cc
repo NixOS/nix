@@ -266,8 +266,8 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
-    state.callFunction(*vRes, *vDump, *vRes, noPos);
+    Value * args[]{&state.getBuiltin("false"), vDump};
+    state.callFunction(*vGenerateManpage, args, *vRes, noPos);
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -567,13 +567,15 @@ void mainWrapped(int argc, char ** argv)
 
 int main(int argc, char ** argv)
 {
+    using namespace nix;
+
     // The CLI has a more detailed version than the libraries; see nixVersion.
-    nix::nixVersion = NIX_CLI_VERSION;
+    nixVersion = NIX_CLI_VERSION;
 #ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    nix::setStackSize(64 * 1024 * 1024);
+    setStackSize(evalStackSize);
 #endif
 
-    return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });
+    return handleExceptions(argv[0], [&]() { mainWrapped(argc, argv); });
 }

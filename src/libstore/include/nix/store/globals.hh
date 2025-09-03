@@ -75,9 +75,9 @@ class Settings : public Config
 
 public:
 
-    Settings();
+    static unsigned int getDefaultCores();
 
-    unsigned int getDefaultCores() const;
+    Settings();
 
     Path nixPrefix;
 

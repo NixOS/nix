@@ -10,6 +10,7 @@ config_pub_h = configure_file(
 headers = [ config_pub_h ] + files(
   'attr-path.hh',
   'attr-set.hh',
+  'counter.hh',
   'eval-cache.hh',
   'eval-error.hh',
   'eval-gc.hh',
@@ -23,6 +24,7 @@ headers = [ config_pub_h ] + files(
   'get-drvs.hh',
   'json-to-value.hh',
   'nixexpr.hh',
+  'parallel-eval.hh',
   'parser-state.hh',
   'primops.hh',
   'print-ambiguous.hh',

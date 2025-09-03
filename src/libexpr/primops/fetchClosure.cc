@@ -130,7 +130,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
     std::optional<bool> inputAddressedMaybe;
 
     for (auto & attr : *args[0]->attrs()) {
-        const auto & attrName = state.symbols[attr.name];
+        std::string_view attrName = state.symbols[attr.name];
         auto attrHint = [&]() -> std::string {
             return fmt("while evaluating the attribute '%s' passed to builtins.fetchClosure", attrName);
         };

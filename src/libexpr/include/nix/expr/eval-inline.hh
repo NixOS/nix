@@ -33,6 +33,9 @@ Value * EvalState::allocValue()
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
        have to explicitly clear the first word of every object we take. */
+    thread_local static std::shared_ptr<void *> valueAllocCache{
+        std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
     if (!*valueAllocCache) {
         *valueAllocCache = GC_malloc_many(sizeof(Value));
         if (!*valueAllocCache)
@@ -63,6 +66,9 @@ Env & EvalState::allocEnv(size_t size)
 #if NIX_USE_BOEHMGC
     if (size == 1) {
         /* see allocValue for explanations. */
+        thread_local static std::shared_ptr<void *> env1AllocCache{
+            std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
             if (!*env1AllocCache)
@@ -82,27 +88,57 @@ Env & EvalState::allocEnv(size_t size)
     return *env;
 }
 
-[[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+template<std::size_t ptrSize>
+void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(
+    EvalState & state, PosIdx pos)
 {
-    if (v.isThunk()) {
-        Env * env = v.thunk().env;
-        assert(env || v.isBlackhole());
-        Expr * expr = v.thunk().expr;
+    auto p0_ = p0.load(std::memory_order_acquire);
+
+    auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+
+    if (pd == pdThunk) {
         try {
-            v.mkBlackhole();
-            // checkInterrupt();
-            if (env) [[likely]]
-                expr->eval(*this, *env, v);
-            else
-                ExprBlackHole::throwInfiniteRecursionError(*this, v);
+            // The value we get here is only valid if we can set the
+            // thunk to pending.
+            auto p1_ = p1;
+
+            // Atomically set the thunk to "pending".
+            if (!p0.compare_exchange_strong(p0_, pdPending, std::memory_order_acquire, std::memory_order_acquire)) {
+                pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+                if (pd == pdPending || pd == pdAwaited) {
+                    // The thunk is already "pending" or "awaited", so
+                    // we need to wait for it.
+                    p0_ = waitOnThunk(state, pd == pdAwaited);
+                    goto done;
+                }
+                assert(pd != pdThunk);
+                // Another thread finished this thunk, no need to wait.
+                goto done;
+            }
+
+            bool isApp = p1_ & discriminatorMask;
+            if (isApp) {
+                auto left = untagPointer<Value *>(p0_);
+                auto right = untagPointer<Value *>(p1_);
+                state.callFunction(*left, *right, (Value &) *this, pos);
+            } else {
+                auto env = untagPointer<Env *>(p0_);
+                auto expr = untagPointer<Expr *>(p1_);
+                expr->eval(state, *env, (Value &) *this);
+            }
         } catch (...) {
-            v.mkThunk(env, expr);
-            tryFixupBlackHolePos(v, pos);
+            state.tryFixupBlackHolePos((Value &) *this, pos);
+            setStorage(new Value::Failed{.ex = std::current_exception()});
             throw;
         }
-    } else if (v.isApp())
-        callFunction(*v.app().left, *v.app().right, v, pos);
+    }
+
+    else if (pd == pdPending || pd == pdAwaited)
+        p0_ = waitOnThunk(state, pd == pdAwaited);
+
+done:
+    if (InternalType(p0_ & 0xff) == tFailed)
+        std::rethrow_exception((std::bit_cast<Failed *>(p1))->ex);
 }
 
 [[gnu::always_inline]]

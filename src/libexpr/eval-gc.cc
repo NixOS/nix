@@ -33,6 +33,88 @@ static void * oomHandler(size_t requested)
     throw std::bad_alloc();
 }
 
+static size_t getFreeMem()
+{
+    /* On Linux, use the `MemAvailable` or `MemFree` fields from
+       /proc/cpuinfo. */
+#  ifdef __linux__
+    {
+        std::unordered_map<std::string, std::string> fields;
+        for (auto & line :
+             tokenizeString<std::vector<std::string>>(readFile(std::filesystem::path("/proc/meminfo")), "\n")) {
+            auto colon = line.find(':');
+            if (colon == line.npos)
+                continue;
+            fields.emplace(line.substr(0, colon), trim(line.substr(colon + 1)));
+        }
+
+        auto i = fields.find("MemAvailable");
+        if (i == fields.end())
+            i = fields.find("MemFree");
+        if (i != fields.end()) {
+            auto kb = tokenizeString<std::vector<std::string>>(i->second, " ");
+            if (kb.size() == 2 && kb[1] == "kB")
+                return string2Int<size_t>(kb[0]).value_or(0) * 1024;
+        }
+    }
+#  endif
+
+    /* On non-Linux systems, conservatively assume that 25% of memory is free. */
+    long pageSize = sysconf(_SC_PAGESIZE);
+    long pages = sysconf(_SC_PHYS_PAGES);
+    if (pageSize > 0 && pages > 0)
+        return (static_cast<size_t>(pageSize) * static_cast<size_t>(pages)) / 4;
+    return 0;
+}
+
+/**
+ * When a thread goes into a coroutine, we lose its original sp until
+ * control flow returns to the thread. This causes Boehm GC to crash
+ * since it will scan memory between the coroutine's sp and the
+ * original stack base of the thread. Therefore, we detect when the
+ * current sp is outside of the original thread stack and push the
+ * entire thread stack instead, as an approximation.
+ *
+ * This is not optimal, because it causes the stack below sp to be
+ * scanned. However, we usually we don't have active coroutines during
+ * evaluation, so this is acceptable.
+ *
+ * Note that we don't scan coroutine stacks. It's currently assumed
+ * that we don't have GC roots in coroutines.
+ */
+void fixupBoehmStackPointer(void ** sp_ptr, void * _pthread_id)
+{
+    void *& sp = *sp_ptr;
+    auto pthread_id = reinterpret_cast<pthread_t>(_pthread_id);
+    size_t osStackSize;
+    char * osStackHi;
+    char * osStackLo;
+
+#  ifdef __APPLE__
+    osStackSize = pthread_get_stacksize_np(pthread_id);
+    osStackHi = (char *) pthread_get_stackaddr_np(pthread_id);
+    osStackLo = osStackHi - osStackSize;
+#  else
+    pthread_attr_t pattr;
+    if (pthread_attr_init(&pattr))
+        throw Error("fixupBoehmStackPointer: pthread_attr_init failed");
+#    ifdef HAVE_PTHREAD_GETATTR_NP
+    if (pthread_getattr_np(pthread_id, &pattr))
+        throw Error("fixupBoehmStackPointer: pthread_getattr_np failed");
+#    else
+#      error "Need  `pthread_attr_get_np`"
+#    endif
+    if (pthread_attr_getstack(&pattr, (void **) &osStackLo, &osStackSize))
+        throw Error("fixupBoehmStackPointer: pthread_attr_getstack failed");
+    if (pthread_attr_destroy(&pattr))
+        throw Error("fixupBoehmStackPointer: pthread_attr_destroy failed");
+    osStackHi = osStackLo + osStackSize;
+#  endif
+
+    if (sp >= osStackHi || sp < osStackLo) // sp is outside the os stack
+        sp = osStackLo;
+}
+
 static inline void initGCReal()
 {
     /* Initialise the Boehm garbage collector. */
@@ -63,8 +145,11 @@ static inline void initGCReal()
 
     GC_set_oom_fn(oomHandler);
 
-    /* Set the initial heap size to something fairly big (25% of
-       physical RAM, up to a maximum of 384 MiB) so that in most cases
+    GC_set_sp_corrector(&fixupBoehmStackPointer);
+    assert(GC_get_sp_corrector());
+
+    /* Set the initial heap size to something fairly big (80% of
+       free RAM, up to a maximum of 4 GiB) so that in most cases
        we don't need to garbage collect at all.  (Collection has a
        fairly significant overhead.)  The heap size can be overridden
        through libgc's GC_INITIAL_HEAP_SIZE environment variable.  We
@@ -75,15 +160,10 @@ static inline void initGCReal()
     if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
         size_t size = 32 * 1024 * 1024;
 #  if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 384 * 1024 * 1024;
-        long pageSize = sysconf(_SC_PAGESIZE);
-        long pages = sysconf(_SC_PHYS_PAGES);
-        if (pageSize != -1)
-            size = (pageSize * pages) / 4; // 25% of RAM
-        if (size > maxSize)
-            size = maxSize;
+        size_t maxSize = 4ULL * 1024 * 1024 * 1024;
+        auto free = getFreeMem();
+        size = std::max(size, std::min((size_t) (free * 0.5), maxSize));
 #  endif
-        debug("setting initial heap size to %1% bytes", size);
         GC_expand_hp(size);
     }
 }

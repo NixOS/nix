@@ -78,6 +78,9 @@ void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<c
             str << "«potential infinite recursion»";
         }
         break;
+    case nFailed:
+        str << "«failed»";
+        break;
     case nFunction:
         if (v.isLambda()) {
             str << "<LAMBDA>";

@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <atomic>
 #include <cassert>
 #include <span>
 #include <type_traits>
@@ -19,6 +20,19 @@ namespace nix {
 struct Value;
 class BindingsBuilder;
 
+static constexpr int discriminatorBits = 3;
+
+enum PrimaryDiscriminator : int {
+    pdSingleDWord = 0,
+    pdThunk = 1,
+    pdPending = 2,
+    pdAwaited = 3,
+    pdPairOfPointers = 4,
+    pdListN = 5, // FIXME: get rid of this by putting the size in the first word
+    pdString = 6,
+    pdPath = 7, // FIXME: get rid of this by ditching the `accessor` field
+};
+
 /**
  * Internal type discriminator, which is more detailed than `ValueType`, as
  * it specifies the exact representation used (for types that have multiple
@@ -29,26 +43,49 @@ class BindingsBuilder;
  * This also restricts the number of internal types represented with distinct memory layouts.
  */
 typedef enum {
-    tUninitialized = 0,
-    /* layout: Single/zero field payload */
-    tInt = 1,
-    tBool,
-    tNull,
-    tFloat,
-    tExternal,
-    tPrimOp,
-    tAttrs,
-    /* layout: Pair of pointers payload */
-    tListSmall,
-    tPrimOpApp,
-    tApp,
-    tThunk,
-    tLambda,
-    /* layout: Single untaggable field */
-    tListN,
-    tString,
-    tPath,
+    /* Values that have more type bits in the first word, and the
+       payload (a single word) in the second word. */
+    tUninitialized = PrimaryDiscriminator::pdSingleDWord | (0 << discriminatorBits),
+    tInt = PrimaryDiscriminator::pdSingleDWord | (1 << discriminatorBits),
+    tFloat = PrimaryDiscriminator::pdSingleDWord | (2 << discriminatorBits),
+    tBool = PrimaryDiscriminator::pdSingleDWord | (3 << discriminatorBits),
+    tNull = PrimaryDiscriminator::pdSingleDWord | (4 << discriminatorBits),
+    tAttrs = PrimaryDiscriminator::pdSingleDWord | (5 << discriminatorBits),
+    tPrimOp = PrimaryDiscriminator::pdSingleDWord | (6 << discriminatorBits),
+    tFailed = PrimaryDiscriminator::pdSingleDWord | (7 << discriminatorBits),
+    tExternal = PrimaryDiscriminator::pdSingleDWord | (8 << discriminatorBits),
+
+    /* Thunks. */
+    tThunk = PrimaryDiscriminator::pdThunk | (0 << discriminatorBits),
+    tApp = PrimaryDiscriminator::pdThunk | (1 << discriminatorBits),
+
+    tPending = PrimaryDiscriminator::pdPending,
+    tAwaited = PrimaryDiscriminator::pdAwaited,
+
+    /* Values that consist of two pointers. The second word contains
+       more type bits in its alignment niche. */
+    tListSmall = PrimaryDiscriminator::pdPairOfPointers | (0 << discriminatorBits),
+    tPrimOpApp = PrimaryDiscriminator::pdPairOfPointers | (1 << discriminatorBits),
+    tLambda = PrimaryDiscriminator::pdPairOfPointers | (2 << discriminatorBits),
+
+    /* Special values. */
+    tListN = PrimaryDiscriminator::pdListN,
+    tString = PrimaryDiscriminator::pdString,
+    tPath = PrimaryDiscriminator::pdPath,
 } InternalType;
+
+/**
+ * Return true if `type` denotes a "finished" value, i.e. a weak-head
+ * normal form.
+ *
+ * Note that tPrimOpApp is considered "finished" because it represents
+ * a primop call with an incomplete number of arguments, and therefore
+ * cannot be evaluated further.
+ */
+inline bool isFinished(InternalType t)
+{
+    return t != tUninitialized && t != tThunk && t != tApp && t != tPending && t != tAwaited;
+}
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -57,6 +94,7 @@ typedef enum {
  */
 typedef enum {
     nThunk,
+    nFailed,
     nInt,
     nFloat,
     nBool,
@@ -73,7 +111,6 @@ class Bindings;
 struct Env;
 struct Expr;
 struct ExprLambda;
-struct ExprBlackHole;
 struct PrimOp;
 class Symbol;
 class SymbolStr;
@@ -189,7 +226,7 @@ namespace detail {
 
 /**
  * Implementation mixin class for defining the public types
- * In can be inherited from by the actual ValueStorage implementations
+ * In can be inherited by the actual ValueStorage implementations
  * for free due to Empty Base Class Optimization (EBCO).
  */
 struct ValueBase
@@ -265,6 +302,11 @@ struct ValueBase
         size_t size;
         Value * const * elems;
     };
+
+    struct Failed : gc
+    {
+        std::exception_ptr ex;
+    };
 };
 
 template<typename T>
@@ -291,6 +333,7 @@ struct PayloadTypeToInternalType
     MACRO(PrimOp *, primOp, tPrimOp)                                \
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
+    MACRO(ValueBase::Failed *, failed, tFailed)                     \
     MACRO(NixFloat, fpoint, tFloat)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
@@ -393,12 +436,44 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
     };
 
     using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
-    using Payload = std::array<PackedPointer, 2>;
-    Payload payload = {};
 
-    static constexpr int discriminatorBits = 3;
+    /**
+     * For multithreaded evaluation, we have to make sure that thunks/apps
+     * (the only mutable types of values) are updated in a safe way. A
+     * value can have the following states (see `force()`):
+     *
+     * * "thunk"/"app". When forced, this value transitions to
+     *   "pending". The current thread will evaluate the
+     *   thunk/app. When done, it will override the value with the
+     *   result. If the value is at that point in the "awaited" state,
+     *   the thread will wake up any waiting threads.
+     *
+     * * "pending". This means it's currently being evaluated. If
+     *   another thread forces this value, it transitions to "awaited"
+     *   and the thread will wait for the value to be updated (see
+     *   `waitOnThunk()`).
+     *
+     * * "awaited". Like pending, only it means that there already are
+     *   one or more threads waiting for this thunk.
+     *
+     * To ensure race-free access, the non-atomic word `p1` must
+     * always be updated before `p0`. Writes to `p0` should use
+     * *release* semantics (so that `p1` and any referenced values become
+     * visible to threads that read `p0`), and reads from `p0` should
+     * use `*acquire* semantics.
+     *
+     * Note: at some point, we may want to switch to 128-bit atomics
+     * so that `p0` and `p1` can be updated together
+     * atomically. However, 128-bit atomics are a bit problematic at
+     * present on x86_64 (see
+     * e.g. https://ibraheem.ca/posts/128-bit-atomics/).
+     */
+    std::atomic<PackedPointer> p0{0};
+    PackedPointer p1{0};
+
     static constexpr PackedPointer discriminatorMask = (PackedPointer(1) << discriminatorBits) - 1;
 
+    // FIXME: move/update
     /**
      * The value is stored as a pair of 8-byte double words. All pointers are assumed
      * to be 8-byte aligned. This gives us at most 6 bits of discriminator bits
@@ -428,15 +503,6 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
      * The primary discriminator with value 0 is reserved for uninitialized Values,
      * which are useful for diagnostics in C bindings.
      */
-    enum PrimaryDiscriminator : int {
-        pdUninitialized = 0,
-        pdSingleDWord, //< layout: Single/zero field payload
-        /* The order of these enumations must be the same as in InternalType. */
-        pdListN, //< layout: Single untaggable field.
-        pdString,
-        pdPath,
-        pdPairOfPointers, //< layout: Pair of pointers payload
-    };
 
     template<typename T>
         requires std::is_pointer_v<T>
@@ -447,7 +513,7 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
 
     PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
     {
-        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+        return static_cast<PrimaryDiscriminator>(p0 & discriminatorMask);
     }
 
     static void assertAligned(PackedPointer val) noexcept
@@ -455,13 +521,30 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
         assert((val & discriminatorMask) == 0 && "Pointer is not 8 bytes aligned");
     }
 
+    void finish(PackedPointer p0_, PackedPointer p1_)
+    {
+        // Note: p1 *must* be updated before p0.
+        p1 = p1_;
+        p0_ = p0.exchange(p0_, std::memory_order_release);
+
+        auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+        if (pd == pdPending)
+            // Nothing to do; no thread is waiting on this thunk.
+            ;
+        else if (pd == pdAwaited)
+            // Slow path: wake up the threads that are waiting on this
+            // thunk.
+            notifyWaiters();
+        else if (pd == pdThunk)
+            unreachable();
+    }
+
     template<InternalType type>
     void setSingleDWordPayload(PackedPointer untaggedVal) noexcept
     {
-        /* There's plenty of free upper bits in the first dword, which is
-           used only for the discriminator. */
-        payload[0] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
-        payload[1] = untaggedVal;
+        /* There's plenty of free upper bits in the first byte, which
+           is used only for the discriminator. */
+        finish(static_cast<uint8_t>(type), untaggedVal);
     }
 
     template<PrimaryDiscriminator discriminator, typename T, typename U>
@@ -470,32 +553,42 @@ class ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<pt
         static_assert(discriminator >= pdListN && discriminator <= pdPath);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
-        payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
-        payload[1] = std::bit_cast<PackedPointer>(untaggableField);
+        finish(static_cast<int>(discriminator) | firstFieldPayload, std::bit_cast<PackedPointer>(untaggableField));
     }
 
     template<InternalType type, typename T, typename U>
     void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
     {
         static_assert(type >= tListSmall && type <= tLambda);
-        {
-            auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
-            assertAligned(firstFieldPayload);
-            payload[0] = static_cast<int>(pdPairOfPointers) | firstFieldPayload;
-        }
-        {
-            auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
-            assertAligned(secondFieldPayload);
-            payload[1] = (type - tListSmall) | secondFieldPayload;
-        }
+        auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
+        assertAligned(firstFieldPayload);
+        auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
+        assertAligned(secondFieldPayload);
+        finish(
+            static_cast<int>(pdPairOfPointers) | firstFieldPayload,
+            ((type - tListSmall) >> discriminatorBits) | secondFieldPayload);
+    }
+
+    template<InternalType type, typename T, typename U>
+    void setThunkPayload(T * firstPtrField, U * secondPtrField) noexcept
+    {
+        static_assert(type >= tThunk && type <= tApp);
+        auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
+        assertAligned(secondFieldPayload);
+        p1 = ((type - tThunk) >> discriminatorBits) | secondFieldPayload;
+        auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
+        assertAligned(firstFieldPayload);
+        // Note: awaited values can never become a thunk, so no need
+        // to check for waiters.
+        p0.store(static_cast<int>(pdThunk) | firstFieldPayload, std::memory_order_release);
     }
 
     template<typename T, typename U>
         requires std::is_pointer_v<T> && std::is_pointer_v<U>
     void getPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
     {
-        firstPtrField = untagPointer<T>(payload[0]);
-        secondPtrField = untagPointer<U>(payload[1]);
+        firstPtrField = untagPointer<T>(p0);
+        secondPtrField = untagPointer<U>(p1);
     }
 
 protected:
@@ -503,42 +596,45 @@ protected:
     InternalType getInternalType() const noexcept
     {
         switch (auto pd = getPrimaryDiscriminator()) {
-        case pdUninitialized:
-            /* Discriminator value of zero is used to distinguish uninitialized values. */
-            return tUninitialized;
         case pdSingleDWord:
-            /* Payloads that only use up a single double word store the InternalType
-               in the upper bits of the first double word. */
-            return InternalType(payload[0] >> discriminatorBits);
+            /* Payloads that only use up a single double word store
+               the full InternalType in the first byte. */
+            return InternalType(p0 & 0xff);
+        case pdThunk:
+            return static_cast<InternalType>(tThunk + ((p1 & discriminatorMask) << discriminatorBits));
+        case pdPending:
+            return tPending;
+        case pdAwaited:
+            return tAwaited;
+        case pdPairOfPointers:
+            return static_cast<InternalType>(tListSmall + ((p1 & discriminatorMask) << discriminatorBits));
         /* The order must match that of the enumerations defined in InternalType. */
         case pdListN:
         case pdString:
         case pdPath:
             return static_cast<InternalType>(tListN + (pd - pdListN));
-        case pdPairOfPointers:
-            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
         [[unlikely]] default:
             unreachable();
         }
     }
 
-#define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, MEMBER_A, MEMBER_B)                                   \
-                                                                                                       \
-    void getStorage(TYPE & val) const noexcept                                                         \
-    {                                                                                                  \
-        getPairOfPointersPayload(val MEMBER_A, val MEMBER_B);                                          \
-    }                                                                                                  \
-                                                                                                       \
-    void setStorage(TYPE val) noexcept                                                                 \
-    {                                                                                                  \
-        setPairOfPointersPayload<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
+#define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, SET, MEMBER_A, MEMBER_B)         \
+                                                                                  \
+    void getStorage(TYPE & val) const noexcept                                    \
+    {                                                                             \
+        getPairOfPointersPayload(val MEMBER_A, val MEMBER_B);                     \
+    }                                                                             \
+                                                                                  \
+    void setStorage(TYPE val) noexcept                                            \
+    {                                                                             \
+        SET<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
     }
 
-    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, [0], [1])
-    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, .left, .right)
-    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(FunctionApplicationThunk, .left, .right)
-    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ClosureThunk, .env, .expr)
-    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(Lambda, .env, .fun)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, setPairOfPointersPayload, [0], [1])
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, setPairOfPointersPayload, .left, .right)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(Lambda, setPairOfPointersPayload, .env, .fun)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(FunctionApplicationThunk, setThunkPayload, .left, .right)
+    NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(ClosureThunk, setThunkPayload, .env, .expr)
 
 #undef NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS
 
@@ -546,52 +642,57 @@ protected:
     {
         /* PackedPointerType -> int64_t here is well-formed, since the standard requires
            this conversion to follow 2's complement rules. This is just a no-op. */
-        integer = NixInt(payload[1]);
+        integer = NixInt(p1);
     }
 
     void getStorage(bool & boolean) const noexcept
     {
-        boolean = payload[1];
+        boolean = p1;
     }
 
     void getStorage(Null & null) const noexcept {}
 
     void getStorage(NixFloat & fpoint) const noexcept
     {
-        fpoint = std::bit_cast<NixFloat>(payload[1]);
+        fpoint = std::bit_cast<NixFloat>(p1);
     }
 
     void getStorage(ExternalValueBase *& external) const noexcept
     {
-        external = std::bit_cast<ExternalValueBase *>(payload[1]);
+        external = std::bit_cast<ExternalValueBase *>(p1);
     }
 
     void getStorage(PrimOp *& primOp) const noexcept
     {
-        primOp = std::bit_cast<PrimOp *>(payload[1]);
+        primOp = std::bit_cast<PrimOp *>(p1);
     }
 
     void getStorage(Bindings *& attrs) const noexcept
     {
-        attrs = std::bit_cast<Bindings *>(payload[1]);
+        attrs = std::bit_cast<Bindings *>(p1);
     }
 
     void getStorage(List & list) const noexcept
     {
-        list.elems = untagPointer<decltype(list.elems)>(payload[0]);
-        list.size = payload[1];
+        list.elems = untagPointer<decltype(list.elems)>(p0);
+        list.size = p1;
     }
 
     void getStorage(StringWithContext & string) const noexcept
     {
-        string.context = untagPointer<decltype(string.context)>(payload[0]);
-        string.c_str = std::bit_cast<const char *>(payload[1]);
+        string.context = untagPointer<decltype(string.context)>(p0);
+        string.c_str = std::bit_cast<const char *>(p1);
     }
 
     void getStorage(Path & path) const noexcept
     {
-        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
-        path.path = std::bit_cast<const char *>(payload[1]);
+        path.accessor = untagPointer<decltype(path.accessor)>(p0);
+        path.path = std::bit_cast<const char *>(p1);
+    }
+
+    void getStorage(Failed *& failed) const noexcept
+    {
+        failed = std::bit_cast<Failed *>(p1);
     }
 
     void setStorage(NixInt integer) noexcept
@@ -643,7 +744,70 @@ protected:
     {
         setUntaggablePayload<pdPath>(path.accessor, path.path);
     }
+
+    void setStorage(Failed * failed) noexcept
+    {
+        setSingleDWordPayload<tFailed>(std::bit_cast<PackedPointer>(failed));
+    }
+
+    ValueStorage() {}
+
+    ValueStorage(const ValueStorage & v)
+    {
+        *this = v;
+    }
+
+    /**
+     * Copy a value. This is not allowed to be a thunk to avoid
+     * accidental work duplication.
+     */
+    ValueStorage & operator=(const ValueStorage & v)
+    {
+        auto p0_ = v.p0.load(std::memory_order_acquire);
+        auto p1_ = v.p1; // must be loaded after p0
+        auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+        if (pd == pdThunk || pd == pdPending || pd == pdAwaited)
+            unreachable();
+        finish(p0_, p1_);
+        return *this;
+    }
+
+public:
+
+    inline void reset()
+    {
+        p1 = 0;
+        p0.store(0, std::memory_order_relaxed);
+    }
+
+    /// Only used for testing.
+    inline void mkBlackhole()
+    {
+        p0.store(pdPending, std::memory_order_relaxed);
+    }
+
+    void force(EvalState & state, PosIdx pos);
+
+private:
+
+    /**
+     * Given a thunk that was observed to be in the pending or awaited
+     * state, wait for it to finish. Returns the first word of the
+     * value.
+     */
+    PackedPointer waitOnThunk(EvalState & state, bool awaited);
+
+    /**
+     * Wake up any threads that are waiting on this value.
+     */
+    void notifyWaiters();
 };
+
+template<>
+void ValueStorage<sizeof(void *)>::notifyWaiters();
+
+template<>
+ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOnThunk(EvalState & state, bool awaited);
 
 /**
  * View into a list of Value * that is itself immutable.
@@ -857,47 +1021,58 @@ public:
 
     void print(EvalState & state, std::ostream & str, PrintOptions options = PrintOptions{});
 
+    // FIXME: optimize, only look at first word
+    inline bool isFinished() const
+    {
+        return nix::isFinished(getInternalType());
+    }
+
     // Functions needed to distinguish the type
     // These should be removed eventually, by putting the functionality that's
     // needed by callers into methods of this type
 
-    // type() == nThunk
     inline bool isThunk() const
     {
         return isa<tThunk>();
-    };
+    }
 
     inline bool isApp() const
     {
         return isa<tApp>();
-    };
+    }
 
-    inline bool isBlackhole() const;
+    inline bool isBlackhole() const
+    {
+        auto t = getInternalType();
+        return t == tPending || t == tAwaited;
+    }
 
     // type() == nFunction
     inline bool isLambda() const
     {
         return isa<tLambda>();
-    };
+    }
 
     inline bool isPrimOp() const
     {
         return isa<tPrimOp>();
-    };
+    }
 
     inline bool isPrimOpApp() const
     {
         return isa<tPrimOpApp>();
-    };
+    }
+
+    inline bool isFailed() const
+    {
+        return isa<tFailed>();
+    }
 
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
-     *
-     * @param invalidIsThunk Instead of aborting an an invalid (probably
-     * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type(bool invalidIsThunk = false) const
+    inline ValueType type() const
     {
         switch (getInternalType()) {
         case tUninitialized:
@@ -925,14 +1100,15 @@ public:
             return nExternal;
         case tFloat:
             return nFloat;
+        case tFailed:
+            return nFailed;
         case tThunk:
         case tApp:
+        case tPending:
+        case tAwaited:
             return nThunk;
         }
-        if (invalidIsThunk)
-            return nThunk;
-        else
-            unreachable();
+        unreachable();
     }
 
     /**
@@ -1016,8 +1192,6 @@ public:
         setStorage(Lambda{.env = e, .fun = f});
     }
 
-    inline void mkBlackhole();
-
     void mkPrimOp(PrimOp * p);
 
     inline void mkPrimOpApp(Value * l, Value * r) noexcept
@@ -1040,6 +1214,11 @@ public:
         setStorage(n);
     }
 
+    inline void mkFailed() noexcept
+    {
+        setStorage(new Value::Failed{.ex = std::current_exception()});
+    }
+
     bool isList() const noexcept
     {
         return isa<tListSmall, tListN>();
@@ -1059,8 +1238,11 @@ public:
 
     /**
      * Check whether forcing this value requires a trivial amount of
-     * computation. In particular, function applications are
-     * non-trivial.
+     * computation. A value is trivial if it's finished or if it's a
+     * thunk whose expression is an attrset with no dynamic
+     * attributes, a lambda or a list. Note that it's up to the caller
+     * to check whether the members of those attrsets or lists must be
+     * trivial.
      */
     bool isTrivial() const;
 
@@ -1119,6 +1301,7 @@ public:
         return getStorage<Lambda>();
     }
 
+    // FIXME: remove this since reading it is racy.
     ClosureThunk thunk() const noexcept
     {
         return getStorage<ClosureThunk>();
@@ -1129,6 +1312,7 @@ public:
         return getStorage<PrimOpApplicationThunk>();
     }
 
+    // FIXME: remove this since reading it is racy.
     FunctionApplicationThunk app() const noexcept
     {
         return getStorage<FunctionApplicationThunk>();
@@ -1143,19 +1327,12 @@ public:
     {
         return getStorage<Path>().accessor;
     }
+
+    Failed * failed() const noexcept
+    {
+        return getStorage<Failed *>();
+    }
 };
-
-extern ExprBlackHole eBlackHole;
-
-bool Value::isBlackhole() const
-{
-    return isThunk() && thunk().expr == (Expr *) &eBlackHole;
-}
-
-void Value::mkBlackhole()
-{
-    mkThunk(nullptr, (Expr *) &eBlackHole);
-}
 
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
 typedef std::unordered_map<

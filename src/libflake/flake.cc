@@ -28,7 +28,7 @@ namespace flake {
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
-    if (value.isThunk() && value.isTrivial())
+    if (!value.isFinished() && value.isTrivial())
         state.forceValue(value, pos);
 }
 

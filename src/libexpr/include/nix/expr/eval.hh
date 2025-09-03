@@ -16,6 +16,7 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/counter.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
@@ -52,6 +53,7 @@ struct AsyncPathWriter;
 namespace eval_cache {
 class EvalCache;
 }
+struct Executor;
 
 /**
  * Increments a count on construction and decrements on destruction.
@@ -188,7 +190,7 @@ std::ostream & operator<<(std::ostream & os, const ValueType t);
 
 struct RegexCache;
 
-std::shared_ptr<RegexCache> makeRegexCache();
+ref<RegexCache> makeRegexCache();
 
 struct DebugTrace
 {
@@ -221,6 +223,9 @@ class EvalState : public std::enable_shared_from_this<EvalState>
 public:
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
+
+    ref<Executor> executor;
+
     SymbolTable symbols;
     PosTable positions;
 
@@ -369,19 +374,13 @@ private:
     Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    typedef std::unordered_map<
-        SourcePath,
-        Expr *,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Expr *>>>
-        FileParseCache;
-    FileParseCache fileParseCache;
+    SharedSync<std::unordered_map<SourcePath, SourcePath>> importResolutionCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
     typedef std::unordered_map<
         SourcePath,
@@ -390,34 +389,23 @@ private:
         std::equal_to<SourcePath>,
         traceable_allocator<std::pair<const SourcePath, Value>>>
         FileEvalCache;
-    FileEvalCache fileEvalCache;
+    SharedSync<FileEvalCache> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    SharedSync<std::unordered_map<SourcePath, DocCommentMap>> positionToDocComment;
 
     LookupPath lookupPath;
 
+    // FIXME: make thread-safe.
     std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
 
     /**
      * Cache used by prim_match().
      */
-    std::shared_ptr<RegexCache> regexCache;
-
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
+    ref<RegexCache> regexCache;
 
 public:
 
@@ -546,7 +534,10 @@ public:
      * application, call the function and overwrite `v` with the
      * result.  Otherwise, this is a no-op.
      */
-    inline void forceValue(Value & v, const PosIdx pos);
+    inline void forceValue(Value & v, const PosIdx pos)
+    {
+        v.force(*this, pos);
+    }
 
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
 
@@ -782,10 +773,11 @@ private:
         std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
-     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run
-     * out of system stack.
+     * Current Nix call stack depth, used with `max-call-depth`
+     * setting to throw stack overflow hopefully before we run out of
+     * system stack.
      */
-    size_t callDepth = 0;
+    thread_local static size_t callDepth;
 
 public:
 
@@ -961,22 +953,32 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    unsigned long nrEnvs = 0;
-    unsigned long nrValuesInEnvs = 0;
-    unsigned long nrValues = 0;
-    unsigned long nrListElems = 0;
-    unsigned long nrLookups = 0;
-    unsigned long nrAttrsets = 0;
-    unsigned long nrAttrsInAttrsets = 0;
-    unsigned long nrAvoided = 0;
-    unsigned long nrOpUpdates = 0;
-    unsigned long nrOpUpdateValuesCopied = 0;
-    unsigned long nrListConcats = 0;
-    unsigned long nrPrimOpCalls = 0;
-    unsigned long nrFunctionCalls = 0;
+    Counter nrEnvs;
+    Counter nrValuesInEnvs;
+    Counter nrValues;
+    Counter nrListElems;
+    Counter nrLookups;
+    Counter nrAttrsets;
+    Counter nrAttrsInAttrsets;
+    Counter nrAvoided;
+    Counter nrOpUpdates;
+    Counter nrOpUpdateValuesCopied;
+    Counter nrListConcats;
+    Counter nrPrimOpCalls;
+    Counter nrFunctionCalls;
 
+public:
+    Counter nrThunksAwaited;
+    Counter nrThunksAwaitedSlow;
+    Counter microsecondsWaiting;
+    Counter currentlyWaiting;
+    Counter maxWaiting;
+    Counter nrSpuriousWakeups;
+
+private:
     bool countCalls;
 
+    // FIXME: make thread-safe.
     typedef std::map<std::string, size_t> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
@@ -988,6 +990,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
+    // FIXME: make thread-safe.
     typedef std::map<PosIdx, size_t> AttrSelects;
     AttrSelects attrSelects;
 

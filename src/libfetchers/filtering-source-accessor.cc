@@ -1,4 +1,5 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/sync.hh"
 
 namespace nix {
 
@@ -74,8 +75,8 @@ void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 {
-    std::set<CanonPath> allowedPrefixes;
-    std::unordered_set<CanonPath> allowedPaths;
+    SharedSync<std::set<CanonPath>> allowedPrefixes;
+    SharedSync<std::unordered_set<CanonPath>> allowedPaths;
 
     AllowListSourceAccessorImpl(
         ref<SourceAccessor> next,
@@ -90,12 +91,12 @@ struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 
     bool isAllowed(const CanonPath & path) override
     {
-        return allowedPaths.contains(path) || path.isAllowed(allowedPrefixes);
+        return allowedPaths.readLock()->contains(path) || path.isAllowed(*allowedPrefixes.readLock());
     }
 
     void allowPrefix(CanonPath prefix) override
     {
-        allowedPrefixes.insert(std::move(prefix));
+        allowedPrefixes.lock()->insert(std::move(prefix));
     }
 };
 

@@ -170,6 +170,11 @@ static void printValueAsXML(
 
     case nThunk:
         doc.writeEmptyElement("unevaluated");
+        break;
+
+    case nFailed:
+        doc.writeEmptyElement("failed");
+        break;
     }
 }
 

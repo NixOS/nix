@@ -8,6 +8,7 @@
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/util/pos-idx.hh"
+#include "nix/expr/counter.hh"
 
 namespace nix {
 
@@ -89,7 +90,7 @@ struct Expr
         Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
     };
 
-    static unsigned long nrExprs;
+    static Counter nrExprs;
 
     Expr()
     {
@@ -631,20 +632,6 @@ struct ExprPos : Expr
 
     COMMON_METHODS
 };
-
-/* only used to mark thunks as black holes. */
-struct ExprBlackHole : Expr
-{
-    void show(const SymbolTable & symbols, std::ostream & str) const override {}
-
-    void eval(EvalState & state, Env & env, Value & v) override;
-
-    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override {}
-
-    [[noreturn]] static void throwInfiniteRecursionError(EvalState & state, Value & v);
-};
-
-extern ExprBlackHole eBlackHole;
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at

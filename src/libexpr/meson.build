@@ -40,7 +40,7 @@ endforeach
 
 boost = dependency(
   'boost',
-  modules : [ 'container', 'context' ],
+  modules : [ 'container', 'context', 'thread' ],
   include_type : 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
@@ -54,7 +54,6 @@ bdw_gc = dependency('bdw-gc', required : get_option('gc'))
 if bdw_gc.found()
   deps_public += bdw_gc
   foreach funcspec : [
-    'pthread_attr_get_np',
     'pthread_getattr_np',
   ]
     define_name = 'HAVE_' + funcspec.underscorify().to_upper()
@@ -153,11 +152,13 @@ sources = files(
   'json-to-value.cc',
   'lexer-helpers.cc',
   'nixexpr.cc',
+  'parallel-eval.cc',
   'paths.cc',
   'primops.cc',
   'print-ambiguous.cc',
   'print.cc',
   'search-path.cc',
+  'symbol-table.cc',
   'value-to-json.cc',
   'value-to-xml.cc',
   'value/context.cc',
