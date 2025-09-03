@@ -7,6 +7,8 @@
 #include "nix/util/error.hh"
 #include "nix_api_util.h"
 
+extern "C" {
+
 struct nix_c_context
 {
     nix_err last_err_code = NIX_OK;
@@ -46,5 +48,7 @@ nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callb
         return def;                 \
     }
 #define NIXC_CATCH_ERRS_NULL NIXC_CATCH_ERRS_RES(nullptr)
+
+} // extern "C"
 
 #endif // NIX_API_UTIL_INTERNAL_H

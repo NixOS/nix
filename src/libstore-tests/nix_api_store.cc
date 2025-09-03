@@ -1,7 +1,5 @@
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 
 #include "nix/store/tests/nix_api_store.hh"
 #include "nix/util/tests/string_callback.hh"
@@ -65,7 +63,7 @@ TEST_F(nix_api_store_test, nix_store_get_storedir)
 TEST_F(nix_api_store_test, InvalidPathFails)
 {
     nix_store_parse_path(ctx, store, "invalid-path");
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
 }
 
 TEST_F(nix_api_store_test, ReturnsValidStorePath)
@@ -80,7 +78,7 @@ TEST_F(nix_api_store_test, ReturnsValidStorePath)
 TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 {
     StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
-    ASSERT_EQ(ctx->last_err_code, NIX_OK);
+    ASSERT_EQ(nix_err_code(ctx), NIX_OK);
     nix_store_path_free(path);
 }
 
@@ -103,7 +101,7 @@ TEST_F(nix_api_util_context, nix_store_open_dummy)
 {
     nix_libstore_init(ctx);
     Store * store = nix_store_open(ctx, "dummy://", nullptr);
-    ASSERT_EQ(NIX_OK, ctx->last_err_code);
+    ASSERT_EQ(NIX_OK, nix_err_code(ctx));
     ASSERT_STREQ("dummy://", store->ptr->config.getReference().render(/*withParams=*/true).c_str());
 
     std::string str;
@@ -117,7 +115,7 @@ TEST_F(nix_api_util_context, nix_store_open_invalid)
 {
     nix_libstore_init(ctx);
     Store * store = nix_store_open(ctx, "invalid://", nullptr);
-    ASSERT_EQ(NIX_ERR_NIX_ERROR, ctx->last_err_code);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
     ASSERT_EQ(nullptr, store);
     nix_store_free(store);
 }

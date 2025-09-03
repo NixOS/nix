@@ -63,6 +63,7 @@ sources = files(
   'lru-cache.cc',
   'monitorfdhup.cc',
   'nix_api_util.cc',
+  'nix_api_util_internal.cc',
   'pool.cc',
   'position.cc',
   'processes.cc',

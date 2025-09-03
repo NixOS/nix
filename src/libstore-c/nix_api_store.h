@@ -148,7 +148,7 @@ void nix_store_path_free(StorePath * p);
  * @param[in] path Path to check
  * @return true or false, error info in context
  */
-bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path);
+bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path);
 
 /**
  * @brief Get the physical location of a store path
@@ -190,7 +190,7 @@ nix_err nix_store_realise(
     Store * store,
     StorePath * path,
     void * userdata,
-    void (*callback)(void * userdata, const char * outname, const char * out));
+    void (*callback)(void * userdata, const char * outname, const StorePath * out));
 
 /**
  * @brief get the version of a nix store.

@@ -5,6 +5,8 @@
 
 #include "nix/main/plugin.hh"
 
+extern "C" {
+
 nix_err nix_init_plugins(nix_c_context * context)
 {
     if (context)
@@ -14,3 +16,5 @@ nix_err nix_init_plugins(nix_c_context * context)
     }
     NIXC_CATCH_ERRS
 }
+
+} // extern "C"

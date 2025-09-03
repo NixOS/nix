@@ -130,10 +130,13 @@ if get_option('benchmarks')
     link_args : linker_export_flags,
     install : true,
     cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
-    cpp_args : [
-      '-DNIX_UNIT_TEST_DATA="' + meson.current_source_dir() + '/data"',
-    ],
   )
 
-  benchmark('nix-store-benchmarks', benchmark_exe)
+  benchmark(
+    'nix-store-benchmarks',
+    benchmark_exe,
+    env : {
+      '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+    },
+  )
 endif
