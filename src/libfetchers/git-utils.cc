@@ -568,23 +568,34 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) override
     {
+        // Map of SSH key types to their internal OpenSSH representations
+        static const std::unordered_map<std::string_view, std::string_view> keyTypeMap = {
+            {"ssh-dsa", "ssh-dsa"},
+            {"ssh-ecdsa", "ssh-ecdsa"},
+            {"ssh-ecdsa-sk", "sk-ecdsa-sha2-nistp256@openssh.com"},
+            {"ssh-ed25519", "ssh-ed25519"},
+            {"ssh-ed25519-sk", "sk-ssh-ed25519@openssh.com"},
+            {"ssh-rsa", "ssh-rsa"}};
+
         // Create ad-hoc allowedSignersFile and populate it with publicKeys
         auto allowedSignersFile = createTempFile().second;
         std::string allowedSigners;
+
         for (const fetchers::PublicKey & k : publicKeys) {
-            if (k.type != "ssh-dsa" && k.type != "ssh-ecdsa" && k.type != "ssh-ecdsa-sk" && k.type != "ssh-ed25519"
-                && k.type != "ssh-ed25519-sk" && k.type != "ssh-rsa")
+            auto it = keyTypeMap.find(k.type);
+            if (it == keyTypeMap.end()) {
+                std::string supportedTypes;
+                for (const auto & [type, _] : keyTypeMap) {
+                    supportedTypes += fmt("  %s\n", type);
+                }
                 throw Error(
-                    "Unknown key type '%s'.\n"
-                    "Please use one of\n"
-                    "- ssh-dsa\n"
-                    "  ssh-ecdsa\n"
-                    "  ssh-ecdsa-sk\n"
-                    "  ssh-ed25519\n"
-                    "  ssh-ed25519-sk\n"
-                    "  ssh-rsa",
-                    k.type);
-            allowedSigners += "* " + k.type + " " + k.key + "\n";
+                    "Invalid SSH key type '%s' in publicKeys.\n"
+                    "Please use one of:\n%s",
+                    k.type,
+                    supportedTypes);
+            }
+
+            allowedSigners += fmt("* %s %s\n", it->second, k.key);
         }
         writeFile(allowedSignersFile, allowedSigners);
 
