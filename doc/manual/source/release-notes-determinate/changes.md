@@ -152,4 +152,4 @@ This section lists the differences between upstream Nix 2.31 and Determinate Nix
 
 <!-- Determinate Nix version 3.11.0 -->
 
-* Multithreaded evaluator by @edolstra in [DeterminateSystems/nix-src#125](https://github.com/DeterminateSystems/nix-src/pull/125)
+* Multithreaded evaluation support [DeterminateSystems/nix-src#125](https://github.com/DeterminateSystems/nix-src/pull/125)
