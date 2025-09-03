@@ -147,17 +147,15 @@ struct DerivationBuilder : RestrictionContext
      * locks as needed). After this is run, the builder should be
      * started.
      *
-     * @returns true if successful, false if we could not acquire a build
-     * user. In that case, the caller must wait and then try again.
-     */
-    virtual bool prepareBuild() = 0;
-
-    /**
-     * Start building a derivation.
+     * @returns logging pipe if successful, `std::nullopt` if we could
+     * not acquire a build user. In that case, the caller must wait and
+     * then try again.
      *
-     * @return logging pipe
+     * @note "success" just means that we were able to set up the environment
+     * and start the build. The builder could have immediately exited with
+     * failure, and that would still be considered a successful start.
      */
-    virtual Descriptor startBuilder() = 0;
+    virtual std::optional<Descriptor> startBuild() = 0;
 
     /**
      * Tear down build environment after the builder exits (either on

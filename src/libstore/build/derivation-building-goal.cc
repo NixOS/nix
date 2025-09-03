@@ -689,6 +689,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #else
     assert(!hook);
 
+    Descriptor builderOut;
+
     // Will continue here while waiting for a build user below
     while (true) {
 
@@ -781,7 +783,17 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 });
         }
 
-        if (!builder->prepareBuild()) {
+        std::optional<Descriptor> builderOutOpt;
+        try {
+            /* Okay, we have to build. */
+            builderOutOpt = builder->startBuild();
+        } catch (BuildError & e) {
+            builder.reset();
+            outputLocks.unlock();
+            worker.permanentFailure = true;
+            co_return doneFailure(std::move(e)); // InputRejected
+        }
+        if (!builderOutOpt) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
@@ -790,25 +802,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
             continue;
-        }
+        } else {
+            builderOut = *std::move(builderOutOpt);
+        };
 
         break;
     }
 
     actLock.reset();
-
-    Descriptor builderOut;
-    try {
-
-        /* Okay, we have to build. */
-        builderOut = builder->startBuilder();
-
-    } catch (BuildError & e) {
-        builder.reset();
-        outputLocks.unlock();
-        worker.permanentFailure = true;
-        co_return doneFailure(std::move(e)); // InputRejected
-    }
 
     worker.childStarted(shared_from_this(), {builderOut}, true, true);
 
