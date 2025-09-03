@@ -27,7 +27,7 @@ private:
     const bool compress;
     const Descriptor logFD;
 
-    ref<AutoDelete> tmpDir;
+    const ref<const AutoDelete> tmpDir;
 
     struct State
     {
