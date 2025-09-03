@@ -29,6 +29,12 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
+    DerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
+    ~DerivationBuildingGoal();
+
+private:
+
     /** The path of the derivation. */
     StorePath drvPath;
 
@@ -44,17 +50,10 @@ struct DerivationBuildingGoal : public Goal
      */
 
     /**
-     * Locks on (fixed) output paths.
-     */
-    PathLocks outputLocks;
-
-    /**
      * All input paths (that is, the union of FS closures of the
      * immediate input paths).
      */
     StorePathSet inputPaths;
-
-    std::map<std::string, InitialOutput> initialOutputs;
 
     /**
      * File descriptor for the log file.
@@ -92,21 +91,7 @@ struct DerivationBuildingGoal : public Goal
 
     std::unique_ptr<Activity> act;
 
-    /**
-     * Activity that denotes waiting for a lock.
-     */
-    std::unique_ptr<Activity> actLock;
-
     std::map<ActivityId, Activity> builderActivities;
-
-    /**
-     * The remote machine on which we're building.
-     */
-    std::string machineName;
-
-    DerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
-    ~DerivationBuildingGoal();
 
     void timedOut(Error && ex) override;
 
@@ -117,12 +102,11 @@ struct DerivationBuildingGoal : public Goal
      */
     Co gaveUpOnSubstitution();
     Co tryToBuild();
-    Co hookDone();
 
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook();
+    HookReply tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Open a log file and a pipe to it.
@@ -156,20 +140,12 @@ struct DerivationBuildingGoal : public Goal
      * whether all outputs are valid and non-corrupt, and a
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
-
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     */
-    SingleDrvOutputs assertPathValidity();
+    std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Forcibly kill the child process, if any.
      */
     void killChild();
-
-    void started();
 
     Done doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs);
 
