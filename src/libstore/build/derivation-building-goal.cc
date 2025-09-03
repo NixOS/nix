@@ -716,11 +716,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
                 ~DerivationBuildingGoalCallbacks() override = default;
 
-                void childStarted(Descriptor builderOut) override
-                {
-                    goal.worker.childStarted(goal.shared_from_this(), {builderOut}, true, true);
-                }
-
                 void childTerminated() override
                 {
                     goal.worker.childTerminated(&goal);
@@ -802,10 +797,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     actLock.reset();
 
+    Descriptor builderOut;
     try {
 
         /* Okay, we have to build. */
-        builder->startBuilder();
+        builderOut = builder->startBuilder();
 
     } catch (BuildError & e) {
         builder.reset();
@@ -813,6 +809,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         worker.permanentFailure = true;
         co_return doneFailure(std::move(e)); // InputRejected
     }
+
+    worker.childStarted(shared_from_this(), {builderOut}, true, true);
 
     started();
     co_await Suspend{};

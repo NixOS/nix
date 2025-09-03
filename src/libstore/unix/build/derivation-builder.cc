@@ -216,7 +216,7 @@ public:
 
     bool prepareBuild() override;
 
-    void startBuilder() override;
+    Descriptor startBuilder() override;
 
     SingleDrvOutputs unprepareBuild() override;
 
@@ -679,7 +679,7 @@ static bool checkNotWorldWritable(std::filesystem::path path)
     return true;
 }
 
-void DerivationBuilderImpl::startBuilder()
+Descriptor DerivationBuilderImpl::startBuilder()
 {
     /* Make sure that no other processes are executing under the
        sandbox uids. This must be done before any chownToBuilder()
@@ -841,9 +841,10 @@ void DerivationBuilderImpl::startBuilder()
     startChild();
 
     pid.setSeparatePG(true);
-    miscMethods->childStarted(builderOut.get());
 
     processSandboxSetupMessages();
+
+    return builderOut.get();
 }
 
 PathsInChroot DerivationBuilderImpl::getPathsInSandbox()

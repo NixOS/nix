@@ -115,13 +115,6 @@ struct DerivationBuilderCallbacks
     virtual void closeLogFile() = 0;
 
     /**
-     * Hook up `builderOut` to some mechanism to ingest the log
-     *
-     * @todo this should be reworked
-     */
-    virtual void childStarted(Descriptor builderOut) = 0;
-
-    /**
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
@@ -161,8 +154,10 @@ struct DerivationBuilder : RestrictionContext
 
     /**
      * Start building a derivation.
+     *
+     * @return logging pipe
      */
-    virtual void startBuilder() = 0;
+    virtual Descriptor startBuilder() = 0;
 
     /**
      * Tear down build environment after the builder exits (either on
