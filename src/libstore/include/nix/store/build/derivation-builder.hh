@@ -76,10 +76,7 @@ struct DerivationBuilderParams
      */
     const StorePathSet & inputPaths;
 
-    /**
-     * @note we do in fact mutate this
-     */
-    std::map<std::string, InitialOutput> & initialOutputs;
+    const std::map<std::string, InitialOutput> & initialOutputs;
 
     const BuildMode & buildMode;
 
