@@ -127,31 +127,6 @@ static void runPostBuildHook(
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
-    /* Recheck at goal start. In particular, whereas before we were
-       given this information by the downstream goal, that cannot happen
-       anymore if the downstream goal only cares about one output, but
-       we care about all outputs. */
-    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-    for (auto & [outputName, outputHash] : outputHashes) {
-        InitialOutput v{.outputHash = outputHash};
-
-        /* TODO we might want to also allow randomizing the paths
-           for regular CA derivations, e.g. for sake of checking
-           determinism. */
-        if (drv->type().isImpure()) {
-            v.known = InitialOutputStatus{
-                .path = StorePath::random(outputPathName(drv->name, outputName)),
-                .status = PathStatus::Absent,
-            };
-        }
-
-        initialOutputs.insert({
-            outputName,
-            std::move(v),
-        });
-    }
-    checkPathValidity();
-
     Goals waitees;
 
     std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
@@ -334,14 +309,15 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
             if (resolvedResult.success()) {
                 SingleDrvOutputs builtOutputs;
 
+                auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
                 auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
                 StorePathSet outputPaths;
 
                 for (auto & outputName : drvResolved.outputNames()) {
-                    auto initialOutput = get(initialOutputs, outputName);
+                    auto outputHash = get(outputHashes, outputName);
                     auto resolvedHash = get(resolvedHashes, outputName);
-                    if ((!initialOutput) || (!resolvedHash))
+                    if ((!outputHash) || (!resolvedHash))
                         throw Error(
                             "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
                             worker.store.printStorePath(drvPath),
@@ -368,7 +344,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                     if (!drv->type().isImpure()) {
                         auto newRealisation = realisation;
-                        newRealisation.id = DrvOutput{initialOutput->outputHash, outputName};
+                        newRealisation.id = DrvOutput{*outputHash, outputName};
                         newRealisation.signatures.clear();
                         if (!drv->type().isFixed()) {
                             auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
@@ -441,6 +417,31 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
 Goal::Co DerivationBuildingGoal::tryToBuild()
 {
+    /* Recheck at goal start. In particular, whereas before we were
+       given this information by the downstream goal, that cannot happen
+       anymore if the downstream goal only cares about one output, but
+       we care about all outputs. */
+    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+    for (auto & [outputName, outputHash] : outputHashes) {
+        InitialOutput v{.outputHash = outputHash};
+
+        /* TODO we might want to also allow randomizing the paths
+           for regular CA derivations, e.g. for sake of checking
+           determinism. */
+        if (drv->type().isImpure()) {
+            v.known = InitialOutputStatus{
+                .path = StorePath::random(outputPathName(drv->name, outputName)),
+                .status = PathStatus::Absent,
+            };
+        }
+
+        initialOutputs.insert({
+            outputName,
+            std::move(v),
+        });
+    }
+    checkPathValidity();
+
     auto started = [&]() {
         auto msg =
             fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
