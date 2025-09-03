@@ -1,7 +1,5 @@
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
@@ -151,8 +149,8 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_value)
     assert_ctx_ok();
     auto r = nix_string_realise(ctx, state, value, false);
     ASSERT_EQ(nullptr, r);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("cannot coerce")));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("cannot coerce"));
 }
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
@@ -168,8 +166,8 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
     assert_ctx_ok();
     auto r = nix_string_realise(ctx, state, value, false);
     ASSERT_EQ(nullptr, r);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("failed with exit code 1")));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("failed with exit code 1"));
 }
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
@@ -381,12 +379,11 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
     nix_value * result = nix_alloc_value(ctx, state);
     assert_ctx_ok();
     nix_value_call(ctx, state, primopValue, three, result);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_THAT(
-        ctx->last_err,
-        testing::Optional(
-            testing::HasSubstr("Implementation error in custom function: return value was not initialized")));
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badNoReturn")));
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("Implementation error in custom function: return value was not initialized"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("badNoReturn"));
 }
 
 static void primop_bad_return_thunk(
@@ -419,12 +416,11 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
     assert_ctx_ok();
     NIX_VALUE_CALL(ctx, state, result, primopValue, toString, four);
 
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_THAT(
-        ctx->last_err,
-        testing::Optional(
-            testing::HasSubstr("Implementation error in custom function: return value must not be a thunk")));
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badReturnThunk")));
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("Implementation error in custom function: return value must not be a thunk"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("badReturnThunk"));
 }
 
 TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)

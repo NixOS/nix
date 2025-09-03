@@ -1,10 +1,7 @@
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
-#include "nix_api_expr_internal.h"
 
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
@@ -15,14 +12,6 @@
 #include <gtest/gtest.h>
 
 namespace nixC {
-
-TEST_F(nix_api_expr_test, as_nix_value_ptr)
-{
-    // nix_alloc_value casts nix::Value to nix_value
-    // It should be obvious from the decl that that works, but if it doesn't,
-    // the whole implementation would be utterly broken.
-    ASSERT_EQ(sizeof(nix::Value), sizeof(nix_value));
-}
 
 TEST_F(nix_api_expr_test, nix_value_get_int_invalid)
 {
@@ -320,8 +309,10 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_error)
 
     // Evaluate it
     nix_value_force(ctx, state, v);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
-    ASSERT_THAT(ctx->last_err.value(), testing::HasSubstr("attempt to call something which is not a function but"));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("attempt to call something which is not a function but"));
 
     // Clean up
     nix_gc_decref(ctx, some_string);
@@ -380,7 +371,9 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
     // nix_get_attr_byname isn't lazy (it could have been) so it will throw the exception
     nix_value * foo = nix_get_attr_byname(ctx, r, state, "foo");
     ASSERT_EQ(nullptr, foo);
-    ASSERT_THAT(ctx->last_err.value(), testing::HasSubstr("error message for test case nix_value_init_apply_lazy_arg"));
+    ASSERT_THAT(
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("error message for test case nix_value_init_apply_lazy_arg"));
 
     // Clean up
     nix_gc_decref(ctx, f);
