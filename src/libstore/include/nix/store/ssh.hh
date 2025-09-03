@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/ref.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/url.hh"
 #include "nix/util/processes.hh"
@@ -26,12 +27,13 @@ private:
     const bool compress;
     const Descriptor logFD;
 
+    ref<AutoDelete> tmpDir;
+
     struct State
     {
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
         Pid sshMaster;
 #endif
-        std::unique_ptr<AutoDelete> tmpDir;
         Path socketPath;
     };
 
