@@ -310,14 +310,11 @@ protected:
         }
     };
 
-    struct State
-    {
-        LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
-    };
-
     void invalidatePathInfoCacheFor(const StorePath & path);
 
-    SharedSync<State> state;
+    // Note: this is a `ref` to avoid false sharing with immutable
+    // bits of `Store`.
+    ref<SharedSync<LRUCache<std::string, PathInfoCacheValue>>> pathInfoCache;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
@@ -860,7 +857,7 @@ public:
      */
     void clearPathInfoCache()
     {
-        state.lock()->pathInfoCache.clear();
+        pathInfoCache->lock()->clear();
     }
 
     /**

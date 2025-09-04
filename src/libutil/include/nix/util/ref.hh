@@ -18,6 +18,9 @@ private:
     std::shared_ptr<T> p;
 
 public:
+
+    using element_type = T;
+
     explicit ref(const std::shared_ptr<T> & p)
         : p(p)
     {
