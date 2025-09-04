@@ -456,12 +456,17 @@ LocalStore::~LocalStore()
 
 StoreReference LocalStoreConfig::getReference() const
 {
+    auto params = getQueryParams();
+    /* Back-compatibility kludge. Tools like nix-output-monitor expect 'local'
+       and can't parse 'local://'. */
+    if (params.empty())
+        return {.variant = StoreReference::Local{}};
     return {
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
             },
-        .params = getQueryParams(),
+        .params = std::move(params),
     };
 }
 

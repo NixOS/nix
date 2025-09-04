@@ -107,6 +107,13 @@ URI_TEST_READ(local_shorthand_1, localExample_1)
 
 URI_TEST_READ(local_shorthand_2, localExample_2)
 
+URI_TEST(
+    local_shorthand_3,
+    (StoreReference{
+        .variant = StoreReference::Local{},
+        .params = {},
+    }))
+
 static StoreReference unixExample{
     .variant =
         StoreReference::Specified{
@@ -131,6 +138,13 @@ URI_TEST(
                 .scheme = "ssh",
                 .authority = "localhost",
             },
+        .params = {},
+    }))
+
+URI_TEST(
+    daemon_shorthand,
+    (StoreReference{
+        .variant = StoreReference::Daemon{},
         .params = {},
     }))
 
