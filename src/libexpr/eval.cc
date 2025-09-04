@@ -178,12 +178,25 @@ PosIdx Value::determinePos(const PosIdx pos) const
 #pragma GCC diagnostic pop
 }
 
-bool Value::isTrivial() const
+template<>
+bool ValueStorage<sizeof(void *)>::isTrivial() const
 {
-    return isFinished()
-           || (isa<tThunk>()
-               && ((dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
-                   || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr)));
+    auto p1_ = p1; // must acquire before reading p0, since thunks can change
+    auto p0_ = p0.load(std::memory_order_acquire);
+
+    auto pd = static_cast<PrimaryDiscriminator>(p0_ & discriminatorMask);
+
+    if (pd == pdThunk || pd == pdPending || pd == pdAwaited) {
+        bool isApp = p1_ & discriminatorMask;
+        if (isApp)
+            return false;
+        auto expr = untagPointer<Expr *>(p1_);
+        return (dynamic_cast<ExprAttrs *>(expr) && ((ExprAttrs *) expr)->dynamicAttrs.empty())
+               || dynamic_cast<ExprLambda *>(expr) || dynamic_cast<ExprList *>(expr);
+    }
+
+    else
+        return true;
 }
 
 static Symbol getName(const AttrName & name, EvalState & state, Env & env)
