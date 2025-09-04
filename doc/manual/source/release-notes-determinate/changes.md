@@ -156,4 +156,3 @@ This section lists the differences between upstream Nix 2.31 and Determinate Nix
 
 <!-- Determinate Nix version 3.11.1 -->
 
-* Fix race condition in Value::isTrivial() by @edolstra in [DeterminateSystems/nix-src#192](https://github.com/DeterminateSystems/nix-src/pull/192)
