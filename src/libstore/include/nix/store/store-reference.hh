@@ -64,7 +64,29 @@ struct StoreReference
         auto operator<=>(const Specified & rhs) const = default;
     };
 
-    typedef std::variant<Auto, Specified> Variant;
+    /**
+     * Special case for `daemon` to avoid normalization.
+     */
+    struct Daemon : Specified
+    {
+        Daemon()
+            : Specified({.scheme = "unix"})
+        {
+        }
+    };
+
+    /**
+     * Special case for `local` to avoid normalization.
+     */
+    struct Local : Specified
+    {
+        Local()
+            : Specified({.scheme = "local"})
+        {
+        }
+    };
+
+    typedef std::variant<Auto, Specified, Daemon, Local> Variant;
 
     Variant variant;
 

@@ -13,14 +13,20 @@ normalize_nix_store_url () {
             # Need to actually ask Nix in this case
             echo "$defaultStore"
             ;;
+        local | 'local://' )
+            echo 'local'
+            ;;
+        daemon | 'unix://' )
+            echo 'daemon'
+            ;;
         'local://'* )
             # To not be captured by next pattern
             echo "$url"
             ;;
-        local | 'local?'* )
+        'local?'* )
             echo "local://${url#local}"
             ;;
-        daemon | 'daemon?'* )
+        'daemon?'* )
             echo "unix://${url#daemon}"
             ;;
         * )
@@ -38,13 +44,13 @@ defaultStore="$(normalize_nix_store_url "$(echo "$STORE_INFO_JSON" | jq -r ".url
 # Test cases for `normalize_nix_store_url` itself
 
 # Normalize local store
-[[ "$(normalize_nix_store_url "local://")" = "local://" ]]
-[[ "$(normalize_nix_store_url "local")" = "local://" ]]
+[[ "$(normalize_nix_store_url "local://")" = "local" ]]
+[[ "$(normalize_nix_store_url "local")" = "local" ]]
 [[ "$(normalize_nix_store_url "local?foo=bar")" = "local://?foo=bar" ]]
 
 # Normalize unix domain socket remote store
-[[ "$(normalize_nix_store_url "unix://")" = "unix://" ]]
-[[ "$(normalize_nix_store_url "daemon")" = "unix://" ]]
+[[ "$(normalize_nix_store_url "unix://")" = "daemon" ]]
+[[ "$(normalize_nix_store_url "daemon")" = "daemon" ]]
 [[ "$(normalize_nix_store_url "daemon?x=y")" = "unix://?x=y" ]]
 
 # otherwise unchanged
