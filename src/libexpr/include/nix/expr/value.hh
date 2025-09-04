@@ -774,6 +774,16 @@ protected:
 
 public:
 
+    /**
+     * Check whether forcing this value requires a trivial amount of
+     * computation. A value is trivial if it's finished or if it's a
+     * thunk whose expression is an attrset with no dynamic
+     * attributes, a lambda or a list. Note that it's up to the caller
+     * to check whether the members of those attrsets or lists must be
+     * trivial.
+     */
+    bool isTrivial() const;
+
     inline void reset()
     {
         p1 = 0;
@@ -808,6 +818,9 @@ void ValueStorage<sizeof(void *)>::notifyWaiters();
 
 template<>
 ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOnThunk(EvalState & state, bool awaited);
+
+template<>
+bool ValueStorage<sizeof(void *)>::isTrivial() const;
 
 /**
  * View into a list of Value * that is itself immutable.
@@ -1235,16 +1248,6 @@ public:
     }
 
     PosIdx determinePos(const PosIdx pos) const;
-
-    /**
-     * Check whether forcing this value requires a trivial amount of
-     * computation. A value is trivial if it's finished or if it's a
-     * thunk whose expression is an attrset with no dynamic
-     * attributes, a lambda or a list. Note that it's up to the caller
-     * to check whether the members of those attrsets or lists must be
-     * trivial.
-     */
-    bool isTrivial() const;
 
     SourcePath path() const
     {

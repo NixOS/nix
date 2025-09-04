@@ -28,15 +28,16 @@ namespace flake {
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
-    if (!value.isFinished() && value.isTrivial())
+    if (value.isTrivial())
         state.forceValue(value, pos);
 }
 
 static void expectType(EvalState & state, ValueType type, Value & value, const PosIdx pos)
 {
     forceTrivialValue(state, value, pos);
-    if (value.type() != type)
-        throw Error("expected %s but got %s at %s", showType(type), showType(value.type()), state.positions[pos]);
+    auto t = value.type();
+    if (t != type)
+        throw Error("expected %s but got %s at %s", showType(type), showType(t), state.positions[pos]);
 }
 
 static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInputs(
