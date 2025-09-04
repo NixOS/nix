@@ -310,7 +310,7 @@ StringSet Store::Config::getDefaultSystemFeatures()
 Store::Store(const Store::Config & config)
     : StoreDirConfig{config}
     , config{config}
-    , state({(size_t) config.pathInfoCacheSize})
+    , pathInfoCache(make_ref<decltype(pathInfoCache)::element_type>((size_t) config.pathInfoCacheSize))
 {
     assertLibStoreInitialized();
 }
@@ -330,7 +330,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
 
 void Store::invalidatePathInfoCacheFor(const StorePath & path)
 {
-    state.lock()->pathInfoCache.erase(path.to_string());
+    pathInfoCache->lock()->erase(path.to_string());
 }
 
 std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
@@ -452,13 +452,10 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    {
-        auto state_(state.lock());
-        auto res = state_->pathInfoCache.get(storePath.to_string());
-        if (res && res->isKnownNow()) {
-            stats.narInfoReadAverted++;
-            return res->didExist();
-        }
+    auto res = pathInfoCache->lock()->get(storePath.to_string());
+    if (res && res->isKnownNow()) {
+        stats.narInfoReadAverted++;
+        return res->didExist();
     }
 
     if (diskCache) {
@@ -466,8 +463,7 @@ bool Store::isValidPath(const StorePath & storePath)
             config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()));
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
-            auto state_(state.lock());
-            state_->pathInfoCache.upsert(
+            pathInfoCache->lock()->upsert(
                 storePath.to_string(),
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
                                                         : PathInfoCacheValue{.value = res.second});
@@ -539,30 +535,25 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
 {
     auto hashPart = std::string(storePath.hashPart());
 
-    {
-        auto res = state.lock()->pathInfoCache.get(storePath.to_string());
-        if (res && res->isKnownNow()) {
-            stats.narInfoReadAverted++;
-            if (res->didExist())
-                return std::make_optional(res->value);
-            else
-                return std::make_optional(nullptr);
-        }
+    auto res = pathInfoCache->lock()->get(storePath.to_string());
+    if (res && res->isKnownNow()) {
+        stats.narInfoReadAverted++;
+        if (res->didExist())
+            return std::make_optional(res->value);
+        else
+            return std::make_optional(nullptr);
     }
 
     if (diskCache) {
         auto res = diskCache->lookupNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
-            {
-                auto state_(state.lock());
-                state_->pathInfoCache.upsert(
-                    storePath.to_string(),
-                    res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
-                                                            : PathInfoCacheValue{.value = res.second});
-                if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
-                    return std::make_optional(nullptr);
-            }
+            pathInfoCache->lock()->upsert(
+                storePath.to_string(),
+                res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
+                                                        : PathInfoCacheValue{.value = res.second});
+            if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
+                return std::make_optional(nullptr);
             assert(res.second);
             return std::make_optional(res.second);
         }
@@ -598,10 +589,7 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 if (diskCache)
                     diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
-                {
-                    auto state_(state.lock());
-                    state_->pathInfoCache.upsert(storePath.to_string(), PathInfoCacheValue{.value = info});
-                }
+                pathInfoCache->lock()->upsert(storePath.to_string(), PathInfoCacheValue{.value = info});
 
                 if (!info || !goodStorePath(storePath, info->path)) {
                     stats.narInfoMissing++;
@@ -823,10 +811,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 
 const Store::Stats & Store::getStats()
 {
-    {
-        auto state_(state.readLock());
-        stats.pathInfoCacheSize = state_->pathInfoCache.size();
-    }
+    stats.pathInfoCacheSize = pathInfoCache->readLock()->size();
     return stats;
 }
 
