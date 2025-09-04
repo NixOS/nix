@@ -174,7 +174,7 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State> _state;
+    ref<Sync<State>> _state;
 
 public:
 
