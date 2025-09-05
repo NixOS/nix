@@ -48,3 +48,11 @@ nix build --no-link "$flake1Dir#stack-depth"
 expect 1 nix build "$flake1Dir#ifd" --option allow-import-from-derivation false 2>&1 \
   | grepQuiet 'error: cannot build .* during evaluation because the option '\''allow-import-from-derivation'\'' is disabled'
 nix build --no-link "$flake1Dir#ifd"
+
+# Test that a store derivation is recreated when it has been deleted
+# but the corresponding attribute is still cached.
+if ! isTestOnNixOS; then
+    nix build "$flake1Dir#drv"
+    clearStore
+    nix build "$flake1Dir#drv"
+fi
