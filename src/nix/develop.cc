@@ -627,13 +627,12 @@ struct CmdDevelop : Common, MixEnvironment
                     fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", escapeShellArgAlways(developSettings.bashPromptSuffix.get()));
         }
 
-        writeFull(rcFileFd.get(), script);
-
         setEnviron();
         // prevent garbage collection until shell exits
         setEnv("NIX_GCROOT", gcroot.c_str());
 
         Path shell = "bash";
+        bool foundInteractive = false;
 
         try {
             auto state = getEvalState();
@@ -656,19 +655,17 @@ struct CmdDevelop : Common, MixEnvironment
                 Strings{"legacyPackages." + settings.thisSystem.get() + "."},
                 nixpkgsLockFlags);
 
-            bool found = false;
-
             for (auto & path : Installable::toStorePathSet(
                      getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
                 auto s = store->printStorePath(path) + "/bin/bash";
                 if (pathExists(s)) {
                     shell = s;
-                    found = true;
+                    foundInteractive = true;
                     break;
                 }
             }
 
-            if (!found)
+            if (!foundInteractive)
                 throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
 
         } catch (Error &) {
@@ -678,6 +675,11 @@ struct CmdDevelop : Common, MixEnvironment
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
         setEnv("SHELL", shell.c_str());
+        // https://github.com/NixOS/nix/issues/5873
+        script += fmt("SHELL=\"%s\"\n", shell);
+        if (foundInteractive)
+            script += fmt("PATH=\"%s${PATH:+:$PATH}\"\n", std::filesystem::path(shell).parent_path());
+        writeFull(rcFileFd.get(), script);
 
 #ifdef _WIN32 // TODO re-enable on Windows
         throw UnimplementedError("Cannot yet spawn processes on Windows");
