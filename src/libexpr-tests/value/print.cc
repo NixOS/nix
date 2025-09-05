@@ -61,7 +61,7 @@ TEST_F(ValuePrintingTests, tAttrs)
     Value vTwo;
     vTwo.mkInt(2);
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("one"), &vOne);
     builder.insert(state.symbols.create("two"), &vTwo);
 
@@ -196,11 +196,11 @@ TEST_F(ValuePrintingTests, depthAttrs)
     Value vTwo;
     vTwo.mkInt(2);
 
-    BindingsBuilder builderEmpty(state, state.allocBindings(0));
+    BindingsBuilder builderEmpty = state.buildBindings(0);
     Value vAttrsEmpty;
     vAttrsEmpty.mkAttrs(builderEmpty.finish());
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("one"), &vOne);
     builder.insert(state.symbols.create("two"), &vTwo);
     builder.insert(state.symbols.create("nested"), &vAttrsEmpty);
@@ -208,7 +208,7 @@ TEST_F(ValuePrintingTests, depthAttrs)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    BindingsBuilder builder2(state, state.allocBindings(10));
+    BindingsBuilder builder2 = state.buildBindings(10);
     builder2.insert(state.symbols.create("one"), &vOne);
     builder2.insert(state.symbols.create("two"), &vTwo);
     builder2.insert(state.symbols.create("nested"), &vAttrs);
@@ -233,14 +233,14 @@ TEST_F(ValuePrintingTests, depthList)
     Value vTwo;
     vTwo.mkInt(2);
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("one"), &vOne);
     builder.insert(state.symbols.create("two"), &vTwo);
 
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    BindingsBuilder builder2(state, state.allocBindings(10));
+    BindingsBuilder builder2 = state.buildBindings(10);
     builder2.insert(state.symbols.create("one"), &vOne);
     builder2.insert(state.symbols.create("two"), &vTwo);
     builder2.insert(state.symbols.create("nested"), &vAttrs);
@@ -295,7 +295,7 @@ TEST_F(ValuePrintingTests, attrsTypeFirst)
     Value vApple;
     vApple.mkStringNoCopy("apple");
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("type"), &vType);
     builder.insert(state.symbols.create("apple"), &vApple);
 
@@ -374,7 +374,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrs)
     Value vTwo;
     vTwo.mkInt(2);
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("one"), &vOne);
     builder.insert(state.symbols.create("two"), &vTwo);
 
@@ -392,7 +392,7 @@ TEST_F(ValuePrintingTests, ansiColorsDerivation)
     Value vDerivation;
     vDerivation.mkStringNoCopy("derivation");
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.s.type, &vDerivation);
 
     Value vAttrs;
@@ -437,7 +437,7 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
     Value vDerivation;
     vDerivation.mkStringNoCopy("derivation");
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.s.type, &vDerivation);
     builder.insert(state.s.drvPath, &vError);
 
@@ -553,12 +553,12 @@ TEST_F(ValuePrintingTests, ansiColorsBlackhole)
 
 TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
 {
-    BindingsBuilder emptyBuilder(state, state.allocBindings(1));
+    BindingsBuilder emptyBuilder = state.buildBindings(1);
 
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("a"), &vEmpty);
     builder.insert(state.symbols.create("b"), &vEmpty);
 
@@ -570,7 +570,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
 
 TEST_F(ValuePrintingTests, ansiColorsListRepeated)
 {
-    BindingsBuilder emptyBuilder(state, state.allocBindings(1));
+    BindingsBuilder emptyBuilder = state.buildBindings(1);
 
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
@@ -586,7 +586,7 @@ TEST_F(ValuePrintingTests, ansiColorsListRepeated)
 
 TEST_F(ValuePrintingTests, listRepeated)
 {
-    BindingsBuilder emptyBuilder(state, state.allocBindings(1));
+    BindingsBuilder emptyBuilder = state.buildBindings(1);
 
     Value vEmpty;
     vEmpty.mkAttrs(emptyBuilder.finish());
@@ -609,7 +609,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     Value vTwo;
     vTwo.mkInt(2);
 
-    BindingsBuilder builder(state, state.allocBindings(10));
+    BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("one"), &vOne);
     builder.insert(state.symbols.create("two"), &vTwo);
 
@@ -635,8 +635,6 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
 
 TEST_F(ValuePrintingTests, ansiColorsListElided)
 {
-    BindingsBuilder emptyBuilder(state, state.allocBindings(1));
-
     Value vOne;
     vOne.mkInt(1);
 

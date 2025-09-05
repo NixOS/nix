@@ -5,6 +5,7 @@
 #include "nix/expr/symbol-table.hh"
 
 #include <algorithm>
+#include <functional>
 
 namespace nix {
 
@@ -54,16 +55,14 @@ public:
     PosIdx pos;
 
 private:
-    size_t size_, capacity_;
+    size_t size_ = 0;
     Attr attrs[0];
 
-    Bindings(size_t capacity)
-        : size_(0)
-        , capacity_(capacity)
-    {
-    }
-
-    Bindings(const Bindings & bindings) = delete;
+    Bindings() = default;
+    Bindings(const Bindings &) = delete;
+    Bindings(Bindings &&) = delete;
+    Bindings & operator=(const Bindings &) = delete;
+    Bindings & operator=(Bindings &&) = delete;
 
 public:
     size_t size() const
@@ -82,7 +81,6 @@ public:
 
     void push_back(const Attr & attr)
     {
-        assert(size_ < capacity_);
         attrs[size_++] = attr;
     }
 
@@ -136,11 +134,6 @@ public:
 
     void sort();
 
-    size_t capacity() const
-    {
-        return capacity_;
-    }
-
     /**
      * Returns the attributes in lexicographically sorted order.
      */
@@ -165,21 +158,28 @@ public:
  * order at the end. The only way to consume a BindingsBuilder is to
  * call finish(), which sorts the bindings.
  */
-class BindingsBuilder
+class BindingsBuilder final
 {
-    Bindings * bindings;
-
 public:
     // needed by std::back_inserter
     using value_type = Attr;
+    using size_type = Bindings::size_t;
 
-    EvalState & state;
+private:
+    Bindings * bindings;
+    Bindings::size_t capacity_;
 
-    BindingsBuilder(EvalState & state, Bindings * bindings)
+    friend class EvalState;
+
+    BindingsBuilder(EvalState & state, Bindings * bindings, size_type capacity)
         : bindings(bindings)
+        , capacity_(capacity)
         , state(state)
     {
     }
+
+public:
+    std::reference_wrapper<EvalState> state;
 
     void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {
@@ -193,6 +193,7 @@ public:
 
     void push_back(const Attr & attr)
     {
+        assert(bindings->size() < capacity_);
         bindings->push_back(attr);
     }
 
@@ -211,16 +212,16 @@ public:
         return bindings;
     }
 
-    size_t capacity()
+    size_t capacity() const noexcept
     {
-        return bindings->capacity();
+        return capacity_;
     }
 
-    void grow(Bindings * newBindings)
+    void grow(BindingsBuilder newBindings)
     {
         for (auto & i : *bindings)
-            newBindings->push_back(i);
-        bindings = newBindings;
+            newBindings.push_back(i);
+        std::swap(*this, newBindings);
     }
 
     friend struct ExprAttrs;
