@@ -1,19 +1,22 @@
 #include "nix/util/mounted-source-accessor.hh"
-#include "nix/util/sync.hh"
+
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
 
 struct MountedSourceAccessorImpl : MountedSourceAccessor
 {
-    SharedSync<std::map<CanonPath, ref<SourceAccessor>>> mounts_;
+    boost::concurrent_flat_map<CanonPath, ref<SourceAccessor>> mounts;
 
     MountedSourceAccessorImpl(std::map<CanonPath, ref<SourceAccessor>> _mounts)
-        : mounts_(std::move(_mounts))
     {
         displayPrefix.clear();
 
         // Currently we require a root filesystem. This could be relaxed.
-        assert(mounts_.lock()->contains(CanonPath::root));
+        assert(_mounts.contains(CanonPath::root));
+
+        for (auto & [path, accessor] : _mounts)
+            mount(path, accessor);
 
         // FIXME: return dummy parent directories automatically?
     }
@@ -59,13 +62,9 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         // Find the nearest parent of `path` that is a mount point.
         std::vector<std::string> subpath;
         while (true) {
-            {
-                auto mounts(mounts_.readLock());
-                auto i = mounts->find(path);
-                if (i != mounts->end()) {
-                    std::reverse(subpath.begin(), subpath.end());
-                    return {i->second, CanonPath(subpath)};
-                }
+            if (auto mount = getMount(path)) {
+                std::reverse(subpath.begin(), subpath.end());
+                return {ref(mount), CanonPath(subpath)};
             }
 
             assert(!path.isRoot());
@@ -82,15 +81,15 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
 
     void mount(CanonPath mountPoint, ref<SourceAccessor> accessor) override
     {
-        mounts_.lock()->insert_or_assign(std::move(mountPoint), accessor);
+        mounts.emplace(std::move(mountPoint), std::move(accessor));
     }
 
     std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
     {
-        auto mounts(mounts_.readLock());
-        auto i = mounts->find(mountPoint);
-        if (i != mounts->end())
-            return i->second;
+        std::optional<ref<SourceAccessor>> res;
+        mounts.cvisit(mountPoint, [&](auto & x) { res = x.second; });
+        if (res)
+            return *res;
         else
             return nullptr;
     }
