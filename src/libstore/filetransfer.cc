@@ -496,11 +496,9 @@ struct curlFileTransfer : public FileTransfer
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
                     err = Misc;
-                } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
-                    // Let's treat most 5xx (server) errors as transient, except for a handful:
-                    //   * 501 not implemented
-                    //   * 505 http version not supported
-                    //   * 511 we're behind a captive portal
+                } else if (httpStatus >= 500 && httpStatus <= 599) {
+                    // a server is unlikely to 5xx unless there is a critical configuration/system error
+                    // we can't recover from an error that isn't our fault so give up
                     err = Misc;
                 } else {
 // Don't bother retrying on certain cURL errors either

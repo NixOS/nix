@@ -96,7 +96,7 @@ protected:
     void maybeDisable()
     {
         auto state(_state.lock());
-        if (state->enabled && settings.tryFallback) {
+        if (state->enabled) {
             int t = 60;
             printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
             state->enabled = false;
@@ -196,8 +196,14 @@ protected:
                     try {
                         (*callbackPtr)(std::move(result.get().data));
                     } catch (FileTransferError & e) {
-                        if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
+                        if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden) {
                             return (*callbackPtr)({});
+                        }
+                        // if the server is having errors then give up on it
+                        if (e.error == FileTransfer::Misc) {
+                            maybeDisable();
+                            return (*callbackPtr)({});
+                        }
                         maybeDisable();
                         callbackPtr->rethrow();
                     } catch (...) {
@@ -219,6 +225,10 @@ protected:
         } catch (FileTransferError & e) {
             if (e.error == FileTransfer::NotFound)
                 return std::nullopt;
+            if (e.error == FileTransfer::Misc) {
+                maybeDisable();
+                return std::nullopt;
+            }
             maybeDisable();
             throw;
         }
