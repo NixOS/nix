@@ -4571,11 +4571,13 @@ struct RegexCache
         std::regex regex;
         /* No std::regex constructor overload from std::string_view, but can be constructed
            from a pointer + size or an iterator range. */
-        cache.try_emplace_and_cvisit(re,
-            /*s=*/re.data(), /*count=*/re.size(), std::regex::extended,
+        cache.try_emplace_and_cvisit(
+            re,
+            /*s=*/re.data(),
+            /*count=*/re.size(),
+            std::regex::extended,
             [&regex](const auto & kv) { regex = kv.second; },
-            [&regex](const auto & kv) { regex = kv.second; }
-        );
+            [&regex](const auto & kv) { regex = kv.second; });
         return regex;
     }
 };

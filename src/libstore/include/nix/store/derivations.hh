@@ -11,7 +11,7 @@
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
-#include <map>
+#include <boost/unordered/concurrent_flat_map_fwd.hpp>
 #include <variant>
 
 namespace nix {
@@ -507,13 +507,23 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
  */
 std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv);
 
+struct DrvHashFct
+{
+    using is_avalanching = std::true_type;
+
+    std::size_t operator()(const StorePath & path) const noexcept
+    {
+        return std::hash<std::string_view>{}(path.to_string());
+    }
+};
+
 /**
  * Memoisation of hashDerivationModulo().
  */
-typedef std::map<StorePath, DrvHash> DrvHashes;
+typedef boost::concurrent_flat_map<StorePath, DrvHash, DrvHashFct> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
-extern Sync<DrvHashes> drvHashes;
+extern DrvHashes drvHashes;
 
 struct Source;
 struct Sink;

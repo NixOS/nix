@@ -16,7 +16,7 @@
 #include "nix_api_util_internal.h"
 
 #if NIX_USE_BOEHMGC
-#  include <mutex>
+#  include <boost/unordered/concurrent_flat_map.hpp>
 #endif
 
 /**
@@ -207,28 +207,20 @@ void nix_state_free(EvalState * state)
 }
 
 #if NIX_USE_BOEHMGC
-std::unordered_map<
+boost::concurrent_flat_map<
     const void *,
     unsigned int,
     std::hash<const void *>,
     std::equal_to<const void *>,
     traceable_allocator<std::pair<const void * const, unsigned int>>>
-    nix_refcounts;
-
-std::mutex nix_refcount_lock;
+    nix_refcounts{};
 
 nix_err nix_gc_incref(nix_c_context * context, const void * p)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        std::scoped_lock lock(nix_refcount_lock);
-        auto f = nix_refcounts.find(p);
-        if (f != nix_refcounts.end()) {
-            f->second++;
-        } else {
-            nix_refcounts[p] = 1;
-        }
+        nix_refcounts.insert_or_visit({p, 1}, [](auto & kv) { kv.second++; });
     }
     NIXC_CATCH_ERRS
 }
@@ -239,12 +231,12 @@ nix_err nix_gc_decref(nix_c_context * context, const void * p)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        std::scoped_lock lock(nix_refcount_lock);
-        auto f = nix_refcounts.find(p);
-        if (f != nix_refcounts.end()) {
-            if (--f->second == 0)
-                nix_refcounts.erase(f);
-        } else
+        bool fail = true;
+        nix_refcounts.erase_if(p, [&](auto & kv) {
+            fail = false;
+            return !--kv.second;
+        });
+        if (fail)
             throw std::runtime_error("nix_gc_decref: object was not referenced");
     }
     NIXC_CATCH_ERRS

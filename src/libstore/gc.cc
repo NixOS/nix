@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/path.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/signals.hh"
@@ -13,14 +14,10 @@
 #  include "nix/util/processes.hh"
 #endif
 
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/regex.hpp>
-
-#include <functional>
 #include <queue>
-#include <algorithm>
-#include <random>
-
-#include <climits>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -314,7 +311,7 @@ Roots LocalStore::findRoots(bool censor)
 /**
  * Key is a mere string because cannot has path with macOS's libc++
  */
-typedef std::unordered_map<std::string, std::unordered_set<std::string>> UncheckedRoots;
+typedef boost::unordered_flat_map<std::string, boost::unordered_flat_set<std::string>> UncheckedRoots;
 
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
@@ -463,13 +460,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    std::unordered_set<StorePath> roots, dead, alive;
+    boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
 
     struct Shared
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        std::unordered_set<std::string> tempRoots;
+        boost::unordered_flat_set<std::string> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -672,7 +669,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    std::unordered_map<StorePath, StorePathSet> referrersCache;
+    boost::unordered_flat_map<StorePath, StorePathSet, std::hash<StorePath>> referrersCache;
 
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation

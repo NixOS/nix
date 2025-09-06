@@ -11,6 +11,7 @@
 #include "nix/util/json-utils.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -834,7 +835,7 @@ DerivationType BasicDerivation::type() const
     throw Error("can't mix derivation output types");
 }
 
-Sync<DrvHashes> drvHashes;
+DrvHashes drvHashes;
 
 /* pathDerivationModulo and hashDerivationModulo are mutually recursive
  */
@@ -844,16 +845,13 @@ Sync<DrvHashes> drvHashes;
  */
 static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPath)
 {
-    {
-        auto hashes = drvHashes.lock();
-        auto h = hashes->find(drvPath);
-        if (h != hashes->end()) {
-            return h->second;
-        }
+    std::optional<DrvHash> hash;
+    if (drvHashes.cvisit(drvPath, [&hash](const auto & kv) { hash.emplace(kv.second); })) {
+        return *hash;
     }
     auto h = hashDerivationModulo(store, store.readInvalidDerivation(drvPath), false);
     // Cache it
-    drvHashes.lock()->insert_or_assign(drvPath, h);
+    drvHashes.insert_or_assign(drvPath, h);
     return h;
 }
 

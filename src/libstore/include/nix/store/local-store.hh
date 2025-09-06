@@ -11,7 +11,7 @@
 #include <chrono>
 #include <future>
 #include <string>
-#include <unordered_set>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -442,7 +442,7 @@ private:
 
     std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
-    typedef std::unordered_set<ino_t> InodeHash;
+    typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
