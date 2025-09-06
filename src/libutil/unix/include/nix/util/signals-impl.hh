@@ -43,13 +43,6 @@ extern thread_local std::function<bool()> interruptCheck;
 void _interrupted();
 
 /**
- * Sets the signal mask. Like saveSignalMask() but for a signal set that doesn't
- * necessarily match the current thread's mask.
- * See saveSignalMask() to set the saved mask to the current mask.
- */
-void setChildSignalMask(sigset_t * sigs);
-
-/**
  * Start a thread that handles various signals. Also block those signals
  * on the current thread (and thus any threads created by it).
  * Saves the signal mask before changing the mask to block those signals.
@@ -60,8 +53,6 @@ void startSignalHandlerThread();
 /**
  * Saves the signal mask, which is the signal mask that nix will restore
  * before creating child processes.
- * See setChildSignalMask() to set an arbitrary signal mask instead of the
- * current mask.
  */
 void saveSignalMask();
 
