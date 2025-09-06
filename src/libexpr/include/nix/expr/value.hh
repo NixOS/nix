@@ -972,7 +972,6 @@ public:
     void mkStringMove(const char * s, const NixStringContext & context);
 
     void mkPath(const SourcePath & path);
-    void mkPath(std::string_view path);
 
     inline void mkPath(SourceAccessor * accessor, const char * path) noexcept
     {
