@@ -50,12 +50,6 @@ private:
      */
 
     /**
-     * All input paths (that is, the union of FS closures of the
-     * immediate input paths).
-     */
-    StorePathSet inputPaths;
-
-    /**
      * File descriptor for the log file.
      */
     AutoCloseFD fdLogFile;
@@ -101,12 +95,12 @@ private:
      * The states.
      */
     Co gaveUpOnSubstitution();
-    Co tryToBuild();
 
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs);
+    HookReply
+    tryBuildHook(const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs);
 
     /**
      * Open a log file and a pipe to it.
