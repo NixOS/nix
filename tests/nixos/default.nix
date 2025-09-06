@@ -189,6 +189,8 @@ in
 
   s3-binary-cache-store = runNixOSTestFor "x86_64-linux" ./s3-binary-cache-store.nix;
 
+  http-binary-cache-auth = runNixOSTestFor "x86_64-linux" ./http-binary-cache-auth.nix;
+
   fsync = runNixOSTestFor "x86_64-linux" ./fsync.nix;
 
   cgroups = runNixOSTestFor "x86_64-linux" ./cgroups;
