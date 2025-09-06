@@ -22,6 +22,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
+#include "nix/util/current-process.hh"
 
 #include "parser-tab.hh"
 
@@ -37,10 +38,6 @@
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
-
-#ifndef _WIN32 // TODO use portable implementation
-#  include <sys/resource.h>
-#endif
 
 #include "nix/util/strings-inline.hh"
 
@@ -2830,11 +2827,8 @@ void EvalState::maybePrintStats()
 
 void EvalState::printStatistics()
 {
-#ifndef _WIN32 // TODO use portable implementation
-    struct rusage buf;
-    getrusage(RUSAGE_SELF, &buf);
-    float cpuTime = buf.ru_utime.tv_sec + ((float) buf.ru_utime.tv_usec / 1000000);
-#endif
+    std::chrono::microseconds cpuTimeDuration = getCpuUserTime();
+    float cpuTime = std::chrono::duration_cast<std::chrono::duration<float>>(cpuTimeDuration).count();
 
     uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
     uint64_t bLists = nrListElems * sizeof(Value *);
@@ -2856,18 +2850,12 @@ void EvalState::printStatistics()
     if (outPath != "-")
         fs.open(outPath, std::fstream::out);
     json topObj = json::object();
-#ifndef _WIN32 // TODO implement
     topObj["cpuTime"] = cpuTime;
-#endif
     topObj["time"] = {
-#ifndef _WIN32 // TODO implement
         {"cpu", cpuTime},
-#endif
 #if NIX_USE_BOEHMGC
         {GC_is_incremental_mode() ? "gcNonIncremental" : "gc", gcFullOnlyTime},
-#  ifndef _WIN32 // TODO implement
         {GC_is_incremental_mode() ? "gcNonIncrementalFraction" : "gcFraction", gcFullOnlyTime / cpuTime},
-#  endif
 #endif
     };
     topObj["envs"] = {

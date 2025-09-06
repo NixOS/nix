@@ -49,6 +49,7 @@ config_unix_priv_h = configure_file(
 sources += config_unix_priv_h
 
 sources += files(
+  'current-process.cc',
   'environment-variables.cc',
   'file-descriptor.cc',
   'file-path.cc',
