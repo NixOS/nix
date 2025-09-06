@@ -25,6 +25,8 @@ std::string StoreReference::render(bool withParams) const
     std::visit(
         overloaded{
             [&](const StoreReference::Auto &) { res = "auto"; },
+            [&](const StoreReference::Daemon &) { res = "daemon"; },
+            [&](const StoreReference::Local &) { res = "local"; },
             [&](const StoreReference::Specified & g) {
                 res = g.scheme;
                 res += "://";
@@ -66,21 +68,17 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                 .params = std::move(params),
             };
         } else if (baseURI == "daemon") {
+            if (params.empty())
+                return {.variant = Daemon{}};
             return {
-                .variant =
-                    Specified{
-                        .scheme = "unix",
-                        .authority = "",
-                    },
+                .variant = Specified{.scheme = "unix", .authority = ""},
                 .params = std::move(params),
             };
         } else if (baseURI == "local") {
+            if (params.empty())
+                return {.variant = Local{}};
             return {
-                .variant =
-                    Specified{
-                        .scheme = "local",
-                        .authority = "",
-                    },
+                .variant = Specified{.scheme = "local", .authority = ""},
                 .params = std::move(params),
             };
         } else if (isNonUriPath(baseURI)) {
