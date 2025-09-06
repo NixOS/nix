@@ -258,7 +258,7 @@ public:
      */
     std::string makeRelative(const CanonPath & path) const;
 
-    friend class std::hash<CanonPath>;
+    friend struct std::hash<CanonPath>;
 };
 
 std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
@@ -268,6 +268,8 @@ std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
 template<>
 struct std::hash<nix::CanonPath>
 {
+    using is_avalanching = std::true_type;
+
     std::size_t operator()(const nix::CanonPath & s) const noexcept
     {
         return std::hash<std::string>{}(s.path);

@@ -4,10 +4,10 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <chrono>
 #include <cmath>
 #include <regex>
-#include <unordered_set>
 #include <thread>
 
 #include <dirent.h>
@@ -76,7 +76,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
 
     int round = 1;
 
-    std::unordered_set<pid_t> pidsShown;
+    boost::unordered_flat_set<pid_t> pidsShown;
 
     while (true) {
         auto pids = tokenizeString<std::vector<std::string>>(readFile(procsFile));
