@@ -57,6 +57,10 @@ void emitTreeAttrs(
             attrs.alloc("revCount").mkInt(0);
     }
 
+    if (input.getRef() && !state.settings.pureEval) {
+        attrs.alloc("ref").mkString(*input.getRef());
+    }
+
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
         attrs.alloc("dirtyRev").mkString(*dirtyRev);
         attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
