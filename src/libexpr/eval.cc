@@ -205,7 +205,7 @@ EvalState::EvalState(
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
-    , emptyBindings(0)
+    , emptyBindings(Bindings())
     , storeFS(makeMountedSourceAccessor({
           {CanonPath::root, makeEmptySourceAccessor()},
           /* In the pure eval case, we can simply require
@@ -1218,7 +1218,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
                 *vOverrides,
                 [&]() { return vOverrides->determinePos(noPos); },
                 "while evaluating the `__overrides` attribute");
-            bindings.grow(state.allocBindings(bindings.capacity() + vOverrides->attrs()->size()));
+            bindings.grow(state.buildBindings(bindings.capacity() + vOverrides->attrs()->size()));
             for (auto & i : *vOverrides->attrs()) {
                 AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {

@@ -879,7 +879,7 @@ public:
 
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity));
+        return BindingsBuilder(*this, allocBindings(capacity), capacity);
     }
 
     ListBuilder buildList(size_t size)
