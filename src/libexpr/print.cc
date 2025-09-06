@@ -1,5 +1,4 @@
 #include <limits>
-#include <unordered_set>
 #include <sstream>
 
 #include "nix/expr/print.hh"
@@ -9,6 +8,8 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/english.hh"
 #include "nix/expr/eval.hh"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -81,7 +82,7 @@ std::ostream & printLiteralBool(std::ostream & str, bool boolean)
 // For example `or' doesn't need to be quoted.
 bool isReservedKeyword(const std::string_view str)
 {
-    static const std::unordered_set<std::string_view> reservedKeywords = {
+    static const boost::unordered_flat_set<std::string_view> reservedKeywords = {
         "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit"};
     return reservedKeywords.contains(str);
 }

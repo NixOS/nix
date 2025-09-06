@@ -1,13 +1,13 @@
 #pragma once
 ///@file
 
-#include <unordered_set>
-
 #include "nix/store/store-api.hh"
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
-typedef std::unordered_map<StorePath, std::unordered_set<std::string>> Roots;
+typedef boost::unordered_flat_map<StorePath, boost::unordered_flat_set<std::string>, std::hash<StorePath>> Roots;
 
 struct GCOptions
 {
