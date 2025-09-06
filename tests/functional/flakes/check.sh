@@ -135,3 +135,35 @@ EOF
 
 checkRes=$(nix flake check --all-systems $flakeDir 2>&1 && fail "nix flake check --all-systems should have failed" || true)
 echo "$checkRes" | grepQuiet "formatter.system-1"
+
+# Test whether `nix flake check` builds checks.
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    checks.$system.foo = with import ./config.nix; mkDerivation {
+      name = "simple";
+      buildCommand = "mkdir \$out";
+    };
+  };
+}
+EOF
+
+cp "${config_nix}" "$flakeDir/"
+
+expectStderr 0 nix flake check "$flakeDir" | grepQuiet 'running 1 flake check'
+
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: {
+    checks.$system.foo = with import ./config.nix; mkDerivation {
+      name = "simple";
+      buildCommand = "false";
+    };
+  };
+}
+EOF
+
+# FIXME: error code 100 doesn't get propagated from the daemon.
+if ! isTestOnNixOS; then
+    expectStderr 100 nix flake check "$flakeDir" | grepQuiet 'builder failed with exit code 1'
+fi
