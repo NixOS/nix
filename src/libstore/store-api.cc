@@ -1,3 +1,4 @@
+#include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/store/globals.hh"
@@ -392,12 +393,10 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
 {
     if (!settings.useSubstitutes)
         return;
-    for (auto & sub : getDefaultSubstituters()) {
-        for (auto & path : paths) {
-            if (infos.count(path.first))
-                // Choose first succeeding substituter.
-                continue;
 
+    for (auto & path : paths) {
+        std::optional<Error> lastStoresException = std::nullopt;
+        for (auto & sub : getDefaultSubstituters()) {
             auto subPath(path.first);
 
             // Recompute store path so that we can use a different store root.
@@ -437,11 +436,16 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
+                printError(
+                    "Error in substituter while querying path info for %s:\n\"%s\"\n\nNix will now try the next substituter",
+                    sub->printStorePath(subPath),
+                    e.message());
+                lastStoresException = std::make_optional(std::move(e));
             }
+        }
+        if (lastStoresException.has_value() && !settings.tryFallback) {
+            printError("Exception left in accumulator after all stores finished");
+            throw lastStoresException.value();
         }
     }
 }

@@ -55,9 +55,14 @@ Goal::Co PathSubstitutionGoal::init()
     auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
 
     bool substituterFailed = false;
+    std::optional<Error> lastStoresException = std::nullopt;
 
     for (const auto & sub : subs) {
         trace("trying next substituter");
+        if (lastStoresException.has_value()) {
+            trace("exception from previous substituter found when creating path substitution goal");
+            trace(lastStoresException.value().message());
+        }
 
         cleanup();
 
@@ -80,19 +85,14 @@ Goal::Co PathSubstitutionGoal::init()
         try {
             // FIXME: make async
             info = sub->queryPathInfo(subPath ? *subPath : storePath);
-        } catch (InvalidPath &) {
+        } catch (InvalidPath & e) {
             continue;
         } catch (SubstituterDisabled & e) {
-            if (settings.tryFallback)
-                continue;
-            else
-                throw e;
+            continue;
         } catch (Error & e) {
-            if (settings.tryFallback) {
-                logError(e.info());
-                continue;
-            } else
-                throw e;
+            logError(e.info());
+            lastStoresException = std::make_optional(std::move(e));
+            continue;
         }
 
         if (info->path != storePath) {
@@ -147,6 +147,7 @@ Goal::Co PathSubstitutionGoal::init()
         bool out = false; // is mutated by tryToRun
         co_await tryToRun(subPath ? *subPath : storePath, sub, info, out);
         substituterFailed = substituterFailed || out;
+        lastStoresException = std::nullopt;
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -155,6 +156,10 @@ Goal::Co PathSubstitutionGoal::init()
     if (substituterFailed) {
         worker.failedSubstitutions++;
         worker.updateProgress();
+    }
+    if (lastStoresException.has_value() && !settings.tryFallback) {
+        printError("Exception left in accumulator after all stores finished");
+        throw lastStoresException.value();
     }
 
     /* Hack: don't indicate failure if there were no substituters.
