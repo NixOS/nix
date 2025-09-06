@@ -23,6 +23,8 @@ extern "C" {
 typedef struct Store Store;
 /** @brief Nix store path */
 typedef struct StorePath StorePath;
+/** @brief Nix Derivation */
+typedef struct Derivation Derivation;
 
 /**
  * @brief Initializes the Nix store library
@@ -206,6 +208,12 @@ nix_err nix_store_realise(
  */
 nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
+
+Derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json);
+
+StorePath * nix_add_derivation(nix_c_context * context, Store * store, Derivation * derivation);
+
+void nix_derivation_free(Derivation * drv);
 
 /**
  * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
