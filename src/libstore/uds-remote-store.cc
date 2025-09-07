@@ -57,15 +57,16 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 
 StoreReference UDSRemoteStoreConfig::getReference() const
 {
+    /* We specifically return "daemon" here instead of "unix://" or "unix://${path}"
+     * to be more compatible with older versions of nix. Some tooling out there
+     * tries hard to parse store references and it might not be able to handle "unix://". */
+    if (path == settings.nixDaemonSocketFile)
+        return {.variant = StoreReference::Daemon{}};
     return {
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
-                // We return the empty string when the path looks like the
-                // default path, but we could also just return the path
-                // verbatim always, to be robust to overall config changes
-                // at the cost of some verbosity.
-                .authority = path == settings.nixDaemonSocketFile ? "" : path,
+                .authority = path,
             },
     };
 }

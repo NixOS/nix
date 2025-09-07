@@ -818,7 +818,13 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
 
     auto isShorthand = [](const StoreReference & ref) {
         /* At this point StoreReference **must** be resolved. */
-        const auto & specified = std::get<StoreReference::Specified>(ref.variant);
+        const auto & specified = std::visit(
+            overloaded{
+                [](const StoreReference::Auto &) -> const StoreReference::Specified & { unreachable(); },
+                [](const StoreReference::Specified & specified) -> const StoreReference::Specified & {
+                    return specified;
+                }},
+            ref.variant);
         const auto & scheme = specified.scheme;
         return (scheme == "local" || scheme == "unix") && specified.authority.empty();
     };
