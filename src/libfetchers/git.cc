@@ -163,7 +163,8 @@ struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        if (url.scheme != "git" && !hasPrefix(url.scheme, "git+"))
+        auto parsedScheme = parseUrlScheme(url.scheme);
+        if (parsedScheme.application != "git")
             return {};
 
         auto url2(url);
