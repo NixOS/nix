@@ -474,7 +474,8 @@ private:
 
     LookupPath lookupPath;
 
-    boost::unordered_flat_map<std::string, std::optional<SourcePath>> lookupPathResolved;
+    boost::unordered_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>
+        lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -751,8 +752,8 @@ public:
     boost::unordered_flat_map<
         std::string,
         Value *,
-        std::hash<std::string>,
-        std::equal_to<std::string>,
+        StringViewHash,
+        std::equal_to<>,
         traceable_allocator<std::pair<const std::string, Value *>>>
         internalPrimOps;
 
@@ -1019,7 +1020,7 @@ private:
 
     bool countCalls;
 
-    typedef boost::unordered_flat_map<std::string, size_t> PrimOpCalls;
+    typedef boost::unordered_flat_map<std::string, size_t, StringViewHash, std::equal_to<>> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
     typedef boost::unordered_flat_map<ExprLambda *, size_t> FunctionCalls;

@@ -7,7 +7,11 @@
 
 namespace nix {
 
-typedef boost::unordered_flat_map<StorePath, boost::unordered_flat_set<std::string>, std::hash<StorePath>> Roots;
+typedef boost::unordered_flat_map<
+    StorePath,
+    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
+    std::hash<StorePath>>
+    Roots;
 
 struct GCOptions
 {

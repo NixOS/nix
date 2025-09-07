@@ -311,7 +311,12 @@ Roots LocalStore::findRoots(bool censor)
 /**
  * Key is a mere string because cannot has path with macOS's libc++
  */
-typedef boost::unordered_flat_map<std::string, boost::unordered_flat_set<std::string>> UncheckedRoots;
+typedef boost::unordered_flat_map<
+    std::string,
+    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
+    StringViewHash,
+    std::equal_to<>>
+    UncheckedRoots;
 
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
@@ -325,7 +330,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
         throw;
     }
     if (buf.is_absolute())
-        roots[buf.string()].emplace(file.string());
+        roots[buf].emplace(file.string());
 }
 
 static std::string quoteRegexChars(const std::string & raw)
@@ -466,7 +471,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        boost::unordered_flat_set<std::string> tempRoots;
+        boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -575,9 +580,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             auto storePath = maybeParseStorePath(path);
                             if (storePath) {
                                 debug("got new GC root '%s'", path);
-                                auto hashPart = std::string(storePath->hashPart());
+                                auto hashPart = storePath->hashPart();
                                 auto shared(_shared.lock());
-                                shared->tempRoots.insert(hashPart);
+                                shared->tempRoots.emplace(hashPart);
                                 /* If this path is currently being
                                    deleted, then we have to wait until
                                    deletion is finished to ensure that
@@ -629,7 +634,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Roots tempRoots;
     findTempRoots(tempRoots, true);
     for (auto & root : tempRoots) {
-        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
+        _shared.lock()->tempRoots.emplace(root.first.hashPart());
         roots.insert(root.first);
     }
 
@@ -736,7 +741,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return;
 
             {
-                auto hashPart = std::string(path->hashPart());
+                auto hashPart = path->hashPart();
                 auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
