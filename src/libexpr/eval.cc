@@ -155,6 +155,8 @@ std::string_view showType(ValueType type, bool withArticle)
         return WA("a", "float");
     case nThunk:
         return WA("a", "thunk");
+    case nFailed:
+        return WA("an", "error");
     }
     unreachable();
 }
@@ -2825,8 +2827,11 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         return;
 
-    case nThunk: // Must not be left by forceValue
-        assert(false);
+    // Cannot be returned by forceValue().
+    case nThunk:
+    case nFailed:
+        unreachable();
+
     default: // Note that we pass compiler flags that should make `default:` unreachable.
         // Also note that this probably ran after `eqValues`, which implements
         // the same logic more efficiently (without having to unwind stacks),
@@ -2920,8 +2925,11 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         // !!!
         return v1.fpoint() == v2.fpoint();
 
-    case nThunk: // Must not be left by forceValue
-        assert(false);
+    // Cannot be returned by forceValue().
+    case nThunk:
+    case nFailed:
+        unreachable();
+
     default: // Note that we pass compiler flags that should make `default:` unreachable.
         error<EvalError>("eqValues: cannot compare %1% with %2%", showType(v1), showType(v2))
             .withTrace(pos, errorCtx)

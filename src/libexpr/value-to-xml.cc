@@ -171,7 +171,11 @@ static void printValueAsXML(
         break;
 
     case nThunk:
+    // Historically, a tried and then ignored value (e.g. through tryEval) was
+    // reverted to the original thunk.
+    case nFailed:
         doc.writeEmptyElement("unevaluated");
+        break;
     }
 }
 

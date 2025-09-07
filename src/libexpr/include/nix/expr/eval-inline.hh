@@ -91,18 +91,25 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
         Expr * expr = v.thunk().expr;
         try {
             v.mkBlackhole();
-            // checkInterrupt();
             if (env) [[likely]]
                 expr->eval(*this, *env, v);
             else
                 ExprBlackHole::throwInfiniteRecursionError(*this, v);
         } catch (...) {
-            v.mkThunk(env, expr);
-            tryFixupBlackHolePos(v, pos);
+            if (!env)
+                tryFixupBlackHolePos(v, pos);
+            v.mkFailed();
             throw;
         }
-    } else if (v.isApp())
-        callFunction(*v.app().left, *v.app().right, v, pos);
+    } else if (v.isApp()) {
+        try {
+            callFunction(*v.app().left, *v.app().right, v, pos);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
+    } else if (v.isFailed())
+        v.failed().rethrow();
 }
 
 [[gnu::always_inline]]

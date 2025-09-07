@@ -194,6 +194,8 @@ ValueType nix_get_type(nix_c_context * context, const nix_value * value)
         switch (v.type()) {
         case nThunk:
             return NIX_TYPE_THUNK;
+        case nFailed:
+            return NIX_TYPE_FAILED;
         case nInt:
             return NIX_TYPE_INT;
         case nFloat:

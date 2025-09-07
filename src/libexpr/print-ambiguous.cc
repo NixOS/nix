@@ -73,6 +73,11 @@ void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<c
             str << "«potential infinite recursion»";
         }
         break;
+    case nFailed:
+        // Historically, a tried and then ignored value (e.g. through tryEval) was
+        // reverted to the original thunk.
+        str << "<CODE>";
+        break;
     case nFunction:
         if (v.isLambda()) {
             str << "<LAMBDA>";

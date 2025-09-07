@@ -562,6 +562,7 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Valu
         v.mkStringNoCopy("float"_sds);
         break;
     case nThunk:
+    case nFailed:
         unreachable();
     }
 }

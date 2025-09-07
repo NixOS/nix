@@ -98,6 +98,7 @@ json printValueAsJSON(
         break;
 
     case nThunk:
+    case nFailed:
     case nFunction:
         state.error<TypeError>("cannot convert %1% to JSON", showType(v)).atPos(v.determinePos(pos)).debugThrow();
     }
