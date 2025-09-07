@@ -362,9 +362,21 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         userNamespaceSync.readSide = -1;
 
-        /* Close the write side to prevent runChild() from hanging
-           reading from this. */
-        Finally cleanup([&]() { userNamespaceSync.writeSide = -1; });
+        /* Make sure that we write *something* to the child in case of
+           an exception. Note that merely closing
+           `userNamespaceSync.writeSide` doesn't work in
+           multi-threaded Nix, since several child processes may have
+           inherited `writeSide` (and O_CLOEXEC doesn't help because
+           the children may not do an execve). */
+        bool userNamespaceSyncDone = false;
+        Finally cleanup([&]() {
+            try {
+                if (!userNamespaceSyncDone)
+                    writeFull(userNamespaceSync.writeSide.get(), "0\n");
+            } catch (...) {
+            }
+            userNamespaceSync.writeSide = -1;
+        });
 
         auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
         assert(ss.size() == 1);
@@ -419,14 +431,15 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             writeFile(*cgroup + "/cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
-        writeFull(userNamespaceSync.writeSide.get(), "1");
+        writeFull(userNamespaceSync.writeSide.get(), "1\n");
+        userNamespaceSyncDone = true;
     }
 
     void enterChroot() override
     {
         userNamespaceSync.writeSide = -1;
 
-        if (drainFD(userNamespaceSync.readSide.get()) != "1")
+        if (readLine(userNamespaceSync.readSide.get()) != "1")
             throw Error("user namespace initialisation failed");
 
         userNamespaceSync.readSide = -1;
