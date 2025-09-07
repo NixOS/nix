@@ -8,7 +8,6 @@ namespace nix::fetchers {
 InputCache::CachedResult
 InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegistries useRegistries)
 {
-    Attrs extraAttrs;
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
 
@@ -18,13 +17,13 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
             if (useRegistries != UseRegistries::No) {
-                auto [res, extraAttrs_] = lookupInRegistries(store, originalInput, useRegistries);
-                extraAttrs = extraAttrs_;
+                auto [res, extraAttrs] = lookupInRegistries(store, originalInput, useRegistries);
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);
                 if (!fetched) {
                     auto [accessor, lockedInput] = resolvedInput.getAccessor(store);
-                    fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
+                    fetched.emplace(
+                        CachedInput{.lockedInput = lockedInput, .accessor = accessor, .extraAttrs = extraAttrs});
                 }
                 upsert(resolvedInput, *fetched);
             } else {
@@ -38,7 +37,7 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
 
     debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
 
-    return {fetched->accessor, resolvedInput, fetched->lockedInput, extraAttrs};
+    return {fetched->accessor, resolvedInput, fetched->lockedInput, fetched->extraAttrs};
 }
 
 struct InputCacheImpl : InputCache
