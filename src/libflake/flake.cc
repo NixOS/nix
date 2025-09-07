@@ -340,8 +340,9 @@ static Flake getFlake(
     // Fetch a lazy tree first.
     auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
 
-    auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), originalRef.subdir);
-    auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), originalRef.subdir);
+    auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
+    auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
+    auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), subdir);
 
     // Parse/eval flake.nix to get at the input.self attributes.
     auto flake = readFlake(state, originalRef, resolvedRef, lockedRef, {cachedInput.accessor}, lockRootAttrPath);

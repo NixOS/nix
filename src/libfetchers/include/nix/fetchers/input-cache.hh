@@ -11,6 +11,7 @@ struct InputCache
         ref<SourceAccessor> accessor;
         Input resolvedInput;
         Input lockedInput;
+        Attrs extraAttrs;
     };
 
     CachedResult getAccessor(ref<Store> store, const Input & originalInput, UseRegistries useRegistries);
