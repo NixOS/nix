@@ -378,7 +378,8 @@ private:
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    SharedSync<std::unordered_map<SourcePath, SourcePath>> importResolutionCache;
+    struct ImportResolutionCache;
+    ref<ImportResolutionCache> importResolutionCache;
 
     /**
      * A cache from resolved paths to values.

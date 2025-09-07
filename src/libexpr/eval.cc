@@ -219,6 +219,11 @@ struct EvalState::SrcToStore
     boost::concurrent_flat_map<SourcePath, StorePath> inner;
 };
 
+struct EvalState::ImportResolutionCache
+{
+    boost::concurrent_flat_map<SourcePath, SourcePath> inner;
+};
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -350,7 +355,8 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , asyncPathWriter(AsyncPathWriter::make(store))
-    , srcToStore(make_ref<decltype(srcToStore)::element_type>())
+    , srcToStore(make_ref<SrcToStore>())
+    , importResolutionCache(make_ref<ImportResolutionCache>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -1175,11 +1181,11 @@ struct ExprParseFile : Expr
 
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    auto resolvedPath = getOptional(*importResolutionCache.readLock(), path);
+    auto resolvedPath = getConcurrent(importResolutionCache->inner, path);
 
     if (!resolvedPath) {
         resolvedPath = resolveExprPath(path);
-        importResolutionCache.lock()->emplace(path, *resolvedPath);
+        importResolutionCache->inner.emplace(path, *resolvedPath);
     }
 
     if (auto v2 = get(*fileEvalCache.readLock(), *resolvedPath)) {
