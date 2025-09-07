@@ -833,6 +833,7 @@ struct Value : public ValueStorage<sizeof(void *)>
 {
     friend std::string showType(const Value & v);
 
+private:
     template<InternalType... discriminator>
     bool isa() const noexcept
     {
