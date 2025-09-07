@@ -384,14 +384,8 @@ private:
     /**
      * A cache from resolved paths to values.
      */
-    typedef std::unordered_map<
-        SourcePath,
-        Value,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value>>>
-        FileEvalCache;
-    SharedSync<FileEvalCache> fileEvalCache;
+    struct FileEvalCache;
+    ref<FileEvalCache> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
