@@ -2506,8 +2506,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    std::optional<StorePath> dstPathCached;
-    srcToStore->inner.cvisit(path, [&](auto & x) { dstPathCached = x.second; });
+    auto dstPathCached = getConcurrent(srcToStore->inner, path);
 
     auto dstPath = dstPathCached ? *dstPathCached : [&]() {
         auto dstPath = fetchToStore(

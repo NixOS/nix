@@ -227,6 +227,14 @@ std::optional<typename T::mapped_type> getOptional(const T & map, const typename
     return {i->second};
 }
 
+template<class T>
+std::optional<typename T::mapped_type> getConcurrent(const T & map, const typename T::key_type & key)
+{
+    std::optional<typename T::mapped_type> res;
+    map.cvisit(key, [&](auto & x) { res = x.second; });
+    return res;
+}
+
 /**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
