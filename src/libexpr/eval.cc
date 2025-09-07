@@ -40,6 +40,7 @@
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
@@ -213,6 +214,11 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 
 static constexpr size_t BASE_ENV_SIZE = 128;
 
+struct EvalState::SrcToStore
+{
+    boost::concurrent_flat_map<SourcePath, StorePath> inner;
+};
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -344,6 +350,7 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , asyncPathWriter(AsyncPathWriter::make(store))
+    , srcToStore(make_ref<decltype(srcToStore)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -2499,7 +2506,8 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto dstPathCached = get(*srcToStore.lock(), path);
+    std::optional<StorePath> dstPathCached;
+    srcToStore->inner.cvisit(path, [&](auto & x) { dstPathCached = x.second; });
 
     auto dstPath = dstPathCached ? *dstPathCached : [&]() {
         auto dstPath = fetchToStore(
@@ -2512,7 +2520,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             nullptr,
             repair);
         allowPath(dstPath);
-        srcToStore.lock()->try_emplace(path, dstPath);
+        srcToStore->inner.try_emplace(path, dstPath);
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
         return dstPath;
     }();

@@ -371,7 +371,8 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
+    struct SrcToStore;
+    ref<SrcToStore> srcToStore;
 
     /**
      * A cache that maps paths to "resolved" paths for importing Nix

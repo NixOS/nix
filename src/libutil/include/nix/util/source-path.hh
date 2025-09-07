@@ -119,6 +119,14 @@ struct SourcePath
 
 std::ostream & operator<<(std::ostream & str, const SourcePath & path);
 
+inline std::size_t hash_value(const SourcePath & path)
+{
+    std::size_t hash = 0;
+    boost::hash_combine(hash, path.accessor->number);
+    boost::hash_combine(hash, path.path);
+    return hash;
+}
+
 } // namespace nix
 
 template<>
@@ -126,8 +134,6 @@ struct std::hash<nix::SourcePath>
 {
     std::size_t operator()(const nix::SourcePath & s) const noexcept
     {
-        std::size_t hash = 0;
-        hash_combine(hash, s.accessor->number, s.path);
-        return hash;
+        return nix::hash_value(s);
     }
 };
