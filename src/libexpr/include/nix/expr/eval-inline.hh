@@ -97,12 +97,19 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             else
                 ExprBlackHole::throwInfiniteRecursionError(*this, v);
         } catch (...) {
-            v.mkThunk(env, expr);
             tryFixupBlackHolePos(v, pos);
+            v.mkFailed();
             throw;
         }
-    } else if (v.isApp())
-        callFunction(*v.app().left, *v.app().right, v, pos);
+    } else if (v.isApp()) {
+        try {
+            callFunction(*v.app().left, *v.app().right, v, pos);
+        } catch (...) {
+            v.mkFailed();
+            throw;
+        }
+    } else if (v.isFailed())
+        std::rethrow_exception(v.failed()->ex);
 }
 
 [[gnu::always_inline]]

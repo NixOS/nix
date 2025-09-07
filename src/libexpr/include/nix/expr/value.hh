@@ -35,6 +35,7 @@ typedef enum {
     tBool,
     tNull,
     tFloat,
+    tFailed,
     tExternal,
     tPrimOp,
     tAttrs,
@@ -57,6 +58,7 @@ typedef enum {
  */
 typedef enum {
     nThunk,
+    nFailed,
     nInt,
     nFloat,
     nBool,
@@ -265,6 +267,11 @@ struct ValueBase
         size_t size;
         Value * const * elems;
     };
+
+    struct Failed : gc
+    {
+        std::exception_ptr ex;
+    };
 };
 
 template<typename T>
@@ -291,6 +298,7 @@ struct PayloadTypeToInternalType
     MACRO(PrimOp *, primOp, tPrimOp)                                \
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
+    MACRO(ValueBase::Failed *, failed, tFailed)                     \
     MACRO(NixFloat, fpoint, tFloat)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
@@ -595,6 +603,11 @@ protected:
         path.path = std::bit_cast<const char *>(payload[1]);
     }
 
+    void getStorage(Failed *& failed) const noexcept
+    {
+        failed = std::bit_cast<Failed *>(payload[1]);
+    }
+
     void setStorage(NixInt integer) noexcept
     {
         setSingleDWordPayload<tInt>(integer.value);
@@ -643,6 +656,11 @@ protected:
     void setStorage(Path path) noexcept
     {
         setUntaggablePayload<pdPath>(path.accessor, path.path);
+    }
+
+    void setStorage(Failed * failed) noexcept
+    {
+        setSingleDWordPayload<tFailed>(std::bit_cast<PackedPointer>(failed));
     }
 };
 
@@ -866,12 +884,12 @@ public:
     inline bool isThunk() const
     {
         return isa<tThunk>();
-    };
+    }
 
     inline bool isApp() const
     {
         return isa<tApp>();
-    };
+    }
 
     inline bool isBlackhole() const;
 
@@ -879,17 +897,22 @@ public:
     inline bool isLambda() const
     {
         return isa<tLambda>();
-    };
+    }
 
     inline bool isPrimOp() const
     {
         return isa<tPrimOp>();
-    };
+    }
 
     inline bool isPrimOpApp() const
     {
         return isa<tPrimOpApp>();
-    };
+    }
+
+    inline bool isFailed() const
+    {
+        return isa<tFailed>();
+    }
 
     /**
      * Returns the normal type of a Value. This only returns nThunk if
@@ -926,6 +949,8 @@ public:
             return nExternal;
         case tFloat:
             return nFloat;
+        case tFailed:
+            return nFailed;
         case tThunk:
         case tApp:
             return nThunk;
@@ -1048,6 +1073,11 @@ public:
         setStorage(n);
     }
 
+    inline void mkFailed() noexcept
+    {
+        setStorage(new Value::Failed{.ex = std::current_exception()});
+    }
+
     bool isList() const noexcept
     {
         return isa<tListSmall, tListN>();
@@ -1150,6 +1180,11 @@ public:
     SourceAccessor * pathAccessor() const noexcept
     {
         return getStorage<Path>().accessor;
+    }
+
+    Failed * failed() const noexcept
+    {
+        return getStorage<Failed *>();
     }
 };
 

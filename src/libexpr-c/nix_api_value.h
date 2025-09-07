@@ -32,7 +32,8 @@ typedef enum {
     NIX_TYPE_ATTRS,
     NIX_TYPE_LIST,
     NIX_TYPE_FUNCTION,
-    NIX_TYPE_EXTERNAL
+    NIX_TYPE_EXTERNAL,
+    NIX_TYPE_FAILED,
 } ValueType;
 
 // forward declarations
