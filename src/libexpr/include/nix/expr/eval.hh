@@ -20,7 +20,6 @@
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
 
-#include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <map>
 #include <optional>
@@ -412,31 +411,21 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    boost::concurrent_flat_map<SourcePath, StorePath, std::hash<SourcePath>> srcToStore;
+    struct SrcToStore;
+    ref<SrcToStore> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    typedef boost::unordered_flat_map<
-        SourcePath,
-        Expr *,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Expr *>>>
-        FileParseCache;
-    FileParseCache fileParseCache;
+    struct ImportResolutionCache;
+    ref<ImportResolutionCache> importResolutionCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
-    typedef boost::unordered_flat_map<
-        SourcePath,
-        Value,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value>>>
-        FileEvalCache;
-    FileEvalCache fileEvalCache;
+    struct FileEvalCache;
+    ref<FileEvalCache> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
