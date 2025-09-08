@@ -148,4 +148,39 @@ URI_TEST(
         .params = {},
     }))
 
+static StoreReference sshLoopbackIPv6{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "[::1]",
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_1, sshLoopbackIPv6)
+
+static StoreReference sshIPv6AuthorityWithUserinfo{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "userinfo@[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e]",
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_2, sshIPv6AuthorityWithUserinfo)
+
+static StoreReference sshIPv6AuthorityWithUserinfoAndParams{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "userinfo@[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e]",
+        },
+    .params =
+        {
+            {"a", "b"},
+            {"c", "d"},
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_3, sshIPv6AuthorityWithUserinfoAndParams)
+
 } // namespace nix
