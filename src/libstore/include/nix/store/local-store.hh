@@ -174,7 +174,11 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State> _state;
+    /**
+     * Mutable state. It's behind a `ref` to reduce false sharing
+     * between immutable and mutable fields.
+     */
+    ref<Sync<State>> _state;
 
 public:
 
