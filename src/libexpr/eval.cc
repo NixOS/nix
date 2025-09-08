@@ -40,6 +40,7 @@
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 #ifndef _WIN32 // TODO use portable implementation
 #  include <sys/resource.h>
@@ -213,6 +214,27 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 
 static constexpr size_t BASE_ENV_SIZE = 128;
 
+struct EvalState::SrcToStore
+{
+    boost::concurrent_flat_map<SourcePath, StorePath> inner;
+};
+
+struct EvalState::ImportResolutionCache
+{
+    boost::concurrent_flat_map<SourcePath, SourcePath> inner;
+};
+
+struct EvalState::FileEvalCache
+{
+    boost::concurrent_flat_map<
+        SourcePath,
+        Value *,
+        std::hash<SourcePath>,
+        std::equal_to<SourcePath>,
+        traceable_allocator<std::pair<const SourcePath, Value *>>>
+        inner;
+};
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -344,6 +366,9 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , asyncPathWriter(AsyncPathWriter::make(store))
+    , srcToStore(make_ref<SrcToStore>())
+    , importResolutionCache(make_ref<ImportResolutionCache>())
+    , fileEvalCache(make_ref<FileEvalCache>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
@@ -1168,29 +1193,31 @@ struct ExprParseFile : Expr
 
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    auto resolvedPath = getOptional(*importResolutionCache.readLock(), path);
+    auto resolvedPath = getConcurrent(importResolutionCache->inner, path);
 
     if (!resolvedPath) {
         resolvedPath = resolveExprPath(path);
-        importResolutionCache.lock()->emplace(path, *resolvedPath);
+        importResolutionCache->inner.emplace(path, *resolvedPath);
     }
 
-    if (auto v2 = get(*fileEvalCache.readLock(), *resolvedPath)) {
-        forceValue(*const_cast<Value *>(v2), noPos);
-        v = *v2;
+    if (auto v2 = getConcurrent(fileEvalCache->inner, *resolvedPath)) {
+        forceValue(**v2, noPos);
+        v = **v2;
         return;
     }
 
     Value * vExpr;
     ExprParseFile expr{*resolvedPath, mustBeTrivial};
 
-    {
-        auto cache(fileEvalCache.lock());
-        auto [i, inserted] = cache->try_emplace(*resolvedPath);
-        if (inserted)
-            i->second.mkThunk(&baseEnv, &expr);
-        vExpr = &i->second;
-    }
+    fileEvalCache->inner.try_emplace_and_cvisit(
+        *resolvedPath,
+        nullptr,
+        [&](auto & i) {
+            vExpr = allocValue();
+            vExpr->mkThunk(&baseEnv, &expr);
+            i.second = vExpr;
+        },
+        [&](auto & i) { vExpr = i.second; });
 
     forceValue(*vExpr, noPos);
 
@@ -1199,7 +1226,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
 void EvalState::resetFileCache()
 {
-    fileEvalCache.lock()->clear();
+    fileEvalCache->inner.clear();
     inputCache->clear();
 }
 
@@ -2499,7 +2526,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto dstPathCached = get(*srcToStore.lock(), path);
+    auto dstPathCached = getConcurrent(srcToStore->inner, path);
 
     auto dstPath = dstPathCached ? *dstPathCached : [&]() {
         auto dstPath = fetchToStore(
@@ -2512,7 +2539,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             nullptr,
             repair);
         allowPath(dstPath);
-        srcToStore.lock()->try_emplace(path, dstPath);
+        srcToStore->inner.try_emplace(path, dstPath);
         printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
         return dstPath;
     }();

@@ -86,9 +86,7 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
 
     std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
     {
-        std::optional<ref<SourceAccessor>> res;
-        mounts.cvisit(mountPoint, [&](auto & x) { res = x.second; });
-        if (res)
+        if (auto res = getConcurrent(mounts, mountPoint))
             return *res;
         else
             return nullptr;
