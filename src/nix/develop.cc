@@ -304,6 +304,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         bmNormal,
         evalStore);
 
+    // `get-env.sh` will write its JSON output to an arbitrary output
+    // path, so return the first non-empty output path.
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
         auto accessor = evalStore->requireStoreObjectAccessor(*optPath);
@@ -497,19 +499,18 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store, ref<Installable> installable)
+    std::pair<BuildEnvironment, StorePath> getBuildEnvironment(ref<Store> store, ref<Installable> installable)
     {
         auto shellOutPath = getShellOutPath(store, installable);
 
-        auto strPath = store->printStorePath(shellOutPath);
-
         updateProfile(shellOutPath);
 
-        debug("reading environment file '%s'", strPath);
+        debug("reading environment file '%s'", store->printStorePath(shellOutPath));
 
         return {
             BuildEnvironment::parseJSON(store->requireStoreObjectAccessor(shellOutPath)->readFile(CanonPath::root)),
-            strPath};
+            shellOutPath,
+        };
     }
 };
 
@@ -636,7 +637,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setEnv("NIX_GCROOT", gcroot.c_str());
+        setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
 
         Path shell = "bash";
         bool foundInteractive = false;
