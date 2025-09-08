@@ -11,6 +11,7 @@ struct InputCache
         ref<SourceAccessor> accessor;
         Input resolvedInput;
         Input lockedInput;
+        Attrs extraAttrs;
     };
 
     CachedResult getAccessor(ref<Store> store, const Input & originalInput, UseRegistries useRegistries);
@@ -19,6 +20,7 @@ struct InputCache
     {
         Input lockedInput;
         ref<SourceAccessor> accessor;
+        Attrs extraAttrs;
     };
 
     virtual std::optional<CachedInput> lookup(const Input & originalInput) const = 0;

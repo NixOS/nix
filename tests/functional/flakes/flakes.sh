@@ -470,3 +470,20 @@ cat > "$flake3Dir/flake.nix" <<EOF
 EOF
 
 [[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $prevFlake1Rev ]]
+
+baseDir=$TEST_ROOT/$RANDOM
+subdirFlakeDir=$baseDir/foo
+mkdir -p "$subdirFlakeDir"
+
+writeSimpleFlake "$baseDir"
+
+cat > "$subdirFlakeDir"/flake.nix <<EOF
+{
+  outputs = inputs: {
+    shouldBeOne = 1;
+  };
+}
+EOF
+
+nix registry add --registry "$registry" flake2 "path:$baseDir?dir=foo"
+[[ "$(nix eval --flake-registry "$registry" flake2#shouldBeOne)" = 1 ]]
