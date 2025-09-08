@@ -105,6 +105,7 @@ boost = dependency(
     'container',
     # Shouldn't list, because can header-only, and Meson currently looks for libs
     #'regex',
+    'url',
   ],
   include_type : 'system',
 )
