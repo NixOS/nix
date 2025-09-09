@@ -16,12 +16,24 @@
 #  endif
 
 #  include <gc/gc_allocator.h>
+#  include <gc/gc_tiny_fl.h> // For GC_GRANULE_BYTES
 
 #  include <boost/coroutine2/coroutine.hpp>
 #  include <boost/coroutine2/protected_fixedsize_stack.hpp>
 #  include <boost/context/stack_context.hpp>
 
 #endif
+
+/*
+ * Ensure that Boehm satisfies our alignment requirements. This is the default configuration [^]
+ * and this assertion should never break for any platform. Let's assert it just in case.
+ *
+ * This alignment is particularly useful to be able to use aligned
+ * load/store instructions for loading/writing Values.
+ *
+ * [^]: https://github.com/bdwgc/bdwgc/blob/54ac18ccbc5a833dd7edaff94a10ab9b65044d61/include/gc/gc_tiny_fl.h#L31-L33
+ */
+static_assert(sizeof(void *) * 2 == GC_GRANULE_BYTES, "Boehm GC must use GC_GRANULE_WORDS = 2");
 
 namespace nix {
 
