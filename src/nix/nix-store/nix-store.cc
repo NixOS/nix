@@ -985,12 +985,6 @@ static void opServe(Strings opFlags, Strings opArgs)
             store->narFromPath(store->parseStorePath(readString(in)), out);
             break;
 
-        case ServeProto::Command::ExportPaths: {
-            readInt(in); // obsolete
-            store->exportPaths(ServeProto::Serialise<StorePathSet>::read(*store, rconn), out);
-            break;
-        }
-
         case ServeProto::Command::BuildPaths: {
 
             if (!writeAllowed)

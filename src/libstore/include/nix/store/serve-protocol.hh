@@ -108,7 +108,6 @@ enum struct ServeProto::Command : uint64_t {
     QueryValidPaths = 1,
     QueryPathInfos = 2,
     DumpStorePath = 3,
-    ExportPaths = 5,
     BuildPaths = 6,
     QueryClosure = 7,
     BuildDerivation = 8,
