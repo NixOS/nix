@@ -993,12 +993,20 @@ public:
 
     void mkList(const ListBuilder & builder) noexcept
     {
-        if (builder.size == 1)
+        switch (builder.size) {
+        case 0:
+            setStorage(List{.size = 0, .elems = nullptr});
+            break;
+        case 1:
             setStorage(std::array<Value *, 2>{builder.inlineElems[0], nullptr});
-        else if (builder.size == 2)
+            break;
+        case 2:
             setStorage(std::array<Value *, 2>{builder.inlineElems[0], builder.inlineElems[1]});
-        else
+            break;
+        default:
             setStorage(List{.size = builder.size, .elems = builder.elems});
+            break;
+        }
     }
 
     inline void mkThunk(Env * e, Expr * ex) noexcept
