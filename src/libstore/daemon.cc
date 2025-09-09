@@ -546,18 +546,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::ImportPaths: {
-        logger->startWork();
-        TunnelSource source(conn.from, conn.to);
-        auto paths = store->importPaths(source, trusted ? NoCheckSigs : CheckSigs);
-        logger->stopWork();
-        Strings paths2;
-        for (auto & i : paths)
-            paths2.push_back(store->printStorePath(i));
-        conn.to << paths2;
-        break;
-    }
-
     case WorkerProto::Op::BuildPaths: {
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
