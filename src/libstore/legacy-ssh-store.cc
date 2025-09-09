@@ -302,22 +302,6 @@ StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths, bool lo
     return conn->queryValidPaths(*this, lock, paths, maybeSubstitute);
 }
 
-void LegacySSHStore::addMultipleToStoreLegacy(Store & srcStore, const StorePathSet & paths)
-{
-    auto conn(connections->get());
-    conn->to << ServeProto::Command::ImportPaths;
-    try {
-        srcStore.exportPaths(paths, conn->to);
-    } catch (...) {
-        conn->good = false;
-        throw;
-    }
-    conn->to.flush();
-
-    if (readInt(conn->from) != 1)
-        throw Error("remote machine failed to import closure");
-}
-
 void LegacySSHStore::connect()
 {
     auto conn(connections->get());
