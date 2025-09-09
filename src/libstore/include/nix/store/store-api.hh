@@ -48,11 +48,6 @@ enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
-/**
- * Magic header of exportPath() output (obsolete).
- */
-const uint32_t exportMagic = 0x4558494e;
-
 enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
@@ -803,21 +798,6 @@ public:
      * relation.  If p refers to q, then p precedes q in this list.
      */
     StorePaths topoSortPaths(const StorePathSet & paths);
-
-    /**
-     * Export multiple paths in the format expected by ‘nix-store
-     * --import’.
-     */
-    void exportPaths(const StorePathSet & paths, Sink & sink);
-
-    void exportPath(const StorePath & path, Sink & sink);
-
-    /**
-     * Import a sequence of NAR dumps created by exportPaths() into the
-     * Nix store. Optionally, the contents of the NARs are preloaded
-     * into the specified FS accessor to speed up subsequent access.
-     */
-    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {

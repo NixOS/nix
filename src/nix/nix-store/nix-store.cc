@@ -14,6 +14,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
+#include "nix/store/export-import.hh"
 
 #include "man-pages.hh"
 
@@ -774,7 +775,7 @@ static void opExport(Strings opFlags, Strings opArgs)
         paths.insert(store->followLinksToStorePath(i));
 
     FdSink sink(getStandardOutput());
-    store->exportPaths(paths, sink);
+    exportPaths(*store, paths, sink);
     sink.flush();
 }
 
@@ -787,7 +788,7 @@ static void opImport(Strings opFlags, Strings opArgs)
         throw UsageError("no arguments expected");
 
     FdSource source(STDIN_FILENO);
-    auto paths = store->importPaths(source, NoCheckSigs);
+    auto paths = importPaths(*store, source, NoCheckSigs);
 
     for (auto & i : paths)
         cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
