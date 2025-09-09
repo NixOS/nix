@@ -113,5 +113,6 @@ template class EvalErrorBuilder<MissingArgumentError>;
 template class EvalErrorBuilder<InfiniteRecursionError>;
 template class EvalErrorBuilder<InvalidPathError>;
 template class EvalErrorBuilder<IFDError>;
+template class EvalErrorBuilder<RecoverableEvalError>;
 
 } // namespace nix

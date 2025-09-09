@@ -51,6 +51,7 @@ struct LinesOfCode
    FIXME: Untangle this mess. Should there be AbstractPos as there used to be before
    4feb7d9f71? */
 struct Pos;
+bool isEmpty(const Pos & pos);
 
 void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc);
 
@@ -185,6 +186,11 @@ public:
     void atPos(std::shared_ptr<const Pos> pos)
     {
         err.pos = pos;
+    }
+
+    bool hasPos()
+    {
+        return err.pos.get() && !isEmpty(*err.pos.get());
     }
 
     void pushTrace(Trace trace)

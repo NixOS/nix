@@ -2,6 +2,7 @@
 ///@file
 
 #include <cassert>
+#include <exception>
 #include <span>
 #include <type_traits>
 #include <concepts>
@@ -279,9 +280,15 @@ struct ValueBase
     {
     public:
         std::exception_ptr ex;
+        /**
+         * Optional value for recovering `RecoverableEvalError`
+         * Must be set iff `ex` is an instance of `RecoverableEvalError`.
+         */
+        Value * recoveryValue;
 
-        Failed(std::exception_ptr && ex)
+        Failed(std::exception_ptr ex, Value * recoveryValue)
             : ex(ex)
+            , recoveryValue(recoveryValue)
         {
         }
     };
@@ -1086,9 +1093,9 @@ public:
         setStorage(n);
     }
 
-    inline void mkFailed() noexcept
+    inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
     {
-        setStorage(new Value::Failed(std::current_exception()));
+        setStorage(new Value::Failed(e, recovery));
     }
 
     bool isList() const noexcept

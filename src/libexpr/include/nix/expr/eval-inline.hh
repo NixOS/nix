@@ -5,6 +5,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
+#include <exception>
 
 namespace nix {
 
@@ -97,19 +98,19 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
             else
                 ExprBlackHole::throwInfiniteRecursionError(*this, v);
         } catch (...) {
-            tryFixupBlackHolePos(v, pos);
-            v.mkFailed();
+            handleEvalExceptionForThunk(env, expr, v, pos);
             throw;
         }
     } else if (v.isApp()) {
         try {
             callFunction(*v.app().left, *v.app().right, v, pos);
         } catch (...) {
-            v.mkFailed();
+            handleEvalExceptionForApp(v);
             throw;
         }
-    } else if (v.isFailed())
-        std::rethrow_exception(v.failed()->ex);
+    } else if (v.isFailed()) {
+        handleEvalFailed(v, pos);
+    }
 }
 
 [[gnu::always_inline]]
