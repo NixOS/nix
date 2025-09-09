@@ -1,4 +1,5 @@
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
@@ -31,6 +32,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -2180,6 +2182,54 @@ void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & 
 // always force this to be separate, otherwise forceValue may inline it and take
 // a massive perf hit
 [[gnu::noinline]]
+void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, const PosIdx pos)
+{
+    if (!env)
+        tryFixupBlackHolePos(v, pos);
+
+    auto e = std::current_exception();
+    Value * recovery = nullptr;
+    try {
+        std::rethrow_exception(e);
+    } catch (const RecoverableEvalError & e) {
+        recovery = allocValue();
+    } catch (...) {
+    }
+    if (recovery) {
+        recovery->mkThunk(env, expr);
+    }
+    v.mkFailed(e, recovery);
+}
+
+[[gnu::noinline]]
+void EvalState::handleEvalExceptionForApp(Value & v, const Value & savedApp)
+{
+    auto e = std::current_exception();
+    Value * recovery = nullptr;
+    try {
+        std::rethrow_exception(e);
+    } catch (const RecoverableEvalError & e) {
+        recovery = allocValue();
+    } catch (...) {
+    }
+    if (recovery) {
+        *recovery = savedApp;
+    }
+    v.mkFailed(e, recovery);
+}
+
+[[gnu::noinline]]
+void EvalState::handleEvalFailed(Value & v, const PosIdx pos)
+{
+    assert(v.isFailed());
+    if (auto recoveryValue = v.failed().recoveryValue) {
+        v = *recoveryValue;
+        forceValue(v, pos);
+    } else {
+        v.failed().rethrow();
+    }
+}
+
 void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
 {
     if (!v.isBlackhole())
@@ -2188,7 +2238,8 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
     try {
         std::rethrow_exception(e);
     } catch (InfiniteRecursionError & e) {
-        e.atPos(positions[pos]);
+        if (!e.hasPos())
+            e.atPos(positions[pos]);
     } catch (...) {
     }
 }

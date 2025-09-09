@@ -1,4 +1,5 @@
 #include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/util/configuration.hh"
 #include "nix/expr/eval.hh"
 #include "nix/store/globals.hh"
@@ -107,8 +108,13 @@ static void nix_c_primop_wrapper(
     f(userdata, &ctx, (EvalState *) &state, external_args.data(), vTmpPtr);
 
     if (ctx.last_err_code != NIX_OK) {
-        /* TODO: Throw different errors depending on the error code */
-        state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
+        if (ctx.last_err_code == NIX_ERR_RECOVERABLE) {
+            state.error<nix::RecoverableEvalError>("Recoverable error from custom function: %s", *ctx.last_err)
+                .atPos(pos)
+                .debugThrow();
+        } else {
+            state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
+        }
     }
 
     if (!vTmp.isValid()) {

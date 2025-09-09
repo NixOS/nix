@@ -652,7 +652,27 @@ public:
      */
     inline void forceValue(Value & v, const PosIdx pos);
 
+private:
+
+    /**
+     * Internal support function for forceValue
+     *
+     * This code is factored out so that it's not in the heavily inlined hot path.
+     */
+    void handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, const PosIdx pos);
+
+    /**
+     * Internal support function for forceValue
+     *
+     * This code is factored out so that it's not in the heavily inlined hot path.
+     */
+    void handleEvalExceptionForApp(Value & v, const Value & savedApp);
+
+    void handleEvalFailed(Value & v, PosIdx pos);
+
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
+
+public:
 
     /**
      * Force a value, then recursively force list elements and

@@ -70,6 +70,14 @@ struct StackOverflowError : public CloneableError<StackOverflowError, EvalBaseEr
 
 MakeError(IFDError, EvalBaseError);
 
+/**
+ * An evaluation error which should be retried instead of rethrown.
+ *
+ * A RecoverableEvalError is not an EvalError, because we shouldn't cache it in
+ * the eval cache, as it should be retried anyway.
+ */
+MakeError(RecoverableEvalError, EvalBaseError);
+
 struct InvalidPathError : public CloneableError<InvalidPathError, EvalError>
 {
 public:

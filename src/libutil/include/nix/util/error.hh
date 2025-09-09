@@ -191,6 +191,8 @@ public:
         err.pos = pos;
     }
 
+    bool hasPos() const;
+
     void pushTrace(Trace trace)
     {
         err.traces.push_front(trace);
