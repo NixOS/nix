@@ -105,9 +105,6 @@ std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached
 {
     auto conn(connections->get());
 
-    /* No longer support missing NAR hash */
-    assert(GET_PROTOCOL_MINOR(conn->remoteVersion) >= 4);
-
     debug(
         "querying remote host '%s' for info on '%s'",
         config->authority.host,
@@ -152,40 +149,21 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
 
     auto conn(connections->get());
 
-    if (GET_PROTOCOL_MINOR(conn->remoteVersion) >= 5) {
-
-        conn->to << ServeProto::Command::AddToStoreNar << printStorePath(info.path)
-                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(HashFormat::Base16, false);
-        ServeProto::write(*this, *conn, info.references);
-        conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs
-                 << renderContentAddress(info.ca);
-        try {
-            copyNAR(source, conn->to);
-        } catch (...) {
-            conn->good = false;
-            throw;
-        }
-        conn->to.flush();
-
-        if (readInt(conn->from) != 1)
-            throw Error(
-                "failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
-
-    } else {
-
-        conn->importPaths(*this, [&](Sink & sink) {
-            try {
-                copyNAR(source, sink);
-            } catch (...) {
-                conn->good = false;
-                throw;
-            }
-            sink << exportMagic << printStorePath(info.path);
-            ServeProto::write(*this, *conn, info.references);
-            sink << (info.deriver ? printStorePath(*info.deriver) : "") << 0 << 0;
-        });
+    conn->to << ServeProto::Command::AddToStoreNar << printStorePath(info.path)
+             << (info.deriver ? printStorePath(*info.deriver) : "")
+             << info.narHash.to_string(HashFormat::Base16, false);
+    ServeProto::write(*this, *conn, info.references);
+    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca);
+    try {
+        copyNAR(source, conn->to);
+    } catch (...) {
+        conn->good = false;
+        throw;
     }
+    conn->to.flush();
+
+    if (readInt(conn->from) != 1)
+        throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
 }
 
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
