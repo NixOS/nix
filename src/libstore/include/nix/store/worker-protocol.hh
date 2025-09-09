@@ -152,7 +152,6 @@ enum struct WorkerProto::Op : uint64_t {
     AddIndirectRoot = 12,
     SyncWithGC = 13,
     FindRoots = 14,
-    ExportPath = 16,   // obsolete
     QueryDeriver = 18, // obsolete
     SetOptions = 19,
     CollectGarbage = 20,

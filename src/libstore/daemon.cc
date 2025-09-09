@@ -546,17 +546,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::ExportPath: {
-        auto path = store->parseStorePath(readString(conn.from));
-        readInt(conn.from); // obsolete
-        logger->startWork();
-        TunnelSink sink(conn.to);
-        store->exportPath(path, sink);
-        logger->stopWork();
-        conn.to << 1;
-        break;
-    }
-
     case WorkerProto::Op::ImportPaths: {
         logger->startWork();
         TunnelSource source(conn.from, conn.to);
