@@ -22,7 +22,8 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
                 fetched = lookup(resolvedInput);
                 if (!fetched) {
                     auto [accessor, lockedInput] = resolvedInput.getAccessor(store);
-                    fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
+                    fetched.emplace(
+                        CachedInput{.lockedInput = lockedInput, .accessor = accessor, .extraAttrs = extraAttrs});
                 }
                 upsert(resolvedInput, *fetched);
             } else {
@@ -36,7 +37,7 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
 
     debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
 
-    return {fetched->accessor, resolvedInput, fetched->lockedInput};
+    return {fetched->accessor, resolvedInput, fetched->lockedInput, fetched->extraAttrs};
 }
 
 struct InputCacheImpl : InputCache
