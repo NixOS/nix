@@ -268,9 +268,22 @@ struct ValueBase
         Value * const * elems;
     };
 
-    struct Failed : gc
+    /**
+      Representation of an evaluation that previously failed.
+
+      `Value` references `Failed` by packed pointer, and its `new` is GC managed.
+
+      @see gc_cleanup std::exception_ptr
+     */
+    class Failed : public gc_cleanup
     {
+    public:
         std::exception_ptr ex;
+
+        Failed(std::exception_ptr && ex)
+            : ex(ex)
+        {
+        }
     };
 };
 
@@ -1075,7 +1088,7 @@ public:
 
     inline void mkFailed() noexcept
     {
-        setStorage(new Value::Failed{.ex = std::current_exception()});
+        setStorage(new Value::Failed(std::current_exception()));
     }
 
     bool isList() const noexcept
