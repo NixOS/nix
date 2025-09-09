@@ -472,12 +472,12 @@ EOF
 [[ "$(nix flake metadata --json "$flake3Dir" | jq -r .locks.nodes.flake1.locked.rev)" = $prevFlake1Rev ]]
 
 baseDir=$TEST_ROOT/$RANDOM
-subdirFlakeDir=$baseDir/foo
-mkdir -p "$subdirFlakeDir"
+subdirFlakeDir1=$baseDir/foo1
+mkdir -p "$subdirFlakeDir1"
 
 writeSimpleFlake "$baseDir"
 
-cat > "$subdirFlakeDir"/flake.nix <<EOF
+cat > "$subdirFlakeDir1"/flake.nix <<EOF
 {
   outputs = inputs: {
     shouldBeOne = 1;
@@ -485,5 +485,18 @@ cat > "$subdirFlakeDir"/flake.nix <<EOF
 }
 EOF
 
-nix registry add --registry "$registry" flake2 "path:$baseDir?dir=foo"
+nix registry add --registry "$registry" flake2 "path:$baseDir?dir=foo1"
 [[ "$(nix eval --flake-registry "$registry" flake2#shouldBeOne)" = 1 ]]
+
+subdirFlakeDir2=$baseDir/foo2
+mkdir -p "$subdirFlakeDir2"
+cat > "$subdirFlakeDir2"/flake.nix <<EOF
+{
+  inputs.foo1.url = "path:$baseDir?dir=foo1";
+
+  outputs = inputs: { };
+}
+EOF
+
+# Regression test for https://github.com/NixOS/nix/issues/13918
+[[ "$(nix eval --inputs-from "$subdirFlakeDir2" foo1#shouldBeOne)" = 1 ]]
