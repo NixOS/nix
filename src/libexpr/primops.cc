@@ -3326,14 +3326,14 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
 {
     state.forceValue(*args[0], pos);
     if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
-        v.mkAttrs(&state.emptyBindings);
+        v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
     if (!args[0]->lambda().fun->hasFormals()) {
-        v.mkAttrs(&state.emptyBindings);
+        v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
 

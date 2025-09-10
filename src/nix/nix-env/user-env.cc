@@ -24,7 +24,7 @@ PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(state.rootPath(CanonPath(manifestFile)).resolveSymlinks(), v);
-        Bindings & bindings(*state.allocBindings(0));
+        Bindings & bindings = Bindings::emptyBindings;
         getDerivations(state, v, "", bindings, elems, false);
     }
     return elems;

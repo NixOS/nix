@@ -54,6 +54,12 @@ public:
     typedef uint32_t size_t;
     PosIdx pos;
 
+    /**
+     * An instance of bindings objects with 0 attributes.
+     * This object must never be modified.
+     */
+    static Bindings emptyBindings;
+
 private:
     size_t size_ = 0;
     Attr attrs[0];

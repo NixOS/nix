@@ -202,7 +202,6 @@ EvalState::EvalState(
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
-    , emptyBindings(Bindings())
     , storeFS(makeMountedSourceAccessor({
           {CanonPath::root, makeEmptySourceAccessor()},
           /* In the pure eval case, we can simply require

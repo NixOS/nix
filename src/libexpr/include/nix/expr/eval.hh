@@ -313,8 +313,6 @@ public:
      */
     RepairFlag repair;
 
-    Bindings emptyBindings;
-
     /**
      * Empty list constant.
      */
