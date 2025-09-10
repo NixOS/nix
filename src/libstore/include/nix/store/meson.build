@@ -34,6 +34,7 @@ headers = [ config_pub_h ] + files(
   'derived-path-map.hh',
   'derived-path.hh',
   'downstream-placeholder.hh',
+  'export-import.hh',
   'filetransfer.hh',
   'gc-store.hh',
   'globals.hh',
