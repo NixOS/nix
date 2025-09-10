@@ -234,7 +234,7 @@ StoreWrapper::exportPaths(int fd, ...)
             StorePathSet paths;
             for (int n = 2; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
             FdSink sink(fd);
-            exportPaths(*THIS->store, paths, sink);
+            exportPaths(*THIS->store, paths, sink, 1);
         } catch (Error & e) {
             croak("%s", e.what());
         }

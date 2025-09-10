@@ -87,6 +87,7 @@ nix_sources = [ config_priv_h ] + files(
   'make-content-addressed.cc',
   'man-pages.cc',
   'nar.cc',
+  'nario.cc',
   'optimise-store.cc',
   'path-from-hash-part.cc',
   'path-info.cc',
