@@ -546,47 +546,22 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::ExportPath: {
-        auto path = store->parseStorePath(readString(conn.from));
-        readInt(conn.from); // obsolete
-        logger->startWork();
-        TunnelSink sink(conn.to);
-        store->exportPath(path, sink);
-        logger->stopWork();
-        conn.to << 1;
-        break;
-    }
-
-    case WorkerProto::Op::ImportPaths: {
-        logger->startWork();
-        TunnelSource source(conn.from, conn.to);
-        auto paths = store->importPaths(source, trusted ? NoCheckSigs : CheckSigs);
-        logger->stopWork();
-        Strings paths2;
-        for (auto & i : paths)
-            paths2.push_back(store->printStorePath(i));
-        conn.to << paths2;
-        break;
-    }
-
     case WorkerProto::Op::BuildPaths: {
         auto drvs = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         BuildMode mode = bmNormal;
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 15) {
-            mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
+        mode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
 
-            /* Repairing is not atomic, so disallowed for "untrusted"
-               clients.
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients.
 
-               FIXME: layer violation in this message: the daemon code (i.e.
-               this file) knows whether a client/connection is trusted, but it
-               does not how how the client was authenticated. The mechanism
-               need not be getting the UID of the other end of a Unix Domain
-               Socket.
-              */
-            if (mode == bmRepair && !trusted)
-                throw Error("repairing is not allowed because you are not in 'trusted-users'");
-        }
+           FIXME: layer violation in this message: the daemon code (i.e.
+           this file) knows whether a client/connection is trusted, but it
+           does not how how the client was authenticated. The mechanism
+           need not be getting the UID of the other end of a Unix Domain
+           Socket.
+          */
+        if (mode == bmRepair && !trusted)
+            throw Error("repairing is not allowed because you are not in 'trusted-users'");
         logger->startWork();
         store->buildPaths(drvs, mode);
         logger->stopWork();
@@ -805,13 +780,11 @@ static void performOp(
         clientSettings.buildCores = readInt(conn.from);
         clientSettings.useSubstitutes = readInt(conn.from);
 
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 12) {
-            unsigned int n = readInt(conn.from);
-            for (unsigned int i = 0; i < n; i++) {
-                auto name = readString(conn.from);
-                auto value = readString(conn.from);
-                clientSettings.overrides.emplace(name, value);
-            }
+        unsigned int n = readInt(conn.from);
+        for (unsigned int i = 0; i < n; i++) {
+            auto name = readString(conn.from);
+            auto value = readString(conn.from);
+            clientSettings.overrides.emplace(name, value);
         }
 
         logger->startWork();
@@ -876,19 +849,12 @@ static void performOp(
         auto path = store->parseStorePath(readString(conn.from));
         std::shared_ptr<const ValidPathInfo> info;
         logger->startWork();
-        try {
-            info = store->queryPathInfo(path);
-        } catch (InvalidPath &) {
-            if (GET_PROTOCOL_MINOR(conn.protoVersion) < 17)
-                throw;
-        }
+        info = store->queryPathInfo(path);
         logger->stopWork();
         if (info) {
-            if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 17)
-                conn.to << 1;
+            conn.to << 1;
             WorkerProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
         } else {
-            assert(GET_PROTOCOL_MINOR(conn.protoVersion) >= 17);
             conn.to << 0;
         }
         break;
@@ -1063,7 +1029,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
     auto [protoVersion, features] =
         WorkerProto::BasicServerConnection::handshake(to, from, PROTOCOL_VERSION, WorkerProto::allFeatures);
 
-    if (protoVersion < 0x10a)
+    if (protoVersion < 256 + 18)
         throw Error("the Nix client version is too old");
 
     WorkerProto::BasicServerConnection conn;

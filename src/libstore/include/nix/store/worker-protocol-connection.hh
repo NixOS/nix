@@ -130,8 +130,6 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
         bool * daemonException,
         const StorePath & path,
         std::function<void(Source &)> fun);
-
-    void importPaths(const StoreDirConfig & store, bool * daemonException, Source & source);
 };
 
 struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection

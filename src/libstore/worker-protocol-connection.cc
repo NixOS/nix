@@ -313,12 +313,4 @@ void WorkerProto::BasicClientConnection::narFromPath(
     fun(from);
 }
 
-void WorkerProto::BasicClientConnection::importPaths(
-    const StoreDirConfig & store, bool * daemonException, Source & source)
-{
-    to << WorkerProto::Op::ImportPaths;
-    processStderr(daemonException, 0, &source);
-    auto importedPaths = WorkerProto::Serialise<StorePathSet>::read(store, *this);
-    assert(importedPaths.size() <= importedPaths.size());
-}
 } // namespace nix

@@ -73,6 +73,8 @@ void RemoteStore::initConnection(Connection & conn)
         try {
             auto [protoVersion, features] =
                 WorkerProto::BasicClientConnection::handshake(conn.to, tee, PROTOCOL_VERSION, WorkerProto::allFeatures);
+            if (protoVersion < 256 + 18)
+                throw Error("the Nix daemon version is too old");
             conn.protoVersion = protoVersion;
             conn.features = features;
         } catch (SerialisationError & e) {
@@ -109,24 +111,22 @@ void RemoteStore::setOptions(Connection & conn)
             << 0                                                  /* obsolete print build trace */
             << settings.buildCores << settings.useSubstitutes;
 
-    if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 12) {
-        std::map<std::string, nix::Config::SettingInfo> overrides;
-        settings.getSettings(overrides, true); // libstore settings
-        fileTransferSettings.getSettings(overrides, true);
-        overrides.erase(settings.keepFailed.name);
-        overrides.erase(settings.keepGoing.name);
-        overrides.erase(settings.tryFallback.name);
-        overrides.erase(settings.maxBuildJobs.name);
-        overrides.erase(settings.maxSilentTime.name);
-        overrides.erase(settings.buildCores.name);
-        overrides.erase(settings.useSubstitutes.name);
-        overrides.erase(loggerSettings.showTrace.name);
-        overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
-        overrides.erase("plugin-files");
-        conn.to << overrides.size();
-        for (auto & i : overrides)
-            conn.to << i.first << i.second.value;
-    }
+    std::map<std::string, nix::Config::SettingInfo> overrides;
+    settings.getSettings(overrides, true); // libstore settings
+    fileTransferSettings.getSettings(overrides, true);
+    overrides.erase(settings.keepFailed.name);
+    overrides.erase(settings.keepGoing.name);
+    overrides.erase(settings.tryFallback.name);
+    overrides.erase(settings.maxBuildJobs.name);
+    overrides.erase(settings.maxSilentTime.name);
+    overrides.erase(settings.buildCores.name);
+    overrides.erase(settings.useSubstitutes.name);
+    overrides.erase(loggerSettings.showTrace.name);
+    overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
+    overrides.erase("plugin-files");
+    conn.to << overrides.size();
+    for (auto & i : overrides)
+        conn.to << i.first << i.second.value;
 
     auto ex = conn.processStderrReturn();
     if (ex)
@@ -167,15 +167,7 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
-        StorePathSet res;
-        for (auto & i : paths)
-            if (isValidPath(i))
-                res.insert(i);
-        return res;
-    } else {
-        return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute);
-    }
+    return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute);
 }
 
 StorePathSet RemoteStore::queryAllValidPaths()
@@ -189,21 +181,10 @@ StorePathSet RemoteStore::queryAllValidPaths()
 StorePathSet RemoteStore::querySubstitutablePaths(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
-        StorePathSet res;
-        for (auto & i : paths) {
-            conn->to << WorkerProto::Op::HasSubstitutes << printStorePath(i);
-            conn.processStderr();
-            if (readInt(conn->from))
-                res.insert(i);
-        }
-        return res;
-    } else {
-        conn->to << WorkerProto::Op::QuerySubstitutablePaths;
-        WorkerProto::write(*this, *conn, paths);
-        conn.processStderr();
-        return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-    }
+    conn->to << WorkerProto::Op::QuerySubstitutablePaths;
+    WorkerProto::write(*this, *conn, paths);
+    conn.processStderr();
+    return WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
 }
 
 void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, SubstitutablePathInfos & infos)
@@ -213,45 +194,24 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
 
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 12) {
-
-        for (auto & i : pathsMap) {
-            SubstitutablePathInfo info;
-            conn->to << WorkerProto::Op::QuerySubstitutablePathInfo << printStorePath(i.first);
-            conn.processStderr();
-            unsigned int reply = readInt(conn->from);
-            if (reply == 0)
-                continue;
-            auto deriver = readString(conn->from);
-            if (deriver != "")
-                info.deriver = parseStorePath(deriver);
-            info.references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-            info.downloadSize = readLongLong(conn->from);
-            info.narSize = readLongLong(conn->from);
-            infos.insert_or_assign(i.first, std::move(info));
-        }
-
-    } else {
-
-        conn->to << WorkerProto::Op::QuerySubstitutablePathInfos;
-        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 22) {
-            StorePathSet paths;
-            for (auto & path : pathsMap)
-                paths.insert(path.first);
-            WorkerProto::write(*this, *conn, paths);
-        } else
-            WorkerProto::write(*this, *conn, pathsMap);
-        conn.processStderr();
-        size_t count = readNum<size_t>(conn->from);
-        for (size_t n = 0; n < count; n++) {
-            SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
-            auto deriver = readString(conn->from);
-            if (deriver != "")
-                info.deriver = parseStorePath(deriver);
-            info.references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-            info.downloadSize = readLongLong(conn->from);
-            info.narSize = readLongLong(conn->from);
-        }
+    conn->to << WorkerProto::Op::QuerySubstitutablePathInfos;
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 22) {
+        StorePathSet paths;
+        for (auto & path : pathsMap)
+            paths.insert(path.first);
+        WorkerProto::write(*this, *conn, paths);
+    } else
+        WorkerProto::write(*this, *conn, pathsMap);
+    conn.processStderr();
+    size_t count = readNum<size_t>(conn->from);
+    for (size_t n = 0; n < count; n++) {
+        SubstitutablePathInfo & info(infos[parseStorePath(readString(conn->from))]);
+        auto deriver = readString(conn->from);
+        if (deriver != "")
+            info.deriver = parseStorePath(deriver);
+        info.references = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
+        info.downloadSize = readLongLong(conn->from);
+        info.narSize = readLongLong(conn->from);
     }
 }
 
@@ -466,36 +426,20 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
 {
     auto conn(getConnection());
 
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 18) {
-        auto source2 = sinkToSource([&](Sink & sink) {
-            sink << 1 // == path follows
-                ;
-            copyNAR(source, sink);
-            sink << exportMagic << printStorePath(info.path);
-            WorkerProto::write(*this, *conn, info.references);
-            sink << (info.deriver ? printStorePath(*info.deriver) : "") << 0 // == no legacy signature
-                 << 0                                                        // == no path follows
-                ;
-        });
-        conn->importPaths(*this, &conn.daemonException, *source2);
-    }
+    conn->to << WorkerProto::Op::AddToStoreNar << printStorePath(info.path)
+             << (info.deriver ? printStorePath(*info.deriver) : "")
+             << info.narHash.to_string(HashFormat::Base16, false);
+    WorkerProto::write(*this, *conn, info.references);
+    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca)
+             << repair << !checkSigs;
 
-    else {
-        conn->to << WorkerProto::Op::AddToStoreNar << printStorePath(info.path)
-                 << (info.deriver ? printStorePath(*info.deriver) : "")
-                 << info.narHash.to_string(HashFormat::Base16, false);
-        WorkerProto::write(*this, *conn, info.references);
-        conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca)
-                 << repair << !checkSigs;
-
-        if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
-            conn.withFramedSink([&](Sink & sink) { copyNAR(source, sink); });
-        } else if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 21) {
-            conn.processStderr(0, &source);
-        } else {
-            copyNAR(source, conn->to);
-            conn.processStderr(0, nullptr);
-        }
+    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
+        conn.withFramedSink([&](Sink & sink) { copyNAR(source, sink); });
+    } else if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 21) {
+        conn.processStderr(0, &source);
+    } else {
+        copyNAR(source, conn->to);
+        conn.processStderr(0, nullptr);
     }
 }
 
@@ -618,15 +562,8 @@ void RemoteStore::buildPaths(
 
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
-    assert(GET_PROTOCOL_MINOR(conn->protoVersion) >= 13);
     WorkerProto::write(*this, *conn, drvPaths);
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 15)
-        conn->to << buildMode;
-    else
-        /* Old daemons did not take a 'buildMode' parameter, so we
-           need to validate it here on the client side.  */
-        if (buildMode != bmNormal)
-            throw Error("repairing or checking is not supported when building through the Nix daemon");
+    conn->to << buildMode;
     conn.processStderr();
     readInt(conn->from);
 }
