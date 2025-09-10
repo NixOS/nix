@@ -20,9 +20,9 @@ struct ServeProtoTest : VersionedProtoTest<ServeProto, serveProtoDir>
 {
     /**
      * For serializers that don't care about the minimum version, we
-     * used the oldest one: 1.0.
+     * used the oldest one: 2.5.
      */
-    ServeProto::Version defaultVersion = 2 << 8 | 0;
+    ServeProto::Version defaultVersion = 2 << 8 | 5;
 };
 
 VERSIONED_CHARACTERIZATION_TEST(
