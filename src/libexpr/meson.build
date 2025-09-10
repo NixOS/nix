@@ -163,6 +163,7 @@ sources = files(
   'search-path.cc',
   'value-to-json.cc',
   'value-to-xml.cc',
+  'value.cc',
   'value/context.cc',
 )
 

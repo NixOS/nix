@@ -833,6 +833,35 @@ struct Value : public ValueStorage<sizeof(void *)>
 {
     friend std::string showType(const Value & v);
 
+    /**
+     * Empty list constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    static Value vEmptyList;
+
+    /**
+     * `null` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    static Value vNull;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    static Value vTrue;
+
+    /**
+     * `true` constant.
+     *
+     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
+     */
+    static Value vFalse;
+
+private:
     template<InternalType... discriminator>
     bool isa() const noexcept
     {

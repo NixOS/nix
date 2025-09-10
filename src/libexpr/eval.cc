@@ -202,7 +202,6 @@ EvalState::EvalState(
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
-    , emptyBindings(Bindings())
     , storeFS(makeMountedSourceAccessor({
           {CanonPath::root, makeEmptySourceAccessor()},
           /* In the pure eval case, we can simply require
@@ -285,10 +284,6 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vEmptyList.mkList(buildList(0));
-    vNull.mkNull();
-    vTrue.mkBool(true);
-    vFalse.mkBool(false);
     vStringRegular.mkStringNoCopy("regular");
     vStringDirectory.mkStringNoCopy("directory");
     vStringSymlink.mkStringNoCopy("symlink");
@@ -895,7 +890,7 @@ ListBuilder::ListBuilder(EvalState & state, size_t size)
 
 Value * EvalState::getBool(bool b)
 {
-    return b ? &vTrue : &vFalse;
+    return b ? &Value::vTrue : &Value::vFalse;
 }
 
 unsigned long nrThunks = 0;
@@ -1301,7 +1296,7 @@ void ExprList::eval(EvalState & state, Env & env, Value & v)
 Value * ExprList::maybeThunk(EvalState & state, Env & env)
 {
     if (elems.empty()) {
-        return &state.vEmptyList;
+        return &Value::vEmptyList;
     }
     return Expr::maybeThunk(state, env);
 }

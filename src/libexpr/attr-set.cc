@@ -5,13 +5,15 @@
 
 namespace nix {
 
+Bindings Bindings::emptyBindings;
+
 /* Allocate a new array of attributes for an attribute set with a specific
    capacity. The space is implicitly reserved after the Bindings
    structure. */
 Bindings * EvalState::allocBindings(size_t capacity)
 {
     if (capacity == 0)
-        return &emptyBindings;
+        return &Bindings::emptyBindings;
     if (capacity > std::numeric_limits<Bindings::size_t>::max())
         throw Error("attribute set of size %d is too big", capacity);
     nrAttrsets++;

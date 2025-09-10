@@ -162,7 +162,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto state = std::make_unique<EvalState>(LookupPath{}, store, fetchSettings, evalSettings);
         auto v = state->allocValue();
         state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
-        Bindings & bindings(*state->allocBindings(0));
+        Bindings & bindings = Bindings::emptyBindings;
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 
         return store->parseStorePath(
