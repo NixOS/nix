@@ -1075,11 +1075,11 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value ** args, Val
     try {
         state.forceValue(*args[0], pos);
         attrs.insert(state.s.value, args[0]);
-        attrs.insert(state.symbols.create("success"), &state.vTrue);
+        attrs.insert(state.symbols.create("success"), &Value::vTrue);
     } catch (AssertionError & e) {
         // `value = false;` is unfortunate but removing it is a breaking change.
-        attrs.insert(state.s.value, &state.vFalse);
-        attrs.insert(state.symbols.create("success"), &state.vFalse);
+        attrs.insert(state.s.value, &Value::vFalse);
+        attrs.insert(state.symbols.create("success"), &Value::vFalse);
     }
 
     // restore the debugRepl pointer if we saved it earlier.
@@ -4613,7 +4613,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
         auto list = state.buildList(match.size() - 1);
         for (const auto & [i, v2] : enumerate(list))
             if (!match[i + 1].matched)
-                v2 = &state.vNull;
+                v2 = &Value::vNull;
             else
                 v2 = mkString(state, match[i + 1]);
         v.mkList(list);
@@ -4705,7 +4705,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             auto list2 = state.buildList(slen);
             for (const auto & [si, v2] : enumerate(list2)) {
                 if (!match[si + 1].matched)
-                    v2 = &state.vNull;
+                    v2 = &Value::vNull;
                 else
                     v2 = mkString(state, match[si + 1]);
             }
@@ -5059,7 +5059,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 
     addConstant(
         "null",
-        &vNull,
+        &Value::vNull,
         {
             .type = nNull,
             .doc = R"(
