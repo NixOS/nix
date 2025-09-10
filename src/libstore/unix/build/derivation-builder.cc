@@ -214,9 +214,7 @@ protected:
 
 public:
 
-    bool prepareBuild() override;
-
-    void startBuilder() override;
+    std::optional<Descriptor> startBuild() override;
 
     SingleDrvOutputs unprepareBuild() override;
 
@@ -470,19 +468,6 @@ bool DerivationBuilderImpl::killChild()
     return ret;
 }
 
-bool DerivationBuilderImpl::prepareBuild()
-{
-    if (useBuildUsers()) {
-        if (!buildUser)
-            buildUser = getBuildUser();
-
-        if (!buildUser)
-            return false;
-    }
-
-    return true;
-}
-
 SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
 {
     /* Since we got an EOF on the logger pipe, the builder is presumed
@@ -679,8 +664,16 @@ static bool checkNotWorldWritable(std::filesystem::path path)
     return true;
 }
 
-void DerivationBuilderImpl::startBuilder()
+std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 {
+    if (useBuildUsers()) {
+        if (!buildUser)
+            buildUser = getBuildUser();
+
+        if (!buildUser)
+            return std::nullopt;
+    }
+
     /* Make sure that no other processes are executing under the
        sandbox uids. This must be done before any chownToBuilder()
        calls. */
@@ -841,9 +834,10 @@ void DerivationBuilderImpl::startBuilder()
     startChild();
 
     pid.setSeparatePG(true);
-    miscMethods->childStarted(builderOut.get());
 
     processSandboxSetupMessages();
+
+    return builderOut.get();
 }
 
 PathsInChroot DerivationBuilderImpl::getPathsInSandbox()

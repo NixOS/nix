@@ -76,10 +76,7 @@ struct DerivationBuilderParams
      */
     const StorePathSet & inputPaths;
 
-    /**
-     * @note we do in fact mutate this
-     */
-    std::map<std::string, InitialOutput> & initialOutputs;
+    const std::map<std::string, InitialOutput> & initialOutputs;
 
     const BuildMode & buildMode;
 
@@ -118,13 +115,6 @@ struct DerivationBuilderCallbacks
     virtual void closeLogFile() = 0;
 
     /**
-     * Hook up `builderOut` to some mechanism to ingest the log
-     *
-     * @todo this should be reworked
-     */
-    virtual void childStarted(Descriptor builderOut) = 0;
-
-    /**
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
@@ -157,15 +147,15 @@ struct DerivationBuilder : RestrictionContext
      * locks as needed). After this is run, the builder should be
      * started.
      *
-     * @returns true if successful, false if we could not acquire a build
-     * user. In that case, the caller must wait and then try again.
+     * @returns logging pipe if successful, `std::nullopt` if we could
+     * not acquire a build user. In that case, the caller must wait and
+     * then try again.
+     *
+     * @note "success" just means that we were able to set up the environment
+     * and start the build. The builder could have immediately exited with
+     * failure, and that would still be considered a successful start.
      */
-    virtual bool prepareBuild() = 0;
-
-    /**
-     * Start building a derivation.
-     */
-    virtual void startBuilder() = 0;
+    virtual std::optional<Descriptor> startBuild() = 0;
 
     /**
      * Tear down build environment after the builder exits (either on
