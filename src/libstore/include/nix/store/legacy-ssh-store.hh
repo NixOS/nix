@@ -179,12 +179,6 @@ public:
      */
     StorePathSet queryValidPaths(const StorePathSet & paths, bool lock, SubstituteFlag maybeSubstitute = NoSubstitute);
 
-    /**
-     * Just exists because this is exactly what Hydra was doing, and we
-     * don't yet want an algorithmic change.
-     */
-    void addMultipleToStoreLegacy(Store & srcStore, const StorePathSet & paths);
-
     void connect() override;
 
     unsigned int getProtocol() override;
