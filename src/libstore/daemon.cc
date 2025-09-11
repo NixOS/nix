@@ -744,6 +744,7 @@ static void performOp(
         options.action = (GCOptions::GCAction) readInt(conn.from);
         options.pathsToDelete = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         conn.from >> options.ignoreLiveness >> options.maxFreed;
+        options.censor = !trusted;
         // obsolete fields
         readInt(conn.from);
         readInt(conn.from);

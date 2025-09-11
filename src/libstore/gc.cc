@@ -209,7 +209,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             Path root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
-            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
+            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{nix-process:%d}", pid));
             pos = end + 1;
         }
     }
@@ -463,13 +463,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    std::unordered_set<StorePath> roots, dead, alive;
+    Roots roots;
+    std::unordered_set<StorePath> dead, alive;
 
     struct Shared
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        std::unordered_set<std::string> tempRoots;
+        std::unordered_map<std::string, GcRootInfo> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -580,7 +581,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                                 debug("got new GC root '%s'", path);
                                 auto hashPart = std::string(storePath->hashPart());
                                 auto shared(_shared.lock());
-                                shared->tempRoots.insert(hashPart);
+                                // FIXME: could get the PID from the socket.
+                                shared->tempRoots.insert_or_assign(hashPart, "{nix-process:unknown}");
                                 /* If this path is currently being
                                    deleted, then we have to wait until
                                    deletion is finished to ensure that
@@ -620,20 +622,16 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
     printInfo("finding garbage collector roots...");
-    Roots rootMap;
     if (!options.ignoreLiveness)
-        findRootsNoTemp(rootMap, true);
-
-    for (auto & i : rootMap)
-        roots.insert(i.first);
+        findRootsNoTemp(roots, options.censor);
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
-    Roots tempRoots;
-    findTempRoots(tempRoots, true);
-    for (auto & root : tempRoots) {
-        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
-        roots.insert(root.first);
+    {
+        Roots tempRoots;
+        findTempRoots(tempRoots, options.censor);
+        for (auto & root : tempRoots)
+            _shared.lock()->tempRoots.insert_or_assign(std::string(root.first.hashPart()), *root.second.begin());
     }
 
     /* Synchronisation point for testing, see tests/functional/gc-non-blocking.sh. */
@@ -729,20 +727,31 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 }
             };
 
+            if (options.action == GCOptions::gcDeleteSpecific && !options.pathsToDelete.count(*path)) {
+                throw Error(
+                    "Cannot delete path '%s' because it's referenced by path '%s'.",
+                    printStorePath(start),
+                    printStorePath(*path));
+            }
+
             /* If this is a root, bail out. */
-            if (roots.count(*path)) {
+            if (auto i = roots.find(*path); i != roots.end()) {
+                if (options.action == GCOptions::gcDeleteSpecific)
+                    throw Error(
+                        "Cannot delete path '%s' because it's referenced by the GC root '%s'.",
+                        printStorePath(start),
+                        *i->second.begin());
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
                 return markAlive();
             }
 
-            if (options.action == GCOptions::gcDeleteSpecific && !options.pathsToDelete.count(*path))
-                return;
-
             {
                 auto hashPart = std::string(path->hashPart());
                 auto shared(_shared.lock());
-                if (shared->tempRoots.count(hashPart)) {
-                    debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
+                if (auto i = shared->tempRoots.find(hashPart); i != shared->tempRoots.end()) {
+                    if (options.action == GCOptions::gcDeleteSpecific)
+                        throw Error(
+                            "Cannot delete path '%s' because it's in use by '%s'.", printStorePath(start), i->second);
                     return markAlive();
                 }
                 shared->pending = hashPart;
@@ -801,12 +810,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         for (auto & i : options.pathsToDelete) {
             deleteReferrersClosure(i);
-            if (!dead.count(i))
-                throw Error(
-                    "Cannot delete path '%1%' since it is still alive. "
-                    "To find out why, use: "
-                    "nix-store --query --roots and nix-store --query --referrers",
-                    printStorePath(i));
+            assert(dead.count(i));
         }
 
     } else if (options.maxFreed > 0) {
