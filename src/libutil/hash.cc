@@ -99,22 +99,37 @@ struct DecodeNamePair
 
 } // namespace
 
+static DecodeNamePair baseExplicit(HashFormat format)
+{
+    switch (format) {
+    case HashFormat::Base16:
+        return {base16::decode, "base16"};
+    case HashFormat::Nix32:
+        return {BaseNix32::decode, "nix32"};
+    case HashFormat::Base64:
+        return {base64::decode, "Base64"};
+    case HashFormat::SRI:
+        assert(false);
+    }
+}
+
 /**
  * Given the expected size of the message once decoded it, figure out
  * which encoding we are using by looking at the size of the encoded
  * message.
  */
-static DecodeNamePair baseFromSize(std::string_view rest, HashAlgorithm algo)
+static HashFormat baseFromSize(std::string_view rest, HashAlgorithm algo)
 {
     auto hashSize = regularHashSize(algo);
+
     if (rest.size() == base16::encodedLength(hashSize))
-        return {base16::decode, "base16"};
+        return HashFormat::Base16;
 
     if (rest.size() == BaseNix32::encodedLength(hashSize))
-        return {BaseNix32::decode, "nix32"};
+        return HashFormat::Nix32;
 
     if (rest.size() == base64::encodedLength(hashSize))
-        return {base64::decode, "Base64"};
+        return HashFormat::Base64;
 
     throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(algo));
 }
@@ -190,7 +205,7 @@ static Hash parseAnyHelper(std::string_view rest, auto resolveAlgo)
         } else {
             /* Otherwise, decide via the length of the hash (for the
                given algorithm) what base encoding it is. */
-            return baseFromSize(rest, algo);
+            return baseExplicit(baseFromSize(rest, algo));
         }
     }();
 
@@ -225,7 +240,12 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optA
 
 Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
 {
-    return parseLowLevel(s, algo, baseFromSize(s, algo));
+    return parseExplicitFormatUnprefixed(s, algo, baseFromSize(s, algo));
+}
+
+Hash Hash::parseExplicitFormatUnprefixed(std::string_view s, HashAlgorithm algo, HashFormat format)
+{
+    return parseLowLevel(s, algo, baseExplicit(format));
 }
 
 Hash Hash::random(HashAlgorithm algo)

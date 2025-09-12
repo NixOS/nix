@@ -90,6 +90,15 @@ struct Hash
      */
     static Hash parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo);
 
+    /**
+     * Like `parseNonSRIUnprefixed`, but the hash format has been
+     * explicitly given.
+     *
+     * @param explicitFormat cannot be SRI, but must be one of the
+     * "bases".
+     */
+    static Hash parseExplicitFormatUnprefixed(std::string_view s, HashAlgorithm algo, HashFormat explicitFormat);
+
     static Hash parseSRI(std::string_view original);
 
 public:
