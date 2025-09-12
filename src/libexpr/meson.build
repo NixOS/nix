@@ -82,6 +82,10 @@ configdata_priv.set(
 
 deps_other += toml11
 
+cpuid = dependency('libcpuid', 'cpuid', required : false)
+configdata_priv.set('HAVE_LIBCPUID', cpuid.found().to_int())
+deps_private += cpuid
+
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'expr-config-private.hh',
