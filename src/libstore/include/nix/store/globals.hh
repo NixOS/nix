@@ -1396,10 +1396,10 @@ public:
             {
               "args": [
                 "-e",
-                "/nix/store/vj1c3wf9c11a0qs6p3ymfvrnsdgsdcbq-source-stdenv.sh",
-                "/nix/store/shkw4qm9qcw5sc5n1k5jznc83ny02r39-default-builder.sh"
+                "/nix/store/vj1c3wf9…-source-stdenv.sh",
+                "/nix/store/shkw4qm9…-default-builder.sh"
               ],
-              "builder": "/nix/store/s1qkj0ph0ma64a6743mvkwnabrbw1hsc-bash-5.2p37/bin/bash",
+              "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
               "env": {
                 "HOME": "/homeless-shelter",
                 "NIX_BUILD_CORES": "14",
@@ -1415,7 +1415,7 @@ public:
                 "TMPDIR": "/build",
                 "__structuredAttrs": "",
                 "buildInputs": "",
-                "builder": "/nix/store/s1qkj0ph0ma64a6743mvkwnabrbw1hsc-bash-5.2p37/bin/bash",
+                "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
                 "cmakeFlags": "",
                 "configureFlags": "",
                 "depsBuildBuild": "",
@@ -1430,16 +1430,16 @@ public:
                 "doInstallCheck": "1",
                 "mesonFlags": "",
                 "name": "hello-2.12.2",
-                "nativeBuildInputs": "/nix/store/l31j72f1h33hsa4nq4iyhsmsqjyndq9f-version-check-hook",
-                "out": "/nix/store/2yx2prgxmzbkrnbb4liy6n4zkzb1cqai-hello-2.12.2",
+                "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2",
                 "outputs": "out",
                 "patches": "",
                 "pname": "hello",
                 "postInstallCheck": "stat \"${!outputBin}/bin/hello\"\n",
                 "propagatedBuildInputs": "",
                 "propagatedNativeBuildInputs": "",
-                "src": "/nix/store/dw402azxjrgrzrk6j0p66wkqrab5mwgw-hello-2.12.2.tar.gz",
-                "stdenv": "/nix/store/i8bw5nqg1225m281zr6lgsz42bw04z7g-stdenv-linux",
+                "src": "/nix/store/dw402azx…-hello-2.12.2.tar.gz",
+                "stdenv": "/nix/store/i8bw5nqg…-stdenv-linux",
                 "strictDeps": "",
                 "system": "aarch64-linux",
                 "version": "2.12.2"
@@ -1466,7 +1466,7 @@ public:
         // With this uncommented:
         //
         // warning: Ignoring setting 'external-builders' because experimental feature 'external-builders' is not enabled
-        // error: Cannot build '/nix/store/vwsp4qd8a62jqa36p26d15hin4xnj949-opentofu-1.10.2.drv'.
+        // error: Cannot build '/nix/store/vwsp4qd8…-opentofu-1.10.2.drv'.
         //        Reason: required system or feature not available
         //        Required system: 'aarch64-linux' with features {}
         //        Current system: 'aarch64-darwin' with features {apple-virt, benchmark, big-parallel, nixos-test}
