@@ -90,6 +90,7 @@ static void disableNet()
 {
     // FIXME: should check for command line overrides only.
     if (!settings.useSubstitutes.overridden)
+        // FIXME: should not disable local substituters (like file:///).
         settings.useSubstitutes = false;
     if (!settings.tarballTtl.overridden)
         settings.tarballTtl = std::numeric_limits<unsigned int>::max();
