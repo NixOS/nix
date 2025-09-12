@@ -1,3 +1,4 @@
+#include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/store/globals.hh"
@@ -392,11 +393,14 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
 {
     if (!settings.useSubstitutes)
         return;
-    for (auto & sub : getDefaultSubstituters()) {
-        for (auto & path : paths) {
-            if (infos.count(path.first))
-                // Choose first succeeding substituter.
-                continue;
+
+    for (auto & path : paths) {
+        std::optional<Error> lastStoresException = std::nullopt;
+        for (auto & sub : getDefaultSubstituters()) {
+            if (lastStoresException.has_value()) {
+                logError(lastStoresException->info());
+                lastStoresException.reset();
+            }
 
             auto subPath(path.first);
 
@@ -437,11 +441,14 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
-                if (settings.tryFallback)
-                    logError(e.info());
-                else
-                    throw;
+                lastStoresException = std::make_optional(std::move(e));
             }
+        }
+        if (lastStoresException.has_value()) {
+            if (!settings.tryFallback) {
+                throw *lastStoresException;
+            } else
+                logError(lastStoresException->info());
         }
     }
 }
