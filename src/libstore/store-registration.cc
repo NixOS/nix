@@ -3,6 +3,8 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
+#include <chrono>
+#include <regex>
 
 namespace nix {
 
@@ -74,6 +76,31 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     return storeConfig;
 }
 
+/**
+ * Check if an error during store initialization is recoverable (network/timeout)
+ * vs permanent (configuration, authentication, etc.)
+ */
+static bool isRecoverableStoreError(const Error & e) {
+    std::string msg = e.what();
+    std::string lowerMsg = msg;
+    std::transform(lowerMsg.begin(), lowerMsg.end(), lowerMsg.begin(), ::tolower);
+    
+    // Network and timeout errors that might be temporary
+    return lowerMsg.find("timeout") != std::string::npos ||
+           lowerMsg.find("timed out") != std::string::npos ||
+           lowerMsg.find("connection timeout") != std::string::npos ||
+           lowerMsg.find("connection refused") != std::string::npos ||
+           lowerMsg.find("network unreachable") != std::string::npos ||
+           lowerMsg.find("could not resolve") != std::string::npos ||
+           lowerMsg.find("temporary failure") != std::string::npos ||
+           lowerMsg.find("service unavailable") != std::string::npos ||
+           lowerMsg.find("curl error") != std::string::npos ||
+           msg.find("curl: (6)") != std::string::npos ||  // Couldn't resolve host  
+           msg.find("curl: (7)") != std::string::npos ||  // Couldn't connect
+           msg.find("curl: (28)") != std::string::npos || // Timeout was reached
+           msg.find("curl: (56)") != std::string::npos;   // Connection reset
+}
+
 std::list<ref<Store>> getDefaultSubstituters()
 {
     static auto stores([]() {
@@ -85,9 +112,29 @@ std::list<ref<Store>> getDefaultSubstituters()
             if (!done.insert(uri).second)
                 return;
             try {
-                stores.push_back(openStore(uri));
+                auto store = resolveStoreConfig(StoreReference::parse(uri))->openStore();
+                // Try to initialize the store, but don't drop it if init fails
+                try {
+                    store->init();
+                } catch (Error & e) {
+                    if (isRecoverableStoreError(e)) {
+                        // Mark store as having failed init, but keep it in the list
+                        warn("substituter '%s' failed during initialization (%s), will retry during substitution", 
+                             uri, e.what());
+                    } else {
+                        // For non-recoverable errors, still warn but keep the store
+                        warn("substituter '%s' failed during initialization (%s), may not be usable", 
+                             uri, e.what());
+                    }
+                }
+                stores.push_back(store);
             } catch (Error & e) {
-                logWarning(e.info());
+                // Only drop stores that fail to even create (config errors, etc.)
+                if (!isRecoverableStoreError(e)) {
+                    logWarning(e.info());
+                } else {
+                    warn("substituter '%s' could not be created (%s), skipping", uri, e.what());
+                }
             }
         };
 
