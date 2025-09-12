@@ -24,6 +24,10 @@
 
 #endif
 
+namespace nix {
+
+#if NIX_USE_BOEHMGC
+
 /*
  * Ensure that Boehm satisfies our alignment requirements. This is the default configuration [^]
  * and this assertion should never break for any platform. Let's assert it just in case.
@@ -35,9 +39,6 @@
  */
 static_assert(sizeof(void *) * 2 == GC_GRANULE_BYTES, "Boehm GC must use GC_GRANULE_WORDS = 2");
 
-namespace nix {
-
-#if NIX_USE_BOEHMGC
 /* Called when the Boehm GC runs out of memory. */
 static void * oomHandler(size_t requested)
 {
