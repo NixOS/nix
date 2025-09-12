@@ -431,7 +431,7 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    boost::unordered_flat_map<SourcePath, DocCommentMap, std::hash<SourcePath>> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
