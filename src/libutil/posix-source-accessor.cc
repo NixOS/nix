@@ -104,7 +104,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
 
     if (cache.size() >= 16384)
         cache.clear();
-    cache.emplace(absPath, st);
+    cache.emplace(std::move(absPath), st);
 
     return st;
 }

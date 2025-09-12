@@ -57,7 +57,7 @@
 
 namespace nix {
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,

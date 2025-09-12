@@ -12,6 +12,7 @@
 #include "nix/expr/print-options.hh"
 #include "nix/util/checked-arithmetic.hh"
 
+#include <boost/unordered/unordered_flat_map_fwd.hpp>
 #include <nlohmann/json_fwd.hpp>
 
 namespace nix {
@@ -1195,7 +1196,7 @@ void Value::mkBlackhole()
 }
 
 typedef std::vector<Value *, traceable_allocator<Value *>> ValueVector;
-typedef std::unordered_map<
+typedef boost::unordered_flat_map<
     Symbol,
     Value *,
     std::hash<Symbol>,

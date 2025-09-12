@@ -1085,7 +1085,9 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 void EvalState::resetFileCache()
 {
     fileEvalCache.clear();
+    fileEvalCache.rehash(0);
     fileParseCache.clear();
+    fileParseCache.rehash(0);
     inputCache->clear();
 }
 
@@ -2370,10 +2372,9 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto dstPathCached = get(*srcToStore.lock(), path);
-
-    auto dstPath = dstPathCached ? *dstPathCached : [&]() {
-        auto dstPath = fetchToStore(
+    std::optional<StorePath> dstPath;
+    if (!srcToStore.cvisit(path, [&dstPath](const auto & kv) { dstPath.emplace(kv.second); })) {
+        dstPath.emplace(fetchToStore(
             fetchSettings,
             *store,
             path.resolveSymlinks(SymlinkResolution::Ancestors),
@@ -2381,15 +2382,14 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             path.baseName(),
             ContentAddressMethod::Raw::NixArchive,
             nullptr,
-            repair);
-        allowPath(dstPath);
-        srcToStore.lock()->try_emplace(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
-        return dstPath;
-    }();
+            repair));
+        allowPath(*dstPath);
+        srcToStore.try_emplace(path, *dstPath);
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(*dstPath));
+    }
 
-    context.insert(NixStringContextElem::Opaque{.path = dstPath});
-    return dstPath;
+    context.insert(NixStringContextElem::Opaque{.path = *dstPath});
+    return *dstPath;
 }
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)

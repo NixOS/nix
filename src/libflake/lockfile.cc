@@ -1,5 +1,3 @@
-#include <unordered_set>
-
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/settings.hh"
 #include "nix/flake/lockfile.hh"
@@ -9,6 +7,7 @@
 #include <algorithm>
 #include <iomanip>
 
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <iterator>
 #include <nlohmann/json.hpp>
 
@@ -162,7 +161,7 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
 {
     nlohmann::json nodes;
     KeyMap nodeKeys;
-    std::unordered_set<std::string> keys;
+    boost::unordered_flat_set<std::string> keys;
 
     std::function<std::string(const std::string & key, ref<const Node> node)> dumpNode;
 

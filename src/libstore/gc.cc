@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/path.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/signals.hh"
@@ -13,14 +14,10 @@
 #  include "nix/util/processes.hh"
 #endif
 
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/regex.hpp>
-
-#include <functional>
 #include <queue>
-#include <algorithm>
-#include <random>
-
-#include <climits>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -314,7 +311,12 @@ Roots LocalStore::findRoots(bool censor)
 /**
  * Key is a mere string because cannot has path with macOS's libc++
  */
-typedef std::unordered_map<std::string, std::unordered_set<std::string>> UncheckedRoots;
+typedef boost::unordered_flat_map<
+    std::string,
+    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
+    StringViewHash,
+    std::equal_to<>>
+    UncheckedRoots;
 
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
@@ -328,7 +330,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
         throw;
     }
     if (buf.is_absolute())
-        roots[buf.string()].emplace(file.string());
+        roots[buf].emplace(file.string());
 }
 
 static std::string quoteRegexChars(const std::string & raw)
@@ -463,13 +465,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    std::unordered_set<StorePath> roots, dead, alive;
+    boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
 
     struct Shared
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        std::unordered_set<std::string> tempRoots;
+        boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -578,9 +580,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             auto storePath = maybeParseStorePath(path);
                             if (storePath) {
                                 debug("got new GC root '%s'", path);
-                                auto hashPart = std::string(storePath->hashPart());
+                                auto hashPart = storePath->hashPart();
                                 auto shared(_shared.lock());
-                                shared->tempRoots.insert(hashPart);
+                                shared->tempRoots.emplace(hashPart);
                                 /* If this path is currently being
                                    deleted, then we have to wait until
                                    deletion is finished to ensure that
@@ -632,7 +634,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Roots tempRoots;
     findTempRoots(tempRoots, true);
     for (auto & root : tempRoots) {
-        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
+        _shared.lock()->tempRoots.emplace(root.first.hashPart());
         roots.insert(root.first);
     }
 
@@ -672,7 +674,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    std::unordered_map<StorePath, StorePathSet> referrersCache;
+    boost::unordered_flat_map<StorePath, StorePathSet, std::hash<StorePath>> referrersCache;
 
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
@@ -739,7 +741,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return;
 
             {
-                auto hashPart = std::string(path->hashPart());
+                auto hashPart = path->hashPart();
                 auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
