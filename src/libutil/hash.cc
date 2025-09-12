@@ -135,7 +135,8 @@ static Hash parseLowLevel(std::string_view rest, HashAlgorithm algo, DecodeNameP
         e.addTrace({}, "While decoding hash '%s'", rest);
     }
     if (d.size() != res.hashSize)
-        throw BadHash("invalid %s hash '%s' %d %d", pair.encodingName, rest);
+        throw BadHash(
+            "invalid %s hash '%s', length %d != expected length %d", pair.encodingName, rest, d.size(), res.hashSize);
     assert(res.hashSize);
     memcpy(res.hash, d.data(), res.hashSize);
 
