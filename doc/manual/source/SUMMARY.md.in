@@ -131,6 +131,7 @@
   - [Contributing](development/contributing.md)
 - [Determinate Nix Release Notes](release-notes-determinate/index.md)
   - [Changes between Nix and Determinate Nix](release-notes-determinate/changes.md)<!-- next -->
+  - [Release 3.11.2 (2025-09-12)](release-notes-determinate/v3.11.2.md)
   - [Release 3.11.1 (2025-09-04)](release-notes-determinate/v3.11.1.md)
   - [Release 3.11.0 (2025-09-03)](release-notes-determinate/v3.11.0.md)
   - [Release 3.10.1 (2025-09-02)](release-notes-determinate/v3.10.1.md)

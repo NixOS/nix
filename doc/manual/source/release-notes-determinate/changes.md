@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.31 and Determinate Nix 3.11.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.31 and Determinate Nix 3.11.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -156,3 +156,19 @@ This section lists the differences between upstream Nix 2.31 and Determinate Nix
 
 <!-- Determinate Nix version 3.11.1 -->
 
+
+<!-- Determinate Nix version 3.11.2 -->
+
+* Parallel eval performance improvements by @edolstra in [DeterminateSystems/nix-src#194](https://github.com/DeterminateSystems/nix-src/pull/194)
+
+* Fix hang in enterChroot() draining userNamespaceSync by @edolstra in [DeterminateSystems/nix-src#195](https://github.com/DeterminateSystems/nix-src/pull/195)
+
+* Fix flake registry ignoring `dir` parameter by @cole-h in [DeterminateSystems/nix-src#196](https://github.com/DeterminateSystems/nix-src/pull/196)
+
+* Pass `dir` in extraAttrs when overriding the registry by @cole-h in [DeterminateSystems/nix-src#199](https://github.com/DeterminateSystems/nix-src/pull/199)
+
+* More use of boost::concurrent_flat_map and a correctness fix by @edolstra in [DeterminateSystems/nix-src#197](https://github.com/DeterminateSystems/nix-src/pull/197)
+
+* `nix develop`: Version the JSON + some cleanups by @edolstra in [DeterminateSystems/nix-src#200](https://github.com/DeterminateSystems/nix-src/pull/200)
+
+* Only try to substitute input if fetching from its original location fails by @edolstra in [DeterminateSystems/nix-src#202](https://github.com/DeterminateSystems/nix-src/pull/202)
