@@ -77,7 +77,6 @@ this_library = library(
   'nixmain',
   sources,
   config_priv_h,
-  soversion : 0,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,
