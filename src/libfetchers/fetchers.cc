@@ -327,47 +327,59 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
-    /* The tree may already be in the Nix store, or it could be
-       substituted (which is often faster than fetching from the
-       original source). So check that. We only do this for final
-       inputs, otherwise there is a risk that we don't return the
-       same attributes (like `lastModified`) that the "real" fetcher
-       would return.
+    std::optional<StorePath> storePath;
+    if (isFinal() && getNarHash())
+        storePath = computeStorePath(*store);
 
-       FIXME: add a setting to disable this.
-       FIXME: substituting may be slower than fetching normally,
-       e.g. for fetchers like Git that are incremental!
-    */
-    if (isFinal() && getNarHash()) {
-        try {
-            auto storePath = computeStorePath(*store);
+    auto makeStoreAccessor = [&]() -> std::pair<ref<SourceAccessor>, Input> {
+        auto accessor = make_ref<SubstitutedSourceAccessor>(makeStorePathAccessor(store, *storePath));
 
-            store->ensurePath(storePath);
+        accessor->fingerprint = getFingerprint(store);
 
-            debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
+        // FIXME: ideally we would use the `showPath()` of the
+        // "real" accessor for this fetcher type.
+        accessor->setPathDisplay("«" + to_string() + "»");
 
-            auto accessor = make_ref<SubstitutedSourceAccessor>(makeStorePathAccessor(store, storePath));
+        return {accessor, *this};
+    };
 
-            accessor->fingerprint = getFingerprint(store);
-
-            // FIXME: ideally we would use the `showPath()` of the
-            // "real" accessor for this fetcher type.
-            accessor->setPathDisplay("«" + to_string() + "»");
-
-            return {accessor, *this};
-        } catch (Error & e) {
-            debug("substitution of input '%s' failed: %s", to_string(), e.what());
-        }
+    /* If a tree with the expected hash is already in the Nix store,
+       reuse it. We only do this for final inputs, since otherwise
+       there is a risk that we don't return the same attributes (like
+       `lastModified`) that the "real" fetcher would return. */
+    if (storePath && store->isValidPath(*storePath)) {
+        debug("using input '%s' in '%s'", to_string(), store->printStorePath(*storePath));
+        return makeStoreAccessor();
     }
 
-    auto [accessor, result] = scheme->getAccessor(store, *this);
+    try {
+        auto [accessor, result] = scheme->getAccessor(store, *this);
 
-    if (!accessor->fingerprint)
-        accessor->fingerprint = result.getFingerprint(store);
-    else
-        result.cachedFingerprint = accessor->fingerprint;
+        if (!accessor->fingerprint)
+            accessor->fingerprint = result.getFingerprint(store);
+        else
+            result.cachedFingerprint = accessor->fingerprint;
 
-    return {accessor, std::move(result)};
+        return {accessor, std::move(result)};
+    } catch (Error & e) {
+        if (storePath) {
+            // Fall back to substitution.
+            try {
+                store->ensurePath(*storePath);
+                warn(
+                    "Successfully substituted input '%s' after failing to fetch it from its original location: %s",
+                    to_string(),
+                    e.info().msg);
+                return makeStoreAccessor();
+            }
+            // Ignore any substitution error, rethrow the original error.
+            catch (Error & e2) {
+                debug("substitution of input '%s' failed: %s", to_string(), e2.info().msg);
+            } catch (...) {
+            }
+        }
+        throw;
+    }
 }
 
 Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const
