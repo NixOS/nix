@@ -315,15 +315,6 @@ public:
      */
     RepairFlag repair;
 
-    /** `"regular"` */
-    Value vStringRegular;
-    /** `"directory"` */
-    Value vStringDirectory;
-    /** `"symlink"` */
-    Value vStringSymlink;
-    /** `"unknown"` */
-    Value vStringUnknown;
-
     /**
      * The accessor corresponding to `store`.
      */

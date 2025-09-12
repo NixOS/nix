@@ -2243,19 +2243,45 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static Value * fileTypeToString(EvalState & state, SourceAccessor::Type type)
+static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type type)
 {
-    return type == SourceAccessor::Type::tRegular     ? &state.vStringRegular
-           : type == SourceAccessor::Type::tDirectory ? &state.vStringDirectory
-           : type == SourceAccessor::Type::tSymlink   ? &state.vStringSymlink
-                                                      : &state.vStringUnknown;
+    struct Constants
+    {
+        Value regular;
+        Value directory;
+        Value symlink;
+        Value unknown;
+    };
+
+    static const Constants stringValues = []() {
+        Constants res;
+        res.regular.mkStringNoCopy("regular");
+        res.directory.mkStringNoCopy("directory");
+        res.symlink.mkStringNoCopy("symlink");
+        res.unknown.mkStringNoCopy("unknown");
+        return res;
+    }();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    using enum SourceAccessor::Type;
+    switch (type) {
+    case tRegular:
+        return stringValues.regular;
+    case tDirectory:
+        return stringValues.directory;
+    case tSymlink:
+        return stringValues.symlink;
+    default:
+        return stringValues.unknown;
+    }
 }
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
-    v = *fileTypeToString(state, path.lstat().type);
+    v = fileTypeToString(state, path.lstat().type);
 }
 
 static RegisterPrimOp primop_readFileType({
@@ -2299,7 +2325,9 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Val
         } else {
             // This branch of the conditional is much more likely.
             // Here we just stringize the directory entry type.
-            attrs.insert(state.symbols.create(name), fileTypeToString(state, *type));
+            // N.B. const_cast here is ok, because these values will never be modified, since
+            // only thunks are mutable - other types do not change once constructed.
+            attrs.insert(state.symbols.create(name), const_cast<Value *>(&fileTypeToString(state, *type)));
         }
     }
 
@@ -2674,7 +2702,7 @@ bool EvalState::callPathFilter(Value * filterFun, const SourcePath & path, PosId
     arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
-    Value * args[]{&arg1, fileTypeToString(*this, st.type)};
+    Value * args[]{&arg1, const_cast<Value *>(&fileTypeToString(*this, st.type))};
     Value res;
     callFunction(*filterFun, args, res, pos);
 

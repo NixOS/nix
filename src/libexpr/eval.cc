@@ -284,11 +284,6 @@ EvalState::EvalState(
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
-    vStringRegular.mkStringNoCopy("regular");
-    vStringDirectory.mkStringNoCopy("directory");
-    vStringSymlink.mkStringNoCopy("symlink");
-    vStringUnknown.mkStringNoCopy("unknown");
-
     /* Construct the Nix expression search path. */
     assert(lookupPath.elements.empty());
     if (!settings.pureEval) {
