@@ -1,13 +1,17 @@
 #include <regex>
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 #include "nix/util/hash.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 
-class BLAKE3HashTest : public virtual ::testing::Test
+class HashTest : public CharacterizationTest
 {
+    std::filesystem::path unitTestData = getUnitTestData() / "hash";
+
 public:
 
     /**
@@ -16,8 +20,14 @@ public:
      */
     ExperimentalFeatureSettings mockXpSettings;
 
-private:
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
 
+class BLAKE3HashTest : public HashTest
+{
     void SetUp() override
     {
         mockXpSettings.set("experimental-features", "blake3-hashes");
@@ -135,6 +145,46 @@ TEST(hashString, testKnownSHA512Hashes2)
         "sha512:8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa1"
         "7299aeadb6889018501d289e4900f7e4331b99dec4b5433a"
         "c7d329eeb6dd26545e96e55b874be909");
+}
+
+/* ----------------------------------------------------------------------------
+ * parsing hashes
+ * --------------------------------------------------------------------------*/
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_correct)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    auto s = "abc";
+
+    auto hash = hashString(HashAlgorithm::SHA256, s);
+    ASSERT_EQ(
+        hash,
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA256,
+            HashFormat::Base16));
+}
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_wrongAlgo)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    ASSERT_THROW(
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA1,
+            HashFormat::Base16),
+        BadHash);
+}
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_wrongBase)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    ASSERT_THROW(
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA256,
+            HashFormat::Nix32),
+        BadHash);
 }
 
 /* ----------------------------------------------------------------------------

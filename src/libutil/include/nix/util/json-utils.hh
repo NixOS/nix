@@ -6,6 +6,7 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/types.hh"
+#include "nix/util/json-non-null.hh"
 
 namespace nix {
 
@@ -58,56 +59,6 @@ const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
 Strings getStringList(const nlohmann::json & value);
 StringMap getStringMap(const nlohmann::json & value);
 StringSet getStringSet(const nlohmann::json & value);
-
-/**
- * For `adl_serializer<std::optional<T>>` below, we need to track what
- * types are not already using `null`. Only for them can we use `null`
- * to represent `std::nullopt`.
- */
-template<typename T>
-struct json_avoids_null;
-
-/**
- * Handle numbers in default impl
- */
-template<typename T>
-struct json_avoids_null : std::bool_constant<std::is_integral<T>::value>
-{};
-
-template<>
-struct json_avoids_null<std::nullptr_t> : std::false_type
-{};
-
-template<>
-struct json_avoids_null<bool> : std::true_type
-{};
-
-template<>
-struct json_avoids_null<std::string> : std::true_type
-{};
-
-template<typename T>
-struct json_avoids_null<std::vector<T>> : std::true_type
-{};
-
-template<typename T>
-struct json_avoids_null<std::list<T>> : std::true_type
-{};
-
-template<typename T, typename Compare>
-struct json_avoids_null<std::set<T, Compare>> : std::true_type
-{};
-
-template<typename K, typename V>
-struct json_avoids_null<std::map<K, V>> : std::true_type
-{};
-
-/**
- * `ExperimentalFeature` is always rendered as a string.
- */
-template<>
-struct json_avoids_null<ExperimentalFeature> : std::true_type
-{};
 
 } // namespace nix
 
