@@ -1,4 +1,5 @@
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/expr/static-string-data.hh"
 
 #include "nix/expr/value.hh"
 #include "nix/expr/print.hh"
@@ -35,14 +36,14 @@ TEST_F(ValuePrintingTests, tBool)
 TEST_F(ValuePrintingTests, tString)
 {
     Value vString;
-    vString.mkStringNoCopy("some-string");
+    vString.mkStringNoCopy("some-string"_sds);
     test(vString, "\"some-string\"");
 }
 
 TEST_F(ValuePrintingTests, tPath)
 {
     Value vPath;
-    vPath.mkStringNoCopy("/foo");
+    vPath.mkStringNoCopy("/foo"_sds);
     test(vPath, "\"/foo\"");
 }
 
@@ -289,10 +290,10 @@ TEST_F(StringPrintingTests, maxLengthTruncation)
 TEST_F(ValuePrintingTests, attrsTypeFirst)
 {
     Value vType;
-    vType.mkStringNoCopy("puppy");
+    vType.mkStringNoCopy("puppy"_sds);
 
     Value vApple;
-    vApple.mkStringNoCopy("apple");
+    vApple.mkStringNoCopy("apple"_sds);
 
     BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.symbols.create("type"), &vType);
@@ -333,7 +334,7 @@ TEST_F(ValuePrintingTests, ansiColorsBool)
 TEST_F(ValuePrintingTests, ansiColorsString)
 {
     Value v;
-    v.mkStringNoCopy("puppy");
+    v.mkStringNoCopy("puppy"_sds);
 
     test(v, ANSI_MAGENTA "\"puppy\"" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }
@@ -341,7 +342,7 @@ TEST_F(ValuePrintingTests, ansiColorsString)
 TEST_F(ValuePrintingTests, ansiColorsStringElided)
 {
     Value v;
-    v.mkStringNoCopy("puppy");
+    v.mkStringNoCopy("puppy"_sds);
 
     test(
         v,
@@ -389,7 +390,7 @@ TEST_F(ValuePrintingTests, ansiColorsAttrs)
 TEST_F(ValuePrintingTests, ansiColorsDerivation)
 {
     Value vDerivation;
-    vDerivation.mkStringNoCopy("derivation");
+    vDerivation.mkStringNoCopy("derivation"_sds);
 
     BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.s.type, &vDerivation);
@@ -412,7 +413,7 @@ TEST_F(ValuePrintingTests, ansiColorsError)
 {
     Value throw_ = state.getBuiltin("throw");
     Value message;
-    message.mkStringNoCopy("uh oh!");
+    message.mkStringNoCopy("uh oh!"_sds);
     Value vError;
     vError.mkApp(&throw_, &message);
 
@@ -429,12 +430,12 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
 {
     Value throw_ = state.getBuiltin("throw");
     Value message;
-    message.mkStringNoCopy("uh oh!");
+    message.mkStringNoCopy("uh oh!"_sds);
     Value vError;
     vError.mkApp(&throw_, &message);
 
     Value vDerivation;
-    vDerivation.mkStringNoCopy("derivation");
+    vDerivation.mkStringNoCopy("derivation"_sds);
 
     BindingsBuilder builder = state.buildBindings(10);
     builder.insert(state.s.type, &vDerivation);

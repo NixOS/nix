@@ -3,6 +3,7 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -28,6 +29,8 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -48,6 +51,9 @@ using json = nlohmann::json;
 
 namespace nix {
 
+/**
+ * Just for doc strings. Not for regular string values.
+ */
 static char * allocString(size_t size)
 {
     char * t;
@@ -61,6 +67,9 @@ static char * allocString(size_t size)
 // string allocations.
 // This function handles makeImmutableString(std::string_view()) by returning
 // the empty string.
+/**
+ * Just for doc strings. Not for regular string values.
+ */
 static const char * makeImmutableString(std::string_view s)
 {
     const size_t size = s.size();
@@ -70,6 +79,25 @@ static const char * makeImmutableString(std::string_view s)
     memcpy(t, s.data(), size);
     t[size] = '\0';
     return t;
+}
+
+StringData & StringData::alloc(size_t size)
+{
+    void * t = GC_MALLOC_ATOMIC(sizeof(StringData) + size + 1);
+    if (!t)
+        throw std::bad_alloc();
+    auto res = new (t) StringData(size);
+    return *res;
+}
+
+const StringData & StringData::make(std::string_view s)
+{
+    if (s.empty())
+        return ""_sds;
+    auto & res = alloc(s.size());
+    std::memcpy(&res.data_, s.data(), s.size());
+    res.data_[s.size()] = '\0';
+    return res;
 }
 
 RootValue allocRootValue(Value * v)
@@ -585,7 +613,9 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc = makeImmutableString(s.view()), // NOTE: memory leak when compiled without GC
+            /* N.B. Can't use StringData here, because that would lead to an interior pointer.
+               NOTE: memory leak when compiled without GC. */
+            .doc = makeImmutableString(s.view()),
         };
     }
     if (isFunctor(v)) {
@@ -819,7 +849,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 
 void Value::mkString(std::string_view s)
 {
-    mkStringNoCopy(makeImmutableString(s));
+    mkStringNoCopy(StringData::make(s));
 }
 
 Value::StringWithContext::Context * Value::StringWithContext::Context::fromBuilder(const NixStringContext & context)
@@ -829,23 +859,23 @@ Value::StringWithContext::Context * Value::StringWithContext::Context::fromBuild
 
     auto ctx = new (allocBytes(sizeof(Context) + context.size() * sizeof(value_type))) Context(context.size());
     std::ranges::transform(
-        context, ctx->elems, [](const NixStringContextElem & elt) { return makeImmutableString(elt.to_string()); });
+        context, ctx->elems, [](const NixStringContextElem & elt) { return &StringData::make(elt.to_string()); });
     return ctx;
 }
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkStringNoCopy(makeImmutableString(s), Value::StringWithContext::Context::fromBuilder(context));
+    mkStringNoCopy(StringData::make(s), Value::StringWithContext::Context::fromBuilder(context));
 }
 
-void Value::mkStringMove(const char * s, const NixStringContext & context)
+void Value::mkStringMove(const StringData & s, const NixStringContext & context)
 {
     mkStringNoCopy(s, Value::StringWithContext::Context::fromBuilder(context));
 }
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
+    mkPath(&*path.accessor, StringData::make(path.path.abs()));
 }
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
@@ -2099,21 +2129,21 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 .atPos(pos)
                 .withFrame(env, *this)
                 .debugThrow();
-        std::string result_str;
-        result_str.reserve(sSize);
+        std::string resultStr;
+        resultStr.reserve(sSize);
         for (const auto & part : strings) {
-            result_str += *part;
+            resultStr += *part;
         }
-        v.mkPath(state.rootPath(CanonPath(result_str)));
+        v.mkPath(state.rootPath(CanonPath(resultStr)));
     } else {
-        char * result_str = allocString(sSize + 1);
-        char * tmp = result_str;
+        auto & resultStr = StringData::alloc(sSize);
+        auto * tmp = resultStr.data();
         for (const auto & part : strings) {
-            memcpy(tmp, part->data(), part->size());
+            std::memcpy(tmp, part->data(), part->size());
             tmp += part->size();
         }
-        *tmp = 0;
-        v.mkStringMove(result_str, context);
+        *tmp = '\0';
+        v.mkStringMove(resultStr, context);
     }
 }
 
@@ -2288,7 +2318,7 @@ void copyContext(const Value & v, NixStringContext & context, const Experimental
 {
     if (auto * ctx = v.context())
         for (auto * elem : *ctx)
-            context.insert(NixStringContextElem::parse(elem, xpSettings));
+            context.insert(NixStringContextElem::parse(elem->view(), xpSettings));
 }
 
 std::string_view EvalState::forceString(
