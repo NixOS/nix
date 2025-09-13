@@ -257,7 +257,7 @@ struct ProfileManifest
 
         auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
-        ValidPathInfo info{
+        auto info = ValidPathInfo::makeFromCA(
             *store,
             "profile",
             FixedOutputInfo{
@@ -270,8 +270,7 @@ struct ProfileManifest
                         .self = false,
                     },
             },
-            narHash,
-        };
+            narHash);
         info.narSize = sink.s.size();
 
         StringSource source(sink.s);

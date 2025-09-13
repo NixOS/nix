@@ -4,6 +4,8 @@
 #include <string_view>
 
 #include "nix/util/types.hh"
+#include "nix/util/json-impls.hh"
+#include "nix/util/json-non-null.hh"
 
 namespace nix {
 
@@ -87,6 +89,13 @@ typedef std::vector<StorePath> StorePaths;
  */
 constexpr std::string_view drvExtension = ".drv";
 
+/**
+ * `ExperimentalFeature` is always rendered as a string.
+ */
+template<>
+struct json_avoids_null<StorePath> : std::true_type
+{};
+
 } // namespace nix
 
 namespace std {
@@ -101,3 +110,5 @@ struct hash<nix::StorePath>
 };
 
 } // namespace std
+
+JSON_IMPL(nix::StorePath)

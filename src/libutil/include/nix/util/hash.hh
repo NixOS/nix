@@ -5,6 +5,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -222,3 +223,5 @@ public:
 };
 
 } // namespace nix
+
+JSON_IMPL(Hash)

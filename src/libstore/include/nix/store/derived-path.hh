@@ -304,4 +304,11 @@ typedef std::vector<DerivedPath> DerivedPaths;
  */
 void drvRequireExperiment(
     const SingleDerivedPath & drv, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
 } // namespace nix
+
+JSON_IMPL(nix::DerivedPathOpaque)
+JSON_IMPL(nix::SingleDerivedPathBuilt)
+JSON_IMPL(nix::SingleDerivedPath)
+JSON_IMPL(nix::DerivedPathBuilt)
+JSON_IMPL(nix::DerivedPath)

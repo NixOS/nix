@@ -29,7 +29,7 @@ static UnkeyedValidPathInfo makeEmpty()
 
 static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
 {
-    ValidPathInfo info = ValidPathInfo{
+    auto info = ValidPathInfo::makeFromCA(
         store,
         "foo",
         FixedOutputInfo{
@@ -47,8 +47,7 @@ static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
                     .self = true,
                 },
         },
-        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-    };
+        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="));
     info.narSize = 34878;
     if (includeImpureInfo) {
         info.deriver = StorePath{
@@ -71,7 +70,7 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
     {                                                                                                 \
         readTest(#STEM, [&](const auto & encoded_) {                                                  \
             auto encoded = json::parse(encoded_);                                                     \
-            UnkeyedValidPathInfo got = UnkeyedValidPathInfo::fromJSON(*store, encoded);               \
+            UnkeyedValidPathInfo got = UnkeyedValidPathInfo::fromJSON(&*store, encoded);              \
             auto expected = OBJ;                                                                      \
             ASSERT_EQ(got, expected);                                                                 \
         });                                                                                           \
@@ -81,7 +80,7 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
     {                                                                                                 \
         writeTest(                                                                                    \
             #STEM,                                                                                    \
-            [&]() -> json { return OBJ.toJSON(*store, PURE, HashFormat::SRI); },                      \
+            [&]() -> json { return OBJ.toJSON(&*store, PURE); },                                      \
             [](const auto & file) { return json::parse(readFile(file)); },                            \
             [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }

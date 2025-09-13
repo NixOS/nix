@@ -203,4 +203,34 @@ TEST(hashFormat, testParseHashFormatOptException)
 {
     ASSERT_EQ(parseHashFormatOpt("sha0042"), std::nullopt);
 }
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+#define TEST_JSON(FIXTURE, NAME, VAL)                                                                 \
+    static const Hash NAME = VAL;                                                                     \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_from_json)                                                                 \
+    {                                                                                                 \
+        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
+            auto encoded = json::parse(encoded_);                                                     \
+            Hash got = static_cast<Hash>(encoded);                                                    \
+            ASSERT_EQ(got, NAME);                                                                     \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_to_json)                                                                   \
+    {                                                                                                 \
+        writeTest(                                                                                    \
+            #NAME ".json",                                                                            \
+            [&]() -> json { return static_cast<json>(NAME); },                                        \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }
+
+TEST_JSON(HashTest, simple, hashString(HashAlgorithm::SHA256, "asdf"));
+
 } // namespace nix
