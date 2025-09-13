@@ -149,7 +149,7 @@ ValidPathInfo ValidPathInfo::makeFromCA(
     return res;
 }
 
-nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo) const
+nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
@@ -163,13 +163,15 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool i
     {
         auto & jsonRefs = jsonObject["references"] = json::array();
         for (auto & ref : references)
-            jsonRefs.emplace_back(store.printStorePath(ref));
+            jsonRefs.emplace_back(store ? static_cast<json>(store->printStorePath(ref)) : static_cast<json>(ref));
     }
 
     jsonObject["ca"] = ca;
 
     if (includeImpureInfo) {
-        jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
+        jsonObject["deriver"] = deriver ? (store ? static_cast<json>(std::optional{store->printStorePath(*deriver)})
+                                                 : static_cast<json>(std::optional{*deriver}))
+                                        : static_cast<json>(std::optional<StorePath>{});
 
         jsonObject["registrationTime"] = registrationTime ? (std::optional{registrationTime}) : std::nullopt;
 
@@ -183,7 +185,7 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool i
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store, const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & _json)
 {
     UnkeyedValidPathInfo res{
         Hash(Hash::dummy),
@@ -203,7 +205,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
     try {
         auto references = getStringList(valueAt(json, "references"));
         for (auto & input : references)
-            res.references.insert(store.parseStorePath(static_cast<const std::string &>(input)));
+            res.references.insert(store ? store->parseStorePath(getString(input)) : static_cast<StorePath>(input));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'references'");
         throw;
@@ -218,7 +220,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 
     if (auto * rawDeriver0 = optionalValueAt(json, "deriver"))
         if (auto * rawDeriver = getNullable(*rawDeriver0))
-            res.deriver = store.parseStorePath(getString(*rawDeriver));
+            res.deriver = store ? store->parseStorePath(getString(*rawDeriver)) : static_cast<StorePath>(*rawDeriver);
 
     if (auto * rawRegistrationTime0 = optionalValueAt(json, "registrationTime"))
         if (auto * rawRegistrationTime = getNullable(*rawRegistrationTime0))
@@ -234,3 +236,19 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json & json)
+{
+    return UnkeyedValidPathInfo::fromJSON(nullptr, json);
+}
+
+void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
+{
+    json = c.toJSON(nullptr, true);
+}
+
+} // namespace nlohmann

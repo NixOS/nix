@@ -7,7 +7,9 @@
 namespace nix {
 
 NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
-    : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
+    : UnkeyedValidPathInfo(Hash::dummy)                                                 // FIXME: hack
+    , ValidPathInfo(StorePath::dummy, static_cast<const UnkeyedValidPathInfo &>(*this)) // FIXME: hack
+    , UnkeyedNarInfo(static_cast<const UnkeyedValidPathInfo &>(*this))
 {
     unsigned line = 1;
 
@@ -130,11 +132,11 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
     return res;
 }
 
-nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo) const
+nlohmann::json UnkeyedNarInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
-    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo);
+    auto jsonObject = UnkeyedValidPathInfo::toJSON(store, includeImpureInfo);
 
     if (includeImpureInfo) {
         if (!url.empty())
@@ -150,14 +152,11 @@ nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureI
     return jsonObject;
 }
 
-NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, const nlohmann::json & json)
+UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & json)
 {
     using nlohmann::detail::value_t;
 
-    NarInfo res{ValidPathInfo{
-        path,
-        UnkeyedValidPathInfo::fromJSON(store, json),
-    }};
+    UnkeyedNarInfo res{UnkeyedValidPathInfo::fromJSON(store, json)};
 
     auto & obj = getObject(json);
 
@@ -177,3 +176,19 @@ NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, 
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+UnkeyedNarInfo adl_serializer<UnkeyedNarInfo>::from_json(const json & json)
+{
+    return UnkeyedNarInfo::fromJSON(nullptr, json);
+}
+
+void adl_serializer<UnkeyedNarInfo>::to_json(json & json, const UnkeyedNarInfo & c)
+{
+    json = c.toJSON(nullptr, true);
+}
+
+} // namespace nlohmann

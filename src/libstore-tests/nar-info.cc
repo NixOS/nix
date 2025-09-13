@@ -65,7 +65,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
         readTest(#STEM, [&](const auto & encoded_) {                                                  \
             auto encoded = json::parse(encoded_);                                                     \
             auto expected = makeNarInfo(*store, PURE);                                                \
-            NarInfo got = NarInfo::fromJSON(*store, expected.path, encoded);                          \
+            auto got = UnkeyedNarInfo::fromJSON(&*store, encoded);                                    \
             ASSERT_EQ(got, expected);                                                                 \
         });                                                                                           \
     }                                                                                                 \
@@ -74,7 +74,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
     {                                                                                                 \
         writeTest(                                                                                    \
             #STEM,                                                                                    \
-            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(*store, PURE); },                 \
+            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(&*store, PURE); },                \
             [](const auto & file) { return json::parse(readFile(file)); },                            \
             [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }
