@@ -3,6 +3,7 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -28,6 +29,8 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -47,28 +50,22 @@ using json = nlohmann::json;
 
 namespace nix {
 
-static char * allocString(size_t size)
+StringData & StringData::alloc(size_t size)
 {
-    char * t;
-    t = (char *) GC_MALLOC_ATOMIC(size);
-    if (!t)
+    auto res = (StringData *) GC_MALLOC_ATOMIC(sizeof(size_t) + size + 1);
+    if (!res) {
         throw std::bad_alloc();
-    return t;
+    }
+    res->m_size = size;
+    return *res;
 }
 
-// When there's no need to write to the string, we can optimize away empty
-// string allocations.
-// This function handles makeImmutableString(std::string_view()) by returning
-// the empty string.
-static const char * makeImmutableString(std::string_view s)
+StringData & StringData::make(std::string_view s)
 {
-    const size_t size = s.size();
-    if (size == 0)
-        return "";
-    auto t = allocString(size + 1);
-    memcpy(t, s.data(), size);
-    t[size] = '\0';
-    return t;
+    auto & res = alloc(s.size());
+    memcpy(&res.m_data, s.data(), s.size());
+    res.m_data[s.size()] = '\0';
+    return res;
 }
 
 RootValue allocRootValue(Value * v)
@@ -584,7 +581,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc = makeImmutableString(s.view()), // NOTE: memory leak when compiled without GC
+            .doc = StringData::make(s.view()).view().data(), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
@@ -818,7 +815,7 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 
 void Value::mkString(std::string_view s)
 {
-    mkStringNoCopy(makeImmutableString(s));
+    mkStringNoCopy(StringData::make(s));
 }
 
 static const char ** encodeContext(const NixStringContext & context)
@@ -827,7 +824,7 @@ static const char ** encodeContext(const NixStringContext & context)
         size_t n = 0;
         auto ctx = (const char **) allocBytes((context.size() + 1) * sizeof(char *));
         for (auto & i : context) {
-            ctx[n++] = makeImmutableString({i.to_string()});
+            ctx[n++] = StringData::make({i.to_string()}).view().data();
         }
         ctx[n] = nullptr;
         return ctx;
@@ -837,17 +834,17 @@ static const char ** encodeContext(const NixStringContext & context)
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkStringNoCopy(makeImmutableString(s), encodeContext(context));
+    mkStringNoCopy(StringData::make(s), encodeContext(context));
 }
 
-void Value::mkStringMove(const char * s, const NixStringContext & context)
+void Value::mkStringMove(const StringData & s, const NixStringContext & context)
 {
     mkStringNoCopy(s, encodeContext(context));
 }
 
 void Value::mkPath(const SourcePath & path)
 {
-    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
+    mkPath(&*path.accessor, StringData::make(path.path.abs()));
 }
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
@@ -1559,6 +1556,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                                 .withFrame(*vCur.lambda().env, lambda)
                                 .debugThrow();
                         }
+
                     unreachable();
                 }
             } else {
@@ -2095,11 +2093,13 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     } else if (firstType == nFloat) {
         v.mkFloat(nf);
     } else if (firstType == nPath) {
-        if (!context.empty())
+        if (!context.empty()) {
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path")
                 .atPos(pos)
                 .withFrame(env, *this)
                 .debugThrow();
+        }
+
         std::string result_str;
         result_str.reserve(sSize);
         for (const auto & part : strings) {
@@ -2107,13 +2107,13 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
         }
         v.mkPath(state.rootPath(CanonPath(result_str)));
     } else {
-        char * result_str = allocString(sSize + 1);
-        char * tmp = result_str;
+        auto & result_str = StringData::alloc(sSize);
+        auto tmp = result_str.data();
         for (const auto & part : strings) {
             memcpy(tmp, part->data(), part->size());
             tmp += part->size();
         }
-        *tmp = 0;
+        *tmp = '\0';
         v.mkStringMove(result_str, context);
     }
 }
@@ -2369,7 +2369,7 @@ BackedStringView EvalState::coerceToString(
         if (!canonicalizePath && !copyToStore) {
             // FIXME: hack to preserve path literals that end in a
             // slash, as in /foo/${x}.
-            return v.pathStrView();
+            return v.pathStr().view();
         } else if (copyToStore) {
             return store->printStorePath(copyPathToStore(context, v.path()));
         } else {

@@ -104,8 +104,10 @@ MATCHER(IsAttrs, "")
 MATCHER_P(IsStringEq, s, fmt("The string is equal to \"%1%\"", s))
 {
     if (arg.type() != nString) {
+        *result_listener << "of non-String type " << arg.type();
         return false;
     }
+    *result_listener << "string(" << arg.string_view() << ")";
     return arg.string_view() == s;
 }
 

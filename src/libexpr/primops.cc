@@ -487,34 +487,34 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Valu
     state.forceValue(*args[0], pos);
     switch (args[0]->type()) {
     case nInt:
-        v.mkStringNoCopy("int");
+        v.mkStringNoCopy("int"_sds);
         break;
     case nBool:
-        v.mkStringNoCopy("bool");
+        v.mkStringNoCopy("bool"_sds);
         break;
     case nString:
-        v.mkStringNoCopy("string");
+        v.mkStringNoCopy("string"_sds);
         break;
     case nPath:
-        v.mkStringNoCopy("path");
+        v.mkStringNoCopy("path"_sds);
         break;
     case nNull:
-        v.mkStringNoCopy("null");
+        v.mkStringNoCopy("null"_sds);
         break;
     case nAttrs:
-        v.mkStringNoCopy("set");
+        v.mkStringNoCopy("set"_sds);
         break;
     case nList:
-        v.mkStringNoCopy("list");
+        v.mkStringNoCopy("list"_sds);
         break;
     case nFunction:
-        v.mkStringNoCopy("lambda");
+        v.mkStringNoCopy("lambda"_sds);
         break;
     case nExternal:
         v.mkString(args[0]->external()->typeOf());
         break;
     case nFloat:
-        v.mkStringNoCopy("float");
+        v.mkStringNoCopy("float"_sds);
         break;
     case nThunk:
         unreachable();
@@ -2256,10 +2256,10 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
 
     static const Constants stringValues = []() {
         Constants res;
-        res.regular.mkStringNoCopy("regular");
-        res.directory.mkStringNoCopy("directory");
-        res.symlink.mkStringNoCopy("symlink");
-        res.unknown.mkStringNoCopy("unknown");
+        res.regular.mkStringNoCopy("regular"_sds);
+        res.directory.mkStringNoCopy("directory"_sds);
+        res.symlink.mkStringNoCopy("symlink"_sds);
+        res.unknown.mkStringNoCopy("unknown"_sds);
         return res;
     }();
 
@@ -4410,7 +4410,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
-            v.mkStringNoCopy("", args[2]->context());
+            v.mkStringNoCopy(""_sds, args[2]->context());
             return;
         }
     }

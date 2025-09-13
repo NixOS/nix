@@ -79,7 +79,11 @@ struct int_t
 
 typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
-typedef std::pair<std::string, NixStringContext> string_t;
+typedef std::pair<
+    // XXX aspen: StringData?
+    std::string,
+    NixStringContext>
+    string_t;
 
 typedef std::variant<
     std::vector<Symbol>,

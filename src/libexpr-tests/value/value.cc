@@ -27,17 +27,17 @@ TEST_F(ValueTest, staticString)
 {
     Value vStr1;
     Value vStr2;
-    vStr1.mkStringNoCopy("foo");
-    vStr2.mkStringNoCopy("foo");
+    vStr1.mkStringNoCopy("foo"_sds);
+    vStr2.mkStringNoCopy("foo"_sds);
 
-    auto sd1 = vStr1.string_view();
-    auto sd2 = vStr2.string_view();
+    auto & sd1 = vStr1.string_data();
+    auto & sd2 = vStr2.string_data();
 
     // The strings should be the same
-    ASSERT_EQ(sd1, sd2);
+    ASSERT_EQ(sd1.view(), sd2.view());
 
     // The strings should also be backed by the same (static) allocation
-    ASSERT_EQ(std::bit_cast<size_t>(sd1.data()), std::bit_cast<size_t>(sd2.data()));
+    ASSERT_EQ(std::bit_cast<size_t>(sd1), std::bit_cast<size_t>(sd2));
 }
 
 } // namespace nix

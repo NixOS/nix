@@ -1,8 +1,14 @@
 #pragma once
 ///@file
 
+#include <bit>
 #include <cassert>
+#include <cstddef>
+#include <cstring>
+#include <memory>
+#include <memory_resource>
 #include <span>
+#include <string_view>
 #include <type_traits>
 #include <concepts>
 
@@ -186,6 +192,115 @@ public:
     friend struct Value;
 };
 
+class StringData
+{
+    std::size_t m_size;
+    char m_data[];
+
+    StringData(auto &&...) = delete;
+    StringData & operator=(auto &&...) = delete;
+    /**
+     * This in particular ensures that we cannot have a `StringData`
+     * that we use by value, which is just what we want!
+     *
+     * (Ideally the `char m_data[]` would make this a dynamically sized
+     * type like Rust, but that is not a thing in C++.)
+     */
+    ~StringData() = delete;
+
+public:
+
+    static StringData & make(std::string_view s);
+    static StringData & alloc(size_t size);
+
+    size_t size() const
+    {
+        return m_size;
+    }
+
+    char * data()
+    {
+        return &m_data[0];
+    }
+
+    constexpr std::string_view view() const
+    {
+        return std::string_view(&*m_data, m_size);
+    }
+
+    constexpr operator std::string_view() const
+    {
+        return view();
+    }
+
+    constexpr bool operator==(const std::string_view & other) const
+    {
+        return view() == other;
+    }
+
+    constexpr bool operator==(const StringData & other) const
+    {
+        return view() == other.view();
+    }
+
+    char & operator[](std::size_t idx)
+    {
+        return data()[idx];
+    }
+
+    template<size_t N>
+    struct Static
+    {
+        const size_t len = N - 1;
+        char data[N];
+
+        consteval Static(const char (&str)[N])
+        {
+            static_assert(N > 0);
+            if (str[len] != '\0')
+                throw;
+            std::copy_n(str, N, data);
+        }
+
+        constexpr operator const StringData &() const &
+        {
+            return *std::bit_cast<const StringData *>(this);
+        }
+
+        constexpr operator std::string_view() const &
+        {
+            return std::string_view(data, len);
+        }
+    };
+
+    static StringData & make(std::pmr::memory_resource & resource, std::string_view s)
+    {
+        auto & res =
+            *static_cast<StringData *>(resource.allocate(sizeof(std::size_t) + s.size() + 1, alignof(StringData)));
+        res.m_size = s.size();
+        memcpy(&res.m_data, s.data(), s.size());
+        res.m_data[s.size()] = '\0';
+        return res;
+    }
+};
+
+template<StringData::Static S>
+constexpr const StringData & operator""_sds()
+{
+    static_assert(S.data[S.len] == '\0');
+    return S;
+}
+
+inline std::ostream & operator<<(std::ostream & os, const StringData *& sd)
+{
+    return os << sd->view();
+}
+
+inline std::ostream & operator<<(std::ostream & os, const StringData & sd)
+{
+    return os << sd.view();
+}
+
 namespace detail {
 
 /**
@@ -219,14 +334,14 @@ struct ValueBase
      */
     struct StringWithContext
     {
-        const char * c_str;
+        const StringData * str;
         const char ** context; // must be in sorted order
     };
 
     struct Path
     {
         SourceAccessor * accessor;
-        const char * path;
+        const StringData * path;
     };
 
     struct Null
@@ -587,13 +702,13 @@ protected:
     void getStorage(StringWithContext & string) const noexcept
     {
         string.context = untagPointer<decltype(string.context)>(payload[0]);
-        string.c_str = std::bit_cast<const char *>(payload[1]);
+        string.str = std::bit_cast<const StringData *>(payload[1]);
     }
 
     void getStorage(Path & path) const noexcept
     {
         path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
-        path.path = std::bit_cast<const char *>(payload[1]);
+        path.path = std::bit_cast<const StringData *>(payload[1]);
     }
 
     void setStorage(NixInt integer) noexcept
@@ -638,7 +753,7 @@ protected:
 
     void setStorage(StringWithContext string) noexcept
     {
-        setUntaggablePayload<pdString>(string.context, string.c_str);
+        setUntaggablePayload<pdString>(string.context, string.str);
     }
 
     void setStorage(Path path) noexcept
@@ -991,22 +1106,22 @@ public:
         setStorage(b);
     }
 
-    void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
+    void mkStringNoCopy(const StringData & s, const char ** context = 0) noexcept
     {
-        setStorage(StringWithContext{.c_str = s, .context = context});
+        setStorage(StringWithContext{.str = &s, .context = context});
     }
 
     void mkString(std::string_view s);
 
     void mkString(std::string_view s, const NixStringContext & context);
 
-    void mkStringMove(const char * s, const NixStringContext & context);
+    void mkStringMove(const StringData & s, const NixStringContext & context);
 
     void mkPath(const SourcePath & path);
 
-    inline void mkPath(SourceAccessor * accessor, const char * path) noexcept
+    inline void mkPath(SourceAccessor * accessor, const StringData & path) noexcept
     {
-        setStorage(Path{.accessor = accessor, .path = path});
+        setStorage(Path{.accessor = accessor, .path = &path});
     }
 
     inline void mkNull() noexcept
@@ -1104,17 +1219,19 @@ public:
 
     SourcePath path() const
     {
-        return SourcePath(ref(pathAccessor()->shared_from_this()), CanonPath(CanonPath::unchecked_t(), pathStr()));
+        return SourcePath(
+            ref(pathAccessor()->shared_from_this()),
+            CanonPath(CanonPath::unchecked_t(), std::string(pathStr().view())));
+    }
+
+    const StringData & string_data() const noexcept
+    {
+        return *getStorage<StringWithContext>().str;
     }
 
     std::string_view string_view() const noexcept
     {
-        return std::string_view{getStorage<StringWithContext>().c_str};
-    }
-
-    const char * c_str() const noexcept
-    {
-        return getStorage<StringWithContext>().c_str;
+        return string_data().view();
     }
 
     const char ** context() const noexcept
@@ -1172,14 +1289,14 @@ public:
         return getStorage<FunctionApplicationThunk>();
     }
 
-    const char * pathStr() const noexcept
+    const StringData & pathStr() const noexcept
     {
-        return getStorage<Path>().path;
+        return *getStorage<Path>().path;
     }
 
     std::string_view pathStrView() const noexcept
     {
-        return std::string_view{getStorage<Path>().path};
+        return pathStr().view();
     }
 
     SourceAccessor * pathAccessor() const noexcept
