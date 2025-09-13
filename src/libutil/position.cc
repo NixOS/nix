@@ -7,6 +7,11 @@ Pos::operator std::shared_ptr<const Pos>() const
     return std::make_shared<const Pos>(*this);
 }
 
+bool isEmpty(const Pos & pos)
+{
+    return !pos.operator bool();
+}
+
 std::optional<LinesOfCode> Pos::getCodeLines() const
 {
     if (line == 0)
