@@ -149,26 +149,31 @@ ValidPathInfo ValidPathInfo::makeFromCA(
     return res;
 }
 
-nlohmann::json
-UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
     auto jsonObject = json::object();
 
-    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    // Back-compat hack, if we are passing a `StoreDirConfig`, do SRI,
+    // which `nix path-info` has always down. Otherwise, use the new
+    // cannonical JSON serialization for `Hash`.
+    jsonObject["narHash"] =
+        store ? static_cast<json>(narHash.to_string(HashFormat::SRI, true)) : static_cast<json>(narHash);
     jsonObject["narSize"] = narSize;
 
     {
         auto & jsonRefs = jsonObject["references"] = json::array();
         for (auto & ref : references)
-            jsonRefs.emplace_back(store.printStorePath(ref));
+            jsonRefs.emplace_back(store ? static_cast<json>(store->printStorePath(ref)) : static_cast<json>(ref));
     }
 
     jsonObject["ca"] = ca ? (std::optional{renderContentAddress(*ca)}) : std::nullopt;
 
     if (includeImpureInfo) {
-        jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
+        jsonObject["deriver"] = deriver ? (store ? static_cast<json>(std::optional{store->printStorePath(*deriver)})
+                                                 : static_cast<json>(std::optional{*deriver}))
+                                        : static_cast<json>(std::optional<StorePath>{});
 
         jsonObject["registrationTime"] = registrationTime ? (std::optional{registrationTime}) : std::nullopt;
 
@@ -182,20 +187,23 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store, const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & _json)
 {
     UnkeyedValidPathInfo res{
         Hash(Hash::dummy),
     };
 
     auto & json = getObject(_json);
-    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narHash = [&] {
+        auto & j = valueAt(json, "narHash");
+        return store ? Hash::parseAny(getString(j), std::nullopt) : static_cast<Hash>(j);
+    }();
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
         auto references = getStringList(valueAt(json, "references"));
         for (auto & input : references)
-            res.references.insert(store.parseStorePath(static_cast<const std::string &>(input)));
+            res.references.insert(store ? store->parseStorePath(getString(input)) : static_cast<StorePath>(input));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'references'");
         throw;
@@ -209,7 +217,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 
     if (json.contains("deriver"))
         if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
-            res.deriver = store.parseStorePath(getString(*rawDeriver));
+            res.deriver = store ? store->parseStorePath(getString(*rawDeriver)) : static_cast<StorePath>(*rawDeriver);
 
     if (json.contains("registrationTime"))
         if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
@@ -225,3 +233,19 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json & json)
+{
+    return UnkeyedValidPathInfo::fromJSON(nullptr, json);
+}
+
+void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
+{
+    json = c.toJSON(nullptr, true);
+}
+
+} // namespace nlohmann
