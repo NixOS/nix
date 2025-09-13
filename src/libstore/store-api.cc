@@ -269,7 +269,7 @@ ValidPathInfo Store::addToStoreSlow(
     if (expectedCAHash && expectedCAHash != hash)
         throw Error("hash mismatch for '%s'", srcPath);
 
-    ValidPathInfo info{
+    auto info = ValidPathInfo::makeFromCA(
         *this,
         name,
         ContentAddressWithReferences::fromParts(
@@ -279,8 +279,7 @@ ValidPathInfo Store::addToStoreSlow(
                 .others = references,
                 .self = false,
             }),
-        narHash,
-    };
+        narHash);
     info.narSize = narSize;
 
     if (!isValidPath(info.path)) {

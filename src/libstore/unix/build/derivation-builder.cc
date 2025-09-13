@@ -1591,12 +1591,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 assert(false);
             }();
 
-            ValidPathInfo newInfo0{
+            auto newInfo0 = ValidPathInfo::makeFromCA(
                 store,
                 outputPathName(drv.name, outputName),
                 ContentAddressWithReferences::fromParts(outputHash.method, std::move(got), rewriteRefs()),
-                Hash::dummy,
-            };
+                Hash::dummy);
             if (*scratchPath != newInfo0.path) {
                 // If the path has some self-references, we need to rewrite
                 // them.

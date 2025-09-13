@@ -124,25 +124,29 @@ Strings ValidPathInfo::shortRefs() const
     return refs;
 }
 
-ValidPathInfo::ValidPathInfo(
+ValidPathInfo ValidPathInfo::makeFromCA(
     const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
-    : UnkeyedValidPathInfo(narHash)
-    , path(store.makeFixedOutputPathFromCA(name, ca))
 {
-    this->ca = ContentAddress{
+    ValidPathInfo res{
+        store.makeFixedOutputPathFromCA(name, ca),
+        narHash,
+    };
+    res.ca = ContentAddress{
         .method = ca.getMethod(),
         .hash = ca.getHash(),
     };
-    std::visit(
+    res.references = std::visit(
         overloaded{
-            [this](TextInfo && ti) { this->references = std::move(ti.references); },
-            [this](FixedOutputInfo && foi) {
-                this->references = std::move(foi.references.others);
+            [&](TextInfo && ti) { return std::move(ti.references); },
+            [&](FixedOutputInfo && foi) {
+                auto references = std::move(foi.references.others);
                 if (foi.references.self)
-                    this->references.insert(path);
+                    references.insert(res.path);
+                return references;
             },
         },
         std::move(ca).raw);
+    return res;
 }
 
 nlohmann::json

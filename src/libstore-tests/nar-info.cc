@@ -23,7 +23,7 @@ class NarInfoTest : public CharacterizationTest, public LibStoreTest
 
 static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
 {
-    NarInfo info = ValidPathInfo{
+    auto info = NarInfo::makeFromCA(
         store,
         "foo",
         FixedOutputInfo{
@@ -41,8 +41,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
                     .self = true,
                 },
         },
-        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-    };
+        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="));
     info.narSize = 34878;
     if (includeImpureInfo) {
         info.deriver = StorePath{

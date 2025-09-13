@@ -366,7 +366,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
                repair,
                CheckSigs,
                [&](HashResult nar) {
-                   ValidPathInfo info{
+                   auto info = ValidPathInfo::makeFromCA(
                        *this,
                        name,
                        ContentAddressWithReferences::fromParts(
@@ -378,8 +378,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
                                // without modulus
                                .self = false,
                            }),
-                       nar.hash,
-                   };
+                       nar.hash);
                    info.narSize = nar.numBytesDigested;
                    return info;
                })
@@ -484,7 +483,7 @@ StorePath BinaryCacheStore::addToStore(
                repair,
                CheckSigs,
                [&](HashResult nar) {
-                   ValidPathInfo info{
+                   auto info = ValidPathInfo::makeFromCA(
                        *this,
                        name,
                        ContentAddressWithReferences::fromParts(
@@ -496,8 +495,7 @@ StorePath BinaryCacheStore::addToStore(
                                // without modulus
                                .self = false,
                            }),
-                       nar.hash,
-                   };
+                       nar.hash);
                    info.narSize = nar.numBytesDigested;
                    return info;
                })
