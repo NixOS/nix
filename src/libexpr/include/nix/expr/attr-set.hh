@@ -81,8 +81,6 @@ public:
         return !size_;
     }
 
-    typedef Attr * iterator;
-
     typedef const Attr * const_iterator;
 
     void push_back(const Attr & attr)
@@ -106,16 +104,6 @@ public:
         if (i != end() && i->name == name)
             return &*i;
         return nullptr;
-    }
-
-    iterator begin()
-    {
-        return &attrs[0];
-    }
-
-    iterator end()
-    {
-        return &attrs[size_];
     }
 
     const_iterator begin() const
