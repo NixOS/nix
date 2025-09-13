@@ -18,19 +18,20 @@ struct NarInfo : ValidPathInfo
 
     NarInfo() = delete;
 
-    NarInfo(const StoreDirConfig & store, std::string name, ContentAddressWithReferences ca, Hash narHash)
-        : ValidPathInfo(store, std::move(name), std::move(ca), narHash)
+    NarInfo(ValidPathInfo info)
+        : ValidPathInfo{std::move(info)}
     {
     }
 
     NarInfo(StorePath path, Hash narHash)
-        : ValidPathInfo(std::move(path), narHash)
+        : NarInfo{ValidPathInfo{std::move(path), UnkeyedValidPathInfo(narHash)}}
     {
     }
 
-    NarInfo(const ValidPathInfo & info)
-        : ValidPathInfo(info)
+    static NarInfo
+    makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences ca, Hash narHash)
     {
+        return ValidPathInfo::makeFromCA(store, std::move(name), std::move(ca), narHash);
     }
 
     NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence);

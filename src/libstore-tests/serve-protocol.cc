@@ -274,7 +274,7 @@ VERSIONED_CHARACTERIZATION_TEST(
             info;
         }),
         ({
-            ValidPathInfo info{
+            auto info = ValidPathInfo::makeFromCA(
                 store,
                 "foo",
                 FixedOutputInfo{
@@ -291,8 +291,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                             .self = true,
                         },
                 },
-                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-            };
+                Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="));
             info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };

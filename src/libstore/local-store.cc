@@ -1311,7 +1311,7 @@ StorePath LocalStore::addToStoreFromDump(
                 syncParent(realPath);
             }
 
-            ValidPathInfo info{*this, name, std::move(desc), narHash.hash};
+            auto info = ValidPathInfo::makeFromCA(*this, name, std::move(desc), narHash.hash);
             info.narSize = narHash.numBytesDigested;
             registerValidPath(info);
         }
