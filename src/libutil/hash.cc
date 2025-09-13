@@ -109,8 +109,9 @@ static DecodeNamePair baseExplicit(HashFormat format)
     case HashFormat::Base64:
         return {base64::decode, "Base64"};
     case HashFormat::SRI:
-        assert(false);
+        break;
     }
+    unreachable();
 }
 
 /**
