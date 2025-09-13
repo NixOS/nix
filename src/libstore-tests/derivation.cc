@@ -66,24 +66,24 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
-#define TEST_JSON(FIXTURE, NAME, VAL, DRV_NAME, OUTPUT_NAME)                                                           \
-    TEST_F(FIXTURE, DerivationOutput_##NAME##_from_json)                                                               \
-    {                                                                                                                  \
-        readTest("output-" #NAME ".json", [&](const auto & encoded_) {                                                 \
-            auto encoded = json::parse(encoded_);                                                                      \
-            DerivationOutput got = DerivationOutput::fromJSON(*store, DRV_NAME, OUTPUT_NAME, encoded, mockXpSettings); \
-            DerivationOutput expected{VAL};                                                                            \
-            ASSERT_EQ(got, expected);                                                                                  \
-        });                                                                                                            \
-    }                                                                                                                  \
-                                                                                                                       \
-    TEST_F(FIXTURE, DerivationOutput_##NAME##_to_json)                                                                 \
-    {                                                                                                                  \
-        writeTest(                                                                                                     \
-            "output-" #NAME ".json",                                                                                   \
-            [&]() -> json { return DerivationOutput{(VAL)}.toJSON(*store, (DRV_NAME), (OUTPUT_NAME)); },               \
-            [](const auto & file) { return json::parse(readFile(file)); },                                             \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });                  \
+#define TEST_JSON(FIXTURE, NAME, VAL, DRV_NAME, OUTPUT_NAME)                                                   \
+    TEST_F(FIXTURE, DerivationOutput_##NAME##_from_json)                                                       \
+    {                                                                                                          \
+        readTest("output-" #NAME ".json", [&](const auto & encoded_) {                                         \
+            auto encoded = json::parse(encoded_);                                                              \
+            DerivationOutput got = DerivationOutput::fromJSON(DRV_NAME, OUTPUT_NAME, encoded, mockXpSettings); \
+            DerivationOutput expected{VAL};                                                                    \
+            ASSERT_EQ(got, expected);                                                                          \
+        });                                                                                                    \
+    }                                                                                                          \
+                                                                                                               \
+    TEST_F(FIXTURE, DerivationOutput_##NAME##_to_json)                                                         \
+    {                                                                                                          \
+        writeTest(                                                                                             \
+            "output-" #NAME ".json",                                                                           \
+            [&]() -> json { return DerivationOutput{(VAL)}.toJSON((DRV_NAME), (OUTPUT_NAME)); },               \
+            [](const auto & file) { return json::parse(readFile(file)); },                                     \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });          \
     }
 
 TEST_JSON(
@@ -164,7 +164,7 @@ TEST_JSON(
         readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
             auto encoded = json::parse(encoded_);                                                     \
             Derivation expected{VAL};                                                                 \
-            Derivation got = Derivation::fromJSON(*store, encoded, mockXpSettings);                   \
+            Derivation got = Derivation::fromJSON(encoded, mockXpSettings);                           \
             ASSERT_EQ(got, expected);                                                                 \
         });                                                                                           \
     }                                                                                                 \
@@ -173,7 +173,7 @@ TEST_JSON(
     {                                                                                                 \
         writeTest(                                                                                    \
             #NAME ".json",                                                                            \
-            [&]() -> json { return Derivation{VAL}.toJSON(*store); },                                 \
+            [&]() -> json { return Derivation{VAL}.toJSON(); },                                       \
             [](const auto & file) { return json::parse(readFile(file)); },                            \
             [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }
@@ -184,7 +184,7 @@ TEST_JSON(
         readTest(#NAME ".drv", [&](auto encoded) {                                              \
             Derivation expected{VAL};                                                           \
             auto got = parseDerivation(*store, std::move(encoded), DRV_NAME, mockXpSettings);   \
-            ASSERT_EQ(got.toJSON(*store), expected.toJSON(*store));                             \
+            ASSERT_EQ(got.toJSON(), expected.toJSON());                                         \
             ASSERT_EQ(got, expected);                                                           \
         });                                                                                     \
     }                                                                                           \

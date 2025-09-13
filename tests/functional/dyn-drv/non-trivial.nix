@@ -65,9 +65,11 @@ builtins.outputOf
           "system": "${system}"
         }
       EOF
-        drvs[$word]="$(echo "$json" | nix derivation add)"
+        drvPath=$(echo "$json" | nix derivation add)
+        storeDir=$(dirname "$drvPath")
+        drvs[$word]="$(basename "$drvPath")"
       done
-      cp "''${drvs[e]}" $out
+      cp "''${storeDir}/''${drvs[e]}" $out
     '';
 
     __contentAddressed = true;

@@ -50,4 +50,4 @@ expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "
 
 # Check it works with the expected structured attrs
 hacky=$(nix-instantiate --expr "$hackyExpr")
-nix derivation show "$hacky" | jq --exit-status '."'"$hacky"'".structuredAttrs | . == {"a": 1}'
+nix derivation show "$hacky" | jq --exit-status '."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'
