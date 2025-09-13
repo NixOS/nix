@@ -213,6 +213,12 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
     /* Determine the full set of input paths. */
 
+    /**
+     * All input paths (that is, the union of FS closures of the
+     * immediate input paths).
+     */
+    StorePathSet inputPaths;
+
     /* First, the input derivations. */
     {
         auto & fullDrv = *drv;
@@ -412,11 +418,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-    co_return tryToBuild();
-}
 
-Goal::Co DerivationBuildingGoal::tryToBuild()
-{
+tryToBuild:
+
     std::map<std::string, InitialOutput> initialOutputs;
 
     /* Recheck at this point. In particular, whereas before we were
@@ -558,7 +562,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(initialOutputs)) {
+            switch (tryBuildHook(inputPaths, initialOutputs)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -577,7 +581,36 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 co_await waitForAWhile();
                 continue;
             case rpDecline:
-                /* We should do it ourselves. */
+                /* We should do it ourselves.
+
+                   Now that we've decided we can't / won't do a remote build, check
+                   that we can in fact build locally. */
+                if (!drvOptions->canBuildLocally(worker.store, *drv)) {
+                    auto msg =
+                        fmt("Cannot build '%s'.\n"
+                            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
+                            "\n"
+                            "Required system: '%s' with features {%s}\n"
+                            "Current system: '%s' with features {%s}",
+                            Magenta(worker.store.printStorePath(drvPath)),
+                            Magenta(drv->platform),
+                            concatStringsSep(", ", drvOptions->getRequiredSystemFeatures(*drv)),
+                            Magenta(settings.thisSystem),
+                            concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
+
+                    // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
+                    // we should tell them to run the command to install Darwin 2
+                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+                        msg += fmt(
+                            "\nNote: run `%s` to run programs for x86_64-darwin",
+                            Magenta(
+                                "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
+
+                    builder.reset();
+                    outputLocks.unlock();
+                    worker.permanentFailure = true;
+                    co_return doneFailure({BuildResult::InputRejected, std::move(msg)});
+                }
                 useHook = false;
                 break;
             }
@@ -674,7 +707,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     co_await yield();
 
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+    auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+    if (!localStoreP) {
         throw Error(
             R"(
             Unable to build with a primary store that isn't a local store;
@@ -698,7 +732,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (curBuilds >= settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild();
+            goto tryToBuild;
         }
 
         if (!builder) {
@@ -723,9 +757,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                Path openLogFile() override
+                void openLogFile() override
                 {
-                    return goal.openLogFile();
+                    [[maybe_unused]] Path logFile = goal.openLogFile();
                 }
 
                 void closeLogFile() override
@@ -733,9 +767,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.closeLogFile();
                 }
             };
-
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
 
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
@@ -767,7 +798,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
-                *localStoreP,
+                makeBuildingStoreFromLocalStore(*localStoreP),
                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                 DerivationBuilderParams{
                     .drvPath = drvPath,
@@ -783,17 +814,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 });
         }
 
-        std::optional<Descriptor> builderOutOpt;
-        try {
-            /* Okay, we have to build. */
-            builderOutOpt = builder->startBuild();
-        } catch (BuildError & e) {
-            builder.reset();
-            outputLocks.unlock();
-            worker.permanentFailure = true;
-            co_return doneFailure(std::move(e)); // InputRejected
-        }
-        if (!builderOutOpt) {
+        if (auto builderOutOpt = builder->startBuild()) {
+            builderOut = *std::move(builderOutOpt);
+        } else {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
@@ -802,9 +825,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
             continue;
-        } else {
-            builderOut = *std::move(builderOutOpt);
-        };
+        }
 
         break;
     }
@@ -818,9 +839,27 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     trace("build done");
 
+    auto [status, diskFull] = builder->unprepareBuild();
+
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+
+        builder->cleanupBuild(false);
+        builder.reset();
+        outputLocks.unlock();
+        co_return doneFailure(fixupBuilderFailureErrorMessage({
+            !drv->type().isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        }));
+    }
+
     SingleDrvOutputs builtOutputs;
     try {
-        builtOutputs = builder->unprepareBuild();
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        builtOutputs = builder->registerOutputs(*localStoreP);
+        builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
@@ -969,7 +1008,8 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs)
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const StorePathSet & inputPaths, const std::map<std::string, InitialOutput> & initialOutputs)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1066,7 +1106,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const std::map<std::string, Initi
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    [[maybe_unused]] Path logFile = openLogFile();
+    openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());

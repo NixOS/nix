@@ -23,6 +23,13 @@ extern "C" {
 typedef struct Store Store;
 /** @brief Nix store path */
 typedef struct StorePath StorePath;
+/** @brief Nix Derivation */
+typedef struct Derivation Derivation;
+
+typedef struct StoreDir
+{
+    const char * store_directory;
+} StoreDir;
 
 /**
  * @brief Initializes the Nix store library
@@ -116,6 +123,11 @@ nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_ca
  */
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
+StorePath * nix_store_parse_path2(nix_c_context * context, StoreDir store_dir, const char * path);
+
+void nix_print_store_path(
+    StoreDir store_dir, const StorePath * path, nix_get_string_callback callback, void * user_data);
+
 /**
  * @brief Get the path name (e.g. "name" in /nix/store/...-name)
  *
@@ -207,6 +219,12 @@ nix_err nix_store_realise(
 nix_err
 nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
+Derivation * nix_derivation_from_json(nix_c_context * context, StoreDir storeDir, const char * json);
+
+StorePath * nix_add_derivation(nix_c_context * context, Store * store, Derivation * derivation);
+
+void nix_derivation_free(Derivation * drv);
+
 /**
  * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
  *
@@ -216,6 +234,23 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
  * @param[in] path Path to copy
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
+
+/** @brief Nix Derivation */
+typedef struct DerivationBuilder DerivationBuilder;
+
+DerivationBuilder * nix_make_derivation_builder(
+    nix_c_context * context,
+    StoreDir storeDir,
+    const char * buildDir,
+    const Derivation * drv,
+    const StorePath * drvPath,
+    const StorePath * inputPaths[]);
+
+nix_err nix_derivation_builder_start(nix_c_context * context, DerivationBuilder * builder);
+
+nix_err nix_derivation_builder_finish(nix_c_context * context, DerivationBuilder * builder);
+
+void nix_derivation_builder_free(DerivationBuilder * builder);
 
 // cffi end
 #ifdef __cplusplus
