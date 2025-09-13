@@ -8,6 +8,8 @@
 #include <set>
 #include <vector>
 
+#include <boost/container_hash/hash.hpp>
+
 namespace nix {
 
 /**
@@ -258,10 +260,16 @@ public:
      */
     std::string makeRelative(const CanonPath & path) const;
 
-    friend struct std::hash<CanonPath>;
+    friend std::size_t hash_value(const CanonPath &);
 };
 
 std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
+
+inline std::size_t hash_value(const CanonPath & path)
+{
+    boost::hash<std::string_view> hasher;
+    return hasher(path.path);
+}
 
 } // namespace nix
 
@@ -270,8 +278,8 @@ struct std::hash<nix::CanonPath>
 {
     using is_avalanching = std::true_type;
 
-    std::size_t operator()(const nix::CanonPath & s) const noexcept
+    std::size_t operator()(const nix::CanonPath & path) const noexcept
     {
-        return std::hash<std::string>{}(s.path);
+        return nix::hash_value(path);
     }
 };

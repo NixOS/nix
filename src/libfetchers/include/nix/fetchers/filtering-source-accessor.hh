@@ -72,7 +72,7 @@ struct AllowListSourceAccessor : public FilteringSourceAccessor
     static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
-        boost::unordered_flat_set<CanonPath, std::hash<CanonPath>> && allowedPaths,
+        boost::unordered_flat_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringSourceAccessor::FilteringSourceAccessor;

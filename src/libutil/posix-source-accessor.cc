@@ -95,9 +95,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
-    std::optional<Cache::mapped_type> res;
-    cache.cvisit(absPath, [&](auto & x) { res.emplace(x.second); });
-    if (res)
+    if (auto res = getConcurrent(cache, absPath))
         return *res;
 
     auto st = nix::maybeLstat(absPath.c_str());
