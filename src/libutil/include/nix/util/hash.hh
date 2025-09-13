@@ -5,6 +5,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -221,6 +222,10 @@ public:
     HashResult currentHash();
 };
 
+template<>
+struct json_avoids_null<Hash> : std::true_type
+{};
+
 } // namespace nix
 
 template<>
@@ -241,3 +246,5 @@ inline std::size_t hash_value(const Hash & hash)
 }
 
 } // namespace nix
+
+JSON_IMPL(Hash)

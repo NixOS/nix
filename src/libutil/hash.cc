@@ -13,6 +13,7 @@
 #include "nix/util/split.hh"
 #include "nix/util/base-n.hh"
 #include "nix/util/base-nix-32.hh"
+#include "nix/util/json-utils.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -491,3 +492,27 @@ std::string_view printHashAlgo(HashAlgorithm ha)
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+Hash adl_serializer<Hash>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    auto algo = parseHashAlgo(getString(valueAt(obj, "algorithm")));
+    auto format = parseHashFormat(getString(valueAt(obj, "format")));
+    auto & hashS = getString(valueAt(obj, "hash"));
+    return Hash::parseExplicitFormatUnprefixed(hashS, algo, format);
+}
+
+void adl_serializer<Hash>::to_json(json & json, const Hash & hash)
+{
+    json = {
+        {"format", printHashFormat(HashFormat::Base64)},
+        {"algorithm", printHashAlgo(hash.algo)},
+        {"hash", hash.to_string(HashFormat::Base64, false)},
+    };
+}
+
+} // namespace nlohmann

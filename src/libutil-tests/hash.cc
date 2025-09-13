@@ -4,11 +4,11 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/hash.hh"
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
-class HashTest : public CharacterizationTest
+class HashTest : public virtual CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "hash";
 
@@ -203,4 +203,37 @@ TEST(hashFormat, testParseHashFormatOptException)
 {
     ASSERT_EQ(parseHashFormatOpt("sha0042"), std::nullopt);
 }
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+struct HashJsonTest : HashTest,
+                      JsonCharacterizationTest<Hash>,
+                      ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
+{};
+
+TEST_P(HashJsonTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(HashJsonTest, to_json)
+{
+    auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    HashJSON,
+    HashJsonTest,
+    ::testing::Values(
+        std::pair{
+            "simple",
+            hashString(HashAlgorithm::SHA256, "asdf"),
+        }));
+
 } // namespace nix
