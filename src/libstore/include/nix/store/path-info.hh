@@ -179,8 +179,8 @@ struct ValidPathInfo : UnkeyedValidPathInfo
         : UnkeyedValidPathInfo(info)
         , path(path) {};
 
-    ValidPathInfo(
-        const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+    static ValidPathInfo
+    makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 };
 
 static_assert(std::is_move_assignable_v<ValidPathInfo>);

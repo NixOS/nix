@@ -74,7 +74,7 @@ DownloadFileResult downloadFile(
         StringSink sink;
         dumpString(res.data, sink);
         auto hash = hashString(HashAlgorithm::SHA256, res.data);
-        ValidPathInfo info{
+        auto info = ValidPathInfo::makeFromCA(
             *store,
             name,
             FixedOutputInfo{
@@ -82,8 +82,7 @@ DownloadFileResult downloadFile(
                 .hash = hash,
                 .references = {},
             },
-            hashString(HashAlgorithm::SHA256, sink.s),
-        };
+            hashString(HashAlgorithm::SHA256, sink.s));
         info.narSize = sink.s.size();
         auto source = StringSource{sink.s};
         store->addToStore(info, source, NoRepair, NoCheckSigs);
