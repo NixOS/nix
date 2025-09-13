@@ -7,7 +7,7 @@
 #include "nix/store/path-regex.hh"
 #include "nix/store/store-api.hh"
 
-#include "nix/util/tests/hash.hh"
+#include "nix/util/tests/characterization.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/store/tests/path.hh"
 
@@ -16,8 +16,17 @@ namespace nix {
 #define STORE_DIR "/nix/store/"
 #define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
 
-class StorePathTest : public LibStoreTest
-{};
+class StorePathTest : public CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "store-path";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
 
 static std::regex nameRegex{std::string{nameRegexStr}};
 
@@ -133,5 +142,34 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
 }
 
 #endif
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+#define TEST_JSON(FIXTURE, NAME, VAL)                                                                 \
+    static const StorePath NAME = VAL;                                                                \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_from_json)                                                                 \
+    {                                                                                                 \
+        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
+            auto encoded = json::parse(encoded_);                                                     \
+            StorePath got = static_cast<StorePath>(encoded);                                          \
+            ASSERT_EQ(got, NAME);                                                                     \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_to_json)                                                                   \
+    {                                                                                                 \
+        writeTest(                                                                                    \
+            #NAME ".json",                                                                            \
+            [&]() -> json { return static_cast<json>(NAME); },                                        \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }
+
+TEST_JSON(StorePathTest, simple, StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"});
 
 } // namespace nix

@@ -21,5 +21,6 @@
       "method": "nar"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 3
 }

@@ -24,14 +24,14 @@
     "system": "my-system"
   },
   "inputDrvs": {
-    "/nix/store/afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
+    "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
       "dynamicOutputs": {},
       "outputs": [
         "dev",
         "out"
       ]
     },
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
+    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
       "dynamicOutputs": {},
       "outputs": [
         "dev",
@@ -40,13 +40,14 @@
     }
   },
   "inputSrcs": [
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
   ],
   "name": "advanced-attributes",
   "outputs": {
     "out": {
-      "path": "/nix/store/wyhpwd748pns4k7svh48wdrc8kvjk0ra-advanced-attributes"
+      "path": "wyhpwd748pns4k7svh48wdrc8kvjk0ra-advanced-attributes"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 3
 }

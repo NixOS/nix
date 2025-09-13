@@ -26,14 +26,14 @@
     "system": "my-system"
   },
   "inputDrvs": {
-    "/nix/store/j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv": {
+    "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv": {
       "dynamicOutputs": {},
       "outputs": [
         "dev",
         "out"
       ]
     },
-    "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv": {
+    "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv": {
       "dynamicOutputs": {},
       "outputs": [
         "dev",
@@ -42,7 +42,7 @@
     }
   },
   "inputSrcs": [
-    "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
+    "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
   ],
   "name": "advanced-attributes",
   "outputs": {
@@ -51,5 +51,6 @@
       "method": "nar"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 3
 }
