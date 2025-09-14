@@ -45,7 +45,7 @@ std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & ds
 
         auto narModuloHash = hashModuloSink.finish().hash;
 
-        ValidPathInfo info{
+        auto info = ValidPathInfo::makeFromCA(
             dstStore,
             path.name(),
             FixedOutputInfo{
@@ -53,8 +53,7 @@ std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & ds
                 .hash = narModuloHash,
                 .references = std::move(refs),
             },
-            Hash::dummy,
-        };
+            Hash::dummy);
 
         printInfo("rewriting '%s' to '%s'", pathS, dstStore.printStorePath(info.path));
 
