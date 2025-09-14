@@ -45,8 +45,8 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
 std::string PackageInfo::queryName() const
 {
     if (name == "" && attrs) {
-        auto i = attrs->find(state->s.name);
-        if (i == attrs->end())
+        auto i = attrs->get(state->s.name);
+        if (!i)
             state->error<TypeError>("derivation name missing").debugThrow();
         name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
     }
@@ -56,11 +56,10 @@ std::string PackageInfo::queryName() const
 std::string PackageInfo::querySystem() const
 {
     if (system == "" && attrs) {
-        auto i = attrs->find(state->s.system);
+        auto i = attrs->get(state->s.system);
         system =
-            i == attrs->end()
-                ? "unknown"
-                : state->forceStringNoCtx(*i->value, i->pos, "while evaluating the 'system' attribute of a derivation");
+            !i ? "unknown"
+               : state->forceStringNoCtx(*i->value, i->pos, "while evaluating the 'system' attribute of a derivation");
     }
     return system;
 }
@@ -95,9 +94,9 @@ StorePath PackageInfo::requireDrvPath() const
 StorePath PackageInfo::queryOutPath() const
 {
     if (!outPath && attrs) {
-        auto i = attrs->find(state->s.outPath);
+        auto i = attrs->get(state->s.outPath);
         NixStringContext context;
-        if (i != attrs->end())
+        if (i)
             outPath = state->coerceToStorePath(
                 i->pos, *i->value, context, "while evaluating the output path of a derivation");
     }
