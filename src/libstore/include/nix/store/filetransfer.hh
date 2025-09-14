@@ -30,9 +30,17 @@ struct FileTransferSettings : Config
         )",
         {"binary-caches-parallel-connections"}};
 
+    /* Do not set this too low. On glibc, getaddrinfo() contains fallback code
+       paths that deal with ill-behaved DNS servers. Setting this too low
+       prevents some fallbacks from occurring.
+
+       See description of options timeout, single-request, single-request-reopen
+       in resolv.conf(5). Also see https://github.com/NixOS/nix/pull/13985 for
+       details on the interaction between getaddrinfo(3) behavior and libcurl
+       CURLOPT_CONNECTTIMEOUT. */
     Setting<unsigned long> connectTimeout{
         this,
-        5,
+        15,
         "connect-timeout",
         R"(
           The timeout (in seconds) for establishing connections in the
