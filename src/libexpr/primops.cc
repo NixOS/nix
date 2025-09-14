@@ -1367,8 +1367,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     using nlohmann::json;
     std::optional<StructuredAttrs> jsonObject;
     auto pos = v.determinePos(noPos);
-    auto attr = attrs->find(state.s.structuredAttrs);
-    if (attr != attrs->end()
+    auto attr = attrs->get(state.s.structuredAttrs);
+    if (attr
         && state.forceBool(
             *attr->value,
             pos,
@@ -1378,8 +1378,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
-    attr = attrs->find(state.s.ignoreNulls);
-    if (attr != attrs->end())
+    attr = attrs->get(state.s.ignoreNulls);
+    if (attr)
         ignoreNulls = state.forceBool(
             *attr->value,
             pos,
@@ -2040,8 +2040,8 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
 
         std::string prefix;
-        auto i = v2->attrs()->find(state.s.prefix);
-        if (i != v2->attrs()->end())
+        auto i = v2->attrs()->get(state.s.prefix);
+        if (i)
             prefix = state.forceStringNoCtx(
                 *i->value,
                 pos,
@@ -3008,8 +3008,8 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value ** 
     auto attr = state.forceStringNoCtx(
         *args[0], pos, "while evaluating the first argument passed to builtins.unsafeGetAttrPos");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.unsafeGetAttrPos");
-    auto i = args[1]->attrs()->find(state.symbols.create(attr));
-    if (i == args[1]->attrs()->end())
+    auto i = args[1]->attrs()->get(state.symbols.create(attr));
+    if (!i)
         v.mkNull();
     else
         state.mkPos(v, i->pos);
@@ -3076,7 +3076,7 @@ static void prim_hasAttr(EvalState & state, const PosIdx pos, Value ** args, Val
 {
     auto attr = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hasAttr");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.hasAttr");
-    v.mkBool(args[1]->attrs()->find(state.symbols.create(attr)) != args[1]->attrs()->end());
+    v.mkBool(args[1]->attrs()->get(state.symbols.create(attr)));
 }
 
 static RegisterPrimOp primop_hasAttr({
@@ -3286,14 +3286,14 @@ static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** ar
 
     if (left.size() < right.size()) {
         for (auto & l : left) {
-            auto r = right.find(l.name);
-            if (r != right.end())
+            auto r = right.get(l.name);
+            if (r)
                 attrs.insert(*r);
         }
     } else {
         for (auto & r : right) {
-            auto l = left.find(r.name);
-            if (l != left.end())
+            auto l = left.get(r.name);
+            if (l)
                 attrs.insert(r);
         }
     }

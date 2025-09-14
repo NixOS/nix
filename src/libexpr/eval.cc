@@ -582,7 +582,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     }
     if (isFunctor(v)) {
         try {
-            Value & functor = *v.attrs()->find(s.functor)->value;
+            Value & functor = *v.attrs()->get(s.functor)->value;
             Value * vp[] = {&v};
             Value partiallyApplied;
             // The first parameter is not user-provided, and may be
@@ -1709,8 +1709,8 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
     forceValue(fun, pos);
 
     if (fun.type() == nAttrs) {
-        auto found = fun.attrs()->find(s.functor);
-        if (found != fun.attrs()->end()) {
+        auto found = fun.attrs()->get(s.functor);
+        if (found) {
             Value * v = allocValue();
             callFunction(*found->value, fun, *v, pos);
             forceValue(*v, pos);
@@ -2160,10 +2160,10 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
     return v.boolean();
 }
 
-Bindings::const_iterator EvalState::getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx)
+const Attr * EvalState::getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx)
 {
-    auto value = attrSet->find(attrSym);
-    if (value == attrSet->end()) {
+    auto value = attrSet->get(attrSym);
+    if (!value) {
         error<TypeError>("attribute '%s' missing", symbols[attrSym]).withTrace(noPos, errorCtx).debugThrow();
     }
     return value;
@@ -2171,7 +2171,7 @@ Bindings::const_iterator EvalState::getAttr(Symbol attrSym, const Bindings * att
 
 bool EvalState::isFunctor(const Value & fun) const
 {
-    return fun.type() == nAttrs && fun.attrs()->find(s.functor) != fun.attrs()->end();
+    return fun.type() == nAttrs && fun.attrs()->get(s.functor);
 }
 
 void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx)
@@ -2252,8 +2252,8 @@ bool EvalState::isDerivation(Value & v)
 std::optional<std::string>
 EvalState::tryAttrsToString(const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore, bool copyToStore)
 {
-    auto i = v.attrs()->find(s.toString);
-    if (i != v.attrs()->end()) {
+    auto i = v.attrs()->get(s.toString);
+    if (i) {
         Value v1;
         callFunction(*i->value, v, v1, pos);
         return coerceToString(
@@ -2298,8 +2298,8 @@ BackedStringView EvalState::coerceToString(
         auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
         if (maybeString)
             return std::move(*maybeString);
-        auto i = v.attrs()->find(s.outPath);
-        if (i == v.attrs()->end()) {
+        auto i = v.attrs()->get(s.outPath);
+        if (!i) {
             error<TypeError>(
                 "cannot coerce %1% to a string: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
                 .withTrace(pos, errorCtx)
@@ -2403,8 +2403,8 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     /* Similarly, handle __toString where the result may be a path
        value. */
     if (v.type() == nAttrs) {
-        auto i = v.attrs()->find(s.toString);
-        if (i != v.attrs()->end()) {
+        auto i = v.attrs()->get(s.toString);
+        if (i) {
             Value v1;
             callFunction(*i->value, v, v1, pos);
             return coerceToPath(pos, v1, context, errorCtx);

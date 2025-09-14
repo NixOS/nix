@@ -137,17 +137,6 @@ public:
         attrs[size_++] = attr;
     }
 
-    const_iterator find(Symbol name) const
-    {
-        Attr key(name, 0);
-        auto first = attrs;
-        auto last = attrs + size_;
-        const Attr * i = std::lower_bound(first, last, key);
-        if (i != last && i->name == name)
-            return const_iterator{i};
-        return end();
-    }
-
     const Attr * get(Symbol name) const
     {
         Attr key(name, 0);
