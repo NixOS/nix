@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <concepts>
 
 namespace nix {
 
@@ -81,9 +82,55 @@ public:
         return !size_;
     }
 
-    typedef Attr * iterator;
+    class iterator
+    {
+    public:
+        using value_type = Attr;
+        using pointer = const value_type *;
+        using reference = const value_type &;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
 
-    typedef const Attr * const_iterator;
+        friend class Bindings;
+
+    private:
+        pointer ptr = nullptr;
+
+        explicit iterator(pointer ptr)
+            : ptr(ptr)
+        {
+        }
+
+    public:
+        iterator() = default;
+
+        reference operator*() const
+        {
+            return *ptr;
+        }
+
+        const value_type * operator->() const
+        {
+            return ptr;
+        }
+
+        iterator & operator++()
+        {
+            ++ptr;
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            pointer tmp = ptr;
+            ++*this;
+            return iterator(tmp);
+        }
+
+        bool operator==(const iterator & rhs) const = default;
+    };
+
+    using const_iterator = iterator;
 
     void push_back(const Attr & attr)
     {
@@ -93,39 +140,33 @@ public:
     const_iterator find(Symbol name) const
     {
         Attr key(name, 0);
-        const_iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name)
-            return i;
+        auto first = attrs;
+        auto last = attrs + size_;
+        const Attr * i = std::lower_bound(first, last, key);
+        if (i != last && i->name == name)
+            return const_iterator{i};
         return end();
     }
 
     const Attr * get(Symbol name) const
     {
         Attr key(name, 0);
-        const_iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name)
-            return &*i;
+        auto first = attrs;
+        auto last = attrs + size_;
+        const Attr * i = std::lower_bound(first, last, key);
+        if (i != last && i->name == name)
+            return i;
         return nullptr;
-    }
-
-    iterator begin()
-    {
-        return &attrs[0];
-    }
-
-    iterator end()
-    {
-        return &attrs[size_];
     }
 
     const_iterator begin() const
     {
-        return &attrs[0];
+        return const_iterator(attrs);
     }
 
     const_iterator end() const
     {
-        return &attrs[size_];
+        return const_iterator(attrs + size_);
     }
 
     Attr & operator[](size_t pos)
@@ -158,6 +199,9 @@ public:
 
     friend class EvalState;
 };
+
+static_assert(std::forward_iterator<Bindings::iterator>);
+static_assert(std::ranges::forward_range<Bindings>);
 
 /**
  * A wrapper around Bindings that ensures that its always in sorted

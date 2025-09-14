@@ -35,8 +35,7 @@ Value & BindingsBuilder::alloc(std::string_view name, PosIdx pos)
 
 void Bindings::sort()
 {
-    if (size_)
-        std::sort(begin(), end());
+    std::sort(attrs, attrs + size_);
 }
 
 Value & Value::mkAttrs(BindingsBuilder & bindings)
