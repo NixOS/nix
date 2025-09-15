@@ -17,14 +17,14 @@ struct CmdInfoStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-info.md"
-          ;
+#include "store-info.md"
+            ;
     }
 
     void run(ref<Store> store) override
     {
         if (!json) {
-            notice("Store URL: %s", store->getUri());
+            notice("Store URL: %s", store->config.getReference().render(/*withParams=*/true));
             store->connect();
             if (auto version = store->getVersion())
                 notice("Version: %s", *version);
@@ -32,11 +32,9 @@ struct CmdInfoStore : StoreCommand, MixJSON
                 notice("Trusted: %s", *trusted);
         } else {
             nlohmann::json res;
-            Finally printRes([&]() {
-                printJSON(res);
-            });
+            Finally printRes([&]() { printJSON(res); });
 
-            res["url"] = store->getUri();
+            res["url"] = store->config.getReference().render(/*withParams=*/true);
             store->connect();
             if (auto version = store->getVersion())
                 res["version"] = *version;

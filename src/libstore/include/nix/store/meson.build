@@ -9,12 +9,14 @@ config_pub_h = configure_file(
   output : 'config.hh',
 )
 
-headers = [config_pub_h] + files(
+headers = [ config_pub_h ] + files(
   'binary-cache-store.hh',
   'build-result.hh',
-  'build/derivation-goal.hh',
+  'build/derivation-builder.hh',
   'build/derivation-building-goal.hh',
   'build/derivation-building-misc.hh',
+  'build/derivation-env-desugar.hh',
+  'build/derivation-goal.hh',
   'build/derivation-trampoline-goal.hh',
   'build/drv-output-substitution-goal.hh',
   'build/goal.hh',
@@ -27,11 +29,12 @@ headers = [config_pub_h] + files(
   'common-ssh-store-config.hh',
   'content-address.hh',
   'daemon.hh',
-  'derivations.hh',
   'derivation-options.hh',
+  'derivations.hh',
   'derived-path-map.hh',
   'derived-path.hh',
   'downstream-placeholder.hh',
+  'export-import.hh',
   'filetransfer.hh',
   'gc-store.hh',
   'globals.hh',
@@ -62,6 +65,7 @@ headers = [config_pub_h] + files(
   'posix-fs-canonicalise.hh',
   'profiles.hh',
   'realisation.hh',
+  'references.hh',
   'remote-fs-accessor.hh',
   'remote-store-connection.hh',
   'remote-store.hh',

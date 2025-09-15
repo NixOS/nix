@@ -47,29 +47,27 @@ struct FlakeRef
      */
     Path subdir;
 
-    bool operator ==(const FlakeRef & other) const = default;
+    bool operator==(const FlakeRef & other) const = default;
 
-    bool operator <(const FlakeRef & other) const
+    bool operator<(const FlakeRef & other) const
     {
         return std::tie(input, subdir) < std::tie(other.input, other.subdir);
     }
 
     FlakeRef(fetchers::Input && input, const Path & subdir)
-        : input(std::move(input)), subdir(subdir)
-    { }
+        : input(std::move(input))
+        , subdir(subdir)
+    {
+    }
 
     // FIXME: change to operator <<.
     std::string to_string() const;
 
     fetchers::Attrs toAttrs() const;
 
-    FlakeRef resolve(
-        ref<Store> store,
-        fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
+    FlakeRef resolve(ref<Store> store, fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
 
-    static FlakeRef fromAttrs(
-        const fetchers::Settings & fetchSettings,
-        const fetchers::Attrs & attrs);
+    static FlakeRef fromAttrs(const fetchers::Settings & fetchSettings, const fetchers::Attrs & attrs);
 
     std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
 
@@ -80,10 +78,10 @@ struct FlakeRef
     FlakeRef canonicalize() const;
 };
 
-std::ostream & operator << (std::ostream & str, const FlakeRef & flakeRef);
+std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 FlakeRef parseFlakeRef(
     const fetchers::Settings & fetchSettings,
@@ -94,7 +92,7 @@ FlakeRef parseFlakeRef(
     bool preserveRelativePaths = false);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
@@ -105,7 +103,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     bool preserveRelativePaths = false);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
@@ -117,4 +115,4 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
 const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
 extern std::regex flakeIdRegex;
 
-}
+} // namespace nix

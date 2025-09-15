@@ -33,7 +33,8 @@ readonly NIX_BUILD_GROUP_NAME="nixbld"
 readonly NIX_ROOT="/nix"
 readonly NIX_EXTRA_CONF=${NIX_EXTRA_CONF:-}
 
-readonly PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
+# PROFILE_TARGETS will be set later after OS-specific scripts are loaded
+PROFILE_TARGETS=()
 readonly PROFILE_BACKUP_SUFFIX=".backup-before-nix"
 readonly PROFILE_NIX_FILE="$NIX_ROOT/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
 
@@ -93,6 +94,14 @@ is_os_linux() {
 
 is_os_darwin() {
     if [ "$(uname -s)" = "Darwin" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_os_freebsd() {
+    if [ "$(uname -s)" = "FreeBSD" ]; then
         return 0
     else
         return 1
@@ -498,6 +507,10 @@ You have aborted the installation.
 EOF
         fi
     fi
+
+    if is_os_freebsd; then
+        ok "Detected FreeBSD, will set up rc.d service for nix-daemon"
+    fi
 }
 
 setup_report() {
@@ -834,8 +847,13 @@ install_from_extracted_nix() {
     (
         cd "$EXTRACTED_NIX_PATH"
 
-        _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
-              cp -RPp ./store/* "$NIX_ROOT/store/"
+        if is_os_darwin || is_os_freebsd; then
+            _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
+                  cp -RPp ./store/* "$NIX_ROOT/store/"
+        else
+            _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
+                  cp -RP --preserve=ownership,timestamps ./store/* "$NIX_ROOT/store/"
+        fi
 
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
@@ -984,10 +1002,21 @@ main() {
         # shellcheck source=./install-systemd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
         check_required_system_specific_settings "install-systemd-multi-user.sh"
+    elif is_os_freebsd; then
+        # shellcheck source=./install-freebsd-multi-user.sh
+        . "$EXTRACTED_NIX_PATH/install-freebsd-multi-user.sh"
+        check_required_system_specific_settings "install-freebsd-multi-user.sh"
     else
         failure "Sorry, I don't know what to do on $(uname)"
     fi
 
+
+    # Set profile targets after OS-specific scripts are loaded
+    if command -v poly_configure_default_profile_targets > /dev/null 2>&1; then
+        PROFILE_TARGETS=($(poly_configure_default_profile_targets))
+    else
+        PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
+    fi
 
     welcome_to_nix
 

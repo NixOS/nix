@@ -20,6 +20,8 @@
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <map>
 #include <optional>
 #include <functional>
@@ -34,39 +36,46 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+
 namespace fetchers {
 struct Settings;
 struct InputCache;
-}
+} // namespace fetchers
 struct EvalSettings;
 class EvalState;
 class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+
 namespace eval_cache {
-    class EvalCache;
+class EvalCache;
 }
 
 /**
  * Increments a count on construction and decrements on destruction.
  */
-class CallDepth {
-  size_t & count;
+class CallDepth
+{
+    size_t & count;
 
 public:
-  CallDepth(size_t & count) : count(count) {
-    ++count;
-  }
-  ~CallDepth() {
-    --count;
-  }
+    CallDepth(size_t & count)
+        : count(count)
+    {
+        ++count;
+    }
+
+    ~CallDepth()
+    {
+        --count;
+    }
 };
 
 /**
  * Function that implements a primop.
  */
-using PrimOpFun = void(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+using PrimOpFun = void(EvalState & state, const PosIdx pos, Value ** args, Value & v);
 
 /**
  * Info about a primitive operation, and its implementation
@@ -151,9 +160,11 @@ struct Constant
     bool impureOnly = false;
 };
 
-typedef std::map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *> > > ValMap;
+typedef std::
+    map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *>>>
+        ValMap;
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 struct Env
 {
@@ -161,23 +172,25 @@ struct Env
     Value * values[0];
 };
 
-void printEnvBindings(const EvalState &es, const Expr & expr, const Env & env);
+void printEnvBindings(const EvalState & es, const Expr & expr, const Env & env);
 void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env, int lvl = 0);
 
 std::unique_ptr<ValMap> mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & env);
 
-void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-
+void copyContext(
+    const Value & v,
+    NixStringContext & context,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 std::string printValue(EvalState & state, Value & v);
-std::ostream & operator << (std::ostream & os, const ValueType t);
-
+std::ostream & operator<<(std::ostream & os, const ValueType t);
 
 struct RegexCache;
 
 std::shared_ptr<RegexCache> makeRegexCache();
 
-struct DebugTrace {
+struct DebugTrace
+{
     /* WARNING: Converting PosIdx -> Pos should be done with extra care. This is
        due to the fact that operator[] of PosTable is incredibly expensive. */
     std::variant<Pos, PosIdx> pos;
@@ -202,72 +215,105 @@ struct DebugTrace {
     }
 };
 
+struct StaticEvalSymbols
+{
+    Symbol with, outPath, drvPath, type, meta, name, value, system, overrides, outputs, outputName, ignoreNulls, file,
+        line, column, functor, toString, right, wrong, structuredAttrs, json, allowedReferences, allowedRequisites,
+        disallowedReferences, disallowedRequisites, maxSize, maxClosureSize, builder, args, contentAddressed, impure,
+        outputHash, outputHashAlgo, outputHashMode, recurseForDerivations, description, self, epsilon, startSet,
+        operator_, key, path, prefix, outputSpecified;
+
+    Expr::AstSymbols exprSymbols;
+
+    static constexpr auto preallocate()
+    {
+        StaticSymbolTable alloc;
+
+        StaticEvalSymbols staticSymbols = {
+            .with = alloc.create("<with>"),
+            .outPath = alloc.create("outPath"),
+            .drvPath = alloc.create("drvPath"),
+            .type = alloc.create("type"),
+            .meta = alloc.create("meta"),
+            .name = alloc.create("name"),
+            .value = alloc.create("value"),
+            .system = alloc.create("system"),
+            .overrides = alloc.create("__overrides"),
+            .outputs = alloc.create("outputs"),
+            .outputName = alloc.create("outputName"),
+            .ignoreNulls = alloc.create("__ignoreNulls"),
+            .file = alloc.create("file"),
+            .line = alloc.create("line"),
+            .column = alloc.create("column"),
+            .functor = alloc.create("__functor"),
+            .toString = alloc.create("__toString"),
+            .right = alloc.create("right"),
+            .wrong = alloc.create("wrong"),
+            .structuredAttrs = alloc.create("__structuredAttrs"),
+            .json = alloc.create("__json"),
+            .allowedReferences = alloc.create("allowedReferences"),
+            .allowedRequisites = alloc.create("allowedRequisites"),
+            .disallowedReferences = alloc.create("disallowedReferences"),
+            .disallowedRequisites = alloc.create("disallowedRequisites"),
+            .maxSize = alloc.create("maxSize"),
+            .maxClosureSize = alloc.create("maxClosureSize"),
+            .builder = alloc.create("builder"),
+            .args = alloc.create("args"),
+            .contentAddressed = alloc.create("__contentAddressed"),
+            .impure = alloc.create("__impure"),
+            .outputHash = alloc.create("outputHash"),
+            .outputHashAlgo = alloc.create("outputHashAlgo"),
+            .outputHashMode = alloc.create("outputHashMode"),
+            .recurseForDerivations = alloc.create("recurseForDerivations"),
+            .description = alloc.create("description"),
+            .self = alloc.create("self"),
+            .epsilon = alloc.create(""),
+            .startSet = alloc.create("startSet"),
+            .operator_ = alloc.create("operator"),
+            .key = alloc.create("key"),
+            .path = alloc.create("path"),
+            .prefix = alloc.create("prefix"),
+            .outputSpecified = alloc.create("outputSpecified"),
+            .exprSymbols = {
+                .sub = alloc.create("__sub"),
+                .lessThan = alloc.create("__lessThan"),
+                .mul = alloc.create("__mul"),
+                .div = alloc.create("__div"),
+                .or_ = alloc.create("or"),
+                .findFile = alloc.create("__findFile"),
+                .nixPath = alloc.create("__nixPath"),
+                .body = alloc.create("body"),
+            }};
+
+        return std::pair{staticSymbols, alloc};
+    }
+
+    static consteval StaticEvalSymbols create()
+    {
+        return preallocate().first;
+    }
+
+    static constexpr StaticSymbolTable staticSymbolTable()
+    {
+        return preallocate().second;
+    }
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    static constexpr StaticEvalSymbols s = StaticEvalSymbols::create();
+
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
-
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue,
-        sSystem, sOverrides, sOutputs, sOutputName, sIgnoreNulls,
-        sFile, sLine, sColumn, sFunctor, sToString,
-        sRight, sWrong, sStructuredAttrs, sJson,
-        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites,
-        sMaxSize, sMaxClosureSize,
-        sBuilder, sArgs,
-        sContentAddressed, sImpure,
-        sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sRecurseForDerivations,
-        sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath,
-        sPrefix,
-        sOutputSpecified;
-
-    const Expr::AstSymbols exprSymbols;
 
     /**
      * If set, force copying files to the Nix store even if they
      * already exist there.
      */
     RepairFlag repair;
-
-    Bindings emptyBindings;
-
-    /**
-     * Empty list constant.
-     */
-    Value vEmptyList;
-
-    /**
-     * `null` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vNull;
-
-    /**
-     * `true` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vTrue;
-
-    /**
-     * `true` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vFalse;
-
-    /** `"regular"` */
-    Value vStringRegular;
-    /** `"directory"` */
-    Value vStringDirectory;
-    /** `"symlink"` */
-    Value vStringSymlink;
-    /** `"unknown"` */
-    Value vStringUnknown;
 
     /**
      * The accessor corresponding to `store`.
@@ -309,19 +355,21 @@ public:
     /**
      * Debugger
      */
-    ReplExitStatus (* debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
+    ReplExitStatus (*debugRepl)(ref<EvalState> es, const ValMap & extraEnv);
     bool debugStop;
     bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
-    std::map<const Expr*, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    boost::unordered_flat_map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
+
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
         auto i = exprEnvs.find(&expr);
         if (i != exprEnvs.end())
             return i->second;
         else
-            return std::shared_ptr<const StaticEnv>();;
+            return std::shared_ptr<const StaticEnv>();
+        ;
     }
 
     /** Whether a debug repl can be started. If `false`, `runDebugRepl(error)` will return without starting a repl. */
@@ -340,7 +388,8 @@ public:
 
     template<class T, typename... Args>
     [[nodiscard, gnu::noinline]]
-    EvalErrorBuilder<T> & error(const Args & ... args) {
+    EvalErrorBuilder<T> & error(const Args &... args)
+    {
         // `EvalErrorBuilder::debugThrow` performs the corresponding `delete`.
         return *new EvalErrorBuilder<T>(*this, args...);
     }
@@ -354,29 +403,42 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
+    boost::concurrent_flat_map<SourcePath, StorePath, std::hash<SourcePath>> srcToStore;
 
     /**
      * A cache from path names to parse trees.
      */
-    typedef std::unordered_map<SourcePath, Expr *, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Expr *>>> FileParseCache;
+    typedef boost::unordered_flat_map<
+        SourcePath,
+        Expr *,
+        std::hash<SourcePath>,
+        std::equal_to<SourcePath>,
+        traceable_allocator<std::pair<const SourcePath, Expr *>>>
+        FileParseCache;
     FileParseCache fileParseCache;
 
     /**
      * A cache from path names to values.
      */
-    typedef std::unordered_map<SourcePath, Value, std::hash<SourcePath>, std::equal_to<SourcePath>, traceable_allocator<std::pair<const SourcePath, Value>>> FileEvalCache;
+    typedef boost::unordered_flat_map<
+        SourcePath,
+        Value,
+        std::hash<SourcePath>,
+        std::equal_to<SourcePath>,
+        traceable_allocator<std::pair<const SourcePath, Value>>>
+        FileEvalCache;
     FileEvalCache fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap, std::hash<SourcePath>> positionToDocComment;
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
+    boost::unordered_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>
+        lookupPathResolved;
 
     /**
      * Cache used by prim_match().
@@ -405,7 +467,10 @@ public:
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
 
-    LookupPath getLookupPath() { return lookupPath; }
+    LookupPath getLookupPath()
+    {
+        return lookupPath;
+    }
 
     /**
      * Return a `SourcePath` that refers to `path` in the root
@@ -486,9 +551,7 @@ public:
      *
      * If it is not found, return `std::nullopt`.
      */
-    std::optional<SourcePath> resolveLookupPathPath(
-        const LookupPath::Path & elem,
-        bool initAccessControl = false);
+    std::optional<SourcePath> resolveLookupPathPath(const LookupPath::Path & elem, bool initAccessControl = false);
 
     /**
      * Evaluate an expression to normal form
@@ -530,7 +593,7 @@ public:
 
     void forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx);
 
-    template <typename Callable>
+    template<typename Callable>
     inline void forceAttrs(Value & v, Callable getPos, std::string_view errorCtx);
 
     inline void forceList(Value & v, const PosIdx pos, std::string_view errorCtx);
@@ -539,20 +602,25 @@ public:
      */
     void forceFunction(Value & v, const PosIdx pos, std::string_view errorCtx);
     std::string_view forceString(Value & v, const PosIdx pos, std::string_view errorCtx);
-    std::string_view forceString(Value & v, NixStringContext & context, const PosIdx pos, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    std::string_view forceString(
+        Value & v,
+        NixStringContext & context,
+        const PosIdx pos,
+        std::string_view errorCtx,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string_view forceStringNoCtx(Value & v, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Get attribute from an attribute set and throw an error if it doesn't exist.
      */
-    Bindings::const_iterator getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
+    const Attr * getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
 
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const Args & ... formatArgs) const;
+    void addErrorTrace(Error & e, const Args &... formatArgs) const;
     template<typename... Args>
     [[gnu::noinline]]
-    void addErrorTrace(Error & e, const PosIdx pos, const Args & ... formatArgs) const;
+    void addErrorTrace(Error & e, const PosIdx pos, const Args &... formatArgs) const;
 
 public:
     /**
@@ -561,8 +629,8 @@ public:
      */
     bool isDerivation(Value & v);
 
-    std::optional<std::string> tryAttrsToString(const PosIdx pos, Value & v,
-        NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
+    std::optional<std::string> tryAttrsToString(
+        const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
     /**
      * String coercion.
@@ -572,9 +640,13 @@ public:
      * booleans and lists to a string.  If `copyToStore` is set,
      * referenced paths are copied to the Nix store as a side effect.
      */
-    BackedStringView coerceToString(const PosIdx pos, Value & v, NixStringContext & context,
+    BackedStringView coerceToString(
+        const PosIdx pos,
+        Value & v,
+        NixStringContext & context,
         std::string_view errorCtx,
-        bool coerceMore = false, bool copyToStore = true,
+        bool coerceMore = false,
+        bool copyToStore = true,
         bool canonicalizePath = true);
 
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
@@ -596,7 +668,11 @@ public:
     /**
      * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
      */
-    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(const PosIdx pos, Value & v, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(
+        const PosIdx pos,
+        Value & v,
+        std::string_view errorCtx,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
      * Coerce to `SingleDerivedPath`.
@@ -636,7 +712,13 @@ public:
     /**
      * Internal primops not exposed to the user.
      */
-    std::unordered_map<std::string, Value *, std::hash<std::string>, std::equal_to<std::string>, traceable_allocator<std::pair<const std::string, Value *>>> internalPrimOps;
+    boost::unordered_flat_map<
+        std::string,
+        Value *,
+        StringViewHash,
+        std::equal_to<>,
+        traceable_allocator<std::pair<const std::string, Value *>>>
+        internalPrimOps;
 
     /**
      * Name and documentation about every constant.
@@ -710,7 +792,8 @@ private:
         std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
-     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run out of system stack.
+     * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run
+     * out of system stack.
      */
     size_t callDepth = 0;
 
@@ -762,7 +845,7 @@ public:
 
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity));
+        return BindingsBuilder(*this, allocBindings(capacity), capacity);
     }
 
     ListBuilder buildList(size_t size)
@@ -773,7 +856,7 @@ public:
     /**
      * Return a boolean `Value *` without allocating.
      */
-    Value *getBool(bool b);
+    Value * getBool(bool b);
 
     void mkThunk_(Value & v, Expr * expr);
     void mkPos(Value & v, PosIdx pos);
@@ -817,9 +900,7 @@ public:
      *
      * A combination of `mkStorePathString` and `mkOutputString`.
      */
-    void mkSingleDerivedPathString(
-        const SingleDerivedPath & p,
-        Value & v);
+    void mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v);
 
     void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
 
@@ -850,22 +931,22 @@ public:
      * @param[out] maybePaths if not nullptr, all built or referenced store paths will be added to this set
      * @return a mapping from the placeholders used to construct the associated value to their final store path.
      */
-    [[nodiscard]] StringMap realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
+    [[nodiscard]] StringMap
+    realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /**
-     * Realise the given string with context, and return the string with outputs instead of downstream output placeholders.
+     * Realise the given string with context, and return the string with outputs instead of downstream output
+     * placeholders.
      * @param[in] str the string to realise
      * @param[out] paths all referenced store paths will be added to this set
      * @return the realised string
      * @throw EvalError if the value is not a string, path or derivation (see `coerceToString`)
      */
-    std::string realiseString(Value & str, StorePathSet * storePathsOutMaybe, bool isIFD = true, const PosIdx pos = noPos);
+    std::string
+    realiseString(Value & str, StorePathSet * storePathsOutMaybe, bool isIFD = true, const PosIdx pos = noPos);
 
     /* Call the binary path filter predicate used builtins.path etc. */
-    bool callPathFilter(
-        Value * filterFun,
-        const SourcePath & path,
-        PosIdx pos);
+    bool callPathFilter(Value * filterFun, const SourcePath & path, PosIdx pos);
 
     DocComment getDocCommentForPos(PosIdx pos);
 
@@ -884,8 +965,7 @@ private:
      * Like `mkSingleDerivedPathStringRaw` but just creates a raw string
      * Value, which would also have a string context.
      */
-    std::string mkSingleDerivedPathStringRaw(
-        const SingleDerivedPath & p);
+    std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
     unsigned long nrEnvs = 0;
     unsigned long nrValuesInEnvs = 0;
@@ -903,10 +983,10 @@ private:
 
     bool countCalls;
 
-    typedef std::map<std::string, size_t> PrimOpCalls;
+    typedef boost::unordered_flat_map<std::string, size_t, StringViewHash, std::equal_to<>> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<ExprLambda *, size_t> FunctionCalls;
+    typedef boost::unordered_flat_map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
 
     /** Evaluation/call profiler. */
@@ -914,7 +994,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<PosIdx, size_t> AttrSelects;
+    typedef boost::unordered_flat_map<PosIdx, size_t, std::hash<PosIdx>> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;
@@ -925,20 +1005,23 @@ private:
     friend struct ExprFloat;
     friend struct ExprPath;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value * * args, Value & v);
-    friend void prim_match(EvalState & state, const PosIdx pos, Value * * args, Value & v);
-    friend void prim_split(EvalState & state, const PosIdx pos, Value * * args, Value & v);
+    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+    friend void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+    friend void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v);
 
     friend struct Value;
     friend class ListBuilder;
 };
 
-struct DebugTraceStacker {
+struct DebugTraceStacker
+{
     DebugTraceStacker(EvalState & evalState, DebugTrace t);
+
     ~DebugTraceStacker()
     {
         evalState.debugTraces.pop_front();
     }
+
     EvalState & evalState;
     DebugTrace trace;
 };
@@ -964,6 +1047,6 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix = true);
  */
 bool isAllowedURI(std::string_view uri, const Strings & allowedPaths);
 
-}
+} // namespace nix
 
 #include "nix/expr/eval-inline.hh"

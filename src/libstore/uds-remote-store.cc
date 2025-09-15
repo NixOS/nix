@@ -2,6 +2,7 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -9,19 +10,17 @@
 #include <unistd.h>
 
 #ifdef _WIN32
-# include <winsock2.h>
-# include <afunix.h>
+#  include <winsock2.h>
+#  include <afunix.h>
 #else
-# include <sys/socket.h>
-# include <sys/un.h>
+#  include <sys/socket.h>
+#  include <sys/un.h>
 #endif
 
 namespace nix {
 
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(
-    std::string_view scheme,
-    std::string_view authority,
-    const StoreReference::Params & params)
+    std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
     : Store::Config{params}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params}
@@ -32,14 +31,12 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     }
 }
 
-
 std::string UDSRemoteStoreConfig::doc()
 {
     return
-        #include "uds-remote-store.md"
+#include "uds-remote-store.md"
         ;
 }
-
 
 // A bit gross that we now pass empty string but this is knowing that
 // empty string will later default to the same nixDaemonSocketFile. Why
@@ -50,7 +47,6 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
 {
 }
 
-
 UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
     : Store{*config}
     , LocalFSStore{*config}
@@ -59,24 +55,26 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 {
 }
 
-
-std::string UDSRemoteStore::getUri()
+StoreReference UDSRemoteStoreConfig::getReference() const
 {
-    return config->path == settings.nixDaemonSocketFile
-        ? // FIXME: Not clear why we return daemon here and not default
-          // to settings.nixDaemonSocketFile
-          //
-          // unix:// with no path also works. Change what we return?
-          "daemon"
-        : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
+    /* We specifically return "daemon" here instead of "unix://" or "unix://${path}"
+     * to be more compatible with older versions of nix. Some tooling out there
+     * tries hard to parse store references and it might not be able to handle "unix://". */
+    if (path == settings.nixDaemonSocketFile)
+        return {.variant = StoreReference::Daemon{}};
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = path,
+            },
+    };
 }
-
 
 void UDSRemoteStore::Connection::closeWrite()
 {
     shutdown(toSocket(fd.get()), SHUT_WR);
 }
-
 
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
@@ -93,7 +91,6 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     return conn;
 }
 
-
 void UDSRemoteStore::addIndirectRoot(const Path & path)
 {
     auto conn(getConnection());
@@ -102,12 +99,11 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
     readInt(conn->from);
 }
 
-
-ref<Store> UDSRemoteStore::Config::openStore() const {
+ref<Store> UDSRemoteStore::Config::openStore() const
+{
     return make_ref<UDSRemoteStore>(ref{shared_from_this()});
 }
 
-
 static RegisterStoreImplementation<UDSRemoteStore::Config> regUDSRemoteStore;
 
-}
+} // namespace nix

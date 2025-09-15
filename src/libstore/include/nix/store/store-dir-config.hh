@@ -3,13 +3,11 @@
 #include "nix/store/path.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/configuration.hh"
 
 #include <map>
 #include <string>
 #include <variant>
-
 
 namespace nix {
 
@@ -19,15 +17,17 @@ MakeError(BadStorePath, Error);
 MakeError(BadStorePathName, BadStorePath);
 
 /**
- * @todo This should just be part of `StoreDirConfig`. However, it would
- * be a huge amount of churn if `Store` didn't have these methods
+ * @todo This should just be inherited by `StoreConfig`. However, it
+ * would be a huge amount of churn if `Store` didn't have these methods
  * anymore, forcing a bunch of code to go from `store.method(...)` to
  * `store.config.method(...)`.
  *
- * So we instead pull out the methods into their own mix-in, so can put
- * them directly on the Store too.
+ * @todo this should not have "config" in its name, because it no longer
+ * uses the configuration system for `storeDir` --- in fact, `storeDir`
+ * isn't even owned, but a mere reference. But doing that rename would
+ * cause a bunch of churn.
  */
-struct MixStoreDirMethods
+struct StoreDirConfig
 {
     const Path & storeDir;
 
@@ -75,13 +75,10 @@ struct MixStoreDirMethods
     /**
      * Constructs a unique store path name.
      */
-    StorePath makeStorePath(std::string_view type,
-        std::string_view hash, std::string_view name) const;
-    StorePath makeStorePath(std::string_view type,
-        const Hash & hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type, std::string_view hash, std::string_view name) const;
+    StorePath makeStorePath(std::string_view type, const Hash & hash, std::string_view name) const;
 
-    StorePath makeOutputPath(std::string_view id,
-        const Hash & hash, std::string_view name) const;
+    StorePath makeOutputPath(std::string_view id, const Hash & hash, std::string_view name) const;
 
     StorePath makeFixedOutputPath(std::string_view name, const FixedOutputInfo & info) const;
 
@@ -100,38 +97,4 @@ struct MixStoreDirMethods
         PathFilter & filter = defaultPathFilter) const;
 };
 
-/**
- * Need to make this a separate class so I can get the right
- * initialization order in the constructor for `StoreDirConfig`.
- */
-struct StoreDirConfigBase : Config
-{
-    using Config::Config;
-
-    const PathSetting storeDir_{this, settings.nixStore,
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
-};
-
-/**
- * The order of `StoreDirConfigBase` and then `MixStoreDirMethods` is
- * very important. This ensures that `StoreDirConfigBase::storeDir_`
- * is initialized before we have our one chance (because references are
- * immutable) to initialize `MixStoreDirMethods::storeDir`.
- */
-struct StoreDirConfig : StoreDirConfigBase, MixStoreDirMethods
-{
-    using Params = StringMap;
-
-    StoreDirConfig(const Params & params);
-
-    StoreDirConfig() = delete;
-
-    virtual ~StoreDirConfig() = default;
-};
-
-}
+} // namespace nix

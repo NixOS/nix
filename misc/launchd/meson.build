@@ -9,5 +9,5 @@ configure_file(
     # 'storedir' : store_dir,
     # 'localstatedir' : localstatedir,
     # 'bindir' : bindir,
-  },
+},
 )

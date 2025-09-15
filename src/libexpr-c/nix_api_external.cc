@@ -14,6 +14,8 @@
 
 #include <nlohmann/json.hpp>
 
+extern "C" {
+
 void nix_set_string_return(nix_string_return * str, const char * c)
 {
     str->str = c;
@@ -40,6 +42,8 @@ nix_err nix_external_add_string_context(nix_c_context * context, nix_string_cont
     NIXC_CATCH_ERRS
 }
 
+} // extern "C"
+
 class NixCExternalValue : public nix::ExternalValueBase
 {
     NixCExternalValueDesc & desc;
@@ -48,11 +52,13 @@ class NixCExternalValue : public nix::ExternalValueBase
 public:
     NixCExternalValue(NixCExternalValueDesc & desc, void * v)
         : desc(desc)
-        , v(v){};
+        , v(v) {};
+
     void * get_ptr()
     {
         return v;
     }
+
     /**
      * Print out the value
      */
@@ -155,12 +161,20 @@ public:
         }
         nix_string_context ctx{context};
         desc.printValueAsXML(
-            v, (EvalState *) &state, strict, location, &doc, &ctx, &drvsSeen,
+            v,
+            (EvalState *) &state,
+            strict,
+            location,
+            &doc,
+            &ctx,
+            &drvsSeen,
             *reinterpret_cast<const uint32_t *>(&pos));
     }
 
-    virtual ~NixCExternalValue() override{};
+    virtual ~NixCExternalValue() override {};
 };
+
+extern "C" {
 
 ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v)
 {
@@ -190,3 +204,5 @@ void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b
     }
     NIXC_CATCH_ERRS_NULL
 }
+
+} // extern "C"

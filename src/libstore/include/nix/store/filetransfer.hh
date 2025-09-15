@@ -9,19 +9,21 @@
 #include "nix/util/ref.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
 struct FileTransferSettings : Config
 {
-    Setting<bool> enableHttp2{this, true, "http2",
-        "Whether to enable HTTP/2 support."};
+    Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
-    Setting<std::string> userAgentSuffix{this, "", "user-agent-suffix",
-        "String appended to the user agent in HTTP requests."};
+    Setting<std::string> userAgentSuffix{
+        this, "", "user-agent-suffix", "String appended to the user agent in HTTP requests."};
 
     Setting<size_t> httpConnections{
-        this, 25, "http-connections",
+        this,
+        25,
+        "http-connections",
         R"(
           The maximum number of parallel TCP connections used to fetch
           files from binary caches and by other downloads. It defaults
@@ -29,8 +31,18 @@ struct FileTransferSettings : Config
         )",
         {"binary-caches-parallel-connections"}};
 
+    /* Do not set this too low. On glibc, getaddrinfo() contains fallback code
+       paths that deal with ill-behaved DNS servers. Setting this too low
+       prevents some fallbacks from occurring.
+
+       See description of options timeout, single-request, single-request-reopen
+       in resolv.conf(5). Also see https://github.com/NixOS/nix/pull/13985 for
+       details on the interaction between getaddrinfo(3) behavior and libcurl
+       CURLOPT_CONNECTTIMEOUT. */
     Setting<unsigned long> connectTimeout{
-        this, 5, "connect-timeout",
+        this,
+        15,
+        "connect-timeout",
         R"(
           The timeout (in seconds) for establishing connections in the
           binary cache substituter. It corresponds to `curl`’s
@@ -38,17 +50,22 @@ struct FileTransferSettings : Config
         )"};
 
     Setting<unsigned long> stalledDownloadTimeout{
-        this, 300, "stalled-download-timeout",
+        this,
+        300,
+        "stalled-download-timeout",
         R"(
           The timeout (in seconds) for receiving data from servers
           during download. Nix cancels idle downloads after this
           timeout's duration.
         )"};
 
-    Setting<unsigned int> tries{this, 5, "download-attempts",
-        "The number of times Nix attempts to download a file before giving up."};
+    Setting<unsigned int> tries{
+        this, 5, "download-attempts", "The number of times Nix attempts to download a file before giving up."};
 
-    Setting<size_t> downloadBufferSize{this, 64 * 1024 * 1024, "download-buffer-size",
+    Setting<size_t> downloadBufferSize{
+        this,
+        64 * 1024 * 1024,
+        "download-buffer-size",
         R"(
           The size of Nix's internal download buffer in bytes during `curl` transfers. If data is
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
@@ -62,7 +79,7 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 struct FileTransferRequest
 {
-    std::string uri;
+    ValidURL uri;
     Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
@@ -76,8 +93,11 @@ struct FileTransferRequest
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
 
-    FileTransferRequest(std::string_view uri)
-        : uri(uri), parentAct(getCurActivity()) { }
+    FileTransferRequest(ValidURL uri)
+        : uri(std::move(uri))
+        , parentAct(getCurActivity())
+    {
+    }
 
     std::string verb() const
     {
@@ -100,6 +120,9 @@ struct FileTransferResult
 
     /**
      * All URLs visited in the redirect chain.
+     *
+     * @note Intentionally strings and not `ParsedURL`s so we faithfully
+     * return what cURL gave us.
      */
     std::vector<std::string> urls;
 
@@ -122,15 +145,14 @@ class Store;
 
 struct FileTransfer
 {
-    virtual ~FileTransfer() { }
+    virtual ~FileTransfer() {}
 
     /**
      * Enqueue a data transfer request, returning a future to the result of
      * the download. The future may throw a FileTransferError
      * exception.
      */
-    virtual void enqueueFileTransfer(const FileTransferRequest & request,
-        Callback<FileTransferResult> callback) = 0;
+    virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
@@ -148,10 +170,8 @@ struct FileTransfer
      * Download a file, writing its data to a sink. The sink will be
      * invoked on the thread of the caller.
      */
-    void download(
-        FileTransferRequest && request,
-        Sink & sink,
-        std::function<void(FileTransferResult)> resultCallback = {});
+    void
+    download(FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback = {});
 
     enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
 };
@@ -179,7 +199,7 @@ public:
     std::optional<std::string> response;
 
     template<typename... Args>
-    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args & ... args);
+    FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args &... args);
 };
 
-}
+} // namespace nix

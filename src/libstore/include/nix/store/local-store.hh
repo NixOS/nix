@@ -11,11 +11,9 @@
 #include <chrono>
 #include <future>
 #include <string>
-#include <unordered_set>
-
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
-
 
 /**
  * Nix store and database schema version.
@@ -26,7 +24,6 @@ namespace nix {
  * Nix 1.0.  Version 7 is Nix 1.3. Version 10 is 2.0.
  */
 const int nixSchemaVersion = 10;
-
 
 struct OptimiseStats
 {
@@ -41,7 +38,10 @@ private:
     /**
       Input for computing the build directory. See `getBuildDir()`.
      */
-     Setting<std::optional<Path>> buildDir{this, std::nullopt, "build-dir",
+    Setting<std::optional<Path>> buildDir{
+        this,
+        std::nullopt,
+        "build-dir",
         R"(
             The directory on the host, in which derivations' temporary build directories are created.
 
@@ -66,21 +66,32 @@ public:
     Path getBuildDir() const;
 };
 
-struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>, virtual LocalFSStoreConfig, virtual LocalBuildStoreConfig
+struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
+                          virtual LocalFSStoreConfig,
+                          virtual LocalBuildStoreConfig
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    LocalStoreConfig(
-        std::string_view scheme,
-        std::string_view authority,
-        const Params & params);
+    LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
-    Setting<bool> requireSigs{this,
-        settings.requireSigs,
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    bool getDefaultRequireSigs();
+
+public:
+
+    Setting<bool> requireSigs{
+        this,
+        getDefaultRequireSigs(),
         "require-sigs",
         "Whether store paths copied into this store should have a trusted signature."};
 
-    Setting<bool> readOnly{this,
+    Setting<bool> readOnly{
+        this,
         false,
         "read-only",
         R"(
@@ -97,19 +108,24 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>, virtua
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
 
-    static const std::string name() { return "Local Store"; }
+    static const std::string name()
+    {
+        return "Local Store";
+    }
 
     static StringSet uriSchemes()
-    { return {"local"}; }
+    {
+        return {"local"};
+    }
 
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    StoreReference getReference() const override;
 };
 
-class LocalStore :
-    public virtual IndirectRootStore,
-    public virtual GcStore
+class LocalStore : public virtual IndirectRootStore, public virtual GcStore
 {
 public:
 
@@ -158,7 +174,11 @@ private:
         std::unique_ptr<PublicKeys> publicKeys;
     };
 
-    Sync<State> _state;
+    /**
+     * Mutable state. It's behind a `ref` to reduce false sharing
+     * between immutable and mutable fields.
+     */
+    ref<Sync<State>> _state;
 
 public:
 
@@ -192,33 +212,30 @@ public:
      * Implementations of abstract store API methods.
      */
 
-    std::string getUri() override;
-
     bool isValidPathUncached(const StorePath & path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
     StorePathSet queryValidDerivers(const StorePath & path) override;
 
-    std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(const StorePath & path) override;
+    std::map<std::string, std::optional<StorePath>>
+    queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
-    bool realisationIsUntrusted(const Realisation & ) override;
+    bool realisationIsUntrusted(const Realisation &) override;
 
-    void addToStore(const ValidPathInfo & info, Source & source,
-        RepairFlag repair, CheckSigsFlag checkSigs) override;
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(
         Source & dump,
@@ -312,7 +329,8 @@ protected:
     /**
      * Result of `verifyAllValidPaths`
      */
-    struct VerificationResult {
+    struct VerificationResult
+    {
         /**
          * Whether any errors were encountered
          */
@@ -365,22 +383,24 @@ public:
     void registerDrvOutput(const Realisation & info) override;
     void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override;
     void cacheDrvOutputMapping(
-        State & state,
-        const uint64_t deriver,
-        const std::string & outputName,
-        const StorePath & output);
+        State & state, const uint64_t deriver, const std::string & outputName, const StorePath & output);
 
     std::optional<const Realisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, Realisation>> queryRealisationCore_(State & state, const DrvOutput & id);
-    void queryRealisationUncached(const DrvOutput&,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     std::optional<std::string> getVersion() override;
 
 protected:
 
-    void verifyPath(const StorePath & path, std::function<bool(const StorePath &)> existsInStoreDir,
-        StorePathSet & done, StorePathSet & validPaths, RepairFlag repair, bool & errors);
+    void verifyPath(
+        const StorePath & path,
+        std::function<bool(const StorePath &)> existsInStoreDir,
+        StorePathSet & done,
+        StorePathSet & validPaths,
+        RepairFlag repair,
+        bool & errors);
 
 private:
 
@@ -422,11 +442,12 @@ private:
 
     std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
-    typedef std::unordered_set<ino_t> InodeHash;
+    typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
+    void
+    optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
@@ -438,4 +459,4 @@ private:
     friend struct DerivationGoal;
 };
 
-}
+} // namespace nix

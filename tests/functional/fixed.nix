@@ -74,5 +74,10 @@ rec {
   nar-not-recursive = f2 "foo" ./fixed.builder2.sh "nar" "md5" "3670af73070fa14077ad74e0f5ea4e42";
 
   # Experimental feature
-  git = f2 "foo" ./fixed.builder2.sh "git" "sha1" "cd44baf36915d5dec8374232ea7e2057f3b4494e";
+
+  git-sha1 = f2 "foo" ./fixed.builder2.sh "git" "sha1" "cd44baf36915d5dec8374232ea7e2057f3b4494e";
+
+  git-sha256 =
+    f2 "foo" ./fixed.builder2.sh "git" "sha256"
+      "3c957653f90c34c0a8badf343b61393936cddf4a2ca93f64b21f02303ddedcc2";
 }

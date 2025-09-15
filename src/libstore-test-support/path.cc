@@ -1,6 +1,7 @@
-#include <rapidcheck/gen/Arbitrary.h>
+#include <exception> // Needed by rapidcheck on Darwin
 #include <regex>
 
+#include <rapidcheck/gen/Arbitrary.h>
 #include <rapidcheck.h>
 
 #include "nix/store/path-regex.hh"
@@ -16,15 +17,16 @@ void showValue(const StorePath & p, std::ostream & os)
     os << p.to_string();
 }
 
-}
+} // namespace nix
 
 namespace rc {
 using namespace nix;
 
 Gen<char> storePathChar()
 {
-    return rc::gen::apply([](uint8_t i) -> char {
-        switch (i) {
+    return rc::gen::apply(
+        [](uint8_t i) -> char {
+            switch (i) {
             case 0 ... 9:
                 return '0' + i;
             case 10 ... 35:
@@ -45,36 +47,23 @@ Gen<char> storePathChar()
                 return '=';
             default:
                 assert(false);
-        }
-    },
-    gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6));
+            }
+        },
+        gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6));
 }
 
 Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
 {
     return gen::construct<StorePathName>(
-        gen::suchThat(
-            gen::container<std::string>(storePathChar()),
-            [](const std::string & s) {
-                return
-                    !( s == ""
-                    || s == "."
-                    || s == ".."
-                    || s.starts_with(".-")
-                    || s.starts_with("..-")
-                    );
-            }
-        )
-    );
+        gen::suchThat(gen::container<std::string>(storePathChar()), [](const std::string & s) {
+            return !(s == "" || s == "." || s == ".." || s.starts_with(".-") || s.starts_with("..-"));
+        }));
 }
 
 Gen<StorePath> Arbitrary<StorePath>::arbitrary()
 {
-    return
-        gen::construct<StorePath>(
-            gen::arbitrary<Hash>(),
-            gen::apply([](StorePathName n){ return n.name; }, gen::arbitrary<StorePathName>())
-        );
+    return gen::construct<StorePath>(
+        gen::arbitrary<Hash>(), gen::apply([](StorePathName n) { return n.name; }, gen::arbitrary<StorePathName>()));
 }
 
 } // namespace rc

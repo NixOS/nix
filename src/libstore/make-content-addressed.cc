@@ -1,12 +1,9 @@
 #include "nix/store/make-content-addressed.hh"
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 
 namespace nix {
 
-std::map<StorePath, StorePath> makeContentAddressed(
-    Store & srcStore,
-    Store & dstStore,
-    const StorePathSet & storePaths)
+std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & dstStore, const StorePathSet & storePaths)
 {
     StorePathSet closure;
     srcStore.computeFSClosure(storePaths, closure);
@@ -46,18 +43,17 @@ std::map<StorePath, StorePath> makeContentAddressed(
         HashModuloSink hashModuloSink(HashAlgorithm::SHA256, oldHashPart);
         hashModuloSink(sink.s);
 
-        auto narModuloHash = hashModuloSink.finish().first;
+        auto narModuloHash = hashModuloSink.finish().hash;
 
-        ValidPathInfo info {
+        auto info = ValidPathInfo::makeFromCA(
             dstStore,
             path.name(),
-            FixedOutputInfo {
+            FixedOutputInfo{
                 .method = FileIngestionMethod::NixArchive,
                 .hash = narModuloHash,
                 .references = std::move(refs),
             },
-            Hash::dummy,
-        };
+            Hash::dummy);
 
         printInfo("rewriting '%s' to '%s'", pathS, dstStore.printStorePath(info.path));
 
@@ -78,15 +74,12 @@ std::map<StorePath, StorePath> makeContentAddressed(
     return remappings;
 }
 
-StorePath makeContentAddressed(
-    Store & srcStore,
-    Store & dstStore,
-    const StorePath & fromPath)
+StorePath makeContentAddressed(Store & srcStore, Store & dstStore, const StorePath & fromPath)
 {
-    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet { fromPath });
+    auto remappings = makeContentAddressed(srcStore, dstStore, StorePathSet{fromPath});
     auto i = remappings.find(fromPath);
     assert(i != remappings.end());
     return i->second;
 }
 
-}
+} // namespace nix

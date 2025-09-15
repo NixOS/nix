@@ -32,15 +32,18 @@ struct Checked
     T value;
 
     Checked() = default;
+
     explicit Checked(T const value)
         : value{value}
     {
     }
+
     Checked(Checked<T> const & other) = default;
     Checked(Checked<T> && other) = default;
     Checked<T> & operator=(Checked<T> const & other) = default;
 
     std::strong_ordering operator<=>(Checked<T> const & other) const = default;
+
     std::strong_ordering operator<=>(T const & other) const
     {
         return value <=> other;
@@ -68,6 +71,7 @@ struct Checked
             , overflowed_{overflowed ? OverflowKind::Overflow : OverflowKind::NoOverflow}
         {
         }
+
         Result(T value, OverflowKind overflowed)
             : value{value}
             , overflowed_{overflowed}
@@ -116,6 +120,7 @@ struct Checked
     {
         return (*this) + other.value;
     }
+
     Result operator+(T const other) const
     {
         T result;
@@ -127,6 +132,7 @@ struct Checked
     {
         return (*this) - other.value;
     }
+
     Result operator-(T const other) const
     {
         T result;
@@ -138,6 +144,7 @@ struct Checked
     {
         return (*this) * other.value;
     }
+
     Result operator*(T const other) const
     {
         T result;
@@ -149,6 +156,7 @@ struct Checked
     {
         return (*this) / other.value;
     }
+
     /**
      * Performs a checked division.
      *
@@ -181,4 +189,4 @@ std::ostream & operator<<(std::ostream & ios, Checked<T> v)
     return ios;
 }
 
-}
+} // namespace nix::checked

@@ -25,6 +25,7 @@ struct InitialOutputStatus
 {
     StorePath path;
     PathStatus status;
+
     /**
      * Valid in the store, and additionally non-corrupt if we are repairing
      */
@@ -32,6 +33,7 @@ struct InitialOutputStatus
     {
         return status == PathStatus::Valid;
     }
+
     /**
      * Merely present, allowed to be corrupt
      */
@@ -43,16 +45,13 @@ struct InitialOutputStatus
 
 struct InitialOutput
 {
-    bool wanted;
     Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
  * Format the known outputs of a derivation for use in error messages.
  */
-std::string showKnownOutputs(Store & store, const Derivation & drv);
+std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
 
-}
+} // namespace nix

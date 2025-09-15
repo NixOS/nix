@@ -6,6 +6,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

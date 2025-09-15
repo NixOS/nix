@@ -11,6 +11,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/store/export-import.hh"
 
 #include <sodium.h>
 #include <nlohmann/json.hpp>
@@ -233,7 +234,7 @@ StoreWrapper::exportPaths(int fd, ...)
             StorePathSet paths;
             for (int n = 2; n < items; ++n) paths.insert(THIS->store->parseStorePath(SvPV_nolen(ST(n))));
             FdSink sink(fd);
-            THIS->store->exportPaths(paths, sink);
+            exportPaths(*THIS->store, paths, sink);
         } catch (Error & e) {
             croak("%s", e.what());
         }
@@ -244,7 +245,7 @@ StoreWrapper::importPaths(int fd, int dontCheckSigs)
     PPCODE:
         try {
             FdSource source(fd);
-            THIS->store->importPaths(source, dontCheckSigs ? NoCheckSigs : CheckSigs);
+            importPaths(*THIS->store, source, dontCheckSigs ? NoCheckSigs : CheckSigs);
         } catch (Error & e) {
             croak("%s", e.what());
         }

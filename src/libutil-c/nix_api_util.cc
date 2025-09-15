@@ -9,6 +9,8 @@
 
 #include "nix_api_util_config.h"
 
+extern "C" {
+
 nix_c_context * nix_c_context_create()
 {
     return new nix_c_context();
@@ -156,3 +158,5 @@ nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callb
     callback(str.c_str(), str.size(), user_data);
     return NIX_OK;
 }
+
+} // extern "C"

@@ -1,7 +1,9 @@
-project('nix-expr', 'cpp',
+project(
+  'nix-expr',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -17,8 +19,7 @@ subdir('nix-meson-build-support/deps-lists')
 configdata_pub = configuration_data()
 configdata_priv = configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -39,8 +40,11 @@ endforeach
 
 boost = dependency(
   'boost',
-  modules : ['container', 'context'],
-  include_type: 'system',
+  modules : [
+    'container',
+    'context',
+  ],
+  include_type : 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -60,8 +64,6 @@ if bdw_gc.found()
     define_value = cxx.has_function(funcspec).to_int()
     configdata_priv.set(define_name, define_value)
   endforeach
-  # Affects ABI, because it changes what bdw_gc itself does!
-  configdata_pub.set('GC_THREADS', 1)
 endif
 # Used in public header. Affects ABI!
 configdata_pub.set('NIX_USE_BOEHMGC', bdw_gc.found().to_int())
@@ -70,8 +72,14 @@ toml11 = dependency(
   'toml11',
   version : '>=3.7.0',
   method : 'cmake',
-  include_type: 'system',
+  include_type : 'system',
 )
+
+configdata_priv.set(
+  'HAVE_TOML11_4',
+  toml11.version().version_compare('>= 4.0.0').to_int(),
+)
+
 deps_other += toml11
 
 config_priv_h = configure_file(
@@ -113,8 +121,7 @@ lexer_tab = custom_target(
   command : [
     'flex',
     '-Cf', # Use full scanner tables
-    '--outfile',
-    '@OUTPUT0@',
+    '--outfile', '@OUTPUT0@',
     '--header-file=' + '@OUTPUT1@',
     '@INPUT0@',
   ],
@@ -156,6 +163,7 @@ sources = files(
   'search-path.cc',
   'value-to-json.cc',
   'value-to-xml.cc',
+  'value.cc',
   'value/context.cc',
 )
 
@@ -175,9 +183,10 @@ this_library = library(
   generated_headers,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/expr', preserve_path : true)

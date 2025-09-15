@@ -26,18 +26,29 @@ C tokenizeString(std::string_view s, std::string_view separators)
 }
 
 template<class C, class CharT>
-C basicSplitString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators)
+void basicSplitStringInto(C & accum, std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators)
 {
-    C result;
     size_t pos = 0;
     while (pos <= s.size()) {
         auto end = s.find_first_of(separators, pos);
         if (end == s.npos)
             end = s.size();
-        result.insert(result.end(), std::basic_string<CharT>(s, pos, end - pos));
+        accum.insert(accum.end(), typename C::value_type{s.substr(pos, end - pos)});
         pos = end + 1;
     }
+}
 
+template<typename C>
+void splitStringInto(C & accum, std::string_view s, std::string_view separators)
+{
+    basicSplitStringInto<C, char>(accum, s, separators);
+}
+
+template<class C, class CharT>
+C basicSplitString(std::basic_string_view<CharT> s, std::basic_string_view<CharT> separators)
+{
+    C result;
+    basicSplitStringInto(result, s, separators);
     return result;
 }
 

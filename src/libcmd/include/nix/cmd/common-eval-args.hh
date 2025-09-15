@@ -13,13 +13,17 @@ namespace nix {
 
 class Store;
 
-namespace fetchers { struct Settings; }
+namespace fetchers {
+struct Settings;
+}
 
 class EvalState;
 struct CompatibilitySettings;
 class Bindings;
 
-namespace flake { struct Settings; }
+namespace flake {
+struct Settings;
+}
 
 /**
  * @todo Get rid of global settings variables
@@ -54,10 +58,23 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
     std::optional<std::string> evalStoreUrl;
 
 private:
-    struct AutoArgExpr { std::string expr; };
-    struct AutoArgString { std::string s; };
-    struct AutoArgFile { std::filesystem::path path; };
-    struct AutoArgStdin { };
+    struct AutoArgExpr
+    {
+        std::string expr;
+    };
+
+    struct AutoArgString
+    {
+        std::string s;
+    };
+
+    struct AutoArgFile
+    {
+        std::filesystem::path path;
+    };
+
+    struct AutoArgStdin
+    {};
 
     using AutoArg = std::variant<AutoArgExpr, AutoArgString, AutoArgFile, AutoArgStdin>;
 
@@ -65,8 +82,8 @@ private:
 };
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary#gloss-base-directory)
  */
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir = nullptr);
 
-}
+} // namespace nix

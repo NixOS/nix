@@ -82,8 +82,6 @@ struct ServeProto::BasicClientConnection
     BuildResult getBuildDerivationResponse(const StoreDirConfig & store);
 
     void narFromPath(const StoreDirConfig & store, const StorePath & path, std::function<void(Source &)> fun);
-
-    void importPaths(const StoreDirConfig & store, std::function<void(Sink &)> fun);
 };
 
 struct ServeProto::BasicServerConnection
@@ -105,4 +103,4 @@ struct ServeProto::BasicServerConnection
     static ServeProto::Version handshake(BufferedSink & to, Source & from, ServeProto::Version localVersion);
 };
 
-}
+} // namespace nix

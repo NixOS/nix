@@ -24,11 +24,18 @@ release:
 * In a checkout of the Nix repo, make sure you're on `master` and run
   `git pull`.
 
+* Compile a release notes to-do list by running
+
+  ```console
+  $ ./maintainers/release-notes-todo PREV_RELEASE HEAD
+  ```
+
 * Compile the release notes by running
 
   ```console
   $ export VERSION=X.YY
   $ git checkout -b release-notes
+  $ export GITHUB_TOKEN=...
   $ ./maintainers/release-notes
   ```
 
@@ -38,10 +45,6 @@ release:
 
 * Proof-read / edit / rearrange the release notes if needed. Breaking changes
   and highlights should go to the top.
-
-* Run `maintainers/release-credits` to make sure the credits script works
-  and produces a sensible output. Some emails might not automatically map to
-  a GitHub handle.
 
 * Push.
 
@@ -130,6 +133,8 @@ release:
 
   Commit and push this to the maintenance branch.
 
+* Create a backport label.
+
 * Bump the version of `master`:
 
   ```console
@@ -137,16 +142,13 @@ release:
   $ git pull
   $ NEW_VERSION=2.13.0
   $ echo $NEW_VERSION > .version
+  $ ... edit .mergify.yml to add the previous version ...
   $ git checkout -b bump-$NEW_VERSION
   $ git commit -a -m 'Bump version'
   $ git push --set-upstream origin bump-$NEW_VERSION
   ```
 
   Make a pull request and auto-merge it.
-
-* Create a backport label.
-
-* Add the new backport label to `.mergify.yml`.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.

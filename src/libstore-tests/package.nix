@@ -3,6 +3,7 @@
   buildPackages,
   stdenv,
   mkMesonExecutable,
+  writableTmpDirAsHomeHook,
 
   nix-store,
   nix-store-c,
@@ -11,12 +12,14 @@
 
   rapidcheck,
   gtest,
+  gbenchmark,
   runCommand,
 
   # Configuration Options
 
   version,
   filesetToSource,
+  withBenchmarks ? false,
 }:
 
 let
@@ -34,7 +37,7 @@ mkMesonExecutable (finalAttrs: {
     ../../.version
     ./.version
     ./meson.build
-    # ./meson.options
+    ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
@@ -44,6 +47,9 @@ mkMesonExecutable (finalAttrs: {
     sqlite
     rapidcheck
     gtest
+  ]
+  ++ lib.optionals withBenchmarks [
+    gbenchmark
   ];
 
   buildInputs = finalAttrs.passthru.externalBuildInputs ++ [
@@ -53,6 +59,7 @@ mkMesonExecutable (finalAttrs: {
   ];
 
   mesonFlags = [
+    (lib.mesonBool "benchmarks" withBenchmarks)
   ];
 
   passthru = {
@@ -72,15 +79,18 @@ mkMesonExecutable (finalAttrs: {
         runCommand "${finalAttrs.pname}-run"
           {
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+            buildInputs = [ writableTmpDirAsHomeHook ];
           }
           (
-            lib.optionalString stdenv.hostPlatform.isWindows ''
-              export HOME="$PWD/home-dir"
-              mkdir -p "$HOME"
+            ''
+              export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
+              export NIX_REMOTE=$HOME/store
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+            ''
+            + lib.optionalString withBenchmarks ''
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-store-benchmarks"}
             ''
             + ''
-              export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
-              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
               touch $out
             ''
           );

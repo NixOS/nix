@@ -1,9 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/store/local-store.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
+
+class LocalStore;
+struct LocalStoreConfig;
 
 /**
  * A restricted store has a pointer to one of these, which manages the
@@ -55,6 +58,6 @@ struct RestrictionContext
 /**
  * Create a shared pointer to a restricted store.
  */
-ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context);
+ref<Store> makeRestrictedStore(ref<LocalStoreConfig> config, ref<LocalStore> next, RestrictionContext & context);
 
-}
+} // namespace nix

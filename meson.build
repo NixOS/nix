@@ -8,7 +8,6 @@ project(
   subproject_dir : 'src',
   default_options : [
     'localstatedir=/nix/var',
-    # hack for trailing newline
   ],
   meson_version : '>= 1.1',
 )
@@ -29,7 +28,7 @@ subproject('nix')
 if get_option('doc-gen')
   subproject('internal-api-docs')
   subproject('external-api-docs')
-  if not meson.is_cross_build()
+  if meson.can_run_host_binaries()
     subproject('nix-manual')
   endif
 endif

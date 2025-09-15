@@ -21,7 +21,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
     bool useSandbox;
 
     DarwinDerivationBuilder(
-        Store & store,
+        LocalStore & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)
@@ -69,7 +69,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             /* Add all our input paths to the chroot */
             for (auto & i : inputPaths) {
                 auto p = store.printStorePath(i);
-                pathsInChroot.insert_or_assign(p, p);
+                pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
             }
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be
@@ -160,6 +160,8 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
+            sandboxArgs.push_back("_NIX_BUILD_TOP");
+            sandboxArgs.push_back(tmpDir);
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
             sandboxArgs.push_back(globalTmpDir);
             if (drvOptions.allowLocalNetworking) {
@@ -204,6 +206,6 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
     }
 };
 
-}
+} // namespace nix
 
 #endif

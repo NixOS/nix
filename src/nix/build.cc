@@ -12,31 +12,32 @@ static nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, Store & sto
 {
     auto res = nlohmann::json::array();
     for (auto & t : paths) {
-        std::visit([&](const auto & t) {
-            res.push_back(t.toJSON(store));
-        }, t.raw());
+        std::visit([&](const auto & t) { res.push_back(t.toJSON(store)); }, t.raw());
     }
     return res;
 }
 
-static nlohmann::json builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult> & buildables, const Store & store)
+static nlohmann::json
+builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult> & buildables, const Store & store)
 {
     auto res = nlohmann::json::array();
     for (auto & b : buildables) {
-        std::visit([&](const auto & t) {
-            auto j = t.toJSON(store);
-            if (b.result) {
-                if (b.result->startTime)
-                    j["startTime"] = b.result->startTime;
-                if (b.result->stopTime)
-                    j["stopTime"] = b.result->stopTime;
-                if (b.result->cpuUser)
-                    j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
-                if (b.result->cpuSystem)
-                    j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
-            }
-            res.push_back(j);
-        }, b.path.raw());
+        std::visit(
+            [&](const auto & t) {
+                auto j = t.toJSON(store);
+                if (b.result) {
+                    if (b.result->startTime)
+                        j["startTime"] = b.result->startTime;
+                    if (b.result->stopTime)
+                        j["stopTime"] = b.result->stopTime;
+                    if (b.result->cpuUser)
+                        j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
+                    if (b.result->cpuSystem)
+                        j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
+                }
+                res.push_back(j);
+            },
+            b.path.raw());
     }
     return res;
 }
@@ -69,8 +70,8 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
     std::string doc() override
     {
         return
-          #include "build.md"
-          ;
+#include "build.md"
+            ;
     }
 
     void run(ref<Store> store, Installables && installables) override
@@ -90,29 +91,27 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
             return;
         }
 
-        auto buildables = Installable::build(
-            getEvalStore(), store,
-            Realise::Outputs,
-            installables,
-            repair ? bmRepair : buildMode);
+        auto buildables =
+            Installable::build(getEvalStore(), store, Realise::Outputs, installables, repair ? bmRepair : buildMode);
 
-        if (json) logger->cout("%s", builtPathsWithResultToJSON(buildables, *store).dump());
+        if (json)
+            logger->cout("%s", builtPathsWithResultToJSON(buildables, *store).dump());
 
         createOutLinksMaybe(buildables, store);
 
         if (printOutputPaths) {
             logger->stop();
             for (auto & buildable : buildables) {
-                std::visit(overloaded {
-                    [&](const BuiltPath::Opaque & bo) {
-                        logger->cout(store->printStorePath(bo.path));
+                std::visit(
+                    overloaded{
+                        [&](const BuiltPath::Opaque & bo) { logger->cout(store->printStorePath(bo.path)); },
+                        [&](const BuiltPath::Built & bfd) {
+                            for (auto & output : bfd.outputs) {
+                                logger->cout(store->printStorePath(output.second));
+                            }
+                        },
                     },
-                    [&](const BuiltPath::Built & bfd) {
-                        for (auto & output : bfd.outputs) {
-                            logger->cout(store->printStorePath(output.second));
-                        }
-                    },
-                }, buildable.path.raw());
+                    buildable.path.raw());
             }
         }
 

@@ -1,6 +1,5 @@
 #include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
-#include "nix/util/logging.hh" /* Needs to be included before config-impl.hh */
 #include "nix/util/config-impl.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 
@@ -46,4 +45,4 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
 /* Explicit instantiation of templates */
 template class BaseSetting<EvalProfilerMode>;
 
-}
+} // namespace nix

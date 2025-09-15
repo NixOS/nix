@@ -5,9 +5,10 @@
 #include "nix/expr/symbol-table.hh"
 
 #include <algorithm>
+#include <functional>
+#include <concepts>
 
 namespace nix {
-
 
 class EvalState;
 struct Value;
@@ -23,17 +24,21 @@ struct Attr
        way we keep Attr size at two words with no wasted space. */
     Symbol name;
     PosIdx pos;
-    Value * value;
+    Value * value = nullptr;
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
-        : name(name), pos(pos), value(value) { };
-    Attr() { };
-    auto operator <=> (const Attr & a) const
+        : name(name)
+        , pos(pos)
+        , value(value) {};
+    Attr() {};
+
+    auto operator<=>(const Attr & a) const
     {
         return name <=> a.name;
     }
 };
 
-static_assert(sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
+static_assert(
+    sizeof(Attr) == 2 * sizeof(uint32_t) + sizeof(Value *),
     "performance of the evaluator is highly sensitive to the size of Attr. "
     "avoid introducing any padding into Attr if at all possible, and do not "
     "introduce new fields that need not be present for almost every instance.");
@@ -50,49 +55,108 @@ public:
     typedef uint32_t size_t;
     PosIdx pos;
 
+    /**
+     * An instance of bindings objects with 0 attributes.
+     * This object must never be modified.
+     */
+    static Bindings emptyBindings;
+
 private:
-    size_t size_, capacity_;
+    size_t size_ = 0;
     Attr attrs[0];
 
-    Bindings(size_t capacity) : size_(0), capacity_(capacity) { }
-    Bindings(const Bindings & bindings) = delete;
+    Bindings() = default;
+    Bindings(const Bindings &) = delete;
+    Bindings(Bindings &&) = delete;
+    Bindings & operator=(const Bindings &) = delete;
+    Bindings & operator=(Bindings &&) = delete;
 
 public:
-    size_t size() const { return size_; }
+    size_t size() const
+    {
+        return size_;
+    }
 
-    bool empty() const { return !size_; }
+    bool empty() const
+    {
+        return !size_;
+    }
 
-    typedef Attr * iterator;
+    class iterator
+    {
+    public:
+        using value_type = Attr;
+        using pointer = const value_type *;
+        using reference = const value_type &;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
 
-    typedef const Attr * const_iterator;
+        friend class Bindings;
+
+    private:
+        pointer ptr = nullptr;
+
+        explicit iterator(pointer ptr)
+            : ptr(ptr)
+        {
+        }
+
+    public:
+        iterator() = default;
+
+        reference operator*() const
+        {
+            return *ptr;
+        }
+
+        const value_type * operator->() const
+        {
+            return ptr;
+        }
+
+        iterator & operator++()
+        {
+            ++ptr;
+            return *this;
+        }
+
+        iterator operator++(int)
+        {
+            pointer tmp = ptr;
+            ++*this;
+            return iterator(tmp);
+        }
+
+        bool operator==(const iterator & rhs) const = default;
+    };
+
+    using const_iterator = iterator;
 
     void push_back(const Attr & attr)
     {
-        assert(size_ < capacity_);
         attrs[size_++] = attr;
-    }
-
-    const_iterator find(Symbol name) const
-    {
-        Attr key(name, 0);
-        const_iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name) return i;
-        return end();
     }
 
     const Attr * get(Symbol name) const
     {
         Attr key(name, 0);
-        const_iterator i = std::lower_bound(begin(), end(), key);
-        if (i != end() && i->name == name) return &*i;
+        auto first = attrs;
+        auto last = attrs + size_;
+        const Attr * i = std::lower_bound(first, last, key);
+        if (i != last && i->name == name)
+            return i;
         return nullptr;
     }
 
-    iterator begin() { return &attrs[0]; }
-    iterator end() { return &attrs[size_]; }
+    const_iterator begin() const
+    {
+        return const_iterator(attrs);
+    }
 
-    const_iterator begin() const { return &attrs[0]; }
-    const_iterator end() const { return &attrs[size_]; }
+    const_iterator end() const
+    {
+        return const_iterator(attrs + size_);
+    }
 
     Attr & operator[](size_t pos)
     {
@@ -105,8 +169,6 @@ public:
     }
 
     void sort();
-
-    size_t capacity() const { return capacity_; }
 
     /**
      * Returns the attributes in lexicographically sorted order.
@@ -127,24 +189,36 @@ public:
     friend class EvalState;
 };
 
+static_assert(std::forward_iterator<Bindings::iterator>);
+static_assert(std::ranges::forward_range<Bindings>);
+
 /**
  * A wrapper around Bindings that ensures that its always in sorted
  * order at the end. The only way to consume a BindingsBuilder is to
  * call finish(), which sorts the bindings.
  */
-class BindingsBuilder
+class BindingsBuilder final
 {
-    Bindings * bindings;
-
 public:
     // needed by std::back_inserter
     using value_type = Attr;
+    using size_type = Bindings::size_t;
 
-    EvalState & state;
+private:
+    Bindings * bindings;
+    Bindings::size_t capacity_;
 
-    BindingsBuilder(EvalState & state, Bindings * bindings)
-        : bindings(bindings), state(state)
-    { }
+    friend class EvalState;
+
+    BindingsBuilder(EvalState & state, Bindings * bindings, size_type capacity)
+        : bindings(bindings)
+        , capacity_(capacity)
+        , state(state)
+    {
+    }
+
+public:
+    std::reference_wrapper<EvalState> state;
 
     void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {
@@ -158,6 +232,7 @@ public:
 
     void push_back(const Attr & attr)
     {
+        assert(bindings->size() < capacity_);
         bindings->push_back(attr);
     }
 
@@ -176,19 +251,19 @@ public:
         return bindings;
     }
 
-    size_t capacity()
+    size_t capacity() const noexcept
     {
-        return bindings->capacity();
+        return capacity_;
     }
 
-    void grow(Bindings * newBindings)
+    void grow(BindingsBuilder newBindings)
     {
         for (auto & i : *bindings)
-            newBindings->push_back(i);
-        bindings = newBindings;
+            newBindings.push_back(i);
+        std::swap(*this, newBindings);
     }
 
     friend struct ExprAttrs;
 };
 
-}
+} // namespace nix

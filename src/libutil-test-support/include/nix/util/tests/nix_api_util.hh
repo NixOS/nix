@@ -40,6 +40,7 @@ protected:
         std::string msg(p, n);
         throw std::runtime_error(loc(file, line) + ": nix_err_code(ctx) != NIX_OK, message: " + msg);
     }
+
 #define assert_ctx_ok() assert_ctx_ok(__FILE__, __LINE__)
 
     inline void assert_ctx_err(const char * file, int line)
@@ -49,7 +50,16 @@ protected:
         }
         throw std::runtime_error(loc(file, line) + ": Got NIX_OK, but expected an error!");
     }
+
 #define assert_ctx_err() assert_ctx_err(__FILE__, __LINE__)
 };
 
+static inline auto createOwnedNixContext()
+{
+    return std::unique_ptr<nix_c_context, decltype([](nix_c_context * ctx) {
+                               if (ctx)
+                                   nix_c_context_free(ctx);
+                           })>(nix_c_context_create(), {});
 }
+
+} // namespace nixC

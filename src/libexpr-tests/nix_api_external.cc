@@ -1,9 +1,6 @@
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
-#include "nix_api_expr_internal.h"
 #include "nix_api_value.h"
 #include "nix_api_external.h"
 
@@ -27,6 +24,7 @@ public:
 
 private:
     int _x;
+
     static void print_function(void * self, nix_printer * printer) {}
 
     static void show_type_function(void * self, nix_string_return * res) {}
@@ -38,7 +36,7 @@ private:
         std::string type_string = "nix-external<MyExternalValueDesc( ";
         type_string += std::to_string(obj->_x);
         type_string += " )>";
-        res->str = &*type_string.begin();
+        nix_set_string_return(res, &*type_string.begin());
     }
 };
 
@@ -68,4 +66,4 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
     nix_state_free(stateFn);
 }
 
-}
+} // namespace nixC

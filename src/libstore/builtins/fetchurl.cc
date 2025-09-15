@@ -1,6 +1,7 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 
@@ -35,14 +36,11 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     auto fileTransfer = makeFileTransfer();
 
     auto fetch = [&](const std::string & url) {
-
         auto source = sinkToSource([&](Sink & sink) {
-
-            FileTransferRequest request(url);
+            FileTransferRequest request(ValidURL{url});
             request.decompress = false;
 
-            auto decompressor = makeDecompressionSink(
-                unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
@@ -64,8 +62,11 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
-                if (!hasSuffix(hashedMirror, "/")) hashedMirror += '/';
-                fetch(hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/" + dof->ca.hash.to_string(HashFormat::Base16, false));
+                if (!hasSuffix(hashedMirror, "/"))
+                    hashedMirror += '/';
+                fetch(
+                    hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/"
+                    + dof->ca.hash.to_string(HashFormat::Base16, false));
                 return;
             } catch (Error & e) {
                 debug(e.what());
@@ -77,4 +78,4 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
 static RegisterBuiltinBuilder registerFetchurl("fetchurl", builtinFetchurl);
 
-}
+} // namespace nix

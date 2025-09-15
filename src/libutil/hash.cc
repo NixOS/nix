@@ -11,6 +11,8 @@
 #include "nix/util/archive.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/split.hh"
+#include "nix/util/base-n.hh"
+#include "nix/util/base-nix-32.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -20,23 +22,12 @@
 
 namespace nix {
 
-static size_t regularHashSize(HashAlgorithm type) {
-    switch (type) {
-    case HashAlgorithm::BLAKE3: return blake3HashSize;
-    case HashAlgorithm::MD5: return md5HashSize;
-    case HashAlgorithm::SHA1: return sha1HashSize;
-    case HashAlgorithm::SHA256: return sha256HashSize;
-    case HashAlgorithm::SHA512: return sha512HashSize;
-    }
-    unreachable();
-}
+const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512"};
 
+const StringSet hashFormats = {"base64", "nix32", "base16", "sri"};
 
-const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512" };
-
-const StringSet hashFormats = {"base64", "nix32", "base16", "sri" };
-
-Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings) : algo(algo)
+Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings)
+    : algo(algo)
 {
     if (algo == HashAlgorithm::BLAKE3) {
         xpSettings.require(Xp::BLAKE3Hashes);
@@ -46,75 +37,28 @@ Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings) :
     memset(hash, 0, maxHashSize);
 }
 
-
-bool Hash::operator == (const Hash & h2) const noexcept
+bool Hash::operator==(const Hash & h2) const noexcept
 {
-    if (hashSize != h2.hashSize) return false;
+    if (hashSize != h2.hashSize)
+        return false;
     for (unsigned int i = 0; i < hashSize; i++)
-        if (hash[i] != h2.hash[i]) return false;
+        if (hash[i] != h2.hash[i])
+            return false;
     return true;
 }
 
-
-std::strong_ordering Hash::operator <=> (const Hash & h) const noexcept
+std::strong_ordering Hash::operator<=>(const Hash & h) const noexcept
 {
-    if (auto cmp = hashSize <=> h.hashSize; cmp != 0) return cmp;
+    if (auto cmp = hashSize <=> h.hashSize; cmp != 0)
+        return cmp;
     for (unsigned int i = 0; i < hashSize; i++) {
-        if (auto cmp = hash[i] <=> h.hash[i]; cmp != 0) return cmp;
+        if (auto cmp = hash[i] <=> h.hash[i]; cmp != 0)
+            return cmp;
     }
-    if (auto cmp = algo <=> h.algo; cmp != 0) return cmp;
+    if (auto cmp = algo <=> h.algo; cmp != 0)
+        return cmp;
     return std::strong_ordering::equivalent;
 }
-
-
-const std::string base16Chars = "0123456789abcdef";
-
-
-static std::string printHash16(const Hash & hash)
-{
-    std::string buf;
-    buf.reserve(hash.hashSize * 2);
-    for (unsigned int i = 0; i < hash.hashSize; i++) {
-        buf.push_back(base16Chars[hash.hash[i] >> 4]);
-        buf.push_back(base16Chars[hash.hash[i] & 0x0f]);
-    }
-    return buf;
-}
-
-
-// omitted: E O U T
-const std::string nix32Chars = "0123456789abcdfghijklmnpqrsvwxyz";
-
-
-static std::string printHash32(const Hash & hash)
-{
-    assert(hash.hashSize);
-    size_t len = hash.base32Len();
-    assert(len);
-
-    std::string s;
-    s.reserve(len);
-
-    for (int n = (int) len - 1; n >= 0; n--) {
-        unsigned int b = n * 5;
-        unsigned int i = b / 8;
-        unsigned int j = b % 8;
-        unsigned char c =
-            (hash.hash[i] >> j)
-            | (i >= hash.hashSize - 1 ? 0 : hash.hash[i + 1] << (8 - j));
-        s.push_back(nix32Chars[c & 0x1f]);
-    }
-
-    return s;
-}
-
-
-std::string printHash16or32(const Hash & hash)
-{
-    assert(static_cast<char>(hash.algo));
-    return hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false);
-}
-
 
 std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 {
@@ -123,22 +67,97 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
         s += printHashAlgo(algo);
         s += hashFormat == HashFormat::SRI ? '-' : ':';
     }
+    const auto bytes = std::as_bytes(std::span<const uint8_t>{&hash[0], hashSize});
     switch (hashFormat) {
     case HashFormat::Base16:
-        s += printHash16(*this);
+        assert(hashSize);
+        s += base16::encode(bytes);
         break;
     case HashFormat::Nix32:
-        s += printHash32(*this);
+        assert(hashSize);
+        s += BaseNix32::encode(bytes);
         break;
     case HashFormat::Base64:
     case HashFormat::SRI:
-        s += base64Encode(std::string_view((const char *) hash, hashSize));
+        assert(hashSize);
+        s += base64::encode(bytes);
         break;
     }
     return s;
 }
 
 Hash Hash::dummy(HashAlgorithm::SHA256);
+
+namespace {
+
+/// Private convenience
+struct DecodeNamePair
+{
+    decltype(base16::decode) * decode;
+    std::string_view encodingName;
+};
+
+} // namespace
+
+static DecodeNamePair baseExplicit(HashFormat format)
+{
+    switch (format) {
+    case HashFormat::Base16:
+        return {base16::decode, "base16"};
+    case HashFormat::Nix32:
+        return {BaseNix32::decode, "nix32"};
+    case HashFormat::Base64:
+        return {base64::decode, "Base64"};
+    case HashFormat::SRI:
+        break;
+    }
+    unreachable();
+}
+
+/**
+ * Given the expected size of the message once decoded it, figure out
+ * which encoding we are using by looking at the size of the encoded
+ * message.
+ */
+static HashFormat baseFromSize(std::string_view rest, HashAlgorithm algo)
+{
+    auto hashSize = regularHashSize(algo);
+
+    if (rest.size() == base16::encodedLength(hashSize))
+        return HashFormat::Base16;
+
+    if (rest.size() == BaseNix32::encodedLength(hashSize))
+        return HashFormat::Nix32;
+
+    if (rest.size() == base64::encodedLength(hashSize))
+        return HashFormat::Base64;
+
+    throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(algo));
+}
+
+/**
+ * Given the exact decoding function, and a display name for in error
+ * messages.
+ *
+ * @param rest the string view to parse. Must not include any `<algo>(:|-)` prefix.
+ */
+static Hash parseLowLevel(std::string_view rest, HashAlgorithm algo, DecodeNamePair pair)
+{
+    Hash res{algo};
+    std::string d;
+    try {
+        d = pair.decode(rest);
+    } catch (Error & e) {
+        e.addTrace({}, "While decoding hash '%s'", rest);
+    }
+    if (d.size() != res.hashSize)
+        throw BadHash(
+            "invalid %s hash '%s', length %d != expected length %d", pair.encodingName, rest, d.size(), res.hashSize);
+    assert(res.hashSize);
+    memcpy(res.hash, d.data(), res.hashSize);
+
+    return res;
+}
 
 Hash Hash::parseSRI(std::string_view original)
 {
@@ -150,16 +169,21 @@ Hash Hash::parseSRI(std::string_view original)
         throw BadHash("hash '%s' is not SRI", original);
     HashAlgorithm parsedType = parseHashAlgo(*hashRaw);
 
-    return Hash(rest, parsedType, true);
+    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"});
 }
 
-// Mutates the string to eliminate the prefixes when found
-static std::pair<std::optional<HashAlgorithm>, bool> getParsedTypeAndSRI(std::string_view & rest)
+/**
+ * @param rest is the string to parse
+ *
+ * @param resolveAlgo resolves the parsed type (or throws an error when it is not
+ * possible.)
+ */
+static Hash parseAnyHelper(std::string_view rest, auto resolveAlgo)
 {
     bool isSRI = false;
 
     // Parse the hash type before the separator, if there was one.
-    std::optional<HashAlgorithm> optParsedType;
+    std::optional<HashAlgorithm> optParsedAlgo;
     {
         auto hashRaw = splitPrefixTo(rest, ':');
 
@@ -169,103 +193,60 @@ static std::pair<std::optional<HashAlgorithm>, bool> getParsedTypeAndSRI(std::st
                 isSRI = true;
         }
         if (hashRaw)
-            optParsedType = parseHashAlgo(*hashRaw);
+            optParsedAlgo = parseHashAlgo(*hashRaw);
     }
 
-    return {optParsedType, isSRI};
+    HashAlgorithm algo = resolveAlgo(std::move(optParsedAlgo));
+
+    auto [decode, formatName] = [&]() -> DecodeNamePair {
+        if (isSRI) {
+            /* In the SRI case, we always are using Base64. If the
+               length is wrong, get an error later. */
+            return {base64::decode, "SRI"};
+        } else {
+            /* Otherwise, decide via the length of the hash (for the
+               given algorithm) what base encoding it is. */
+            return baseExplicit(baseFromSize(rest, algo));
+        }
+    }();
+
+    return parseLowLevel(rest, algo, {decode, formatName});
 }
 
 Hash Hash::parseAnyPrefixed(std::string_view original)
 {
-    auto rest = original;
-    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
+    return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
+        // Either the string or user must provide the type, if they both do they
+        // must agree.
+        if (!optParsedAlgo)
+            throw BadHash("hash '%s' does not include a type", original);
 
-    // Either the string or user must provide the type, if they both do they
-    // must agree.
-    if (!optParsedType)
-        throw BadHash("hash '%s' does not include a type", rest);
-
-    return Hash(rest, *optParsedType, isSRI);
+        return *optParsedAlgo;
+    });
 }
 
 Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optAlgo)
 {
-    auto rest = original;
-    auto [optParsedType, isSRI] = getParsedTypeAndSRI(rest);
+    return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
+        // Either the string or user must provide the type, if they both do they
+        // must agree.
+        if (!optParsedAlgo && !optAlgo)
+            throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", original);
+        else if (optParsedAlgo && optAlgo && *optParsedAlgo != *optAlgo)
+            throw BadHash("hash '%s' should have type '%s'", original, printHashAlgo(*optAlgo));
 
-    // Either the string or user must provide the type, if they both do they
-    // must agree.
-    if (!optParsedType && !optAlgo)
-        throw BadHash("hash '%s' does not include a type, nor is the type otherwise known from context", rest);
-    else if (optParsedType && optAlgo && *optParsedType != *optAlgo)
-        throw BadHash("hash '%s' should have type '%s'", original, printHashAlgo(*optAlgo));
-
-    HashAlgorithm hashAlgo = optParsedType ? *optParsedType : *optAlgo;
-    return Hash(rest, hashAlgo, isSRI);
+        return optParsedAlgo ? *optParsedAlgo : *optAlgo;
+    });
 }
 
 Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
 {
-    return Hash(s, algo, false);
+    return parseExplicitFormatUnprefixed(s, algo, baseFromSize(s, algo));
 }
 
-Hash::Hash(std::string_view rest, HashAlgorithm algo, bool isSRI)
-    : Hash(algo)
+Hash Hash::parseExplicitFormatUnprefixed(std::string_view s, HashAlgorithm algo, HashFormat format)
 {
-    if (!isSRI && rest.size() == base16Len()) {
-
-        auto parseHexDigit = [&](char c) {
-            if (c >= '0' && c <= '9') return c - '0';
-            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-            throw BadHash("invalid base-16 hash '%s'", rest);
-        };
-
-        for (unsigned int i = 0; i < hashSize; i++) {
-            hash[i] =
-                parseHexDigit(rest[i * 2]) << 4
-                | parseHexDigit(rest[i * 2 + 1]);
-        }
-    }
-
-    else if (!isSRI && rest.size() == base32Len()) {
-
-        for (unsigned int n = 0; n < rest.size(); ++n) {
-            char c = rest[rest.size() - n - 1];
-            unsigned char digit;
-            for (digit = 0; digit < nix32Chars.size(); ++digit) /* !!! slow */
-                if (nix32Chars[digit] == c) break;
-            if (digit >= 32)
-                throw BadHash("invalid base-32 hash '%s'", rest);
-            unsigned int b = n * 5;
-            unsigned int i = b / 8;
-            unsigned int j = b % 8;
-            hash[i] |= digit << j;
-
-            if (i < hashSize - 1) {
-                hash[i + 1] |= digit >> (8 - j);
-            } else {
-                if (digit >> (8 - j))
-                    throw BadHash("invalid base-32 hash '%s'", rest);
-            }
-        }
-    }
-
-    else if (isSRI || rest.size() == base64Len()) {
-        std::string d;
-        try {
-            d = base64Decode(rest);
-        } catch (Error & e) {
-            e.addTrace({}, "While decoding hash '%s'", rest);
-        }
-        if (d.size() != hashSize)
-            throw BadHash("invalid %s hash '%s'", isSRI ? "SRI" : "base-64", rest);
-        assert(hashSize);
-        memcpy(hash, d.data(), hashSize);
-    }
-
-    else
-        throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(this->algo));
+    return parseLowLevel(s, algo, baseExplicit(format));
 }
 
 Hash Hash::random(HashAlgorithm algo)
@@ -287,8 +268,7 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
         return Hash::parseAny(hashStr, ha);
 }
 
-
-union Ctx
+union Hash::Ctx
 {
     blake3_hasher blake3;
     MD5_CTX md5;
@@ -297,14 +277,18 @@ union Ctx
     SHA512_CTX sha512;
 };
 
-
-static void start(HashAlgorithm ha, Ctx & ctx)
+static void start(HashAlgorithm ha, Hash::Ctx & ctx)
 {
-    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_init(&ctx.blake3);
-    else if (ha == HashAlgorithm::MD5) MD5_Init(&ctx.md5);
-    else if (ha == HashAlgorithm::SHA1) SHA1_Init(&ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256) SHA256_Init(&ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512) SHA512_Init(&ctx.sha512);
+    if (ha == HashAlgorithm::BLAKE3)
+        blake3_hasher_init(&ctx.blake3);
+    else if (ha == HashAlgorithm::MD5)
+        MD5_Init(&ctx.md5);
+    else if (ha == HashAlgorithm::SHA1)
+        SHA1_Init(&ctx.sha1);
+    else if (ha == HashAlgorithm::SHA256)
+        SHA256_Init(&ctx.sha256);
+    else if (ha == HashAlgorithm::SHA512)
+        SHA512_Init(&ctx.sha512);
 }
 
 // BLAKE3 data size threshold beyond which parallel hashing with TBB is likely faster.
@@ -328,30 +312,37 @@ void blake3_hasher_update_with_heuristics(blake3_hasher * blake3, std::string_vi
     }
 }
 
-static void update(HashAlgorithm ha, Ctx & ctx,
-                   std::string_view data)
+static void update(HashAlgorithm ha, Hash::Ctx & ctx, std::string_view data)
 {
-    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_update_with_heuristics(&ctx.blake3, data);
-    else if (ha == HashAlgorithm::MD5) MD5_Update(&ctx.md5, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA1) SHA1_Update(&ctx.sha1, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA256) SHA256_Update(&ctx.sha256, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA512) SHA512_Update(&ctx.sha512, data.data(), data.size());
+    if (ha == HashAlgorithm::BLAKE3)
+        blake3_hasher_update_with_heuristics(&ctx.blake3, data);
+    else if (ha == HashAlgorithm::MD5)
+        MD5_Update(&ctx.md5, data.data(), data.size());
+    else if (ha == HashAlgorithm::SHA1)
+        SHA1_Update(&ctx.sha1, data.data(), data.size());
+    else if (ha == HashAlgorithm::SHA256)
+        SHA256_Update(&ctx.sha256, data.data(), data.size());
+    else if (ha == HashAlgorithm::SHA512)
+        SHA512_Update(&ctx.sha512, data.data(), data.size());
 }
 
-
-static void finish(HashAlgorithm ha, Ctx & ctx, unsigned char * hash)
+static void finish(HashAlgorithm ha, Hash::Ctx & ctx, unsigned char * hash)
 {
-    if (ha == HashAlgorithm::BLAKE3) blake3_hasher_finalize(&ctx.blake3, hash, BLAKE3_OUT_LEN);
-    else if (ha == HashAlgorithm::MD5) MD5_Final(hash, &ctx.md5);
-    else if (ha == HashAlgorithm::SHA1) SHA1_Final(hash, &ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256) SHA256_Final(hash, &ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512) SHA512_Final(hash, &ctx.sha512);
+    if (ha == HashAlgorithm::BLAKE3)
+        blake3_hasher_finalize(&ctx.blake3, hash, BLAKE3_OUT_LEN);
+    else if (ha == HashAlgorithm::MD5)
+        MD5_Final(hash, &ctx.md5);
+    else if (ha == HashAlgorithm::SHA1)
+        SHA1_Final(hash, &ctx.sha1);
+    else if (ha == HashAlgorithm::SHA256)
+        SHA256_Final(hash, &ctx.sha256);
+    else if (ha == HashAlgorithm::SHA512)
+        SHA512_Final(hash, &ctx.sha512);
 }
 
-Hash hashString(
-    HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
+Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
 {
-    Ctx ctx;
+    Hash::Ctx ctx;
     Hash hash(ha, xpSettings);
     start(ha, ctx);
     update(ha, ctx, s);
@@ -363,13 +354,13 @@ Hash hashFile(HashAlgorithm ha, const Path & path)
 {
     HashSink sink(ha);
     readFile(path, sink);
-    return sink.finish().first;
+    return sink.finish().hash;
 }
 
-
-HashSink::HashSink(HashAlgorithm ha) : ha(ha)
+HashSink::HashSink(HashAlgorithm ha)
+    : ha(ha)
 {
-    ctx = new Ctx;
+    ctx = new Hash::Ctx;
     bytes = 0;
     start(ha, *ctx);
 }
@@ -397,12 +388,11 @@ HashResult HashSink::finish()
 HashResult HashSink::currentHash()
 {
     flush();
-    Ctx ctx2 = *ctx;
+    Hash::Ctx ctx2 = *ctx;
     Hash hash(ha);
     nix::finish(ha, ctx2, hash.hash);
     return HashResult(hash, bytes);
 }
-
 
 Hash compressHash(const Hash & hash, unsigned int newSize)
 {
@@ -413,17 +403,20 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
     return h;
 }
 
-
 std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName)
 {
-    if (hashFormatName == "base16") return HashFormat::Base16;
-    if (hashFormatName == "nix32") return HashFormat::Nix32;
+    if (hashFormatName == "base16")
+        return HashFormat::Base16;
+    if (hashFormatName == "nix32")
+        return HashFormat::Nix32;
     if (hashFormatName == "base32") {
         warn(R"("base32" is a deprecated alias for hash format "nix32".)");
         return HashFormat::Nix32;
     }
-    if (hashFormatName == "base64") return HashFormat::Base64;
-    if (hashFormatName == "sri") return HashFormat::SRI;
+    if (hashFormatName == "base64")
+        return HashFormat::Base64;
+    if (hashFormatName == "sri")
+        return HashFormat::SRI;
     return std::nullopt;
 }
 
@@ -455,11 +448,16 @@ std::string_view printHashFormat(HashFormat HashFormat)
 
 std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s)
 {
-    if (s == "blake3") return HashAlgorithm::BLAKE3;
-    if (s == "md5") return HashAlgorithm::MD5;
-    if (s == "sha1") return HashAlgorithm::SHA1;
-    if (s == "sha256") return HashAlgorithm::SHA256;
-    if (s == "sha512") return HashAlgorithm::SHA512;
+    if (s == "blake3")
+        return HashAlgorithm::BLAKE3;
+    if (s == "md5")
+        return HashAlgorithm::MD5;
+    if (s == "sha1")
+        return HashAlgorithm::SHA1;
+    if (s == "sha256")
+        return HashAlgorithm::SHA256;
+    if (s == "sha512")
+        return HashAlgorithm::SHA512;
     return std::nullopt;
 }
 
@@ -475,11 +473,16 @@ HashAlgorithm parseHashAlgo(std::string_view s)
 std::string_view printHashAlgo(HashAlgorithm ha)
 {
     switch (ha) {
-    case HashAlgorithm::BLAKE3: return "blake3";
-    case HashAlgorithm::MD5: return "md5";
-    case HashAlgorithm::SHA1: return "sha1";
-    case HashAlgorithm::SHA256: return "sha256";
-    case HashAlgorithm::SHA512: return "sha512";
+    case HashAlgorithm::BLAKE3:
+        return "blake3";
+    case HashAlgorithm::MD5:
+        return "md5";
+    case HashAlgorithm::SHA1:
+        return "sha1";
+    case HashAlgorithm::SHA256:
+        return "sha256";
+    case HashAlgorithm::SHA512:
+        return "sha512";
     default:
         // illegal hash type enum value internally, as opposed to external input
         // which should be validated with nice error message.
@@ -487,4 +490,4 @@ std::string_view printHashAlgo(HashAlgorithm ha)
     }
 }
 
-}
+} // namespace nix

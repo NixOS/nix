@@ -10,13 +10,18 @@
 namespace nix {
 
 template<class Proto, const char * protocolDir>
-class ProtoTest : public CharacterizationTest, public LibStoreTest
+class ProtoTest : public CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / protocolDir;
 
-    std::filesystem::path goldenMaster(std::string_view testStem) const override {
-        return unitTestData / (std::string { testStem + ".bin" });
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / (std::string{testStem + ".bin"});
     }
+
+public:
+    Path storeDir = "/nix/store";
+    StoreDirConfig store{storeDir};
 };
 
 template<class Proto, const char * protocolDir>
@@ -31,10 +36,10 @@ public:
     {
         CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
-                StringSource from { encoded };
+                StringSource from{encoded};
                 Proto::template Serialise<T>::read(
-                    *LibStoreTest::store,
-                    typename Proto::ReadConn {
+                    this->store,
+                    typename Proto::ReadConn{
                         .from = from,
                         .version = version,
                     });
@@ -53,8 +58,8 @@ public:
         CharacterizationTest::writeTest(testStem, [&]() {
             StringSink to;
             Proto::template Serialise<T>::write(
-                *LibStoreTest::store,
-                typename Proto::WriteConn {
+                this->store,
+                typename Proto::WriteConn{
                     .to = to,
                     .version = version,
                 },
@@ -65,11 +70,13 @@ public:
 };
 
 #define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    TEST_F(FIXTURE, NAME ## _read) { \
-        readProtoTest(STEM, VERSION, VALUE); \
-    } \
-    TEST_F(FIXTURE, NAME ## _write) { \
-        writeProtoTest(STEM, VERSION, VALUE); \
+    TEST_F(FIXTURE, NAME##_read)                                             \
+    {                                                                        \
+        readProtoTest(STEM, VERSION, VALUE);                                 \
+    }                                                                        \
+    TEST_F(FIXTURE, NAME##_write)                                            \
+    {                                                                        \
+        writeProtoTest(STEM, VERSION, VALUE);                                \
     }
 
-}
+} // namespace nix

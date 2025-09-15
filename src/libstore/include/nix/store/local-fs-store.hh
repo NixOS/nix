@@ -20,29 +20,41 @@ struct LocalFSStoreConfig : virtual StoreConfig
      */
     LocalFSStoreConfig(PathView path, const Params & params);
 
-    OptionalPathSetting rootDir{this, std::nullopt,
-        "root",
-        "Directory prefixed to all other paths."};
+    OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
 
-    PathSetting stateDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultStateDir();
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultLogDir();
+
+public:
+
+    PathSetting stateDir{
+        this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
         "state",
         "Directory where Nix stores state."};
 
-    PathSetting logDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
+    PathSetting logDir{
+        this,
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
         "log",
         "directory where Nix stores log files."};
 
-    PathSetting realStoreDir{this,
-        rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real",
-        "Physical path of the Nix store."};
+    PathSetting realStoreDir{
+        this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
 };
 
-struct LocalFSStore :
-    virtual Store,
-    virtual GcStore,
-    virtual LogStore
+struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
 {
     using Config = LocalFSStoreConfig;
 
@@ -73,7 +85,10 @@ struct LocalFSStore :
      */
     virtual Path addPermRoot(const StorePath & storePath, const Path & gcRoot) = 0;
 
-    virtual Path getRealStoreDir() { return config.realStoreDir; }
+    virtual Path getRealStoreDir()
+    {
+        return config.realStoreDir;
+    }
 
     Path toRealPath(const Path & storePath) override
     {
@@ -82,7 +97,6 @@ struct LocalFSStore :
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
-
 };
 
-}
+} // namespace nix

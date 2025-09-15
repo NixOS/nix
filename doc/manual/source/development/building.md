@@ -34,7 +34,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
+[nix-shell]$ out="$(pwd)/outputs/out" dev=$out debug=$out mesonFlags+=" --prefix=${out}"
 [nix-shell]$ dontAddPrefix=1 configurePhase
 [nix-shell]$ buildPhase
 ```
@@ -215,14 +215,18 @@ nix build .#nix-everything-x86_64-w64-mingw32
 
 For historic reasons and backward-compatibility, some CPU and OS identifiers are translated as follows:
 
-| `config.guess`             | Nix                 |
-|----------------------------|---------------------|
-| `amd64`                    | `x86_64`            |
-| `i*86`                     | `i686`              |
-| `arm6`                     | `arm6l`             |
-| `arm7`                     | `arm7l`             |
-| `linux-gnu*`               | `linux`             |
-| `linux-musl*`              | `linux`             |
+| `host_machine.cpu_family()` | `host_machine.endian()` | Nix                 |
+|-----------------------------|-------------------------|---------------------|
+| `x86`                       |                         | `i686`              |
+| `arm`                       |                         | `host_machine.cpu()`|
+| `ppc`                       | `little`                | `powerpcle`         |
+| `ppc64`                     | `little`                | `powerpc64le`       |
+| `ppc`                       | `big`                   | `powerpc`           |
+| `ppc64`                     | `big`                   | `powerpc64`         |
+| `mips`                      | `little`                | `mipsel`            |
+| `mips64`                    | `little`                | `mips64el`          |
+| `mips`                      | `big`                   | `mips`              |
+| `mips64`                    | `big`                   | `mips64`            |
 
 ## Compilation environments
 

@@ -1,12 +1,10 @@
 #pragma once
 ///@file
 
-#include "nix/util/references.hh"
+#include "nix/store/references.hh"
 #include "nix/store/path.hh"
 
 namespace nix {
-
-std::pair<StorePathSet, HashResult> scanForReferences(const Path & path, const StorePathSet & refs);
 
 StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
 
@@ -23,4 +21,4 @@ public:
     StorePathSet getResultPaths();
 };
 
-}
+} // namespace nix

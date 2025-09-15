@@ -10,7 +10,7 @@
   - Bash Shell. The `./configure` script relies on bashisms, so Bash is
     required.
 
-  - A version of GCC or Clang that supports C++20.
+  - A version of GCC or Clang that supports C++23.
 
   - `pkg-config` to locate dependencies. If your distribution does not
     provide it, you can get it from

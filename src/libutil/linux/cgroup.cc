@@ -4,10 +4,10 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <chrono>
 #include <cmath>
 #include <regex>
-#include <unordered_set>
 #include <thread>
 
 #include <dirent.h>
@@ -19,7 +19,8 @@ std::optional<Path> getCgroupFS()
 {
     static auto res = [&]() -> std::optional<Path> {
         auto fp = fopen("/proc/mounts", "r");
-        if (!fp) return std::nullopt;
+        if (!fp)
+            return std::nullopt;
         Finally delFP = [&]() { fclose(fp); };
         while (auto ent = getmntent(fp))
             if (std::string_view(ent->mnt_type) == "cgroup2")
@@ -50,7 +51,8 @@ StringMap getCgroups(const Path & cgroupFile)
 
 static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
 {
-    if (!pathExists(cgroup)) return {};
+    if (!pathExists(cgroup))
+        return {};
 
     auto procsFile = cgroup / "cgroup.procs";
 
@@ -67,18 +69,20 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
        this cgroup. */
     for (auto & entry : DirectoryIterator{cgroup}) {
         checkInterrupt();
-        if (entry.symlink_status().type() != std::filesystem::file_type::directory) continue;
+        if (entry.symlink_status().type() != std::filesystem::file_type::directory)
+            continue;
         destroyCgroup(cgroup / entry.path().filename(), false);
     }
 
     int round = 1;
 
-    std::unordered_set<pid_t> pidsShown;
+    boost::unordered_flat_set<pid_t> pidsShown;
 
     while (true) {
         auto pids = tokenizeString<std::vector<std::string>>(readFile(procsFile));
 
-        if (pids.empty()) break;
+        if (pids.empty())
+            break;
 
         if (round > 20)
             throw Error("cannot kill cgroup '%s'", cgroup);
@@ -93,8 +97,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
                 try {
                     auto cmdline = readFile(fmt("/proc/%d/cmdline", pid));
                     using namespace std::string_literals;
-                    warn("killing stray builder process %d (%s)...",
-                        pid, trim(replaceStrings(cmdline, "\0"s, " ")));
+                    warn("killing stray builder process %d (%s)...", pid, trim(replaceStrings(cmdline, "\0"s, " ")));
                 } catch (SystemError &) {
                 }
             }
@@ -120,17 +123,18 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
                 std::string_view userPrefix = "user_usec ";
                 if (hasPrefix(line, userPrefix)) {
                     auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
-                    if (n) stats.cpuUser = std::chrono::microseconds(*n);
+                    if (n)
+                        stats.cpuUser = std::chrono::microseconds(*n);
                 }
 
                 std::string_view systemPrefix = "system_usec ";
                 if (hasPrefix(line, systemPrefix)) {
                     auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
-                    if (n) stats.cpuSystem = std::chrono::microseconds(*n);
+                    if (n)
+                        stats.cpuSystem = std::chrono::microseconds(*n);
                 }
             }
         }
-
     }
 
     if (rmdir(cgroup.c_str()) == -1)
@@ -163,4 +167,4 @@ std::string getRootCgroup()
     return rootCgroup;
 }
 
-}
+} // namespace nix

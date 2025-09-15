@@ -1,4 +1,5 @@
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/git-utils.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/store/path.hh"
 
@@ -8,13 +9,13 @@ std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(
-        const Settings & settings,
-        const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        if (url.scheme != "flake") return {};
+        if (url.scheme != "flake")
+            return {};
 
-        auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
+        /* This ignores empty path segments for back-compat. Older versions used a tokenizeString here. */
+        auto path = url.pathSegments(/*skipEmpty=*/true) | std::ranges::to<std::vector<std::string>>();
 
         std::optional<Hash> rev;
         std::optional<std::string> ref;
@@ -23,12 +24,12 @@ struct IndirectInputScheme : InputScheme
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
                 rev = Hash::parseAny(path[1], HashAlgorithm::SHA1);
-            else if (std::regex_match(path[1], refRegex))
+            else if (isLegalRefName(path[1]))
                 ref = path[1];
             else
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash or branch/tag name", url, path[1]);
         } else if (path.size() == 3) {
-            if (!std::regex_match(path[1], refRegex))
+            if (!isLegalRefName(path[1]))
                 throw BadURL("in flake URL '%s', '%s' is not a branch/tag name", url, path[1]);
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
@@ -46,8 +47,10 @@ struct IndirectInputScheme : InputScheme
         Input input{settings};
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
 
         return input;
     }
@@ -67,9 +70,7 @@ struct IndirectInputScheme : InputScheme
         };
     }
 
-    std::optional<Input> inputFromAttrs(
-        const Settings & settings,
-        const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
     {
         auto id = getStrAttr(attrs, "id");
         if (!std::regex_match(id, flakeRegex))
@@ -82,22 +83,26 @@ struct IndirectInputScheme : InputScheme
 
     ParsedURL toURL(const Input & input) const override
     {
-        ParsedURL url;
-        url.scheme = "flake";
-        url.path = getStrAttr(input.attrs, "id");
-        if (auto ref = input.getRef()) { url.path += '/'; url.path += *ref; };
-        if (auto rev = input.getRev()) { url.path += '/'; url.path += rev->gitRev(); };
+        ParsedURL url{
+            .scheme = "flake",
+            .path = {getStrAttr(input.attrs, "id")},
+        };
+        if (auto ref = input.getRef()) {
+            url.path.push_back(*ref);
+        };
+        if (auto rev = input.getRev()) {
+            url.path.push_back(rev->gitRev());
+        };
         return url;
     }
 
-    Input applyOverrides(
-        const Input & _input,
-        std::optional<std::string> ref,
-        std::optional<Hash> rev) const override
+    Input applyOverrides(const Input & _input, std::optional<std::string> ref, std::optional<Hash> rev) const override
     {
         auto input(_input);
-        if (rev) input.attrs.insert_or_assign("rev", rev->gitRev());
-        if (ref) input.attrs.insert_or_assign("ref", *ref);
+        if (rev)
+            input.attrs.insert_or_assign("rev", rev->gitRev());
+        if (ref)
+            input.attrs.insert_or_assign("ref", *ref);
         return input;
     }
 
@@ -112,9 +117,11 @@ struct IndirectInputScheme : InputScheme
     }
 
     bool isDirect(const Input & input) const override
-    { return false; }
+    {
+        return false;
+    }
 };
 
 static auto rIndirectInputScheme = OnStartup([] { registerInputScheme(std::make_unique<IndirectInputScheme>()); });
 
-}
+} // namespace nix::fetchers

@@ -1,10 +1,11 @@
-#include <regex>
-
 #include "nix/util/error.hh"
+#include "nix/util/split.hh"
 #include "nix/util/url.hh"
 #include "nix/store/store-reference.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/util.hh"
+
+#include <boost/url/ipv6_address.hpp>
 
 namespace nix {
 
@@ -18,13 +19,15 @@ static bool isNonUriPath(const std::string & spec)
         && spec.find("/") != std::string::npos;
 }
 
-std::string StoreReference::render() const
+std::string StoreReference::render(bool withParams) const
 {
     std::string res;
 
     std::visit(
         overloaded{
             [&](const StoreReference::Auto &) { res = "auto"; },
+            [&](const StoreReference::Daemon &) { res = "daemon"; },
+            [&](const StoreReference::Local &) { res = "local"; },
             [&](const StoreReference::Specified & g) {
                 res = g.scheme;
                 res += "://";
@@ -33,7 +36,7 @@ std::string StoreReference::render() const
         },
         variant);
 
-    if (!params.empty()) {
+    if (withParams && !params.empty()) {
         res += "?";
         res += encodeQuery(params);
     }
@@ -41,20 +44,41 @@ std::string StoreReference::render() const
     return res;
 }
 
+namespace {
+
+struct SchemeAndAuthorityWithPath
+{
+    std::string_view scheme;
+    std::string_view authority;
+};
+
+} // namespace
+
+/**
+ * Return the 'scheme' and remove the '://' or ':' separator.
+ */
+static std::optional<SchemeAndAuthorityWithPath> splitSchemePrefixTo(std::string_view string)
+{
+    auto scheme = splitPrefixTo(string, ':');
+    if (!scheme)
+        return std::nullopt;
+
+    splitPrefix(string, "//");
+    return SchemeAndAuthorityWithPath{.scheme = *scheme, .authority = string};
+}
+
 StoreReference StoreReference::parse(const std::string & uri, const StoreReference::Params & extraParams)
 {
     auto params = extraParams;
     try {
-        auto parsedUri = parseURL(uri);
+        auto parsedUri = parseURL(uri, /*lenient=*/true);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
-
-        auto baseURI = parsedUri.authority.value_or("") + parsedUri.path;
 
         return {
             .variant =
                 Specified{
                     .scheme = std::move(parsedUri.scheme),
-                    .authority = std::move(baseURI),
+                    .authority = parsedUri.renderAuthorityAndPath(),
                 },
             .params = std::move(params),
         };
@@ -68,21 +92,17 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                 .params = std::move(params),
             };
         } else if (baseURI == "daemon") {
+            if (params.empty())
+                return {.variant = Daemon{}};
             return {
-                .variant =
-                    Specified{
-                        .scheme = "unix",
-                        .authority = "",
-                    },
+                .variant = Specified{.scheme = "unix", .authority = ""},
                 .params = std::move(params),
             };
         } else if (baseURI == "local") {
+            if (params.empty())
+                return {.variant = Local{}};
             return {
-                .variant =
-                    Specified{
-                        .scheme = "local",
-                        .authority = "",
-                    },
+                .variant = Specified{.scheme = "local", .authority = ""},
                 .params = std::move(params),
             };
         } else if (isNonUriPath(baseURI)) {
@@ -94,6 +114,32 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                     },
                 .params = std::move(params),
             };
+        } else if (auto schemeAndAuthority = splitSchemePrefixTo(baseURI)) {
+            /* Back-compatibility shim to accept unbracketed IPv6 addresses after the scheme.
+             * Old versions of nix allowed that. Note that this is ambiguous and does not allow
+             * specifying the port number. For that the address must be bracketed, otherwise it's
+             * greedily assumed to be the part of the host address. */
+            auto authorityString = schemeAndAuthority->authority;
+            auto userinfo = splitPrefixTo(authorityString, '@');
+            auto maybeIpv6 = boost::urls::parse_ipv6_address(authorityString);
+            if (maybeIpv6) {
+                std::string fixedAuthority;
+                if (userinfo) {
+                    fixedAuthority += *userinfo;
+                    fixedAuthority += '@';
+                }
+                fixedAuthority += '[';
+                fixedAuthority += authorityString;
+                fixedAuthority += ']';
+                return {
+                    .variant =
+                        Specified{
+                            .scheme = std::string(schemeAndAuthority->scheme),
+                            .authority = fixedAuthority,
+                        },
+                    .params = std::move(params),
+                };
+            }
         }
     }
 
@@ -107,10 +153,10 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
     StoreReference::Params params;
     auto q = uri.find('?');
     if (q != std::string::npos) {
-        params = decodeQuery(uri.substr(q + 1));
+        params = decodeQuery(uri.substr(q + 1), /*lenient=*/true);
         uri = uri_.substr(0, q);
     }
     return {uri, params};
 }
 
-}
+} // namespace nix

@@ -39,6 +39,7 @@ mkMesonDerivation (
 
     workDir = ./.;
     fileset = fileset.unions [
+      ../../nix-meson-build-support
       ../../scripts/nix-profile.sh.in
       ../../.version
       ../../tests/functional
@@ -46,26 +47,25 @@ mkMesonDerivation (
     ];
 
     # Hack for sake of the dev shell
-    passthru.externalNativeBuildInputs =
-      [
-        meson
-        ninja
-        pkg-config
+    passthru.externalNativeBuildInputs = [
+      meson
+      ninja
+      pkg-config
 
-        jq
-        git
-        mercurial
-        unixtools.script
-      ]
-      ++ lib.optionals stdenv.hostPlatform.isLinux [
-        # For various sandboxing tests that needs a statically-linked shell,
-        # etc.
-        busybox-sandbox-shell
-        # For Overlay FS tests need `mount`, `umount`, and `unshare`.
-        # For `script` command (ensuring a TTY)
-        # TODO use `unixtools` to be precise over which executables instead?
-        util-linux
-      ];
+      jq
+      git
+      mercurial
+      unixtools.script
+    ]
+    ++ lib.optionals stdenv.hostPlatform.isLinux [
+      # For various sandboxing tests that needs a statically-linked shell,
+      # etc.
+      busybox-sandbox-shell
+      # For Overlay FS tests need `mount`, `umount`, and `unshare`.
+      # For `script` command (ensuring a TTY)
+      # TODO use `unixtools` to be precise over which executables instead?
+      util-linux
+    ];
 
     nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
       nix-cli

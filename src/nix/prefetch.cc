@@ -12,6 +12,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/environment-variables.hh"
 
 #include "man-pages.hh"
 
@@ -23,18 +24,20 @@ using namespace nix;
    mirrors defined in Nixpkgs. */
 std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 {
-    if (url.substr(0, 9) != "mirror://") return url;
+    if (url.substr(0, 9) != "mirror://")
+        return url;
 
     std::string s(url, 9);
     auto p = s.find('/');
-    if (p == std::string::npos) throw Error("invalid mirror URL '%s'", url);
+    if (p == std::string::npos)
+        throw Error("invalid mirror URL '%s'", url);
     std::string mirrorName(s, 0, p);
 
     Value vMirrors;
     // FIXME: use nixpkgs flake
-    state.eval(state.parseExprFromString(
-            "import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>",
-            state.rootPath(CanonPath::root)),
+    state.eval(
+        state.parseExprFromString(
+            "import <nixpkgs/pkgs/build-support/fetchurl/mirrors.nix>", state.rootPath(CanonPath::root)),
         vMirrors);
     state.forceAttrs(vMirrors, noPos, "while evaluating the set of all mirrors");
 
@@ -46,22 +49,22 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
     if (mirrorList->value->listSize() < 1)
         throw Error("mirror URL '%s' did not expand to anything", url);
 
-    std::string mirror(state.forceString(*mirrorList->value->listView()[0], noPos, "while evaluating the first available mirror"));
+    std::string mirror(
+        state.forceString(*mirrorList->value->listView()[0], noPos, "while evaluating the first available mirror"));
     return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
 }
 
 std::tuple<StorePath, Hash> prefetchFile(
-        ref<Store> store,
-        std::string_view url,
-        std::optional<std::string> name,
-        HashAlgorithm hashAlgo,
-        std::optional<Hash> expectedHash,
-        bool unpack,
-        bool executable)
+    ref<Store> store,
+    std::string_view url,
+    std::optional<std::string> name,
+    HashAlgorithm hashAlgo,
+    std::optional<Hash> expectedHash,
+    bool unpack,
+    bool executable)
 {
-    ContentAddressMethod method = unpack || executable
-        ? ContentAddressMethod::Raw::NixArchive
-        : ContentAddressMethod::Raw::Flat;
+    ContentAddressMethod method =
+        unpack || executable ? ContentAddressMethod::Raw::NixArchive : ContentAddressMethod::Raw::Flat;
 
     /* Figure out a name in the Nix store. */
     if (!name) {
@@ -77,10 +80,8 @@ std::tuple<StorePath, Hash> prefetchFile(
        the store. */
     if (expectedHash) {
         hashAlgo = expectedHash->algo;
-        storePath = store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(
-            method,
-            *expectedHash,
-            {}));
+        storePath =
+            store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(method, *expectedHash, {}));
         if (store->isValidPath(*storePath))
             hash = expectedHash;
         else
@@ -99,19 +100,19 @@ std::tuple<StorePath, Hash> prefetchFile(
                 mode = 0700;
 
             AutoCloseFD fd = toDescriptor(open(tmpFile.string().c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
-            if (!fd) throw SysError("creating temporary file '%s'", tmpFile);
+            if (!fd)
+                throw SysError("creating temporary file '%s'", tmpFile);
 
             FdSink sink(fd.get());
 
-            FileTransferRequest req(url);
+            FileTransferRequest req(ValidURL{url});
             req.decompress = false;
             getFileTransfer()->download(std::move(req), sink);
         }
 
         /* Optionally unpack the file. */
         if (unpack) {
-            Activity act(*logger, lvlChatty, actUnknown,
-                fmt("unpacking '%s'", url));
+            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url));
             auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
@@ -127,12 +128,10 @@ std::tuple<StorePath, Hash> prefetchFile(
             }
         }
 
-        Activity act(*logger, lvlChatty, actUnknown,
-            fmt("adding '%s' to the store", url));
+        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url));
 
         auto info = store->addToStoreSlow(
-            *name, PosixSourceAccessor::createAtRoot(tmpFile),
-            method, hashAlgo, {}, expectedHash);
+            *name, PosixSourceAccessor::createAtRoot(tmpFile), method, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
@@ -141,7 +140,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     return {storePath.value(), hash.value()};
 }
 
-static int main_nix_prefetch_url(int argc, char * * argv)
+static int main_nix_prefetch_url(int argc, char ** argv)
 {
     {
         HashAlgorithm ha = HashAlgorithm::SHA256;
@@ -166,14 +165,12 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             else if (*arg == "--type") {
                 auto s = getArg(*arg, arg, end);
                 ha = parseHashAlgo(s);
-            }
-            else if (*arg == "--print-path")
+            } else if (*arg == "--print-path")
                 printPath = true;
             else if (*arg == "--attr" || *arg == "-A") {
                 fromExpr = true;
                 attrPath = getArg(*arg, arg, end);
-            }
-            else if (*arg == "--unpack")
+            } else if (*arg == "--unpack")
                 unpack = true;
             else if (*arg == "--executable")
                 executable = true;
@@ -207,10 +204,7 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             url = args[0];
         } else {
             Value vRoot;
-            state->evalFile(
-                resolveExprPath(
-                    lookupFileArg(*state, args.empty() ? "." : args[0])),
-                vRoot);
+            state->evalFile(resolveExprPath(lookupFileArg(*state, args.empty() ? "." : args[0])), vRoot);
             Value & v(*findAlongAttrPath(*state, attrPath, autoArgs, vRoot).first);
             state->forceAttrs(v, noPos, "while evaluating the source attribute to prefetch");
 
@@ -221,20 +215,24 @@ static int main_nix_prefetch_url(int argc, char * * argv)
             state->forceList(*attr->value, noPos, "while evaluating the urls to prefetch");
             if (attr->value->listSize() < 1)
                 throw Error("'urls' list is empty");
-            url = state->forceString(*attr->value->listView()[0], noPos, "while evaluating the first url from the urls list");
+            url = state->forceString(
+                *attr->value->listView()[0], noPos, "while evaluating the first url from the urls list");
 
             /* Extract the hash mode. */
             auto attr2 = v.attrs()->get(state->symbols.create("outputHashMode"));
             if (!attr2)
                 printInfo("warning: this does not look like a fetchurl call");
             else
-                unpack = state->forceString(*attr2->value, noPos, "while evaluating the outputHashMode of the source to prefetch") == "recursive";
+                unpack = state->forceString(
+                             *attr2->value, noPos, "while evaluating the outputHashMode of the source to prefetch")
+                         == "recursive";
 
             /* Extract the name. */
             if (!name) {
                 auto attr3 = v.attrs()->get(state->symbols.create("name"));
                 if (!attr3)
-                    name = state->forceString(*attr3->value, noPos, "while evaluating the name of the source to prefetch");
+                    name =
+                        state->forceString(*attr3->value, noPos, "while evaluating the name of the source to prefetch");
             }
         }
 
@@ -242,15 +240,17 @@ static int main_nix_prefetch_url(int argc, char * * argv)
         if (args.size() == 2)
             expectedHash = Hash::parseAny(args[1], ha);
 
-        auto [storePath, hash] = prefetchFile(
-            store, resolveMirrorUrl(*state, url), name, ha, expectedHash, unpack, executable);
+        auto [storePath, hash] =
+            prefetchFile(store, resolveMirrorUrl(*state, url), name, ha, expectedHash, unpack, executable);
 
         logger->stop();
 
         if (!printPath)
             printInfo("path is '%s'", store->printStorePath(storePath));
 
-        logger->cout(printHash16or32(hash));
+        assert(static_cast<char>(hash.algo));
+        logger->cout(hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false));
+
         if (printPath)
             logger->cout(store->printStorePath(storePath));
 
@@ -273,7 +273,8 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     {
         addFlag({
             .longName = "name",
-            .description = "Override the name component of the resulting store path. It defaults to the base name of *url*.",
+            .description =
+                "Override the name component of the resulting store path. It defaults to the base name of *url*.",
             .labels = {"name"},
             .handler = {&name},
         });
@@ -282,26 +283,22 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             .longName = "expected-hash",
             .description = "The expected hash of the file.",
             .labels = {"hash"},
-            .handler = {[&](std::string s) {
-                expectedHash = Hash::parseAny(s, hashAlgo);
-            }},
+            .handler = {[&](std::string s) { expectedHash = Hash::parseAny(s, hashAlgo); }},
         });
 
         addFlag(flag::hashAlgo("hash-type", &hashAlgo));
 
         addFlag({
             .longName = "executable",
-            .description =
-                "Make the resulting file executable. Note that this causes the "
-                "resulting hash to be a NAR hash rather than a flat file hash.",
+            .description = "Make the resulting file executable. Note that this causes the "
+                           "resulting hash to be a NAR hash rather than a flat file hash.",
             .handler = {&executable, true},
         });
 
         addFlag({
             .longName = "unpack",
-            .description =
-                "Unpack the archive (which must be a tarball or zip file) and add "
-                "the result to the Nix store.",
+            .description = "Unpack the archive (which must be a tarball or zip file) and add "
+                           "the result to the Nix store.",
             .handler = {&unpack, true},
         });
 
@@ -316,9 +313,10 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-prefetch-file.md"
-          ;
+#include "store-prefetch-file.md"
+            ;
     }
+
     void run(ref<Store> store) override
     {
         auto [storePath, hash] = prefetchFile(store, url, name, hashAlgo, expectedHash, unpack, executable);
@@ -329,7 +327,8 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
             res["hash"] = hash.to_string(HashFormat::SRI, true);
             printJSON(res);
         } else {
-            notice("Downloaded '%s' to '%s' (hash '%s').",
+            notice(
+                "Downloaded '%s' to '%s' (hash '%s').",
                 url,
                 store->printStorePath(storePath),
                 hash.to_string(HashFormat::SRI, true));

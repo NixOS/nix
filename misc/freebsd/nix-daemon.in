@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# PROVIDE: nix_daemon
+# REQUIRE: DAEMON
+# KEYWORD: shutdown
+#
+# Add the following lines to /etc/rc.conf to enable nix-daemon:
+#
+# nix_daemon_enable="YES"
+#
+
+# shellcheck source=/dev/null
+. /etc/rc.subr
+
+name="nix_daemon"
+# shellcheck disable=SC2034
+rcvar="nix_daemon_enable"
+
+load_rc_config $name
+
+: "${nix_daemon_enable:=NO}"
+
+command="@bindir@/nix-daemon"
+command_args=""
+pidfile="/var/run/nix-daemon.pid"
+
+# shellcheck disable=SC2034
+start_cmd="${name}_start"
+# shellcheck disable=SC2034
+stop_cmd="${name}_stop"
+
+nix_daemon_start() {
+    echo "Starting ${name}."
+    # command_args is intentionally unquoted to allow multiple arguments
+    # shellcheck disable=SC2086
+    /usr/sbin/daemon -c -f -p "${pidfile}" "${command}" ${command_args}
+}
+
+nix_daemon_stop() {
+    if [ -f "${pidfile}" ]; then
+        echo "Stopping ${name}."
+        kill -TERM "$(cat "${pidfile}")"
+        rm -f "${pidfile}"
+    else
+        echo "${name} is not running."
+    fi
+}
+
+run_rc_command "$1"

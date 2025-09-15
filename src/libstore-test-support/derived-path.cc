@@ -1,5 +1,6 @@
 #include <regex>
 
+#include <exception> // Needed by rapidcheck on Darwin
 #include <rapidcheck.h>
 
 #include "nix/store/tests/derived-path.hh"
@@ -68,4 +69,4 @@ Gen<DerivedPath> Arbitrary<DerivedPath>::arbitrary()
     });
 }
 
-}
+} // namespace rc

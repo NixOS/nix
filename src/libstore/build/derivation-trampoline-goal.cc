@@ -172,4 +172,4 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
     co_return amDone(g->exitCode, g->ex);
 }
 
-}
+} // namespace nix

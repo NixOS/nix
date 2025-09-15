@@ -106,6 +106,8 @@ public:
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    StoreReference getReference() const override;
 };
 
 struct S3BinaryCacheStore : virtual BinaryCacheStore
@@ -130,6 +132,6 @@ struct S3BinaryCacheStore : virtual BinaryCacheStore
     virtual const Stats & getS3Stats() = 0;
 };
 
-}
+} // namespace nix
 
 #endif

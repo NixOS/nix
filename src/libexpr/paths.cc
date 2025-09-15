@@ -18,4 +18,4 @@ SourcePath EvalState::storePath(const StorePath & path)
     return {rootFS, CanonPath{store->printStorePath(path)}};
 }
 
-}
+} // namespace nix

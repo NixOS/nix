@@ -2,6 +2,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/local-store.hh"
 
 namespace nix {
 
@@ -55,11 +56,6 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
     Path getRealStoreDir() override
     {
         return next->config->realStoreDir;
-    }
-
-    std::string getUri() override
-    {
-        return next->getUri();
     }
 
     StorePathSet queryAllValidPaths() override;
@@ -323,4 +319,4 @@ MissingPaths RestrictedStore::queryMissing(const std::vector<DerivedPath> & targ
     return res;
 }
 
-}
+} // namespace nix

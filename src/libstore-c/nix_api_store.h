@@ -57,14 +57,14 @@ nix_err nix_libstore_init_no_load_config(nix_c_context * context);
  * ignores `NIX_REMOTE` and the `store` option. For this reason, `NULL` is most likely the better choice.
  *
  *   For supported store URLs, see [*Store URL format* in the Nix Reference
- * Manual](https://nixos.org/manual/nix/stable/store/types/#store-url-format).
+ * Manual](https://nix.dev/manual/nix/stable/store/types/#store-url-format).
  * @endparblock
  *
  * @param[in] params @parblock
  *   optional, null-terminated array of key-value pairs, e.g. {{"endpoint",
  * "https://s3.local"}}.
  *
- *   See [*Store Types* in the Nix Reference Manual](https://nixos.org/manual/nix/stable/store/types).
+ *   See [*Store Types* in the Nix Reference Manual](https://nix.dev/manual/nix/stable/store/types).
  * @endparblock
  *
  * @return a Store pointer, NULL in case of errors
@@ -148,7 +148,7 @@ void nix_store_path_free(StorePath * p);
  * @param[in] path Path to check
  * @return true or false, error info in context
  */
-bool nix_store_is_valid_path(nix_c_context * context, Store * store, StorePath * path);
+bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path);
 
 /**
  * @brief Get the physical location of a store path
@@ -190,7 +190,7 @@ nix_err nix_store_realise(
     Store * store,
     StorePath * path,
     void * userdata,
-    void (*callback)(void * userdata, const char * outname, const char * out));
+    void (*callback)(void * userdata, const char * outname, const StorePath * out));
 
 /**
  * @brief get the version of a nix store.

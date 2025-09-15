@@ -11,26 +11,7 @@
 }:
 
 let
-  prevStdenv = stdenv;
-in
-
-let
   inherit (pkgs) lib;
-
-  stdenv = if prevStdenv.isDarwin && prevStdenv.isx86_64 then darwinStdenv else prevStdenv;
-
-  # Fix the following error with the default x86_64-darwin SDK:
-  #
-  #     error: aligned allocation function of type 'void *(std::size_t, std::align_val_t)' is only available on macOS 10.13 or newer
-  #
-  # Despite the use of the 10.13 deployment target here, the aligned
-  # allocation function Clang uses with this setting actually works
-  # all the way back to 10.6.
-  # NOTE: this is not just a version constraint, but a request to make Darwin
-  #       provide this version level of support. Removing this minimum version
-  #       request will regress the above error.
-  darwinStdenv = pkgs.overrideSDK prevStdenv { darwinMinVersion = "10.13"; };
-
 in
 scope: {
   inherit stdenv;
@@ -50,8 +31,40 @@ scope: {
         requiredSystemFeatures = [ ];
       };
 
-  boehmgc = pkgs.boehmgc.override {
-    enableLargeConfig = true;
+  boehmgc =
+    (pkgs.boehmgc.override {
+      enableLargeConfig = true;
+    }).overrideAttrs
+      (attrs: {
+        # Increase the initial mark stack size to avoid stack
+        # overflows, since these inhibit parallel marking (see
+        # GC_mark_some()). To check whether the mark stack is too
+        # small, run Nix with GC_PRINT_STATS=1 and look for messages
+        # such as `Mark stack overflow`, `No room to copy back mark
+        # stack`, and `Grew mark stack to ... frames`.
+        NIX_CFLAGS_COMPILE = "-DINITIAL_MARK_STACK_SIZE=1048576";
+      });
+
+  lowdown = pkgs.lowdown.overrideAttrs (prevAttrs: rec {
+    version = "2.0.2";
+    src = pkgs.fetchurl {
+      url = "https://kristaps.bsd.lv/lowdown/snapshots/lowdown-${version}.tar.gz";
+      hash = "sha512-cfzhuF4EnGmLJf5EGSIbWqJItY3npbRSALm+GarZ7SMU7Hr1xw0gtBFMpOdi5PBar4TgtvbnG4oRPh+COINGlA==";
+    };
+    nativeBuildInputs = prevAttrs.nativeBuildInputs ++ [ pkgs.buildPackages.bmake ];
+    postInstall =
+      lib.replaceStrings [ "lowdown.so.1" "lowdown.1.dylib" ] [ "lowdown.so.2" "lowdown.2.dylib" ]
+        prevAttrs.postInstall;
+  });
+
+  toml11 = pkgs.toml11.overrideAttrs rec {
+    version = "4.4.0";
+    src = pkgs.fetchFromGitHub {
+      owner = "ToruNiina";
+      repo = "toml11";
+      tag = "v${version}";
+      hash = "sha256-sgWKYxNT22nw376ttGsTdg0AMzOwp8QH3E8mx0BZJTQ=";
+    };
   };
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
@@ -62,6 +75,7 @@ scope: {
         "--with-context"
         "--with-coroutine"
         "--with-iostreams"
+        "--with-url"
       ];
       enableIcu = false;
     }).overrideAttrs

@@ -73,7 +73,7 @@ public:
      * - res: map to store settings in
      * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
-    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) = 0;
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -160,7 +160,7 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
     void resetOverridden() override;
 
@@ -247,7 +247,8 @@ protected:
 
 public:
 
-    BaseSetting(const T & def,
+    BaseSetting(
+        const T & def,
         const bool documentDefault,
         const std::string & name,
         const std::string & description,
@@ -257,21 +258,58 @@ public:
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
-    { }
+    {
+    }
 
-    operator const T &() const { return value; }
-    operator T &() { return value; }
-    const T & get() const { return value; }
-    T & get() { return value; }
+    operator const T &() const
+    {
+        return value;
+    }
+
+    operator T &()
+    {
+        return value;
+    }
+
+    const T & get() const
+    {
+        return value;
+    }
+
+    T & get()
+    {
+        return value;
+    }
+
     template<typename U>
-    bool operator ==(const U & v2) const { return value == v2; }
+    bool operator==(const U & v2) const
+    {
+        return value == v2;
+    }
+
     template<typename U>
-    bool operator !=(const U & v2) const { return value != v2; }
+    bool operator!=(const U & v2) const
+    {
+        return value != v2;
+    }
+
     template<typename U>
-    void operator =(const U & v) { assign(v); }
-    virtual void assign(const T & v) { value = v; }
+    void operator=(const U & v)
+    {
+        assign(v);
+    }
+
+    virtual void assign(const T & v)
+    {
+        value = v;
+    }
+
     template<typename U>
-    void setDefault(const U & v) { if (!overridden) value = v; }
+    void setDefault(const U & v)
+    {
+        if (!overridden)
+            value = v;
+    }
 
     /**
      * Require any experimental feature the setting depends on
@@ -307,19 +345,23 @@ public:
 };
 
 template<typename T>
-std::ostream & operator <<(std::ostream & str, const BaseSetting<T> & opt)
+std::ostream & operator<<(std::ostream & str, const BaseSetting<T> & opt)
 {
     return str << static_cast<const T &>(opt);
 }
 
 template<typename T>
-bool operator ==(const T & v1, const BaseSetting<T> & v2) { return v1 == static_cast<const T &>(v2); }
+bool operator==(const T & v1, const BaseSetting<T> & v2)
+{
+    return v1 == static_cast<const T &>(v2);
+}
 
 template<typename T>
 class Setting : public BaseSetting<T>
 {
 public:
-    Setting(Config * options,
+    Setting(
+        Config * options,
         const T & def,
         const std::string & name,
         const std::string & description,
@@ -331,7 +373,10 @@ public:
         options->addSetting(this);
     }
 
-    void operator =(const T & v) { this->assign(v); }
+    void operator=(const T & v)
+    {
+        this->assign(v);
+    }
 };
 
 /**
@@ -345,7 +390,8 @@ class PathSetting : public BaseSetting<Path>
 {
 public:
 
-    PathSetting(Config * options,
+    PathSetting(
+        Config * options,
         const Path & def,
         const std::string & name,
         const std::string & description,
@@ -353,9 +399,15 @@ public:
 
     Path parse(const std::string & str) const override;
 
-    Path operator +(const char * p) const { return value + p; }
+    Path operator+(const char * p) const
+    {
+        return value + p;
+    }
 
-    void operator =(const Path & v) { this->assign(v); }
+    void operator=(const Path & v)
+    {
+        this->assign(v);
+    }
 };
 
 /**
@@ -367,7 +419,8 @@ class OptionalPathSetting : public BaseSetting<std::optional<Path>>
 {
 public:
 
-    OptionalPathSetting(Config * options,
+    OptionalPathSetting(
+        Config * options,
         const std::optional<Path> & def,
         const std::string & name,
         const std::string & description,
@@ -375,14 +428,16 @@ public:
 
     std::optional<Path> parse(const std::string & str) const override;
 
-    void operator =(const std::optional<Path> & v);
+    void operator=(const std::optional<Path> & v);
 };
 
-
-struct ExperimentalFeatureSettings : Config {
+struct ExperimentalFeatureSettings : Config
+{
 
     Setting<std::set<ExperimentalFeature>> experimentalFeatures{
-        this, {}, "experimental-features",
+        this,
+        {},
+        "experimental-features",
         R"(
           Experimental features that are enabled.
 
@@ -426,4 +481,4 @@ struct ExperimentalFeatureSettings : Config {
 // FIXME: don't use a global variable.
 extern ExperimentalFeatureSettings experimentalFeatureSettings;
 
-}
+} // namespace nix

@@ -57,7 +57,7 @@
 
 namespace nix {
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 Expr * parseExprFromBuf(
     char * text,
@@ -68,8 +68,7 @@ Expr * parseExprFromBuf(
     const EvalSettings & settings,
     PosTable & positions,
     DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS,
-    const Expr::AstSymbols & astSymbols);
+    const ref<SourceAccessor> rootFS);
 
 }
 
@@ -365,6 +364,15 @@ string_parts_interpolated
 path_start
   : PATH {
     std::string_view literal({$1.p, $1.l});
+
+    /* check for short path literals */
+    if (state->settings.warnShortPathLiterals && literal.front() != '/' && literal.front() != '.') {
+        logWarning({
+            .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'. (" ANSI_BOLD "warn-short-path-literals" ANSI_NORMAL " = true)", literal, literal),
+            .pos = state->positions[CUR_POS]
+        });
+    }
+
     Path path(absPath(literal, state->basePath.path.abs()));
     /* add back in the trailing '/' to the first segment */
     if (literal.size() > 1 && literal.back() == '/')
@@ -533,8 +541,7 @@ Expr * parseExprFromBuf(
     const EvalSettings & settings,
     PosTable & positions,
     DocCommentMap & docComments,
-    const ref<SourceAccessor> rootFS,
-    const Expr::AstSymbols & astSymbols)
+    const ref<SourceAccessor> rootFS)
 {
     yyscan_t scanner;
     LexerState lexerState {
@@ -549,7 +556,6 @@ Expr * parseExprFromBuf(
         .basePath = basePath,
         .origin = lexerState.origin,
         .rootFS = rootFS,
-        .s = astSymbols,
         .settings = settings,
     };
 

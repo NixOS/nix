@@ -8,7 +8,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/configuration.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/repair-flag.hh"
@@ -23,14 +22,8 @@
 #include <string>
 #include <chrono>
 
-
 namespace nix {
 
-MakeError(SubstError, Error);
-/**
- * denotes a permanent build failure
- */
-MakeError(BuildError, Error);
 MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
 MakeError(SubstituteGone, Error);
@@ -49,25 +42,18 @@ struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
-
 typedef std::map<std::string, StorePath> OutputPathMap;
 
-
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
+
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
-/**
- * Magic header of exportPath() output (obsolete).
- */
-const uint32_t exportMagic = 0x4558494e;
-
-
 enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
+
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 
 struct BuildResult;
 struct KeyedBuildResult;
-
 
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
@@ -82,6 +68,35 @@ struct MissingPaths
     StorePathSet unknown;
     uint64_t downloadSize{0};
     uint64_t narSize{0};
+};
+
+/**
+ * Need to make this a separate class so I can get the right
+ * initialization order in the constructor for `StoreConfig`.
+ */
+struct StoreConfigBase : Config
+{
+    using Config::Config;
+
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultNixStoreDir();
+
+public:
+
+    const PathSetting storeDir_{
+        this,
+        getDefaultNixStoreDir(),
+        "store",
+        R"(
+          Logical location of the Nix store, usually
+          `/nix/store`. Note that you can only copy store paths
+          between stores if they have the same `store` setting.
+        )"};
 };
 
 /**
@@ -110,14 +125,21 @@ struct MissingPaths
  * ```
  * cpp static RegisterStoreImplementation<FooConfig> regStore;
  * ```
+ *
+ * @note The order of `StoreConfigBase` and then `StorerConfig` is
+ * very important. This ensures that `StoreConfigBase::storeDir_`
+ * is initialized before we have our one chance (because references are
+ * immutable) to initialize `StoreConfig::storeDir`.
  */
-struct StoreConfig : public StoreDirConfig
+struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
-    using StoreDirConfig::StoreDirConfig;
+    using Params = StoreReference::Params;
+
+    StoreConfig(const Params & params);
 
     StoreConfig() = delete;
 
-    virtual ~StoreConfig() { }
+    virtual ~StoreConfig() {}
 
     static StringSet getDefaultSystemFeatures();
 
@@ -130,6 +152,19 @@ struct StoreConfig : public StoreDirConfig
     }
 
     /**
+     * Get overridden store reference query parameters.
+     */
+    StringMap getQueryParams() const
+    {
+        auto queryParams = std::map<std::string, AbstractConfig::SettingInfo>{};
+        getSettings(queryParams, /*overriddenOnly=*/true);
+        StringMap res;
+        for (const auto & [name, info] : queryParams)
+            res.insert({name, info.value});
+        return res;
+    }
+
+    /**
      * An experimental feature this type store is gated, if it is to be
      * experimental.
      */
@@ -138,10 +173,13 @@ struct StoreConfig : public StoreDirConfig
         return std::nullopt;
     }
 
-    Setting<int> pathInfoCacheSize{this, 65536, "path-info-cache-size",
-        "Size of the in-memory store path metadata cache."};
+    Setting<int> pathInfoCacheSize{
+        this, 65536, "path-info-cache-size", "Size of the in-memory store path metadata cache."};
 
-    Setting<bool> isTrusted{this, false, "trusted",
+    Setting<bool> isTrusted{
+        this,
+        false,
+        "trusted",
         R"(
           Whether paths from this store can be used as substitutes
           even if they are not signed by a key listed in the
@@ -149,18 +187,26 @@ struct StoreConfig : public StoreDirConfig
           setting.
         )"};
 
-    Setting<int> priority{this, 0, "priority",
+    Setting<int> priority{
+        this,
+        0,
+        "priority",
         R"(
           Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
           A lower value means a higher priority.
         )"};
 
-    Setting<bool> wantMassQuery{this, false, "want-mass-query",
+    Setting<bool> wantMassQuery{
+        this,
+        false,
+        "want-mass-query",
         R"(
           Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
         )"};
 
-    Setting<StringSet> systemFeatures{this, getDefaultSystemFeatures(),
+    Setting<StringSet> systemFeatures{
+        this,
+        getDefaultSystemFeatures(),
         "system-features",
         R"(
           Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
@@ -176,6 +222,29 @@ struct StoreConfig : public StoreDirConfig
      * type.
      */
     virtual ref<Store> openStore() const = 0;
+
+    /**
+     * Render the config back to a `StoreReference`. It should round-trip
+     * with `resolveStoreConfig` (for stores configs that are
+     * registered).
+     */
+    virtual StoreReference getReference() const;
+
+    /**
+     * Get a textual representation of the store reference.
+     *
+     * @warning This is only suitable for logging or error messages.
+     * This will not roundtrip when parsed as a StoreReference.
+     * Must NOT be used as a cache key or otherwise be relied upon to
+     * be stable.
+     *
+     * Can be implemented by subclasses to make the URI more legible,
+     * e.g. when some query parameters are necessary to make sense of the URI.
+     */
+    virtual std::string getHumanReadableURI() const
+    {
+        return getReference().render(/*withParams=*/false);
+    }
 };
 
 /**
@@ -189,7 +258,7 @@ struct StoreConfig : public StoreDirConfig
  * underlying resource, which could be an external process (daemon
  * server), file system state, etc.
  */
-class Store : public std::enable_shared_from_this<Store>, public MixStoreDirMethods
+class Store : public std::enable_shared_from_this<Store>, public StoreDirConfig
 {
 public:
 
@@ -200,11 +269,15 @@ public:
     /**
      * @note Avoid churn, since we used to inherit from `Config`.
      */
-    operator const Config &() const { return config; }
+    operator const Config &() const
+    {
+        return config;
+    }
 
 protected:
 
-    struct PathInfoCacheValue {
+    struct PathInfoCacheValue
+    {
 
         /**
          * Time of cache entry creation or update
@@ -226,17 +299,17 @@ protected:
          * Past tense, because a path can only be assumed to exists when
          * isKnownNow() && didExist()
          */
-        inline bool didExist() {
-          return value != nullptr;
+        inline bool didExist()
+        {
+            return value != nullptr;
         }
     };
 
-    struct State
-    {
-        LRUCache<std::string, PathInfoCacheValue> pathInfoCache;
-    };
+    void invalidatePathInfoCacheFor(const StorePath & path);
 
-    SharedSync<State> state;
+    // Note: this is a `ref` to avoid false sharing with immutable
+    // bits of `Store`.
+    ref<SharedSync<LRUCache<std::string, PathInfoCacheValue>>> pathInfoCache;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
@@ -249,13 +322,7 @@ public:
      */
     virtual void init() {};
 
-    virtual ~Store() { }
-
-    /**
-     * @todo move to `StoreConfig` one we store enough information in
-     * those to recover the scheme and authority in all cases.
-     */
-    virtual std::string getUri() = 0;
+    virtual ~Store() {}
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.
@@ -290,8 +357,7 @@ public:
      * Query which of the given paths is valid. Optionally, try to
      * substitute missing paths.
      */
-    virtual StorePathSet queryValidPaths(const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute = NoSubstitute);
+    virtual StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute);
 
     /**
      * Query the set of all valid paths. Note that for some store
@@ -302,7 +368,9 @@ public:
      * `std::variant<StorePath, HashPart>` to get rid of this hack.
      */
     virtual StorePathSet queryAllValidPaths()
-    { unsupported("queryAllValidPaths"); }
+    {
+        unsupported("queryAllValidPaths");
+    }
 
     constexpr static const char * MissingName = "x";
 
@@ -315,8 +383,7 @@ public:
     /**
      * Asynchronous version of queryPathInfo().
      */
-    void queryPathInfo(const StorePath & path,
-        Callback<ref<const ValidPathInfo>> callback) noexcept;
+    void queryPathInfo(const StorePath & path, Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
      * Version of queryPathInfo() that only queries the local narinfo cache and not
@@ -336,9 +403,7 @@ public:
     /**
      * Asynchronous version of queryRealisation().
      */
-    void queryRealisation(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept;
-
+    void queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept;
 
     /**
      * Check whether the given valid path info is sufficiently attested, by
@@ -356,17 +421,17 @@ public:
         return true;
     }
 
-    virtual bool realisationIsUntrusted(const Realisation & )
+    virtual bool realisationIsUntrusted(const Realisation &)
     {
         return true;
     }
 
 protected:
 
-    virtual void queryPathInfoUncached(const StorePath & path,
-        Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
-    virtual void queryRealisationUncached(const DrvOutput &,
-        Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
+    virtual void
+    queryPathInfoUncached(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
+    virtual void
+    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
 
 public:
 
@@ -375,7 +440,9 @@ public:
      * The result is not cleared.
      */
     virtual void queryReferrers(const StorePath & path, StorePathSet & referrers)
-    { unsupported("queryReferrers"); }
+    {
+        unsupported("queryReferrers");
+    }
 
     /**
      * @return all currently valid derivations that have `path` as an
@@ -385,7 +452,10 @@ public:
      * was actually used to produce `path`, which may not exist
      * anymore.)
      */
-    virtual StorePathSet queryValidDerivers(const StorePath & path) { return {}; };
+    virtual StorePathSet queryValidDerivers(const StorePath & path)
+    {
+        return {};
+    };
 
     /**
      * Query the outputs of the derivation denoted by `path`.
@@ -397,9 +467,8 @@ public:
      * derivation. All outputs are mentioned so ones missing the mapping
      * are mapped to `std::nullopt`.
      */
-    virtual std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap(
-        const StorePath & path,
-        Store * evalStore = nullptr);
+    virtual std::map<std::string, std::optional<StorePath>>
+    queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
      * Like `queryPartialDerivationOutputMap` but only considers
@@ -409,8 +478,8 @@ public:
      * Just a helper function for implementing
      * `queryPartialDerivationOutputMap`.
      */
-    virtual std::map<std::string, std::optional<StorePath>> queryStaticPartialDerivationOutputMap(
-        const StorePath & path);
+    virtual std::map<std::string, std::optional<StorePath>>
+    queryStaticPartialDerivationOutputMap(const StorePath & path);
 
     /**
      * Query the mapping outputName=>outputPath for the given derivation.
@@ -427,7 +496,10 @@ public:
     /**
      * Query which of the given paths have substitutes.
      */
-    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths) { return {}; };
+    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths)
+    {
+        return {};
+    };
 
     /**
      * Query substitute info (i.e. references, derivers and download
@@ -436,14 +508,16 @@ public:
      * If a path does not have substitute info, it's omitted from the
      * resulting ‘infos’ map.
      */
-    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths,
-        SubstitutablePathInfos & infos);
+    virtual void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos);
 
     /**
      * Import a path into the store.
      */
-    virtual void addToStore(const ValidPathInfo & info, Source & narSource,
-        RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs) = 0;
+    virtual void addToStore(
+        const ValidPathInfo & info,
+        Source & narSource,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs) = 0;
 
     /**
      * A list of paths infos along with a source providing the content
@@ -454,16 +528,10 @@ public:
     /**
      * Import multiple paths into the store.
      */
-    virtual void addMultipleToStore(
-        Source & source,
-        RepairFlag repair = NoRepair,
-        CheckSigsFlag checkSigs = CheckSigs);
+    virtual void addMultipleToStore(Source & source, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     virtual void addMultipleToStore(
-        PathsSource && pathsToCopy,
-        Activity & act,
-        RepairFlag repair = NoRepair,
-        CheckSigsFlag checkSigs = CheckSigs);
+        PathsSource && pathsToCopy, Activity & act, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
     /**
      * Copy the contents of a path to the store and register the
@@ -531,9 +599,14 @@ public:
      * retrieve this information otherwise.
      */
     virtual void registerDrvOutput(const Realisation & output)
-    { unsupported("registerDrvOutput"); }
+    {
+        unsupported("registerDrvOutput");
+    }
+
     virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
-    { return registerDrvOutput(output); }
+    {
+        return registerDrvOutput(output);
+    }
 
     /**
      * Write a NAR dump of a store path.
@@ -601,8 +674,8 @@ public:
      *     up with multiple different versions of dependencies without
      *     explicitly choosing to allow it).
      */
-    virtual BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv,
-        BuildMode buildMode = bmNormal);
+    virtual BuildResult
+    buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode = bmNormal);
 
     /**
      * Ensure that a path is valid.  If it is not currently valid, it
@@ -616,28 +689,32 @@ public:
      * The root disappears as soon as we exit.
      */
     virtual void addTempRoot(const StorePath & path)
-    { debug("not creating temporary root, store doesn't support GC"); }
+    {
+        debug("not creating temporary root, store doesn't support GC");
+    }
 
     /**
      * @return a string representing information about the path that
      * can be loaded into the database using `nix-store --load-db` or
      * `nix-store --register-validity`.
      */
-    std::string makeValidityRegistration(const StorePathSet & paths,
-        bool showDerivers, bool showHash);
+    std::string makeValidityRegistration(const StorePathSet & paths, bool showDerivers, bool showHash);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking files
      * with the same contents.
      */
-    virtual void optimiseStore() { };
+    virtual void optimiseStore() {};
 
     /**
      * Check the integrity of the Nix store.
      *
      * @return true if errors remain.
      */
-    virtual bool verifyStore(bool checkContents, RepairFlag repair = NoRepair) { return false; };
+    virtual bool verifyStore(bool checkContents, RepairFlag repair = NoRepair)
+    {
+        return false;
+    };
 
     /**
      * @return An object to access files in the Nix store.
@@ -655,7 +732,9 @@ public:
      * not verified.
      */
     virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
-    { unsupported("addSignatures"); }
+    {
+        unsupported("addSignatures");
+    }
 
     /**
      * Add signatures to a ValidPathInfo or Realisation using the secret keys
@@ -693,13 +772,19 @@ public:
      * `referrers` relation instead of the `references` relation is
      * returned.
      */
-    virtual void computeFSClosure(const StorePathSet & paths,
-        StorePathSet & out, bool flipDirection = false,
-        bool includeOutputs = false, bool includeDerivers = false);
+    virtual void computeFSClosure(
+        const StorePathSet & paths,
+        StorePathSet & out,
+        bool flipDirection = false,
+        bool includeOutputs = false,
+        bool includeDerivers = false);
 
-    void computeFSClosure(const StorePath & path,
-        StorePathSet & out, bool flipDirection = false,
-        bool includeOutputs = false, bool includeDerivers = false);
+    void computeFSClosure(
+        const StorePath & path,
+        StorePathSet & out,
+        bool flipDirection = false,
+        bool includeOutputs = false,
+        bool includeDerivers = false);
 
     /**
      * Given a set of paths that are to be built, return the set of
@@ -713,21 +798,6 @@ public:
      * relation.  If p refers to q, then p precedes q in this list.
      */
     StorePaths topoSortPaths(const StorePathSet & paths);
-
-    /**
-     * Export multiple paths in the format expected by ‘nix-store
-     * --import’.
-     */
-    void exportPaths(const StorePathSet & paths, Sink & sink);
-
-    void exportPath(const StorePath & path, Sink & sink);
-
-    /**
-     * Import a sequence of NAR dumps created by exportPaths() into the
-     * Nix store. Optionally, the contents of the NARs are preloaded
-     * into the specified FS accessor to speed up subsequent access.
-     */
-    StorePaths importPaths(Source & source, CheckSigsFlag checkSigs = CheckSigs);
 
     struct Stats
     {
@@ -767,14 +837,14 @@ public:
      */
     void clearPathInfoCache()
     {
-        state.lock()->pathInfoCache.clear();
+        pathInfoCache->lock()->clear();
     }
 
     /**
      * Establish a connection to the store, for store types that have
      * a notion of connection. Otherwise this is a no-op.
      */
-    virtual void connect() { };
+    virtual void connect() {};
 
     /**
      * Get the protocol version of this store or it's connection.
@@ -794,7 +864,6 @@ public:
      */
     virtual std::optional<TrustedFlag> isTrustedClient() = 0;
 
-
     virtual Path toRealPath(const Path & storePath)
     {
         return storePath;
@@ -809,9 +878,12 @@ public:
      * Synchronises the options of the client with those of the daemon
      * (a no-op when there’s no daemon)
      */
-    virtual void setOptions() { }
+    virtual void setOptions() {}
 
-    virtual std::optional<std::string> getVersion() { return {}; }
+    virtual std::optional<std::string> getVersion()
+    {
+        return {};
+    }
 
 protected:
 
@@ -826,11 +898,9 @@ protected:
      */
     [[noreturn]] void unsupported(const std::string & op)
     {
-        throw Unsupported("operation '%s' is not supported by store '%s'", op, getUri());
+        throw Unsupported("operation '%s' is not supported by store '%s'", op, config.getHumanReadableURI());
     }
-
 };
-
 
 /**
  * Copy a path from one store to another.
@@ -842,7 +912,6 @@ void copyStorePath(
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs);
 
-
 /**
  * Copy store paths from one store to another. The paths may be copied
  * in parallel. They are copied in a topologically sorted order (i.e. if
@@ -852,14 +921,16 @@ void copyStorePath(
  * @return a map of what each path was copied to the dstStore as.
  */
 std::map<StorePath, StorePath> copyPaths(
-    Store & srcStore, Store & dstStore,
+    Store & srcStore,
+    Store & dstStore,
     const std::set<RealisedPath> &,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
 std::map<StorePath, StorePath> copyPaths(
-    Store & srcStore, Store & dstStore,
+    Store & srcStore,
+    Store & dstStore,
     const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
@@ -869,14 +940,16 @@ std::map<StorePath, StorePath> copyPaths(
  * Copy the closure of `paths` from `srcStore` to `dstStore`.
  */
 void copyClosure(
-    Store & srcStore, Store & dstStore,
+    Store & srcStore,
+    Store & dstStore,
     const std::set<RealisedPath> & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
     SubstituteFlag substitute = NoSubstitute);
 
 void copyClosure(
-    Store & srcStore, Store & dstStore,
+    Store & srcStore,
+    Store & dstStore,
     const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
@@ -889,7 +962,6 @@ void copyClosure(
  */
 void removeTempRoots();
 
-
 /**
  * Resolve the derived path completely, failing if any derivation output
  * is unknown.
@@ -897,25 +969,18 @@ void removeTempRoots();
 StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
-
 /**
  * Display a set of paths in human-readable form (i.e., between quotes
  * and separated by commas).
  */
 std::string showPaths(const PathSet & paths);
 
-
-std::optional<ValidPathInfo> decodeValidPathInfo(
-    const Store & store,
-    std::istream & str,
-    std::optional<HashResult> hashGiven = std::nullopt);
+std::optional<ValidPathInfo>
+decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven = std::nullopt);
 
 const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
-std::map<DrvOutput, StorePath> drvOutputReferences(
-    Store & store,
-    const Derivation & drv,
-    const StorePath & outputPath,
-    Store * evalStore = nullptr);
+std::map<DrvOutput, StorePath>
+drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);
 
-}
+} // namespace nix

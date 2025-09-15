@@ -1,12 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/store/realisation.hh"
-#include "nix/store/derived-path.hh"
-
 #include <string>
 #include <chrono>
 #include <optional>
+
+#include "nix/store/derived-path.hh"
+#include "nix/store/realisation.hh"
 
 namespace nix {
 
@@ -36,6 +36,10 @@ struct BuildResult
         NotDeterministic,
         ResolvesToAlreadyValid,
         NoSubstituters,
+        /// A certain type of `OutputRejected`. The protocols do not yet
+        /// know about this one, so change it back to `OutputRejected`
+        /// before serialization.
+        HashMismatch,
     } status = MiscFailure;
 
     /**
@@ -45,30 +49,6 @@ struct BuildResult
      * string, for richer information.
      */
     std::string errorMsg;
-
-    std::string toString() const {
-        auto strStatus = [&]() {
-            switch (status) {
-                case Built: return "Built";
-                case Substituted: return "Substituted";
-                case AlreadyValid: return "AlreadyValid";
-                case PermanentFailure: return "PermanentFailure";
-                case InputRejected: return "InputRejected";
-                case OutputRejected: return "OutputRejected";
-                case TransientFailure: return "TransientFailure";
-                case CachedFailure: return "CachedFailure";
-                case TimedOut: return "TimedOut";
-                case MiscFailure: return "MiscFailure";
-                case DependencyFailed: return "DependencyFailed";
-                case LogLimitExceeded: return "LogLimitExceeded";
-                case NotDeterministic: return "NotDeterministic";
-                case ResolvesToAlreadyValid: return "ResolvesToAlreadyValid";
-                case NoSubstituters: return "NoSubstituters";
-                default: return "Unknown";
-            };
-        }();
-        return strStatus + ((errorMsg == "") ? "" : " : " + errorMsg);
-    }
 
     /**
      * How many times this build was performed.
@@ -100,8 +80,8 @@ struct BuildResult
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 
-    bool operator ==(const BuildResult &) const noexcept;
-    std::strong_ordering operator <=>(const BuildResult &) const noexcept;
+    bool operator==(const BuildResult &) const noexcept;
+    std::strong_ordering operator<=>(const BuildResult &) const noexcept;
 
     bool success()
     {
@@ -111,6 +91,26 @@ struct BuildResult
     void rethrow()
     {
         throw Error("%s", errorMsg);
+    }
+};
+
+/**
+ * denotes a permanent build failure
+ */
+struct BuildError : public Error
+{
+    BuildResult::Status status;
+
+    BuildError(BuildResult::Status status, BuildError && error)
+        : Error{std::move(error)}
+        , status{status}
+    {
+    }
+
+    BuildError(BuildResult::Status status, auto &&... args)
+        : Error{args...}
+        , status{status}
+    {
     }
 };
 
@@ -126,8 +126,10 @@ struct KeyedBuildResult : BuildResult
 
     // Hack to work around a gcc "may be used uninitialized" warning.
     KeyedBuildResult(BuildResult res, DerivedPath path)
-        : BuildResult(std::move(res)), path(std::move(path))
-    { }
+        : BuildResult(std::move(res))
+        , path(std::move(path))
+    {
+    }
 };
 
-}
+} // namespace nix

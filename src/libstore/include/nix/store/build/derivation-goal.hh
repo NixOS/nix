@@ -14,13 +14,6 @@ namespace nix {
 
 using std::map;
 
-/** Used internally */
-void runPostBuildHook(
-    Store & store,
-    Logger & logger,
-    const StorePath & drvPath,
-    const StorePathSet & outputPaths);
-
 /**
  * A goal for realising a single output of a derivation. Various sorts of
  * fetching (which will be done by other goal types) is tried, and if none of
@@ -47,29 +40,42 @@ struct DerivationGoal : public Goal
      */
     OutputName wantedOutput;
 
+    DerivationGoal(
+        const StorePath & drvPath,
+        const Derivation & drv,
+        const OutputName & wantedOutput,
+        Worker & worker,
+        BuildMode buildMode = bmNormal);
+    ~DerivationGoal() = default;
+
+    void timedOut(Error && ex) override
+    {
+        unreachable();
+    };
+
+    std::string key() override;
+
+    JobCategory jobCategory() const override
+    {
+        return JobCategory::Administration;
+    };
+
+private:
+
     /**
      * The derivation stored at drvPath.
      */
     std::unique_ptr<Derivation> drv;
 
+    const Hash outputHash;
+
+    const BuildMode buildMode;
+
     /**
      * The remainder is state held during the build.
      */
 
-    std::map<std::string, InitialOutput> initialOutputs;
-
-    BuildMode buildMode;
-
     std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
-
-    DerivationGoal(const StorePath & drvPath, const Derivation & drv,
-        const OutputName & wantedOutput, Worker & worker,
-        BuildMode buildMode = bmNormal);
-    ~DerivationGoal() = default;
-
-    void timedOut(Error && ex) override { unreachable(); };
-
-    std::string key() override;
 
     /**
      * The states.
@@ -77,37 +83,25 @@ struct DerivationGoal : public Goal
     Co haveDerivation();
 
     /**
-     * Wrappers around the corresponding Store methods that first consult the
-     * derivation.  This is currently needed because when there is no drv file
-     * there also is no DB entry.
+     * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
+     * floating content-addressing derivation. Otherwise, returns a pair
+     * of a `Realisation`, containing among other things the store path
+     * of the wanted output, and a `PathStatus` with the
+     * current status of that output.
      */
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
-
-    /**
-     * Update 'initialOutputs' to determine the current status of the
-     * outputs of the derivation. Also returns a Boolean denoting
-     * whether all outputs are valid and non-corrupt, and a
-     * 'SingleDrvOutputs' structure containing the valid outputs.
-     */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
+    std::optional<std::pair<Realisation, PathStatus>> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
+     * returns a 'Realisation' for the wanted output.
      */
-    SingleDrvOutputs assertPathValidity();
+    Realisation assertPathValidity();
 
     Co repairClosure();
 
-    Done done(
-        BuildResult::Status status,
-        SingleDrvOutputs builtOutputs = {},
-        std::optional<Error> ex = {});
+    Done doneSuccess(BuildResult::Status status, Realisation builtOutput);
 
-    JobCategory jobCategory() const override {
-        return JobCategory::Administration;
-    };
+    Done doneFailure(BuildError ex);
 };
 
-}
+} // namespace nix
