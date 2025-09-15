@@ -507,24 +507,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore or any other transformations.
      */
-<<<<<<< HEAD
-    ref<GitSourceAccessor> getRawAccessor(
-        const Hash & rev,
-        bool smudgeLfs = false,
-        bool applyFilters = false);
-
-    ref<SourceAccessor> getAccessor(
-        const Hash & rev,
-        bool exportIgnore,
-        std::string displayPrefix,
-        bool smudgeLfs = false,
-        bool applyFilters = false) override;
-=======
-    ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs = false);
+    ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs = false, bool applyFilters = false);
 
     ref<SourceAccessor>
-    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false) override;
->>>>>>> origin/master
+    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false, bool applyFilters = false) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -1267,30 +1253,14 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     }
 };
 
-<<<<<<< HEAD
-ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(
-    const Hash & rev,
-    bool smudgeLfs,
-    bool applyFilters)
-=======
-ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs)
->>>>>>> origin/master
+ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudgeLfs, bool applyFilters)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     return make_ref<GitSourceAccessor>(self, rev, smudgeLfs, applyFilters);
 }
 
-<<<<<<< HEAD
-ref<SourceAccessor> GitRepoImpl::getAccessor(
-    const Hash & rev,
-    bool exportIgnore,
-    std::string displayPrefix,
-    bool smudgeLfs,
-    bool applyFilters)
-=======
 ref<SourceAccessor>
-GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs)
->>>>>>> origin/master
+GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs, bool applyFilters)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs, applyFilters);
