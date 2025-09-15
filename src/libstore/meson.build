@@ -363,6 +363,7 @@ this_library = library(
   generated_headers,
   sources,
   config_priv_h,
+  soversion : meson.project_version().replace('pre', ''),
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,

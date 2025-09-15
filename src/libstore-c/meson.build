@@ -46,6 +46,7 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixstorec',
   sources,
+  soversion : meson.project_version().replace('pre', ''),
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,
