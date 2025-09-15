@@ -16,6 +16,7 @@ clearStoreIfPossible
 repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
+export _NIX_TEST_ATTRS_REF=1
 
 rm -rf "$repo" "${repo}-tmp" "$TEST_HOME/.cache/nix"
 
