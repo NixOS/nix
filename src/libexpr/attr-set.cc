@@ -14,7 +14,7 @@ Bindings * EvalState::allocBindings(size_t capacity)
 {
     if (capacity == 0)
         return &Bindings::emptyBindings;
-    if (capacity > std::numeric_limits<Bindings::size_t>::max())
+    if (capacity > std::numeric_limits<Bindings::size_type>::max())
         throw Error("attribute set of size %d is too big", capacity);
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
@@ -35,7 +35,7 @@ Value & BindingsBuilder::alloc(std::string_view name, PosIdx pos)
 
 void Bindings::sort()
 {
-    std::sort(attrs, attrs + size_);
+    std::sort(attrs, attrs + numAttrs);
 }
 
 Value & Value::mkAttrs(BindingsBuilder & bindings)

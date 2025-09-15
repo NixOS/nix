@@ -371,13 +371,24 @@ bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalS
     NIXC_CATCH_ERRS_RES(false);
 }
 
-nix_value * nix_get_attr_byidx(
-    nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i, const char ** name)
+static void collapse_attrset_layer_chain_if_needed(nix::Value & v, EvalState * state)
+{
+    auto & attrs = *v.attrs();
+    if (attrs.isLayered()) {
+        auto bindings = state->state.buildBindings(attrs.size());
+        std::ranges::copy(attrs, std::back_inserter(bindings));
+        v.mkAttrs(bindings);
+    }
+}
+
+nix_value *
+nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_in(value);
+        collapse_attrset_layer_chain_if_needed(v, state);
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
         nix_gc_incref(nullptr, a.value);
@@ -387,13 +398,13 @@ nix_value * nix_get_attr_byidx(
     NIXC_CATCH_ERRS_NULL
 }
 
-const char *
-nix_get_attr_name_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i)
+const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_in(value);
+        collapse_attrset_layer_chain_if_needed(v, state);
         const nix::Attr & a = (*v.attrs())[i];
         return state->state.symbols[a.name].c_str();
     }
