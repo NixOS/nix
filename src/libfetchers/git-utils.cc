@@ -509,8 +509,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     ref<GitSourceAccessor> getRawAccessor(const Hash & rev, bool smudgeLfs = false, bool applyFilters = false);
 
-    ref<SourceAccessor>
-    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false, bool applyFilters = false) override;
+    ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix,
+        bool smudgeLfs = false,
+        bool applyFilters = false) override;
 
     ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError e) override;
 
@@ -699,7 +703,7 @@ struct GitSourceAccessor : SourceAccessor
     GitSourceAccessor(ref<GitRepoImpl> repo_, const Hash & rev, bool smudgeLfs, bool applyFilters_)
         : state_{State{
               .repo = repo_,
-                    .oid = hashToOID(rev),
+              .oid = hashToOID(rev),
               .root = peelToTreeOrBlob(lookupObject(*repo_, hashToOID(rev)).get()),
               .lfsFetch = smudgeLfs ? std::make_optional(lfs::Fetch(*repo_, hashToOID(rev))) : std::nullopt,
               .applyFilters = applyFilters_,
@@ -742,7 +746,7 @@ struct GitSourceAccessor : SourceAccessor
 
             int error = git_blob_filter(&filtered, blob.get(), path.rel_c_str(), &opts);
             if (error != 0) {
-                const git_error *e = git_error_last();
+                const git_error * e = git_error_last();
                 std::string errorMsg = e ? e->message : "Unknown error";
                 git_buf_dispose(&filtered);
                 throw Error("Failed to filter blob: " + errorMsg);
@@ -1259,8 +1263,8 @@ ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, bool smudge
     return make_ref<GitSourceAccessor>(self, rev, smudgeLfs, applyFilters);
 }
 
-ref<SourceAccessor>
-GitRepoImpl::getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs, bool applyFilters)
+ref<SourceAccessor> GitRepoImpl::getAccessor(
+    const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs, bool applyFilters)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, smudgeLfs, applyFilters);
