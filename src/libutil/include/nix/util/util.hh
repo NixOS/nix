@@ -197,7 +197,7 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s);
  * Get a value for the specified key from an associate container.
  */
 template<class T, typename K>
-const typename T::mapped_type * get(const T & map, K & key)
+const typename T::mapped_type * get(const T & map, const K & key)
 {
     auto i = map.find(key);
     if (i == map.end())
@@ -206,7 +206,7 @@ const typename T::mapped_type * get(const T & map, K & key)
 }
 
 template<class T, typename K>
-typename T::mapped_type * get(T & map, K & key)
+typename T::mapped_type * get(T & map, const K & key)
 {
     auto i = map.find(key);
     if (i == map.end())
@@ -214,15 +214,17 @@ typename T::mapped_type * get(T & map, K & key)
     return &i->second;
 }
 
-/** Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set. */
-template<class T>
-typename T::mapped_type * get(T && map, const typename T::key_type & key) = delete;
+/**
+ * Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set.
+ */
+template<class T, typename K>
+typename T::mapped_type * get(T && map, const K & key) = delete;
 
 /**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
 template<class T, typename K>
-const typename T::mapped_type & getOr(T & map, K & key, const typename T::mapped_type & defaultValue)
+const typename T::mapped_type & getOr(T & map, const K & key, const typename T::mapped_type & defaultValue)
 {
     auto i = map.find(key);
     if (i == map.end())
@@ -230,10 +232,11 @@ const typename T::mapped_type & getOr(T & map, K & key, const typename T::mapped
     return i->second;
 }
 
-/** Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set. */
-template<class T>
-const typename T::mapped_type &
-getOr(T && map, const typename T::key_type & key, const typename T::mapped_type & defaultValue) = delete;
+/**
+ * Deleted because this is use-after-free liability. Just don't pass temporaries to this overload set.
+ */
+template<class T, typename K>
+const typename T::mapped_type & getOr(T && map, const K & key, const typename T::mapped_type & defaultValue) = delete;
 
 /**
  * Remove and return the first item from a container.
