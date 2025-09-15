@@ -167,3 +167,23 @@ EOF
 if !isTestOnNixOS && $NIX_REMOTE != daemon; then
     expectStderr 100 nix flake check "$flakeDir" | grepQuiet 'builder failed with exit code 1'
 fi
+
+# Ensure non-substitutable (read: usually failed) checks are actually run
+# https://github.com/NixOS/nix/pull/13574
+cp "$config_nix" $flakeDir/
+cat > $flakeDir/flake.nix <<EOF
+{
+  outputs = { self }: with import ./config.nix; {
+    checks.${system}.expectedToFail = derivation {
+      name = "expected-to-fail";
+      inherit system;
+      builder = "not-a-real-file";
+    };
+  };
+}
+EOF
+
+# NOTE: Regex pattern is used for compatibility with older daemon versions
+# We also can't expect a specific status code. Earlier daemons return 1, but as of 2.31, we return 100
+checkRes=$(nix flake check $flakeDir 2>&1 && fail "nix flake check should have failed" || true)
+echo "$checkRes" | grepQuiet -E "builder( for .*)? failed with exit code 1"

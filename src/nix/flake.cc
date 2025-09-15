@@ -786,8 +786,32 @@ struct CmdFlakeCheck : FlakeCommand
         }
 
         if (build && !drvPaths.empty()) {
-            Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", drvPaths.size()));
-            store->buildPaths(drvPaths);
+            // TODO: This filtering of substitutable paths is a temporary workaround until
+            // https://github.com/NixOS/nix/issues/5025 (union stores) is implemented.
+            //
+            // Once union stores are available, this code should be replaced with a proper
+            // union store configuration. Ideally, we'd use a union of multiple destination
+            // stores to preserve the current behavior where different substituters can
+            // cache different check results.
+            //
+            // For now, we skip building derivations whose outputs are already available
+            // via substitution, as `nix flake check` only needs to verify buildability,
+            // not actually produce the outputs.
+            auto missing = store->queryMissing(drvPaths);
+            // Only occurs if `drvPaths` contains a `DerivedPath::Opaque`, which should never happen
+            assert(missing.unknown.empty());
+
+            std::vector<DerivedPath> toBuild;
+            for (auto & path : missing.willBuild) {
+                toBuild.emplace_back(
+                    DerivedPath::Built{
+                        .drvPath = makeConstantStorePathRef(path),
+                        .outputs = OutputsSpec::All{},
+                    });
+            }
+
+            Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
+            store->buildPaths(toBuild);
         }
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
