@@ -318,12 +318,18 @@ echo 'test.txt eol=crlf' > "$repo/.gitattributes"
 git -C "$repo" add .gitattributes
 git -C "$repo" commit -m 'Add eol=crlf to gitattributes'
 narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; }).narHash")
+[[ "$narhash" = "sha256-BBhuj+vOnwCUnk5az22PwAnF32KE1aulWAVfCQlbW7U=" ]]
+
+narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; applyFilters = true; }).narHash")
 [[ "$narhash" = "sha256-k7u7RAaF+OvrbtT3KCCDQA8e9uOdflUo5zSgsosoLzA=" ]]
+
 
 # Ensure that NAR hash doesn't depend on user configuration.
 rm -rf $TEST_HOME/.cache/nix
 export GIT_CONFIG_GLOBAL="$TEST_ROOT/gitconfig"
 git config --global core.autocrlf true
-new_narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; }).narHash")
-[[ "$new_narhash" = "$narhash" ]]
+narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; }).narHash")
+[[ "$narhash" = "sha256-BBhuj+vOnwCUnk5az22PwAnF32KE1aulWAVfCQlbW7U=" ]]
+narhash=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = \"$repo\"; ref = \"master\"; applyFilters = true; }).narHash")
+[[ "$narhash" = "sha256-k7u7RAaF+OvrbtT3KCCDQA8e9uOdflUo5zSgsosoLzA=" ]]
 unset GIT_CONFIG_GLOBAL

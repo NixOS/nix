@@ -90,7 +90,8 @@ struct GitRepo
         const Hash & rev,
         bool exportIgnore,
         std::string displayPrefix,
-        bool smudgeLfs = false) = 0;
+        bool smudgeLfs = false,
+        bool applyFilters = false) = 0;
 
     virtual ref<SourceAccessor> getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
 
