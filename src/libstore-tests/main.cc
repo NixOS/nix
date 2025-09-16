@@ -7,7 +7,7 @@ using namespace nix;
 int main(int argc, char ** argv)
 {
     auto res = testMainForBuidingPre(argc, argv);
-    if (!res)
+    if (res)
         return res;
 
     ::testing::InitGoogleTest(&argc, argv);

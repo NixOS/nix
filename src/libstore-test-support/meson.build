@@ -34,6 +34,7 @@ sources = files(
   'derived-path.cc',
   'outputs-spec.cc',
   'path.cc',
+  'test-main.cc',
 )
 
 subdir('include/nix/store/tests')
