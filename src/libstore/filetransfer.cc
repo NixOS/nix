@@ -207,21 +207,32 @@ private:
 
                     // Get credentials
                     try {
-                        std::string profile = parsed.profile.value_or("");
+                        // Check if pre-resolved credentials are available
+                        std::optional<AwsCredentials> credsOpt;
+                        if (request.preResolvedAwsCredentials) {
+                            debug("Using pre-resolved AWS credentials from parent process");
+                            credsOpt = request.preResolvedAwsCredentials;
+                        } else {
+                            std::string profile = parsed.profile.value_or("");
 
-                        // Use cached credential provider
-                        auto credProvider = fileTransfer.getOrCreateCredentialProvider(profile);
-                        auto creds = credProvider->getCredentials();
-                        awsCredentials = creds.accessKeyId + ":" + creds.secretAccessKey;
+                            // Use cached credential provider
+                            auto credProvider = fileTransfer.getOrCreateCredentialProvider(profile);
+                            credsOpt = credProvider->getCredentials();
+                        }
 
-                        std::string region = parsed.region.value_or("us-east-1");
-                        std::string service = "s3";
-                        awsSigV4Provider = "aws:amz:" + region + ":" + service;
+                        if (credsOpt) {
+                            auto & creds = *credsOpt;
+                            awsCredentials = creds.accessKeyId + ":" + creds.secretAccessKey;
 
-                        // Add session token header if present
-                        if (creds.sessionToken) {
-                            requestHeaders = curl_slist_append(
-                                requestHeaders, ("x-amz-security-token: " + *creds.sessionToken).c_str());
+                            std::string region = parsed.region.value_or("us-east-1");
+                            std::string service = "s3";
+                            awsSigV4Provider = "aws:amz:" + region + ":" + service;
+
+                            // Add session token header if present
+                            if (creds.sessionToken) {
+                                requestHeaders = curl_slist_append(
+                                    requestHeaders, ("x-amz-security-token: " + *creds.sessionToken).c_str());
+                            }
                         }
                     } catch (const AwsAuthError & e) {
                         warn("AWS authentication failed for S3 request %s: %s", request.uri, e.what());
@@ -953,6 +964,31 @@ public:
 
         enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
+
+#if NIX_WITH_S3_SUPPORT
+    std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url) override
+    {
+        try {
+            auto parsedUrl = parseURL(url);
+            if (parsedUrl.scheme != "s3") {
+                return std::nullopt;
+            }
+
+            auto s3Url = ParsedS3URL::parse(parsedUrl);
+            std::string profile = s3Url.profile.value_or("");
+
+            // Get or create credential provider from cache
+            auto credProvider = getOrCreateCredentialProvider(profile);
+            return credProvider->getCredentials();
+        } catch (const AwsAuthError & e) {
+            debug("Failed to pre-resolve S3 credentials: %s", e.what());
+            return std::nullopt;
+        } catch (const std::exception & e) {
+            debug("Error pre-resolving S3 credentials: %s", e.what());
+            return std::nullopt;
+        }
+    }
+#endif
 };
 
 ref<curlFileTransfer> makeCurlFileTransfer()

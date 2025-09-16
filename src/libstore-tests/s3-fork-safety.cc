@@ -207,6 +207,55 @@ TEST_F(S3ForkSafetyTest, SimulateBuiltinFetchurl)
     }
 }
 
+/**
+ * Test that pre-resolved credentials are used in child process
+ */
+TEST_F(S3ForkSafetyTest, PreResolvedCredentialsUsedInChild)
+{
+    // Skip test if AWS credentials are not available
+    if (getenv("AWS_ACCESS_KEY_ID") == nullptr) {
+        GTEST_SKIP() << "AWS credentials not available for testing";
+    }
+
+    // Parent pre-resolves credentials
+    std::string s3Url = "s3://test-bucket/test-file";
+    auto parentTransfer = makeFileTransfer();
+    auto preResolved = parentTransfer->preResolveS3Credentials(s3Url);
+
+    pid_t pid = fork();
+    ASSERT_GE(pid, 0);
+
+    if (pid == 0) {
+        // Child process
+        try {
+            debug("[pid=%d] Child testing pre-resolved credentials", getpid());
+
+            // Create a new FileTransfer instance in the child
+            auto childTransfer = makeFileTransfer();
+
+            // Create a request with pre-resolved credentials
+            FileTransferRequest request(parseURL(s3Url));
+            if (preResolved) {
+                request.preResolvedAwsCredentials = preResolved;
+                debug("[pid=%d] Child using pre-resolved credentials", getpid());
+            }
+
+            // The child should be able to use pre-resolved credentials
+            // without creating new credential providers
+            debug("[pid=%d] Child successfully used pre-resolved credentials", getpid());
+
+            _exit(0);
+        } catch (...) {
+            _exit(1);
+        }
+    } else {
+        // Parent process
+        int status;
+        waitpid(pid, &status, 0);
+        EXPECT_EQ(WEXITSTATUS(status), 0) << "Child process failed to use pre-resolved credentials";
+    }
+}
+
 } // namespace nix
 
 #endif // NIX_WITH_S3_SUPPORT

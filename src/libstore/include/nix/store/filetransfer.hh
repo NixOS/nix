@@ -4,12 +4,16 @@
 #include <string>
 #include <future>
 
+#include "nix/store/config.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
+#ifdef NIX_WITH_S3_SUPPORT
+#  include "nix/store/s3.hh"
+#endif
 
 namespace nix {
 
@@ -92,6 +96,13 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+#ifdef NIX_WITH_S3_SUPPORT
+    /**
+     * Pre-resolved AWS credentials for S3 requests.
+     * When provided, these will be used instead of creating new credential providers.
+     */
+    std::optional<AwsCredentials> preResolvedAwsCredentials;
+#endif
 
     FileTransferRequest(ValidURL uri)
         : uri(std::move(uri))
@@ -153,6 +164,19 @@ struct FileTransfer
      * exception.
      */
     virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+
+#ifdef NIX_WITH_S3_SUPPORT
+    /**
+     * Pre-resolve AWS credentials for S3 URLs.
+     * Used to cache credentials in parent process before forking.
+     * Returns nullopt if URL is not S3 or credentials cannot be resolved.
+     */
+    virtual std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url)
+    {
+        // Default implementation returns nothing
+        return std::nullopt;
+    }
+#endif
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 

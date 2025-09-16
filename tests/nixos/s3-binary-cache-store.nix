@@ -124,12 +124,40 @@ in
       else:
         print("SUCCESS: Found evidence of FileTransfer creation in forked process")
 
-      if "[pid=" not in derivation_output or "creating new AWS credential provider" not in derivation_output:
+      # Check that pre-resolution is working properly
+      # Parent should pre-resolve credentials
+      if "Pre-resolving AWS credentials for S3 URL in builtin:fetchurl" not in derivation_output:
         print("Debug output:")
         print(derivation_output)
-        raise Exception("FAILED: Expected to find PID tracking and credential provider creation in debug output")
-      else:
-        print("SUCCESS: Found evidence of credential provider creation with PID tracking")
+        raise Exception("FAILED: Expected to find parent pre-resolving AWS credentials")
+
+      if "Successfully pre-resolved AWS credentials in parent process" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected parent to successfully pre-resolve credentials")
+
+      # Child should use pre-resolved credentials, NOT create new providers
+      if "Using pre-resolved AWS credentials from parent process" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected child to use pre-resolved AWS credentials")
+
+      # Extract child PID from "builtin:fetchurl creating fresh FileTransfer instance" message
+      import re
+      filetransfer_match = re.search(r'\[pid=(\d+)\] builtin:fetchurl creating fresh FileTransfer instance', derivation_output)
+      if not filetransfer_match:
+        raise Exception("FAILED: Could not extract child PID from debug output")
+
+      child_pid = filetransfer_match.group(1)
+
+      # Make sure the child (identified by PID) is NOT creating new credential providers
+      child_credential_creation = f"[pid={child_pid}] creating new AWS credential provider"
+      if child_credential_creation in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception(f"FAILED: Child process (pid={child_pid}) should NOT create new credential providers when using pre-resolved credentials")
+
+      print("SUCCESS: Pre-resolution is working - child uses pre-resolved credentials instead of creating new providers")
 
       # Copy a package from the binary cache.
       client.fail("nix path-info ${pkgA}")

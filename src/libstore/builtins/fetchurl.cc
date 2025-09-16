@@ -43,6 +43,17 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             FileTransferRequest request(ValidURL{url});
             request.decompress = false;
 
+#if NIX_WITH_S3_SUPPORT
+            // Use pre-resolved credentials if available
+            if (ctx.awsCredentials && request.uri.scheme() == "s3") {
+                debug("[pid=%d] Using pre-resolved AWS credentials from parent process", getpid());
+                request.preResolvedAwsCredentials = AwsCredentials{
+                    ctx.awsCredentials->accessKeyId,
+                    ctx.awsCredentials->secretAccessKey,
+                    ctx.awsCredentials->sessionToken};
+            }
+#endif
+
             auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
