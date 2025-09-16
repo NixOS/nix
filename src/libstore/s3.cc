@@ -183,8 +183,14 @@ AwsCredentials AwsCredentialProvider::getCredentials()
 
     {
         auto state_ = state.lock();
-        while (!state_->resolved) {
-            state_.wait(cv);
+        // AWS CRT GetCredentials is asynchronous and only guarantees the callback will be
+        // invoked if the initial call returns success. There's no documented timeout mechanism,
+        // so we add a timeout to prevent indefinite hanging if the callback is never called.
+        auto timeout = std::chrono::seconds(30);
+        if (!state_.wait_for(cv, timeout, [&] { return state_->resolved; })) {
+            throw AwsAuthError(
+                "Timeout waiting for AWS credentials (%d seconds)",
+                std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
         }
     }
 
