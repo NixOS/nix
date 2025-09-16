@@ -131,6 +131,39 @@ void deleteGeneration(const Path & profile, GenerationNumber gen);
 void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun);
 
 /**
+ * Delete old generations. Will never delete the current or future generations.
+ *
+ * Examples:
+ * - All parameters are nullopt
+ *   No generations are deleted
+ * - keepMax is 5
+ *   No generations are deleted
+ * - keepMax is 10
+ *   10 generations after the current one are kept, the rest is deleted.
+ * - olderThan is 2025-09-16
+ *   Generations older than 2025-09-16 are deleted
+ * - olderThan is 2025-09-16, keepMin is 5, keepMax is 10 -
+ *   Will try to delete generations older than 2025-09-16.
+ *   If there are more than 10 generations to be kept, continues to delete old generations until there is 10.
+ *   If there are less than 5 generations to be kept, preserves older generations until there is 5.
+ *
+ * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
+ * delete.
+ *
+ * @param olderThan Age of the oldest generation to keep.
+ * If nullopt, no generation will be deleted based on its age.
+ *
+ * @param keepMin Minimum amount of recent generations to keep after deletion (not counting the current or future ones).
+ * If nullopt, all old generations will be deleted.
+ *
+ * @param keepMax Maximum amount of recent generations to keep after deletion (not counting the current or future ones).
+ * If nullopt, all recent generations will be kept.
+ *
+ * @param dryRun Log what would be deleted instead of actually doing so.
+ */
+void deleteGenerationsFilter(const Path & profile, std::optional<time_t> olderThan, std::optional<GenerationNumber> keepMin, std::optional<GenerationNumber> keepMax, bool dryRun);
+
+/**
  * Delete generations older than `max` passed the current generation.
  *
  * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
