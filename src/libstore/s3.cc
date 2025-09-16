@@ -30,7 +30,6 @@ using namespace std::string_view_literals;
 namespace nix {
 
 // AWS CRT initialization
-static std::once_flag crtInitFlag;
 static bool crtInitialized = false;
 
 // Forward declaration for cleanup function
@@ -38,7 +37,7 @@ void cleanupCredentialProviderCache();
 
 static void initAwsCrt()
 {
-    std::call_once(crtInitFlag, []() {
+    static auto initialized = []() {
         try {
             // Use a static local variable instead of global to control destruction order
             struct CrtWrapper
@@ -59,14 +58,17 @@ static void initAwsCrt()
             };
             static CrtWrapper crt;
             crtInitialized = true;
+            return true;
         } catch (const std::exception & e) {
             debug("Failed to initialize AWS CRT: %s", e.what());
             crtInitialized = false;
+            return false;
         } catch (...) {
             debug("Failed to initialize AWS CRT: unknown error");
             crtInitialized = false;
+            return false;
         }
-    });
+    }();
 }
 
 // AwsCredentialProvider implementation
