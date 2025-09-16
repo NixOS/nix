@@ -40,3 +40,6 @@ if cxx.get_id() == 'clang' and ('address' in get_option('b_sanitize') or 'undefi
 ))
   add_project_link_arguments('-shared-libasan', language : 'cpp')
 endif
+
+# Darwin ld doesn't like "X.Y.Zpre"
+nix_soversion = meson.project_version().strip('pre')
