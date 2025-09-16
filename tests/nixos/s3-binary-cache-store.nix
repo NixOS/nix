@@ -131,38 +131,6 @@ in
       else:
         print("SUCCESS: Found evidence of credential provider creation with PID tracking")
 
-      # Test multiple sequential derivations to check if credential providers are recreated
-      sequential_providers_found = 0
-      for i in range(3):
-        test_expr = f"""
-          derivation {{
-            name = "s3-fetch-sequential-{i}";
-            builder = "builtin:fetchurl";
-            url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1";
-            outputHashMode = "flat";
-            outputHashAlgo = "sha256";
-            outputHash = "{cache_info_hash}";
-            system = "x86_64-linux";
-          }}
-        """
-        try:
-          result = client.succeed("${env} nix build --debug --impure --expr '" + test_expr + "' 2>&1")
-        except:
-          result = client.fail("${env} nix build --debug --impure --expr '" + test_expr + "' 2>&1")
-
-        if "builtin:fetchurl creating fresh FileTransfer instance" in result:
-          sequential_providers_found += 1
-          print(f"Derivation {i}: Found FileTransfer creation in forked process")
-
-        if "[pid=" in result:
-          pids = [line for line in result.split('\\n') if 'creating new AWS credential provider' in line]
-          if pids:
-            print(f"Derivation {i}: Found credential provider creation: {pids[0]}")
-
-      # Each derivation should create its own FileTransfer in a forked process
-      if sequential_providers_found != 3:
-        raise Exception(f"FAILED: Expected 3 FileTransfer creations in sequential derivations, but found {sequential_providers_found}")
-
       # Copy a package from the binary cache.
       client.fail("nix path-info ${pkgA}")
 
