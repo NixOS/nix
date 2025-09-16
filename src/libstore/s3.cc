@@ -15,6 +15,7 @@
 #  include "nix/util/error.hh"
 #  include "nix/util/split.hh"
 #  include "nix/util/url.hh"
+#  include "nix/util/sync.hh"
 
 #  include <aws/crt/Api.h>
 #  include <aws/crt/auth/Credentials.h>
@@ -37,7 +38,7 @@ void cleanupCredentialProviderCache();
 
 static void initAwsCrt()
 {
-    static auto initialized = []() {
+    [[maybe_unused]] static auto initialized = []() {
         try {
             // Use a static local variable instead of global to control destruction order
             struct CrtWrapper
@@ -145,17 +146,21 @@ AwsCredentials AwsCredentialProvider::getCredentials()
         throw AwsAuthError("AWS credential provider is invalid");
     }
 
-    std::mutex mutex;
+    struct State
+    {
+        std::optional<AwsCredentials> result;
+        int resolvedErrorCode = 0;
+        bool resolved = false;
+    };
+
+    Sync<State> state;
     std::condition_variable cv;
-    std::optional<AwsCredentials> result;
-    int resolvedErrorCode = 0;
-    bool resolved = false;
 
     provider->GetCredentials([&](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
-        std::lock_guard<std::mutex> lock(mutex);
+        auto state_ = state.lock();
 
         if (errorCode != 0 || !credentials) {
-            resolvedErrorCode = errorCode;
+            state_->resolvedErrorCode = errorCode;
         } else {
             auto accessKeyId = credentials->GetAccessKeyId();
             auto secretAccessKey = credentials->GetSecretAccessKey();
@@ -166,24 +171,29 @@ AwsCredentials AwsCredentialProvider::getCredentials()
                 sessionTokenStr = std::string(reinterpret_cast<const char *>(sessionToken.ptr), sessionToken.len);
             }
 
-            result = AwsCredentials(
+            state_->result = AwsCredentials(
                 std::string(reinterpret_cast<const char *>(accessKeyId.ptr), accessKeyId.len),
                 std::string(reinterpret_cast<const char *>(secretAccessKey.ptr), secretAccessKey.len),
                 sessionTokenStr);
         }
 
-        resolved = true;
+        state_->resolved = true;
         cv.notify_one();
     });
 
-    std::unique_lock<std::mutex> lock(mutex);
-    cv.wait(lock, [&] { return resolved; });
-
-    if (!result) {
-        throw AwsAuthError("Failed to resolve AWS credentials: error code %d", resolvedErrorCode);
+    {
+        auto state_ = state.lock();
+        while (!state_->resolved) {
+            state_.wait(cv);
+        }
     }
 
-    return *result;
+    auto state_ = state.lock();
+    if (!state_->result) {
+        throw AwsAuthError("Failed to resolve AWS credentials: error code %d", state_->resolvedErrorCode);
+    }
+
+    return *state_->result;
 }
 
 // ParsedS3URL implementation
