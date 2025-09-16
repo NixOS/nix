@@ -15,7 +15,7 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     auto ret = StringSet{"http", "https"};
     if (forceHttp)
         ret.insert("file");
-    // S3 is now handled by S3BinaryCacheStoreConfig
+    // S3 is handled by S3BinaryCacheStoreConfig
     return ret;
 }
 

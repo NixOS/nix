@@ -77,22 +77,16 @@ private:
             return it->second;
         }
 
-        try {
-            debug(
-                "[pid=%d] creating new AWS credential provider for profile '%s'",
-                getpid(),
-                profile.empty() ? "(default)" : profile.c_str());
-            auto provider = profile.empty() ? AwsCredentialProvider::createDefault()
-                                            : AwsCredentialProvider::createProfile(profile);
+        debug(
+            "[pid=%d] creating new AWS credential provider for profile '%s'",
+            getpid(),
+            profile.empty() ? "(default)" : profile.c_str());
+        auto provider =
+            profile.empty() ? AwsCredentialProvider::createDefault() : AwsCredentialProvider::createProfile(profile);
 
-            auto sharedProvider = std::shared_ptr<AwsCredentialProvider>(std::move(provider));
-            cache->providers[profile] = sharedProvider;
-            return sharedProvider;
-
-        } catch (const AwsAuthError & e) {
-            // Don't cache failed providers, just propagate the error
-            throw;
-        }
+        auto sharedProvider = std::shared_ptr<AwsCredentialProvider>(std::move(provider));
+        cache->providers[profile] = sharedProvider;
+        return sharedProvider;
     }
 
     /**
@@ -945,23 +939,17 @@ public:
 #endif
     }
 
-#if NIX_WITH_S3_SUPPORT
-#endif
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
+#if !NIX_WITH_S3_SUPPORT
         /* Handle s3:// URIs with curl-based AWS SigV4 authentication */
         if (request.uri.scheme() == "s3") {
-#if NIX_WITH_S3_SUPPORT
-            // Use curl-based approach with AWS SigV4 authentication
-            enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
-#else
             callback.throw_(
                 nix::Error(
                     "cannot download '%s' because Nix is not built with AWS CRT support (requires aws-crt-cpp and curl >= 7.75.0)",
                     request.uri.to_string()));
-#endif
-            return;
         }
+#endif
 
         enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
