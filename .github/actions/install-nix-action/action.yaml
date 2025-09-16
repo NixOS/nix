@@ -4,12 +4,18 @@ inputs:
   dogfood:
     description: "Whether to use Nix installed from the latest artifact from master branch"
     required: true # Be explicit about the fact that we are using unreleased artifacts
+  experimental-installer:
+    description: "Whether to use the experimental installer to install Nix"
+    default: false
   extra_nix_config:
     description: "Gets appended to `/etc/nix/nix.conf` if passed."
   install_url:
     description: "URL of the Nix installer"
     required: false
     default: "https://releases.nixos.org/nix/nix-2.29.1/install"
+  tarball_url:
+    description: "URL of the Nix tarball to use with the experimental installer"
+    required: false
   github_token:
     description: "Github token"
     required: true
@@ -37,14 +43,57 @@ runs:
 
         gh run download "$RUN_ID" --repo "$DOGFOOD_REPO" -n "$INSTALLER_ARTIFACT" -D "$INSTALLER_DOWNLOAD_DIR"
         echo "installer-path=file://$INSTALLER_DOWNLOAD_DIR" >> "$GITHUB_OUTPUT"
+        TARBALL_PATH="$(find "$INSTALLER_DOWNLOAD_DIR" -name 'nix*.tar.xz' -print | head -n 1)"
+        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
 
         echo "::notice ::Dogfooding Nix installer from master (https://github.com/$DOGFOOD_REPO/actions/runs/$RUN_ID)"
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         DOGFOOD_REPO: "NixOS/nix"
+    - name: "Download experimental installer"
+      shell: bash
+      id: download-experimental-nix-installer
+      if: ${{ inputs.experimental-installer == 'true' }}
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          INSTALLER_OS="linux"
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          INSTALLER_OS="darwin"
+        else
+          echo "::error ::Unsupported RUNNER_OS: $RUNNER_OS"
+        fi
+
+        if [ "$RUNNER_ARCH" == "X64" ]; then
+          INSTALLER_ARCH="x86_64"
+        elif [ "$RUNNER_ARCH" == "ARM64" ]; then
+          INSTALLER_ARCH="aarch64"
+        else
+          echo "::error ::Unsupported RUNNER_ARCH: $RUNNER_ARCH"
+        fi
+
+        EXPERIMENTAL_INSTALLER_ARTIFACT="nix-installer-$INSTALLER_ARCH-$INSTALLER_OS"
+        EXPERIMENTAL_INSTALLER_PATH="$GITHUB_WORKSPACE/$EXPERIMENTAL_INSTALLER_ARTIFACT"
+        # TODO: This uses the latest release. It should probably be pinned, or dogfood the experimental repo's default branch - similar to the above
+        gh release download -R "$EXPERIMENTAL_INSTALLER_REPO" -D "$EXPERIMENTAL_INSTALLER_PATH" -p "nix-installer.sh" -p "$EXPERIMENTAL_INSTALLER_ARTIFACT"
+        chmod +x "$EXPERIMENTAL_INSTALLER_PATH/$EXPERIMENTAL_INSTALLER_ARTIFACT"
+
+        echo "installer-path=$EXPERIMENTAL_INSTALLER_PATH" >> "$GITHUB_OUTPUT"
+
+        echo "::notice Using experimental installer from $EXPERIMENTAL_INSTALLER_REPO (https://github.com/$EXPERIMENTAL_INSTALLER_REPO)"
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        EXPERIMENTAL_INSTALLER_REPO: "NixOS/experimental-nix-installer"
     - uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31.5.1
+      if: ${{ inputs.experimental-installer != 'true' }}
       with:
         # Ternary operator in GHA: https://www.github.com/actions/runner/issues/409#issuecomment-752775072
         install_url: ${{ inputs.dogfood == 'true' && format('{0}/install', steps.download-nix-installer.outputs.installer-path) || inputs.install_url }}
         install_options: ${{ inputs.dogfood == 'true' && format('--tarball-url-prefix {0}', steps.download-nix-installer.outputs.installer-path) || '' }}
         extra_nix_config: ${{ inputs.extra_nix_config }}
+    - uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 # v20
+      if: ${{ inputs.experimental-installer == 'true' }}
+      with:
+        diagnostic-endpoint: ""
+        local-root: ${{ steps.download-experimental-nix-installer.outputs.installer-path }}
+        nix-package-url: ${{ inputs.dogfood == 'true' && steps.download-nix-installer.outputs.tarball-path || (inputs.tarball_url || '') }}
+        extra-conf: ${{ inputs.extra_nix_config }}
