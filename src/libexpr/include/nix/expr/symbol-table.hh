@@ -32,7 +32,7 @@ struct ContiguousArena
     // Put this in a separate cache line to ensure that a thread
     // adding a symbol doesn't slow down threads dereferencing symbols
     // by invalidating the read-only `data` field.
-    std::atomic<size_t> size __attribute__((aligned(64))){0};
+    alignas(64) std::atomic<size_t> size{0};
 
     ContiguousArena(size_t maxSize);
 
