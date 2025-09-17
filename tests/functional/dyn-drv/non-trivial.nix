@@ -62,12 +62,15 @@ builtins.outputOf
               "hashAlgo": "sha256"
             }
           },
-          "system": "${system}"
+          "system": "${system}",
+          "version": 3
         }
       EOF
-        drvs[$word]="$(echo "$json" | nix derivation add)"
+        drvPath=$(echo "$json" | nix derivation add)
+        storeDir=$(dirname "$drvPath")
+        drvs[$word]="$(basename "$drvPath")"
       done
-      cp "''${drvs[e]}" $out
+      cp "''${storeDir}/''${drvs[e]}" $out
     '';
 
     __contentAddressed = true;
