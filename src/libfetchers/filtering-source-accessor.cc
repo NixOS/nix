@@ -59,12 +59,12 @@ void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 {
     std::set<CanonPath> allowedPrefixes;
-    boost::unordered_flat_set<CanonPath> allowedPaths;
+    boost::unordered_flat_set<CanonPath, std::hash<CanonPath>> allowedPaths;
 
     AllowListSourceAccessorImpl(
         ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
-        boost::unordered_flat_set<CanonPath> && allowedPaths,
+        boost::unordered_flat_set<CanonPath, std::hash<CanonPath>> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListSourceAccessor(SourcePath(next), std::move(makeNotAllowedError))
         , allowedPrefixes(std::move(allowedPrefixes))
@@ -86,7 +86,7 @@ struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 ref<AllowListSourceAccessor> AllowListSourceAccessor::create(
     ref<SourceAccessor> next,
     std::set<CanonPath> && allowedPrefixes,
-    boost::unordered_flat_set<CanonPath> && allowedPaths,
+    boost::unordered_flat_set<CanonPath, std::hash<CanonPath>> && allowedPaths,
     MakeNotAllowedError && makeNotAllowedError)
 {
     return make_ref<AllowListSourceAccessorImpl>(
