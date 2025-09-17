@@ -297,8 +297,8 @@ bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalS
  * @param[out] name will store a pointer to the attribute name
  * @return value, NULL in case of errors
  */
-nix_value * nix_get_attr_byidx(
-    nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i, const char ** name);
+nix_value *
+nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name);
 
 /** @brief Get an attribute name by index in the sorted bindings
  *
@@ -311,8 +311,7 @@ nix_value * nix_get_attr_byidx(
  * @param[in] i attribute index
  * @return name, NULL in case of errors
  */
-const char *
-nix_get_attr_name_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int i);
+const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i);
 
 /**@}*/
 /** @name Initializers

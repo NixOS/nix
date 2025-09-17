@@ -437,4 +437,31 @@ TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
     assert_ctx_ok();
     ASSERT_EQ(3, rInt);
 }
+
+TEST_F(nix_api_expr_test, nix_expr_attrset_update)
+{
+    nix_expr_eval_from_string(ctx, state, "{ a = 0; b = 2; } // { a = 1; b = 3; } // { a = 2; }", ".", value);
+    assert_ctx_ok();
+
+    ASSERT_EQ(nix_get_attrs_size(ctx, value), 2);
+    assert_ctx_ok();
+    std::array<std::pair<std::string_view, nix_value *>, 2> values;
+    for (unsigned int i = 0; i < 2; ++i) {
+        const char * name;
+        values[i].second = nix_get_attr_byidx(ctx, value, state, i, &name);
+        assert_ctx_ok();
+        values[i].first = name;
+    }
+    std::sort(values.begin(), values.end(), [](const auto & lhs, const auto & rhs) { return lhs.first < rhs.first; });
+
+    nix_value * a = values[0].second;
+    ASSERT_EQ("a", values[0].first);
+    ASSERT_EQ(nix_get_int(ctx, a), 2);
+    assert_ctx_ok();
+    nix_value * b = values[1].second;
+    ASSERT_EQ("b", values[1].first);
+    ASSERT_EQ(nix_get_int(ctx, b), 3);
+    assert_ctx_ok();
+}
+
 } // namespace nixC
