@@ -509,6 +509,11 @@ private:
         }
     }
 
+    void printFailed(Value & v)
+    {
+        output << "«failed»";
+    }
+
     void printExternal(Value & v)
     {
         v.external()->print(output);
@@ -582,6 +587,10 @@ private:
 
             case nThunk:
                 printThunk(v);
+                break;
+
+            case nFailed:
+                printFailed(v);
                 break;
 
             case nExternal:

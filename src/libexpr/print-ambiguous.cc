@@ -75,6 +75,9 @@ void printAmbiguous(
             str << "«potential infinite recursion»";
         }
         break;
+    case nFailed:
+        str << "«failed»";
+        break;
     case nFunction:
         if (v.isLambda()) {
             str << "<LAMBDA>";

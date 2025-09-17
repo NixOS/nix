@@ -1,4 +1,5 @@
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
@@ -27,6 +28,7 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
+#include <exception>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -125,6 +127,8 @@ std::string_view showType(ValueType type, bool withArticle)
         return WA("a", "float");
     case nThunk:
         return WA("a", "thunk");
+    case nFailed:
+        return WA("a", "failure");
     }
     unreachable();
 }
@@ -2078,6 +2082,54 @@ void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & 
 // always force this to be separate, otherwise forceValue may inline it and take
 // a massive perf hit
 [[gnu::noinline]]
+void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, const PosIdx pos)
+{
+    v.mkThunk(env, expr);
+    tryFixupBlackHolePos(v, pos);
+
+    auto e = std::current_exception();
+    Value * recovery = nullptr;
+    try {
+        std::rethrow_exception(e);
+    } catch (const RecoverableEvalError & e) {
+        recovery = allocValue();
+    } catch (...) {
+    }
+    if (recovery) {
+        recovery->mkThunk(env, expr);
+    }
+    v.mkFailed(e, recovery);
+}
+
+[[gnu::noinline]]
+void EvalState::handleEvalExceptionForApp(Value & v)
+{
+    auto e = std::current_exception();
+    Value * recovery = nullptr;
+    try {
+        std::rethrow_exception(e);
+    } catch (const RecoverableEvalError & e) {
+        recovery = allocValue();
+    } catch (...) {
+    }
+    if (recovery) {
+        *recovery = v;
+    }
+    v.mkFailed(e, recovery);
+}
+
+[[gnu::noinline]]
+void EvalState::handleEvalFailed(Value & v, const PosIdx pos)
+{
+    assert(v.isFailed());
+    if (auto recoveryValue = v.failed()->recoveryValue) {
+        v = *recoveryValue;
+        forceValue(v, pos);
+    } else {
+        std::rethrow_exception(v.failed()->ex);
+    }
+}
+
 void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
 {
     if (!v.isBlackhole())
@@ -2086,7 +2138,8 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
     try {
         std::rethrow_exception(e);
     } catch (InfiniteRecursionError & e) {
-        e.atPos(positions[pos]);
+        if (!e.hasPos())
+            e.atPos(positions[pos]);
     } catch (...) {
     }
 }
@@ -2711,8 +2764,11 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         }
         return;
 
-    case nThunk: // Must not be left by forceValue
-        assert(false);
+    // Cannot be returned by forceValue().
+    case nThunk:
+    case nFailed:
+        unreachable();
+
     default: // Note that we pass compiler flags that should make `default:` unreachable.
         // Also note that this probably ran after `eqValues`, which implements
         // the same logic more efficiently (without having to unwind stacks),
@@ -2804,8 +2860,11 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         // !!!
         return v1.fpoint() == v2.fpoint();
 
-    case nThunk: // Must not be left by forceValue
-        assert(false);
+    // Cannot be returned by forceValue().
+    case nThunk:
+    case nFailed:
+        unreachable();
+
     default: // Note that we pass compiler flags that should make `default:` unreachable.
         error<EvalError>("eqValues: cannot compare %1% with %2%", showType(v1), showType(v2))
             .withTrace(pos, errorCtx)
