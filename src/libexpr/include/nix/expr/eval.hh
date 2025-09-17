@@ -20,9 +20,8 @@
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/concurrent_flat_map_fwd.hpp>
-
 #include <map>
 #include <optional>
 #include <functional>
@@ -404,30 +403,37 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    ref<boost::concurrent_flat_map<SourcePath, StorePath>> srcToStore;
+    boost::concurrent_flat_map<SourcePath, StorePath, std::hash<SourcePath>> srcToStore;
 
     /**
-     * A cache that maps paths to "resolved" paths for importing Nix
-     * expressions, i.e. `/foo` to `/foo/default.nix`.
+     * A cache from path names to parse trees.
      */
-    ref<boost::concurrent_flat_map<SourcePath, SourcePath>> importResolutionCache;
-
-    /**
-     * A cache from resolved paths to values.
-     */
-    ref<boost::concurrent_flat_map<
+    typedef boost::unordered_flat_map<
         SourcePath,
-        Value *,
+        Expr *,
         std::hash<SourcePath>,
         std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value *>>>>
-        fileEvalCache;
+        traceable_allocator<std::pair<const SourcePath, Expr *>>>
+        FileParseCache;
+    FileParseCache fileParseCache;
+
+    /**
+     * A cache from path names to values.
+     */
+    typedef boost::unordered_flat_map<
+        SourcePath,
+        Value,
+        std::hash<SourcePath>,
+        std::equal_to<SourcePath>,
+        traceable_allocator<std::pair<const SourcePath, Value>>>
+        FileEvalCache;
+    FileEvalCache fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    boost::unordered_flat_map<SourcePath, DocCommentMap> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap, std::hash<SourcePath>> positionToDocComment;
 
     LookupPath lookupPath;
 

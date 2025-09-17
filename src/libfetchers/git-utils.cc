@@ -817,7 +817,7 @@ struct GitSourceAccessor : SourceAccessor
         return toHash(*git_tree_entry_id(entry));
     }
 
-    boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
+    boost::unordered_flat_map<CanonPath, TreeEntry, std::hash<CanonPath>> lookupCache;
 
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(State & state, const CanonPath & path)
@@ -1254,7 +1254,7 @@ GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllow
                                            makeFSSourceAccessor(path),
                                            std::set<CanonPath>{wd.files},
                                            // Always allow access to the root, but not its children.
-                                           boost::unordered_flat_set<CanonPath>{CanonPath::root},
+                                           boost::unordered_flat_set<CanonPath, std::hash<CanonPath>>{CanonPath::root},
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (exportIgnore)
