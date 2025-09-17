@@ -377,6 +377,8 @@ struct EvalSettings : Config
           * Any evaluation that uses `builtins.parallel`
 
           The value `0` causes Nix to use all available CPU cores in the system.
+
+          Note that enabling the debugger (`--debugger`) disables multi-threaded evaluation.
         )"};
 };
 

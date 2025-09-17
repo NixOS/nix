@@ -125,6 +125,13 @@ ref<Store> EvalCommand::getEvalStore()
 ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
+        if (startReplOnEvalErrors && evalSettings.evalCores != 1U) {
+            // Disable parallel eval if the debugger is enabled, since
+            // they're incompatible at the moment.
+            warn("using the debugger disables multi-threaded evaluation");
+            evalSettings.evalCores = 1;
+        }
+
         evalState = std::allocate_shared<EvalState>(
             traceable_allocator<EvalState>(), lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
 
