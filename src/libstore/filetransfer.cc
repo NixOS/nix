@@ -13,6 +13,7 @@
 #include "nix/store/config.hh"
 #if NIX_WITH_S3_SUPPORT
 #  include "nix/store/s3.hh"
+#  include "nix/store/s3-creds-cache.hh"
 #endif
 
 #ifdef __linux__
@@ -48,56 +49,6 @@ struct curlFileTransfer : public FileTransfer
 
     std::random_device rd;
     std::mt19937 mt19937;
-
-#if NIX_WITH_S3_SUPPORT
-public:
-    // Public method to clear credential provider cache (called from AWS CRT shutdown)
-    void clearCredentialCache();
-
-private:
-    struct CredentialProviderCache
-    {
-        // Key: profile name (empty string for default profile)
-        std::map<std::string, std::shared_ptr<AwsCredentialProvider>> providers;
-    };
-
-    Sync<CredentialProviderCache> credentialProviderCache;
-
-    /**
-     * Get or create a credential provider for the given profile.
-     * Thread-safe: holds lock for entire duration to prevent duplicate creation.
-     */
-    std::shared_ptr<AwsCredentialProvider> getOrCreateCredentialProvider(const std::string & profile)
-    {
-        auto cache(credentialProviderCache.lock());
-
-        // Check if provider exists
-        auto it = cache->providers.find(profile);
-        if (it != cache->providers.end()) {
-            return it->second;
-        }
-
-        debug(
-            "[pid=%d] creating new AWS credential provider for profile '%s'",
-            getpid(),
-            profile.empty() ? "(default)" : profile.c_str());
-        auto provider =
-            profile.empty() ? AwsCredentialProvider::createDefault() : AwsCredentialProvider::createProfile(profile);
-
-        auto sharedProvider = std::shared_ptr<AwsCredentialProvider>(std::move(provider));
-        cache->providers[profile] = sharedProvider;
-        return sharedProvider;
-    }
-
-    /**
-     * Invalidate a cached credential provider (e.g., on auth failure)
-     */
-    void invalidateCredentialProvider(const std::string & profile)
-    {
-        auto cache(credentialProviderCache.lock());
-        cache->providers.erase(profile);
-    }
-#endif
 
     struct TransferItem : public std::enable_shared_from_this<TransferItem>
     {
@@ -216,7 +167,7 @@ private:
                             std::string profile = parsed.profile.value_or("");
 
                             // Use cached credential provider
-                            auto credProvider = fileTransfer.getOrCreateCredentialProvider(profile);
+                            auto credProvider = getOrCreateCredentialProvider(profile);
                             credsOpt = credProvider->getCredentials();
                         }
 
@@ -239,7 +190,7 @@ private:
 
                         // Invalidate the cached provider so next request will retry
                         std::string profile = parsed.profile.value_or("");
-                        fileTransfer.invalidateCredentialProvider(profile);
+                        invalidateCredentialProvider(profile);
 
                         // Continue without authentication - might be a public bucket
                     }
@@ -779,13 +730,10 @@ public:
         workerThread.join();
 
 #if NIX_WITH_S3_SUPPORT
-        {
-            auto cache(credentialProviderCache.lock());
-            // IMPORTANT: We must clear the providers here to ensure they are destroyed
-            // BEFORE the AWS CRT ApiHandle is destroyed during static destruction.
-            // This prevents a deadlock where AWS CRT waits for resources we're holding.
-            cache->providers.clear();
-        }
+        // IMPORTANT: We must clear the providers here to ensure they are destroyed
+        // BEFORE the AWS CRT ApiHandle is destroyed during static destruction.
+        // This prevents a deadlock where AWS CRT waits for resources we're holding.
+        clearCredentialProviderCache();
 #endif
 
         if (curlm)
@@ -1173,27 +1121,6 @@ FileTransferError::FileTransferError(
 }
 
 #if NIX_WITH_S3_SUPPORT
-void curlFileTransfer::clearCredentialCache()
-{
-    auto cache(credentialProviderCache.lock());
-    cache->providers.clear();
-}
-
-// Function called by AWS CRT shutdown to clear credential provider cache
-void cleanupCredentialProviderCache()
-{
-    // Access the curlFileTransfer singleton and clear its cache
-    try {
-        auto ft = getFileTransfer();
-        if (auto curlFt = ft.dynamic_pointer_cast<curlFileTransfer>()) {
-            curlFt->clearCredentialCache();
-        }
-    } catch (const std::exception & e) {
-        warn("Error clearing credential cache during AWS CRT shutdown: %s", e.what());
-    } catch (...) {
-        warn("Unknown error clearing credential cache during AWS CRT shutdown");
-    }
-}
 #endif
 
 } // namespace nix

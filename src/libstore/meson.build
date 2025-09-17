@@ -333,6 +333,7 @@ sources = files(
   'remote-store.cc',
   'restricted-store.cc',
   's3-binary-cache-store.cc',
+  's3-creds-cache.cc',
   's3.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',

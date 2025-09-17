@@ -10,6 +10,7 @@
 
 #if NIX_WITH_S3_SUPPORT
 
+#  include "nix/store/s3-creds-cache.hh"
 #  include "nix/util/logging.hh"
 #  include "nix/util/finally.hh"
 #  include "nix/util/error.hh"
@@ -32,9 +33,6 @@ namespace nix {
 
 // AWS CRT initialization
 static bool crtInitialized = false;
-
-// Forward declaration for cleanup function
-void cleanupCredentialProviderCache();
 
 static void initAwsCrt()
 {
