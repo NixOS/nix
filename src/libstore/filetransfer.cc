@@ -1120,7 +1120,4 @@ FileTransferError::FileTransferError(
         err.msg = hf;
 }
 
-#if NIX_WITH_S3_SUPPORT
-#endif
-
 } // namespace nix
