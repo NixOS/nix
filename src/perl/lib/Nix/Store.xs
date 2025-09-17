@@ -168,7 +168,7 @@ StoreWrapper::queryRawRealisation(char * outputId)
       try {
         auto realisation = THIS->store->queryRealisation(DrvOutput::parse(outputId));
         if (realisation)
-            XPUSHs(sv_2mortal(newSVpv(realisation->toJSON().dump().c_str(), 0)));
+            XPUSHs(sv_2mortal(newSVpv(static_cast<nlohmann::json>(*realisation).dump().c_str(), 0)));
         else
             XPUSHs(sv_2mortal(newSVpv("", 0)));
       } catch (Error & e) {
