@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/variant-wrapper.hh"
