@@ -5,6 +5,14 @@
 
 namespace nix {
 
+// cache line alignment to prevent false sharing
+struct alignas(64) WaiterDomain
+{
+    std::condition_variable cv;
+};
+
+static std::array<Sync<WaiterDomain>, 128> waiterDomains;
+
 thread_local bool Executor::amWorkerThread{false};
 
 unsigned int Executor::getEvalCores(const EvalSettings & evalSettings)
@@ -15,6 +23,10 @@ unsigned int Executor::getEvalCores(const EvalSettings & evalSettings)
 Executor::Executor(const EvalSettings & evalSettings)
     : evalCores(getEvalCores(evalSettings))
     , enabled(evalCores > 1)
+    , interruptCallback(createInterruptCallback([&]() {
+        for (auto & domain : waiterDomains)
+            domain.lock()->cv.notify_all();
+    }))
 {
     debug("executor using %d threads", evalCores);
     auto state(state_.lock());
@@ -169,13 +181,6 @@ void FutureVector::finishAll()
         std::rethrow_exception(ex);
 }
 
-struct WaiterDomain
-{
-    std::condition_variable cv;
-} __attribute__((aligned(64))); // cache line alignment to prevent false sharing
-
-static std::array<Sync<WaiterDomain>, 128> waiterDomains;
-
 static Sync<WaiterDomain> & getWaiterDomain(detail::ValueBase & v)
 {
     auto domain = (((size_t) &v) >> 5) % waiterDomains.size();
@@ -241,6 +246,7 @@ ValueStorage<sizeof(void *)>::PackedPointer ValueStorage<sizeof(void *)>::waitOn
             return p0_;
         }
         state.nrSpuriousWakeups++;
+        checkInterrupt();
     }
 }
 

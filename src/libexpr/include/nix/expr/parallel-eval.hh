@@ -41,6 +41,8 @@ struct Executor
 
     const bool enabled;
 
+    const std::unique_ptr<InterruptCallback> interruptCallback;
+
     Sync<State> state_;
 
     std::condition_variable wakeup;
