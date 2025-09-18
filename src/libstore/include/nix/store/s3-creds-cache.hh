@@ -1,12 +1,16 @@
 #pragma once
 ///@file
 
-#include "nix/store/s3.hh"
-#include "nix/util/sync.hh"
+#include "nix/store/config.hh"
 
-#include <map>
-#include <memory>
-#include <string>
+#if NIX_WITH_S3_SUPPORT
+
+#  include "nix/store/s3.hh"
+#  include "nix/util/sync.hh"
+
+#  include <map>
+#  include <memory>
+#  include <string>
 
 namespace nix {
 
@@ -46,3 +50,5 @@ void clearCredentialProviderCache();
 void cleanupCredentialProviderCache();
 
 } // namespace nix
+
+#endif // NIX_WITH_S3_SUPPORT

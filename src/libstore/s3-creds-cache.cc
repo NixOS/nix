@@ -65,30 +65,6 @@ void cleanupCredentialProviderCache()
     }
 }
 
-#else
-
-// Stub implementations when S3 support is disabled
-
-std::shared_ptr<AwsCredentialProvider> getOrCreateCredentialProvider(const std::string & profile)
-{
-    throw Error("S3 support is not enabled");
-}
-
-void invalidateCredentialProvider(const std::string & profile)
-{
-    // No-op when S3 support is disabled
-}
-
-void clearCredentialProviderCache()
-{
-    // No-op when S3 support is disabled
-}
-
-void cleanupCredentialProviderCache()
-{
-    // No-op when S3 support is disabled
-}
-
-#endif
+#endif // NIX_WITH_S3_SUPPORT
 
 } // namespace nix
