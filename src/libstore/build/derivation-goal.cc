@@ -183,18 +183,6 @@ Goal::Co DerivationGoal::haveDerivation()
     co_return amDone(g->exitCode, g->ex);
 }
 
-/**
- * Used for `inputGoals` local variable below
- */
-struct value_comparison
-{
-    template<typename T>
-    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const
-    {
-        return *lhs < *rhs;
-    }
-};
-
 Goal::Co DerivationGoal::repairClosure()
 {
     assert(!drv->type().isImpure());
