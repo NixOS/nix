@@ -10,14 +10,6 @@
 #  include <optional>
 #  include <string>
 
-namespace Aws {
-namespace Crt {
-namespace Auth {
-class ICredentialsProvider;
-} // namespace Auth
-} // namespace Crt
-} // namespace Aws
-
 namespace nix {
 
 /**
