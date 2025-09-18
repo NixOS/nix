@@ -48,11 +48,15 @@ static void initAwsCrt()
                 }
                 ~CrtWrapper()
                 {
-                    // CRITICAL: Clear credential provider cache BEFORE AWS CRT shuts down
-                    // This ensures all providers (which hold references to ClientBootstrap)
-                    // are destroyed while AWS CRT is still valid
-                    cleanupCredentialProviderCache();
-                    // Now it's safe for ApiHandle destructor to run
+                    try {
+                        // CRITICAL: Clear credential provider cache BEFORE AWS CRT shuts down
+                        // This ensures all providers (which hold references to ClientBootstrap)
+                        // are destroyed while AWS CRT is still valid
+                        cleanupCredentialProviderCache();
+                        // Now it's safe for ApiHandle destructor to run
+                    } catch (...) {
+                        ignoreExceptionInDestructor();
+                    }
                 }
             };
             static CrtWrapper crt;

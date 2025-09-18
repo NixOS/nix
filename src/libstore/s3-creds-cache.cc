@@ -1,5 +1,6 @@
 #include "nix/store/s3-creds-cache.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 #include <unistd.h>
 
@@ -59,10 +60,8 @@ void cleanupCredentialProviderCache()
     // Simply clear the global cache
     try {
         clearCredentialProviderCache();
-    } catch (const std::exception & e) {
-        warn("Error clearing credential cache during AWS CRT shutdown: %s", e.what());
     } catch (...) {
-        warn("Unknown error clearing credential cache during AWS CRT shutdown");
+        ignoreExceptionInDestructor(lvlWarn);
     }
 }
 
