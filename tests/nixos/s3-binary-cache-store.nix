@@ -61,6 +61,7 @@ in
 
   testScript =
     { nodes }:
+    # NOTE: for tree-sitter highlighting
     # python
     ''
       # fmt: off
