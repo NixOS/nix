@@ -11,8 +11,9 @@
 #  include <aws/crt/auth/Credentials.h>
 #  include <aws/crt/io/Bootstrap.h>
 
+#  include <boost/unordered/concurrent_flat_map.hpp>
+
 #  include <condition_variable>
-#  include <map>
 #  include <mutex>
 #  include <unistd.h>
 
@@ -177,15 +178,12 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
     return *state_->result;
 }
 
-// Credential provider cache
-struct CredentialProviderCache
-{
-    // Key: profile name (empty string for default profile)
-    std::map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>> providers;
-};
+// Global credential provider cache using boost's concurrent map
+// Key: profile name (empty string for default profile)
+using CredentialProviderCache =
+    boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>;
 
-// Global credential provider cache
-Sync<CredentialProviderCache> credentialProviderCache;
+static CredentialProviderCache credentialProviderCache;
 
 } // anonymous namespace
 
@@ -193,22 +191,21 @@ AwsCredentials getAwsCredentials(const std::string & profile)
 {
     // Get or create credential provider with caching
     std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
-    {
-        auto cache(credentialProviderCache.lock());
 
-        // Check if provider exists
-        auto it = cache->providers.find(profile);
-        if (it != cache->providers.end()) {
-            provider = it->second;
-        } else {
-            debug(
-                "[pid=%d] creating new AWS credential provider for profile '%s'",
-                getpid(),
-                profile.empty() ? "(default)" : profile.c_str());
+    // Try to find existing provider
+    credentialProviderCache.visit(profile, [&](const auto & pair) { provider = pair.second; });
 
-            provider = profile.empty() ? createDefaultProvider() : createProfileProvider(profile);
-            cache->providers[profile] = provider;
-        }
+    if (!provider) {
+        // Create new provider if not found
+        debug(
+            "[pid=%d] creating new AWS credential provider for profile '%s'",
+            getpid(),
+            profile.empty() ? "(default)" : profile.c_str());
+
+        provider = profile.empty() ? createDefaultProvider() : createProfileProvider(profile);
+
+        // Insert into cache (try_emplace is thread-safe and won't overwrite if another thread added it)
+        credentialProviderCache.try_emplace(profile, provider);
     }
 
     return getCredentialsFromProvider(provider);
@@ -216,14 +213,12 @@ AwsCredentials getAwsCredentials(const std::string & profile)
 
 void invalidateAwsCredentials(const std::string & profile)
 {
-    auto cache(credentialProviderCache.lock());
-    cache->providers.erase(profile);
+    credentialProviderCache.erase(profile);
 }
 
 void clearAwsCredentialsCache()
 {
-    auto cache(credentialProviderCache.lock());
-    cache->providers.clear();
+    credentialProviderCache.clear();
 }
 
 } // namespace nix
