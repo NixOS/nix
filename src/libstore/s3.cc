@@ -32,11 +32,9 @@ using namespace std::string_view_literals;
 namespace nix {
 
 // AWS CRT initialization
-static bool crtInitialized = false;
-
-static void initAwsCrt()
+static bool initAwsCrt()
 {
-    [[maybe_unused]] static auto initialized = []() {
+    static bool initialized = []() {
         try {
             // Use a static local variable instead of global to control destruction order
             struct CrtWrapper
@@ -60,27 +58,23 @@ static void initAwsCrt()
                 }
             };
             static CrtWrapper crt;
-            crtInitialized = true;
             return true;
         } catch (const std::exception & e) {
             debug("Failed to initialize AWS CRT: %s", e.what());
-            crtInitialized = false;
             return false;
         } catch (...) {
             debug("Failed to initialize AWS CRT: unknown error");
-            crtInitialized = false;
             return false;
         }
     }();
+    return initialized;
 }
 
 // AwsCredentialProvider implementation
 
 std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
 {
-    initAwsCrt();
-
-    if (!crtInitialized) {
+    if (!initAwsCrt()) {
         throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
@@ -105,9 +99,7 @@ std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createDefault()
 
 std::unique_ptr<AwsCredentialProvider> AwsCredentialProvider::createProfile(const std::string & profile)
 {
-    initAwsCrt();
-
-    if (!crtInitialized) {
+    if (!initAwsCrt()) {
         throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
