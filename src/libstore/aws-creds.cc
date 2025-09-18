@@ -59,147 +59,135 @@ static bool initAwsCrt()
     return initialized;
 }
 
-// Internal credential provider class
-class AwsCredentialProvider
+// Free functions for creating and using credential providers
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createDefaultProvider()
 {
-private:
-    std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
-
-public:
-    static std::unique_ptr<AwsCredentialProvider> createDefault()
-    {
-        if (!initAwsCrt()) {
-            throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
-        }
-
-        try {
-            Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-            config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-
-            auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
-            if (!provider) {
-                throw AwsAuthError("Failed to create default AWS credentials provider");
-            }
-
-            return std::make_unique<AwsCredentialProvider>(provider);
-        } catch (const AwsAuthError &) {
-            throw;
-        } catch (const std::exception & e) {
-            throw AwsAuthError("Exception creating AWS credential provider: %s", e.what());
-        } catch (...) {
-            throw AwsAuthError("Unknown exception creating AWS credential provider");
-        }
+    if (!initAwsCrt()) {
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
-    static std::unique_ptr<AwsCredentialProvider> createProfile(const std::string & profile)
-    {
-        if (!initAwsCrt()) {
-            throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
+    try {
+        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
+        if (!provider) {
+            throw AwsAuthError("Failed to create default AWS credentials provider");
         }
 
-        if (profile.empty()) {
-            return createDefault();
-        }
+        return provider;
+    } catch (const AwsAuthError &) {
+        throw;
+    } catch (const std::exception & e) {
+        throw AwsAuthError("Exception creating AWS credential provider: %s", e.what());
+    } catch (...) {
+        throw AwsAuthError("Unknown exception creating AWS credential provider");
+    }
+}
 
-        try {
-            Aws::Crt::Auth::CredentialsProviderProfileConfig config;
-            config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-            config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
-
-            auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
-            if (!provider) {
-                throw AwsAuthError("Failed to create AWS credentials provider for profile '%s'", profile);
-            }
-
-            return std::make_unique<AwsCredentialProvider>(provider);
-        } catch (const AwsAuthError &) {
-            throw;
-        } catch (const std::exception & e) {
-            throw AwsAuthError("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
-        } catch (...) {
-            throw AwsAuthError("Unknown exception creating AWS credential provider for profile '%s'", profile);
-        }
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createProfileProvider(const std::string & profile)
+{
+    if (!initAwsCrt()) {
+        throw AwsAuthError("AWS CRT not initialized, cannot create credential provider");
     }
 
-    AwsCredentialProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
-        : provider(provider)
-    {
+    if (profile.empty()) {
+        return createDefaultProvider();
     }
 
-    AwsCredentials getCredentials()
+    try {
+        Aws::Crt::Auth::CredentialsProviderProfileConfig config;
+        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+        config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+
+        auto provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+        if (!provider) {
+            throw AwsAuthError("Failed to create AWS credentials provider for profile '%s'", profile);
+        }
+
+        return provider;
+    } catch (const AwsAuthError &) {
+        throw;
+    } catch (const std::exception & e) {
+        throw AwsAuthError("Exception creating AWS credential provider for profile '%s': %s", profile, e.what());
+    } catch (...) {
+        throw AwsAuthError("Unknown exception creating AWS credential provider for profile '%s'", profile);
+    }
+}
+
+static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
+{
+    if (!provider || !provider->IsValid()) {
+        throw AwsAuthError("AWS credential provider is invalid");
+    }
+
+    struct State
     {
-        if (!provider || !provider->IsValid()) {
-            throw AwsAuthError("AWS credential provider is invalid");
-        }
+        std::optional<AwsCredentials> result;
+        int resolvedErrorCode = 0;
+        bool resolved = false;
+    };
 
-        struct State
-        {
-            std::optional<AwsCredentials> result;
-            int resolvedErrorCode = 0;
-            bool resolved = false;
-        };
+    Sync<State> state;
+    std::condition_variable cv;
 
-        Sync<State> state;
-        std::condition_variable cv;
-
-        provider->GetCredentials([&](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
-            auto state_ = state.lock();
-
-            if (errorCode != 0 || !credentials) {
-                state_->resolvedErrorCode = errorCode;
-            } else {
-                auto accessKeyId = credentials->GetAccessKeyId();
-                auto secretAccessKey = credentials->GetSecretAccessKey();
-                auto sessionToken = credentials->GetSessionToken();
-
-                std::optional<std::string> sessionTokenStr;
-                if (sessionToken.len > 0) {
-                    sessionTokenStr = std::string(reinterpret_cast<const char *>(sessionToken.ptr), sessionToken.len);
-                }
-
-                state_->result = AwsCredentials(
-                    std::string(reinterpret_cast<const char *>(accessKeyId.ptr), accessKeyId.len),
-                    std::string(reinterpret_cast<const char *>(secretAccessKey.ptr), secretAccessKey.len),
-                    sessionTokenStr);
-            }
-
-            state_->resolved = true;
-            cv.notify_one();
-        });
-
-        {
-            auto state_ = state.lock();
-            // AWS CRT GetCredentials is asynchronous and only guarantees the callback will be
-            // invoked if the initial call returns success. There's no documented timeout mechanism,
-            // so we add a timeout to prevent indefinite hanging if the callback is never called.
-            auto timeout = std::chrono::seconds(30);
-            if (!state_.wait_for(cv, timeout, [&] { return state_->resolved; })) {
-                throw AwsAuthError(
-                    "Timeout waiting for AWS credentials (%d seconds)",
-                    std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
-            }
-        }
-
+    provider->GetCredentials([&](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
         auto state_ = state.lock();
-        if (!state_->result) {
-            throw AwsAuthError("Failed to resolve AWS credentials: error code %d", state_->resolvedErrorCode);
+
+        if (errorCode != 0 || !credentials) {
+            state_->resolvedErrorCode = errorCode;
+        } else {
+            auto accessKeyId = credentials->GetAccessKeyId();
+            auto secretAccessKey = credentials->GetSecretAccessKey();
+            auto sessionToken = credentials->GetSessionToken();
+
+            std::optional<std::string> sessionTokenStr;
+            if (sessionToken.len > 0) {
+                sessionTokenStr = std::string(reinterpret_cast<const char *>(sessionToken.ptr), sessionToken.len);
+            }
+
+            state_->result = AwsCredentials(
+                std::string(reinterpret_cast<const char *>(accessKeyId.ptr), accessKeyId.len),
+                std::string(reinterpret_cast<const char *>(secretAccessKey.ptr), secretAccessKey.len),
+                sessionTokenStr);
         }
 
-        return *state_->result;
+        state_->resolved = true;
+        cv.notify_one();
+    });
+
+    {
+        auto state_ = state.lock();
+        // AWS CRT GetCredentials is asynchronous and only guarantees the callback will be
+        // invoked if the initial call returns success. There's no documented timeout mechanism,
+        // so we add a timeout to prevent indefinite hanging if the callback is never called.
+        auto timeout = std::chrono::seconds(30);
+        if (!state_.wait_for(cv, timeout, [&] { return state_->resolved; })) {
+            throw AwsAuthError(
+                "Timeout waiting for AWS credentials (%d seconds)",
+                std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
+        }
     }
-};
+
+    auto state_ = state.lock();
+    if (!state_->result) {
+        throw AwsAuthError("Failed to resolve AWS credentials: error code %d", state_->resolvedErrorCode);
+    }
+
+    return *state_->result;
+}
 
 // Credential provider cache
 struct CredentialProviderCache
 {
     // Key: profile name (empty string for default profile)
-    std::map<std::string, std::shared_ptr<AwsCredentialProvider>> providers;
+    std::map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>> providers;
 };
 
 // Global credential provider cache
 Sync<CredentialProviderCache> credentialProviderCache;
 
-std::shared_ptr<AwsCredentialProvider> getOrCreateCredentialProvider(const std::string & profile)
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> getOrCreateCredentialProvider(const std::string & profile)
 {
     auto cache(credentialProviderCache.lock());
 
@@ -213,12 +201,10 @@ std::shared_ptr<AwsCredentialProvider> getOrCreateCredentialProvider(const std::
         "[pid=%d] creating new AWS credential provider for profile '%s'",
         getpid(),
         profile.empty() ? "(default)" : profile.c_str());
-    auto provider =
-        profile.empty() ? AwsCredentialProvider::createDefault() : AwsCredentialProvider::createProfile(profile);
 
-    auto sharedProvider = std::shared_ptr<AwsCredentialProvider>(std::move(provider));
-    cache->providers[profile] = sharedProvider;
-    return sharedProvider;
+    auto provider = profile.empty() ? createDefaultProvider() : createProfileProvider(profile);
+    cache->providers[profile] = provider;
+    return provider;
 }
 
 } // anonymous namespace
@@ -226,7 +212,7 @@ std::shared_ptr<AwsCredentialProvider> getOrCreateCredentialProvider(const std::
 AwsCredentials getAwsCredentials(const std::string & profile)
 {
     auto provider = getOrCreateCredentialProvider(profile);
-    return provider->getCredentials();
+    return getCredentialsFromProvider(provider);
 }
 
 void invalidateAwsCredentials(const std::string & profile)
