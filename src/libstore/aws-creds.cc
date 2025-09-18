@@ -187,31 +187,30 @@ struct CredentialProviderCache
 // Global credential provider cache
 Sync<CredentialProviderCache> credentialProviderCache;
 
-static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> getOrCreateCredentialProvider(const std::string & profile)
-{
-    auto cache(credentialProviderCache.lock());
-
-    // Check if provider exists
-    auto it = cache->providers.find(profile);
-    if (it != cache->providers.end()) {
-        return it->second;
-    }
-
-    debug(
-        "[pid=%d] creating new AWS credential provider for profile '%s'",
-        getpid(),
-        profile.empty() ? "(default)" : profile.c_str());
-
-    auto provider = profile.empty() ? createDefaultProvider() : createProfileProvider(profile);
-    cache->providers[profile] = provider;
-    return provider;
-}
-
 } // anonymous namespace
 
 AwsCredentials getAwsCredentials(const std::string & profile)
 {
-    auto provider = getOrCreateCredentialProvider(profile);
+    // Get or create credential provider with caching
+    std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
+    {
+        auto cache(credentialProviderCache.lock());
+
+        // Check if provider exists
+        auto it = cache->providers.find(profile);
+        if (it != cache->providers.end()) {
+            provider = it->second;
+        } else {
+            debug(
+                "[pid=%d] creating new AWS credential provider for profile '%s'",
+                getpid(),
+                profile.empty() ? "(default)" : profile.c_str());
+
+            provider = profile.empty() ? createDefaultProvider() : createProfileProvider(profile);
+            cache->providers[profile] = provider;
+        }
+    }
+
     return getCredentialsFromProvider(provider);
 }
 
