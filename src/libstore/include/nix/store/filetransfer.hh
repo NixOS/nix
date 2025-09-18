@@ -12,7 +12,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
 #ifdef NIX_WITH_S3_SUPPORT
-#  include "nix/store/s3.hh"
+#  include "nix/store/aws-creds.hh"
 #endif
 
 namespace nix {

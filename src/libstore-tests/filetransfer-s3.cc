@@ -1,7 +1,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/config.hh"
 #include "nix/store/s3-binary-cache-store.hh"
-#include "nix/store/s3.hh"
+#include "nix/store/s3-url.hh"
 
 #if NIX_WITH_S3_SUPPORT
 

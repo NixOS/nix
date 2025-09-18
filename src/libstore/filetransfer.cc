@@ -12,8 +12,8 @@
 #include "store-config-private.hh"
 #include "nix/store/config.hh"
 #if NIX_WITH_S3_SUPPORT
-#  include "nix/store/s3.hh"
-#  include "nix/store/s3-creds-cache.hh"
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
 #endif
 
 #ifdef __linux__
@@ -166,9 +166,8 @@ struct curlFileTransfer : public FileTransfer
                         } else {
                             std::string profile = parsed.profile.value_or("");
 
-                            // Use cached credential provider
-                            auto credProvider = getOrCreateCredentialProvider(profile);
-                            credsOpt = credProvider->getCredentials();
+                            // Get credentials (automatically cached)
+                            credsOpt = getAwsCredentials(profile);
                         }
 
                         if (credsOpt) {
@@ -188,9 +187,9 @@ struct curlFileTransfer : public FileTransfer
                     } catch (const AwsAuthError & e) {
                         warn("AWS authentication failed for S3 request %s: %s", request.uri, e.what());
 
-                        // Invalidate the cached provider so next request will retry
+                        // Invalidate the cached credentials so next request will retry
                         std::string profile = parsed.profile.value_or("");
-                        invalidateCredentialProvider(profile);
+                        invalidateAwsCredentials(profile);
 
                         // Continue without authentication - might be a public bucket
                     }
@@ -733,7 +732,7 @@ public:
         // IMPORTANT: We must clear the providers here to ensure they are destroyed
         // BEFORE the AWS CRT ApiHandle is destroyed during static destruction.
         // This prevents a deadlock where AWS CRT waits for resources we're holding.
-        clearCredentialProviderCache();
+        clearAwsCredentialsCache();
 #endif
 
         if (curlm)
@@ -925,9 +924,8 @@ public:
             auto s3Url = ParsedS3URL::parse(parsedUrl);
             std::string profile = s3Url.profile.value_or("");
 
-            // Get or create credential provider from cache
-            auto credProvider = getOrCreateCredentialProvider(profile);
-            return credProvider->getCredentials();
+            // Get credentials (automatically cached)
+            return getAwsCredentials(profile);
         } catch (const AwsAuthError & e) {
             debug("Failed to pre-resolve S3 credentials: %s", e.what());
             return std::nullopt;

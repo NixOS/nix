@@ -19,7 +19,8 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/filetransfer.hh"
-#include "nix/store/s3.hh"
+#include "nix/store/aws-creds.hh"
+#include "nix/store/s3-url.hh"
 
 #include <queue>
 
