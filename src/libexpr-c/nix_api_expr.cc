@@ -137,7 +137,7 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
 
 void nix_eval_state_builder_free(nix_eval_state_builder * builder)
 {
-    delete builder;
+    operator delete(builder, static_cast<std::align_val_t>(alignof(nix_eval_state_builder)));
 }
 
 nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder)
@@ -203,7 +203,7 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
 
 void nix_state_free(EvalState * state)
 {
-    delete state;
+    operator delete(state, static_cast<std::align_val_t>(alignof(EvalState)));
 }
 
 #if NIX_USE_BOEHMGC
