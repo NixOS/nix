@@ -155,7 +155,7 @@ private:
 
     JobCategory jobCategory() const override
     {
-        return JobCategory::Build;
+        return JobCategory::Administration;
     };
 };
 
