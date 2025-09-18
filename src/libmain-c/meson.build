@@ -28,6 +28,7 @@ deps_public_maybe_subproject = [
 subdir('nix-meson-build-support/subprojects')
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'nix_api_main.cc',

@@ -239,6 +239,12 @@ foreach suite : suites
     # Turns, e.g., `tests/functional/flakes/show.sh` into a Meson test target called
     # `functional-flakes-show`.
     name = fs.replace_suffix(script, '')
+    asan_options = 'abort_on_error=1:print_summary=1:detect_leaks=0'
+    # Otherwise ASAN dumps warnings into stderr that make some tests fail on stderr output
+    # comparisons.
+    asan_options += ':log_path=@0@'.format(
+      meson.current_build_dir() / 'asan-log',
+    )
 
     test(
       name,
@@ -253,6 +259,7 @@ foreach suite : suites
       ],
       suite : suite_name,
       env : {
+        'ASAN_OPTIONS' : asan_options,
         '_NIX_TEST_SOURCE_DIR' : meson.current_source_dir(),
         '_NIX_TEST_BUILD_DIR' : meson.current_build_dir(),
         'TEST_NAME' : suite_name / name,

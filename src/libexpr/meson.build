@@ -53,7 +53,12 @@ deps_other += boost
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-bdw_gc = dependency('bdw-gc', required : get_option('gc'))
+bdw_gc_required = get_option('gc').disable_if(
+  'address' in get_option('b_sanitize'),
+  error_message : 'Building with Boehm GC and ASAN is not supported',
+)
+
+bdw_gc = dependency('bdw-gc', required : bdw_gc_required)
 if bdw_gc.found()
   deps_public += bdw_gc
   foreach funcspec : [
@@ -88,6 +93,7 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 
 parser_tab = custom_target(
   input : 'parser.y',

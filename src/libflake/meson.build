@@ -29,6 +29,7 @@ nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 
 subdir('nix-meson-build-support/generate-header')
 

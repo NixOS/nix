@@ -2,6 +2,7 @@ xp_features_json = custom_target(
   command : [ nix, '__dump-xp-features' ],
   capture : true,
   output : 'xp-features.json',
+  env : nix_env_for_docs,
 )
 
 experimental_features_shortlist_md = custom_target(
