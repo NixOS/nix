@@ -265,9 +265,24 @@ ExternalValue * nix_get_external(nix_c_context * context, nix_value * value);
  */
 nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int ix);
 
-/** @brief Get an attr by name
+/** @brief Get the ix'th element of a list without forcing evaluation of the element
+ *
+ * Returns the list element without forcing its evaluation, allowing access to lazy values.
+ * The list value itself must already be evaluated.
  *
  * Owned by the GC. Use nix_gc_decref when you're done with the pointer
+ * @param[out] context Optional, stores error information
+ * @param[in] value Nix value to inspect (must be an evaluated list)
+ * @param[in] state nix evaluator state
+ * @param[in] ix list element to get
+ * @return value, NULL in case of errors
+ */
+nix_value *
+nix_get_list_byidx_lazy(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int ix);
+
+/** @brief Get an attr by name
+ *
+ * Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
@@ -275,6 +290,21 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
  * @return value, NULL in case of errors
  */
 nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name);
+
+/** @brief Get an attribute value by attribute name, without forcing evaluation of the attribute's value
+ *
+ * Returns the attribute value without forcing its evaluation, allowing access to lazy values.
+ * The attribute set value itself must already be evaluated.
+ *
+ * Use nix_gc_decref when you're done with the pointer
+ * @param[out] context Optional, stores error information
+ * @param[in] value Nix value to inspect (must be an evaluated attribute set)
+ * @param[in] state nix evaluator state
+ * @param[in] name attribute name
+ * @return value, NULL in case of errors
+ */
+nix_value *
+nix_get_attr_byname_lazy(nix_c_context * context, const nix_value * value, EvalState * state, const char * name);
 
 /** @brief Check if an attribute name exists on a value
  * @param[out] context Optional, stores error information
@@ -289,7 +319,7 @@ bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalS
  *
  * Also gives you the name.
  *
- * Owned by the GC. Use nix_gc_decref when you're done with the pointer
+ * Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
  * @param[in] value Nix value to inspect
  * @param[in] state nix evaluator state
@@ -299,6 +329,22 @@ bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalS
  */
 nix_value *
 nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name);
+
+/** @brief Get an attribute by index in the sorted bindings, without forcing evaluation of the attribute's value
+ *
+ * Also gives you the name. Returns the attribute value without forcing its evaluation, allowing access to lazy values.
+ * The attribute set value itself must already be evaluated.
+ *
+ * Use nix_gc_decref when you're done with the pointer
+ * @param[out] context Optional, stores error information
+ * @param[in] value Nix value to inspect (must be an evaluated attribute set)
+ * @param[in] state nix evaluator state
+ * @param[in] i attribute index
+ * @param[out] name will store a pointer to the attribute name
+ * @return value, NULL in case of errors
+ */
+nix_value * nix_get_attr_byidx_lazy(
+    nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name);
 
 /** @brief Get an attribute name by index in the sorted bindings
  *
