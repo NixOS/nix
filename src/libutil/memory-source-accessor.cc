@@ -24,11 +24,11 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
                     i,
                     {
                         std::string{name},
-                        File::Directory{},
+                        make_ref<File>(File::Directory{}),
                     });
             }
         }
-        cur = &i->second;
+        cur = &*i->second;
     }
 
     if (newF && create)
@@ -92,7 +92,7 @@ MemorySourceAccessor::DirEntries MemorySourceAccessor::readDirectory(const Canon
     if (auto * d = std::get_if<File::Directory>(&f->raw)) {
         DirEntries res;
         for (auto & [name, file] : d->contents)
-            res.insert_or_assign(name, file.lstat().type);
+            res.insert_or_assign(name, file->lstat().type);
         return res;
     } else
         throw Error("file '%s' is not a directory", path);
