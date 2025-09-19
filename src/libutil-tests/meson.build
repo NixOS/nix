@@ -42,6 +42,7 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'args.cc',
@@ -96,7 +97,7 @@ this_exe = executable(
 test(
   meson.project_name(),
   this_exe,
-  env : {
+  env : asan_test_options_env + {
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
   },
   protocol : 'gtest',

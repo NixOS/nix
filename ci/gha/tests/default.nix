@@ -24,16 +24,7 @@ let
   enableSanitizersLayer = finalAttrs: prevAttrs: {
     mesonFlags =
       (prevAttrs.mesonFlags or [ ])
-      ++ [
-        # Run all tests with UBSAN enabled. Running both with ubsan and
-        # without doesn't seem to have much immediate benefit for doubling
-        # the GHA CI workaround.
-        #
-        # TODO: Work toward enabling "address,undefined" if it seems feasible.
-        # This would maybe require dropping Boost coroutines and ignoring intentional
-        # memory leaks with detect_leaks=0.
-        (lib.mesonOption "b_sanitize" "undefined")
-      ]
+      ++ [ (lib.mesonOption "b_sanitize" "address,undefined") ]
       ++ (lib.optionals stdenv.cc.isClang [
         # https://www.github.com/mesonbuild/meson/issues/764
         (lib.mesonBool "b_lundef" false)
@@ -71,8 +62,12 @@ rec {
   nixComponentsInstrumented = nixComponents.overrideScope (
     final: prev: {
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
+      # Boehm is incompatible with ASAN.
+      nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
+      # Unclear how to make Perl bindings work with a dynamically linked ASAN.
+      nix-perl-bindings = if withSanitizers then null else prev.nix-perl-bindings;
     }
   );
 
