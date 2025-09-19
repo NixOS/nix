@@ -1,4 +1,5 @@
 #include "nix/store/aws-creds.hh"
+#include <aws/crt/Types.h>
 
 #if NIX_WITH_S3_SUPPORT
 
@@ -141,18 +142,18 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
         if (errorCode != 0 || !credentials) {
             state_->resolvedErrorCode = errorCode;
         } else {
-            auto accessKeyId = credentials->GetAccessKeyId();
-            auto secretAccessKey = credentials->GetSecretAccessKey();
-            auto sessionToken = credentials->GetSessionToken();
+            auto accessKeyId = Aws::Crt::ByteCursorToStringView(credentials->GetAccessKeyId());
+            auto secretAccessKey = Aws::Crt::ByteCursorToStringView(credentials->GetSecretAccessKey());
+            auto sessionToken = Aws::Crt::ByteCursorToStringView(credentials->GetSessionToken());
 
             std::optional<std::string> sessionTokenStr;
-            if (sessionToken.len > 0) {
-                sessionTokenStr = std::string(reinterpret_cast<const char *>(sessionToken.ptr), sessionToken.len);
+            if (!sessionToken.empty()) {
+                sessionTokenStr = std::string(sessionToken.data(), sessionToken.size());
             }
 
             state_->result = AwsCredentials(
-                std::string(reinterpret_cast<const char *>(accessKeyId.ptr), accessKeyId.len),
-                std::string(reinterpret_cast<const char *>(secretAccessKey.ptr), secretAccessKey.len),
+                std::string(accessKeyId.data(), accessKeyId.size()),
+                std::string(secretAccessKey.data(), secretAccessKey.size()),
                 sessionTokenStr);
         }
 
