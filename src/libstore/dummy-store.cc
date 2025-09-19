@@ -26,6 +26,7 @@ struct DummyStore : virtual Store
         , config(config)
         , contents(make_ref<MemorySourceAccessor>())
     {
+        contents->setPathDisplay(config->storeDir);
     }
 
     void queryPathInfoUncached(
