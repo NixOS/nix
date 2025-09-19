@@ -93,29 +93,25 @@ in
         raise Exception("Error message formatting didn't work")
 
       # Test derivation-based fetchurl to validate forked process behavior
-      # Use a raw derivation with builtin:fetchurl to ensure we can observe fork behavior
       # First, get the actual hash of nix-cache-info
       cache_info_path = client.succeed("${env} nix eval --impure --raw --expr 'builtins.fetchurl { name = \"nix-cache-info\"; url = \"s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1\"; }'")
       cache_info_path = cache_info_path.strip()
       cache_info_hash = client.succeed(f"nix hash file --type sha256 --base32 {cache_info_path}")
       cache_info_hash = cache_info_hash.strip()
 
-      # Use a unique name to avoid cache hits
+      # Use a unique test_id to avoid cache hits
       import random
-      derivation_test = f"""
-        derivation {{
-          name = "s3-fork-test-{random.randint(0, 100)}";
-          builder = "builtin:fetchurl";
-          url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1";
-          outputHashMode = "flat";
-          outputHashAlgo = "sha256";
-          outputHash = "{cache_info_hash}";
-          system = "x86_64-linux";
+      test_id = random.randint(0, 10000)
+      fetchurl_test = f"""
+        import <nix/fetchurl.nix> {{
+          name = "s3-fork-test-{test_id}";
+          url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1&test_id={test_id}";
+          sha256 = "{cache_info_hash}";
         }}
       """
 
       # Run the derivation and capture debug output to check credential provider creation
-      derivation_output = client.succeed("${env} nix build --debug --impure --expr '" + derivation_test + "' 2>&1")
+      derivation_output = client.succeed("${env} nix build --debug --impure --expr '" + fetchurl_test + "' 2>&1")
 
       # Check for evidence of forked process behavior
       if "builtin:fetchurl creating fresh FileTransfer instance" not in derivation_output:
@@ -191,17 +187,12 @@ in
       print("Testing concurrent S3 fetches...")
 
       # Create multiple concurrent derivations that fetch from S3
-      # Use raw derivations to ensure we can observe fork behavior
       concurrent_test = """
         let
-          mkFetch = i: derivation {
+          mkFetch = i: import <nix/fetchurl.nix> {
             name = "concurrent-s3-fetch-''${toString i}";
-            builder = "builtin:fetchurl";
-            url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1";
-            outputHashMode = "flat";
-            outputHashAlgo = "sha256";
-            outputHash = \"""" + cache_info_hash + """\";
-            system = "x86_64-linux";
+            url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1&fetch_id=''${toString i}";
+            sha256 = \"""" + cache_info_hash + """\";
           };
           # Create 5 concurrent fetches
           fetches = builtins.listToAttrs (map (i: {
