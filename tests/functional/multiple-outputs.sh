@@ -8,11 +8,15 @@ clearStoreIfPossible
 
 rm -f $TEST_ROOT/result*
 
-# Test whether the output names match our expectations
-outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
-[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]
-outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.dev.outPath)
-[ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a-dev" ]
+# Placeholder strings are opaque, so cannot do this check for floating
+# content-addressing derivations.
+if [[ ! -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    # Test whether the output names match our expectations
+    outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.out.outPath)
+    [ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a" ]
+    outPath=$(nix-instantiate multiple-outputs.nix --eval -A nameCheck.dev.outPath)
+    [ "$(echo "$outPath" | sed -E 's_^".*/[^-/]*-([^/]*)"$_\1_')" = "multiple-outputs-a-dev" ]
+fi
 
 # Test whether read-only evaluation works when referring to the
 # ‘drvPath’ attribute.
@@ -29,8 +33,12 @@ grepQuiet 'multiple-outputs-b.drv",\["out"\]' $drvPath
 # While we're at it, test the ‘unsafeDiscardOutputDependency’ primop.
 outPath=$(nix-build multiple-outputs.nix -A d --no-out-link)
 drvPath=$(cat $outPath/drv)
-outPath=$(nix-store -q $drvPath)
-(! [ -e "$outPath" ])
+if [[ -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    expectStderr 1 nix-store -q $drvPath | grepQuiet "Cannot use output path of floating content-addressing derivation until we know what it is (e.g. by building it)"
+else
+    outPath=$(nix-store -q $drvPath)
+    (! [ -e "$outPath" ])
+fi
 
 # Do a build of something that depends on a derivation with multiple
 # outputs.
@@ -60,14 +68,16 @@ outPath2=$(nix-build $(nix-instantiate multiple-outputs.nix -A a.second) --no-ou
 
 [[ $(nix-build $(nix-instantiate multiple-outputs.nix -A a.all) --no-out-link | wc -l) -eq 2 ]]
 
-# Delete one of the outputs and rebuild it.  This will cause a hash
-# rewrite.
-env -u NIX_REMOTE nix store delete $TEST_ROOT/result-second --ignore-liveness
-nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
-[ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
-[ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
-hash2=$(nix-store -q --hash $TEST_ROOT/result-second)
-[ "$hash1" = "$hash2" ]
+if [[ ! -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    # Delete one of the outputs and rebuild it.  This will cause a hash
+    # rewrite.
+    env -u NIX_REMOTE nix store delete $TEST_ROOT/result-second --ignore-liveness
+    nix-build multiple-outputs.nix -A a.all -o $TEST_ROOT/result
+    [ "$(cat $TEST_ROOT/result-second/file)" = "second" ]
+    [ "$(cat $TEST_ROOT/result-second/link/file)" = "first" ]
+    hash2=$(nix-store -q --hash $TEST_ROOT/result-second)
+    [ "$hash1" = "$hash2" ]
+fi
 
 # Make sure that nix-build works on derivations with multiple outputs.
 echo "building a.first..."
@@ -88,5 +98,9 @@ nix-store --gc --print-roots
 rm -rf $NIX_STORE_DIR/.links
 rmdir $NIX_STORE_DIR
 
-expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
-expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'
+# TODO inspect why this doesn't work with floating content-addressing
+# derivations.
+if [[ ! -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
+    expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'
+fi

@@ -18,6 +18,7 @@ suites += {
     'eval-store.sh',
     'gc.sh',
     'import-from-derivation.sh',
+    'multiple-outputs.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
     'nix-run.sh',
