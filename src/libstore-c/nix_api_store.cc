@@ -126,6 +126,36 @@ StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const c
     NIXC_CATCH_ERRS_NULL
 }
 
+nix_err nix_store_get_fs_closure(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    bool flip_direction,
+    bool include_outputs,
+    bool include_derivers,
+    void * userdata,
+    void (*callback)(nix_c_context * context, void * userdata, const StorePath * store_path))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        const auto nixStore = store->ptr;
+
+        nix::StorePathSet set;
+        nixStore->computeFSClosure(store_path->path, set, flip_direction, include_outputs, include_derivers);
+
+        if (callback) {
+            for (const auto & path : set) {
+                const StorePath tmp{path};
+                callback(context, userdata, &tmp);
+                if (context && context->last_err_code != NIX_OK)
+                    return context->last_err_code;
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_err nix_store_realise(
     nix_c_context * context,
     Store * store,

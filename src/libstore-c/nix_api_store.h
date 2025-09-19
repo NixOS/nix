@@ -245,6 +245,30 @@ void nix_derivation_free(nix_derivation * drv);
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
 
+/**
+ * @brief Gets the closure of a specific store path
+ *
+ * @note The callback borrows each StorePath only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] store_path The path to compute from
+ * @param[in] flip_direction
+ * @param[in] include_outputs
+ * @param[in] include_derivers
+ * @param[in] callback The function to call for every store path, in no particular order
+ * @param[in] userdata The userdata to pass to the callback
+ */
+nix_err nix_store_get_fs_closure(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    bool flip_direction,
+    bool include_outputs,
+    bool include_derivers,
+    void * userdata,
+    void (*callback)(nix_c_context * context, void * userdata, const StorePath * store_path));
+
 // cffi end
 #ifdef __cplusplus
 }
