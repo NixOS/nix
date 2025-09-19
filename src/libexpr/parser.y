@@ -456,7 +456,7 @@ attrs
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($2);
       if (str) {
-          $$->emplace_back(AttrName(state->symbols.create(str->s)), state->at(@2));
+          $$->emplace_back(AttrName(state->symbols.create(str->v.string_view())), state->at(@2));
           delete str;
       } else
           throw ParseError({
@@ -473,7 +473,7 @@ attrpath
     { $$ = $1;
       ExprString * str = dynamic_cast<ExprString *>($3);
       if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->s)));
+          $$->push_back(AttrName(state->symbols.create(str->v.string_view())));
           delete str;
       } else
           $$->push_back(AttrName($3));
@@ -483,7 +483,7 @@ attrpath
     { $$ = new std::vector<AttrName>;
       ExprString *str = dynamic_cast<ExprString *>($1);
       if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->s)));
+          $$->push_back(AttrName(state->symbols.create(str->v.string_view())));
           delete str;
       } else
           $$->push_back(AttrName($1));

@@ -173,7 +173,9 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
+    private:
     std::string s;
+    public:
     Value v;
 
     ExprString(std::string && s)
