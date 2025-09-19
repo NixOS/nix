@@ -920,25 +920,12 @@ ref<curlFileTransfer> makeCurlFileTransfer()
 
 ref<FileTransfer> getFileTransfer()
 {
-    struct StaticFileTransfer
-    {
-        ref<curlFileTransfer> fileTransfer;
+    static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-        StaticFileTransfer()
-            : fileTransfer(makeCurlFileTransfer())
-        {
-        }
+    if (fileTransfer->state_.lock()->quit)
+        fileTransfer = makeCurlFileTransfer();
 
-        ~StaticFileTransfer() {}
-    };
-
-    static StaticFileTransfer staticFT;
-
-    if (staticFT.fileTransfer->hasQuit()) {
-        staticFT.fileTransfer = makeCurlFileTransfer();
-    }
-
-    return staticFT.fileTransfer;
+    return fileTransfer;
 }
 
 ref<FileTransfer> makeFileTransfer()
