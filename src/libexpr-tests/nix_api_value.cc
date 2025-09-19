@@ -162,6 +162,29 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     nix_gc_decref(ctx, intValue);
 }
 
+TEST_F(nix_api_expr_test, nix_get_list_byidx_large_indices)
+{
+    // Create a small list to test extremely large out-of-bounds access
+    ListBuilder * builder = nix_make_list_builder(ctx, state, 2);
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    nix_list_builder_insert(ctx, builder, 0, intValue);
+    nix_list_builder_insert(ctx, builder, 1, intValue);
+    nix_make_list(ctx, builder, value);
+    nix_list_builder_free(builder);
+
+    // Test extremely large indices that would definitely crash without bounds checking
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, UINT_MAX / 2));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, UINT_MAX / 2 + 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Clean up
+    nix_gc_decref(ctx, intValue);
+}
+
 TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_attr_byname(ctx, nullptr, state, 0));
@@ -241,6 +264,38 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     // Clean up
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
+    free(out_name);
+}
+
+TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
+{
+    // Create a small attribute set to test extremely large out-of-bounds access
+    const char ** out_name = (const char **) malloc(sizeof(char *));
+    BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 2);
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    nix_bindings_builder_insert(ctx, builder, "test", intValue);
+    nix_make_attrs(ctx, value, builder);
+    nix_bindings_builder_free(builder);
+
+    // Test extremely large indices that would definitely crash without bounds checking
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, 1000000, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, UINT_MAX / 2, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, UINT_MAX / 2 + 1000000, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Test nix_get_attr_name_byidx with large indices too
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, UINT_MAX / 2));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, UINT_MAX / 2 + 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Clean up
+    nix_gc_decref(ctx, intValue);
     free(out_name);
 }
 

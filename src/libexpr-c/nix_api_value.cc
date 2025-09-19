@@ -326,6 +326,10 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
+        if (ix >= v.listSize()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "list index out of bounds");
+            return nullptr;
+        }
         auto * p = v.listView()[ix];
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
@@ -389,6 +393,10 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
     try {
         auto & v = check_value_in(value);
         collapse_attrset_layer_chain_if_needed(v, state);
+        if (i >= v.attrs()->size()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "attribute index out of bounds");
+            return nullptr;
+        }
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
         nix_gc_incref(nullptr, a.value);
@@ -405,6 +413,10 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value,
     try {
         auto & v = check_value_in(value);
         collapse_attrset_layer_chain_if_needed(v, state);
+        if (i >= v.attrs()->size()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "attribute index out of bounds (Nix C API contract violation)");
+            return nullptr;
+        }
         const nix::Attr & a = (*v.attrs())[i];
         return state->state.symbols[a.name].c_str();
     }
