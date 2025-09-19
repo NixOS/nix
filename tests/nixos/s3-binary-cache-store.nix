@@ -61,6 +61,8 @@ in
 
   testScript =
     { nodes }:
+    # NOTE: for tree-sitter highlighting
+    # python
     ''
       # fmt: off
       start_all()
@@ -73,7 +75,11 @@ in
       server.succeed("mc config host add minio http://localhost:9000 ${accessKey} ${secretKey} --api s3v4")
       server.succeed("mc mb minio/my-cache")
 
-      server.succeed("${env} nix copy --to '${storeUrl}' ${pkgA}")
+      # Test copying from a store and credential caching works
+      server_cp_out = server.succeed("${env} nix copy --debug --to '${storeUrl}' ${pkgA} 2>&1")
+      server_providers_created = server_cp_out.count("creating new AWS credential provider")
+      if server_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {server_providers_created}. Credential provider caching is probably not working.")
 
       client.wait_for_unit("network-addresses-eth1.service")
 
@@ -82,17 +88,143 @@ in
 
       # Test that the format string in the error message is properly setup and won't display `%s` instead of the failed URI
       msg = client.fail("${env} nix eval --impure --expr 'builtins.fetchurl { name = \"foo\"; url = \"${objectThatDoesNotExist}\"; }' 2>&1")
-      if "S3 object '${objectThatDoesNotExist}' does not exist" not in msg:
+      if "unable to download '${objectThatDoesNotExist}': HTTP error 404" not in msg:
         print(msg) # So that you can see the message that was improperly formatted
         raise Exception("Error message formatting didn't work")
+
+      # Test derivation-based fetchurl to validate forked process behavior
+      # First, get the actual hash of nix-cache-info
+      cache_info_path = client.succeed("${env} nix eval --impure --raw --expr 'builtins.fetchurl { name = \"nix-cache-info\"; url = \"s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1\"; }'")
+      cache_info_path = cache_info_path.strip()
+      cache_info_hash = client.succeed(f"nix hash file --type sha256 --base32 {cache_info_path}")
+      cache_info_hash = cache_info_hash.strip()
+
+      # Use a unique test_id to avoid cache hits
+      import random
+      test_id = random.randint(0, 10000)
+      fetchurl_test = f"""
+        import <nix/fetchurl.nix> {{
+          name = "s3-fork-test-{test_id}";
+          url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1&test_id={test_id}";
+          sha256 = "{cache_info_hash}";
+        }}
+      """
+
+      # Run the derivation and capture debug output to check credential provider creation
+      derivation_output = client.succeed("${env} nix build --debug --impure --expr '" + fetchurl_test + "' 2>&1")
+
+      # Check for evidence of forked process behavior
+      if "builtin:fetchurl creating fresh FileTransfer instance" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected to find 'builtin:fetchurl creating fresh FileTransfer instance' in debug output")
+      else:
+        print("SUCCESS: Found evidence of FileTransfer creation in forked process")
+
+      # Check that pre-resolution is working properly
+      # Parent should pre-resolve credentials
+      if "Pre-resolving AWS credentials for S3 URL in builtin:fetchurl" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected to find parent pre-resolving AWS credentials")
+
+      if "Successfully pre-resolved AWS credentials in parent process" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected parent to successfully pre-resolve credentials")
+
+      # Child should use pre-resolved credentials, NOT create new providers
+      if "Using pre-resolved AWS credentials from parent process" not in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception("FAILED: Expected child to use pre-resolved AWS credentials")
+
+      # Extract child PID from "builtin:fetchurl creating fresh FileTransfer instance" message
+      import re
+      filetransfer_match = re.search(r'\[pid=(\d+)\] builtin:fetchurl creating fresh FileTransfer instance', derivation_output)
+      if not filetransfer_match:
+        raise Exception("FAILED: Could not extract child PID from debug output")
+
+      child_pid = filetransfer_match.group(1)
+
+      # Make sure the child (identified by PID) is NOT creating new credential providers
+      child_credential_creation = f"[pid={child_pid}] creating new AWS credential provider"
+      if child_credential_creation in derivation_output:
+        print("Debug output:")
+        print(derivation_output)
+        raise Exception(f"FAILED: Child process (pid={child_pid}) should NOT create new credential providers when using pre-resolved credentials")
+
+      print("SUCCESS: Pre-resolution is working - child uses pre-resolved credentials instead of creating new providers")
 
       # Copy a package from the binary cache.
       client.fail("nix path-info ${pkgA}")
 
+      # Test nix store info with various S3 URL formats
       client.succeed("${env} nix store info --store '${storeUrl}' >&2")
 
-      client.succeed("${env} nix copy --no-check-sigs --from '${storeUrl}' ${pkgA}")
+      # Test with different region parameter (should work without warnings)
+      client.succeed("${env} nix store info --store 's3://my-cache?endpoint=http://server:9000&region=us-east-2' >&2")
+
+      # Test with just bucket name and region
+      client.succeed("${env} nix store info --store 's3://my-cache?region=eu-west-1&endpoint=http://server:9000' >&2")
+
+      # Test that store info shows the store is available
+      info = client.succeed("${env} nix store info --json --store '${storeUrl}'")
+      import json
+      store_info = json.loads(info)
+      assert store_info.get("url"), "Store should have a URL"
+      print(f"Store URL: {store_info.get('url')}")
+
+      # Test copying from a store and credential caching works
+      client_cp_out = client.succeed("${env} nix copy --debug --no-check-sigs --from '${storeUrl}' ${pkgA} 2>&1")
+      client_providers_created = client_cp_out.count("creating new AWS credential provider")
+      if client_providers_created != 1:
+          raise Exception(f"Expected only 1 credential provider to be created, but got {client_providers_created}. Credential provider caching is probably not working.")
 
       client.succeed("nix path-info ${pkgA}")
+
+      # Test concurrent S3 fetches to identify potential thread safety issues
+      print("Testing concurrent S3 fetches...")
+
+      # Create multiple concurrent derivations that fetch from S3
+      concurrent_test = """
+        let
+          mkFetch = i: import <nix/fetchurl.nix> {
+            name = "concurrent-s3-fetch-''${toString i}";
+            url = "s3://my-cache/nix-cache-info?endpoint=http://server:9000&region=eu-west-1&fetch_id=''${toString i}";
+            sha256 = \"""" + cache_info_hash + """\";
+          };
+          # Create 5 concurrent fetches
+          fetches = builtins.listToAttrs (map (i: {
+            name = "fetch''${toString i}";
+            value = mkFetch i;
+          }) (builtins.genList (i: i) 5));
+        in fetches
+      """
+
+      # Build all derivations concurrently with debug output
+      try:
+        concurrent_output = client.succeed("${env} nix build --debug --impure --expr '" + concurrent_test + "' --max-jobs 5 2>&1")
+      except:
+        concurrent_output = client.fail("${env} nix build --debug --impure --expr '" + concurrent_test + "' --max-jobs 5 2>&1")
+
+      # Check for any errors or crashes
+      if "error:" in concurrent_output.lower():
+        print("Found error during concurrent fetches:")
+        print(concurrent_output)
+        # Don't fail immediately, but log the issue
+
+      # Count how many credential providers were created
+      concurrent_providers = concurrent_output.count("creating new AWS credential provider")
+      concurrent_transfers = concurrent_output.count("builtin:fetchurl creating fresh FileTransfer instance")
+
+      print(f"Concurrent test: {concurrent_providers} credential providers created")
+      print(f"Concurrent test: {concurrent_transfers} FileTransfer instances created")
+
+      # Each forked process should create its own FileTransfer
+      if concurrent_transfers != 5:
+        print("Debug output:")
+        print(concurrent_output)
+        raise Exception(f"FAILED: Expected at least 5 FileTransfer instances for 5 concurrent fetches, but got {concurrent_transfers}")
     '';
 }

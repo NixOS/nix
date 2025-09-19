@@ -275,6 +275,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void startChild() override
     {
+        // Pre-resolve AWS credentials before forking
+        preResolveAwsCredentials();
+
         /* Set up private namespaces for the build:
 
            - The PID namespace causes the build to start as PID 1.
