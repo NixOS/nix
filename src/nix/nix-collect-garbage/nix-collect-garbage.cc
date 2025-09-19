@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <cerrno>
+#include <optional>
 
 namespace nix::fs {
 using namespace std::filesystem;
@@ -18,8 +19,10 @@ using namespace std::filesystem;
 
 using namespace nix;
 
-std::string deleteOlderThan;
 bool dryRun = false;
+std::optional<time_t> deleteOlderThan;
+std::optional<GenerationNumber> keepMin = std::nullopt;
+std::optional<GenerationNumber> keepMax = std::nullopt;
 
 /* If `-d' was specified, remove all old generations of all profiles.
  * Of course, this makes rollbacks to before this point in time
@@ -49,10 +52,10 @@ void removeOldGenerations(std::filesystem::path dir)
             }
             if (link.find("link") != std::string::npos) {
                 printInfo("removing old generations of profile %s", path);
-                if (deleteOlderThan != "") {
-                    auto t = parseOlderThanTimeSpec(deleteOlderThan);
-                    deleteGenerationsOlderThan(path, t, dryRun);
-                } else
+
+                if (deleteOlderThan.has_value() || keepMax.has_value())
+                    deleteGenerationsFilter(path, deleteOlderThan, keepMin, keepMax, dryRun);
+                else
                     deleteOldGenerations(path, dryRun);
             }
         } else if (type == std::filesystem::file_type::directory) {
@@ -77,8 +80,14 @@ static int main_nix_collect_garbage(int argc, char ** argv)
                 removeOld = true;
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
-                deleteOlderThan = getArg(*arg, arg, end);
-            } else if (*arg == "--dry-run")
+                deleteOlderThan = std::optional<time_t> { parseOlderThanTimeSpec(getArg(*arg, arg, end)) };
+            } else if (*arg == "--keep-min")
+                keepMin = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
+            else if (*arg == "--keep-max"){
+                removeOld = true;
+                keepMax = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
+            }
+            else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--max-freed")
                 options.maxFreed = std::max(getIntArg<int64_t>(*arg, arg, end, true), (int64_t) 0);
