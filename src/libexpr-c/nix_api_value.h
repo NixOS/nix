@@ -302,7 +302,7 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
 
 /** @brief Get an attribute name by index in the sorted bindings
  *
- * Useful when you want the name but want to avoid evaluation.
+ * Returns the attribute name without forcing evaluation of the attribute's value.
  *
  * Owned by the nix EvalState
  * @param[out] context Optional, stores error information
