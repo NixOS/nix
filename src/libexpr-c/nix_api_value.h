@@ -315,9 +315,14 @@ nix_get_attr_byname_lazy(nix_c_context * context, const nix_value * value, EvalS
  */
 bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalState * state, const char * name);
 
-/** @brief Get an attribute by index in the sorted bindings
+/** @brief Get an attribute by index
  *
- * Also gives you the name.
+ * Also gives you the name. Attributes are returned in implementation-defined order
+ * and are NOT suitable for reproducible operations. In Nix's domain, reproducibility
+ * is paramount. The caller is responsible for sorting the attributes or storing them
+ * in an ordered map to ensure deterministic behavior in your application.
+ * (Nix normally sorts attributes in byte-wise lexicographic order, which, for valid
+ * UTF-8, is equivalent to lexicographic order by Unicode scalar value.)
  *
  * Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
@@ -330,10 +335,17 @@ bool nix_has_attr_byname(nix_c_context * context, const nix_value * value, EvalS
 nix_value *
 nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name);
 
-/** @brief Get an attribute by index in the sorted bindings, without forcing evaluation of the attribute's value
+/** @brief Get an attribute by index, without forcing evaluation of the attribute's value
  *
  * Also gives you the name. Returns the attribute value without forcing its evaluation, allowing access to lazy values.
  * The attribute set value itself must already be evaluated.
+ *
+ * Attributes are returned in implementation-defined order and are NOT suitable for
+ * reproducible operations. In Nix's domain, reproducibility is paramount. The caller
+ * is responsible for sorting the attributes or storing them in an ordered map to
+ * ensure deterministic behavior in your application.
+ * (Nix normally sorts attributes in byte-wise lexicographic order, which, for valid
+ * UTF-8, is equivalent to lexicographic order by Unicode scalar value.)
  *
  * Use nix_gc_decref when you're done with the pointer
  * @param[out] context Optional, stores error information
@@ -346,9 +358,15 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
 nix_value * nix_get_attr_byidx_lazy(
     nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name);
 
-/** @brief Get an attribute name by index in the sorted bindings
+/** @brief Get an attribute name by index
  *
  * Returns the attribute name without forcing evaluation of the attribute's value.
+ * Attributes are returned in implementation-defined order and are NOT suitable for
+ * reproducible operations. In Nix's domain, reproducibility is paramount. The caller
+ * is responsible for sorting the attributes or storing them in an ordered map to
+ * ensure deterministic behavior in your application.
+ * (Nix normally sorts attributes in byte-wise lexicographic order, which, for valid
+ * UTF-8, is equivalent to lexicographic order by Unicode scalar value.)
  *
  * Owned by the nix EvalState
  * @param[out] context Optional, stores error information
