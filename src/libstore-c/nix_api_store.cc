@@ -216,4 +216,77 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const nix_derivation * drv),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::Derivation drv = store->ptr->derivationFromPath(path->path);
+        if (callback) {
+            const nix_derivation tmp{drv};
+            callback(userdata, &tmp);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_outputs_and_optpaths(
+    nix_c_context * context,
+    const nix_derivation * drv,
+    const Store * store,
+    void (*callback)(
+        void * userdata, const char * name, const nix_derivation_output * drv_output, const StorePath * path),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto value = drv->drv.outputsAndOptPaths(store->ptr->config);
+        if (callback) {
+            for (const auto & [name, result] : value) {
+                const nix_derivation_output tmp_output{result.first};
+
+                if (auto store_path = result.second) {
+                    const StorePath tmp_path{*store_path};
+                    callback(userdata, name.c_str(), &tmp_output, &tmp_path);
+                } else {
+                    callback(userdata, name.c_str(), &tmp_output, nullptr);
+                }
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_structured_attrs(
+    nix_c_context * context, const nix_derivation * drv, nix_get_string_callback callback, void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (auto structuredAttrs = drv->drv.structuredAttrs) {
+            if (callback) {
+                auto result = structuredAttrs->structuredAttrs.dump();
+                callback(result.data(), result.size(), userdata);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_derivation_output * nix_derivation_output_clone(const nix_derivation_output * o)
+{
+    return new nix_derivation_output{o->drv_out};
+}
+
+void nix_derivation_output_free(nix_derivation_output * o)
+{
+    delete o;
+}
+
 } // extern "C"
