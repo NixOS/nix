@@ -1,5 +1,7 @@
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/s3-url.hh"
 
 #if NIX_WITH_S3_SUPPORT
 
@@ -71,6 +73,31 @@ TEST(S3BinaryCacheStore, s3SchemeRegistration)
     // Verify HttpBinaryCacheStoreConfig doesn't directly list S3
     auto httpSchemes = HttpBinaryCacheStoreConfig::uriSchemes();
     EXPECT_FALSE(httpSchemes.count("s3") > 0) << "HTTP store shouldn't directly list S3 scheme";
+}
+
+// =============================================================================
+// FileTransferRequest Tests (moved from s3-url.cc)
+// =============================================================================
+
+/**
+ * Test that S3 upload requests are properly configured
+ */
+TEST(S3BinaryCacheStore, s3UploadRequestConfiguration)
+{
+    auto s3Url = ParsedS3URL{
+        .bucket = "test-bucket",
+        .key = {"test-file"},
+    };
+    auto httpsUrl = s3Url.toHttpsUrl();
+
+    FileTransferRequest uploadReq(httpsUrl);
+    uploadReq.data = std::string("test data");
+
+    // Verify upload request is properly configured
+    EXPECT_EQ(uploadReq.uri.scheme(), "https");
+    EXPECT_TRUE(uploadReq.data.has_value());
+    EXPECT_EQ(*uploadReq.data, "test data");
+    EXPECT_TRUE(uploadReq.uri.to_string().find("test-bucket") != std::string::npos);
 }
 
 } // namespace nix

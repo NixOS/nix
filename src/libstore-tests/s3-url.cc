@@ -1,4 +1,5 @@
-#include "nix/store/s3.hh"
+#include "nix/store/s3-url.hh"
+#include "nix/store/config.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
 #if NIX_WITH_S3_SUPPORT
