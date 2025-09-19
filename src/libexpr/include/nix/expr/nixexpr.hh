@@ -178,10 +178,15 @@ struct ExprString : Expr
     public:
     Value v;
 
-    ExprString(std::string && s)
+    explicit ExprString(std::string && s)
         : s(std::move(s))
     {
         v.mkStringNoCopy(this->s.data());
+    };
+
+    explicit ExprString(std::string_view s)
+    {
+        v.mkString(s);
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;

@@ -346,7 +346,7 @@ expr_simple
 string_parts
   : STR { $$ = new ExprString(std::string($1)); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(""); }
+  | { $$ = new ExprString(std::string_view()); }
   ;
 
 string_parts_interpolated
