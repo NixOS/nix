@@ -64,9 +64,6 @@ struct Realisation
      */
     std::map<DrvOutput, StorePath> dependentRealisations;
 
-    nlohmann::json toJSON() const;
-    static Realisation fromJSON(const nlohmann::json & json, const std::string & whence);
-
     std::string fingerprint() const;
     void sign(const Signer &);
     bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
@@ -169,3 +166,5 @@ public:
 };
 
 } // namespace nix
+
+JSON_IMPL(nix::Realisation)
