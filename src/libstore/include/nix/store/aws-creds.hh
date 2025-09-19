@@ -68,7 +68,7 @@ void clearAwsCredentialsCache();
  * Returns credentials if URL is S3 and credentials are available.
  * Returns nullopt if URL is not S3 or credentials cannot be resolved.
  */
-std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url);
+std::optional<AwsCredentials> preResolveAwsCredentials(const std::string & url);
 
 } // namespace nix
 

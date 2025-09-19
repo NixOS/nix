@@ -212,7 +212,7 @@ protected:
                         auto s3Url = ParsedS3URL::parse(parsedUrl);
 
                         // Get credentials from the parent process's cached provider
-                        auto creds = preResolveS3Credentials(url->second);
+                        auto creds = nix::preResolveAwsCredentials(url->second);
 
                         if (creds) {
                             preResolvedAwsCredentials = AwsCredentialsForBuilder{

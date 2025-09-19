@@ -223,7 +223,7 @@ void clearAwsCredentialsCache()
     credentialProviderCache.clear();
 }
 
-std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url)
+std::optional<AwsCredentials> preResolveAwsCredentials(const std::string & url)
 {
     try {
         auto parsedUrl = parseURL(url);
@@ -237,10 +237,10 @@ std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url)
         // Get credentials (automatically cached)
         return getAwsCredentials(profile);
     } catch (const AwsAuthError & e) {
-        debug("Failed to pre-resolve S3 credentials: %s", e.what());
+        debug("Failed to pre-resolve AWS credentials: %s", e.what());
         return std::nullopt;
     } catch (const std::exception & e) {
-        debug("Error pre-resolving S3 credentials: %s", e.what());
+        debug("Error pre-resolving AWS credentials: %s", e.what());
         return std::nullopt;
     }
 }
