@@ -15,6 +15,7 @@
 
 #  include <boost/unordered/concurrent_flat_map.hpp>
 
+#  include <chrono>
 #  include <condition_variable>
 #  include <mutex>
 #  include <unistd.h>
@@ -164,11 +165,20 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
         // AWS CRT GetCredentials is asynchronous and only guarantees the callback will be
         // invoked if the initial call returns success. There's no documented timeout mechanism,
         // so we add a timeout to prevent indefinite hanging if the callback is never called.
+        // Use an absolute deadline to handle spurious wakeups correctly.
         auto timeout = std::chrono::seconds(30);
-        if (!state_.wait_for(cv, timeout, [&] { return state_->resolved; })) {
-            throw AwsAuthError(
-                "Timeout waiting for AWS credentials (%d seconds)",
-                std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
+        auto deadline = std::chrono::steady_clock::now() + timeout;
+
+        while (!state_->resolved) {
+            if (state_.wait_until(cv, deadline) == std::cv_status::timeout) {
+                // Double-check the condition after timeout to avoid race
+                if (!state_->resolved) {
+                    throw AwsAuthError(
+                        "Timeout waiting for AWS credentials (%d seconds)",
+                        std::chrono::duration_cast<std::chrono::seconds>(timeout).count());
+                }
+                break;
+            }
         }
     }
 
