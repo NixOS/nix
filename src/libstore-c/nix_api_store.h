@@ -23,6 +23,10 @@ extern "C" {
 typedef struct Store Store;
 /** @brief Nix store path */
 typedef struct StorePath StorePath;
+/** @brief Nix Derivation */
+typedef struct Derivation Derivation;
+/** @brief Nix Derivation Output */
+typedef struct DerivationOutput DerivationOutput;
 
 /**
  * @brief Initializes the Nix store library
@@ -216,6 +220,90 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
  * @param[in] path Path to copy
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
+
+/**
+ * @brief Returns the derivation associated with the store path
+ *
+ * @note The callback borrows the Derivation only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store The nix store
+ * @param[in] path The nix store path
+ * @param[in] callback The callback to call
+ * @param[in] userdata The userdata to pass to the callback
+ */
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const Derivation * drv),
+    void * userdata);
+
+/**
+ * @brief Copy of a Derivation
+ *
+ * @param[in] d the derivation to copy
+ * @return a new Derivation
+ */
+Derivation * nix_drv_clone(const Derivation * d);
+
+/**
+ * @brief Deallocate a Derivation
+ *
+ * Does not fail.
+ * @param[in] p the derivation to free
+ */
+void nix_drv_free(Derivation * d);
+
+/**
+ * @brief Iterate through all of the outputs in a derivation
+ *
+ * @note The callback borrows the DerivationOutput only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] drv The derivation
+ * @param[in] callback The function to call on every output
+ * @param[in] userdata Userdata to pass to the callback
+ */
+nix_err nix_drv_get_outputs(
+    nix_c_context * context,
+    const Derivation * drv,
+    void (*callback)(void * userdata, const char * name, const DerivationOutput * drv_output),
+    void * userdata);
+
+/**
+ * @brief Iterate and get all of the derivation outputs and their store paths.
+ *
+ * @note The callback borrows the DerivationOutput and StorePath only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] drv The derivation
+ * @param[in] store The nix store
+ * @param[in] callback The function to call on every output and store path
+ * @param[in] userdata The userdata to pass to the callback
+ */
+nix_err nix_drv_get_outputs_and_optpaths(
+    nix_c_context * context,
+    const Derivation * drv,
+    const Store * store,
+    void (*callback)(void * userdata, const char * name, const DerivationOutput * drv_output, const StorePath * path),
+    void * userdata);
+
+/**
+ * @brief Copy of a DerivationOutput
+ *
+ * @param[in] o the derivation output to copy
+ * @return a new DerivationOutput
+ */
+DerivationOutput * nix_drv_output_clone(const DerivationOutput * o);
+
+/**
+ * @brief Deallocate a DerivationOutput
+ *
+ * Does not fail.
+ * @param[in] o the derivation output to free
+ */
+void nix_drv_output_free(DerivationOutput * o);
 
 // cffi end
 #ifdef __cplusplus

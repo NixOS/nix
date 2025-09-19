@@ -180,3 +180,88 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
     }
     NIXC_CATCH_ERRS
 }
+
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const Derivation * drv),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::Derivation drv = store->ptr->derivationFromPath(path->path);
+        if (callback) {
+            const Derivation tmp{drv};
+            callback(userdata, &tmp);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+Derivation * nix_drv_clone(const Derivation * d)
+{
+    return new Derivation{d->drv};
+}
+
+void nix_drv_free(Derivation * d)
+{
+    delete d;
+}
+
+nix_err nix_drv_get_outputs(
+    nix_c_context * context,
+    const Derivation * drv,
+    void (*callback)(void * userdata, const char * name, const DerivationOutput * drv_output),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & [name, result] : drv->drv.outputs) {
+                const DerivationOutput tmp{result};
+                callback(userdata, name.c_str(), &tmp);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_drv_get_outputs_and_optpaths(
+    nix_c_context * context,
+    const Derivation * drv,
+    const Store * store,
+    void (*callback)(void * userdata, const char * name, const DerivationOutput * drv_output, const StorePath * path),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto value = drv->drv.outputsAndOptPaths(store->ptr->config);
+        if (callback) {
+            for (const auto & [name, result] : value) {
+                const DerivationOutput tmp_output{result.first};
+
+                if (auto store_path = result.second) {
+                    const StorePath tmp_path{*store_path};
+                    callback(userdata, name.c_str(), &tmp_output, &tmp_path);
+                } else {
+                    callback(userdata, name.c_str(), &tmp_output, nullptr);
+                }
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+DerivationOutput * nix_drv_output_clone(const DerivationOutput * o)
+{
+    return new DerivationOutput{o->drv_out};
+}
+
+void nix_drv_output_free(DerivationOutput * o)
+{
+    delete o;
+}
