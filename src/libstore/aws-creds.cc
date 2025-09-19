@@ -2,9 +2,11 @@
 
 #if NIX_WITH_S3_SUPPORT
 
+#  include "nix/store/s3-url.hh"
 #  include "nix/util/finally.hh"
 #  include "nix/util/logging.hh"
 #  include "nix/util/sync.hh"
+#  include "nix/util/url.hh"
 #  include "nix/util/util.hh"
 
 #  include <aws/crt/Api.h>
@@ -219,6 +221,28 @@ void invalidateAwsCredentials(const std::string & profile)
 void clearAwsCredentialsCache()
 {
     credentialProviderCache.clear();
+}
+
+std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url)
+{
+    try {
+        auto parsedUrl = parseURL(url);
+        if (parsedUrl.scheme != "s3") {
+            return std::nullopt;
+        }
+
+        auto s3Url = ParsedS3URL::parse(parsedUrl);
+        std::string profile = s3Url.profile.value_or("");
+
+        // Get credentials (automatically cached)
+        return getAwsCredentials(profile);
+    } catch (const AwsAuthError & e) {
+        debug("Failed to pre-resolve S3 credentials: %s", e.what());
+        return std::nullopt;
+    } catch (const std::exception & e) {
+        debug("Error pre-resolving S3 credentials: %s", e.what());
+        return std::nullopt;
+    }
 }
 
 } // namespace nix

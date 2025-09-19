@@ -62,6 +62,14 @@ void invalidateAwsCredentials(const std::string & profile);
  */
 void clearAwsCredentialsCache();
 
+/**
+ * Pre-resolve AWS credentials for S3 URLs.
+ * Used to cache credentials in parent process before forking.
+ * Returns credentials if URL is S3 and credentials are available.
+ * Returns nullopt if URL is not S3 or credentials cannot be resolved.
+ */
+std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url);
+
 } // namespace nix
 
 #endif // NIX_WITH_S3_SUPPORT

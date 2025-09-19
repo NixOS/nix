@@ -212,8 +212,7 @@ protected:
                         auto s3Url = ParsedS3URL::parse(parsedUrl);
 
                         // Get credentials from the parent process's cached provider
-                        auto ft = getFileTransfer();
-                        auto creds = ft->preResolveS3Credentials(url->second);
+                        auto creds = preResolveS3Credentials(url->second);
 
                         if (creds) {
                             preResolvedAwsCredentials = AwsCredentialsForBuilder{

@@ -911,30 +911,6 @@ public:
 
         enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
-
-#if NIX_WITH_S3_SUPPORT
-    std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url) override
-    {
-        try {
-            auto parsedUrl = parseURL(url);
-            if (parsedUrl.scheme != "s3") {
-                return std::nullopt;
-            }
-
-            auto s3Url = ParsedS3URL::parse(parsedUrl);
-            std::string profile = s3Url.profile.value_or("");
-
-            // Get credentials (automatically cached)
-            return getAwsCredentials(profile);
-        } catch (const AwsAuthError & e) {
-            debug("Failed to pre-resolve S3 credentials: %s", e.what());
-            return std::nullopt;
-        } catch (const std::exception & e) {
-            debug("Error pre-resolving S3 credentials: %s", e.what());
-            return std::nullopt;
-        }
-    }
-#endif
 };
 
 ref<curlFileTransfer> makeCurlFileTransfer()

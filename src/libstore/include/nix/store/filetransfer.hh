@@ -165,19 +165,6 @@ struct FileTransfer
      */
     virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
 
-#ifdef NIX_WITH_S3_SUPPORT
-    /**
-     * Pre-resolve AWS credentials for S3 URLs.
-     * Used to cache credentials in parent process before forking.
-     * Returns nullopt if URL is not S3 or credentials cannot be resolved.
-     */
-    virtual std::optional<AwsCredentials> preResolveS3Credentials(const std::string & url)
-    {
-        // Default implementation returns nothing
-        return std::nullopt;
-    }
-#endif
-
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
     /**
