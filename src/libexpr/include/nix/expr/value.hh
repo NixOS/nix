@@ -5,6 +5,7 @@
 #include <span>
 #include <type_traits>
 #include <concepts>
+#include <bit>
 
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/value/context.hh"
@@ -48,6 +49,7 @@ typedef enum {
     /* layout: Single untaggable field */
     tListN,
     tString,
+    tSmallString,
     tPath,
 } InternalType;
 
@@ -324,13 +326,22 @@ inline constexpr InternalType payloadTypeToInternalType = PayloadTypeToInternalT
 template<std::size_t ptrSize, typename Enable = void>
 class ValueStorage : public detail::ValueBase
 {
+    static constexpr std::size_t smallStringStorageSize = std::max({
+#define NIX_VALUE_STORAGE_FIELD_SIZE(T, FIELD_NAME, DISCRIMINATOR) sizeof(T),
+        NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_FIELD_SIZE)
+#undef NIX_VALUE_STORAGE_FIELD_SIZE
+    });
+
 protected:
     using Payload = union
     {
 #define NIX_VALUE_STORAGE_DEFINE_FIELD(T, FIELD_NAME, DISCRIMINATOR) T FIELD_NAME;
         NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_DEFINE_FIELD)
 #undef NIX_VALUE_STORAGE_DEFINE_FIELD
+        std::array<char, smallStringStorageSize> smallString;
     };
+
+    static constexpr std::size_t maxSmallStringSize = smallStringStorageSize - 1;
 
 private:
     InternalType internalType = tUninitialized;
@@ -357,6 +368,30 @@ protected:
 #undef NIX_VALUE_STORAGE_SET_IMPL
 #undef NIX_VALUE_STORAGE_GET_IMPL
 #undef NIX_VALUE_STORAGE_FOR_EACH_FIELD
+
+    void setSmallString(std::string_view s)
+    {
+        assert(s.size() <= maxSmallStringSize);
+        internalType = tSmallString;
+        payload.smallString = {};
+        /* Trick is the same as in Facebook's Folly string. Use the last byte
+           of the string to store the remaining capacity. This was it naturally
+           becomes the null terminator when string has the size (smallStringStorageSize - 1). */
+        payload.smallString.back() = maxSmallStringSize - s.size();
+        std::memcpy(payload.smallString.data(), s.data(), s.size());
+    }
+
+    std::size_t getSmallStringSize() const
+    {
+        std::size_t remainingCapacity = payload.smallString.back();
+        return maxSmallStringSize - remainingCapacity;
+    }
+
+    const char * getSmallStringData() const
+    {
+        /* This string is null terminated. See setSmallString. */
+        return payload.smallString.data();
+    }
 
     /** Get internal type currently occupying the storage. */
     InternalType getInternalType() const noexcept
@@ -436,6 +471,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         /* The order of these enumations must be the same as in InternalType. */
         pdListN, //< layout: Single untaggable field.
         pdString,
+        pdSmallString,
         pdPath,
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
@@ -515,6 +551,7 @@ protected:
         /* The order must match that of the enumerations defined in InternalType. */
         case pdListN:
         case pdString:
+        case pdSmallString:
         case pdPath:
             return static_cast<InternalType>(tListN + (pd - pdListN));
         case pdPairOfPointers:
@@ -644,6 +681,56 @@ protected:
     void setStorage(Path path) noexcept
     {
         setUntaggablePayload<pdPath>(path.accessor, path.path);
+    }
+
+    /**
+     * Pointer tagging doesn't play well with big endian systems (because the tag will be in the middle
+     * of the array), so we don't do this optimization on big endian systems.
+     *
+     * 14 = 8 + 8 - 1 (the type tag) - 1 (string size + null terminator)
+     */
+    static constexpr std::size_t maxSmallStringSize = std::endian::native == std::endian::little ? 14 : 0;
+
+    void setSmallString(std::string_view s)
+    {
+        assert(s.size() <= maxSmallStringSize);
+
+        std::size_t remainingCapacity = maxSmallStringSize - s.size();
+        payload = {pdSmallString, remainingCapacity << 56};
+
+        /* 7 - we are skipping the first tag byte (it's stored in the 3 least significant bits). */
+        {
+            auto firstDWord = s.substr(0, 7);
+            std::size_t bitPos = 8;
+            for (auto c : firstDWord) {
+                payload[0] |= (PackedPointer{static_cast<unsigned char>(c)} << bitPos);
+                bitPos += 8;
+            }
+
+            s.remove_prefix(firstDWord.size());
+        }
+
+        {
+            auto secondDWord = s;
+            assert(secondDWord.size() <= 7);
+            std::size_t bitPos = 0;
+            for (auto c : secondDWord) {
+                payload[1] |= (PackedPointer{static_cast<unsigned char>(c)} << bitPos);
+                bitPos += 8;
+            }
+        }
+    }
+
+    std::size_t getSmallStringSize() const
+    {
+        std::size_t remainingCapacity = payload[1] >> 56;
+        return maxSmallStringSize - remainingCapacity;
+    }
+
+    const char * getSmallStringData() const
+    {
+        /* Skip the type tag byte. */
+        return reinterpret_cast<const char *>(payload.data()) + 1;
     }
 };
 
@@ -880,6 +967,10 @@ private:
     }
 
 public:
+    /**
+     * Maximum size of a string that can be stored inline without allocations.
+     */
+    using ValueStorage::maxSmallStringSize;
 
     /**
      * Never modify the backing `Value` object!
@@ -938,6 +1029,7 @@ public:
         case tBool:
             return nBool;
         case tString:
+        case tSmallString:
             return nString;
         case tPath:
             return nPath;
@@ -1109,16 +1201,28 @@ public:
 
     std::string_view string_view() const noexcept
     {
+        if constexpr (maxSmallStringSize > 0) {
+            if (isa<tSmallString>())
+                return std::string_view{getSmallStringData(), getSmallStringSize()};
+        }
         return std::string_view(getStorage<StringWithContext>().c_str);
     }
 
     const char * c_str() const noexcept
     {
+        if constexpr (maxSmallStringSize > 0) {
+            if (isa<tSmallString>())
+                return getSmallStringData();
+        }
         return getStorage<StringWithContext>().c_str;
     }
 
     const char ** context() const noexcept
     {
+        if constexpr (maxSmallStringSize > 0) {
+            if (isa<tSmallString>())
+                return nullptr;
+        }
         return getStorage<StringWithContext>().context;
     }
 
