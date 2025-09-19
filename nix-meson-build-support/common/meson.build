@@ -34,4 +34,4 @@ if cxx.get_id() == 'clang'
 endif
 
 # Darwin ld doesn't like "X.Y.Zpre"
-nix_soversion = meson.project_version().replace('pre', '')
+nix_soversion = meson.project_version().split('pre')[0]
