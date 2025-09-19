@@ -178,6 +178,11 @@ StorePath * nix_store_path_clone(const StorePath * p)
     return new StorePath{p->path};
 }
 
+nix_derivation * nix_derivation_clone(const nix_derivation * d)
+{
+    return new nix_derivation{d->drv};
+}
+
 nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
 {
     if (context)
@@ -192,6 +197,45 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
         return new nix_derivation{drv};
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_derivation_to_json(
+    nix_c_context * context, const nix_derivation * drv, nix_get_string_callback callback, void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto result = drv->drv.toJSON().dump();
+        if (callback) {
+            callback(result.data(), result.size(), userdata);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_make_outputs(
+    nix_c_context * context,
+    Store * store,
+    const char * json,
+    void (*callback)(void * userdata, const char * output_name, const char * path),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto drv = static_cast<nix::Derivation>(nlohmann::json::parse(json));
+        auto hashesModulo = hashDerivationModulo(*store->ptr, drv, true);
+
+        for (auto & output : drv.outputs) {
+            nix::Hash h = hashesModulo.hashes.at(output.first);
+            auto outPath = store->ptr->makeOutputPath(output.first, h, drv.name);
+
+            if (callback) {
+                callback(userdata, output.first.c_str(), store->ptr->printStorePath(outPath).c_str());
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
 }
 
 StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation)
@@ -216,6 +260,115 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
         nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
     }
     NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const nix_derivation * drv),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::Derivation drv = store->ptr->derivationFromPath(path->path);
+        if (callback) {
+            const nix_derivation tmp{drv};
+            callback(userdata, &tmp);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_query_path_info(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * derived_path))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(store_path->path);
+        if (callback) {
+            if (auto deriver = info->deriver) {
+                const StorePath deriver_tmp{*info->deriver};
+                callback(userdata, &deriver_tmp);
+            } else {
+                callback(userdata, nullptr);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        std::vector<nix::DerivedPath> derived_paths;
+        for (size_t i = 0; i < num_store_paths; i++) {
+            const StorePath * store_path = store_paths[i];
+            derived_paths.push_back(nix::SingleDerivedPath::Opaque{store_path->path});
+        }
+
+        auto results = store->ptr->buildPathsWithResults(derived_paths);
+        for (auto & result : results) {
+            if (callback) {
+                nlohmann::json json;
+                nix::to_json(json, result);
+                callback(userdata, result.path.to_string(store->ptr->config).c_str(), json.dump().c_str());
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_outputs_and_optpaths(
+    nix_c_context * context,
+    const nix_derivation * drv,
+    const Store * store,
+    void (*callback)(
+        void * userdata, const char * name, const nix_derivation_output * drv_output, const StorePath * path),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto value = drv->drv.outputsAndOptPaths(store->ptr->config);
+        if (callback) {
+            for (const auto & [name, result] : value) {
+                const nix_derivation_output tmp_output{result.first};
+
+                if (auto store_path = result.second) {
+                    const StorePath tmp_path{*store_path};
+                    callback(userdata, name.c_str(), &tmp_output, &tmp_path);
+                } else {
+                    callback(userdata, name.c_str(), &tmp_output, nullptr);
+                }
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_derivation_output * nix_derivation_output_clone(const nix_derivation_output * o)
+{
+    return new nix_derivation_output{o->drv_out};
+}
+
+void nix_derivation_output_free(nix_derivation_output * o)
+{
+    delete o;
 }
 
 } // extern "C"

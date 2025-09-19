@@ -25,6 +25,8 @@ typedef struct Store Store;
 typedef struct StorePath StorePath;
 /** @brief Nix Derivation */
 typedef struct nix_derivation nix_derivation;
+/** @brief Nix Derivation Output */
+typedef struct nix_derivation_output nix_derivation_output;
 
 /**
  * @brief Initializes the Nix store library
@@ -219,6 +221,33 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
 nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json);
 
 /**
+ * @brief Gets the derivation as a JSON string
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] drv The derivation
+ * @param[in] callback Called with the JSON string
+ * @param[in] userdata Arbitrary data passed to the callback
+ */
+nix_err nix_derivation_to_json(
+    nix_c_context * context, const nix_derivation * drv, nix_get_string_callback callback, void * userdata);
+
+/**
+ * @brief Hashes the derivation and gives the output paths
+ *
+ * @param[in] context Optional, stores error information.
+ * @param[in] store nix store reference.
+ * @param[in] json JSON of the derivation as a string.
+ * @param[in] callback Called for every output to provide the output path.
+ * @param[in] userdata User data to pass to the callback.
+ */
+nix_err nix_derivation_make_outputs(
+    nix_c_context * context,
+    Store * store,
+    const char * json,
+    void (*callback)(void * userdata, const char * output_name, const char * path),
+    void * userdata);
+
+/**
  * @brief Add the given `nix_derivation` to the given store
  *
  * @param[out] context Optional, stores error information.
@@ -236,6 +265,14 @@ StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_deriv
 void nix_derivation_free(nix_derivation * drv);
 
 /**
+ * @brief Copy a `nix_derivation`
+ *
+ * @param[in] d the derivation to copy
+ * @return a new `nix_derivation`
+ */
+nix_derivation * nix_derivation_clone(const nix_derivation * d);
+
+/**
  * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
  *
  * @param[out] context Optional, stores error information
@@ -244,6 +281,96 @@ void nix_derivation_free(nix_derivation * drv);
  * @param[in] path Path to copy
  */
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path);
+
+/**
+ * @brief Returns the derivation associated with the store path
+ *
+ * @note The callback borrows the Derivation only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store The nix store
+ * @param[in] path The nix store path
+ * @param[in] callback The callback to call
+ * @param[in] userdata The userdata to pass to the callback
+ */
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const nix_derivation * drv),
+    void * userdata);
+
+/**
+ * @brief Queries for the nix store path info.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] path A store path
+ * @param[in] userdata The data to pass to the callback
+ * @param[in] callback Called for when the path info is resolved
+ */
+nix_err nix_store_query_path_info(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * derived_path));
+
+/**
+ * @brief Builds the paths, if they are a derivation then they get built.
+ *
+ * @note Path and result for the callback only exist for the lifetime of
+ * the call. Result is a string containing the build result in JSON.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] store_paths Pointer to list of nix store paths
+ * @param[in] num_store_paths Number of nix store paths
+ * @param[in] callback The callback to trigger for build results
+ * @param[in] userdata User data to pass to the callback
+ */
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata);
+
+/**
+ * @brief Iterate and get all of the derivation outputs and their store paths.
+ *
+ * @note The callback borrows the DerivationOutput and StorePath only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] drv The derivation
+ * @param[in] store The nix store
+ * @param[in] callback The function to call on every output and store path
+ * @param[in] userdata The userdata to pass to the callback
+ */
+nix_err nix_derivation_get_outputs_and_optpaths(
+    nix_c_context * context,
+    const nix_derivation * drv,
+    const Store * store,
+    void (*callback)(
+        void * userdata, const char * name, const nix_derivation_output * drv_output, const StorePath * path),
+    void * userdata);
+
+/**
+ * @brief Copy of a 'nix_derivation_output'
+ *
+ * @param[in] o the derivation output to copy
+ * @return a new 'nix_derivation_output'
+ */
+nix_derivation_output * nix_derivation_output_clone(const nix_derivation_output * o);
+
+/**
+ * @brief Deallocate a 'nix_derivation_output'
+ *
+ * Does not fail.
+ * @param[in] o the derivation output to free
+ */
+void nix_derivation_output_free(nix_derivation_output * o);
 
 // cffi end
 #ifdef __cplusplus
