@@ -694,12 +694,6 @@ struct curlFileTransfer : public FileTransfer
 
     std::thread workerThread;
 
-public:
-    bool hasQuit()
-    {
-        return state_.lock()->quit;
-    }
-
     curlFileTransfer()
         : mt19937(rd())
     {
