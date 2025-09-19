@@ -82,6 +82,7 @@ struct LexerState
 struct ParserState
 {
     const LexerState & lexerState;
+    std::pmr::polymorphic_allocator<char> & alloc;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -327,7 +328,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(std::move(s2)));
+            es2->emplace_back(i->first, new ExprString(alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {
