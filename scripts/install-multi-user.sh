@@ -915,9 +915,11 @@ configure_shell_profile() {
         fi
 
         if [ -e "$profile_target" ]; then
-            shell_source_lines \
-                | _sudo "extend your $profile_target with nix-daemon settings" \
-                        tee -a "$profile_target"
+            {
+                shell_source_lines
+                cat "$profile_target"
+            } | _sudo "extend your $profile_target with nix-daemon settings" \
+                      tee "$profile_target"
         fi
     done
 
