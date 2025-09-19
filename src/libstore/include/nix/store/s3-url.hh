@@ -57,4 +57,4 @@ struct ParsedS3URL
 
 } // namespace nix
 
-#endif // NIX_WITH_S3_SUPPORT
+#endif

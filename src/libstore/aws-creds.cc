@@ -258,4 +258,4 @@ std::optional<AwsCredentials> preResolveAwsCredentials(const std::string & url)
 
 } // namespace nix
 
-#endif // NIX_WITH_S3_SUPPORT
+#endif

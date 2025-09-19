@@ -118,4 +118,4 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
 
 } // namespace nix
 
-#endif // NIX_WITH_S3_SUPPORT
+#endif

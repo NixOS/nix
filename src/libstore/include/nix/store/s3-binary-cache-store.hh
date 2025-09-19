@@ -2,11 +2,12 @@
 ///@file
 
 #include "nix/store/config.hh"
-#include "nix/store/http-binary-cache-store.hh"
-
-namespace nix {
 
 #if NIX_WITH_S3_SUPPORT
+
+#  include "nix/store/http-binary-cache-store.hh"
+
+namespace nix {
 
 struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
 {
@@ -74,6 +75,6 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
     ref<Store> openStore() const override;
 };
 
-#endif // NIX_WITH_S3_SUPPORT
-
 } // namespace nix
+
+#endif

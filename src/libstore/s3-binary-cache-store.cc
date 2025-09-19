@@ -1,11 +1,12 @@
 #include "nix/store/config.hh"
-#include "nix/store/s3-binary-cache-store.hh"
-#include "nix/store/http-binary-cache-store.hh"
-#include "nix/store/store-registration.hh"
-
-namespace nix {
 
 #if NIX_WITH_S3_SUPPORT
+
+#  include "nix/store/s3-binary-cache-store.hh"
+#  include "nix/store/http-binary-cache-store.hh"
+#  include "nix/store/store-registration.hh"
+
+namespace nix {
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
 {
@@ -44,6 +45,5 @@ ref<Store> S3BinaryCacheStoreConfig::openStore() const
 
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;
 
-#endif // NIX_WITH_S3_SUPPORT
-
 } // namespace nix
+#endif

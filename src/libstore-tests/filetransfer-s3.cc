@@ -92,4 +92,4 @@ TEST_F(S3FileTransferTest, s3SchemeIsRegistered)
 
 } // namespace nix
 
-#endif // NIX_WITH_S3_SUPPORT
+#endif
