@@ -1,8 +1,8 @@
 #include "nix/store/aws-creds.hh"
-#include <aws/crt/Types.h>
 
 #if NIX_WITH_S3_SUPPORT
 
+#  include <aws/crt/Types.h>
 #  include "nix/store/s3-url.hh"
 #  include "nix/util/finally.hh"
 #  include "nix/util/logging.hh"

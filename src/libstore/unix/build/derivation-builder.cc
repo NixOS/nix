@@ -188,11 +188,13 @@ protected:
      */
     std::vector<std::thread> daemonWorkerThreads;
 
+#if NIX_WITH_S3_SUPPORT
     /**
      * Pre-resolved AWS credentials for builtin:fetchurl with S3 URLs.
      * Resolved in parent process before fork to avoid credential provider recreation.
      */
     std::optional<AwsCredentialsForBuilder> preResolvedAwsCredentials;
+#endif
 
 protected:
     /**
@@ -1270,7 +1272,9 @@ void DerivationBuilderImpl::runChild()
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_S3_SUPPORT
             .awsCredentials = preResolvedAwsCredentials,
+#endif
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {

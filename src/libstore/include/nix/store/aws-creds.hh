@@ -13,11 +13,6 @@
 namespace nix {
 
 /**
- * Exception thrown when AWS authentication fails
- */
-MakeError(AwsAuthError, Error);
-
-/**
  * AWS credentials obtained from credential providers
  */
 struct AwsCredentials
@@ -36,6 +31,11 @@ struct AwsCredentials
     {
     }
 };
+
+/**
+ * Exception thrown when AWS authentication fails
+ */
+MakeError(AwsAuthError, Error);
 
 /**
  * Get AWS credentials for the given profile.
@@ -71,5 +71,4 @@ void clearAwsCredentialsCache();
 std::optional<AwsCredentials> preResolveAwsCredentials(const std::string & url);
 
 } // namespace nix
-
 #endif

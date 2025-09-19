@@ -896,10 +896,11 @@ struct curlFileTransfer : public FileTransfer
 #if !NIX_WITH_S3_SUPPORT
         /* Handle s3:// URIs with curl-based AWS SigV4 authentication */
         if (request.uri.scheme() == "s3") {
-            callback.throw_(
-                nix::Error(
-                    "cannot download '%s' because Nix is not built with AWS CRT support (requires aws-crt-cpp and curl >= 7.75.0)",
-                    request.uri.to_string()));
+            callback.rethrow(
+                std::make_exception_ptr(
+                    nix::Error(
+                        "cannot download '%s' because Nix is not built with AWS CRT support (requires aws-crt-cpp and curl >= 7.75.0)",
+                        request.uri.to_string())));
         }
 #endif
 

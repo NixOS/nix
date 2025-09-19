@@ -11,7 +11,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
-#ifdef NIX_WITH_S3_SUPPORT
+#if NIX_WITH_S3_SUPPORT
 #  include "nix/store/aws-creds.hh"
 #endif
 
@@ -96,7 +96,7 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
-#ifdef NIX_WITH_S3_SUPPORT
+#if NIX_WITH_S3_SUPPORT
     /**
      * Pre-resolved AWS credentials for S3 requests.
      * When provided, these will be used instead of creating new credential providers.
