@@ -53,7 +53,7 @@ extern "C" {
  * - NIX_OK: No error occurred (0)
  * - NIX_ERR_UNKNOWN: An unknown error occurred (-1)
  * - NIX_ERR_OVERFLOW: An overflow error occurred (-2)
- * - NIX_ERR_KEY: A key error occurred (-3)
+ * - NIX_ERR_KEY: A key/index access error occurred in C API functions (-3)
  * - NIX_ERR_NIX_ERROR: A generic Nix error occurred (-4)
  */
 enum nix_err {
@@ -83,10 +83,21 @@ enum nix_err {
     NIX_ERR_OVERFLOW = -2,
 
     /**
-     * @brief A key error occurred.
+     * @brief A key/index access error occurred in C API functions.
      *
-     * This error code is returned when a key error occurred during the function
-     * execution.
+     * This error code is returned when accessing a key, index, or identifier that
+     * does not exist in C API functions. Common scenarios include:
+     * - Setting keys that don't exist (nix_setting_get, nix_setting_set)
+     * - List indices that are out of bounds (nix_get_list_byidx*)
+     * - Attribute names that don't exist (nix_get_attr_byname*)
+     * - Attribute indices that are out of bounds (nix_get_attr_byidx*, nix_get_attr_name_byidx)
+     *
+     * This error typically indicates incorrect usage or assumptions about data structure
+     * contents, rather than internal Nix evaluation errors.
+     *
+     * @note This error code should ONLY be returned by C API functions themselves,
+     * not by underlying Nix evaluation. For example, evaluating `{}.foo` in Nix
+     * will throw a normal error (NIX_ERR_NIX_ERROR), not NIX_ERR_KEY.
      */
     NIX_ERR_KEY = -3,
 

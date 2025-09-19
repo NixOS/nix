@@ -423,6 +423,55 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
     ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("badReturnThunk"));
 }
 
+static void primop_with_nix_err_key(
+    void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret)
+{
+    nix_set_err_msg(context, NIX_ERR_KEY, "Test error from primop");
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop_nix_err_key_conversion)
+{
+    // Test that NIX_ERR_KEY from a custom primop gets converted to a generic EvalError
+    //
+    // RATIONALE: NIX_ERR_KEY must not be propagated from custom primops because it would
+    // create semantic confusion. NIX_ERR_KEY indicates missing keys/indices in C API functions
+    // (like nix_get_attr_byname, nix_get_list_byidx). If custom primops could return NIX_ERR_KEY,
+    // an evaluation error would be indistinguishable from an actual missing attribute.
+    //
+    // For example, if nix_get_attr_byname returned NIX_ERR_KEY when the attribute is present
+    // but the value evaluation fails, callers expecting NIX_ERR_KEY to mean "missing attribute"
+    // would incorrectly handle evaluation failures as missing attributes. In places where
+    // missing attributes are tolerated (like optional attributes), this would cause the
+    // program to continue after swallowing the error, leading to silent failures.
+    PrimOp * primop = nix_alloc_primop(
+        ctx, primop_with_nix_err_key, 1, "testErrorPrimop", nullptr, "a test primop that sets NIX_ERR_KEY", nullptr);
+    assert_ctx_ok();
+    nix_value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    nix_value * arg = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, arg, 42);
+    assert_ctx_ok();
+
+    nix_value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, arg, result);
+
+    // Verify that NIX_ERR_KEY gets converted to NIX_ERR_NIX_ERROR (generic evaluation error)
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("Error from custom function"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("Test error from primop"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("testErrorPrimop"));
+
+    // Clean up
+    nix_gc_decref(ctx, primopValue);
+    nix_gc_decref(ctx, arg);
+    nix_gc_decref(ctx, result);
+}
+
 TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
 {
     nix_value * n = nix_alloc_value(ctx, state);
