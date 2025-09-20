@@ -4,10 +4,15 @@ namespace nix {
 
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    DummyStoreConfig(const Params & params)
+        : StoreConfig(params)
+    {
+        // Disable caching since this a temporary in-memory store.
+        pathInfoCacheSize = 0;
+    }
 
     DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
+        : DummyStoreConfig(params)
     {
         if (!authority.empty())
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
