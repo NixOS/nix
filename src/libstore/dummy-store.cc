@@ -19,20 +19,43 @@ struct DummyStore : virtual Store
 
     ref<const Config> config;
 
-    ref<MemorySourceAccessor> contents;
+    struct PathInfoAndContents
+    {
+        UnkeyedValidPathInfo info;
+        ref<MemorySourceAccessor> contents;
+    };
+
+    /**
+     * This is map conceptually owns the file system objects for each
+     * store object.
+     */
+    std::map<StorePath, PathInfoAndContents> contents;
+
+    /**
+     * This view conceptually just borrows the file systems objects of
+     * each store object from `contents`, and combines them together
+     * into one store-wide source accessor.
+     *
+     * This is needed just in order to implement `Store::getFSAccessor`.
+     */
+    ref<MemorySourceAccessor> wholeStoreView = make_ref<MemorySourceAccessor>();
 
     DummyStore(ref<const Config> config)
         : Store{*config}
         , config(config)
-        , contents(make_ref<MemorySourceAccessor>())
     {
-        contents->setPathDisplay(config->storeDir);
+        wholeStoreView->setPathDisplay(config->storeDir);
+        MemorySink sink{*wholeStoreView};
+        sink.createDirectory(CanonPath::root);
     }
 
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
-        callback(nullptr);
+        if (auto it = contents.find(path); it != contents.end())
+            callback(std::make_shared<ValidPathInfo>(StorePath{path}, it->second.info));
+        else
+            callback(nullptr);
     }
 
     /**
@@ -50,7 +73,33 @@ struct DummyStore : virtual Store
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
     {
-        unsupported("addToStore");
+        if (config->readOnly)
+            unsupported("addToStore");
+
+        if (repair)
+            throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
+
+        if (checkSigs)
+            throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
+
+        auto temp = make_ref<MemorySourceAccessor>();
+        MemorySink tempSink{*temp};
+        parseDump(tempSink, source);
+        auto path = info.path;
+
+        auto [it, _] = contents.insert({
+            path,
+            {
+                std::move(info),
+                make_ref<MemorySourceAccessor>(std::move(*temp)),
+            },
+        });
+
+        auto & pathAndContents = it->second;
+
+        bool inserted = wholeStoreView->open(CanonPath(path.to_string()), pathAndContents.contents->root);
+        if (!inserted)
+            unreachable();
     }
 
     StorePath addToStoreFromDump(
@@ -64,6 +113,9 @@ struct DummyStore : virtual Store
     {
         if (config->readOnly)
             unsupported("addToStoreFromDump");
+
+        if (repair)
+            throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
 
         auto temp = make_ref<MemorySourceAccessor>();
 
@@ -85,22 +137,41 @@ struct DummyStore : virtual Store
         }
 
         auto hash = hashPath({temp, CanonPath::root}, hashMethod.getFileIngestionMethod(), hashAlgo).first;
+        auto narHash = hashPath({temp, CanonPath::root}, FileIngestionMethod::NixArchive, HashAlgorithm::SHA256);
 
-        auto desc = ContentAddressWithReferences::fromParts(
-            hashMethod,
-            hash,
+        auto info = ValidPathInfo::makeFromCA(
+            *this,
+            name,
+            ContentAddressWithReferences::fromParts(
+                hashMethod,
+                std::move(hash),
+                {
+                    .others = references,
+                    // caller is not capable of creating a self-reference, because
+                    // this is content-addressed without modulus
+                    .self = false,
+                }),
+            std::move(narHash.first));
+
+        info.narSize = narHash.second.value();
+
+        auto path = info.path;
+
+        auto [it, _] = contents.insert({
+            path,
             {
-                .others = references,
-                // caller is not capable of creating a self-reference, because
-                // this is content-addressed without modulus
-                .self = false,
-            });
+                std::move(info),
+                make_ref<MemorySourceAccessor>(std::move(*temp)),
+            },
+        });
 
-        auto dstPath = makeFixedOutputPathFromCA(name, desc);
+        auto & pathAndContents = it->second;
 
-        contents->open(CanonPath(printStorePath(dstPath)), std::move(temp->root));
+        bool inserted = wholeStoreView->open(CanonPath(path.to_string()), pathAndContents.contents->root);
+        if (!inserted)
+            unreachable();
 
-        return dstPath;
+        return path;
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
@@ -116,7 +187,7 @@ struct DummyStore : virtual Store
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
-        return this->contents;
+        return wholeStoreView;
     }
 };
 
