@@ -176,7 +176,13 @@ struct DummyStore : virtual Store
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        unsupported("narFromPath");
+        auto object = contents.find(path);
+        if (object == contents.end())
+            throw Error("path '%s' is not valid", printStorePath(path));
+
+        const auto & [info, accessor] = object->second;
+        SourcePath sourcePath(accessor);
+        dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
     }
 
     void
