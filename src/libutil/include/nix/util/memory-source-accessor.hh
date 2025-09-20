@@ -58,7 +58,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
         Stat lstat() const;
     };
 
-    File root{File::Directory{}};
+    std::optional<File> root;
 
     bool operator==(const MemorySourceAccessor &) const noexcept = default;
 
