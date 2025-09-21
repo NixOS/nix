@@ -35,7 +35,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
         {
             using Name = std::string;
 
-            std::map<Name, File, std::less<>> contents;
+            std::map<Name, ref<File>, std::less<>> contents;
 
             bool operator==(const Directory &) const noexcept;
             // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
@@ -58,7 +58,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
         Stat lstat() const;
     };
 
-    File root{File::Directory{}};
+    std::optional<File> root;
 
     bool operator==(const MemorySourceAccessor &) const noexcept = default;
 
@@ -89,13 +89,21 @@ struct MemorySourceAccessor : virtual SourceAccessor
     SourcePath addFile(CanonPath path, std::string && contents);
 };
 
-inline bool MemorySourceAccessor::File::Directory::operator==(
-    const MemorySourceAccessor::File::Directory &) const noexcept = default;
+inline bool
+MemorySourceAccessor::File::Directory::operator==(const MemorySourceAccessor::File::Directory & other) const noexcept
+{
+    return std::ranges::equal(contents, other.contents, [](const auto & lhs, const auto & rhs) -> bool {
+        return lhs.first == rhs.first && *lhs.second == *rhs.second;
+    });
+};
 
 inline bool
 MemorySourceAccessor::File::Directory::operator<(const MemorySourceAccessor::File::Directory & other) const noexcept
 {
-    return contents < other.contents;
+    return std::ranges::lexicographical_compare(
+        contents, other.contents, [](const auto & lhs, const auto & rhs) -> bool {
+            return lhs.first < rhs.first && *lhs.second < *rhs.second;
+        });
 }
 
 inline bool MemorySourceAccessor::File::operator==(const MemorySourceAccessor::File &) const noexcept = default;

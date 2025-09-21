@@ -52,3 +52,7 @@ rm -rf "$eval_store"
 [[ $(nix eval --eval-store "$eval_store?require-sigs=false" --impure --raw --file ./ifd.nix) = hi ]]
 ls $NIX_STORE_DIR/*dependencies-top/foobar
 (! ls $eval_store/nix/store/*dependencies-top/foobar)
+
+# Can't write .drv by default
+(! nix-instantiate dependencies.nix --eval-store "dummy://")
+nix-instantiate dependencies.nix --eval-store "dummy://?read-only=false"

@@ -406,6 +406,7 @@ nix flake update flake1 flake2/flake1 --flake "$flake3Dir"
 
 # Test 'nix flake metadata --json'.
 nix flake metadata "$flake3Dir" --json | jq .
+nix flake metadata "$flake3Dir" --json --eval-store "dummy://?read-only=false" | jq .
 
 # Test flake in store does not evaluate.
 rm -rf $badFlakeDir

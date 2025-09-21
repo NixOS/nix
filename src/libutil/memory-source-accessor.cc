@@ -4,7 +4,22 @@ namespace nix {
 
 MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, std::optional<File> create)
 {
-    File * cur = &root;
+    bool hasRoot = root.has_value();
+
+    // Special handling of root directory.
+    if (path.isRoot() && !hasRoot) {
+        if (create) {
+            root = std::move(*create);
+            return &root.value();
+        }
+        return nullptr;
+    }
+
+    // Root does not exist.
+    if (!hasRoot)
+        return nullptr;
+
+    File * cur = &root.value();
 
     bool newF = false;
 
@@ -24,11 +39,11 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
                     i,
                     {
                         std::string{name},
-                        File::Directory{},
+                        make_ref<File>(File::Directory{}),
                     });
             }
         }
-        cur = &i->second;
+        cur = &*i->second;
     }
 
     if (newF && create)
@@ -92,7 +107,7 @@ MemorySourceAccessor::DirEntries MemorySourceAccessor::readDirectory(const Canon
     if (auto * d = std::get_if<File::Directory>(&f->raw)) {
         DirEntries res;
         for (auto & [name, file] : d->contents)
-            res.insert_or_assign(name, file.lstat().type);
+            res.insert_or_assign(name, file->lstat().type);
         return res;
     } else
         throw Error("file '%s' is not a directory", path);
@@ -112,6 +127,10 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
 
 SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
 {
+    // Create root directory automatically if necessary as a convenience.
+    if (!root && !path.isRoot())
+        open(CanonPath::root, File::Directory{});
+
     auto * f = open(path, File{File::Regular{}});
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
