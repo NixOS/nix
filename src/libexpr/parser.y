@@ -314,11 +314,11 @@ expr_simple
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
-      std::string path($1.p + 1, $1.l - 2);
+      std::string_view path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
           new ExprVar(state->s.findFile),
           {new ExprVar(state->s.nixPath),
-           new ExprString(std::move(path))});
+           new ExprString(path)});
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
@@ -327,7 +327,7 @@ expr_simple
               .msg = HintFmt("URL literals are disabled"),
               .pos = state->positions[CUR_POS]
           });
-      $$ = new ExprString(std::string($1));
+      $$ = new ExprString($1);
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -344,19 +344,19 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new ExprString(std::string($1)); }
+  : STR { $$ = new ExprString($1); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
   | { $$ = new ExprString(std::string_view()); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(std::string($2))); }
+  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString($2)); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<PosIdx, Expr *>>;
-      $$->emplace_back(state->at(@1), new ExprString(std::string($1)));
+      $$->emplace_back(state->at(@1), new ExprString($1));
       $$->emplace_back(state->at(@2), $3);
     }
   ;
