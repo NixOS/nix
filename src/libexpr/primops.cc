@@ -43,10 +43,10 @@ namespace nix {
  * Miscellaneous
  *************************************************************/
 
-static inline Value * mkString(EvalState & state, const std::csub_match & match)
+static inline Value * mkString(EvalState & state, const std::csub_match & match, const NixStringContext & context)
 {
     Value * v = state.allocValue();
-    v->mkString({match.first, match.second});
+    v->mkString({match.first, match.second}, context);
     return v;
 }
 
@@ -4639,7 +4639,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             if (!match[i + 1].matched)
                 v2 = &Value::vNull;
             else
-                v2 = mkString(state, match[i + 1]);
+                v2 = mkString(state, match[i + 1], context);
         v.mkList(list);
 
     } catch (std::regex_error & e) {
@@ -4720,7 +4720,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             const auto & match = *i;
 
             // Add a string for non-matched characters.
-            list[idx++] = mkString(state, match.prefix());
+            list[idx++] = mkString(state, match.prefix(), context);
 
             // Add a list for matched substrings.
             const size_t slen = match.size() - 1;
@@ -4731,14 +4731,14 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
                 if (!match[si + 1].matched)
                     v2 = &Value::vNull;
                 else
-                    v2 = mkString(state, match[si + 1]);
+                    v2 = mkString(state, match[si + 1], context);
             }
 
             (list[idx++] = state.allocValue())->mkList(list2);
 
             // Add a string for non-matched suffix characters.
             if (idx == 2 * len)
-                list[idx++] = mkString(state, match.suffix());
+                list[idx++] = mkString(state, match.suffix(), context);
         }
 
         assert(idx == 2 * len + 1);
