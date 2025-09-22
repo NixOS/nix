@@ -273,6 +273,13 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                 if (str->p[j] == ' ')
                     curIndent++;
                 else if (str->p[j] == '\n') {
+                    /* if curIndent < minIndent, we can't calculate at this
+                     * point how much indention we will remove; we will just have
+                     * to over-allocate later. Fortunately in practice this doesn't
+                     * come up very much.
+                    */
+                    if (curIndent >= minIndent)
+                        nrIndentedLines[n]++;
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -304,9 +311,12 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     };
     const auto trimString = [&](const StringToken & t) {
         auto finalLineTrim = n == es.size() - 1 ? finalBlankLine : 0;
-        /* TODO: pre-calculate exactly how big of a string we need */
+        /* try to pre-calculate exactly how big of a string we need. In weird
+         * rare cases we can't efficiently pre-calculate it and will end up
+         * over-allocating. See comment above.
+         */
         size_t size = 1 + t.l - nrIndentedLines[n] * minIndent;
-        if (size == 1) // empty string
+        if (size == 1) // ignore (most) empty strings before we allocate
             return;
         char * s2 = (char *) alloc.allocate(size);
         size_t end = t.l - finalLineTrim;
