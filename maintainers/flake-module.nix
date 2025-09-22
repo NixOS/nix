@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^misc/bash/completion\.sh$''
               ''^misc/fish/completion\.fish$''
               ''^misc/zsh/completion\.zsh$''
               ''^scripts/create-darwin-volume\.sh$''
