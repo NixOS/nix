@@ -221,6 +221,17 @@ template<class T, typename K>
 typename T::mapped_type * get(T && map, const K & key) = delete;
 
 /**
+ * Look up a value in a `boost::concurrent_flat_map`.
+ */
+template<class T>
+std::optional<typename T::mapped_type> getConcurrent(const T & map, const typename T::key_type & key)
+{
+    std::optional<typename T::mapped_type> res;
+    map.cvisit(key, [&](auto & x) { res = x.second; });
+    return res;
+}
+
+/**
  * Get a value for the specified key from an associate container, or a default value if the key isn't present.
  */
 template<class T, typename K>

@@ -38,6 +38,7 @@
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 #include "nix/util/strings-inline.hh"
 
@@ -264,6 +265,9 @@ EvalState::EvalState(
     , debugRepl(nullptr)
     , debugStop(false)
     , trylevel(0)
+    , srcToStore(make_ref<decltype(srcToStore)::element_type>())
+    , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
+    , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
@@ -1026,63 +1030,85 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
     return &v;
 }
 
+/**
+ * A helper `Expr` class to lets us parse and evaluate Nix expressions
+ * from a thunk, ensuring that every file is parsed/evaluated only
+ * once (via the thunk stored in `EvalState::fileEvalCache`).
+ */
+struct ExprParseFile : Expr
+{
+    SourcePath & path;
+    bool mustBeTrivial;
+
+    ExprParseFile(SourcePath & path, bool mustBeTrivial)
+        : path(path)
+        , mustBeTrivial(mustBeTrivial)
+    {
+    }
+
+    void eval(EvalState & state, Env & env, Value & v) override
+    {
+        printTalkative("evaluating file '%s'", path);
+
+        auto e = state.parseExprFromFile(path);
+
+        try {
+            auto dts =
+                state.debugRepl
+                    ? makeDebugTraceStacker(
+                          state, *e, state.baseEnv, e->getPos(), "while evaluating the file '%s':", path.to_string())
+                    : nullptr;
+
+            // Enforce that 'flake.nix' is a direct attrset, not a
+            // computation.
+            if (mustBeTrivial && !(dynamic_cast<ExprAttrs *>(e)))
+                state.error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
+
+            state.eval(e, v);
+        } catch (Error & e) {
+            state.addErrorTrace(e, "while evaluating the file '%s':", path.to_string());
+            throw;
+        }
+    }
+};
+
 void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 {
-    FileEvalCache::iterator i;
-    if ((i = fileEvalCache.find(path)) != fileEvalCache.end()) {
-        v = i->second;
+    auto resolvedPath = getConcurrent(*importResolutionCache, path);
+
+    if (!resolvedPath) {
+        resolvedPath = resolveExprPath(path);
+        importResolutionCache->emplace(path, *resolvedPath);
+    }
+
+    if (auto v2 = getConcurrent(*fileEvalCache, *resolvedPath)) {
+        forceValue(**v2, noPos);
+        v = **v2;
         return;
     }
 
-    auto resolvedPath = resolveExprPath(path);
-    if ((i = fileEvalCache.find(resolvedPath)) != fileEvalCache.end()) {
-        v = i->second;
-        return;
-    }
+    Value * vExpr;
+    ExprParseFile expr{*resolvedPath, mustBeTrivial};
 
-    printTalkative("evaluating file '%1%'", resolvedPath);
-    Expr * e = nullptr;
+    fileEvalCache->try_emplace_and_cvisit(
+        *resolvedPath,
+        nullptr,
+        [&](auto & i) {
+            vExpr = allocValue();
+            vExpr->mkThunk(&baseEnv, &expr);
+            i.second = vExpr;
+        },
+        [&](auto & i) { vExpr = i.second; });
 
-    auto j = fileParseCache.find(resolvedPath);
-    if (j != fileParseCache.end())
-        e = j->second;
+    forceValue(*vExpr, noPos);
 
-    if (!e)
-        e = parseExprFromFile(resolvedPath);
-
-    fileParseCache.emplace(resolvedPath, e);
-
-    try {
-        auto dts = debugRepl ? makeDebugTraceStacker(
-                                   *this,
-                                   *e,
-                                   this->baseEnv,
-                                   e->getPos(),
-                                   "while evaluating the file '%1%':",
-                                   resolvedPath.to_string())
-                             : nullptr;
-
-        // Enforce that 'flake.nix' is a direct attrset, not a
-        // computation.
-        if (mustBeTrivial && !(dynamic_cast<ExprAttrs *>(e)))
-            error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-        eval(e, v);
-    } catch (Error & e) {
-        addErrorTrace(e, "while evaluating the file '%1%':", resolvedPath.to_string());
-        throw;
-    }
-
-    fileEvalCache.emplace(resolvedPath, v);
-    if (path != resolvedPath)
-        fileEvalCache.emplace(path, v);
+    v = *vExpr;
 }
 
 void EvalState::resetFileCache()
 {
-    fileEvalCache.clear();
-    fileEvalCache.rehash(0);
-    fileParseCache.clear();
-    fileParseCache.rehash(0);
+    importResolutionCache->clear();
+    fileEvalCache->clear();
     inputCache->clear();
 }
 
@@ -2401,9 +2427,10 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    std::optional<StorePath> dstPath;
-    if (!srcToStore.cvisit(path, [&dstPath](const auto & kv) { dstPath.emplace(kv.second); })) {
-        dstPath.emplace(fetchToStore(
+    auto dstPathCached = getConcurrent(*srcToStore, path);
+
+    auto dstPath = dstPathCached ? *dstPathCached : [&]() {
+        auto dstPath = fetchToStore(
             fetchSettings,
             *store,
             path.resolveSymlinks(SymlinkResolution::Ancestors),
@@ -2411,14 +2438,15 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             path.baseName(),
             ContentAddressMethod::Raw::NixArchive,
             nullptr,
-            repair));
-        allowPath(*dstPath);
-        srcToStore.try_emplace(path, *dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(*dstPath));
-    }
+            repair);
+        allowPath(dstPath);
+        srcToStore->try_emplace(path, dstPath);
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        return dstPath;
+    }();
 
-    context.insert(NixStringContextElem::Opaque{.path = *dstPath});
-    return *dstPath;
+    context.insert(NixStringContextElem::Opaque{.path = dstPath});
+    return dstPath;
 }
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
