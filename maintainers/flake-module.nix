@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^scripts/create-darwin-volume\.sh$''
               ''^scripts/install-darwin-multi-user\.sh$''
               ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
