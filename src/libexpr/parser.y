@@ -64,6 +64,7 @@ Expr * parseExprFromBuf(
     size_t length,
     Pos::Origin origin,
     const SourcePath & basePath,
+    std::pmr::polymorphic_allocator<char> & alloc,
     SymbolTable & symbols,
     const EvalSettings & settings,
     PosTable & positions,
@@ -318,7 +319,7 @@ expr_simple
       $$ = new ExprCall(CUR_POS,
           new ExprVar(state->s.findFile),
           {new ExprVar(state->s.nixPath),
-           new ExprString(path)});
+           new ExprString(state->alloc, path)});
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
@@ -327,7 +328,7 @@ expr_simple
               .msg = HintFmt("URL literals are disabled"),
               .pos = state->positions[CUR_POS]
           });
-      $$ = new ExprString($1);
+      $$ = new ExprString(state->alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -344,19 +345,19 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new ExprString($1); }
+  : STR { $$ = new ExprString(state->alloc, $1); }
   | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(std::string_view()); }
+  | { $$ = new ExprString(state->alloc, std::string_view()); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString($2)); }
+  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(state->alloc, $2)); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<PosIdx, Expr *>>;
-      $$->emplace_back(state->at(@1), new ExprString($1));
+      $$->emplace_back(state->at(@1), new ExprString(state->alloc, $1));
       $$->emplace_back(state->at(@2), $3);
     }
   ;
@@ -537,6 +538,7 @@ Expr * parseExprFromBuf(
     size_t length,
     Pos::Origin origin,
     const SourcePath & basePath,
+    std::pmr::polymorphic_allocator<char> & alloc,
     SymbolTable & symbols,
     const EvalSettings & settings,
     PosTable & positions,
@@ -551,6 +553,7 @@ Expr * parseExprFromBuf(
     };
     ParserState state {
         .lexerState = lexerState,
+        .alloc = alloc,
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,

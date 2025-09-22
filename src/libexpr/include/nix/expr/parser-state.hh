@@ -82,6 +82,7 @@ struct LexerState
 struct ParserState
 {
     const LexerState & lexerState;
+    std::pmr::polymorphic_allocator<char> & alloc;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -245,7 +246,7 @@ inline Expr *
 ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty())
-        return new ExprString(std::string_view());
+        return new ExprString(alloc, std::string_view());
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -337,7 +338,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
     if (es2->size() == 0) {
-        auto * const result = new ExprString(std::string_view());
+        auto * const result = new ExprString(alloc, std::string_view());
         delete es2;
         return result;
     }

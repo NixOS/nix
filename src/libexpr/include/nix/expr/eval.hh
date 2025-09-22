@@ -355,6 +355,11 @@ public:
         return stats;
     }
 
+    /**
+     * Storage for the AST nodes
+     */
+    Exprs exprs;
+
 private:
     Statistics stats;
 };

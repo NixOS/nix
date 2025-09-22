@@ -84,6 +84,14 @@ std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
+struct Exprs
+{
+    /** The actual Expr's don't live in here yet, but their data does */
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+};
+
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -184,10 +192,24 @@ struct ExprString : Expr
         v.mkStringNoCopy(this->s.data());
     };
 
-    explicit ExprString(std::string_view s)
+    // This is only for strings already allocated in our polymorphic allocator
+    ExprString(char * s)
     {
-        v.mkString(s);
+        v.mkStringNoCopy(s);
     };
+
+    ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
+    {
+        char * s = alloc.allocate(sv.length() + 1);
+        sv.copy(s, sv.length());
+        s[sv.length()] = '\0';
+        v.mkStringNoCopy(s);
+    };
+
+    ~ExprString()
+    {
+        // Leak allocated string. We never clean up ExprStrings anyways.
+    }
 
     Value * maybeThunk(EvalState & state, Env & env) override;
     COMMON_METHODS
