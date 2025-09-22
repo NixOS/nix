@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^config/install-sh$''
               ''^misc/bash/completion\.sh$''
               ''^misc/fish/completion\.fish$''
               ''^misc/zsh/completion\.zsh$''
