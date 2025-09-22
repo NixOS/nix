@@ -233,30 +233,30 @@ TEST_F(GitTest, both_roundrip)
         .contents{
             {
                 "foo",
-                make_ref<File>(File::Regular{
+                File::Regular{
                     .contents = "hello\n\0\n\tworld!",
-                }),
+                },
             },
             {
                 "bar",
-                make_ref<File>(File::Directory{
+                File::Directory{
                     .contents =
                         {
                             {
                                 "baz",
-                                make_ref<File>(File::Regular{
+                                File::Regular{
                                     .executable = true,
                                     .contents = "good day,\n\0\n\tworld!",
-                                }),
+                                },
                             },
                             {
                                 "quux",
-                                make_ref<File>(File::Symlink{
+                                File::Symlink{
                                     .target = "/over/there",
-                                }),
+                                },
                             },
                         },
-                }),
+                },
             },
         },
     };

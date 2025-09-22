@@ -108,4 +108,13 @@ struct hash<nix::StorePath>
 
 } // namespace std
 
+namespace nix {
+
+inline std::size_t hash_value(const StorePath & path)
+{
+    return std::hash<StorePath>{}(path);
+}
+
+} // namespace nix
+
 JSON_IMPL(nix::StorePath)
