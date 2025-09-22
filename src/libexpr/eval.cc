@@ -227,24 +227,17 @@ EvalState::EvalState(
           {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
       }))
     , rootFS([&] {
-        auto accessor = [&]() -> decltype(rootFS) {
-            /* In pure eval mode, we provide a filesystem that only
-               contains the Nix store. */
-            if (settings.pureEval)
-                return storeFS;
+        /* In pure eval mode, we provide a filesystem that only
+           contains the Nix store.
 
-            /* If we have a chroot store and pure eval is not enabled,
-               use a union accessor to make the chroot store available
-               at its logical location while still having the underlying
-               directory available. This is necessary for instance if
-               we're evaluating a file from the physical /nix/store
-               while using a chroot store. */
-            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-            if (store->storeDir != realStoreDir)
-                return makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
-
-            return getFSSourceAccessor();
-        }();
+           Otherwise, use a union accessor to make the augmented store
+           available at its logical location while still having the
+           underlying directory available. This is necessary for
+           instance if we're evaluating a file from the physical
+           /nix/store while using a chroot store, and also for lazy
+           mounted fetchTree. */
+        auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
+                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
 
         /* Apply access control if needed. */
         if (settings.restrictEval || settings.pureEval)

@@ -27,14 +27,19 @@ StorePath fetchToStore(
 
     std::optional<fetchers::Cache::Key> cacheKey;
 
-    if (!filter && path.accessor->fingerprint) {
-        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *path.accessor->fingerprint, method, path.path.abs());
+    auto [subpath, fingerprint] = filter ? std::pair<CanonPath, std::optional<std::string>>{path.path, std::nullopt}
+                                         : path.accessor->getFingerprint(path.path);
+
+    if (fingerprint) {
+        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, subpath.abs());
         if (auto res = settings.getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
-    } else
+    } else {
+        // FIXME: could still provide in-memory caching keyed on `SourcePath`.
         debug("source path '%s' is uncacheable", path);
+    }
 
     Activity act(
         *logger,

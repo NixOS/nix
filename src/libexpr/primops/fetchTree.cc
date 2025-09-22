@@ -10,6 +10,7 @@
 #include "nix/util/url.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/input-cache.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -218,11 +219,11 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    auto cachedInput = state.inputCache->getAccessor(state.store, input, fetchers::UseRegistries::No);
 
-    state.allowPath(storePath);
+    auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
