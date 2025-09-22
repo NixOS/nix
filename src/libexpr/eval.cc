@@ -1035,9 +1035,10 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
  * from a thunk, ensuring that every file is parsed/evaluated only
  * once (via the thunk stored in `EvalState::fileEvalCache`).
  */
-struct ExprParseFile : Expr
+struct ExprParseFile : Expr, gc
 {
-    SourcePath & path;
+    // FIXME: make this a reference (see below).
+    SourcePath path;
     bool mustBeTrivial;
 
     ExprParseFile(SourcePath & path, bool mustBeTrivial)
@@ -1088,14 +1089,18 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     }
 
     Value * vExpr;
-    ExprParseFile expr{*resolvedPath, mustBeTrivial};
+    // FIXME: put ExprParseFile on the stack instead of the heap once
+    // https://github.com/NixOS/nix/pull/13930 is merged. That will ensure
+    // the post-condition that `expr` is unreachable after
+    // `forceValue()` returns.
+    auto expr = new ExprParseFile{*resolvedPath, mustBeTrivial};
 
     fileEvalCache->try_emplace_and_cvisit(
         *resolvedPath,
         nullptr,
         [&](auto & i) {
             vExpr = allocValue();
-            vExpr->mkThunk(&baseEnv, &expr);
+            vExpr->mkThunk(&baseEnv, expr);
             i.second = vExpr;
         },
         [&](auto & i) { vExpr = i.second; });
