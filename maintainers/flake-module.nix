@@ -106,31 +106,8 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^config/install-sh$''
-              ''^misc/bash/completion\.sh$''
-              ''^misc/fish/completion\.fish$''
-              ''^misc/zsh/completion\.zsh$''
-              ''^scripts/create-darwin-volume\.sh$''
-              ''^scripts/install-darwin-multi-user\.sh$''
               ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^src/nix/get-env\.sh$''
-              ''^tests/functional/ca/build-dry\.sh$''
-              ''^tests/functional/ca/build-with-garbage-path\.sh$''
-              ''^tests/functional/ca/common\.sh$''
-              ''^tests/functional/ca/concurrent-builds\.sh$''
-              ''^tests/functional/ca/eval-store\.sh$''
-              ''^tests/functional/ca/gc\.sh$''
-              ''^tests/functional/ca/import-from-derivation\.sh$''
-              ''^tests/functional/ca/new-build-cmd\.sh$''
-              ''^tests/functional/ca/nix-shell\.sh$''
-              ''^tests/functional/ca/post-hook\.sh$''
-              ''^tests/functional/ca/recursive\.sh$''
-              ''^tests/functional/ca/repl\.sh$''
-              ''^tests/functional/ca/selfref-gc\.sh$''
-              ''^tests/functional/ca/why-depends\.sh$''
-              ''^tests/functional/characterisation-test-infra\.sh$''
-              ''^tests/functional/common/vars-and-functions\.sh$''
               ''^tests/functional/completions\.sh$''
               ''^tests/functional/compute-levels\.sh$''
               ''^tests/functional/config\.sh$''
@@ -248,6 +225,25 @@
               ''^tests/functional/user-envs\.builder\.sh$''
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
+
+              # Shellcheck doesn't support fish or zsh shell syntax
+              ''^misc/fish/completion\.fish$''
+              ''^misc/zsh/completion\.zsh$''
+
+              # Content-addressed test files that use recursive-*looking* sourcing
+              # (cd .. && source <self>), causing shellcheck to loop
+              # They're small wrapper scripts with not a lot going on
+              ''^tests/functional/ca/build-dry\.sh$''
+              ''^tests/functional/ca/eval-store\.sh$''
+              ''^tests/functional/ca/gc\.sh$''
+              ''^tests/functional/ca/import-from-derivation\.sh$''
+              ''^tests/functional/ca/new-build-cmd\.sh$''
+              ''^tests/functional/ca/nix-shell\.sh$''
+              ''^tests/functional/ca/post-hook\.sh$''
+              ''^tests/functional/ca/recursive\.sh$''
+              ''^tests/functional/ca/repl\.sh$''
+              ''^tests/functional/ca/selfref-gc\.sh$''
+              ''^tests/functional/ca/why-depends\.sh$''
             ];
           };
         };

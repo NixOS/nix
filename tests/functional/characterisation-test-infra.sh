@@ -40,7 +40,7 @@ echo Bye! > "$TEST_ROOT/expected"
   diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
   (( "$badDiff" == 1 ))
 )
-[[ "$(echo Bye! )" == $(< "$TEST_ROOT/expected") ]]
+[[ "Bye!" == $(< "$TEST_ROOT/expected") ]]
 
 # _NIX_TEST_ACCEPT=1 matches non-empty
 echo Hi! > "$TEST_ROOT/got"
@@ -57,7 +57,7 @@ echo Bye! > "$TEST_ROOT/expected"
   _NIX_TEST_ACCEPT=1 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
   (( "$badDiff" == 1 ))
 )
-[[ "$(echo Hi! )" == $(< "$TEST_ROOT/expected") ]]
+[[ "Hi!" == $(< "$TEST_ROOT/expected") ]]
 # second time succeeds
 (
   diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
