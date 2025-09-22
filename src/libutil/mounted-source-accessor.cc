@@ -91,6 +91,14 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         else
             return nullptr;
     }
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override
+    {
+        if (fingerprint)
+            return {path, fingerprint};
+        auto [accessor, subpath] = resolve(path);
+        return accessor->getFingerprint(subpath);
+    }
 };
 
 ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)

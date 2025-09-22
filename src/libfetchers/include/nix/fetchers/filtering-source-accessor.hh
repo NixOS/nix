@@ -50,6 +50,8 @@ struct FilteringSourceAccessor : SourceAccessor
 
     std::string showPath(const CanonPath & path) override;
 
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override;
+
     /**
      * Call `makeNotAllowedError` to throw a `RestrictedPathError`
      * exception if `isAllowed()` returns `false` for `path`.

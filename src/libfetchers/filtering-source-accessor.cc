@@ -60,6 +60,13 @@ std::string FilteringSourceAccessor::showPath(const CanonPath & path)
     return displayPrefix + next->showPath(prefix / path) + displaySuffix;
 }
 
+std::pair<CanonPath, std::optional<std::string>> FilteringSourceAccessor::getFingerprint(const CanonPath & path)
+{
+    if (fingerprint)
+        return {path, fingerprint};
+    return next->getFingerprint(prefix / path);
+}
+
 void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 {
     if (!isAllowed(path))
