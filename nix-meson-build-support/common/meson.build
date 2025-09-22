@@ -5,6 +5,15 @@ if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
   deps_private += dependency('threads')
 endif
 
+if host_machine.system() == 'cygwin'
+  # -std=gnu on cygwin defines 'unix', which conflicts with the namespace
+  add_project_arguments(
+    '-D_POSIX_C_SOURCE=200809L',
+    '-D_GNU_SOURCE',
+    language : 'cpp',
+  )
+endif
+
 add_project_arguments(
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
