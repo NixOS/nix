@@ -181,16 +181,7 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    private:
-    std::string s;
-    public:
     Value v;
-
-    explicit ExprString(std::string && s)
-        : s(std::move(s))
-    {
-        v.mkStringNoCopy(this->s.data());
-    };
 
     // This is only for strings already allocated in our polymorphic allocator
     ExprString(char * s)
