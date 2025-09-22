@@ -108,7 +108,6 @@
               # We haven't linted these files yet
               ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^tests/functional/characterisation-test-infra\.sh$''
               ''^tests/functional/common/vars-and-functions\.sh$''
               ''^tests/functional/completions\.sh$''
               ''^tests/functional/compute-levels\.sh$''
