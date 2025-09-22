@@ -7,6 +7,7 @@
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 using namespace nix;
 
