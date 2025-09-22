@@ -135,6 +135,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::AttrName, nix::PosIdx>> * inheritAttrs;
   std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
+  std::variant<nix::Expr *, std::string_view> * to_be_string;
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
 }
 
@@ -149,7 +150,8 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <inheritAttrs> attrs
 %type <string_parts> string_parts_interpolated
 %type <ind_string_parts> ind_string_parts
-%type <e> path_start string_parts string_attr
+%type <e> path_start
+%type <to_be_string> string_parts string_attr
 %type <id> attr
 %token <id> ID
 %token <str> STR IND_STR
@@ -304,7 +306,12 @@ expr_simple
   }
   | INT_LIT { $$ = new ExprInt($1); }
   | FLOAT_LIT { $$ = new ExprFloat($1); }
-  | '"' string_parts '"' { $$ = $2; }
+  | '"' string_parts '"' {
+      std::visit(overloaded{
+          [&](std::string_view str) { $$ = new ExprString(state->alloc, str); },
+          [&](Expr * expr) { $$ = expr; }},
+      *$2);
+  }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = state->stripIndentation(CUR_POS, std::move(*$2));
       delete $2;
@@ -345,9 +352,9 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new ExprString(state->alloc, $1); }
-  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
-  | { $$ = new ExprString(state->alloc, std::string_view()); }
+  : STR { $$ = new std::variant<Expr *, std::string_view>($1); }
+  | string_parts_interpolated { $$ = new std::variant<Expr *, std::string_view>(new ExprConcatStrings(CUR_POS, true, $1)); }
+  | { $$ = new std::variant<Expr *, std::string_view>(std::string_view()); }
   ;
 
 string_parts_interpolated
@@ -455,15 +462,15 @@ attrs
   : attrs attr { $$ = $1; $1->emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
   | attrs string_attr
     { $$ = $1;
-      ExprString * str = dynamic_cast<ExprString *>($2);
-      if (str) {
-          $$->emplace_back(AttrName(state->symbols.create(str->v.string_view())), state->at(@2));
-          delete str;
-      } else
-          throw ParseError({
-              .msg = HintFmt("dynamic attributes not allowed in inherit"),
-              .pos = state->positions[state->at(@2)]
-          });
+      std::visit(overloaded {
+          [&](std::string_view str) { $$->emplace_back(AttrName(state->symbols.create(str)), state->at(@2)); },
+          [&](Expr * expr) {
+              throw ParseError({
+                  .msg = HintFmt("dynamic attributes not allowed in inherit"),
+                  .pos = state->positions[state->at(@2)]
+              });
+          }
+      }, *$2);
     }
   | { $$ = new std::vector<std::pair<AttrName, PosIdx>>; }
   ;
@@ -472,22 +479,18 @@ attrpath
   : attrpath '.' attr { $$ = $1; $1->push_back(AttrName(state->symbols.create($3))); }
   | attrpath '.' string_attr
     { $$ = $1;
-      ExprString * str = dynamic_cast<ExprString *>($3);
-      if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->v.string_view())));
-          delete str;
-      } else
-          $$->push_back(AttrName($3));
+      std::visit(overloaded {
+          [&](std::string_view str) { $$->push_back(AttrName(state->symbols.create(str))); },
+          [&](Expr * expr) { $$->push_back(AttrName(expr)); }
+      }, *$3);
     }
   | attr { $$ = new std::vector<AttrName>; $$->push_back(AttrName(state->symbols.create($1))); }
   | string_attr
     { $$ = new std::vector<AttrName>;
-      ExprString *str = dynamic_cast<ExprString *>($1);
-      if (str) {
-          $$->push_back(AttrName(state->symbols.create(str->v.string_view())));
-          delete str;
-      } else
-          $$->push_back(AttrName($1));
+      std::visit(overloaded {
+          [&](std::string_view str) { $$->push_back(AttrName(state->symbols.create(str))); },
+          [&](Expr * expr) { $$->push_back(AttrName(expr)); }
+      }, *$1);
     }
   ;
 
@@ -498,7 +501,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = $2; }
+  | DOLLAR_CURLY expr '}' { $$ = new std::variant<Expr *, std::string_view>($2); }
   ;
 
 expr_list
