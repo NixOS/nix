@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^misc/zsh/completion\.zsh$''
               ''^scripts/create-darwin-volume\.sh$''
               ''^scripts/install-darwin-multi-user\.sh$''
               ''^scripts/install-multi-user\.sh$''
@@ -246,8 +245,9 @@
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
 
-              # Shellcheck doesn't support fish shell syntax
+              # Shellcheck doesn't support fish or zsh shell syntax
               ''^misc/fish/completion\.fish$''
+              ''^misc/zsh/completion\.zsh$''
             ];
           };
         };
