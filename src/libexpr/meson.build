@@ -69,6 +69,10 @@ if bdw_gc.found()
     define_value = cxx.has_function(funcspec).to_int()
     configdata_priv.set(define_name, define_value)
   endforeach
+  if host_machine.system() == 'cygwin'
+    # undefined reference to `__wrap__Znwm'
+    configdata_pub.set('GC_NO_INLINE_STD_NEW', 1)
+  endif
 endif
 # Used in public header. Affects ABI!
 configdata_pub.set('NIX_USE_BOEHMGC', bdw_gc.found().to_int())
