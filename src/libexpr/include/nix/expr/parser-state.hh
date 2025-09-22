@@ -254,8 +254,10 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     size_t minIndent = 1000000;
     size_t curIndent = 0;
-    for (auto & [i_pos, i] : es) {
+    std::vector<int> nrIndentedLines(es.size(), 0);
     size_t finalBlankLine = 0;
+    for (const auto & [n, pair] : enumerate(es)) {
+        auto & [i_pos, i] = pair;
         auto * str = std::get_if<StringToken>(&i);
         if (!str || !str->hasIndentation) {
             /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
@@ -281,6 +283,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                 }
             } else if (str->p[j] == '\n') {
                 atStartOfLine = true;
+                nrIndentedLines[n]++;
                 curIndent = 0;
             }
         }
@@ -302,7 +305,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     const auto trimString = [&](const StringToken & t) {
         auto finalLineTrim = n == es.size() - 1 ? finalBlankLine : 0;
         /* TODO: pre-calculate exactly how big of a string we need */
-        size_t size = t.l + 1;
+        size_t size = 1 + t.l - nrIndentedLines[n] * minIndent;
         if (size == 1) // empty string
             return;
         char * s2 = (char *) alloc.allocate(size);
