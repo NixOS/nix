@@ -2,11 +2,12 @@
 #define NIX_API_EXTERNAL_H
 /** @ingroup libexpr
  * @addtogroup Externals
- * @brief Deal with external values
+ * @brief Externals let Nix expressions work with foreign values that aren't part of the normal Nix value data model
  * @{
  */
 /** @file
  * @brief libexpr C bindings dealing with external values
+ * @see Externals
  */
 
 #include "nix_api_expr.h"
@@ -115,7 +116,7 @@ typedef struct NixCExternalValueDesc
      * @brief Try to compare two external values
      *
      * Optional, the default is always false.
-     * If the other object was not a Nix C external value, this comparison will
+     * If the other object was not a Nix C API external value, this comparison will
      * also return false
      * @param[in] self the void* passed to nix_create_external_value
      * @param[in] other the void* passed to the other object's
@@ -168,7 +169,7 @@ typedef struct NixCExternalValueDesc
 /**
  * @brief Create an external value, that can be given to nix_init_external
  *
- * Owned by the GC. Use nix_gc_decref when you're done with the pointer.
+ * Call nix_gc_decref() when you're done with the pointer.
  *
  * @param[out] context Optional, stores error information
  * @param[in] desc a NixCExternalValueDesc, you should keep this alive as long
@@ -180,10 +181,11 @@ typedef struct NixCExternalValueDesc
 ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalValueDesc * desc, void * v);
 
 /**
- * @brief Extract the pointer from a nix c external value.
+ * @brief Extract the pointer from a Nix C API external value.
  * @param[out] context Optional, stores error information
  * @param[in] b The external value
- * @returns The pointer, or null if the external value was not from nix c.
+ * @returns The pointer, valid while the external value is valid, or null if the external value was not from the Nix C
+ * API.
  * @see nix_get_external
  */
 void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b);

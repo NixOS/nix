@@ -240,3 +240,9 @@ $ configurePhase
 $ ninja src/external-api-docs/html
 $ xdg-open src/external-api-docs/html/index.html
 ```
+
+If you use direnv, or otherwise want to run `configurePhase` in a transient shell, use:
+
+```bash
+nix-shell -A devShells.x86_64-linux.native-clangStdenv --command 'mesonFlags="$mesonFlags -Ddoc-gen=true"; mesonConfigurePhase'
+```
