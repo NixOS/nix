@@ -3,7 +3,6 @@
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
@@ -332,7 +331,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
 
-            auto accessor = makeStorePathAccessor(store, storePath);
+            // We just ensured the store object was there
+            auto accessor = ref{store->getFSAccessor(storePath)};
 
             accessor->fingerprint = getFingerprint(store);
 

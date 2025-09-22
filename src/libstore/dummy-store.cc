@@ -276,7 +276,14 @@ struct DummyStore : virtual Store
         callback(nullptr);
     }
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
+    {
+        std::shared_ptr<SourceAccessor> res;
+        contents.cvisit(path, [&](const auto & kv) { res = kv.second.contents.get_ptr(); });
+        return res;
+    }
+
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
         return wholeStoreView;
     }

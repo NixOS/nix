@@ -539,9 +539,19 @@ void BinaryCacheStore::registerDrvOutput(const Realisation & info)
     upsertFile(filePath, static_cast<nlohmann::json>(info).dump(), "application/json");
 }
 
-ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
+ref<RemoteFSAccessor> BinaryCacheStore::getRemoteFSAccessor(bool requireValidPath)
 {
     return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
+}
+
+ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
+{
+    return getRemoteFSAccessor(requireValidPath);
+}
+
+std::shared_ptr<SourceAccessor> BinaryCacheStore::getFSAccessor(const StorePath & storePath, bool requireValidPath)
+{
+    return getRemoteFSAccessor(requireValidPath)->accessObject(storePath);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)

@@ -41,7 +41,10 @@ struct CmdCatStore : StoreCommand, MixCat
     void run(ref<Store> store) override
     {
         auto [storePath, rest] = store->toStorePath(path);
-        cat(store->getFSAccessor(), CanonPath{storePath.to_string()} / CanonPath{rest});
+        auto accessor = store->getFSAccessor(storePath);
+        if (!accessor)
+            throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
+        cat(ref{std::move(accessor)}, CanonPath{rest});
     }
 };
 

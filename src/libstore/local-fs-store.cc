@@ -91,6 +91,23 @@ ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
         ref<LocalFSStore>(std::dynamic_pointer_cast<LocalFSStore>(shared_from_this())), requireValidPath);
 }
 
+std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & path, bool requireValidPath)
+{
+    auto absPath = std::filesystem::path{config.realStoreDir.get()} / path.to_string();
+    if (requireValidPath) {
+        /* Only return non-null if the store object is a fully-valid
+           member of the store. */
+        if (!isValidPath(path))
+            return nullptr;
+    } else {
+        /* Return non-null as long as the some file system data exists,
+           even if the store object is not fully registered. */
+        if (!pathExists(absPath))
+            return nullptr;
+    }
+    return std::make_shared<PosixSourceAccessor>(std::move(absPath));
+}
+
 void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
 {
     if (!isValidPath(path))

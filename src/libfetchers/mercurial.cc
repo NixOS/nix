@@ -6,7 +6,6 @@
 #include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <sys/time.h>
@@ -331,7 +330,8 @@ struct MercurialInputScheme : InputScheme
 
         auto storePath = fetchToStore(store, input);
 
-        auto accessor = makeStorePathAccessor(store, storePath);
+        // We just added it, it should be there.
+        auto accessor = ref{store->getFSAccessor(storePath)};
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 

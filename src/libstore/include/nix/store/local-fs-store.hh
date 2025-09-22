@@ -68,6 +68,7 @@ struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
 
     void narFromPath(const StorePath & path, Sink & sink) override;
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
 
     /**
      * Creates symlink from the `gcRoot` to the `storePath` and

@@ -151,6 +151,11 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
         return LocalFSStore::getFSAccessor(requireValidPath);
     }
 
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
+    {
+        return LocalFSStore::getFSAccessor(path, requireValidPath);
+    }
+
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
     {
         return LocalFSStore::getBuildLogExact(path);
