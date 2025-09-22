@@ -108,7 +108,6 @@
               # We haven't linted these files yet
               ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^tests/functional/ca/build-with-garbage-path\.sh$''
               ''^tests/functional/ca/common\.sh$''
               ''^tests/functional/ca/concurrent-builds\.sh$''
               ''^tests/functional/characterisation-test-infra\.sh$''
