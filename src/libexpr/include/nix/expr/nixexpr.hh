@@ -99,7 +99,16 @@ struct Expr
     virtual ~Expr() {};
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+
+    /** Normal evaluation, implemented directly by all subclasses. */
     virtual void eval(EvalState & state, Env & env, Value & v);
+
+    /**
+     * Create a thunk for the delayed computation of the given expression
+     * in the given environment. But if the expression is a variable,
+     * then look it up right away. This significantly reduces the number
+     * of thunks allocated.
+     */
     virtual Value * maybeThunk(EvalState & state, Env & env);
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) {};
