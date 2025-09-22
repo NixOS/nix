@@ -1,6 +1,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 
@@ -37,6 +38,9 @@ StorePath fetchToStore(
             return res->storePath;
         }
     } else {
+        static auto barf = getEnv("_NIX_TEST_BARF_ON_UNCACHEABLE").value_or("") == "1";
+        if (barf && !filter)
+            throw Error("source path '%s' is uncacheable (filter=%d)", path, (bool) filter);
         // FIXME: could still provide in-memory caching keyed on `SourcePath`.
         debug("source path '%s' is uncacheable", path);
     }
