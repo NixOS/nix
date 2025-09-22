@@ -65,7 +65,7 @@ traverseDir="${_NIX_TEST_SOURCE_DIR}/restricted-traverse-me"
 ln -sfn "${_NIX_TEST_SOURCE_DIR}/restricted-secret" "${_NIX_TEST_SOURCE_DIR}/restricted-innocent"
 mkdir -p "$traverseDir"
 goUp="..$(echo "$traverseDir" | sed -e 's,[^/]\+,..,g')"
-output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
+output="$(nix eval --raw --impure --restrict-eval -I "$traverseDir" \
     --expr "builtins.readFile \"$traverseDir/$goUp${_NIX_TEST_SOURCE_DIR}/restricted-innocent\"" \
     2>&1 || :)"
 echo "$output" | grep "is forbidden"
