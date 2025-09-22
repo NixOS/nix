@@ -274,10 +274,10 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                     curIndent++;
                 else if (str->p[j] == '\n') {
                     /* if curIndent < minIndent, we can't calculate at this
-                     * point how much indention we will remove; we will just have
-                     * to over-allocate later. Fortunately in practice this doesn't
-                     * come up very much.
-                    */
+                     * point how much indention we will remove; we will just
+                     * have to over-allocate later. Fortunately in practice this
+                     * shouldn't come up very much.
+                     */
                     if (curIndent >= minIndent)
                         nrIndentedLines[n]++;
                     /* Empty line, doesn't influence minimum

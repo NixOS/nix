@@ -86,7 +86,6 @@ using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
 struct Exprs
 {
-    /** The actual Expr's don't live in here yet, but their data does */
     std::pmr::monotonic_buffer_resource buffer;
 public:
     std::pmr::polymorphic_allocator<char> alloc{&buffer};
@@ -199,7 +198,7 @@ struct ExprString : Expr
 
     ~ExprString()
     {
-        // Leak allocated string. We never clean up ExprStrings anyways.
+        // String is allocated in an arena
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;
