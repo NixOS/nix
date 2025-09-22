@@ -16,6 +16,12 @@ std::string FilteringSourceAccessor::readFile(const CanonPath & path)
     return next->readFile(prefix / path);
 }
 
+void FilteringSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+{
+    checkAccess(path);
+    return next->readFile(prefix / path, sink, sizeCallback);
+}
+
 bool FilteringSourceAccessor::pathExists(const CanonPath & path)
 {
     return isAllowed(path) && next->pathExists(prefix / path);
@@ -23,8 +29,13 @@ bool FilteringSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<SourceAccessor::Stat> FilteringSourceAccessor::maybeLstat(const CanonPath & path)
 {
+    return isAllowed(path) ? next->maybeLstat(prefix / path) : std::nullopt;
+}
+
+SourceAccessor::Stat FilteringSourceAccessor::lstat(const CanonPath & path)
+{
     checkAccess(path);
-    return next->maybeLstat(prefix / path);
+    return next->lstat(prefix / path);
 }
 
 SourceAccessor::DirEntries FilteringSourceAccessor::readDirectory(const CanonPath & path)

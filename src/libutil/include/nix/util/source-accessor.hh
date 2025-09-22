@@ -121,7 +121,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
         std::string typeString();
     };
 
-    Stat lstat(const CanonPath & path);
+    virtual Stat lstat(const CanonPath & path);
 
     virtual std::optional<Stat> maybeLstat(const CanonPath & path) = 0;
 

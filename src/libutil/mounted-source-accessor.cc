@@ -27,6 +27,12 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         return accessor->readFile(subpath);
     }
 
+    Stat lstat(const CanonPath & path) override
+    {
+        auto [accessor, subpath] = resolve(path);
+        return accessor->lstat(subpath);
+    }
+
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);
