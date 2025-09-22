@@ -1,11 +1,14 @@
+# shellcheck shell=bash
 set -e
+# shellcheck disable=SC1090  # Dynamic sourcing is intentional
 if [ -e "$NIX_ATTRS_SH_FILE" ]; then source "$NIX_ATTRS_SH_FILE"; fi
 
 export IN_NIX_SHELL=impure
 export dontAddDisableDepTrack=1
 
 if [[ -n $stdenv ]]; then
-    source $stdenv/setup
+    # shellcheck disable=SC1091  # setup file is in nix store
+    source "$stdenv"/setup
 fi
 
 # Better to use compgen, but stdenv bash doesn't have it.
@@ -17,10 +20,10 @@ __dumpEnv() {
 
     printf '  "bashFunctions": {\n'
     local __first=1
-    while read __line; do
+    while read -r __line; do
         if ! [[ $__line =~ ^declare\ -f\ (.*) ]]; then continue; fi
         __fun_name="${BASH_REMATCH[1]}"
-        __fun_body="$(type $__fun_name)"
+        __fun_body="$(type "$__fun_name")"
         if [[ $__fun_body =~ \{(.*)\} ]]; then
             if [[ -z $__first ]]; then printf ',\n'; else __first=; fi
             __fun_body="${BASH_REMATCH[1]}"
@@ -37,7 +40,7 @@ __dumpEnv() {
 
     printf '  "variables": {\n'
     local __first=1
-    while read __line; do
+    while read -r __line; do
         if ! [[ $__line =~ ^declare\ (-[^ ])\ ([^=]*) ]]; then continue; fi
         local type="${BASH_REMATCH[1]}"
         local __var_name="${BASH_REMATCH[2]}"
@@ -76,7 +79,9 @@ __dumpEnv() {
         elif [[ $type == -a ]]; then
             printf '"type": "array", "value": ['
             local __first2=1
+            # shellcheck disable=SC1087  # Complex array manipulation, syntax is correct
             __var_name="$__var_name[@]"
+            # shellcheck disable=SC1087  # Complex array manipulation, syntax is correct
             for __i in "${!__var_name}"; do
                 if [[ -z $__first2 ]]; then printf ', '; else __first2=; fi
                 __escapeString "$__i"
@@ -142,6 +147,7 @@ __dumpEnvToOutput() {
 # array with a format like `outname => /nix/store/hash-drvname-outname`.
 # Otherwise it is a space-separated list of output variable names.
 if [ -e "$NIX_ATTRS_SH_FILE" ]; then
+    # shellcheck disable=SC2154  # outputs is set by sourced file
     for __output in "${outputs[@]}"; do
         __dumpEnvToOutput "$__output"
     done
