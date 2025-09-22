@@ -255,6 +255,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     size_t minIndent = 1000000;
     size_t curIndent = 0;
     for (auto & [i_pos, i] : es) {
+    size_t finalBlankLine = 0;
         auto * str = std::get_if<StringToken>(&i);
         if (!str || !str->hasIndentation) {
             /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
@@ -284,12 +285,14 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
             }
         }
     }
+    if (atStartOfLine)
+        finalBlankLine = curIndent + 1; // include '\n'
 
     /* Strip spaces from each line. */
     auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
     atStartOfLine = true;
     size_t curDropped = 0;
-    size_t n = es.size();
+    size_t n = 0;
     auto i = es.begin();
     const auto trimExpr = [&](Expr * e) {
         atStartOfLine = false;
@@ -297,41 +300,41 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         es2->emplace_back(i->first, e);
     };
     const auto trimString = [&](const StringToken & t) {
-        std::string s2;
-        for (size_t j = 0; j < t.l; ++j) {
+        auto finalLineTrim = n == es.size() - 1 ? finalBlankLine : 0;
+        /* TODO: pre-calculate exactly how big of a string we need */
+        size_t size = t.l + 1;
+        if (size == 1) // empty string
+            return;
+        char * s2 = (char *) alloc.allocate(size);
+        size_t end = t.l - finalLineTrim;
+        size_t c = 0;
+        for (size_t j = 0; j < end; ++j) {
             if (atStartOfLine) {
                 if (t.p[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += t.p[j];
+                        s2[c++] = t.p[j];
                 } else if (t.p[j] == '\n') {
                     curDropped = 0;
-                    s2 += t.p[j];
+                    s2[c++] = t.p[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += t.p[j];
+                    s2[c++] = t.p[j];
                 }
             } else {
-                s2 += t.p[j];
+                s2[c++] = t.p[j];
                 if (t.p[j] == '\n')
                     atStartOfLine = true;
             }
         }
-
-        /* Remove the last line if it is empty and consists only of
-           spaces. */
-        if (n == 1) {
-            std::string::size_type p = s2.find_last_of('\n');
-            if (p != std::string::npos && s2.find_first_not_of(' ', p + 1) == std::string::npos)
-                s2 = std::string(s2, 0, p + 1);
-        }
+        s2[c] = '\0';
 
         // Ignore empty strings for a minor optimisation and AST simplification
-        if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(std::move(s2)));
+        if (*s2 != '\0') {
+            es2->emplace_back(i->first, new ExprString(s2));
         }
     };
-    for (; i != es.end(); ++i, --n) {
+    for (; i != es.end(); ++i, ++n) {
         std::visit(overloaded{trimExpr, trimString}, i->second);
     }
 
