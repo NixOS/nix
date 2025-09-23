@@ -356,7 +356,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
     };
 }
 
-void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o)
+void adl_serializer<DerivationOptions>::to_json(json & json, const DerivationOptions & o)
 {
     json["outputChecks"] = std::visit(
         overloaded{
@@ -398,7 +398,7 @@ DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>:
     };
 }
 
-void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, DerivationOptions::OutputChecks c)
+void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, const DerivationOptions::OutputChecks & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
     json["allowedReferences"] = c.allowedReferences;

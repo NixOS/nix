@@ -509,7 +509,7 @@ fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & 
     return res;
 }
 
-void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p)
+void adl_serializer<fetchers::PublicKey>::to_json(json & json, const fetchers::PublicKey & p)
 {
     json["type"] = p.type;
     json["key"] = p.key;

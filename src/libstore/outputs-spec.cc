@@ -150,7 +150,7 @@ OutputsSpec adl_serializer<OutputsSpec>::from_json(const json & json)
         return OutputsSpec::Names{std::move(names)};
 }
 
-void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t)
+void adl_serializer<OutputsSpec>::to_json(json & json, const OutputsSpec & t)
 {
     std::visit(
         overloaded{
@@ -169,7 +169,7 @@ ExtendedOutputsSpec adl_serializer<ExtendedOutputsSpec>::from_json(const json & 
     }
 }
 
-void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSpec t)
+void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, const ExtendedOutputsSpec & t)
 {
     std::visit(
         overloaded{
