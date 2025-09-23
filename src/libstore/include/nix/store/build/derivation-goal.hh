@@ -99,7 +99,7 @@ private:
 
     Co repairClosure();
 
-    Done doneSuccess(BuildResult::Status status, Realisation builtOutput);
+    Done doneSuccess(BuildResult::Success::Status status, Realisation builtOutput);
 
     Done doneFailure(BuildError ex);
 };

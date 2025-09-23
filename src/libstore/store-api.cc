@@ -764,7 +764,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     for (auto & storePath : storePaths) {
         if (!inputPaths.count(storePath))
             throw BuildError(
-                BuildResult::InputRejected,
+                BuildResult::Failure::InputRejected,
                 "cannot export references of path '%s' because it is not in the input closure of the derivation",
                 printStorePath(storePath));
 
