@@ -20,26 +20,26 @@ struct BuildResult
      */
     enum Status {
         Built = 0,
-        Substituted,
-        AlreadyValid,
-        PermanentFailure,
-        InputRejected,
-        OutputRejected,
+        Substituted = 1,
+        AlreadyValid = 2,
+        PermanentFailure = 3,
+        InputRejected = 4,
+        OutputRejected = 5,
         /// possibly transient
-        TransientFailure,
+        TransientFailure = 6,
         /// no longer used
-        CachedFailure,
-        TimedOut,
-        MiscFailure,
-        DependencyFailed,
-        LogLimitExceeded,
-        NotDeterministic,
-        ResolvesToAlreadyValid,
-        NoSubstituters,
+        CachedFailure = 7,
+        TimedOut = 8,
+        MiscFailure = 9,
+        DependencyFailed = 10,
+        LogLimitExceeded = 11,
+        NotDeterministic = 12,
+        ResolvesToAlreadyValid = 13,
+        NoSubstituters = 14,
         /// A certain type of `OutputRejected`. The protocols do not yet
         /// know about this one, so change it back to `OutputRejected`
         /// before serialization.
-        HashMismatch,
+        HashMismatch = 15,
     } status = MiscFailure;
 
     /**
