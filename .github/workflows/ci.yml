@@ -29,7 +29,28 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
     - run: nix flake show --all-systems --json
 
+  pre-commit-checks:
+    name: pre-commit checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+          extra_nix_config: experimental-features = nix-command flakes
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: ./ci/gha/tests/pre-commit-checks
+
+  basic-checks:
+    name: aggregate basic checks
+    runs-on: ubuntu-24.04
+    needs: [pre-commit-checks, eval]
+    steps:
+      - run: ":" # Dummy step
+
   tests:
+    needs: basic-checks
     strategy:
       fail-fast: false
       matrix:
@@ -214,6 +235,7 @@ jobs:
         docker push $IMAGE_ID:master
 
   vm_tests:
+    needs: basic-checks
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
