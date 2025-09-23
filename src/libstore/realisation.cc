@@ -165,7 +165,7 @@ Realisation adl_serializer<Realisation>::from_json(const json & json0)
     };
 }
 
-void adl_serializer<Realisation>::to_json(json & json, Realisation r)
+void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
 {
     auto jsonDependentRealisations = nlohmann::json::object();
     for (auto & [depId, depOutPath] : r.dependentRealisations)

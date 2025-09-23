@@ -1494,7 +1494,7 @@ Derivation adl_serializer<Derivation>::from_json(const json & json)
     return Derivation::fromJSON(json);
 }
 
-void adl_serializer<Derivation>::to_json(json & json, Derivation c)
+void adl_serializer<Derivation>::to_json(json & json, const Derivation & c)
 {
     json = c.toJSON();
 }
