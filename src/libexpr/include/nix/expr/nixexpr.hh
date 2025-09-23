@@ -614,8 +614,12 @@ MakeBinOp(ExprOpNEq, "!=");
 MakeBinOp(ExprOpAnd, "&&");
 MakeBinOp(ExprOpOr, "||");
 MakeBinOp(ExprOpImpl, "->");
-MakeBinOp(ExprOpUpdate, "//");
 MakeBinOp(ExprOpConcatLists, "++");
+
+struct ExprOpUpdate : Expr
+{
+    MakeBinOpMembers(ExprOpUpdate, "//")
+};
 
 struct ExprConcatStrings : Expr
 {
