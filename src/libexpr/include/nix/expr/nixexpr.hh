@@ -574,37 +574,40 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
-#define MakeBinOp(name, s)                                                                   \
-    struct name : Expr                                                                       \
-    {                                                                                        \
-        PosIdx pos;                                                                          \
-        Expr *e1, *e2;                                                                       \
-        name(Expr * e1, Expr * e2)                                                           \
-            : e1(e1)                                                                         \
-            , e2(e2) {};                                                                     \
-        name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
-            : pos(pos)                                                                       \
-            , e1(e1)                                                                         \
-            , e2(e2) {};                                                                     \
-        void show(const SymbolTable & symbols, std::ostream & str) const override            \
-        {                                                                                    \
-            str << "(";                                                                      \
-            e1->show(symbols, str);                                                          \
-            str << " " s " ";                                                                \
-            e2->show(symbols, str);                                                          \
-            str << ")";                                                                      \
-        }                                                                                    \
-        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
-        {                                                                                    \
-            e1->bindVars(es, env);                                                           \
-            e2->bindVars(es, env);                                                           \
-        }                                                                                    \
-        void eval(EvalState & state, Env & env, Value & v) override;                         \
-        PosIdx getPos() const override                                                       \
-        {                                                                                    \
-            return pos;                                                                      \
-        }                                                                                    \
+#define MakeBinOpMembers(name, s)                                                        \
+    PosIdx pos;                                                                          \
+    Expr *e1, *e2;                                                                       \
+    name(Expr * e1, Expr * e2)                                                           \
+        : e1(e1)                                                                         \
+        , e2(e2){};                                                                      \
+    name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
+        : pos(pos)                                                                       \
+        , e1(e1)                                                                         \
+        , e2(e2){};                                                                      \
+    void show(const SymbolTable & symbols, std::ostream & str) const override            \
+    {                                                                                    \
+        str << "(";                                                                      \
+        e1->show(symbols, str);                                                          \
+        str << " " s " ";                                                                \
+        e2->show(symbols, str);                                                          \
+        str << ")";                                                                      \
+    }                                                                                    \
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
+    {                                                                                    \
+        e1->bindVars(es, env);                                                           \
+        e2->bindVars(es, env);                                                           \
+    }                                                                                    \
+    void eval(EvalState & state, Env & env, Value & v) override;                         \
+    PosIdx getPos() const override                                                       \
+    {                                                                                    \
+        return pos;                                                                      \
     }
+
+#define MakeBinOp(name, s)        \
+    struct name : Expr            \
+    {                             \
+        MakeBinOpMembers(name, s) \
+    };
 
 MakeBinOp(ExprOpEq, "==");
 MakeBinOp(ExprOpNEq, "!=");
