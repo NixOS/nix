@@ -12,7 +12,7 @@ static nlohmann::json derivedPathsToJSON(const DerivedPaths & paths, Store & sto
 {
     auto res = nlohmann::json::array();
     for (auto & t : paths) {
-        std::visit([&](const auto & t) { res.push_back(t.toJSON(store)); }, t.raw());
+        res.push_back(t.toJSON(store));
     }
     return res;
 }
@@ -22,22 +22,18 @@ builtPathsWithResultToJSON(const std::vector<BuiltPathWithResult> & buildables, 
 {
     auto res = nlohmann::json::array();
     for (auto & b : buildables) {
-        std::visit(
-            [&](const auto & t) {
-                auto j = t.toJSON(store);
-                if (b.result) {
-                    if (b.result->startTime)
-                        j["startTime"] = b.result->startTime;
-                    if (b.result->stopTime)
-                        j["stopTime"] = b.result->stopTime;
-                    if (b.result->cpuUser)
-                        j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
-                    if (b.result->cpuSystem)
-                        j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
-                }
-                res.push_back(j);
-            },
-            b.path.raw());
+        auto j = b.path.toJSON(store);
+        if (b.result) {
+            if (b.result->startTime)
+                j["startTime"] = b.result->startTime;
+            if (b.result->stopTime)
+                j["stopTime"] = b.result->stopTime;
+            if (b.result->cpuUser)
+                j["cpuUser"] = ((double) b.result->cpuUser->count()) / 1000000;
+            if (b.result->cpuSystem)
+                j["cpuSystem"] = ((double) b.result->cpuSystem->count()) / 1000000;
+        }
+        res.push_back(j);
     }
     return res;
 }
