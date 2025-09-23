@@ -314,8 +314,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         checkInterrupt();
     }
 
-    uint64_t getRevCount(const Hash & rev) override
+    std::optional<uint64_t> getRevCount(const Hash & rev) override
     {
+        auto obj = lookupObject(*this, hashToOID(rev));
+        auto type = git_object_type(obj.get());
+        if (type == GIT_OBJECT_BLOB || type == GIT_OBJECT_TREE)
+            return std::nullopt;
+
         boost::unordered_flat_set<git_oid, std::hash<git_oid>> done;
         std::queue<Commit> todo;
 
@@ -344,10 +349,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return done.size();
     }
 
-    uint64_t getLastModified(const Hash & rev) override
+    std::optional<uint64_t> getLastModified(const Hash & rev) override
     {
-        auto commit = peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
-
+        auto obj = lookupObject(*this, hashToOID(rev));
+        auto type = git_object_type(obj.get());
+        // blobs and trees don't have commit times
+        if (type == GIT_OBJECT_BLOB || type == GIT_OBJECT_TREE)
+            return std::nullopt;
+        // peel annotated tags
+        Commit commit = peelObject<Commit>(obj.get(), GIT_OBJECT_COMMIT);
         return git_commit_time(commit.get());
     }
 
@@ -367,10 +377,10 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         Object object;
 
         // Using the rev-parse notation which libgit2 supports, make sure we peel
-        // the ref ultimately down to the underlying commit.
+        // the ref ultimately down to the underlying object.
         // This is to handle the case where it may be an annotated tag which itself has
         // an object_id.
-        std::string peeledRef = ref + "^{commit}";
+        std::string peeledRef = ref + "^{}";
         if (git_revparse_single(Setter(object), *this, peeledRef.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
         auto oid = git_object_id(object.get());

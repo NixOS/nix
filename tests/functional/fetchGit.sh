@@ -298,6 +298,11 @@ expected_attrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHa
 result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")
 [[ "$result" = "$expected_attrs" ]]
 
+# fetchTree shouldn't have rev, revCount or shortRev
+expected_attrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHash = \"sha256-wzlAGjxKxpaWdqVhlq55q5Gxo4Bf860+kLeEa/v02As=\"; submodules = false; }"
+result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchTree { type = \"git\"; url = \"file://$empty\"; }) [\"outPath\"]")
+[[ "$result" = "$expected_attrs" ]]
+
 # Test a repo with an empty commit.
 git -C "$empty" rm -f x
 

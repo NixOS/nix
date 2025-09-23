@@ -44,17 +44,15 @@ void emitTreeAttrs(
         if (auto rev = input.getRev()) {
             attrs.alloc("rev").mkString(rev->gitRev());
             attrs.alloc("shortRev").mkString(rev->gitShortRev());
+            if (auto revCount = input.getRevCount())
+                attrs.alloc("revCount").mkInt(*revCount);
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(HashAlgorithm::SHA1);
             attrs.alloc("rev").mkString(emptyHash.gitRev());
             attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
-        }
-
-        if (auto revCount = input.getRevCount())
-            attrs.alloc("revCount").mkInt(*revCount);
-        else if (emptyRevFallback)
             attrs.alloc("revCount").mkInt(0);
+        }
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
