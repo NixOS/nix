@@ -3,12 +3,11 @@
 #include <rapidcheck/gtest.h>
 
 #include "nix/store/tests/outputs-spec.hh"
-
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
-class OutputsSpecTest : public CharacterizationTest
+class OutputsSpecTest : public virtual CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "outputs-spec";
 
@@ -20,7 +19,7 @@ public:
     }
 };
 
-class ExtendedOutputsSpecTest : public CharacterizationTest
+class ExtendedOutputsSpecTest : public virtual CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "outputs-spec" / "extended";
 
@@ -214,40 +213,49 @@ TEST_F(ExtendedOutputsSpecTest, many_carrot)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), "foo^bar^bin,out");
 }
 
-#define TEST_JSON(FIXTURE, TYPE, NAME, VAL)                                                           \
-    static const TYPE FIXTURE##_##NAME = VAL;                                                         \
-                                                                                                      \
-    TEST_F(FIXTURE, NAME##_from_json)                                                                 \
-    {                                                                                                 \
-        using namespace nlohmann;                                                                     \
-                                                                                                      \
-        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
-            auto encoded = json::parse(encoded_);                                                     \
-            TYPE got = adl_serializer<TYPE>::from_json(encoded);                                      \
-            ASSERT_EQ(got, FIXTURE##_##NAME);                                                         \
-        });                                                                                           \
-    }                                                                                                 \
-                                                                                                      \
-    TEST_F(FIXTURE, NAME##_to_json)                                                                   \
-    {                                                                                                 \
-        using namespace nlohmann;                                                                     \
-                                                                                                      \
-        writeTest(                                                                                    \
-            #NAME ".json",                                                                            \
-            [&]() -> json { return static_cast<json>(FIXTURE##_##NAME); },                            \
-            [](const auto & file) { return json::parse(readFile(file)); },                            \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+#define MAKE_TEST_P(FIXTURE, TYPE)               \
+    TEST_P(FIXTURE, from_json)                   \
+    {                                            \
+        const auto & [name, value] = GetParam(); \
+        readJsonTest(name, value);               \
+    }                                            \
+                                                 \
+    TEST_P(FIXTURE, to_json)                     \
+    {                                            \
+        const auto & [name, value] = GetParam(); \
+        writeJsonTest(name, value);              \
     }
 
-TEST_JSON(OutputsSpecTest, OutputsSpec, all, OutputsSpec::All{})
-TEST_JSON(OutputsSpecTest, OutputsSpec, name, OutputsSpec::Names{"a"})
-TEST_JSON(OutputsSpecTest, OutputsSpec, names, (OutputsSpec::Names{"a", "b"}))
+struct OutputsSpecJsonTest : OutputsSpecTest,
+                             JsonCharacterizationTest<OutputsSpec>,
+                             ::testing::WithParamInterface<std::pair<std::string_view, OutputsSpec>>
+{};
 
-TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, def, ExtendedOutputsSpec::Default{})
-TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, all, ExtendedOutputsSpec::Explicit{OutputsSpec::All{}})
-TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, name, ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a"}})
-TEST_JSON(
-    ExtendedOutputsSpecTest, ExtendedOutputsSpec, names, (ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a", "b"}}))
+MAKE_TEST_P(OutputsSpecJsonTest, OutputsSpec);
+
+INSTANTIATE_TEST_SUITE_P(
+    OutputsSpecJSON,
+    OutputsSpecJsonTest,
+    ::testing::Values(
+        std::pair{"all", OutputsSpec{OutputsSpec::All{}}},
+        std::pair{"name", OutputsSpec{OutputsSpec::Names{"a"}}},
+        std::pair{"names", OutputsSpec{OutputsSpec::Names{"a", "b"}}}));
+
+struct ExtendedOutputsSpecJsonTest : ExtendedOutputsSpecTest,
+                                     JsonCharacterizationTest<ExtendedOutputsSpec>,
+                                     ::testing::WithParamInterface<std::pair<std::string_view, ExtendedOutputsSpec>>
+{};
+
+MAKE_TEST_P(ExtendedOutputsSpecJsonTest, ExtendedOutputsSpec);
+
+INSTANTIATE_TEST_SUITE_P(
+    ExtendedOutputsSpecJSON,
+    ExtendedOutputsSpecJsonTest,
+    ::testing::Values(
+        std::pair{"def", ExtendedOutputsSpec{ExtendedOutputsSpec::Default{}}},
+        std::pair{"all", ExtendedOutputsSpec{ExtendedOutputsSpec::Explicit{OutputsSpec::All{}}}},
+        std::pair{"name", ExtendedOutputsSpec{ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a"}}}},
+        std::pair{"names", ExtendedOutputsSpec{ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a", "b"}}}}));
 
 #undef TEST_JSON
 

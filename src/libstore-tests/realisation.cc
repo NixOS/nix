@@ -6,12 +6,12 @@
 
 #include "nix/store/store-api.hh"
 
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/libstore.hh"
 
 namespace nix {
 
-class RealisationTest : public CharacterizationTest, public LibStoreTest
+class RealisationTest : public JsonCharacterizationTest<Realisation>, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "realisation";
 
@@ -34,22 +34,14 @@ struct RealisationJsonTest : RealisationTest, ::testing::WithParamInterface<std:
 
 TEST_P(RealisationJsonTest, from_json)
 {
-    auto [name, expected] = GetParam();
-    readTest(name + ".json", [&](const auto & encoded_) {
-        auto encoded = json::parse(encoded_);
-        Realisation got = static_cast<Realisation>(encoded);
-        ASSERT_EQ(got, expected);
-    });
+    const auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
 }
 
 TEST_P(RealisationJsonTest, to_json)
 {
-    auto [name, value] = GetParam();
-    writeTest(
-        name + ".json",
-        [&]() -> json { return static_cast<json>(value); },
-        [](const auto & file) { return json::parse(readFile(file)); },
-        [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
+    const auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
 }
 
 INSTANTIATE_TEST_SUITE_P(
