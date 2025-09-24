@@ -1866,12 +1866,8 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
         || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
 }
 
-void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)
 {
-    Value v1, v2;
-    state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
-    state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
-
     state.nrOpUpdates++;
 
     const Bindings & bindings1 = *v1.attrs();
@@ -1943,6 +1939,38 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     v.mkAttrs(attrs.alreadySorted());
 
     state.nrOpUpdateValuesCopied += v.attrs()->size();
+}
+
+void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+{
+    UpdateQueue q;
+    evalForUpdate(state, env, q);
+
+    v.mkAttrs(&Bindings::emptyBindings);
+    for (auto & rhs : std::views::reverse(q)) {
+        /* Remember that queue is sorted rightmost attrset first. */
+        eval(state, /*v=*/v, /*v1=*/v, /*v2=*/rhs);
+    }
+}
+
+void Expr::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
+{
+    Value v;
+    state.evalAttrs(env, this, v, getPos(), errorCtx);
+    q.push_back(v);
+}
+
+void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q)
+{
+    /* Output rightmost attrset first to the merge queue as the one
+       with the most priority. */
+    e2->evalForUpdate(state, env, q, "in the right operand of the update (//) operator");
+    e1->evalForUpdate(state, env, q, "in the left operand of the update (//) operator");
+}
+
+void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
+{
+    evalForUpdate(state, env, q);
 }
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)

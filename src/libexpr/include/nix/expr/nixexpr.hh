@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 
+#include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
@@ -80,6 +81,8 @@ typedef std::vector<AttrName> AttrPath;
 
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
+using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
+
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -110,6 +113,14 @@ struct Expr
      * of thunks allocated.
      */
     virtual Value * maybeThunk(EvalState & state, Env & env);
+
+    /**
+     * Only called when performing an attrset update: `//` or similar.
+     * Instead of writing to a Value &, this function writes to an UpdateQueue.
+     * This allows the expression to perform multiple updates in a delayed manner, gathering up all the updates before
+     * applying them.
+     */
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx);
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) {};
 
@@ -607,7 +618,7 @@ struct ExprOpNot : Expr
     struct name : Expr            \
     {                             \
         MakeBinOpMembers(name, s) \
-    };
+    }
 
 MakeBinOp(ExprOpEq, "==");
 MakeBinOp(ExprOpNEq, "!=");
@@ -618,7 +629,14 @@ MakeBinOp(ExprOpConcatLists, "++");
 
 struct ExprOpUpdate : Expr
 {
-    MakeBinOpMembers(ExprOpUpdate, "//")
+private:
+    /** Special case for merging of two attrsets. */
+    void eval(EvalState & state, Value & v, Value & v1, Value & v2);
+    void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q);
+
+public:
+    MakeBinOpMembers(ExprOpUpdate, "//");
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx) override;
 };
 
 struct ExprConcatStrings : Expr
