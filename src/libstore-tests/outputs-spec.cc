@@ -1,18 +1,44 @@
-#include "nix/store/tests/outputs-spec.hh"
-
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
+#include "nix/store/tests/outputs-spec.hh"
+
+#include "nix/util/tests/characterization.hh"
+
 namespace nix {
 
-TEST(OutputsSpec, no_empty_names)
+class OutputsSpecTest : public CharacterizationTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "outputs-spec";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
+
+class ExtendedOutputsSpecTest : public CharacterizationTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "outputs-spec" / "extended";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
+
+TEST_F(OutputsSpecTest, no_empty_names)
 {
     ASSERT_DEATH(OutputsSpec::Names{StringSet{}}, "");
 }
 
 #define TEST_DONT_PARSE(NAME, STR)                                 \
-    TEST(OutputsSpec, bad_##NAME)                                  \
+    TEST_F(OutputsSpecTest, bad_##NAME)                            \
     {                                                              \
         std::optional OutputsSpecOpt = OutputsSpec::parseOpt(STR); \
         ASSERT_FALSE(OutputsSpecOpt);                              \
@@ -26,7 +52,7 @@ TEST_DONT_PARSE(star_second, "foo,*")
 
 #undef TEST_DONT_PARSE
 
-TEST(OutputsSpec, all)
+TEST_F(OutputsSpecTest, all)
 {
     std::string_view str = "*";
     OutputsSpec expected = OutputsSpec::All{};
@@ -34,7 +60,7 @@ TEST(OutputsSpec, all)
     ASSERT_EQ(expected.to_string(), str);
 }
 
-TEST(OutputsSpec, names_out)
+TEST_F(OutputsSpecTest, names_out)
 {
     std::string_view str = "out";
     OutputsSpec expected = OutputsSpec::Names{"out"};
@@ -42,7 +68,7 @@ TEST(OutputsSpec, names_out)
     ASSERT_EQ(expected.to_string(), str);
 }
 
-TEST(OutputsSpec, names_underscore)
+TEST_F(OutputsSpecTest, names_underscore)
 {
     std::string_view str = "a_b";
     OutputsSpec expected = OutputsSpec::Names{"a_b"};
@@ -50,7 +76,7 @@ TEST(OutputsSpec, names_underscore)
     ASSERT_EQ(expected.to_string(), str);
 }
 
-TEST(OutputsSpec, names_numeric)
+TEST_F(OutputsSpecTest, names_numeric)
 {
     std::string_view str = "01";
     OutputsSpec expected = OutputsSpec::Names{"01"};
@@ -58,7 +84,7 @@ TEST(OutputsSpec, names_numeric)
     ASSERT_EQ(expected.to_string(), str);
 }
 
-TEST(OutputsSpec, names_out_bin)
+TEST_F(OutputsSpecTest, names_out_bin)
 {
     OutputsSpec expected = OutputsSpec::Names{"out", "bin"};
     ASSERT_EQ(OutputsSpec::parse("out,bin"), expected);
@@ -68,32 +94,32 @@ TEST(OutputsSpec, names_out_bin)
 
 #define TEST_SUBSET(X, THIS, THAT) X((OutputsSpec{THIS}).isSubsetOf(THAT));
 
-TEST(OutputsSpec, subsets_all_all)
+TEST_F(OutputsSpecTest, subsets_all_all)
 {
     TEST_SUBSET(ASSERT_TRUE, OutputsSpec::All{}, OutputsSpec::All{});
 }
 
-TEST(OutputsSpec, subsets_names_all)
+TEST_F(OutputsSpecTest, subsets_names_all)
 {
     TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names{"a"}, OutputsSpec::All{});
 }
 
-TEST(OutputsSpec, subsets_names_names_eq)
+TEST_F(OutputsSpecTest, subsets_names_names_eq)
 {
     TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names{"a"}, OutputsSpec::Names{"a"});
 }
 
-TEST(OutputsSpec, subsets_names_names_noneq)
+TEST_F(OutputsSpecTest, subsets_names_names_noneq)
 {
     TEST_SUBSET(ASSERT_TRUE, OutputsSpec::Names{"a"}, (OutputsSpec::Names{"a", "b"}));
 }
 
-TEST(OutputsSpec, not_subsets_all_names)
+TEST_F(OutputsSpecTest, not_subsets_all_names)
 {
     TEST_SUBSET(ASSERT_FALSE, OutputsSpec::All{}, OutputsSpec::Names{"a"});
 }
 
-TEST(OutputsSpec, not_subsets_names_names)
+TEST_F(OutputsSpecTest, not_subsets_names_names)
 {
     TEST_SUBSET(ASSERT_FALSE, (OutputsSpec::Names{"a", "b"}), (OutputsSpec::Names{"a"}));
 }
@@ -102,22 +128,22 @@ TEST(OutputsSpec, not_subsets_names_names)
 
 #define TEST_UNION(RES, THIS, THAT) ASSERT_EQ(OutputsSpec{RES}, (OutputsSpec{THIS}).union_(THAT));
 
-TEST(OutputsSpec, union_all_all)
+TEST_F(OutputsSpecTest, union_all_all)
 {
     TEST_UNION(OutputsSpec::All{}, OutputsSpec::All{}, OutputsSpec::All{});
 }
 
-TEST(OutputsSpec, union_all_names)
+TEST_F(OutputsSpecTest, union_all_names)
 {
     TEST_UNION(OutputsSpec::All{}, OutputsSpec::All{}, OutputsSpec::Names{"a"});
 }
 
-TEST(OutputsSpec, union_names_all)
+TEST_F(OutputsSpecTest, union_names_all)
 {
     TEST_UNION(OutputsSpec::All{}, OutputsSpec::Names{"a"}, OutputsSpec::All{});
 }
 
-TEST(OutputsSpec, union_names_names)
+TEST_F(OutputsSpecTest, union_names_names)
 {
     TEST_UNION((OutputsSpec::Names{"a", "b"}), OutputsSpec::Names{"a"}, OutputsSpec::Names{"b"});
 }
@@ -125,7 +151,7 @@ TEST(OutputsSpec, union_names_names)
 #undef TEST_UNION
 
 #define TEST_DONT_PARSE(NAME, STR)                                                 \
-    TEST(ExtendedOutputsSpec, bad_##NAME)                                          \
+    TEST_F(ExtendedOutputsSpecTest, bad_##NAME)                                    \
     {                                                                              \
         std::optional extendedOutputsSpecOpt = ExtendedOutputsSpec::parseOpt(STR); \
         ASSERT_FALSE(extendedOutputsSpecOpt);                                      \
@@ -140,7 +166,7 @@ TEST_DONT_PARSE(star_second, "^foo,*")
 
 #undef TEST_DONT_PARSE
 
-TEST(ExtendedOutputsSpec, default)
+TEST_F(ExtendedOutputsSpecTest, default)
 {
     std::string_view str = "foo";
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
@@ -150,7 +176,7 @@ TEST(ExtendedOutputsSpec, default)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), str);
 }
 
-TEST(ExtendedOutputsSpec, all)
+TEST_F(ExtendedOutputsSpecTest, all)
 {
     std::string_view str = "foo^*";
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
@@ -160,7 +186,7 @@ TEST(ExtendedOutputsSpec, all)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), str);
 }
 
-TEST(ExtendedOutputsSpec, out)
+TEST_F(ExtendedOutputsSpecTest, out)
 {
     std::string_view str = "foo^out";
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse(str);
@@ -170,7 +196,7 @@ TEST(ExtendedOutputsSpec, out)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), str);
 }
 
-TEST(ExtendedOutputsSpec, out_bin)
+TEST_F(ExtendedOutputsSpecTest, out_bin)
 {
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^out,bin");
     ASSERT_EQ(prefix, "foo");
@@ -179,7 +205,7 @@ TEST(ExtendedOutputsSpec, out_bin)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), "foo^bin,out");
 }
 
-TEST(ExtendedOutputsSpec, many_carrot)
+TEST_F(ExtendedOutputsSpecTest, many_carrot)
 {
     auto [prefix, extendedOutputsSpec] = ExtendedOutputsSpec::parse("foo^bar^out,bin");
     ASSERT_EQ(prefix, "foo^bar");
@@ -188,28 +214,40 @@ TEST(ExtendedOutputsSpec, many_carrot)
     ASSERT_EQ(std::string{prefix} + expected.to_string(), "foo^bar^bin,out");
 }
 
-#define TEST_JSON(TYPE, NAME, STR, VAL)                      \
-                                                             \
-    TEST(TYPE, NAME##_to_json)                               \
-    {                                                        \
-        using nlohmann::literals::operator"" _json;          \
-        ASSERT_EQ(STR##_json, ((nlohmann::json) TYPE{VAL})); \
-    }                                                        \
-                                                             \
-    TEST(TYPE, NAME##_from_json)                             \
-    {                                                        \
-        using nlohmann::literals::operator"" _json;          \
-        ASSERT_EQ(TYPE{VAL}, (STR##_json).get<TYPE>());      \
+#define TEST_JSON(FIXTURE, TYPE, NAME, VAL)                                                           \
+    static const TYPE FIXTURE##_##NAME = VAL;                                                         \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_from_json)                                                                 \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+                                                                                                      \
+        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
+            auto encoded = json::parse(encoded_);                                                     \
+            TYPE got = adl_serializer<TYPE>::from_json(encoded);                                      \
+            ASSERT_EQ(got, FIXTURE##_##NAME);                                                         \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_F(FIXTURE, NAME##_to_json)                                                                   \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+                                                                                                      \
+        writeTest(                                                                                    \
+            #NAME ".json",                                                                            \
+            [&]() -> json { return static_cast<json>(FIXTURE##_##NAME); },                            \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }
 
-TEST_JSON(OutputsSpec, all, R"(["*"])", OutputsSpec::All{})
-TEST_JSON(OutputsSpec, name, R"(["a"])", OutputsSpec::Names{"a"})
-TEST_JSON(OutputsSpec, names, R"(["a","b"])", (OutputsSpec::Names{"a", "b"}))
+TEST_JSON(OutputsSpecTest, OutputsSpec, all, OutputsSpec::All{})
+TEST_JSON(OutputsSpecTest, OutputsSpec, name, OutputsSpec::Names{"a"})
+TEST_JSON(OutputsSpecTest, OutputsSpec, names, (OutputsSpec::Names{"a", "b"}))
 
-TEST_JSON(ExtendedOutputsSpec, def, R"(null)", ExtendedOutputsSpec::Default{})
-TEST_JSON(ExtendedOutputsSpec, all, R"(["*"])", ExtendedOutputsSpec::Explicit{OutputsSpec::All{}})
-TEST_JSON(ExtendedOutputsSpec, name, R"(["a"])", ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a"}})
-TEST_JSON(ExtendedOutputsSpec, names, R"(["a","b"])", (ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a", "b"}}))
+TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, def, ExtendedOutputsSpec::Default{})
+TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, all, ExtendedOutputsSpec::Explicit{OutputsSpec::All{}})
+TEST_JSON(ExtendedOutputsSpecTest, ExtendedOutputsSpec, name, ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a"}})
+TEST_JSON(
+    ExtendedOutputsSpecTest, ExtendedOutputsSpec, names, (ExtendedOutputsSpec::Explicit{OutputsSpec::Names{"a", "b"}}))
 
 #undef TEST_JSON
 
