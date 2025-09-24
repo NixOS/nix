@@ -112,32 +112,34 @@ CHARACTERIZATION_TEST(
     "realisation",
     (std::tuple<Realisation, Realisation>{
         Realisation{
-            .id =
-                DrvOutput{
-                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                    .outputName = "baz",
-                },
-            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-            .signatures = {"asdf", "qwer"},
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+            },
+            DrvOutput{
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
         },
         Realisation{
-            .id =
-                {
-                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                    .outputName = "baz",
-                },
-            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-            .signatures = {"asdf", "qwer"},
-            .dependentRealisations =
-                {
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+                .dependentRealisations =
                     {
-                        DrvOutput{
-                            .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                            .outputName = "quux",
+                        {
+                            DrvOutput{
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "quux",
+                            },
+                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                         },
-                        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                     },
-                },
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
         },
     }))
 

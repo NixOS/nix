@@ -501,7 +501,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 }
 
 void RemoteStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
         auto conn(getConnection());
@@ -515,21 +515,21 @@ void RemoteStore::queryRealisationUncached(
         conn->to << id.to_string();
         conn.processStderr();
 
-        auto real = [&]() -> std::shared_ptr<const Realisation> {
+        auto real = [&]() -> std::shared_ptr<const UnkeyedRealisation> {
             if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
                 auto outPaths = WorkerProto::Serialise<std::set<StorePath>>::read(*this, *conn);
                 if (outPaths.empty())
                     return nullptr;
-                return std::make_shared<const Realisation>(Realisation{.id = id, .outPath = *outPaths.begin()});
+                return std::make_shared<const UnkeyedRealisation>(UnkeyedRealisation{.outPath = *outPaths.begin()});
             } else {
                 auto realisations = WorkerProto::Serialise<std::set<Realisation>>::read(*this, *conn);
                 if (realisations.empty())
                     return nullptr;
-                return std::make_shared<const Realisation>(*realisations.begin());
+                return std::make_shared<const UnkeyedRealisation>(*realisations.begin());
             }
         }();
 
-        callback(std::shared_ptr<const Realisation>(real));
+        callback(std::shared_ptr<const UnkeyedRealisation>(real));
     } catch (...) {
         return callback.rethrow();
     }
@@ -626,13 +626,15 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                                 auto realisation = queryRealisation(outputId);
                                 if (!realisation)
                                     throw MissingRealisation(outputId);
-                                success.builtOutputs.emplace(output, *realisation);
+                                success.builtOutputs.emplace(output, Realisation{*realisation, outputId});
                             } else {
                                 success.builtOutputs.emplace(
                                     output,
                                     Realisation{
-                                        .id = outputId,
-                                        .outPath = outputPath,
+                                        UnkeyedRealisation{
+                                            .outPath = outputPath,
+                                        },
+                                        outputId,
                                     });
                             }
                         }
