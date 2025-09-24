@@ -44,10 +44,14 @@ jobs:
 
   basic-checks:
     name: aggregate basic checks
+    if: ${{ always() }}
     runs-on: ubuntu-24.04
     needs: [pre-commit-checks, eval]
     steps:
-      - run: ":" # Dummy step
+      - name: Exit with any errors
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          exit 1
 
   tests:
     needs: basic-checks
