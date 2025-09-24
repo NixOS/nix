@@ -598,7 +598,8 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
         }});
 }
 
-void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+void Store::queryRealisation(
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
 
     try {
@@ -624,20 +625,20 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    queryRealisationUncached(id, {[this, id, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+    queryRealisationUncached(id, {[this, id, callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
                                  try {
                                      auto info = fut.get();
 
                                      if (diskCache) {
                                          if (info)
                                              diskCache->upsertRealisation(
-                                                 config.getReference().render(/*FIXME withParams=*/false), *info);
+                                                 config.getReference().render(/*FIXME withParams=*/false), {*info, id});
                                          else
                                              diskCache->upsertAbsentRealisation(
                                                  config.getReference().render(/*FIXME withParams=*/false), id);
                                      }
 
-                                     (*callbackPtr)(std::shared_ptr<const Realisation>(info));
+                                     (*callbackPtr)(std::shared_ptr<const UnkeyedRealisation>(info));
 
                                  } catch (...) {
                                      callbackPtr->rethrow();
@@ -645,9 +646,9 @@ void Store::queryRealisation(const DrvOutput & id, Callback<std::shared_ptr<cons
                              }});
 }
 
-std::shared_ptr<const Realisation> Store::queryRealisation(const DrvOutput & id)
+std::shared_ptr<const UnkeyedRealisation> Store::queryRealisation(const DrvOutput & id)
 {
-    using RealPtr = std::shared_ptr<const Realisation>;
+    using RealPtr = std::shared_ptr<const UnkeyedRealisation>;
     std::promise<RealPtr> promise;
 
     queryRealisation(id, {[&](std::future<RealPtr> result) {
@@ -910,11 +911,12 @@ std::map<StorePath, StorePath> copyPaths(
     std::set<Realisation> toplevelRealisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
-        if (auto realisation = std::get_if<Realisation>(&path.raw)) {
+        if (auto * realisation = std::get_if<Realisation>(&path.raw)) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
             toplevelRealisations.insert(*realisation);
         }
     }
+
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
 
     try {
@@ -931,7 +933,7 @@ std::map<StorePath, StorePath> copyPaths(
                             "dependency of '%s' but isn't registered",
                             drvOutput.to_string(),
                             current.id.to_string());
-                    children.insert(*currentChild);
+                    children.insert({*currentChild, drvOutput});
                 }
                 return children;
             },
@@ -1199,7 +1201,7 @@ void Store::signRealisation(Realisation & realisation)
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
-        realisation.sign(signer);
+        realisation.sign(realisation.id, signer);
     }
 }
 

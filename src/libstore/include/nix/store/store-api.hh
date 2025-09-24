@@ -31,6 +31,7 @@ MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreReference, Error);
 
+struct UnkeyedRealisation;
 struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
@@ -398,12 +399,12 @@ public:
     /**
      * Query the information about a realisation.
      */
-    std::shared_ptr<const Realisation> queryRealisation(const DrvOutput &);
+    std::shared_ptr<const UnkeyedRealisation> queryRealisation(const DrvOutput &);
 
     /**
      * Asynchronous version of queryRealisation().
      */
-    void queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept;
+    void queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept;
 
     /**
      * Check whether the given valid path info is sufficiently attested, by
@@ -430,8 +431,8 @@ protected:
 
     virtual void
     queryPathInfoUncached(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
-    virtual void
-    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept = 0;
+    virtual void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept = 0;
 
 public:
 
