@@ -338,9 +338,10 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                            outputs in resolvedResult, this can get out of sync with the
                            store, which is our actual source of truth. For now we just
                            check the store directly if it fails. */
-                        auto take2 = worker.evalStore.queryRealisation(DrvOutput{*resolvedHash, outputName});
+                        DrvOutput key{*resolvedHash, outputName};
+                        auto take2 = worker.evalStore.queryRealisation(key);
                         if (take2)
-                            return *take2;
+                            return Realisation{*take2, std::move(key)};
 
                         throw Error(
                             "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
@@ -1293,13 +1294,22 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                 // without the `ca-derivations` experimental flag).
                 worker.store.registerDrvOutput(
                     Realisation{
+                        {
+                            .outPath = info.known->path,
+                        },
                         drvOutput,
-                        info.known->path,
                     });
             }
         }
         if (info.known && info.known->isValid())
-            validOutputs.emplace(i.first, Realisation{drvOutput, info.known->path});
+            validOutputs.emplace(
+                i.first,
+                Realisation{
+                    {
+                        .outPath = info.known->path,
+                    },
+                    drvOutput,
+                });
     }
 
     bool allValid = true;

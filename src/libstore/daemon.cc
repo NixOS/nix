@@ -964,7 +964,7 @@ static void performOp(
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
             auto outputId = DrvOutput::parse(readString(conn.from));
             auto outputPath = StorePath(readString(conn.from));
-            store->registerDrvOutput(Realisation{.id = outputId, .outPath = outputPath});
+            store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
         } else {
             auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
             store->registerDrvOutput(realisation);
@@ -986,7 +986,7 @@ static void performOp(
         } else {
             std::set<Realisation> realisations;
             if (info)
-                realisations.insert(*info);
+                realisations.insert({*info, outputId});
             WorkerProto::write(*store, wconn, realisations);
         }
         break;

@@ -502,10 +502,15 @@ StorePath BinaryCacheStore::addToStore(
         ->path;
 }
 
-void BinaryCacheStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
 {
-    auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
+    return realisationsPrefix + "/" + id.to_string() + ".doi";
+}
+
+void BinaryCacheStore::queryRealisationUncached(
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
+{
+    auto outputInfoFilePath = makeRealisationPath(id);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -515,11 +520,12 @@ void BinaryCacheStore::queryRealisationUncached(
             if (!data)
                 return (*callbackPtr)({});
 
-            std::shared_ptr<const Realisation> realisation;
+            std::shared_ptr<const UnkeyedRealisation> realisation;
             try {
-                realisation = std::make_shared<const Realisation>(nlohmann::json::parse(*data));
+                realisation = std::make_shared<const UnkeyedRealisation>(nlohmann::json::parse(*data));
             } catch (Error & e) {
-                e.addTrace({}, "while parsing file '%s' as a realisation", outputInfoFilePath);
+                e.addTrace(
+                    {}, "while parsing file '%s' as a realisation for key '%s'", outputInfoFilePath, id.to_string());
                 throw;
             }
             return (*callbackPtr)(std::move(realisation));
@@ -535,8 +541,7 @@ void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 {
     if (diskCache)
         diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);
-    auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
-    upsertFile(filePath, static_cast<nlohmann::json>(info).dump(), "application/json");
+    upsertFile(makeRealisationPath(info.id), static_cast<nlohmann::json>(info).dump(), "application/json");
 }
 
 ref<RemoteFSAccessor> BinaryCacheStore::getRemoteFSAccessor(bool requireValidPath)

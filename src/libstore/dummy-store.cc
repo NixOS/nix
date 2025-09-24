@@ -270,8 +270,8 @@ struct DummyStore : virtual Store
             throw Error("path '%s' is not valid", printStorePath(path));
     }
 
-    void
-    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    void queryRealisationUncached(
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
         callback(nullptr);
     }

@@ -39,7 +39,7 @@ void Realisation::closure(Store & store, const std::set<Realisation> & startOutp
         std::set<Realisation> res;
         for (auto & [currentDep, _] : current.dependentRealisations) {
             if (auto currentRealisation = store.queryRealisation(currentDep))
-                res.insert(*currentRealisation);
+                res.insert({*currentRealisation, currentDep});
             else
                 throw Error("Unrealised derivation '%s'", currentDep.to_string());
         }
@@ -61,24 +61,25 @@ void Realisation::closure(Store & store, const std::set<Realisation> & startOutp
         });
 }
 
-std::string Realisation::fingerprint() const
+std::string UnkeyedRealisation::fingerprint(const DrvOutput & key) const
 {
-    nlohmann::json serialized = *this;
+    nlohmann::json serialized = Realisation{*this, key};
     serialized.erase("signatures");
     return serialized.dump();
 }
 
-void Realisation::sign(const Signer & signer)
+void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
 {
-    signatures.insert(signer.signDetached(fingerprint()));
+    signatures.insert(signer.signDetached(fingerprint(key)));
 }
 
-bool Realisation::checkSignature(const PublicKeys & publicKeys, const std::string & sig) const
+bool UnkeyedRealisation::checkSignature(
+    const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const
 {
-    return verifyDetached(fingerprint(), sig, publicKeys);
+    return verifyDetached(fingerprint(key), sig, publicKeys);
 }
 
-size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
+size_t UnkeyedRealisation::checkSignatures(const DrvOutput & key, const PublicKeys & publicKeys) const
 {
     // FIXME: Maybe we should return `maxSigs` if the realisation corresponds to
     // an input-addressed one − because in that case the drv is enough to check
@@ -86,19 +87,18 @@ size_t Realisation::checkSignatures(const PublicKeys & publicKeys) const
 
     size_t good = 0;
     for (auto & sig : signatures)
-        if (checkSignature(publicKeys, sig))
+        if (checkSignature(key, publicKeys, sig))
             good++;
     return good;
 }
 
-StorePath RealisedPath::path() const
+const StorePath & RealisedPath::path() const
 {
-    return std::visit([](auto && arg) { return arg.getPath(); }, raw);
+    return std::visit([](auto && arg) -> auto & { return arg.getPath(); }, raw);
 }
 
-bool Realisation::isCompatibleWith(const Realisation & other) const
+bool Realisation::isCompatibleWith(const UnkeyedRealisation & other) const
 {
-    assert(id == other.id);
     if (outPath == other.outPath) {
         if (dependentRealisations.empty() != other.dependentRealisations.empty()) {
             warn(
@@ -144,7 +144,7 @@ namespace nlohmann {
 
 using namespace nix;
 
-Realisation adl_serializer<Realisation>::from_json(const json & json0)
+UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & json0)
 {
     auto json = getObject(json0);
 
@@ -157,25 +157,39 @@ Realisation adl_serializer<Realisation>::from_json(const json & json0)
         for (auto & [jsonDepId, jsonDepOutPath] : getObject(*jsonDependencies))
             dependentRealisations.insert({DrvOutput::parse(jsonDepId), jsonDepOutPath});
 
-    return Realisation{
-        .id = DrvOutput::parse(valueAt(json, "id")),
+    return UnkeyedRealisation{
         .outPath = valueAt(json, "outPath"),
         .signatures = signatures,
         .dependentRealisations = dependentRealisations,
     };
 }
 
-void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
+void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedRealisation & r)
 {
     auto jsonDependentRealisations = nlohmann::json::object();
     for (auto & [depId, depOutPath] : r.dependentRealisations)
         jsonDependentRealisations.emplace(depId.to_string(), depOutPath);
     json = {
-        {"id", r.id.to_string()},
         {"outPath", r.outPath},
         {"signatures", r.signatures},
         {"dependentRealisations", jsonDependentRealisations},
     };
+}
+
+Realisation adl_serializer<Realisation>::from_json(const json & json0)
+{
+    auto json = getObject(json0);
+
+    return Realisation{
+        static_cast<UnkeyedRealisation>(json0),
+        DrvOutput::parse(valueAt(json, "id")),
+    };
+}
+
+void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
+{
+    json = static_cast<const UnkeyedRealisation &>(r);
+    json["id"] = r.id.to_string();
 }
 
 } // namespace nlohmann
