@@ -50,7 +50,6 @@ sources = files(
   'mercurial.cc',
   'path.cc',
   'registry.cc',
-  'store-path-accessor.cc',
   'tarball.cc',
 )
 

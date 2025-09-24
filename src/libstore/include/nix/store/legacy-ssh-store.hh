@@ -142,7 +142,12 @@ public:
         unsupported("ensurePath");
     }
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    {
+        unsupported("getFSAccessor");
+    }
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
     {
         unsupported("getFSAccessor");
     }

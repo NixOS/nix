@@ -6,7 +6,6 @@
 #include "nix/util/archive.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/types.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -354,7 +353,7 @@ struct FileInputScheme : CurlInputScheme
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-        auto accessor = makeStorePathAccessor(store, file.storePath);
+        auto accessor = ref{store->getFSAccessor(file.storePath)};
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 

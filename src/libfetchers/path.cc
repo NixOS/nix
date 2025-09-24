@@ -1,7 +1,6 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/archive.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -153,7 +152,7 @@ struct PathInputScheme : InputScheme
         if (!input.getLastModified())
             input.attrs.insert_or_assign("lastModified", uint64_t(mtime));
 
-        return {makeStorePathAccessor(store, *storePath), std::move(input)};
+        return {ref{store->getFSAccessor(*storePath)}, std::move(input)};
     }
 
     std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
