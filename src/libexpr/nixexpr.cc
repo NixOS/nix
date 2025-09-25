@@ -11,7 +11,7 @@
 
 namespace nix {
 
-unsigned long Expr::nrExprs = 0;
+Counter Expr::nrExprs;
 
 ExprBlackHole eBlackHole;
 
