@@ -39,7 +39,7 @@ create_systemd_proxy_env() {
     vars="http_proxy https_proxy ftp_proxy all_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY NO_PROXY"
     for v in $vars; do
         if [ "x${!v:-}" != "x" ]; then
-            echo "Environment=${v}=$(escape_systemd_env ${!v})"
+            echo "Environment=${v}=$(escape_systemd_env "${!v}")"
         fi
     done
 }
