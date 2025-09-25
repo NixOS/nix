@@ -106,18 +106,11 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^tests/functional/completions\.sh$''
               ''^tests/functional/compute-levels\.sh$''
-              ''^tests/functional/config\.sh$''
               ''^tests/functional/db-migration\.sh$''
-              ''^tests/functional/debugger\.sh$''
               ''^tests/functional/dependencies\.builder0\.sh$''
-              ''^tests/functional/dependencies\.sh$''
               ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/dyn-drv/common\.sh$''
-              ''^tests/functional/dyn-drv/dep-built-drv\.sh$''
               ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
               ''^tests/functional/dyn-drv/recursive-mod-json\.sh$''
