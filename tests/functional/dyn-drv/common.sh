@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 source ../common.sh
 
 # Need backend to support text-hashing too
