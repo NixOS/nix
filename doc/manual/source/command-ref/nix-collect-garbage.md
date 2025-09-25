@@ -94,7 +94,7 @@ generations of each profile, do
 $ nix-collect-garbage -d
 ```
 
-## Keep most-recent by time (number fo days) and trim by amount
+## Keep most-recent by time (number of days) and trim by amount
 
 This command will delete generations older than a week if possible, while keeping an amount of generations between `10` and `20`.
 

@@ -83,7 +83,7 @@ static int main_nix_collect_garbage(int argc, char ** argv)
                 deleteOlderThan = std::optional<time_t> { parseOlderThanTimeSpec(getArg(*arg, arg, end)) };
             } else if (*arg == "--keep-min")
                 keepMin = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
-            else if (*arg == "--keep-max"){
+            else if (*arg == "--keep-max") {
                 removeOld = true;
                 keepMax = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
             }

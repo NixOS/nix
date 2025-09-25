@@ -166,7 +166,7 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
 void deleteGenerationsFilter(const Path & profile, std::optional<time_t> olderThan, std::optional<GenerationNumber> keepMin, std::optional<GenerationNumber> keepMax, bool dryRun)
 {
     if (keepMin.has_value() && keepMax.has_value() && *keepMin > *keepMax)
-        throw Error("Keep min cannot be greater than keep max");
+        throw Error("--keep-min cannot be greater than --keep-max");
 
     PathLocks lock;
     lockProfile(lock, profile);
@@ -197,13 +197,18 @@ void deleteGenerationsFilter(const Path & profile, std::optional<time_t> olderTh
         iterDropUntil(gens, older, [&](auto & g) { return g.creationTime < *olderThan; });
     }
 
-    // Find first generation to delete by clamping
+    // Find first generation to delete by clamping between keepMin and keepMax
     auto toDelete = older;
-    for (int i = std::distance(gens.rbegin(), older) - std::distance(gens.rbegin(), end); i > 0; --i)
+
+    auto clampBackward = std::distance(gens.rbegin(), older) - std::distance(gens.rbegin(), end);
+    for (int i = clampBackward; i > 0; --i)
         --toDelete;
-    for (int i = std::distance(gens.rbegin(), start) - std::distance(gens.rbegin(), older); i > 0; --i)
+
+    auto clampForward = std::distance(gens.rbegin(), start) - std::distance(gens.rbegin(), older);
+    for (int i = clampForward; i > 0; --i)
         ++toDelete;
 
+    // Delete
     for (; toDelete != gens.rend(); ++toDelete)
         deleteGeneration2(profile, toDelete->number, dryRun);
 }

@@ -135,17 +135,17 @@ void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & 
  *
  * Examples:
  * - All parameters are nullopt
- *   No generations are deleted
- * - keepMax is 5
- *   No generations are deleted
+ *   No generations are deleted.
+ * - keepMin is 5
+ *   No generations are deleted, only keepMax and olderThan delete generations.
  * - keepMax is 10
- *   10 generations after the current one are kept, the rest is deleted.
+ *   10 most recent generations after the current one are kept, the rest is deleted.
  * - olderThan is 2025-09-16
- *   Generations older than 2025-09-16 are deleted
+ *   Generations older than 2025-09-16 are deleted.
  * - olderThan is 2025-09-16, keepMin is 5, keepMax is 10 -
  *   Will try to delete generations older than 2025-09-16.
- *   If there are more than 10 generations to be kept, continues to delete old generations until there is 10.
- *   If there are less than 5 generations to be kept, preserves older generations until there is 5.
+ *   If there are more than 10 generations to be kept, continues to delete old generations until there are 10.
+ *   If there are less than 5 generations to be kept, preserves the most recent of generations to be deleted until there are 5.
  *
  * @param profile The profile, specified by its name and location combined into a path, whose generations we want to
  * delete.
