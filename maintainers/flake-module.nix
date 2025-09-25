@@ -107,7 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^tests/functional/dependencies\.builder0\.sh$''
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
