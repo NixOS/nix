@@ -107,7 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^scripts/install-systemd-multi-user\.sh$''
-              ''^tests/functional/compute-levels\.sh$''
               ''^tests/functional/db-migration\.sh$''
               ''^tests/functional/dependencies\.builder0\.sh$''
               ''^tests/functional/dump-db\.sh$''
