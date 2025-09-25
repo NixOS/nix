@@ -116,6 +116,7 @@
               ''^tests/functional/extra-sandbox-profile\.sh$''
               ''^tests/functional/fetchClosure\.sh$''
               ''^tests/functional/fetchGit\.sh$''
+              ''^tests/functional/fetchGitObjects\.sh$''
               ''^tests/functional/fetchGitRefs\.sh$''
               ''^tests/functional/fetchGitSubmodules\.sh$''
               ''^tests/functional/fetchGitVerification\.sh$''

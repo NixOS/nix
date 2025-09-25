@@ -76,6 +76,7 @@ suites = [
       'gc-runtime.sh',
       'tarball.sh',
       'fetchGit.sh',
+      'fetchGitObjects.sh',
       'fetchGitShallow.sh',
       'fetchurl.sh',
       'fetchPath.sh',
