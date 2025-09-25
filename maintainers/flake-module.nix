@@ -112,7 +112,6 @@
               ''^tests/functional/db-migration\.sh$''
               ''^tests/functional/debugger\.sh$''
               ''^tests/functional/dependencies\.builder0\.sh$''
-              ''^tests/functional/dependencies\.sh$''
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/dyn-drv/build-built-drv\.sh$''
               ''^tests/functional/dyn-drv/dep-built-drv\.sh$''
