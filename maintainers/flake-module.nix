@@ -110,7 +110,6 @@
               ''^scripts/install-systemd-multi-user\.sh$''
               ''^tests/functional/completions\.sh$''
               ''^tests/functional/compute-levels\.sh$''
-              ''^tests/functional/config\.sh$''
               ''^tests/functional/db-migration\.sh$''
               ''^tests/functional/debugger\.sh$''
               ''^tests/functional/dependencies\.builder0\.sh$''
