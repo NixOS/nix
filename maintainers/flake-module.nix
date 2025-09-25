@@ -107,7 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
               ''^tests/functional/dyn-drv/recursive-mod-json\.sh$''
               ''^tests/functional/eval-store\.sh$''
