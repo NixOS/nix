@@ -117,7 +117,6 @@
               ''^tests/functional/dependencies\.sh$''
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/dyn-drv/build-built-drv\.sh$''
-              ''^tests/functional/dyn-drv/common\.sh$''
               ''^tests/functional/dyn-drv/dep-built-drv\.sh$''
               ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
