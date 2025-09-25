@@ -112,7 +112,6 @@
               ''^tests/functional/dependencies\.builder0\.sh$''
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/dyn-drv/build-built-drv\.sh$''
-              ''^tests/functional/dyn-drv/dep-built-drv\.sh$''
               ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
               ''^tests/functional/dyn-drv/recursive-mod-json\.sh$''
