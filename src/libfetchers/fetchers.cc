@@ -4,6 +4,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/fetch-to-store.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -335,6 +336,15 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
             auto accessor = ref{store->getFSAccessor(storePath)};
 
             accessor->fingerprint = getFingerprint(store);
+
+            // Store a cache entry for the substituted tree so later fetches
+            // can reuse the existing nar instead of copying the unpacked
+            // input back into the store on every evaluation.
+            if (accessor->fingerprint) {
+                ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
+                auto cacheKey = makeFetchToStoreCacheKey(getName(), *accessor->fingerprint, method, "/");
+                settings->getCache()->upsert(cacheKey, *store, {}, storePath);
+            }
 
             accessor->setPathDisplay("«" + to_string() + "»");
 
