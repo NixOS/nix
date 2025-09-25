@@ -488,8 +488,11 @@ public:
 
     /**
      * Allow access to a path.
+     *
+     * Only for restrict eval: pure eval just whitelist store paths,
+     * never arbitrary paths.
      */
-    void allowPath(const Path & path);
+    void allowPathLegacy(const Path & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to

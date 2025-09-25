@@ -177,8 +177,8 @@ struct ProfileManifest
 
         else if (std::filesystem::exists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStore(profile.string()));
-            state.allowPath(state.store->followLinksToStore((profile / "manifest.nix").string()));
+            state.allowPath(state.store->followLinksToStorePath(profile.string()));
+            state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
 
             auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
 
