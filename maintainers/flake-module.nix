@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/db-migration\.sh$''
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
               ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
