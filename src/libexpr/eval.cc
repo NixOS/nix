@@ -17,6 +17,7 @@
 #include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -225,22 +226,25 @@ EvalState::EvalState(
            */
           {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
       }))
-    , rootFS(({
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
+    , rootFS([&] {
+        auto accessor = [&]() -> decltype(rootFS) {
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store. */
+            if (settings.pureEval)
+                return storeFS;
 
-           If we have a chroot store and pure eval is not enabled,
-           use a union accessor to make the chroot store available
-           at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store. */
-        auto accessor = getFSSourceAccessor();
+            /* If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the underlying
+               directory available. This is necessary for instance if
+               we're evaluating a file from the physical /nix/store
+               while using a chroot store. */
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (store->storeDir != realStoreDir)
+                return makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
 
-        auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-        if (settings.pureEval || store->storeDir != realStoreDir) {
-            accessor = settings.pureEval ? storeFS : makeUnionSourceAccessor({accessor, storeFS});
-        }
+            return getFSSourceAccessor();
+        }();
 
         /* Apply access control if needed. */
         if (settings.restrictEval || settings.pureEval)
@@ -251,8 +255,8 @@ EvalState::EvalState(
                     throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
                 });
 
-        accessor;
-    }))
+        return accessor;
+    }())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -334,7 +338,7 @@ EvalState::EvalState(
 
 EvalState::~EvalState() {}
 
-void EvalState::allowPath(const Path & path)
+void EvalState::allowPathLegacy(const Path & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(path));
@@ -3177,7 +3181,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path.path.abs());
+            allowPathLegacy(path.path.abs());
             if (store->isInStore(path.path.abs())) {
                 try {
                     allowClosure(store->toStorePath(path.path.abs()).first);
