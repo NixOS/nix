@@ -197,10 +197,6 @@
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
 
-              # Shellcheck doesn't support fish or zsh shell syntax
-              ''^misc/fish/completion\.fish$''
-              ''^misc/zsh/completion\.zsh$''
-
               # Content-addressed test files that use recursive-*looking* sourcing
               # (cd .. && source <self>), causing shellcheck to loop
               # They're small wrapper scripts with not a lot going on

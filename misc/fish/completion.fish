@@ -1,3 +1,4 @@
+# shellcheck disable=all
 function _nix_complete
   # Get the current command up to a cursor.
   # - Behaves correctly even with pipes and nested in commands like env.
