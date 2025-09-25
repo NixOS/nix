@@ -160,7 +160,8 @@ EOF
 }
 
 nix_user_for_core() {
-    printf "%s%s" "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
+    # shellcheck disable=SC2059
+    printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
 
 nix_uid_for_core() {
