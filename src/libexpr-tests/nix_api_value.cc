@@ -162,6 +162,114 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     nix_gc_decref(ctx, intValue);
 }
 
+TEST_F(nix_api_expr_test, nix_get_list_byidx_large_indices)
+{
+    // Create a small list to test extremely large out-of-bounds access
+    ListBuilder * builder = nix_make_list_builder(ctx, state, 2);
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    nix_list_builder_insert(ctx, builder, 0, intValue);
+    nix_list_builder_insert(ctx, builder, 1, intValue);
+    nix_make_list(ctx, builder, value);
+    nix_list_builder_free(builder);
+
+    // Test extremely large indices that would definitely crash without bounds checking
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, UINT_MAX / 2));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, value, state, UINT_MAX / 2 + 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Clean up
+    nix_gc_decref(ctx, intValue);
+}
+
+TEST_F(nix_api_expr_test, nix_get_list_byidx_lazy)
+{
+    // Create a list with a throwing lazy element, an already-evaluated int, and a lazy function call
+
+    // 1. Throwing lazy element - create a function application thunk that will throw when forced
+    nix_value * throwingFn = nix_alloc_value(ctx, state);
+    nix_value * throwingValue = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(
+        ctx,
+        state,
+        R"(
+        _: throw "This should not be evaluated by the lazy accessor"
+    )",
+        "<test>",
+        throwingFn);
+    assert_ctx_ok();
+
+    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    assert_ctx_ok();
+
+    // 2. Already evaluated int (not lazy)
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    assert_ctx_ok();
+
+    // 3. Lazy function application that would compute increment 5 = 6
+    nix_value * lazyApply = nix_alloc_value(ctx, state);
+    nix_value * incrementFn = nix_alloc_value(ctx, state);
+    nix_value * argFive = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
+    assert_ctx_ok();
+    nix_init_int(ctx, argFive, 5);
+
+    // Create a lazy application: (x: x + 1) 5
+    nix_init_apply(ctx, lazyApply, incrementFn, argFive);
+    assert_ctx_ok();
+
+    ListBuilder * builder = nix_make_list_builder(ctx, state, 3);
+    nix_list_builder_insert(ctx, builder, 0, throwingValue);
+    nix_list_builder_insert(ctx, builder, 1, intValue);
+    nix_list_builder_insert(ctx, builder, 2, lazyApply);
+    nix_make_list(ctx, builder, value);
+    nix_list_builder_free(builder);
+
+    // Test 1: Lazy accessor should return the throwing element without forcing evaluation
+    nix_value * lazyThrowingElement = nix_get_list_byidx_lazy(ctx, value, state, 0);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, lazyThrowingElement);
+
+    // Verify the element is still lazy by checking that forcing it throws
+    nix_value_force(ctx, state, lazyThrowingElement);
+    assert_ctx_err();
+    ASSERT_THAT(
+        nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("This should not be evaluated by the lazy accessor"));
+
+    // Test 2: Lazy accessor should return the already-evaluated int
+    nix_value * intElement = nix_get_list_byidx_lazy(ctx, value, state, 1);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, intElement);
+    ASSERT_EQ(42, nix_get_int(ctx, intElement));
+
+    // Test 3: Lazy accessor should return the lazy function application without forcing
+    nix_value * lazyFunctionElement = nix_get_list_byidx_lazy(ctx, value, state, 2);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, lazyFunctionElement);
+
+    // Force the lazy function application - should compute 5 + 1 = 6
+    nix_value_force(ctx, state, lazyFunctionElement);
+    assert_ctx_ok();
+    ASSERT_EQ(6, nix_get_int(ctx, lazyFunctionElement));
+
+    // Clean up
+    nix_gc_decref(ctx, throwingFn);
+    nix_gc_decref(ctx, throwingValue);
+    nix_gc_decref(ctx, intValue);
+    nix_gc_decref(ctx, lazyApply);
+    nix_gc_decref(ctx, incrementFn);
+    nix_gc_decref(ctx, argFive);
+    nix_gc_decref(ctx, lazyThrowingElement);
+    nix_gc_decref(ctx, intElement);
+    nix_gc_decref(ctx, lazyFunctionElement);
+}
+
 TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_attr_byname(ctx, nullptr, state, 0));
@@ -242,6 +350,225 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
     free(out_name);
+}
+
+TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
+{
+    // Create a small attribute set to test extremely large out-of-bounds access
+    const char ** out_name = (const char **) malloc(sizeof(char *));
+    BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 2);
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    nix_bindings_builder_insert(ctx, builder, "test", intValue);
+    nix_make_attrs(ctx, value, builder);
+    nix_bindings_builder_free(builder);
+
+    // Test extremely large indices that would definitely crash without bounds checking
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, 1000000, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, UINT_MAX / 2, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_byidx(ctx, value, state, UINT_MAX / 2 + 1000000, out_name));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Test nix_get_attr_name_byidx with large indices too
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, UINT_MAX / 2));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+    ASSERT_EQ(nullptr, nix_get_attr_name_byidx(ctx, value, state, UINT_MAX / 2 + 1000000));
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Clean up
+    nix_gc_decref(ctx, intValue);
+    free(out_name);
+}
+
+TEST_F(nix_api_expr_test, nix_get_attr_byname_lazy)
+{
+    // Create an attribute set with a throwing lazy attribute, an already-evaluated int, and a lazy function call
+
+    // 1. Throwing lazy element - create a function application thunk that will throw when forced
+    nix_value * throwingFn = nix_alloc_value(ctx, state);
+    nix_value * throwingValue = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(
+        ctx,
+        state,
+        R"(
+        _: throw "This should not be evaluated by the lazy accessor"
+    )",
+        "<test>",
+        throwingFn);
+    assert_ctx_ok();
+
+    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    assert_ctx_ok();
+
+    // 2. Already evaluated int (not lazy)
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 42);
+    assert_ctx_ok();
+
+    // 3. Lazy function application that would compute increment 7 = 8
+    nix_value * lazyApply = nix_alloc_value(ctx, state);
+    nix_value * incrementFn = nix_alloc_value(ctx, state);
+    nix_value * argSeven = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
+    assert_ctx_ok();
+    nix_init_int(ctx, argSeven, 7);
+
+    // Create a lazy application: (x: x + 1) 7
+    nix_init_apply(ctx, lazyApply, incrementFn, argSeven);
+    assert_ctx_ok();
+
+    BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 3);
+    nix_bindings_builder_insert(ctx, builder, "throwing", throwingValue);
+    nix_bindings_builder_insert(ctx, builder, "normal", intValue);
+    nix_bindings_builder_insert(ctx, builder, "lazy", lazyApply);
+    nix_make_attrs(ctx, value, builder);
+    nix_bindings_builder_free(builder);
+
+    // Test 1: Lazy accessor should return the throwing attribute without forcing evaluation
+    nix_value * lazyThrowingAttr = nix_get_attr_byname_lazy(ctx, value, state, "throwing");
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, lazyThrowingAttr);
+
+    // Verify the attribute is still lazy by checking that forcing it throws
+    nix_value_force(ctx, state, lazyThrowingAttr);
+    assert_ctx_err();
+    ASSERT_THAT(
+        nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("This should not be evaluated by the lazy accessor"));
+
+    // Test 2: Lazy accessor should return the already-evaluated int
+    nix_value * intAttr = nix_get_attr_byname_lazy(ctx, value, state, "normal");
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, intAttr);
+    ASSERT_EQ(42, nix_get_int(ctx, intAttr));
+
+    // Test 3: Lazy accessor should return the lazy function application without forcing
+    nix_value * lazyFunctionAttr = nix_get_attr_byname_lazy(ctx, value, state, "lazy");
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, lazyFunctionAttr);
+
+    // Force the lazy function application - should compute 7 + 1 = 8
+    nix_value_force(ctx, state, lazyFunctionAttr);
+    assert_ctx_ok();
+    ASSERT_EQ(8, nix_get_int(ctx, lazyFunctionAttr));
+
+    // Test 4: Missing attribute should return NULL with NIX_ERR_KEY
+    nix_value * missingAttr = nix_get_attr_byname_lazy(ctx, value, state, "nonexistent");
+    ASSERT_EQ(nullptr, missingAttr);
+    ASSERT_EQ(NIX_ERR_KEY, nix_err_code(ctx));
+
+    // Clean up
+    nix_gc_decref(ctx, throwingFn);
+    nix_gc_decref(ctx, throwingValue);
+    nix_gc_decref(ctx, intValue);
+    nix_gc_decref(ctx, lazyApply);
+    nix_gc_decref(ctx, incrementFn);
+    nix_gc_decref(ctx, argSeven);
+    nix_gc_decref(ctx, lazyThrowingAttr);
+    nix_gc_decref(ctx, intAttr);
+    nix_gc_decref(ctx, lazyFunctionAttr);
+}
+
+TEST_F(nix_api_expr_test, nix_get_attr_byidx_lazy)
+{
+    // Create an attribute set with a throwing lazy attribute, an already-evaluated int, and a lazy function call
+
+    // 1. Throwing lazy element - create a function application thunk that will throw when forced
+    nix_value * throwingFn = nix_alloc_value(ctx, state);
+    nix_value * throwingValue = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(
+        ctx,
+        state,
+        R"(
+        _: throw "This should not be evaluated by the lazy accessor"
+    )",
+        "<test>",
+        throwingFn);
+    assert_ctx_ok();
+
+    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    assert_ctx_ok();
+
+    // 2. Already evaluated int (not lazy)
+    nix_value * intValue = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, intValue, 99);
+    assert_ctx_ok();
+
+    // 3. Lazy function application that would compute increment 10 = 11
+    nix_value * lazyApply = nix_alloc_value(ctx, state);
+    nix_value * incrementFn = nix_alloc_value(ctx, state);
+    nix_value * argTen = nix_alloc_value(ctx, state);
+
+    nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
+    assert_ctx_ok();
+    nix_init_int(ctx, argTen, 10);
+
+    // Create a lazy application: (x: x + 1) 10
+    nix_init_apply(ctx, lazyApply, incrementFn, argTen);
+    assert_ctx_ok();
+
+    BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 3);
+    nix_bindings_builder_insert(ctx, builder, "a_throwing", throwingValue);
+    nix_bindings_builder_insert(ctx, builder, "b_normal", intValue);
+    nix_bindings_builder_insert(ctx, builder, "c_lazy", lazyApply);
+    nix_make_attrs(ctx, value, builder);
+    nix_bindings_builder_free(builder);
+
+    // Proper usage: first get the size and gather all attributes into a map
+    unsigned int attrCount = nix_get_attrs_size(ctx, value);
+    assert_ctx_ok();
+    ASSERT_EQ(3u, attrCount);
+
+    // Gather all attributes into a map (proper contract usage)
+    std::map<std::string, nix_value *> attrMap;
+    const char * name;
+
+    for (unsigned int i = 0; i < attrCount; i++) {
+        nix_value * attr = nix_get_attr_byidx_lazy(ctx, value, state, i, &name);
+        assert_ctx_ok();
+        ASSERT_NE(nullptr, attr);
+        attrMap[std::string(name)] = attr;
+    }
+
+    // Now test the gathered attributes
+    ASSERT_EQ(3u, attrMap.size());
+    ASSERT_TRUE(attrMap.count("a_throwing"));
+    ASSERT_TRUE(attrMap.count("b_normal"));
+    ASSERT_TRUE(attrMap.count("c_lazy"));
+
+    // Test 1: Throwing attribute should be lazy
+    nix_value * throwingAttr = attrMap["a_throwing"];
+    nix_value_force(ctx, state, throwingAttr);
+    assert_ctx_err();
+    ASSERT_THAT(
+        nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("This should not be evaluated by the lazy accessor"));
+
+    // Test 2: Normal attribute should be already evaluated
+    nix_value * normalAttr = attrMap["b_normal"];
+    ASSERT_EQ(99, nix_get_int(ctx, normalAttr));
+
+    // Test 3: Lazy function should compute when forced
+    nix_value * lazyAttr = attrMap["c_lazy"];
+    nix_value_force(ctx, state, lazyAttr);
+    assert_ctx_ok();
+    ASSERT_EQ(11, nix_get_int(ctx, lazyAttr));
+
+    // Clean up
+    nix_gc_decref(ctx, throwingFn);
+    nix_gc_decref(ctx, throwingValue);
+    nix_gc_decref(ctx, intValue);
+    nix_gc_decref(ctx, lazyApply);
+    nix_gc_decref(ctx, incrementFn);
+    nix_gc_decref(ctx, argTen);
+    for (auto & pair : attrMap) {
+        nix_gc_decref(ctx, pair.second);
+    }
 }
 
 TEST_F(nix_api_expr_test, nix_value_init)
