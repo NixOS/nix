@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/flakes/absolute-paths\.sh$''
               ''^tests/functional/flakes/check\.sh$''
               ''^tests/functional/flakes/config\.sh$''
               ''^tests/functional/flakes/flakes\.sh$''
