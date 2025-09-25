@@ -107,7 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/fetchGitRefs\.sh$''
               ''^tests/functional/fetchGitSubmodules\.sh$''
               ''^tests/functional/fetchGitVerification\.sh$''
               ''^tests/functional/fetchMercurial\.sh$''

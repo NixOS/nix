@@ -38,16 +38,16 @@ path=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = $repo; ref = \
 #       10. They cannot contain a \.
 
 valid_ref() {
-    { set +x; printf >&2 '\n>>>>>>>>>> valid_ref %s\b <<<<<<<<<<\n' $(printf %s "$1" | sed -n -e l); set -x; }
+    { set +x; printf >&2 '\n>>>>>>>>>> valid_ref %s\b <<<<<<<<<<\n' "$(printf %s "$1" | sed -n -e l)"; set -x; }
     git check-ref-format --branch "$1" >/dev/null
     git -C "$repo" branch "$1" master >/dev/null
     path1=$(nix eval --raw --impure --expr "(builtins.fetchGit { url = $repo; ref = ''$1''; }).outPath")
-    [[ $path1 = $path ]]
+    [[ $path1 = "$path" ]]
     git -C "$repo" branch -D "$1" >/dev/null
 }
 
 invalid_ref() {
-    { set +x; printf >&2 '\n>>>>>>>>>> invalid_ref %s\b <<<<<<<<<<\n' $(printf %s "$1" | sed -n -e l); set -x; }
+    { set +x; printf >&2 '\n>>>>>>>>>> invalid_ref %s\b <<<<<<<<<<\n' "$(printf %s "$1" | sed -n -e l)"; set -x; }
     # special case for a sole @:
     # --branch @ will try to interpret @ as a branch reference and not fail. Thus we need --allow-onelevel
     if [ "$1" = "@" ]; then
@@ -68,6 +68,7 @@ valid_ref 'heads/foo@bar'
 valid_ref "$(printf 'heads/fu\303\237')"
 valid_ref 'foo-bar-baz'
 valid_ref 'branch#'
+# shellcheck disable=SC2016
 valid_ref '$1'
 valid_ref 'foo.locke'
 
