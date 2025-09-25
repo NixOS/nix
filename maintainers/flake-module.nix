@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/flakes/follow-paths\.sh$''
               ''^tests/functional/flakes/prefetch\.sh$''
               ''^tests/functional/flakes/run\.sh$''
               ''^tests/functional/flakes/show\.sh$''
