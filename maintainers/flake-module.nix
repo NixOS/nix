@@ -107,7 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/export-graph\.sh$''
               ''^tests/functional/export\.sh$''
               ''^tests/functional/extra-sandbox-profile\.sh$''
               ''^tests/functional/fetchClosure\.sh$''
