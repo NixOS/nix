@@ -108,7 +108,6 @@
               # We haven't linted these files yet
               ''^tests/functional/dump-db\.sh$''
               ''^tests/functional/export\.sh$''
-              ''^tests/functional/extra-sandbox-profile\.sh$''
               ''^tests/functional/fetchClosure\.sh$''
               ''^tests/functional/fetchGit\.sh$''
               ''^tests/functional/fetchGitRefs\.sh$''
