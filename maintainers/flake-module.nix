@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/fetchGitVerification\.sh$''
               ''^tests/functional/fetchMercurial\.sh$''
               ''^tests/functional/fixed\.builder1\.sh$''
               ''^tests/functional/fixed\.builder2\.sh$''
