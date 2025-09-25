@@ -107,16 +107,6 @@
             excludes = [
               # We haven't linted these files yet
               ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/dyn-drv/eval-outputOf\.sh$''
-              ''^tests/functional/dyn-drv/old-daemon-error-hack\.sh$''
-              ''^tests/functional/dyn-drv/recursive-mod-json\.sh$''
-              ''^tests/functional/eval-store\.sh$''
-              ''^tests/functional/export-graph\.sh$''
-              ''^tests/functional/export\.sh$''
-              ''^tests/functional/extra-sandbox-profile\.sh$''
-              ''^tests/functional/fetchClosure\.sh$''
-              ''^tests/functional/fetchGit\.sh$''
-              ''^tests/functional/fetchGitRefs\.sh$''
               ''^tests/functional/fetchGitSubmodules\.sh$''
               ''^tests/functional/fetchGitVerification\.sh$''
               ''^tests/functional/fetchMercurial\.sh$''
