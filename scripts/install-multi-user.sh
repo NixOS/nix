@@ -55,18 +55,22 @@ readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
 #readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
 #readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
-readonly EXTRACTED_NIX_PATH="$(dirname "$0")"
+EXTRACTED_NIX_PATH="$(dirname "$0")"
+readonly EXTRACTED_NIX_PATH
 
 # allow to override identity change command
-readonly NIX_BECOME=${NIX_BECOME:-sudo}
+NIX_BECOME=${NIX_BECOME:-sudo}
+readonly NIX_BECOME
 
-readonly ROOT_HOME=~root
+ROOT_HOME=~root
+readonly ROOT_HOME
 
 if [ -t 0 ] && [ -z "${NIX_INSTALLER_YES:-}" ]; then
-    readonly IS_HEADLESS='no'
+    IS_HEADLESS='no'
 else
-    readonly IS_HEADLESS='yes'
+    IS_HEADLESS='yes'
 fi
+readonly IS_HEADLESS
 
 headless() {
     if [ "$IS_HEADLESS" = "yes" ]; then
@@ -156,6 +160,7 @@ EOF
 }
 
 nix_user_for_core() {
+    # shellcheck disable=SC2059
     printf "$NIX_BUILD_USER_NAME_TEMPLATE" "$1"
 }
 
@@ -381,10 +386,12 @@ _sudo() {
 
 # Ensure that $TMPDIR exists if defined.
 if [[ -n "${TMPDIR:-}" ]] && [[ ! -d "${TMPDIR:-}" ]]; then
+    # shellcheck disable=SC2174
     mkdir -m 0700 -p "${TMPDIR:-}"
 fi
 
-readonly SCRATCH=$(mktemp -d)
+SCRATCH=$(mktemp -d)
+readonly SCRATCH
 finish_cleanup() {
     rm -rf "$SCRATCH"
 }
@@ -677,7 +684,8 @@ create_directories() {
         # hiding behind || true, and the general state
         # should be one the user can repair once they
         # figure out where chown is...
-        local get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
+        local get_chr_own
+        get_chr_own="$(PATH="$(getconf PATH 2>/dev/null)" command -vp chown)"
         if [[ -z "$get_chr_own" ]]; then
             get_chr_own="$(command -v chown)"
         fi
@@ -1015,6 +1023,7 @@ main() {
 
     # Set profile targets after OS-specific scripts are loaded
     if command -v poly_configure_default_profile_targets > /dev/null 2>&1; then
+        # shellcheck disable=SC2207
         PROFILE_TARGETS=($(poly_configure_default_profile_targets))
     else
         PROFILE_TARGETS=("/etc/bashrc" "/etc/profile.d/nix.sh" "/etc/zshrc" "/etc/bash.bashrc" "/etc/zsh/zshrc")
