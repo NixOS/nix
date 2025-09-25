@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^scripts/install-multi-user\.sh$''
               ''^scripts/install-systemd-multi-user\.sh$''
               ''^tests/functional/completions\.sh$''
               ''^tests/functional/compute-levels\.sh$''
