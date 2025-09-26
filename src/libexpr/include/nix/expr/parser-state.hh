@@ -255,7 +255,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     size_t minIndent = 1000000;
     size_t curIndent = 0;
     std::vector<int> nrIndentedLines(es.size(), 0);
-    bool perfectPreallocate = true;
+    std::vector<bool> perfectPreallocate(es.size(), true);
     size_t finalBlankLine = 0;
     for (const auto & [n, pair] : enumerate(es)) {
         auto & [i_pos, i] = pair;
@@ -276,15 +276,30 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                 if (str->p[j] == ' ')
                     curIndent++;
                 else if (str->p[j] == '\n') {
-                    /* if curIndent < minIndent, we can't calculate at this
-                     * point how much indention we will remove; we will just
-                     * have to over-allocate later. Fortunately in practice this
-                     * shouldn't come up very much.
+                    /* if curIndent is less than the current value of minIndent,
+                     * we can't calculate at this point how much indention we
+                     * will remove; we will just have to over-allocate later.
+                     * Fortunately in practice this shouldn't come up very much.
+                     * It would have to look like (with spaces replaced with
+                     * underscore for clarity)
+                     *
+                     * ''
+                     * ________only long indentations initially
+                     * ________more long indentations
+                     * ____
+                     * ^^ empty line with a shorter indentation
+                     * ____after that there can be shorter indentations
+                     * ''
+                     *
+                     * most empty lines will have no indentation, and those that
+                     * do will usually be of at least the minium indentation,
+                     * and come after a line with said minimum indentation, in
+                     * which case we can perfectly pre-allocate the string.
                      */
-                    if (curIndent >= minIndent)
-                        nrIndentedLines[n]++;
+                    if (curIndent < minIndent)
+                        perfectPreallocate[n] = false;
                     else
-                        perfectPreallocate = false;
+                        nrIndentedLines[n]++;
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -321,7 +336,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
          * over-allocating. See comment above.
          */
         size_t size = 1 + t.l - nrIndentedLines[n] * minIndent - finalLineTrim;
-        if (size == 1) // ignore (most) empty strings before we allocate
+        if (size == 1) // ignore empty strings before we allocate
             return;
         char * s2 = (char *) alloc.allocate(size);
         size_t end = t.l - finalLineTrim;
@@ -345,16 +360,17 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                     atStartOfLine = true;
             }
         }
-        if (perfectPreallocate)
+        if (perfectPreallocate[n])
             assert(c == size - 1);
         else
             assert(c < size);
+        // We should have caught empty strings before allocation. The only case
+        // in which we have to over-allocate is a case with an empty line, which
+        // is therefore not empty.
+        assert(c > 0);
         s2[c] = '\0';
 
-        // Ignore empty strings for a minor optimisation and AST simplification
-        if (*s2 != '\0') {
-            es2->emplace_back(i->first, new ExprString(s2));
-        }
+        es2->emplace_back(i->first, new ExprString(s2));
     };
     for (; i != es.end(); ++i, ++n) {
         std::visit(overloaded{trimExpr, trimString}, i->second);
