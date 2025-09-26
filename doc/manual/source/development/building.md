@@ -23,7 +23,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenv
 ```
 
 > **Note**
