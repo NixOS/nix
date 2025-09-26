@@ -255,6 +255,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     size_t minIndent = 1000000;
     size_t curIndent = 0;
     std::vector<int> nrIndentedLines(es.size(), 0);
+    bool perfectPreallocate = true;
     size_t finalBlankLine = 0;
     for (const auto & [n, pair] : enumerate(es)) {
         auto & [i_pos, i] = pair;
@@ -282,6 +283,8 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                      */
                     if (curIndent >= minIndent)
                         nrIndentedLines[n]++;
+                    else
+                        perfectPreallocate = false;
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
@@ -317,7 +320,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
          * rare cases we can't efficiently pre-calculate it and will end up
          * over-allocating. See comment above.
          */
-        size_t size = 1 + t.l - nrIndentedLines[n] * minIndent;
+        size_t size = 1 + t.l - nrIndentedLines[n] * minIndent - finalLineTrim;
         if (size == 1) // ignore (most) empty strings before we allocate
             return;
         char * s2 = (char *) alloc.allocate(size);
@@ -342,6 +345,10 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                     atStartOfLine = true;
             }
         }
+        if (perfectPreallocate)
+            assert(c == size - 1);
+        else
+            assert(c < size);
         s2[c] = '\0';
 
         // Ignore empty strings for a minor optimisation and AST simplification
