@@ -28,6 +28,7 @@
 #include <random>
 #include <thread>
 #include <regex>
+#include <mutex>
 
 using namespace std::string_literals;
 
@@ -844,9 +845,15 @@ ref<curlFileTransfer> makeCurlFileTransfer()
 ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
+    static std::mutex fileTransferMutex;
 
-    if (fileTransfer->state_.lock()->quit)
-        fileTransfer = makeCurlFileTransfer();
+    if (fileTransfer->state_.lock()->quit) {
+        std::lock_guard<std::mutex> guard(fileTransferMutex);
+        // Double-check after acquiring the lock
+        if (fileTransfer->state_.lock()->quit) {
+            fileTransfer = makeCurlFileTransfer();
+        }
+    }
 
     return fileTransfer;
 }
