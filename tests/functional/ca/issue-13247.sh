@@ -58,7 +58,4 @@ nix build -f issue-13247.nix use-a-prime-more-outputs^first --no-link --max-jobs
 # Should only fetch the output we asked for
 [[ -d "$(jq -r <"$TEST_ROOT"/a.json '.[0].outputs.out')" ]]
 [[ -f "$(jq -r <"$TEST_ROOT"/a.json '.[2].outputs.first')" ]]
-
-# Output should *not* be here, this is the bug
-[[ -e "$(jq -r <"$TEST_ROOT"/a.json '.[2].outputs.second')" ]]
-skipTest "bug is not yet fixed"
+[[ ! -e "$(jq -r <"$TEST_ROOT"/a.json '.[2].outputs.second')" ]]
