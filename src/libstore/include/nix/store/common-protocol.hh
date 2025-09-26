@@ -12,7 +12,6 @@ struct Source;
 class StorePath;
 struct ContentAddress;
 struct DrvOutput;
-struct Realisation;
 
 /**
  * Shared serializers between the worker protocol, serve protocol, and a
@@ -70,8 +69,6 @@ template<>
 DECLARE_COMMON_SERIALISER(ContentAddress);
 template<>
 DECLARE_COMMON_SERIALISER(DrvOutput);
-template<>
-DECLARE_COMMON_SERIALISER(Realisation);
 
 #define COMMA_ ,
 template<typename T>
@@ -81,8 +78,8 @@ DECLARE_COMMON_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_COMMON_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V>
-DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V>);
+template<typename K, typename V, typename Compare>
+DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
 #undef COMMA_
 
 /**

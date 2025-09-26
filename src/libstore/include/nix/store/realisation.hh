@@ -18,68 +18,87 @@ struct OutputsSpec;
 /**
  * A general `Realisation` key.
  *
- * This is similar to a `DerivedPath::Opaque`, but the derivation is
- * identified by its "hash modulo" instead of by its store path.
+ * This is similar to a `DerivedPath::Built`, except it is only a single
+ * step: `drvPath` is a `StorePath` rather than a `DerivedPath`.
  */
 struct DrvOutput
 {
     /**
-     * The hash modulo of the derivation.
-     *
-     * Computed from the derivation itself for most types of
-     * derivations, but computed from the (fixed) content address of the
-     * output for fixed-output derivations.
+     * The store path to the derivation
      */
-    Hash drvHash;
+    StorePath drvPath;
 
     /**
      * The name of the output.
      */
     OutputName outputName;
 
+    /**
+     * Skips the store dir on the `drvPath`
+     */
     std::string to_string() const;
 
-    std::string strHash() const
-    {
-        return drvHash.to_string(HashFormat::Base16, true);
-    }
+    /**
+     * Skips the store dir on the `drvPath`
+     */
+    static DrvOutput from_string(std::string_view);
 
-    static DrvOutput parse(const std::string &);
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    std::string render(const StoreDirConfig & store) const;
 
-    GENERATE_CMP(DrvOutput, me->drvHash, me->outputName);
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    static DrvOutput parse(const StoreDirConfig & store, std::string_view);
+
+    bool operator==(const DrvOutput &) const = default;
+    auto operator<=>(const DrvOutput &) const = default;
 };
 
-struct Realisation
+struct UnkeyedRealisation
 {
-    DrvOutput id;
     StorePath outPath;
 
     StringSet signatures;
 
+    std::string fingerprint(const DrvOutput & key) const;
+
+    void sign(const DrvOutput & key, const Signer &);
+
+    bool checkSignature(
+        const DrvOutput & key,
+        const PublicKeys & publicKeys,
+        const std::string & sig) const;
+
+    size_t checkSignatures(const DrvOutput & key, const PublicKeys & publicKeys) const;
+
     /**
-     * The realisations that are required for the current one to be valid.
-     *
-     * When importing this realisation, the store will first check that all its
-     * dependencies exist, and map to the correct output path
+     * Just check the `outPath`. Signatures don't matter for this.
+     * Callers must ensure that the corresponding key is the same for
+     * most use-cases.
      */
-    std::map<DrvOutput, StorePath> dependentRealisations;
+    bool isCompatibleWith(const UnkeyedRealisation & other) const
+    {
+        return outPath == other.outPath;
+    }
 
-    std::string fingerprint() const;
-    void sign(const Signer &);
-    bool checkSignature(const PublicKeys & publicKeys, const std::string & sig) const;
-    size_t checkSignatures(const PublicKeys & publicKeys) const;
-
-    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
-    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
-
-    bool isCompatibleWith(const Realisation & other) const;
-
-    StorePath getPath() const
+    const StorePath & getPath() const
     {
         return outPath;
     }
 
-    GENERATE_CMP(Realisation, me->id, me->outPath);
+    // TODO sketchy that it avoids signatures
+    GENERATE_CMP(UnkeyedRealisation, me->outPath);
+};
+
+struct Realisation : UnkeyedRealisation
+{
+    DrvOutput id;
+
+    bool operator==(const Realisation &) const = default;
+    auto operator<=>(const Realisation &) const = default;
 };
 
 /**
@@ -88,27 +107,19 @@ struct Realisation
  * Since these are the outputs of a single derivation, we know the
  * output names are unique so we can use them as the map key.
  */
-typedef std::map<OutputName, Realisation> SingleDrvOutputs;
-
-/**
- * Collection type for multiple derivations' outputs' `Realisation`s.
- *
- * `DrvOutput` is used because in general the derivations are not all
- * the same, so we need to identify firstly which derivation, and
- * secondly which output of that derivation.
- */
-typedef std::map<DrvOutput, Realisation> DrvOutputs;
+typedef std::map<OutputName, UnkeyedRealisation> SingleDrvOutputs;
 
 struct OpaquePath
 {
     StorePath path;
 
-    StorePath getPath() const
+    const StorePath & getPath() const
     {
         return path;
     }
 
-    GENERATE_CMP(OpaquePath, me->path);
+    bool operator==(const OpaquePath &) const = default;
+    auto operator<=>(const OpaquePath &) const = default;
 };
 
 /**
@@ -116,7 +127,7 @@ struct OpaquePath
  */
 struct RealisedPath
 {
-    /*
+    /**
      * A path is either the result of the realisation of a derivation or
      * an opaque blob that has been directly added to the store
      */
@@ -138,33 +149,30 @@ struct RealisedPath
     /**
      * Get the raw store path associated to this
      */
-    StorePath path() const;
+    const StorePath & path() const;
 
-    void closure(Store & store, Set & ret) const;
-    static void closure(Store & store, const Set & startPaths, Set & ret);
-    Set closure(Store & store) const;
-
-    GENERATE_CMP(RealisedPath, me->raw);
+    bool operator==(const RealisedPath &) const = default;
+    auto operator<=>(const RealisedPath &) const = default;
 };
 
 class MissingRealisation : public Error
 {
 public:
-    MissingRealisation(DrvOutput & outputId)
-        : MissingRealisation(outputId.outputName, outputId.strHash())
+    MissingRealisation(const StoreDirConfig & store, DrvOutput & outputId)
+        : MissingRealisation(store, outputId.drvPath, outputId.outputName)
     {
     }
 
-    MissingRealisation(std::string_view drv, OutputName outputName)
-        : Error(
-              "cannot operate on output '%s' of the "
-              "unbuilt derivation '%s'",
-              outputName,
-              drv)
-    {
-    }
+    MissingRealisation(const StoreDirConfig & store, const StorePath & drvPath, const OutputName & outputName);
+    MissingRealisation(
+        const StoreDirConfig & store,
+        const SingleDerivedPath & drvPath,
+        const StorePath & drvPathResolved,
+        const OutputName & outputName);
 };
 
 } // namespace nix
 
+JSON_IMPL(nix::DrvOutput)
+JSON_IMPL(nix::UnkeyedRealisation)
 JSON_IMPL(nix::Realisation)

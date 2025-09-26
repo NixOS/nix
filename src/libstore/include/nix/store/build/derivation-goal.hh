@@ -67,8 +67,6 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
-    const Hash outputHash;
-
     const BuildMode buildMode;
 
     /**
@@ -89,17 +87,17 @@ private:
      * of the wanted output, and a `PathStatus` with the
      * current status of that output.
      */
-    std::optional<std::pair<Realisation, PathStatus>> checkPathValidity();
+    std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
      * returns a 'Realisation' for the wanted output.
      */
-    Realisation assertPathValidity();
+    UnkeyedRealisation assertPathValidity();
 
     Co repairClosure();
 
-    Done doneSuccess(BuildResult::Status status, Realisation builtOutput);
+    Done doneSuccess(BuildResult::Status status, UnkeyedRealisation builtOutput);
 
     Done doneFailure(BuildError ex);
 };
