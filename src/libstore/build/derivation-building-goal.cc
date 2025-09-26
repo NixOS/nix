@@ -1,7 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
-#include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
-#include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -158,107 +156,6 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
     /* Determine the full set of input paths. */
 
     {
-        auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, *drv, buildMode);
-        {
-            Goals waitees{resolutionGoal};
-            co_await await(std::move(waitees));
-        }
-        if (nrFailed != 0) {
-            co_return doneFailure({BuildResult::Failure::DependencyFailed, "resolution failed"});
-        }
-
-        if (resolutionGoal->resolvedDrv) {
-            auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
-
-            /* Store the resolved derivation, as part of the record of
-               what we're actually building */
-            writeDerivation(worker.store, drvResolved);
-
-            /* TODO https://github.com/NixOS/nix/issues/13247 we should
-               let the calling goal do this, so it has a change to pass
-               just the output(s) it cares about. */
-            auto resolvedDrvGoal =
-                worker.makeDerivationTrampolineGoal(pathResolved, OutputsSpec::All{}, drvResolved, buildMode);
-            {
-                Goals waitees{resolvedDrvGoal};
-                co_await await(std::move(waitees));
-            }
-
-            trace("resolved derivation finished");
-
-            auto resolvedResult = resolvedDrvGoal->buildResult;
-
-            // No `std::visit` for coroutines yet
-            if (auto * successP = resolvedResult.tryGetSuccess()) {
-                auto & success = *successP;
-                SingleDrvOutputs builtOutputs;
-
-                auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-                auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
-
-                StorePathSet outputPaths;
-
-                for (auto & outputName : drvResolved.outputNames()) {
-                    auto outputHash = get(outputHashes, outputName);
-                    auto resolvedHash = get(resolvedHashes, outputName);
-                    if ((!outputHash) || (!resolvedHash))
-                        throw Error(
-                            "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
-                            worker.store.printStorePath(drvPath),
-                            outputName);
-
-                    auto realisation = [&] {
-                        auto take1 = get(success.builtOutputs, outputName);
-                        if (take1)
-                            return *take1;
-
-                        /* The above `get` should work. But stateful tracking of
-                           outputs in resolvedResult, this can get out of sync with the
-                           store, which is our actual source of truth. For now we just
-                           check the store directly if it fails. */
-                        auto take2 = worker.evalStore.queryRealisation(DrvOutput{*resolvedHash, outputName});
-                        if (take2)
-                            return *take2;
-
-                        throw Error(
-                            "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
-                            worker.store.printStorePath(pathResolved),
-                            outputName);
-                    }();
-
-                    if (!drv->type().isImpure()) {
-                        auto newRealisation = realisation;
-                        newRealisation.id = DrvOutput{*outputHash, outputName};
-                        newRealisation.signatures.clear();
-                        if (!drv->type().isFixed()) {
-                            auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
-                            newRealisation.dependentRealisations =
-                                drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
-                        }
-                        worker.store.signRealisation(newRealisation);
-                        worker.store.registerDrvOutput(newRealisation);
-                    }
-                    outputPaths.insert(realisation.outPath);
-                    builtOutputs.emplace(outputName, realisation);
-                }
-
-                runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
-
-                auto status = success.status;
-                if (status == BuildResult::Success::AlreadyValid)
-                    status = BuildResult::Success::ResolvesToAlreadyValid;
-
-                co_return doneSuccess(success.status, std::move(builtOutputs));
-            } else if (resolvedResult.tryGetFailure()) {
-                co_return doneFailure({
-                    BuildResult::Failure::DependencyFailed,
-                    "build of resolved derivation '%s' failed",
-                    worker.store.printStorePath(pathResolved),
-                });
-            } else
-                assert(false);
-        }
-
         /* If we get this far, we know no dynamic drvs inputs */
 
         for (auto & [depDrvPath, depNode] : drv->inputDrvs.map) {
