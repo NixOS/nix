@@ -262,6 +262,8 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         if (!str || !str->hasIndentation) {
             /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
             if (atStartOfLine) {
+                if (n > 0)
+                    nrIndentedLines[n - 1]++;
                 atStartOfLine = false;
                 if (curIndent < minIndent)
                     minIndent = curIndent;
@@ -284,13 +286,13 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                        indentation. */
                     curIndent = 0;
                 } else {
+                    nrIndentedLines[n]++;
                     atStartOfLine = false;
                     if (curIndent < minIndent)
                         minIndent = curIndent;
                 }
             } else if (str->p[j] == '\n') {
                 atStartOfLine = true;
-                nrIndentedLines[n]++;
                 curIndent = 0;
             }
         }
