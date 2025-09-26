@@ -107,7 +107,7 @@ time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
     auto path2 = PosixSourceAccessor::createAtRoot(path);
     path2.dumpPath(sink, filter);
-    return path2.accessor.dynamic_pointer_cast<PosixSourceAccessor>()->mtime;
+    return path2.accessor.dynamic_pointer_cast<PosixSourceAccessor>()->mtime.load();
 }
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)

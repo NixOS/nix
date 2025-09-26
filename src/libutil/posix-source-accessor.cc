@@ -114,7 +114,10 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     auto st = cachedLstat(path);
     if (!st)
         return std::nullopt;
-    mtime = std::max(mtime, st->st_mtime);
+    // Atomic max operation to avoid data races
+    time_t current = mtime.load();
+    while (current < st->st_mtime && !mtime.compare_exchange_weak(current, st->st_mtime))
+        ;
     return Stat{
         .type = S_ISREG(st->st_mode)   ? tRegular
                 : S_ISDIR(st->st_mode) ? tDirectory

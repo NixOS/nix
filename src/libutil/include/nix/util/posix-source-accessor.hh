@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nix/util/source-accessor.hh"
+#include <atomic>
 
 namespace nix {
 
@@ -25,7 +26,7 @@ struct PosixSourceAccessor : virtual SourceAccessor
      * The most recent mtime seen by lstat(). This is a hack to
      * support dumpPathAndGetMtime(). Should remove this eventually.
      */
-    time_t mtime = 0;
+    std::atomic<time_t> mtime{0};
 
     void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
 
