@@ -190,6 +190,15 @@ public:
 
 namespace detail {
 
+static constexpr size_t ptrSize = sizeof(void *);
+
+/* Whether to use a specialization of ValueStorage that does bitpacking into
+   alignment niches. */
+template<size_t ptrSize>
+inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16);
+
+static constexpr bool little_endian = std::endian::native == std::endian::little;
+
 /**
  * Implementation mixin class for defining the public types
  * In can be inherited from by the actual ValueStorage implementations
@@ -227,7 +236,7 @@ struct ValueBase
 
     struct SmallString
     {
-        static constexpr size_t size = 15;
+        static constexpr size_t size = ptrSize * 2 - (useBitPackedValueStorage<ptrSize> ? 1 : 0);
         char small_str[size];
     };
 
@@ -288,8 +297,6 @@ struct PayloadTypeToInternalType
 #define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)                     \
     MACRO(NixInt, integer, tInt)                                    \
     MACRO(bool, boolean, tBool)                                     \
-    MACRO(ValueBase::StringWithContext, string, tString)            \
-    MACRO(ValueBase::SmallString, smallString, tSmallString)        \
     MACRO(ValueBase::Path, path, tPath)                             \
     MACRO(ValueBase::Null, null_, tNull)                            \
     MACRO(Bindings *, attrs, tAttrs)                                \
@@ -302,6 +309,9 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
     MACRO(NixFloat, fpoint, tFloat)
+    // small string is accessed as though it is an ordinary string, so it must be handled specially
+    // MACRO(ValueBase::StringWithContext, string, tString)
+    // MACRO(ValueBase::SmallString, smallString, tSmallString)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
     template<>                                               \
@@ -311,6 +321,8 @@ struct PayloadTypeToInternalType
     };
 
 NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_PAYLOAD_TYPE)
+NIX_VALUE_PAYLOAD_TYPE(ValueBase::SmallString, smallString, tSmallString)
+NIX_VALUE_PAYLOAD_TYPE(ValueBase::StringWithContext, string, tString)
 
 #undef NIX_VALUE_PAYLOAD_TYPE
 
@@ -338,6 +350,8 @@ protected:
     {
 #define NIX_VALUE_STORAGE_DEFINE_FIELD(T, FIELD_NAME, DISCRIMINATOR) T FIELD_NAME;
         NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_DEFINE_FIELD)
+        NIX_VALUE_STORAGE_DEFINE_FIELD(ValueBase::SmallString, smallString, tSmallString)
+        NIX_VALUE_STORAGE_DEFINE_FIELD(ValueBase::StringWithContext, string, tString)
 #undef NIX_VALUE_STORAGE_DEFINE_FIELD
     };
 
@@ -353,6 +367,18 @@ protected:
         val = payload.FIELD_NAME;                                \
     }
 
+    void getStorage(ValueBase::StringWithContext & val) const noexcept
+    {
+        if (internalType == tString)
+            val = payload.string;
+        else if (internalType == tSmallString) {
+            val.context = nullptr;
+            val.c_str = payload.smallString.small_str;
+        }
+        else
+            unreachable();
+    }
+
 #define NIX_VALUE_STORAGE_SET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void setStorage(K val) noexcept                              \
     {                                                            \
@@ -362,6 +388,8 @@ protected:
 
     NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_GET_IMPL)
     NIX_VALUE_STORAGE_FOR_EACH_FIELD(NIX_VALUE_STORAGE_SET_IMPL)
+    NIX_VALUE_STORAGE_SET_IMPL(ValueBase::SmallString, smallString, tSmallString)
+    NIX_VALUE_STORAGE_SET_IMPL(ValueBase::StringWithContext, string, tString)
 
 #undef NIX_VALUE_STORAGE_SET_IMPL
 #undef NIX_VALUE_STORAGE_GET_IMPL
@@ -373,17 +401,6 @@ protected:
         return internalType;
     }
 };
-
-namespace detail {
-
-/* Whether to use a specialization of ValueStorage that does bitpacking into
-   alignment niches. */
-template<std::size_t ptrSize>
-inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16);
-
-static constexpr bool little_endian = std::endian::native == std::endian::little;
-
-} // namespace detail
 
 /**
  * Value storage that is optimized for 64 bit systems.
