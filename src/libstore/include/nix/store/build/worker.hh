@@ -223,7 +223,8 @@ public:
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode = bmNormal,
+        bool storeDerivation = false);
 
     /**
      * @ref DerivationResolutionGoal "derivation resolution goal"
@@ -234,8 +235,11 @@ public:
     /**
      * @ref DerivationBuildingGoal "derivation building goal"
      */
-    std::shared_ptr<DerivationBuildingGoal>
-    makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
+        const StorePath & drvPath,
+        const Derivation & drv,
+        BuildMode buildMode = bmNormal,
+        bool storeDerivation = false);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"

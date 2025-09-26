@@ -26,8 +26,8 @@
 namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv_, Worker & worker, BuildMode buildMode)
-    : Goal(worker, gaveUpOnSubstitution())
+    const StorePath & drvPath, const Derivation & drv_, Worker & worker, BuildMode buildMode, bool storeDerivation)
+    : Goal(worker, gaveUpOnSubstitution(storeDerivation))
     , drvPath(drvPath)
     , buildMode(buildMode)
 {
@@ -124,7 +124,7 @@ static void runPostBuildHook(
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
+Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
 {
     Goals waitees;
 
@@ -171,6 +171,13 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
        running the build hook. */
 
     /* Determine the full set of input paths. */
+
+    if (storeDerivation) {
+        assert(drv->inputDrvs.map.empty());
+        /* Store the resolved derivation, as part of the record of
+           what we're actually building */
+        writeDerivation(worker.store, *drv);
+    }
 
     {
         /* If we get this far, we know no dynamic drvs inputs */
