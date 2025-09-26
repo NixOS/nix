@@ -155,7 +155,7 @@ class ListBuilder
     Value * inlineElems[2] = {nullptr, nullptr};
 public:
     Value ** elems;
-    ListBuilder(EvalState & state, size_t size);
+    ListBuilder(size_t size);
 
     // NOTE: Can be noexcept because we are just copying integral values and
     // raw pointers.

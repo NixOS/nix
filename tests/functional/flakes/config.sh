@@ -2,9 +2,9 @@
 
 source common.sh
 
-cp ../simple.nix ../simple.builder.sh "${config_nix}" $TEST_HOME
+cp ../simple.nix ../simple.builder.sh "${config_nix}" "$TEST_HOME"
 
-cd $TEST_HOME
+cd "$TEST_HOME"
 
 rm -f post-hook-ran
 cat <<EOF > echoing-post-hook.sh
@@ -37,6 +37,7 @@ if type -p script >/dev/null && script -q -c true /dev/null; then
 else
     echo "script is not available or not GNU-like, so we skip testing with an added tty"
 fi
+# shellcheck disable=SC2235
 (! [[ -f post-hook-ran ]])
 TODO_NixOS
 clearStore

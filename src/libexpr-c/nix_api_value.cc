@@ -679,7 +679,7 @@ nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * b
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        nix::Symbol s = bb->builder.state.get().symbols.create(name);
+        nix::Symbol s = bb->builder.symbols.get().create(name);
         bb->builder.insert(s, &v);
     }
     NIXC_CATCH_ERRS

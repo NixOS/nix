@@ -303,6 +303,63 @@ struct StaticEvalSymbols
     }
 };
 
+class EvalMemory
+{
+#if NIX_USE_BOEHMGC
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
+    std::shared_ptr<void *> valueAllocCache;
+
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
+    std::shared_ptr<void *> env1AllocCache;
+#endif
+
+public:
+    struct Statistics
+    {
+        Counter nrEnvs;
+        Counter nrValuesInEnvs;
+        Counter nrValues;
+        Counter nrAttrsets;
+        Counter nrAttrsInAttrsets;
+        Counter nrListElems;
+    };
+
+    EvalMemory();
+
+    EvalMemory(const EvalMemory &) = delete;
+    EvalMemory(EvalMemory &&) = delete;
+    EvalMemory & operator=(const EvalMemory &) = delete;
+    EvalMemory & operator=(EvalMemory &&) = delete;
+
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
+
+    Bindings * allocBindings(size_t capacity);
+
+    BindingsBuilder buildBindings(SymbolTable & symbols, size_t capacity)
+    {
+        return BindingsBuilder(*this, symbols, allocBindings(capacity), capacity);
+    }
+
+    ListBuilder buildList(size_t size)
+    {
+        stats.nrListElems += size;
+        return ListBuilder(size);
+    }
+
+    const Statistics & getStats() const &
+    {
+        return stats;
+    }
+
+private:
+    Statistics stats;
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -312,6 +369,8 @@ public:
     const EvalSettings & settings;
     SymbolTable symbols;
     PosTable positions;
+
+    EvalMemory mem;
 
     /**
      * If set, force copying files to the Nix store even if they
@@ -442,18 +501,6 @@ private:
      */
     std::shared_ptr<RegexCache> regexCache;
 
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
-
 public:
 
     EvalState(
@@ -463,6 +510,15 @@ public:
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    /**
+     * A wrapper around EvalMemory::allocValue() to avoid code churn when it
+     * was introduced.
+     */
+    inline Value * allocValue()
+    {
+        return mem.allocValue();
+    }
 
     LookupPath getLookupPath()
     {
@@ -840,22 +896,14 @@ public:
      */
     void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
-    /**
-     * Allocation primitives.
-     */
-    inline Value * allocValue();
-    inline Env & allocEnv(size_t size);
-
-    Bindings * allocBindings(size_t capacity);
-
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity), capacity);
+        return mem.buildBindings(symbols, capacity);
     }
 
     ListBuilder buildList(size_t size)
     {
-        return ListBuilder(*this, size);
+        return mem.buildList(size);
     }
 
     /**
@@ -972,13 +1020,7 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    Counter nrEnvs;
-    Counter nrValuesInEnvs;
-    Counter nrValues;
-    Counter nrListElems;
     Counter nrLookups;
-    Counter nrAttrsets;
-    Counter nrAttrsInAttrsets;
     Counter nrAvoided;
     Counter nrOpUpdates;
     Counter nrOpUpdateValuesCopied;

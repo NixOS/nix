@@ -194,6 +194,15 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 
 static constexpr size_t BASE_ENV_SIZE = 128;
 
+EvalMemory::EvalMemory()
+#if NIX_USE_BOEHMGC
+    : valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+#endif
+{
+    assertGCInitialized();
+}
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -267,12 +276,10 @@ EvalState::EvalState(
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
-    , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
+    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
 #else
-    , baseEnv(allocEnv(BASE_ENV_SIZE))
+    , baseEnv(mem.allocEnv(BASE_ENV_SIZE))
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
@@ -280,8 +287,6 @@ EvalState::EvalState(
     internalFS->setPathDisplay("«nix-internal»", "");
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
-
-    assertGCInitialized();
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
     static_assert(sizeof(Counter) == 64, "counters must be 64 bytes");
@@ -878,11 +883,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-ListBuilder::ListBuilder(EvalState & state, size_t size)
+ListBuilder::ListBuilder(size_t size)
     : size(size)
     , elems(size <= 2 ? inlineElems : (Value **) allocBytes(size * sizeof(Value *)))
 {
-    state.nrListElems += size;
 }
 
 Value * EvalState::getBool(bool b)
@@ -1176,7 +1180,7 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
 {
-    Env & inheritEnv = state.allocEnv(inheritFromExprs->size());
+    Env & inheritEnv = state.mem.allocEnv(inheritFromExprs->size());
     inheritEnv.up = &up;
 
     Displacement displ = 0;
@@ -1195,7 +1199,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size()));
+        Env & env2(state.mem.allocEnv(attrs.size()));
         env2.up = &env;
         dynamicEnv = &env2;
         Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
@@ -1287,7 +1291,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size()));
+    Env & env2(state.mem.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
     Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, env2) : nullptr;
@@ -1493,7 +1497,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             ExprLambda & lambda(*vCur.lambda().fun);
 
             auto size = (!lambda.arg ? 0 : 1) + (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
-            Env & env2(allocEnv(size));
+            Env & env2(mem.allocEnv(size));
             env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
@@ -1782,7 +1786,7 @@ https://nix.dev/manual/nix/stable/language/syntax.html#functions.)",
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    Env & env2(state.allocEnv(1));
+    Env & env2(state.mem.allocEnv(1));
     env2.up = &env;
     env2.values[0] = attrs->maybeThunk(state, env);
 
@@ -2909,10 +2913,12 @@ void EvalState::printStatistics()
     std::chrono::microseconds cpuTimeDuration = getCpuUserTime();
     float cpuTime = std::chrono::duration_cast<std::chrono::duration<float>>(cpuTimeDuration).count();
 
-    uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
-    uint64_t bLists = nrListElems * sizeof(Value *);
-    uint64_t bValues = nrValues * sizeof(Value);
-    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+    auto & memstats = mem.getStats();
+
+    uint64_t bEnvs = memstats.nrEnvs * sizeof(Env) + memstats.nrValuesInEnvs * sizeof(Value *);
+    uint64_t bLists = memstats.nrListElems * sizeof(Value *);
+    uint64_t bValues = memstats.nrValues * sizeof(Value);
+    uint64_t bAttrsets = memstats.nrAttrsets * sizeof(Bindings) + memstats.nrAttrsInAttrsets * sizeof(Attr);
 
 #if NIX_USE_BOEHMGC
     GC_word heapSize, totalBytes;
@@ -2938,18 +2944,18 @@ void EvalState::printStatistics()
 #endif
     };
     topObj["envs"] = {
-        {"number", nrEnvs.load()},
-        {"elements", nrValuesInEnvs.load()},
+        {"number", memstats.nrEnvs.load()},
+        {"elements", memstats.nrValuesInEnvs.load()},
         {"bytes", bEnvs},
     };
     topObj["nrExprs"] = Expr::nrExprs.load();
     topObj["list"] = {
-        {"elements", nrListElems.load()},
+        {"elements", memstats.nrListElems.load()},
         {"bytes", bLists},
         {"concats", nrListConcats.load()},
     };
     topObj["values"] = {
-        {"number", nrValues.load()},
+        {"number", memstats.nrValues.load()},
         {"bytes", bValues},
     };
     topObj["symbols"] = {
@@ -2957,9 +2963,9 @@ void EvalState::printStatistics()
         {"bytes", symbols.totalSize()},
     };
     topObj["sets"] = {
-        {"number", nrAttrsets.load()},
+        {"number", memstats.nrAttrsets.load()},
         {"bytes", bAttrsets},
-        {"elements", nrAttrsInAttrsets.load()},
+        {"elements", memstats.nrAttrsInAttrsets.load()},
     };
     topObj["sizes"] = {
         {"Env", sizeof(Env)},
