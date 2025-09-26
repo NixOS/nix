@@ -217,11 +217,14 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN_KW expr_function
-    { if (!$2->dynamicAttrs.empty())
+    { if (!$2->dynamicAttrs.empty()) {
+        delete $2;
+        delete $4;
         throw ParseError({
             .msg = HintFmt("dynamic attributes not allowed in let"),
             .pos = state->positions[CUR_POS]
         });
+      }
       $$ = new ExprLet($2, $4);
     }
   | expr_if
@@ -458,11 +461,13 @@ attrs
       if (str) {
           $$->emplace_back(AttrName(state->symbols.create(str->s)), state->at(@2));
           delete str;
-      } else
+      } else {
+          delete $2;
           throw ParseError({
               .msg = HintFmt("dynamic attributes not allowed in inherit"),
               .pos = state->positions[state->at(@2)]
           });
+      }
     }
   | { $$ = new std::vector<std::pair<AttrName, PosIdx>>; }
   ;
