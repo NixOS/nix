@@ -76,9 +76,14 @@ std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
 }
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
-    const StorePath & drvPath, const Derivation & drv, const OutputName & wantedOutput, BuildMode buildMode)
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    BuildMode buildMode,
+    bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode);
+    return initGoalIfNeeded(
+        derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<DerivationResolutionGoal>
@@ -87,10 +92,10 @@ Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation
     return initGoalIfNeeded(derivationResolutionGoals[drvPath], drvPath, drv, *this, buildMode);
 }
 
-std::shared_ptr<DerivationBuildingGoal>
-Worker::makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
+    const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode);
+    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<PathSubstitutionGoal>
