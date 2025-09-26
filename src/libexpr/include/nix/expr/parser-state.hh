@@ -296,7 +296,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         }
     }
     if (atStartOfLine)
-        finalBlankLine = curIndent + 1; // include '\n'
+        finalBlankLine = curIndent;
 
     /* Strip spaces from each line. */
     auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
