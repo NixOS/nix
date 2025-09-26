@@ -237,7 +237,8 @@ struct ValueBase
     struct SmallString
     {
         static constexpr size_t size = ptrSize * 2 - (useBitPackedValueStorage<ptrSize> ? 1 : 0);
-        char small_str[size];
+        using SmallStr = std::array<char, size>;
+        SmallStr small_str;
     };
 
     struct Path
@@ -423,7 +424,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     };
 
     using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
-    using Payload = PackedPointer[2];
+    using Payload = std::array<PackedPointer, 2>;
     Payload payload = {};
 
     static constexpr int discriminatorBits = 3;
@@ -517,11 +518,11 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     }
 
     template<PrimaryDiscriminator discriminator>
-    void setLastByteTaggedPayload(char * bytes) noexcept
+    void setSmallStrPayload(SmallString::SmallStr s) noexcept
     {
         static_assert(discriminator == pdSmallString);
-        memcpy(reinterpret_cast<char *>(payload) + small_string_payload_start, bytes, 15);
-        reinterpret_cast<char *>(payload)[small_string_pd_byte] = static_cast<char>(discriminator);
+        memcpy(reinterpret_cast<char *>(payload.data()) + small_string_payload_start, s.data(), SmallString::size);
+        reinterpret_cast<char *>(payload.data())[small_string_pd_byte] = static_cast<char>(discriminator);
     }
 
     template<InternalType type, typename T, typename U>
@@ -702,7 +703,7 @@ protected:
 
     void setStorage(SmallString string) noexcept
     {
-        setLastByteTaggedPayload<pdSmallString>(string.small_str);
+        setSmallStrPayload<pdSmallString>(string.small_str);
     }
 
     void setStorage(Path path) noexcept
@@ -1074,10 +1075,15 @@ public:
     {
         size_t s_length = s.length();
         assert(s_length < SmallString::size);
-        SmallString sswc{.small_str = {},};
-        s.copy(sswc.small_str, s_length);
-        sswc.small_str[s_length] = '\0';
-        setStorage(sswc);
+        SmallString::SmallStr ss{};
+        s.copy(ss.data(), s_length);
+        ss[s_length] = '\0';
+        mkStringSmall(ss);
+    }
+
+    void mkStringSmall(SmallString::SmallStr s) noexcept
+    {
+        setStorage(SmallString{ .small_str = s});
     }
 
     void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
