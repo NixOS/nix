@@ -106,18 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/dump-db\.sh$''
-              ''^tests/functional/fetchGitSubmodules\.sh$''
-              ''^tests/functional/fetchGitVerification\.sh$''
-              ''^tests/functional/fetchMercurial\.sh$''
-              ''^tests/functional/fixed\.builder1\.sh$''
-              ''^tests/functional/fixed\.builder2\.sh$''
-              ''^tests/functional/fixed\.sh$''
-              ''^tests/functional/flakes/absolute-paths\.sh$''
-              ''^tests/functional/flakes/check\.sh$''
-              ''^tests/functional/flakes/config\.sh$''
-              ''^tests/functional/flakes/flakes\.sh$''
-              ''^tests/functional/flakes/follow-paths\.sh$''
               ''^tests/functional/flakes/prefetch\.sh$''
               ''^tests/functional/flakes/run\.sh$''
               ''^tests/functional/flakes/show\.sh$''
@@ -203,10 +191,6 @@
               ''^tests/functional/user-envs\.builder\.sh$''
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
-
-              # Shellcheck doesn't support fish or zsh shell syntax
-              ''^misc/fish/completion\.fish$''
-              ''^misc/zsh/completion\.zsh$''
 
               # Content-addressed test files that use recursive-*looking* sourcing
               # (cd .. && source <self>), causing shellcheck to loop
