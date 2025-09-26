@@ -825,7 +825,10 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 
 void Value::mkString(std::string_view s)
 {
-    mkStringNoCopy(makeImmutableString(s));
+    if (s.length() < SmallString::size)
+        mkStringSmall(s);
+    else
+        mkStringNoCopy(makeImmutableString(s));
 }
 
 static const char ** encodeContext(const NixStringContext & context)
