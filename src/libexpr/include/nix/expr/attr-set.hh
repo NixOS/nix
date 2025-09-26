@@ -13,7 +13,7 @@
 
 namespace nix {
 
-class EvalState;
+class EvalMemory;
 struct Value;
 
 /**
@@ -426,7 +426,7 @@ public:
         return res;
     }
 
-    friend class EvalState;
+    friend class EvalMemory;
 };
 
 static_assert(std::forward_iterator<Bindings::iterator>);
@@ -448,12 +448,13 @@ private:
     Bindings * bindings;
     Bindings::size_type capacity_;
 
-    friend class EvalState;
+    friend class EvalMemory;
 
-    BindingsBuilder(EvalState & state, Bindings * bindings, size_type capacity)
+    BindingsBuilder(EvalMemory & mem, SymbolTable & symbols, Bindings * bindings, size_type capacity)
         : bindings(bindings)
         , capacity_(capacity)
-        , state(state)
+        , mem(mem)
+        , symbols(symbols)
     {
     }
 
@@ -471,7 +472,8 @@ private:
     }
 
 public:
-    std::reference_wrapper<EvalState> state;
+    std::reference_wrapper<EvalMemory> mem;
+    std::reference_wrapper<SymbolTable> symbols;
 
     void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {

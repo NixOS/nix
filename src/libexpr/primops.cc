@@ -262,7 +262,7 @@ static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path,
 {
     state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
 
-    Env * env = &state.allocEnv(vScope->attrs()->size());
+    Env * env = &state.mem.allocEnv(vScope->attrs()->size());
     env->up = &state.baseEnv;
 
     auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv, vScope->attrs()->size());
@@ -3161,7 +3161,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
     // Step 1. Sort the name-value attrsets in place using the memory we allocate for the result
     auto listView = args[0]->listView();
     size_t listSize = listView.size();
-    auto & bindings = *state.allocBindings(listSize);
+    auto & bindings = *state.mem.allocBindings(listSize);
     using ElemPtr = decltype(&bindings[0].value);
 
     for (const auto & [n, v2] : enumerate(listView)) {
