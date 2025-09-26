@@ -194,23 +194,42 @@ expr_function
       SET_DOC_POS(me, @1);
     }
   | formal_set ':' expr_function[body]
-    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
-      $$ = me;
-      SET_DOC_POS(me, @1);
+    {
+      try {
+        auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
+        $$ = me;
+        SET_DOC_POS(me, @1);
+      } catch (...) {
+        delete $formal_set;
+        delete $body;
+        throw;
+      }
     }
   | formal_set '@' ID ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
-      $$ = me;
-      SET_DOC_POS(me, @1);
+      try {
+        auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+        $$ = me;
+        SET_DOC_POS(me, @1);
+      } catch (...) {
+        delete $formal_set;
+        delete $body;
+        throw;
+      }
     }
   | ID '@' formal_set ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
-      $$ = me;
-      SET_DOC_POS(me, @1);
+      try {
+        auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+        $$ = me;
+        SET_DOC_POS(me, @1);
+      } catch (...) {
+        delete $formal_set;
+        delete $body;
+        throw;
+      }
     }
   | ASSERT expr ';' expr_function
     { $$ = new ExprAssert(CUR_POS, $2, $4); }
@@ -414,17 +433,27 @@ binds
 binds1
   : binds1[accum] attrpath '=' expr ';'
     { $$ = $accum;
-      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      try {
+        state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      } catch (...) {
+        delete $attrpath;
+        throw;
+      }
       delete $attrpath;
     }
   | binds[accum] INHERIT attrs ';'
     { $$ = $accum;
-      for (auto & [i, iPos] : *$attrs) {
-          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
-              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
-          $accum->attrs.emplace(
-              i.symbol,
-              ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
+      try {
+        for (auto & [i, iPos] : *$attrs) {
+            if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+                state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+            $accum->attrs.emplace(
+                i.symbol,
+                ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
+        }
+      } catch (...) {
+        delete $attrs;
+        throw;
       }
       delete $attrs;
     }
@@ -434,21 +463,33 @@ binds1
           $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
       $accum->inheritFromExprs->push_back($expr);
       auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
-      for (auto & [i, iPos] : *$attrs) {
-          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
-              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
-          $accum->attrs.emplace(
-              i.symbol,
-              ExprAttrs::AttrDef(
-                  new ExprSelect(iPos, from, i.symbol),
-                  iPos,
-                  ExprAttrs::AttrDef::Kind::InheritedFrom));
+      try {
+        for (auto & [i, iPos] : *$attrs) {
+            if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
+                state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
+            $accum->attrs.emplace(
+                i.symbol,
+                ExprAttrs::AttrDef(
+                    new ExprSelect(iPos, from, i.symbol),
+                    iPos,
+                    ExprAttrs::AttrDef::Kind::InheritedFrom));
+        }
+      } catch (...) {
+        delete from;
+        delete $attrs;
+        throw;
       }
       delete $attrs;
     }
   | attrpath '=' expr ';'
     { $$ = new ExprAttrs;
-      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      try {
+        state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      } catch (...) {
+        delete $$;
+        delete $attrpath;
+        throw;
+      }
       delete $attrpath;
     }
   ;
