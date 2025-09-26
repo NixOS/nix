@@ -310,9 +310,9 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
     MACRO(NixFloat, fpoint, tFloat)
-    // small string is accessed as though it is an ordinary string, so it must be handled specially
-    // MACRO(ValueBase::StringWithContext, string, tString)
-    // MACRO(ValueBase::SmallString, smallString, tSmallString)
+// small string is accessed as though it is an ordinary string, so it must be handled specially
+// MACRO(ValueBase::StringWithContext, string, tString)
+// MACRO(ValueBase::SmallString, smallString, tSmallString)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
     template<>                                               \
@@ -375,8 +375,7 @@ protected:
         else if (internalType == tSmallString) {
             val.context = nullptr;
             val.c_str = payload.smallString.small_str;
-        }
-        else
+        } else
             unreachable();
     }
 
@@ -476,8 +475,9 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         pdListN, //< layout: Single untaggable field.
         pdString,
         pdPath,
-        // in some sense this is a different layout, but it's still tagged in the same place, so it could be lumped in with the types above
-        pdSmallString, //< layout: first 15 bytes occupied, last byte free.
+        // in some sense this is a different layout, but it's still tagged in the same place, so it could be lumped in
+        // with the types above
+        pdSmallString,    //< layout: first 15 bytes occupied, last byte free.
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
 
@@ -640,8 +640,7 @@ protected:
         if (getInternalType() == tSmallString) {
             string.context = nullptr;
             string.c_str = &reinterpret_cast<const char *>(this)[small_string_payload_start];
-        }
-        else if (getInternalType() == tString) {
+        } else if (getInternalType() == tString) {
             string.context = untagPointer<decltype(string.context)>(payload[primaryIdx]);
             string.c_str = std::bit_cast<const char *>(payload[secondaryIdx]);
         }
@@ -954,7 +953,8 @@ private:
         return out;
     }
 
-    // You should probably be accessing SmallString via getStorage<StringWithContext>() above, which does the appropriate conversion
+    // You should probably be accessing SmallString via getStorage<StringWithContext>() above, which does the
+    // appropriate conversion
     template<>
     SmallString getStorage() const noexcept = delete;
 
@@ -1083,7 +1083,7 @@ public:
 
     void mkStringSmall(SmallString::SmallStr s) noexcept
     {
-        setStorage(SmallString{ .small_str = s});
+        setStorage(SmallString{.small_str = s});
     }
 
     void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
