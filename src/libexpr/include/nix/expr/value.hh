@@ -49,6 +49,8 @@ typedef enum {
     tListN,
     tString,
     tPath,
+    /* layout: 15 bytes untaggable, with one byte (beginning or end depending on endianness) for the tag */
+    tSmallString,
 } InternalType;
 
 /**
@@ -223,6 +225,12 @@ struct ValueBase
         const char ** context; // must be in sorted order
     };
 
+    struct SmallString
+    {
+        static constexpr size_t size = 15;
+        char small_str[size];
+    };
+
     struct Path
     {
         SourceAccessor * accessor;
@@ -281,6 +289,7 @@ struct PayloadTypeToInternalType
     MACRO(NixInt, integer, tInt)                                    \
     MACRO(bool, boolean, tBool)                                     \
     MACRO(ValueBase::StringWithContext, string, tString)            \
+    MACRO(ValueBase::SmallString, smallString, tSmallString)        \
     MACRO(ValueBase::Path, path, tPath)                             \
     MACRO(ValueBase::Null, null_, tNull)                            \
     MACRO(Bindings *, attrs, tAttrs)                                \
@@ -372,6 +381,8 @@ namespace detail {
 template<std::size_t ptrSize>
 inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEFAULT_NEW_ALIGNMENT__ >= 16);
 
+static constexpr bool little_endian = std::endian::native == std::endian::little;
+
 } // namespace detail
 
 /**
@@ -395,11 +406,21 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     };
 
     using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
-    using Payload = std::array<PackedPointer, 2>;
+    using Payload = PackedPointer[2];
     Payload payload = {};
 
     static constexpr int discriminatorBits = 3;
     static constexpr PackedPointer discriminatorMask = (PackedPointer(1) << discriminatorBits) - 1;
+
+    // We store the pd tag in payload[primryIdx], and the rest of the info in
+    // payload[scndryIdx] if necessary. This depends on the endianness of the
+    // system so that we can store a string contiguously in the same memory,
+    // considered as bytes.
+    static constexpr size_t primaryIdx = detail::little_endian ? 0 : 1;
+    static constexpr size_t secondaryIdx = detail::little_endian ? 1 : 0;
+
+    static constexpr size_t small_string_pd_byte = detail::little_endian ? 0 : 15;
+    static constexpr size_t small_string_payload_start = detail::little_endian ? 1 : 0;
 
     /**
      * The value is stored as a pair of 8-byte double words. All pointers are assumed
@@ -422,10 +443,10 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
      * be aligned.
      *
      * In this case we reserve their discriminators directly in the PrimaryDiscriminator
-     * bits stored in payload[0].
+     * bits stored in payload[primaryIdx].
      *
      * PrimaryDiscriminator::pdPairOfPointers - Payloads that consist of a pair of pointers.
-     * In this case the 3 lower bits of payload[1] can be tagged.
+     * In this case the 3 lower bits of payload[secondaryIdx] can be tagged.
      *
      * The primary discriminator with value 0 is reserved for uninitialized Values,
      * which are useful for diagnostics in C bindings.
@@ -437,6 +458,8 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         pdListN, //< layout: Single untaggable field.
         pdString,
         pdPath,
+        // in some sense this is a different layout, but it's still tagged in the same place, so it could be lumped in with the types above
+        pdSmallString, //< layout: first 15 bytes occupied, last byte free.
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
 
@@ -449,7 +472,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
 
     PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
     {
-        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+        return static_cast<PrimaryDiscriminator>(payload[primaryIdx] & discriminatorMask);
     }
 
     static void assertAligned(PackedPointer val) noexcept
@@ -462,42 +485,50 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     {
         /* There's plenty of free upper bits in the first dword, which is
            used only for the discriminator. */
-        payload[0] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
-        payload[1] = untaggedVal;
+        payload[primaryIdx] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
+        payload[secondaryIdx] = untaggedVal;
     }
 
     template<PrimaryDiscriminator discriminator, typename T, typename U>
-    void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
+    void setUntaggablePayload(T * ptrField, U untaggableField) noexcept
     {
         static_assert(discriminator >= pdListN && discriminator <= pdPath);
-        auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
-        assertAligned(firstFieldPayload);
-        payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
-        payload[1] = std::bit_cast<PackedPointer>(untaggableField);
+        auto fieldPayload = std::bit_cast<PackedPointer>(ptrField);
+        assertAligned(fieldPayload);
+        payload[primaryIdx] = static_cast<int>(discriminator) | fieldPayload;
+        payload[secondaryIdx] = std::bit_cast<PackedPointer>(untaggableField);
+    }
+
+    template<PrimaryDiscriminator discriminator>
+    void setLastByteTaggedPayload(char * bytes) noexcept
+    {
+        static_assert(discriminator == pdSmallString);
+        memcpy(reinterpret_cast<char *>(payload) + small_string_payload_start, bytes, 15);
+        reinterpret_cast<char *>(payload)[small_string_pd_byte] = static_cast<char>(discriminator);
     }
 
     template<InternalType type, typename T, typename U>
-    void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
+    void setPairOfPointersPayload(T * primaryPtrField, U * secondaryPtrField) noexcept
     {
         static_assert(type >= tListSmall && type <= tLambda);
         {
-            auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
-            assertAligned(firstFieldPayload);
-            payload[0] = static_cast<int>(pdPairOfPointers) | firstFieldPayload;
+            auto primaryFieldPayload = std::bit_cast<PackedPointer>(primaryPtrField);
+            assertAligned(primaryFieldPayload);
+            payload[primaryIdx] = static_cast<int>(pdPairOfPointers) | primaryFieldPayload;
         }
         {
-            auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
-            assertAligned(secondFieldPayload);
-            payload[1] = (type - tListSmall) | secondFieldPayload;
+            auto secondaryFieldPayload = std::bit_cast<PackedPointer>(secondaryPtrField);
+            assertAligned(secondaryFieldPayload);
+            payload[secondaryIdx] = (type - tListSmall) | secondaryFieldPayload;
         }
     }
 
     template<typename T, typename U>
         requires std::is_pointer_v<T> && std::is_pointer_v<U>
-    void getPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
+    void getPairOfPointersPayload(T & primaryPtrField, U & secondaryPtrField) const noexcept
     {
-        firstPtrField = untagPointer<T>(payload[0]);
-        secondPtrField = untagPointer<U>(payload[1]);
+        primaryPtrField = untagPointer<T>(payload[primaryIdx]);
+        secondaryPtrField = untagPointer<U>(payload[secondaryIdx]);
     }
 
 protected:
@@ -510,15 +541,17 @@ protected:
             return tUninitialized;
         case pdSingleDWord:
             /* Payloads that only use up a single double word store the InternalType
-               in the upper bits of the first double word. */
-            return InternalType(payload[0] >> discriminatorBits);
+               in the upper bits of the second double word. */
+            return InternalType(payload[primaryIdx] >> discriminatorBits);
         /* The order must match that of the enumerations defined in InternalType. */
         case pdListN:
         case pdString:
         case pdPath:
             return static_cast<InternalType>(tListN + (pd - pdListN));
+        case pdSmallString:
+            return tSmallString;
         case pdPairOfPointers:
-            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
+            return static_cast<InternalType>(tListSmall + (payload[secondaryIdx] & discriminatorMask));
         [[unlikely]] default:
             unreachable();
         }
@@ -548,52 +581,61 @@ protected:
     {
         /* PackedPointerType -> int64_t here is well-formed, since the standard requires
            this conversion to follow 2's complement rules. This is just a no-op. */
-        integer = NixInt(payload[1]);
+        integer = NixInt(payload[secondaryIdx]);
     }
 
     void getStorage(bool & boolean) const noexcept
     {
-        boolean = payload[1];
+        boolean = payload[secondaryIdx];
     }
 
     void getStorage(Null & null) const noexcept {}
 
     void getStorage(NixFloat & fpoint) const noexcept
     {
-        fpoint = std::bit_cast<NixFloat>(payload[1]);
+        fpoint = std::bit_cast<NixFloat>(payload[secondaryIdx]);
     }
 
     void getStorage(ExternalValueBase *& external) const noexcept
     {
-        external = std::bit_cast<ExternalValueBase *>(payload[1]);
+        external = std::bit_cast<ExternalValueBase *>(payload[secondaryIdx]);
     }
 
     void getStorage(PrimOp *& primOp) const noexcept
     {
-        primOp = std::bit_cast<PrimOp *>(payload[1]);
+        primOp = std::bit_cast<PrimOp *>(payload[secondaryIdx]);
     }
 
     void getStorage(Bindings *& attrs) const noexcept
     {
-        attrs = std::bit_cast<Bindings *>(payload[1]);
+        attrs = std::bit_cast<Bindings *>(payload[secondaryIdx]);
     }
 
     void getStorage(List & list) const noexcept
     {
-        list.elems = untagPointer<decltype(list.elems)>(payload[0]);
-        list.size = payload[1];
+        list.elems = untagPointer<decltype(list.elems)>(payload[primaryIdx]);
+        list.size = payload[secondaryIdx];
     }
 
     void getStorage(StringWithContext & string) const noexcept
     {
-        string.context = untagPointer<decltype(string.context)>(payload[0]);
-        string.c_str = std::bit_cast<const char *>(payload[1]);
+        if (getInternalType() == tSmallString) {
+            string.context = nullptr;
+            string.c_str = &reinterpret_cast<const char *>(this)[small_string_payload_start];
+        }
+        else if (getInternalType() == tString) {
+            string.context = untagPointer<decltype(string.context)>(payload[primaryIdx]);
+            string.c_str = std::bit_cast<const char *>(payload[secondaryIdx]);
+        }
     }
+
+    // Intentionally not included. Access through getStorage(StringWithContext &) above
+    void getStorage(SmallString & string) const noexcept = delete;
 
     void getStorage(Path & path) const noexcept
     {
-        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
-        path.path = std::bit_cast<const char *>(payload[1]);
+        path.accessor = untagPointer<decltype(path.accessor)>(payload[primaryIdx]);
+        path.path = std::bit_cast<const char *>(payload[secondaryIdx]);
     }
 
     void setStorage(NixInt integer) noexcept
@@ -639,6 +681,11 @@ protected:
     void setStorage(StringWithContext string) noexcept
     {
         setUntaggablePayload<pdString>(string.context, string.c_str);
+    }
+
+    void setStorage(SmallString string) noexcept
+    {
+        setLastByteTaggedPayload<pdSmallString>(string.small_str);
     }
 
     void setStorage(Path path) noexcept
@@ -879,6 +926,20 @@ private:
         return out;
     }
 
+    template<>
+    StringWithContext getStorage() const noexcept
+    {
+        if (getInternalType() != tSmallString && getInternalType() != tString)
+            unreachable();
+        StringWithContext out;
+        ValueStorage::getStorage(out);
+        return out;
+    }
+
+    // You should probably be accessing SmallString via getStorage<StringWithContext>() above, which does the appropriate conversion
+    template<>
+    SmallString getStorage() const noexcept = delete;
+
 public:
 
     /**
@@ -938,6 +999,7 @@ public:
         case tBool:
             return nBool;
         case tString:
+        case tSmallString:
             return nString;
         case tPath:
             return nPath;
@@ -989,6 +1051,16 @@ public:
     inline void mkBool(bool b) noexcept
     {
         setStorage(b);
+    }
+
+    void mkStringSmall(std::string_view s) noexcept
+    {
+        size_t s_length = s.length();
+        assert(s_length < SmallString::size);
+        SmallString sswc{.small_str = {},};
+        s.copy(sswc.small_str, s_length);
+        sswc.small_str[s_length] = '\0';
+        setStorage(sswc);
     }
 
     void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
