@@ -182,17 +182,23 @@ struct ExprString : Expr
 {
     Value v;
 
-    // This is only for strings already allocated in our polymorphic allocator
-    ExprString(char * s)
+    // This is only for strings already allocated in our polymorphic allocator,
+    // or that live at least that long (e.g. c++ string literals)
+    ExprString(const char * s)
     {
         v.mkStringNoCopy(s);
     };
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
-        char * s = alloc.allocate(sv.length() + 1);
-        sv.copy(s, sv.length());
-        s[sv.length()] = '\0';
+        auto len = sv.length();
+        if (len == 0) {
+            v.mkStringNoCopy("");
+            return;
+        }
+        char * s = alloc.allocate(len + 1);
+        sv.copy(s, len);
+        s[len] = '\0';
         v.mkStringNoCopy(s);
     };
 
