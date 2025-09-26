@@ -145,7 +145,7 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
     /* Build this step! */
 
     for (auto & output : resolvedWantedOutputs) {
-        auto g = upcast_goal(worker.makeDerivationGoal(drvPath, drv, output, buildMode));
+        auto g = upcast_goal(worker.makeDerivationGoal(drvPath, drv, output, buildMode, false));
         g->preserveException = true;
         /* We will finish with it ourselves, as if we were the derivational goal. */
         concreteDrvGoals.insert(std::move(g));

@@ -217,7 +217,11 @@ public:
         const StorePath & drvPath, const OutputsSpec & wantedOutputs, const Derivation & drv, BuildMode buildMode);
 
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
-        const StorePath & drvPath, const Derivation & drv, const OutputName & wantedOutput, BuildMode buildMode);
+        const StorePath & drvPath,
+        const Derivation & drv,
+        const OutputName & wantedOutput,
+        BuildMode buildMode,
+        bool storeDerivation);
 
     /**
      * @ref DerivationResolutionGoal "derivation resolution goal"
@@ -228,8 +232,8 @@ public:
     /**
      * @ref DerivationBuildingGoal "derivation building goal"
      */
-    std::shared_ptr<DerivationBuildingGoal>
-    makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode);
+    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"

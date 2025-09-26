@@ -30,8 +30,9 @@ DerivationGoal::DerivationGoal(
     const Derivation & drv,
     const OutputName & wantedOutput,
     Worker & worker,
-    BuildMode buildMode)
-    : Goal(worker, haveDerivation())
+    BuildMode buildMode,
+    bool storeDerivation)
+    : Goal(worker, haveDerivation(storeDerivation))
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
     , drv{std::make_unique<Derivation>(drv)}
@@ -59,7 +60,7 @@ std::string DerivationGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co DerivationGoal::haveDerivation()
+Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
@@ -153,11 +154,8 @@ Goal::Co DerivationGoal::haveDerivation()
     if (resolutionGoal->resolvedDrv) {
         auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
 
-        /* Store the resolved derivation, as part of the record of
-           what we're actually building */
-        writeDerivation(worker.store, drvResolved);
-
-        auto resolvedDrvGoal = worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode);
+        auto resolvedDrvGoal =
+            worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode, /*storeDerivation=*/true);
         {
             Goals waitees{resolvedDrvGoal};
             co_await await(std::move(waitees));
@@ -233,7 +231,7 @@ Goal::Co DerivationGoal::haveDerivation()
 
     /* Give up on substitution for the output we want, actually build this derivation */
 
-    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode);
+    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode, storeDerivation);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
     g->preserveException = true;
