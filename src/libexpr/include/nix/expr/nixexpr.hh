@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <memory_resource>
 
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
