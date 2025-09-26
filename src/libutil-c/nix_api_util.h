@@ -114,6 +114,24 @@ enum nix_err {
 typedef enum nix_err nix_err;
 
 /**
+ * @brief Verbosity level
+ *
+ * @note This should be kept in sync with the C++ implementation (nix::Verbosity)
+ */
+enum nix_verbosity {
+    NIX_LVL_ERROR = 0,
+    NIX_LVL_WARN,
+    NIX_LVL_NOTICE,
+    NIX_LVL_INFO,
+    NIX_LVL_TALKATIVE,
+    NIX_LVL_CHATTY,
+    NIX_LVL_DEBUG,
+    NIX_LVL_VOMIT,
+};
+
+typedef enum nix_verbosity nix_verbosity;
+
+/**
  * @brief This object stores error state.
  * @struct nix_c_context
  *
@@ -326,6 +344,14 @@ nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
  * This failure can be avoided by clearing the error message after handling it.
  */
 void nix_clear_err(nix_c_context * context);
+
+/**
+ * @brief Sets the verbosity level
+ *
+ * @param[out] context Optional, additional error context.
+ * @param[in] level Verbosity level
+ */
+nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level);
 
 /**
  *  @}
