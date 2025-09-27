@@ -9,6 +9,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include "nix/util/comparator.hh"
 #include "nix/util/signature/signer.hh"
+#include "nix/util/std-hash.hh"
 
 namespace nix {
 
@@ -180,7 +181,25 @@ public:
     }
 };
 
+inline std::size_t hash_value(const DrvOutput & drvOutput)
+{
+    std::size_t hash = std::hash<nix::Hash>{}(drvOutput.drvHash);
+    nix::hash_combine(hash, std::hash<std::string>{}(drvOutput.outputName));
+    return hash;
+}
+
 } // namespace nix
+
+template<>
+struct std::hash<nix::DrvOutput>
+{
+    using is_avalanching = std::true_type;
+
+    std::size_t operator()(const nix::DrvOutput & s) const noexcept
+    {
+        return nix::hash_value(s);
+    }
+};
 
 JSON_IMPL(nix::UnkeyedRealisation)
 JSON_IMPL(nix::Realisation)

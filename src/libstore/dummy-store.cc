@@ -3,6 +3,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store.hh"
+#include "nix/store/realisation.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -125,6 +126,13 @@ struct DummyStore : virtual Store
      * store object.
      */
     boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
+
+    /**
+     * The build trace maps the pair of a content-addressing (fixed or
+     * floating) derivations an one of its output to a
+     * (content-addressed) store object.
+     */
+    boost::concurrent_flat_map<DrvOutput, ref<UnkeyedRealisation>> buildTrace;
 
     /**
      * This view conceptually just borrows the file systems objects of
@@ -260,7 +268,7 @@ struct DummyStore : virtual Store
 
     void registerDrvOutput(const Realisation & output) override
     {
-        unsupported("registerDrvOutput");
+        buildTrace.insert({output.id, make_ref<UnkeyedRealisation>(output)});
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
@@ -276,9 +284,12 @@ struct DummyStore : virtual Store
     }
 
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
+        const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
-        callback(nullptr);
+        bool visited = buildTrace.cvisit(drvOutput, [&](const auto & kv) { callback(kv.second.get_ptr()); });
+
+        if (!visited)
+            callback(nullptr);
     }
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
