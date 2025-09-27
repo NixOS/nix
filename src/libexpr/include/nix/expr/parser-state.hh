@@ -82,6 +82,7 @@ struct LexerState
 struct ParserState
 {
     const LexerState & lexerState;
+    std::pmr::polymorphic_allocator<char> & alloc;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -253,11 +254,17 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     bool atStartOfLine = true; /* = seen only whitespace in the current line */
     size_t minIndent = 1000000;
     size_t curIndent = 0;
-    for (auto & [i_pos, i] : es) {
+    std::vector<int> nrIndentedLines(es.size(), 0);
+    std::vector<bool> perfectPreallocate(es.size(), true);
+    size_t finalBlankLine = 0;
+    for (const auto & [n, pair] : enumerate(es)) {
+        auto & [i_pos, i] = pair;
         auto * str = std::get_if<StringToken>(&i);
         if (!str || !str->hasIndentation) {
             /* Anti-quotations and escaped characters end the current start-of-line whitespace. */
             if (atStartOfLine) {
+                if (n > 0)
+                    nrIndentedLines[n - 1]++;
                 atStartOfLine = false;
                 if (curIndent < minIndent)
                     minIndent = curIndent;
@@ -269,10 +276,35 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
                 if (str->p[j] == ' ')
                     curIndent++;
                 else if (str->p[j] == '\n') {
+                    /* if curIndent is less than the current value of minIndent,
+                     * we can't calculate at this point how much indention we
+                     * will remove; we will just have to over-allocate later.
+                     * Fortunately in practice this shouldn't come up very much.
+                     * It would have to look like (with spaces replaced with
+                     * underscore for clarity)
+                     *
+                     * ''
+                     * ________only long indentations initially
+                     * ________more long indentations
+                     * ____
+                     * ^^ empty line with a shorter indentation
+                     * ____after that there can be shorter indentations
+                     * ''
+                     *
+                     * most empty lines will have no indentation, and those that
+                     * do will usually be of at least the minium indentation,
+                     * and come after a line with said minimum indentation, in
+                     * which case we can perfectly pre-allocate the string.
+                     */
+                    if (curIndent < minIndent)
+                        perfectPreallocate[n] = false;
+                    else
+                        nrIndentedLines[n]++;
                     /* Empty line, doesn't influence minimum
                        indentation. */
                     curIndent = 0;
                 } else {
+                    nrIndentedLines[n]++;
                     atStartOfLine = false;
                     if (curIndent < minIndent)
                         minIndent = curIndent;
@@ -283,12 +315,14 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
             }
         }
     }
+    if (atStartOfLine)
+        finalBlankLine = curIndent;
 
     /* Strip spaces from each line. */
     auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
     atStartOfLine = true;
     size_t curDropped = 0;
-    size_t n = es.size();
+    size_t n = 0;
     auto i = es.begin();
     const auto trimExpr = [&](Expr * e) {
         atStartOfLine = false;
@@ -296,41 +330,49 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         es2->emplace_back(i->first, e);
     };
     const auto trimString = [&](const StringToken & t) {
-        std::string s2;
-        for (size_t j = 0; j < t.l; ++j) {
+        auto finalLineTrim = n == es.size() - 1 ? finalBlankLine : 0;
+        /* try to pre-calculate exactly how big of a string we need. In weird
+         * rare cases we can't efficiently pre-calculate it and will end up
+         * over-allocating. See comment above.
+         */
+        size_t size = 1 + t.l - nrIndentedLines[n] * minIndent - finalLineTrim;
+        if (size == 1) // ignore empty strings before we allocate
+            return;
+        char * s2 = (char *) alloc.allocate(size);
+        size_t end = t.l - finalLineTrim;
+        size_t c = 0;
+        for (size_t j = 0; j < end; ++j) {
             if (atStartOfLine) {
                 if (t.p[j] == ' ') {
                     if (curDropped++ >= minIndent)
-                        s2 += t.p[j];
+                        s2[c++] = t.p[j];
                 } else if (t.p[j] == '\n') {
                     curDropped = 0;
-                    s2 += t.p[j];
+                    s2[c++] = t.p[j];
                 } else {
                     atStartOfLine = false;
                     curDropped = 0;
-                    s2 += t.p[j];
+                    s2[c++] = t.p[j];
                 }
             } else {
-                s2 += t.p[j];
+                s2[c++] = t.p[j];
                 if (t.p[j] == '\n')
                     atStartOfLine = true;
             }
         }
+        if (perfectPreallocate[n])
+            assert(c == size - 1);
+        else
+            assert(c < size);
+        // We should have caught empty strings before allocation. The only case
+        // in which we have to over-allocate is a case with an empty line, which
+        // is therefore not empty.
+        assert(c > 0);
+        s2[c] = '\0';
 
-        /* Remove the last line if it is empty and consists only of
-           spaces. */
-        if (n == 1) {
-            std::string::size_type p = s2.find_last_of('\n');
-            if (p != std::string::npos && s2.find_first_not_of(' ', p + 1) == std::string::npos)
-                s2 = std::string(s2, 0, p + 1);
-        }
-
-        // Ignore empty strings for a minor optimisation and AST simplification
-        if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(std::move(s2)));
-        }
+        es2->emplace_back(i->first, new ExprString(s2));
     };
-    for (; i != es.end(); ++i, --n) {
+    for (; i != es.end(); ++i, ++n) {
         std::visit(overloaded{trimExpr, trimString}, i->second);
     }
 
