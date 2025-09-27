@@ -2,6 +2,8 @@
 
 source ../common.sh
 
+export _NIX_TEST_BARF_ON_UNCACHEABLE=1
+
 # shellcheck disable=SC2034 # this variable is used by tests that source this file
 registry=$TEST_ROOT/registry.json
 

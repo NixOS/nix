@@ -24,21 +24,6 @@ using namespace flake;
 
 namespace flake {
 
-static StorePath copyInputToStore(
-    EvalState & state, fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor)
-{
-    auto storePath = fetchToStore(*input.settings, *state.store, accessor, FetchMode::Copy, input.getName());
-
-    state.allowPath(storePath);
-
-    auto narHash = state.store->queryPathInfo(storePath)->narHash;
-    input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
-
-    assert(!originalInput.getNarHash() || storePath == originalInput.computeStorePath(*state.store));
-
-    return storePath;
-}
-
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
     if (value.isThunk() && value.isTrivial())
@@ -360,11 +345,14 @@ static Flake getFlake(
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
 
-    // Copy the tree to the store.
-    auto storePath = copyInputToStore(state, lockedRef.input, originalRef.input, cachedInput.accessor);
-
     // Re-parse flake.nix from the store.
-    return readFlake(state, originalRef, resolvedRef, lockedRef, state.storePath(storePath), lockRootAttrPath);
+    return readFlake(
+        state,
+        originalRef,
+        resolvedRef,
+        lockedRef,
+        state.storePath(state.mountInput(lockedRef.input, originalRef.input, cachedInput.accessor)),
+        lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, fetchers::UseRegistries useRegistries)
@@ -721,11 +709,10 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
-                                    // FIXME: allow input to be lazy.
-                                    auto storePath = copyInputToStore(
-                                        state, lockedRef.input, input.ref->input, cachedInput.accessor);
-
-                                    return {state.storePath(storePath), lockedRef};
+                                    return {
+                                        state.storePath(
+                                            state.mountInput(lockedRef.input, input.ref->input, cachedInput.accessor)),
+                                        lockedRef};
                                 }
                             }();
 

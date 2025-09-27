@@ -27,9 +27,9 @@ nix build -o "$TEST_ROOT/result" "hg+file://$flake2Dir"
 
 (! nix flake metadata --json "hg+file://$flake2Dir" | jq -e -r .revision)
 
-nix eval "hg+file://$flake2Dir"#expr
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix eval "hg+file://$flake2Dir"#expr
 
-nix eval "hg+file://$flake2Dir"#expr
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix eval "hg+file://$flake2Dir"#expr
 
 (! nix eval "hg+file://$flake2Dir"#expr --no-allow-dirty)
 
