@@ -109,7 +109,7 @@ struct LegacySSHStore : public virtual Store
         unsupported("addToStore");
     }
 
-    virtual StorePath addToStoreFromDump(
+    StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
         FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
@@ -119,6 +119,11 @@ struct LegacySSHStore : public virtual Store
         RepairFlag repair = NoRepair) override
     {
         unsupported("addToStore");
+    }
+
+    void registerDrvOutput(const Realisation & output) override
+    {
+        unsupported("registerDrvOutput");
     }
 
 public:

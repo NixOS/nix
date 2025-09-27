@@ -258,6 +258,11 @@ struct DummyStore : virtual Store
         return path;
     }
 
+    void registerDrvOutput(const Realisation & output) override
+    {
+        unsupported("registerDrvOutput");
+    }
+
     void narFromPath(const StorePath & path, Sink & sink) override
     {
         bool visited = contents.cvisit(path, [&](const auto & kv) {
