@@ -869,14 +869,8 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
-}
-
-void NixRepl::evalString(std::string s, Value & v)
-{
-    Expr * e;
     try {
-        e = parseString(s);
+        return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
     } catch (ParseError & e) {
         if (e.msg().find("unexpected end of file") != std::string::npos)
             // For parse errors on incomplete input, we continue waiting for the next line of
@@ -885,6 +879,11 @@ void NixRepl::evalString(std::string s, Value & v)
         else
             throw;
     }
+}
+
+void NixRepl::evalString(std::string s, Value & v)
+{
+    Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
