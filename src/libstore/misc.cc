@@ -322,7 +322,7 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }},
         {[&](const StorePath & path, const StorePath & parent) {
             return BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "cycle detected in the references of '%s' from '%s'",
                 printStorePath(path),
                 printStorePath(parent));

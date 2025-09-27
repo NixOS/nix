@@ -22,7 +22,7 @@ struct BuilderFailureError : BuildError
 
     std::string extraMsgAfter;
 
-    BuilderFailureError(BuildResult::Status status, int builderStatus, std::string extraMsgAfter)
+    BuilderFailureError(BuildResult::Failure::Status status, int builderStatus, std::string extraMsgAfter)
         : BuildError{
             status,
               /* No message for now, because the caller will make for

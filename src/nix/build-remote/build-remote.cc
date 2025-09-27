@@ -324,7 +324,7 @@ static int main_build_remote(int argc, char ** argv)
                 drv.inputSrcs = store->parseStorePathSet(inputs);
             optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
             auto & result = *optResult;
-            if (!result.success()) {
+            if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {
                     warn(
                         "The failed build directory was kept on the remote builder due to `--keep-failed`.%s",
@@ -333,7 +333,7 @@ static int main_build_remote(int argc, char ** argv)
                             : "");
                 }
                 throw Error(
-                    "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, result.errorMsg);
+                    "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, failureP->errorMsg);
             }
         } else {
             copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);
@@ -357,11 +357,14 @@ static int main_build_remote(int argc, char ** argv)
                     debug("missing output %s", outputName);
                     assert(optResult);
                     auto & result = *optResult;
-                    auto i = result.builtOutputs.find(outputName);
-                    assert(i != result.builtOutputs.end());
-                    auto & newRealisation = i->second;
-                    missingRealisations.insert(newRealisation);
-                    missingPaths.insert(newRealisation.outPath);
+                    if (auto * successP = result.tryGetSuccess()) {
+                        auto & success = *successP;
+                        auto i = success.builtOutputs.find(outputName);
+                        assert(i != success.builtOutputs.end());
+                        auto & newRealisation = i->second;
+                        missingRealisations.insert(newRealisation);
+                        missingPaths.insert(newRealisation.outPath);
+                    }
                 }
             }
         } else {

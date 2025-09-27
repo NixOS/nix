@@ -127,17 +127,17 @@ VERSIONED_CHARACTERIZATION_TEST(
 VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2.2", 2 << 8 | 2, ({
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{
-                                            .status = BuildResult::OutputRejected,
+                                        BuildResult{.inner{BuildResult::Failure{
+                                            .status = BuildResult::Failure::OutputRejected,
                                             .errorMsg = "no idea why",
-                                        },
-                                        BuildResult{
-                                            .status = BuildResult::NotDeterministic,
+                                        }}},
+                                        BuildResult{.inner{BuildResult::Failure{
+                                            .status = BuildResult::Failure::NotDeterministic,
                                             .errorMsg = "no idea why",
-                                        },
-                                        BuildResult{
-                                            .status = BuildResult::Built,
-                                        },
+                                        }}},
+                                        BuildResult{.inner{BuildResult::Success{
+                                            .status = BuildResult::Success::Built,
+                                        }}},
                                     };
                                     t;
                                 }))
@@ -145,20 +145,24 @@ VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2
 VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_3, "build-result-2.3", 2 << 8 | 3, ({
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{
-                                            .status = BuildResult::OutputRejected,
+                                        BuildResult{.inner{BuildResult::Failure{
+                                            .status = BuildResult::Failure::OutputRejected,
                                             .errorMsg = "no idea why",
-                                        },
+                                        }}},
                                         BuildResult{
-                                            .status = BuildResult::NotDeterministic,
-                                            .errorMsg = "no idea why",
+                                            .inner{BuildResult::Failure{
+                                                .status = BuildResult::Failure::NotDeterministic,
+                                                .errorMsg = "no idea why",
+                                                .isNonDeterministic = true,
+                                            }},
                                             .timesBuilt = 3,
-                                            .isNonDeterministic = true,
                                             .startTime = 30,
                                             .stopTime = 50,
                                         },
                                         BuildResult{
-                                            .status = BuildResult::Built,
+                                            .inner{BuildResult::Success{
+                                                .status = BuildResult::Success::Built,
+                                            }},
                                             .startTime = 30,
                                             .stopTime = 50,
                                         },
@@ -170,48 +174,52 @@ VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest, buildResult_2_6, "build-result-2.6", 2 << 8 | 6, ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
-            BuildResult{
-                .status = BuildResult::OutputRejected,
+            BuildResult{.inner{BuildResult::Failure{
+                .status = BuildResult::Failure::OutputRejected,
                 .errorMsg = "no idea why",
-            },
+            }}},
             BuildResult{
-                .status = BuildResult::NotDeterministic,
-                .errorMsg = "no idea why",
+                .inner{BuildResult::Failure{
+                    .status = BuildResult::Failure::NotDeterministic,
+                    .errorMsg = "no idea why",
+                    .isNonDeterministic = true,
+                }},
                 .timesBuilt = 3,
-                .isNonDeterministic = true,
                 .startTime = 30,
                 .stopTime = 50,
             },
             BuildResult{
-                .status = BuildResult::Built,
+                .inner{BuildResult::Success{
+                    .status = BuildResult::Success::Built,
+                    .builtOutputs =
+                        {
+                            {
+                                "foo",
+                                {
+                                    .id =
+                                        DrvOutput{
+                                            .drvHash =
+                                                Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                            .outputName = "foo",
+                                        },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                                },
+                            },
+                            {
+                                "bar",
+                                {
+                                    .id =
+                                        DrvOutput{
+                                            .drvHash =
+                                                Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                            .outputName = "bar",
+                                        },
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
+                                },
+                            },
+                        },
+                }},
                 .timesBuilt = 1,
-                .builtOutputs =
-                    {
-                        {
-                            "foo",
-                            {
-                                .id =
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "foo",
-                                    },
-                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                            },
-                        },
-                        {
-                            "bar",
-                            {
-                                .id =
-                                    DrvOutput{
-                                        .drvHash =
-                                            Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                        .outputName = "bar",
-                                    },
-                                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
-                            },
-                        },
-                    },
                 .startTime = 30,
                 .stopTime = 50,
 #if 0

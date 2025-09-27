@@ -257,8 +257,8 @@ void RestrictedStore::buildPaths(
     const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
     for (auto & result : buildPathsWithResults(paths, buildMode, evalStore))
-        if (!result.success())
-            result.rethrow();
+        if (auto * failureP = result.tryGetFailure())
+            failureP->rethrow();
 }
 
 std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
@@ -280,9 +280,11 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     auto results = next->buildPathsWithResults(paths, buildMode);
 
     for (auto & result : results) {
-        for (auto & [outputName, output] : result.builtOutputs) {
-            newPaths.insert(output.outPath);
-            newRealisations.insert(output);
+        if (auto * successP = result.tryGetSuccess()) {
+            for (auto & [outputName, output] : successP->builtOutputs) {
+                newPaths.insert(output.outPath);
+                newRealisations.insert(output);
+            }
         }
     }
 

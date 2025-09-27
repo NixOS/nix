@@ -82,10 +82,10 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         worker.run(Goals{goal});
         return goal->buildResult;
     } catch (Error & e) {
-        return BuildResult{
-            .status = BuildResult::MiscFailure,
+        return BuildResult{.inner{BuildResult::Failure{
+            .status = BuildResult::Failure::MiscFailure,
             .errorMsg = e.msg(),
-        };
+        }}};
     };
 }
 

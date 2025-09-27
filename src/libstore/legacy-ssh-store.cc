@@ -241,12 +241,13 @@ void LegacySSHStore::buildPaths(
 
     conn->to.flush();
 
-    BuildResult result;
-    result.status = (BuildResult::Status) readInt(conn->from);
-
-    if (!result.success()) {
-        conn->from >> result.errorMsg;
-        throw Error(result.status, result.errorMsg);
+    auto status = readInt(conn->from);
+    if (!BuildResult::Success::statusIs(status)) {
+        BuildResult::Failure failure{
+            .status = (BuildResult::Failure::Status) status,
+        };
+        conn->from >> failure.errorMsg;
+        throw Error(failure.status, std::move(failure.errorMsg));
     }
 }
 

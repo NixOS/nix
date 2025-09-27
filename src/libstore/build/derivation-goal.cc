@@ -94,7 +94,7 @@ Goal::Co DerivationGoal::haveDerivation()
 
         /* If they are all valid, then we're done. */
         if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
-            co_return doneSuccess(BuildResult::AlreadyValid, checkResult->first);
+            co_return doneSuccess(BuildResult::Success::AlreadyValid, checkResult->first);
         }
 
         Goals waitees;
@@ -123,7 +123,7 @@ Goal::Co DerivationGoal::haveDerivation()
 
         if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
             co_return doneFailure(BuildError(
-                BuildResult::TransientFailure,
+                BuildResult::Failure::TransientFailure,
                 "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
         }
@@ -135,7 +135,7 @@ Goal::Co DerivationGoal::haveDerivation()
         bool allValid = checkResult && checkResult->second == PathStatus::Valid;
 
         if (buildMode == bmNormal && allValid) {
-            co_return doneSuccess(BuildResult::Substituted, checkResult->first);
+            co_return doneSuccess(BuildResult::Success::Substituted, checkResult->first);
         }
         if (buildMode == bmRepair && allValid) {
             co_return repairClosure();
@@ -163,25 +163,27 @@ Goal::Co DerivationGoal::haveDerivation()
 
     buildResult = g->buildResult;
 
-    if (buildMode == bmCheck) {
-        /* In checking mode, the builder will not register any outputs.
-           So we want to make sure the ones that we wanted to check are
-           properly there. */
-        buildResult.builtOutputs = {{wantedOutput, assertPathValidity()}};
-    } else {
-        /* Otherwise the builder will give us info for out output, but
-           also for other outputs. Filter down to just our output so as
-           not to leak info on unrelated things. */
-        for (auto it = buildResult.builtOutputs.begin(); it != buildResult.builtOutputs.end();) {
-            if (it->first != wantedOutput) {
-                it = buildResult.builtOutputs.erase(it);
-            } else {
-                ++it;
+    if (auto * successP = buildResult.tryGetSuccess()) {
+        auto & success = *successP;
+        if (buildMode == bmCheck) {
+            /* In checking mode, the builder will not register any outputs.
+               So we want to make sure the ones that we wanted to check are
+               properly there. */
+            success.builtOutputs = {{wantedOutput, assertPathValidity()}};
+        } else {
+            /* Otherwise the builder will give us info for out output, but
+               also for other outputs. Filter down to just our output so as
+               not to leak info on unrelated things. */
+            for (auto it = success.builtOutputs.begin(); it != success.builtOutputs.end();) {
+                if (it->first != wantedOutput) {
+                    it = success.builtOutputs.erase(it);
+                } else {
+                    ++it;
+                }
             }
-        }
 
-        if (buildResult.success())
-            assert(buildResult.builtOutputs.count(wantedOutput) > 0);
+            assert(success.builtOutputs.count(wantedOutput) > 0);
+        }
     }
 
     co_return amDone(g->exitCode, g->ex);
@@ -279,7 +281,7 @@ Goal::Co DerivationGoal::repairClosure()
                 "some paths in the output closure of derivation '%s' could not be repaired",
                 worker.store.printStorePath(drvPath));
     }
-    co_return doneSuccess(BuildResult::AlreadyValid, assertPathValidity());
+    co_return doneSuccess(BuildResult::Success::AlreadyValid, assertPathValidity());
 }
 
 std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValidity()
@@ -337,16 +339,16 @@ Realisation DerivationGoal::assertPathValidity()
     return checkResult->first;
 }
 
-Goal::Done DerivationGoal::doneSuccess(BuildResult::Status status, Realisation builtOutput)
+Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, Realisation builtOutput)
 {
-    buildResult.status = status;
-
-    assert(buildResult.success());
+    buildResult.inner = BuildResult::Success{
+        .status = status,
+        .builtOutputs = {{wantedOutput, std::move(builtOutput)}},
+    };
 
     mcExpectedBuilds.reset();
 
-    buildResult.builtOutputs = {{wantedOutput, std::move(builtOutput)}};
-    if (status == BuildResult::Built)
+    if (status == BuildResult::Success::Built)
         worker.doneBuilds++;
 
     worker.updateProgress();
@@ -356,16 +358,18 @@ Goal::Done DerivationGoal::doneSuccess(BuildResult::Status status, Realisation b
 
 Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
-    buildResult.status = ex.status;
-    buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
-    if (buildResult.status == BuildResult::TimedOut)
-        worker.timedOut = true;
-    if (buildResult.status == BuildResult::PermanentFailure)
-        worker.permanentFailure = true;
+    buildResult.inner = BuildResult::Failure{
+        .status = ex.status,
+        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+    };
 
     mcExpectedBuilds.reset();
 
-    if (ex.status != BuildResult::DependencyFailed)
+    if (ex.status == BuildResult::Failure::TimedOut)
+        worker.timedOut = true;
+    if (ex.status == BuildResult::Failure::PermanentFailure)
+        worker.permanentFailure = true;
+    if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();

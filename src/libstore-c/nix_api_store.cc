@@ -145,9 +145,11 @@ nix_err nix_store_realise(
 
         if (callback) {
             for (const auto & result : results) {
-                for (const auto & [outputName, realisation] : result.builtOutputs) {
-                    StorePath p{realisation.outPath};
-                    callback(userdata, outputName.c_str(), &p);
+                if (auto * success = result.tryGetSuccess()) {
+                    for (const auto & [outputName, realisation] : success->builtOutputs) {
+                        StorePath p{realisation.outPath};
+                        callback(userdata, outputName.c_str(), &p);
+                    }
                 }
             }
         }

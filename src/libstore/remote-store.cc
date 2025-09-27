@@ -598,16 +598,15 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                     [&](const DerivedPath::Opaque & bo) {
                         results.push_back(
                             KeyedBuildResult{
-                                {
-                                    .status = BuildResult::Substituted,
-                                },
+                                {.inner{BuildResult::Success{
+                                    .status = BuildResult::Success::Substituted,
+                                }}},
                                 /* .path = */ bo,
                             });
                     },
                     [&](const DerivedPath::Built & bfd) {
-                        KeyedBuildResult res{
-                            {.status = BuildResult::Built},
-                            /* .path = */ bfd,
+                        BuildResult::Success success{
+                            .status = BuildResult::Success::Built,
                         };
 
                         OutputPathMap outputs;
@@ -627,9 +626,9 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                                 auto realisation = queryRealisation(outputId);
                                 if (!realisation)
                                     throw MissingRealisation(outputId);
-                                res.builtOutputs.emplace(output, *realisation);
+                                success.builtOutputs.emplace(output, *realisation);
                             } else {
-                                res.builtOutputs.emplace(
+                                success.builtOutputs.emplace(
                                     output,
                                     Realisation{
                                         .id = outputId,
@@ -638,7 +637,11 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                             }
                         }
 
-                        results.push_back(res);
+                        results.push_back(
+                            KeyedBuildResult{
+                                {.inner = std::move(success)},
+                                /* .path = */ bfd,
+                            });
                     }},
                 path.raw());
         }

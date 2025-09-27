@@ -16,32 +16,62 @@ namespace nix {
 BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
 {
     BuildResult status;
-    status.status = (BuildResult::Status) readInt(conn.from);
-    conn.from >> status.errorMsg;
+    BuildResult::Success success;
+    BuildResult::Failure failure;
+
+    auto rawStatus = readInt(conn.from);
+    conn.from >> failure.errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.from >> status.timesBuilt >> status.isNonDeterministic >> status.startTime >> status.stopTime;
+        conn.from >> status.timesBuilt >> failure.isNonDeterministic >> status.startTime >> status.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
-            status.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
+
+    if (BuildResult::Success::statusIs(rawStatus)) {
+        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
+        status.inner = std::move(success);
+    } else {
+        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
+        status.inner = std::move(failure);
+    }
+
     return status;
 }
 
 void ServeProto::Serialise<BuildResult>::write(
-    const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResult & status)
+    const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResult & res)
 {
-    conn.to << status.status << status.errorMsg;
-
-    if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.to << status.timesBuilt << status.isNonDeterministic << status.startTime << status.stopTime;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
-        DrvOutputs builtOutputs;
-        for (auto & [output, realisation] : status.builtOutputs)
-            builtOutputs.insert_or_assign(realisation.id, realisation);
-        ServeProto::write(store, conn, builtOutputs);
-    }
+    /* The protocol predates the use of sum types (std::variant) to
+       separate the success or failure cases. As such, it transits some
+       success- or failure-only fields in both cases. This helper
+       function helps support this: in each case, we just pass the old
+       default value for the fields that don't exist in that case. */
+    auto common = [&](std::string_view errorMsg, bool isNonDeterministic, const auto & builtOutputs) {
+        conn.to << errorMsg;
+        if (GET_PROTOCOL_MINOR(conn.version) >= 3)
+            conn.to << res.timesBuilt << isNonDeterministic << res.startTime << res.stopTime;
+        if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
+            DrvOutputs builtOutputsFullKey;
+            for (auto & [output, realisation] : builtOutputs)
+                builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
+            ServeProto::write(store, conn, builtOutputsFullKey);
+        }
+    };
+    std::visit(
+        overloaded{
+            [&](const BuildResult::Failure & failure) {
+                conn.to << failure.status;
+                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+            },
+            [&](const BuildResult::Success & success) {
+                conn.to << success.status;
+                common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
+            },
+        },
+        res.inner);
 }
 
 UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
