@@ -2,15 +2,21 @@
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/s3.hh"
 #include "nix/util/compression.hh"
+#include "nix/util/error.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/sync.hh"
+#include "nix/store/store-reference.hh"
 
 #include "store-config-private.hh"
+#include "nix/store/config.hh"
+#include <string>
+#include <utility>
 #if NIX_WITH_S3_SUPPORT
-#  include <aws/core/client/ClientConfiguration.h>
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
 #endif
 
 #ifdef __linux__
@@ -39,6 +45,72 @@ const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
+
+struct S3Request
+{
+    FileTransferRequest request;
+    std::string awsCredentials;
+    std::string awsSigV4Provider;
+};
+
+static S3Request setupRequestForS3(FileTransferRequest request)
+{
+    if (request.uri.scheme() != "s3") {
+        nix::unreachable();
+    }
+#if !NIX_WITH_S3_SUPPORT
+    throw nix::Error(
+        "cannot download '%s' because Nix is not built with AWS CRT support (requires aws-crt-cpp and curl >= 7.75.0)",
+        request.uri.to_string());
+#else
+    auto parsedS3 = ParsedS3URL::parse(request.uri.parsed());
+    auto httpsUrl = parsedS3.toHttpsUrl();
+
+    // Update the request URI to use HTTPS (modifying our member copy)
+    request.uri = httpsUrl;
+
+    // Get credentials
+    try {
+        // Check if pre-resolved credentials are available
+        std::optional<AwsCredentials> credsOpt;
+        if (request.preResolvedAwsCredentials) {
+            debug("Using pre-resolved AWS credentials from parent process");
+            credsOpt = request.preResolvedAwsCredentials;
+        } else {
+            std::string profile = parsedS3.profile.value_or("");
+
+            // Get credentials (automatically cached)
+            credsOpt = getAwsCredentials(profile);
+        }
+
+        auto awsCredentials = std::string();
+        auto awsSigV4Provider = std::string();
+        if (credsOpt) {
+            auto & creds = *credsOpt;
+            awsCredentials = creds.accessKeyId + ":" + creds.secretAccessKey;
+
+            std::string region = parsedS3.region.value_or("us-east-1");
+            std::string service = "s3";
+            awsSigV4Provider = "aws:amz:" + region + ":" + service;
+
+            // Add session token header if present
+            if (creds.sessionToken) {
+                request.headers.emplace_back("x-amz-security-token", *creds.sessionToken);
+            }
+        }
+        return S3Request{std::move(request), awsCredentials, awsSigV4Provider};
+    } catch (const AwsAuthError & e) {
+        warn("AWS authentication failed for S3 request %s: %s", request.uri, e.what());
+
+        // Invalidate the cached credentials so next request will retry
+        std::string profile = parsedS3.profile.value_or("");
+        invalidateAwsCredentials(profile);
+
+        // Continue without authentication - might be a public bucket
+        return S3Request{std::move(request)};
+    }
+#endif
+}
 
 struct curlFileTransfer : public FileTransfer
 {
@@ -77,6 +149,11 @@ struct curlFileTransfer : public FileTransfer
 
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 
+#if NIX_WITH_S3_SUPPORT
+        std::string awsCredentials;   // "access_key:secret_key" for CURLOPT_USERPWD
+        std::string awsSigV4Provider; // Provider string for CURLOPT_AWS_SIGV4
+#endif
+
         inline static const std::set<long> successfulStatuses{200, 201, 204, 206, 304, 0 /* other protocol */};
 
         /* Get the HTTP status code, or 0 for other protocols. */
@@ -88,6 +165,14 @@ struct curlFileTransfer : public FileTransfer
             if (protocol == CURLPROTO_HTTP || protocol == CURLPROTO_HTTPS)
                 curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
             return httpStatus;
+        }
+
+        TransferItem(
+            curlFileTransfer & fileTransfer, const S3Request & request, Callback<FileTransferResult> && callback)
+            : TransferItem(fileTransfer, request.request, std::move(callback))
+        {
+            awsCredentials = request.awsCredentials;
+            awsSigV4Provider = request.awsSigV4Provider;
         }
 
         TransferItem(
@@ -350,7 +435,9 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
 
-            curl_easy_setopt(req, CURLOPT_URL, request.uri.to_string().c_str());
+            // Use the actual URL, which may have been transformed from s3:// to https://
+            std::string actualUrl = request.uri.to_string();
+            curl_easy_setopt(req, CURLOPT_URL, actualUrl.c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
@@ -425,6 +512,15 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
+
+#if NIX_WITH_S3_SUPPORT
+            // Set up AWS SigV4 authentication if this is an S3 request
+            // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
+            if (!awsCredentials.empty() && !awsSigV4Provider.empty()) {
+                curl_easy_setopt(req, CURLOPT_USERPWD, awsCredentials.c_str());
+                curl_easy_setopt(req, CURLOPT_AWS_SIGV4, awsSigV4Provider.c_str());
+            }
+#endif
 
             result.data.clear();
             result.bodySize = 0;
@@ -637,8 +733,14 @@ struct curlFileTransfer : public FileTransfer
     ~curlFileTransfer()
     {
         stopWorkerThread();
-
         workerThread.join();
+
+#if NIX_WITH_S3_SUPPORT
+        // IMPORTANT: We must clear the providers here to ensure they are destroyed
+        // BEFORE the AWS CRT ApiHandle is destroyed during static destruction.
+        // This prevents a deadlock where AWS CRT waits for resources we're holding.
+        clearAwsCredentialsCache();
+#endif
 
         if (curlm)
             curl_multi_cleanup(curlm);
@@ -784,7 +886,11 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https")
+        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
+#if NIX_WITH_S3_SUPPORT
+            && item->request.uri.scheme() != "s3"
+#endif
+        )
             throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
@@ -800,39 +906,11 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Ugly hack to support s3:// URIs. */
         if (request.uri.scheme() == "s3") {
-            // FIXME: do this on a worker thread
-            try {
-#if NIX_WITH_S3_SUPPORT
-                auto parsed = ParsedS3URL::parse(request.uri.parsed());
-
-                std::string profile = parsed.profile.value_or("");
-                std::string region = parsed.region.value_or(Aws::Region::US_EAST_1);
-                std::string scheme = parsed.scheme.value_or("");
-                std::string endpoint = parsed.getEncodedEndpoint().value_or("");
-
-                S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(parsed.bucket, encodeUrlPath(parsed.key));
-                FileTransferResult res;
-                if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
-                res.data = std::move(*s3Res.data);
-                res.urls.push_back(request.uri.to_string());
-                callback(std::move(res));
-#else
-                throw nix::Error(
-                    "cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
-#endif
-            } catch (...) {
-                callback.rethrow();
-            }
-            return;
+            enqueueItem(std::make_shared<TransferItem>(*this, setupRequestForS3(request), std::move(callback)));
+        } else {
+            enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
         }
-
-        enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
     }
 };
 

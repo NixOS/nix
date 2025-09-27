@@ -142,27 +142,27 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config. See
-# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-# The S3 store definitions in the header will be hidden based on this variables.
-configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
-if aws_s3.found()
-  aws_s3 = declare_dependency(
-    include_directories : include_directories(aws_s3.get_variable('includedir')),
-    link_args : [
-      '-L' + aws_s3.get_variable('libdir'),
-      '-laws-cpp-sdk-transfer',
-      '-laws-cpp-sdk-s3',
-      '-laws-cpp-sdk-identity-management',
-      '-laws-cpp-sdk-cognito-identity',
-      '-laws-cpp-sdk-sts',
-      '-laws-cpp-sdk-core',
-      '-laws-crt-cpp',
-    ],
-  ).as_system('system')
+# S3 store support
+# Check if curl supports AWS SigV4 (requires >= 7.75.0)
+curl_supports_aws_sigv4 = curl.version().version_compare('>= 7.75.0')
+# AWS CRT C++ for lightweight credential management
+aws_crt_cpp = cxx.find_library('aws-crt-cpp')
+
+s3_store_opt = get_option('s3-store').require(
+  curl_supports_aws_sigv4,
+  error_message : 'S3 support requires curl >=7.75.0',
+).require(
+  aws_crt_cpp.found(),
+  error_message : 'S3 support requires aws-crt-cpp',
+)
+
+if s3_store_opt.enabled()
+  deps_other += aws_crt_cpp
 endif
-deps_other += aws_s3
+configdata_pub.set(
+  'NIX_WITH_S3_SUPPORT',
+  s3_store_opt.enabled().to_int(),
+)
 
 subdir('nix-meson-build-support/generate-header')
 
@@ -268,6 +268,7 @@ subdir('nix-meson-build-support/common')
 subdir('nix-meson-build-support/asan-options')
 
 sources = files(
+  'aws-creds.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-building-goal.cc',
@@ -329,7 +330,7 @@ sources = files(
   'remote-store.cc',
   'restricted-store.cc',
   's3-binary-cache-store.cc',
-  's3.cc',
+  's3-url.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',
