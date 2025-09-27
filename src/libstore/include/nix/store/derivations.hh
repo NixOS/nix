@@ -135,15 +135,12 @@ struct DerivationOutput
     std::optional<StorePath>
     path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 
-    nlohmann::json toJSON(std::string_view drvName, OutputNameView outputName) const;
+    nlohmann::json toJSON() const;
     /**
      * @param xpSettings Stop-gap to avoid globals during unit tests.
      */
-    static DerivationOutput fromJSON(
-        std::string_view drvName,
-        OutputNameView outputName,
-        const nlohmann::json & json,
-        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+    static DerivationOutput
+    fromJSON(const nlohmann::json & json, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
@@ -540,4 +537,5 @@ std::string hashPlaceholder(const OutputNameView outputName);
 
 } // namespace nix
 
+JSON_IMPL(nix::DerivationOutput)
 JSON_IMPL(nix::Derivation)

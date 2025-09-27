@@ -7,7 +7,7 @@
 #include "nix/store/path-regex.hh"
 #include "nix/store/store-api.hh"
 
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/store/tests/path.hh"
 
@@ -16,7 +16,7 @@ namespace nix {
 #define STORE_DIR "/nix/store/"
 #define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
 
-class StorePathTest : public CharacterizationTest, public LibStoreTest
+class StorePathTest : public virtual CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "store-path";
 
@@ -149,27 +149,30 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
 
 using nlohmann::json;
 
-#define TEST_JSON(FIXTURE, NAME, VAL)                                                                 \
-    static const StorePath NAME = VAL;                                                                \
-                                                                                                      \
-    TEST_F(FIXTURE, NAME##_from_json)                                                                 \
-    {                                                                                                 \
-        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
-            auto encoded = json::parse(encoded_);                                                     \
-            StorePath got = static_cast<StorePath>(encoded);                                          \
-            ASSERT_EQ(got, NAME);                                                                     \
-        });                                                                                           \
-    }                                                                                                 \
-                                                                                                      \
-    TEST_F(FIXTURE, NAME##_to_json)                                                                   \
-    {                                                                                                 \
-        writeTest(                                                                                    \
-            #NAME ".json",                                                                            \
-            [&]() -> json { return static_cast<json>(NAME); },                                        \
-            [](const auto & file) { return json::parse(readFile(file)); },                            \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
-    }
+struct StorePathJsonTest : StorePathTest,
+                           JsonCharacterizationTest<StorePath>,
+                           ::testing::WithParamInterface<std::pair<std::string_view, StorePath>>
+{};
 
-TEST_JSON(StorePathTest, simple, StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"});
+TEST_P(StorePathJsonTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(StorePathJsonTest, to_json)
+{
+    auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    StorePathJSON,
+    StorePathJsonTest,
+    ::testing::Values(
+        std::pair{
+            "simple",
+            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+        }));
 
 } // namespace nix

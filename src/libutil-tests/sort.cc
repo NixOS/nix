@@ -102,14 +102,14 @@ struct RandomPeekSort : public ::testing::TestWithParam<
 
     void SetUp() override
     {
-        auto [maxSize, min, max, iterations] = GetParam();
+        const auto & [maxSize, min, max, iterations] = GetParam();
         urng_ = std::mt19937(GTEST_FLAG_GET(random_seed));
         distribution_ = std::uniform_int_distribution<int>(min, max);
     }
 
     auto regenerate()
     {
-        auto [maxSize, min, max, iterations] = GetParam();
+        const auto & [maxSize, min, max, iterations] = GetParam();
         std::size_t dataSize = std::uniform_int_distribution<std::size_t>(0, maxSize)(urng_);
         data_.resize(dataSize);
         std::generate(data_.begin(), data_.end(), [&]() { return distribution_(urng_); });
@@ -118,7 +118,7 @@ struct RandomPeekSort : public ::testing::TestWithParam<
 
 TEST_P(RandomPeekSort, defaultComparator)
 {
-    auto [maxSize, min, max, iterations] = GetParam();
+    const auto & [maxSize, min, max, iterations] = GetParam();
 
     for (std::size_t i = 0; i < iterations; ++i) {
         regenerate();
@@ -132,7 +132,7 @@ TEST_P(RandomPeekSort, defaultComparator)
 
 TEST_P(RandomPeekSort, greater)
 {
-    auto [maxSize, min, max, iterations] = GetParam();
+    const auto & [maxSize, min, max, iterations] = GetParam();
 
     for (std::size_t i = 0; i < iterations; ++i) {
         regenerate();
@@ -146,7 +146,7 @@ TEST_P(RandomPeekSort, greater)
 
 TEST_P(RandomPeekSort, brokenComparator)
 {
-    auto [maxSize, min, max, iterations] = GetParam();
+    const auto & [maxSize, min, max, iterations] = GetParam();
 
     /* This is a pretty nice way of modeling a worst-case scenario for a broken comparator.
        If the sorting algorithm doesn't break in such case, then surely all deterministic
@@ -170,7 +170,7 @@ TEST_P(RandomPeekSort, brokenComparator)
 
 TEST_P(RandomPeekSort, stability)
 {
-    auto [maxSize, min, max, iterations] = GetParam();
+    const auto & [maxSize, min, max, iterations] = GetParam();
 
     for (std::size_t i = 0; i < iterations; ++i) {
         regenerate();
