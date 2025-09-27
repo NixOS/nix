@@ -61,6 +61,7 @@ sources = files(
   'derivation.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
+  'dummy-store.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
   'local-binary-cache-store.cc',

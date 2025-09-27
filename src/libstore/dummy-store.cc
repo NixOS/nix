@@ -2,7 +2,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
-#include "nix/store/dummy-store.hh"
+#include "nix/store/dummy-store-impl.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -108,23 +108,14 @@ public:
 
 } // namespace
 
-struct DummyStore : virtual Store
+ref<Store> DummyStoreConfig::openStore() const
+{
+    return openDummyStore();
+}
+
+struct DummyStoreImpl : DummyStore
 {
     using Config = DummyStoreConfig;
-
-    ref<const Config> config;
-
-    struct PathInfoAndContents
-    {
-        UnkeyedValidPathInfo info;
-        ref<MemorySourceAccessor> contents;
-    };
-
-    /**
-     * This is map conceptually owns the file system objects for each
-     * store object.
-     */
-    boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
 
     /**
      * This view conceptually just borrows the file systems objects of
@@ -135,9 +126,9 @@ struct DummyStore : virtual Store
      */
     ref<WholeStoreViewAccessor> wholeStoreView = make_ref<WholeStoreViewAccessor>();
 
-    DummyStore(ref<const Config> config)
+    DummyStoreImpl(ref<const Config> config)
         : Store{*config}
-        , config(config)
+        , DummyStore{config}
     {
         wholeStoreView->setPathDisplay(config->storeDir);
     }
@@ -289,9 +280,9 @@ struct DummyStore : virtual Store
     }
 };
 
-ref<Store> DummyStore::Config::openStore() const
+ref<DummyStore> DummyStore::Config::openDummyStore() const
 {
-    return make_ref<DummyStore>(ref{shared_from_this()});
+    return make_ref<DummyStoreImpl>(ref{shared_from_this()});
 }
 
 static RegisterStoreImplementation<DummyStore::Config> regDummyStore;
