@@ -121,6 +121,7 @@
 - [Architecture and Design](architecture/architecture.md)
 - [Formats and Protocols](protocols/index.md)
   - [JSON Formats](protocols/json/index.md)
+    - [File System Object](protocols/json/file-system-object.md)
     - [Hash](protocols/json/hash.md)
     - [Content Address](protocols/json/content-address.md)
     - [Store Path](protocols/json/store-path.md)

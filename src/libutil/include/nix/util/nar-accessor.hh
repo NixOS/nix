@@ -75,14 +75,6 @@ NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path);
  */
 ShallowNarListing listNarShallow(SourceAccessor & accessor, const CanonPath & path);
 
-/**
- * Serialize a NarListing to JSON.
- */
-void to_json(nlohmann::json & j, const NarListing & listing);
-
-/**
- * Serialize a ShallowNarListing to JSON.
- */
-void to_json(nlohmann::json & j, const ShallowNarListing & listing);
+// All json_avoids_null and JSON_IMPL covered by generic templates in memory-source-accessor.hh
 
 } // namespace nix
