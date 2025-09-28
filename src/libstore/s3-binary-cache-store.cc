@@ -262,6 +262,7 @@ StoreReference S3BinaryCacheStoreConfig::getReference() const
                 .scheme = *uriSchemes().begin(),
                 .authority = bucketName,
             },
+        .params = getQueryParams(),
     };
 }
 

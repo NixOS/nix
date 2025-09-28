@@ -61,13 +61,17 @@ StoreReference UDSRemoteStoreConfig::getReference() const
      * to be more compatible with older versions of nix. Some tooling out there
      * tries hard to parse store references and it might not be able to handle "unix://". */
     if (path == settings.nixDaemonSocketFile)
-        return {.variant = StoreReference::Daemon{}};
+        return {
+            .variant = StoreReference::Daemon{},
+            .params = getQueryParams(),
+        };
     return {
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
                 .authority = path,
             },
+        .params = getQueryParams(),
     };
 }
 
