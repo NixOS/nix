@@ -39,7 +39,7 @@ StoreReference HttpBinaryCacheStoreConfig::getReference() const
                 .scheme = cacheUri.scheme,
                 .authority = cacheUri.renderAuthorityAndPath(),
             },
-        .params = cacheUri.query,
+        .params = getQueryParams(),
     };
 }
 

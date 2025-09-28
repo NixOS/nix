@@ -48,6 +48,7 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
                 StoreReference::Specified{
                     .scheme = *uriSchemes().begin(),
                 },
+            .params = getQueryParams(),
         };
     }
 };
