@@ -101,11 +101,11 @@ struct Expr
         Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
     };
 
-    static Counter nrExprs;
+    static Counter nrCreated;
 
     Expr()
     {
-        nrExprs++;
+        nrCreated++;
     }
 
     virtual ~Expr() {};
@@ -150,15 +150,18 @@ struct Expr
 
 struct ExprInt : Expr
 {
+    static Counter nrCreated;
     Value v;
 
     ExprInt(NixInt n)
     {
+        nrCreated++;
         v.mkInt(n);
     };
 
     ExprInt(NixInt::Inner n)
     {
+        nrCreated++;
         v.mkInt(n);
     };
 
@@ -168,10 +171,12 @@ struct ExprInt : Expr
 
 struct ExprFloat : Expr
 {
+    static Counter nrCreated;
     Value v;
 
     ExprFloat(NixFloat nf)
     {
+        nrCreated++;
         v.mkFloat(nf);
     };
 
@@ -181,6 +186,7 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
+    static Counter nrCreated;
     Value v;
 
     /**
@@ -189,11 +195,13 @@ struct ExprString : Expr
      */
     ExprString(const char * s)
     {
+        nrCreated++;
         v.mkStringNoCopy(s);
     };
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
+        nrCreated++;
         auto len = sv.length();
         if (len == 0) {
             v.mkStringNoCopy("");
@@ -211,6 +219,7 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
+    static Counter nrCreated;
     ref<SourceAccessor> accessor;
     std::string s;
     Value v;
@@ -219,6 +228,7 @@ struct ExprPath : Expr
         : accessor(accessor)
         , s(std::move(s))
     {
+        nrCreated++;
         v.mkPath(&*accessor, this->s.c_str());
     }
 
@@ -231,6 +241,7 @@ typedef uint32_t Displacement;
 
 struct ExprVar : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Symbol name;
 
@@ -251,10 +262,18 @@ struct ExprVar : Expr
     Displacement displ = 0;
 
     ExprVar(Symbol name)
-        : name(name) {};
+        : name(name)
+    {
+        nrCreated++;
+    };
+
     ExprVar(const PosIdx & pos, Symbol name)
         : pos(pos)
-        , name(name) {};
+        , name(name)
+    {
+        nrCreated++;
+    };
+
     Value * maybeThunk(EvalState & state, Env & env) override;
 
     PosIdx getPos() const override
@@ -272,9 +291,12 @@ struct ExprVar : Expr
  */
 struct ExprInheritFrom : ExprVar
 {
+    static Counter nrCreated;
+
     ExprInheritFrom(PosIdx pos, Displacement displ)
         : ExprVar(pos, {})
     {
+        nrCreated++;
         this->level = 0;
         this->displ = displ;
         this->fromWith = nullptr;
@@ -285,20 +307,26 @@ struct ExprInheritFrom : ExprVar
 
 struct ExprSelect : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Expr *e, *def;
     AttrPath attrPath;
+
     ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def)
         : pos(pos)
         , e(e)
         , def(def)
-        , attrPath(std::move(attrPath)) {};
+        , attrPath(std::move(attrPath))
+    {
+        nrCreated++;
+    };
 
     ExprSelect(const PosIdx & pos, Expr * e, Symbol name)
         : pos(pos)
         , e(e)
         , def(0)
     {
+        nrCreated++;
         attrPath.push_back(AttrName(name));
     };
 
@@ -323,11 +351,16 @@ struct ExprSelect : Expr
 
 struct ExprOpHasAttr : Expr
 {
+    static Counter nrCreated;
     Expr * e;
     AttrPath attrPath;
+
     ExprOpHasAttr(Expr * e, AttrPath attrPath)
         : e(e)
-        , attrPath(std::move(attrPath)) {};
+        , attrPath(std::move(attrPath))
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -339,6 +372,7 @@ struct ExprOpHasAttr : Expr
 
 struct ExprAttrs : Expr
 {
+    static Counter nrCreated;
     bool recursive;
     PosIdx pos;
 
@@ -357,11 +391,19 @@ struct ExprAttrs : Expr
         Expr * e;
         PosIdx pos;
         Displacement displ = 0; // displacement
+
         AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
             : kind(kind)
             , e(e)
-            , pos(pos) {};
-        AttrDef() {};
+            , pos(pos)
+        {
+            nrCreated++;
+        };
+
+        AttrDef()
+        {
+            nrCreated++;
+        };
 
         template<typename T>
         const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
@@ -414,8 +456,14 @@ struct ExprAttrs : Expr
 
 struct ExprList : Expr
 {
+    static Counter nrCreated;
     std::vector<Expr *> elems;
-    ExprList() {};
+
+    ExprList()
+    {
+        nrCreated++;
+    };
+
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
 
@@ -461,6 +509,7 @@ struct Formals
 
 struct ExprLambda : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Symbol name;
     Symbol arg;
@@ -472,13 +521,17 @@ struct ExprLambda : Expr
         : pos(pos)
         , arg(arg)
         , formals(formals)
-        , body(body) {};
+        , body(body)
+    {
+        nrCreated++;
+    };
 
     ExprLambda(PosIdx pos, Formals * formals, Expr * body)
         : pos(pos)
         , formals(formals)
         , body(body)
     {
+        nrCreated++;
     }
 
     void setName(Symbol name) override;
@@ -500,6 +553,7 @@ struct ExprLambda : Expr
 
 struct ExprCall : Expr
 {
+    static Counter nrCreated;
     Expr * fun;
     std::vector<Expr *> args;
     PosIdx pos;
@@ -511,6 +565,7 @@ struct ExprCall : Expr
         , pos(pos)
         , cursedOrEndPos({})
     {
+        nrCreated++;
     }
 
     ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
@@ -519,6 +574,7 @@ struct ExprCall : Expr
         , pos(pos)
         , cursedOrEndPos(cursedOrEndPos)
     {
+        nrCreated++;
     }
 
     PosIdx getPos() const override
@@ -533,24 +589,35 @@ struct ExprCall : Expr
 
 struct ExprLet : Expr
 {
+    static Counter nrCreated;
     ExprAttrs * attrs;
     Expr * body;
+
     ExprLet(ExprAttrs * attrs, Expr * body)
         : attrs(attrs)
-        , body(body) {};
+        , body(body)
+    {
+        nrCreated++;
+    };
+
     COMMON_METHODS
 };
 
 struct ExprWith : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Expr *attrs, *body;
     size_t prevWith;
     ExprWith * parentWith;
+
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body)
         : pos(pos)
         , attrs(attrs)
-        , body(body) {};
+        , body(body)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -562,13 +629,18 @@ struct ExprWith : Expr
 
 struct ExprIf : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Expr *cond, *then, *else_;
+
     ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_)
         : pos(pos)
         , cond(cond)
         , then(then)
-        , else_(else_) {};
+        , else_(else_)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -580,12 +652,17 @@ struct ExprIf : Expr
 
 struct ExprAssert : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     Expr *cond, *body;
+
     ExprAssert(const PosIdx & pos, Expr * cond, Expr * body)
         : pos(pos)
         , cond(cond)
-        , body(body) {};
+        , body(body)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -597,9 +674,14 @@ struct ExprAssert : Expr
 
 struct ExprOpNot : Expr
 {
+    static Counter nrCreated;
     Expr * e;
+
     ExprOpNot(Expr * e)
-        : e(e) {};
+        : e(e)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -610,15 +692,22 @@ struct ExprOpNot : Expr
 };
 
 #define MakeBinOpMembers(name, s)                                                        \
+    static Counter nrCreated;                                                            \
     PosIdx pos;                                                                          \
     Expr *e1, *e2;                                                                       \
     name(Expr * e1, Expr * e2)                                                           \
         : e1(e1)                                                                         \
-        , e2(e2){};                                                                      \
+        , e2(e2)                                                                         \
+    {                                                                                    \
+        nrCreated++;                                                                     \
+    };                                                                                   \
     name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
         : pos(pos)                                                                       \
         , e1(e1)                                                                         \
-        , e2(e2){};                                                                      \
+        , e2(e2)                                                                         \
+    {                                                                                    \
+        nrCreated++;                                                                     \
+    };                                                                                   \
     void show(const SymbolTable & symbols, std::ostream & str) const override            \
     {                                                                                    \
         str << "(";                                                                      \
@@ -665,13 +754,18 @@ public:
 
 struct ExprConcatStrings : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
     bool forceString;
     std::vector<std::pair<PosIdx, Expr *>> * es;
+
     ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
         : pos(pos)
         , forceString(forceString)
-        , es(es) {};
+        , es(es)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
@@ -683,9 +777,14 @@ struct ExprConcatStrings : Expr
 
 struct ExprPos : Expr
 {
+    static Counter nrCreated;
     PosIdx pos;
+
     ExprPos(const PosIdx & pos)
-        : pos(pos) {};
+        : pos(pos)
+    {
+        nrCreated++;
+    };
 
     PosIdx getPos() const override
     {
