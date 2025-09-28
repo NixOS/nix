@@ -1,15 +1,23 @@
+#pragma once
+///@file
+
 #include "nix/store/store-api.hh"
 
 namespace nix {
 
-struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
+template<template<typename> class F>
+struct DummyStoreConfigT
 {
-    DummyStoreConfig(const Params & params)
-        : StoreConfig(params)
-    {
-        // Disable caching since this a temporary in-memory store.
-        pathInfoCacheSize = 0;
-    }
+    F<bool>::type readOnly;
+};
+
+struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
+                          Store::Config,
+                          DummyStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
+
+    DummyStoreConfig(const Params & params);
 
     DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
         : DummyStoreConfig(params)
@@ -17,15 +25,6 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
         if (!authority.empty())
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
     }
-
-    Setting<bool> readOnly{
-        this,
-        true,
-        "read-only",
-        R"(
-          Make any sort of write fail instead of succeeding.
-          No additional memory will be used, because no information needs to be stored.
-        )"};
 
     static const std::string name()
     {
@@ -41,15 +40,7 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
 
     ref<Store> openStore() const override;
 
-    StoreReference getReference() const override
-    {
-        return {
-            .variant =
-                StoreReference::Specified{
-                    .scheme = *uriSchemes().begin(),
-                },
-        };
-    }
+    StoreReference getReference() const override;
 };
 
 } // namespace nix

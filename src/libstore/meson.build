@@ -285,6 +285,7 @@ sources = files(
   'builtins/unpack-channel.cc',
   'common-protocol.cc',
   'common-ssh-store-config.cc',
+  'config-parse.cc',
   'content-address.cc',
   'daemon.cc',
   'derivation-options.cc',
