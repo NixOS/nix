@@ -23,6 +23,8 @@ struct DummyStore : virtual Store
     {
         UnkeyedValidPathInfo info;
         ref<MemorySourceAccessor> contents;
+
+        bool operator==(const PathInfoAndContents &) const;
     };
 
     /**
@@ -54,6 +56,14 @@ struct DummyStore : virtual Store
         , config(config)
     {
     }
+
+    bool operator==(const DummyStore &) const;
 };
 
+template<>
+struct json_avoids_null<DummyStore::PathInfoAndContents> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::DummyStore::PathInfoAndContents)
