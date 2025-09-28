@@ -1712,6 +1712,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* Path already exists because CA path produced by something
                    else. No moving needed. */
                 assert(newInfo.ca);
+                /* Can delete our scratch copy now. */
+                deletePath(actualPath);
             } else {
                 auto destPath = store.toRealPath(finalDestPath);
                 deletePath(destPath);
