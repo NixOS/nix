@@ -24,7 +24,7 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
     // FIXME don't duplicate description once we don't have root setting
     , rootDir{
           this,
-          !rootDir.empty() && params.count("root") == 0 ? (std::optional<Path>{rootDir}) : std::nullopt,
+          !rootDir.empty() && params.count("root") == 0 ? (std::optional{canonPath(rootDir)}) : std::nullopt,
           "root",
           "Directory prefixed to all other paths."}
 {
