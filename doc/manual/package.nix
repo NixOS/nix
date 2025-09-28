@@ -34,6 +34,7 @@ mkMesonDerivation (finalAttrs: {
       (fileset.unions [
         ../../.version
         # For example JSON
+        ../../src/libutil-tests/data/memory-source-accessor
         ../../src/libutil-tests/data/hash
         # Too many different types of files to filter for now
         ../../doc/manual
