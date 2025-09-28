@@ -1257,14 +1257,18 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
-nlohmann::json DerivationOutput::toJSON(std::string_view drvName, OutputNameView outputName) const
+nlohmann::json DerivationOutput::toJSON() const
 {
     nlohmann::json res = nlohmann::json::object();
     std::visit(
         overloaded{
             [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
             [&](const DerivationOutput::CAFixed & dof) {
-                // res["path"] = dof.path(store, drvName, outputName);
+    /* it would be nice to output the path for user convenience, but
+       this would require us to know the store dir. */
+#if 0
+                res["path"] = dof.path(store, drvName, outputName);
+#endif
                 res["method"] = std::string{dof.ca.method.render()};
                 res["hashAlgo"] = printHashAlgo(dof.ca.hash.algo);
                 res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
@@ -1285,11 +1289,8 @@ nlohmann::json DerivationOutput::toJSON(std::string_view drvName, OutputNameView
     return res;
 }
 
-DerivationOutput DerivationOutput::fromJSON(
-    std::string_view drvName,
-    OutputNameView outputName,
-    const nlohmann::json & _json,
-    const ExperimentalFeatureSettings & xpSettings)
+DerivationOutput
+DerivationOutput::fromJSON(const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
     auto & json = getObject(_json);
@@ -1321,6 +1322,8 @@ DerivationOutput DerivationOutput::fromJSON(
                     .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
                 },
         };
+        /* We no longer produce this (denormalized) field (for the
+           reasons described above), so we don't need to check it. */
 #if 0
         if (dof.path(store, drvName, outputName) != static_cast<StorePath>(valueAt(json, "path")))
             throw Error("Path doesn't match derivation output");
@@ -1367,7 +1370,7 @@ nlohmann::json Derivation::toJSON() const
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
         for (auto & [outputName, output] : outputs) {
-            outputsObj[outputName] = output.toJSON(name, outputName);
+            outputsObj[outputName] = output;
         }
     }
 
@@ -1427,8 +1430,7 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
         for (auto & [outputName, output] : outputs) {
-            res.outputs.insert_or_assign(
-                outputName, DerivationOutput::fromJSON(res.name, outputName, output, xpSettings));
+            res.outputs.insert_or_assign(outputName, DerivationOutput::fromJSON(output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");
@@ -1488,6 +1490,16 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
 namespace nlohmann {
 
 using namespace nix;
+
+DerivationOutput adl_serializer<DerivationOutput>::from_json(const json & json)
+{
+    return DerivationOutput::fromJSON(json);
+}
+
+void adl_serializer<DerivationOutput>::to_json(json & json, const DerivationOutput & c)
+{
+    json = c.toJSON();
+}
 
 Derivation adl_serializer<Derivation>::from_json(const json & json)
 {
