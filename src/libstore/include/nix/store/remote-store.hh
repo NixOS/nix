@@ -18,18 +18,20 @@ template<typename T>
 class Pool;
 class RemoteFSAccessor;
 
-struct RemoteStoreConfig : virtual StoreConfig
+template<template<typename> class F>
+struct RemoteStoreConfigT
 {
-    using StoreConfig::StoreConfig;
+    F<int>::type maxConnections;
+    F<unsigned int>::type maxConnectionAge;
+};
 
-    const Setting<int> maxConnections{
-        this, 1, "max-connections", "Maximum number of concurrent connections to the Nix daemon."};
+struct RemoteStoreConfig : RemoteStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-    const Setting<unsigned int> maxConnectionAge{
-        this,
-        std::numeric_limits<unsigned int>::max(),
-        "max-connection-age",
-        "Maximum age of a connection before it is closed."};
+    const Store::Config & storeConfig;
+
+    RemoteStoreConfig(const Store::Config &, const StoreConfig::Params &);
 };
 
 /**

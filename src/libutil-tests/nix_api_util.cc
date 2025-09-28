@@ -1,5 +1,5 @@
-#include "nix/util/config-global.hh"
-#include "nix/util/args.hh"
+#include "nix/main/config-global.hh"
+#include "nix/main/args.hh"
 #include "nix_api_util.h"
 #include "nix/util/tests/nix_api_util.hh"
 #include "nix/util/tests/string_callback.hh"

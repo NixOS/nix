@@ -1,3 +1,4 @@
+#include "nix/util/json-utils.hh"
 #include "nix/store/ssh-store.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/remote-store-connection.hh"
@@ -7,14 +8,88 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-registration.hh"
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+constexpr static const SSHStoreConfigT<config::SettingInfoWithDefault> sshStoreConfigDescriptions = {
+    .remoteProgram{
+        {
+            .name = "remote-program",
+            .description = "Path to the `nix-daemon` executable on the remote machine.",
+        },
+        {
+            .makeDefault = []() -> Strings { return {"nix-daemon"}; },
+        },
+    },
+};
+
+#define SSH_STORE_CONFIG_FIELDS(X) X(remoteProgram)
+
+MAKE_PARSE(SSHStoreConfig, sshStoreConfig, SSH_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(SSHStoreConfig, sshStoreConfig, SSH_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap SSHStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(CommonSSHStoreConfig::descriptions());
+    ret.merge(RemoteStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = sshStoreConfigDescriptions;
+        ret.merge(decltype(ret){SSH_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    ret.insert_or_assign(
+        "mounted",
+        config::SettingDescription{
+            .description = stripIndentation(R"(
+                If this nested settings object is defined (`{..}` not `null`), additionally requires that store be mounted in the local file system.
+
+                The mounting of that store is not managed by Nix, and must by managed manually.
+                It could be accomplished with SSHFS or NFS, for example.
+
+                The local file system is used to optimize certain operations.
+                For example, rather than serializing Nix archives and sending over the Nix channel,
+                we can directly access the file system data via the mount-point.
+
+                The local file system is also used to make certain operations possible that wouldn't otherwise be.
+                For example, persistent GC roots can be created if they reside on the same file system as the remote store:
+                the remote side will create the symlinks necessary to avoid race conditions.
+            )"),
+            .experimentalFeature = Xp::MountedSSHStore,
+            .info = config::SettingDescription::Sub{.nullable = true, .map = LocalFSStoreConfig::descriptions()},
+        });
+    return ret;
+}
+
+static std::optional<LocalFSStore::Config> getMounted(
+    const Store::Config & storeConfig,
+    const StoreConfig::Params & params,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    auto mountedParamsOpt = optionalValueAt(params, "mounted");
+    if (!mountedParamsOpt)
+        return {};
+    auto * mountedParamsP = getNullable(*mountedParamsOpt);
+    xpSettings.require(Xp::MountedSSHStore);
+    if (!mountedParamsP)
+        return {};
+    auto & mountedParams = getObject(*mountedParamsP);
+    return {{storeConfig, mountedParams}};
+}
+
+SSHStoreConfig::SSHStoreConfig(
+    std::string_view scheme,
+    std::string_view authority,
+    const StoreConfig::Params & params,
+    const ExperimentalFeatureSettings & xpSettings)
     : Store::Config{params}
-    , RemoteStore::Config{params}
+    , RemoteStore::Config{*this, params}
     , CommonSSHStoreConfig{scheme, authority, params}
+    , SSHStoreConfigT<config::PlainValue>{sshStoreConfigApplyParse(params)}
+    , mounted{getMounted(*this, params, xpSettings)}
 {
 }
 
@@ -87,31 +162,6 @@ protected:
     };
 };
 
-MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(params)
-    , SSHStoreConfig(params)
-    , LocalFSStoreConfig(params)
-{
-}
-
-MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(scheme, host, params)
-    , LocalFSStoreConfig(params)
-{
-}
-
-std::string MountedSSHStoreConfig::doc()
-{
-    return
-#include "mounted-ssh-store.md"
-        ;
-}
-
 /**
  * The mounted ssh store assumes that filesystems on the remote host are
  * shared with the local host. This means that the remote nix store is
@@ -128,13 +178,16 @@ std::string MountedSSHStoreConfig::doc()
  */
 struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 {
-    using Config = MountedSSHStoreConfig;
+    using Config = SSHStore::Config;
 
-    MountedSSHStore(ref<const Config> config)
+    const LocalFSStore::Config & mountedConfig;
+
+    MountedSSHStore(ref<const Config> config, const LocalFSStore::Config & mountedConfig)
         : Store{*config}
         , RemoteStore{*config}
         , SSHStore{config}
-        , LocalFSStore{*config}
+        , LocalFSStore{mountedConfig}
+        , mountedConfig{mountedConfig}
     {
         extraRemoteProgramArgs = {
             "--process-ops",
@@ -187,24 +240,24 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
     }
 };
 
-ref<Store> SSHStore::Config::openStore() const
-{
-    return make_ref<SSHStore>(ref{shared_from_this()});
-}
-
 ref<Store> MountedSSHStore::Config::openStore() const
 {
-    return make_ref<MountedSSHStore>(ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())});
+    ref config{shared_from_this()};
+
+    if (config->mounted)
+        return make_ref<MountedSSHStore>(config, *config->mounted);
+    else
+        return make_ref<SSHStore>(config);
 }
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = config->remoteProgram.get();
+    Strings command = config->remoteProgram;
     command.push_back("--stdio");
-    if (config->remoteStore.get() != "") {
+    if (config->remoteStore != "") {
         command.push_back("--store");
-        command.push_back(config->remoteStore.get());
+        command.push_back(config->remoteStore);
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
     conn->sshConn = master.startCommand(std::move(command));
@@ -214,6 +267,5 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
 }
 
 static RegisterStoreImplementation<SSHStore::Config> regSSHStore;
-static RegisterStoreImplementation<MountedSSHStore::Config> regMountedSSHStore;
 
 } // namespace nix
