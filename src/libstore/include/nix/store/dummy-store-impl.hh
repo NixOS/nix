@@ -60,4 +60,10 @@ struct DummyStore : virtual Store
     bool operator==(const DummyStore &) const;
 };
 
+template<>
+struct json_avoids_null<DummyStore::PathInfoAndContents> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::DummyStore::PathInfoAndContents)

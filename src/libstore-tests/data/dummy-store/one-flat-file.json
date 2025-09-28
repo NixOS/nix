@@ -1,0 +1,38 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {
+    "5hizn7xyyrhxr0k2magvxl5ccvk0ci9n-my-file": {
+      "contents": {
+        "contents": "asdf",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": {
+            "algorithm": "sha256",
+            "format": "base64",
+            "hash": "f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU="
+          },
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": {
+          "algorithm": "sha256",
+          "format": "base64",
+          "hash": "f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU="
+        },
+        "narSize": 120,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "ultimate": false,
+        "version": 2
+      }
+    }
+  },
+  "derivations": {}
+}

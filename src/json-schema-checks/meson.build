@@ -212,6 +212,19 @@ schemas += [
   },
 ]
 
+# Dummy store
+schemas += [
+  {
+    'stem' : 'store',
+    'schema' : schema_dir / 'store-v1.yaml',
+    'files' : [
+      'empty.json',
+      'one-flat-file.json',
+      'one-derivation.json',
+    ],
+  },
+]
+
 # Validate each example against the schema
 foreach schema : schemas
   stem = schema['stem']
