@@ -24,7 +24,6 @@ struct StringToken
     }
 };
 
-// This type must be trivially copyable; see YYLTYPE_IS_TRIVIAL in parser.y.
 struct ParserLocation
 {
     int beginOffset;
