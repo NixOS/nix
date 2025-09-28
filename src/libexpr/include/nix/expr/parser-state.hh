@@ -44,9 +44,6 @@ struct ParserLocation
         beginOffset = stashedBeginOffset;
         endOffset = stashedEndOffset;
     }
-
-    /** Latest doc comment position, or 0. */
-    int doc_comment_first_column, doc_comment_last_column;
 };
 
 struct LexerState
