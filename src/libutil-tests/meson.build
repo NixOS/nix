@@ -63,6 +63,7 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'lru-cache.cc',
+  'memory-source-accessor.cc',
   'monitorfdhup.cc',
   'nix_api_util.cc',
   'nix_api_util_internal.cc',
