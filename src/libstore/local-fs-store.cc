@@ -20,13 +20,17 @@ Path LocalFSStoreConfig::getDefaultLogDir()
 
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
     : StoreConfig(params)
-    // Default `?root` from `rootDir` if non set
-    // FIXME don't duplicate description once we don't have root setting
-    , rootDir{
-          this,
-          !rootDir.empty() && params.count("root") == 0 ? (std::optional<Path>{rootDir}) : std::nullopt,
-          "root",
-          "Directory prefixed to all other paths."}
+    /* Default `?root` from `rootDir` if non set
+     * NOTE: We would like to just do rootDir.set(...), which would take care of
+     * all normalization and error checking for us. Unfortunately we cannot do
+     * that because of the complicated initialization order of other fields with
+     * the virtual class hierarchy of nix store configs, and the design of the
+     * settings system. As such, we have no choice but to redefine the field and
+     * manually repeat the same normalization logic.
+     */
+    , rootDir{makeRootDirSetting(
+          *this,
+          !rootDir.empty() && params.count("root") == 0 ? std::optional<Path>{canonPath(rootDir)} : std::nullopt)}
 {
 }
 
