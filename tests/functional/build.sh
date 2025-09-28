@@ -178,7 +178,7 @@ test "$(<<<"$out" grep -cE '^error:')" = 4
 
 out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -cE '^error:')" = 2
+test "$(<<<"$out" grep -cE '^error:')" = 3
 
 if isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
@@ -190,7 +190,7 @@ fi
 
 out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -cE '^error:')" = 3
+test "$(<<<"$out" grep -cE '^error:')" = 4
 if isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 2 dependencies failed."
