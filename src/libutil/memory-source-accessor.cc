@@ -1,4 +1,7 @@
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/base-n.hh"
+#include "nix/util/bytes.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -58,7 +61,7 @@ std::string MemorySourceAccessor::readFile(const CanonPath & path)
     if (!f)
         throw Error("file '%s' does not exist", path);
     if (auto * r = std::get_if<File::Regular>(&f->raw))
-        return r->contents;
+        return std::string{to_str(r->contents)};
     else
         throw Error("file '%s' is not a regular file", path);
 }
@@ -125,7 +128,7 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
         throw Error("file '%s' is not a symbolic link", path);
 }
 
-SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
+SourcePath MemorySourceAccessor::addFile(CanonPath path, std::vector<std::byte> && contents)
 {
     // Create root directory automatically if necessary as a convenience.
     if (!root && !path.isRoot())
@@ -140,6 +143,11 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
         throw Error("file '%s' is not a regular file", path);
 
     return SourcePath{ref(shared_from_this()), path};
+}
+
+SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string_view contents)
+{
+    return addFile(path, to_owned(as_bytes(contents)));
 }
 
 using File = MemorySourceAccessor::File;
@@ -190,9 +198,10 @@ void CreateMemoryRegularFile::preallocateContents(uint64_t len)
     regularFile.contents.reserve(len);
 }
 
-void CreateMemoryRegularFile::operator()(std::string_view data)
+void CreateMemoryRegularFile::operator()(std::string_view data_)
 {
-    regularFile.contents += data;
+    auto data = as_bytes(data_);
+    regularFile.contents.insert(regularFile.contents.end(), data.begin(), data.end());
 }
 
 void MemorySink::createSymlink(const CanonPath & path, const std::string & target)
@@ -222,3 +231,106 @@ ref<SourceAccessor> makeEmptySourceAccessor()
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+MemorySourceAccessor::File::Regular adl_serializer<MemorySourceAccessor::File::Regular>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    return MemorySourceAccessor::File::Regular{
+        .executable = getBoolean(valueAt(obj, "executable")),
+        .contents = to_owned(as_bytes(base64::decode(getString(valueAt(obj, "contents"))))),
+    };
+}
+
+void adl_serializer<MemorySourceAccessor::File::Regular>::to_json(
+    json & json, const MemorySourceAccessor::File::Regular & val)
+{
+    json = {
+        {"executable", val.executable},
+        {"contents", base64::encode(val.contents)},
+    };
+}
+
+MemorySourceAccessor::File::Directory
+adl_serializer<MemorySourceAccessor::File::Directory>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    return MemorySourceAccessor::File::Directory{
+        .contents = valueAt(obj, "contents"),
+    };
+}
+
+void adl_serializer<MemorySourceAccessor::File::Directory>::to_json(
+    json & json, const MemorySourceAccessor::File::Directory & val)
+{
+    json = {
+        {"contents", val.contents},
+    };
+}
+
+MemorySourceAccessor::File::Symlink adl_serializer<MemorySourceAccessor::File::Symlink>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    return MemorySourceAccessor::File::Symlink{
+        .target = getString(valueAt(obj, "target")),
+    };
+}
+
+void adl_serializer<MemorySourceAccessor::File::Symlink>::to_json(
+    json & json, const MemorySourceAccessor::File::Symlink & val)
+{
+    json = {
+        {"target", val.target},
+    };
+}
+
+MemorySourceAccessor::File adl_serializer<MemorySourceAccessor::File>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    auto type = getString(valueAt(obj, "type"));
+    if (type == "regular")
+        return static_cast<MemorySourceAccessor::File::Regular>(json);
+    if (type == "directory")
+        return static_cast<MemorySourceAccessor::File::Directory>(json);
+    if (type == "symlink")
+        return static_cast<MemorySourceAccessor::File::Symlink>(json);
+    else
+        throw Error("unknown type of file '%s'", type);
+}
+
+void adl_serializer<MemorySourceAccessor::File>::to_json(json & json, const MemorySourceAccessor::File & val)
+{
+    std::visit(
+        overloaded{
+            [&](const MemorySourceAccessor::File::Regular & r) {
+                json = r;
+                json["type"] = "regular";
+            },
+            [&](const MemorySourceAccessor::File::Directory & d) {
+                json = d;
+                json["type"] = "directory";
+            },
+            [&](const MemorySourceAccessor::File::Symlink & s) {
+                json = s;
+                json["type"] = "symlink";
+            },
+        },
+        val.raw);
+}
+
+MemorySourceAccessor adl_serializer<MemorySourceAccessor>::from_json(const json & json)
+{
+    MemorySourceAccessor res;
+    res.root = json;
+    return res;
+}
+
+void adl_serializer<MemorySourceAccessor>::to_json(json & json, const MemorySourceAccessor & val)
+{
+    json = val.root;
+}
+
+} // namespace nlohmann

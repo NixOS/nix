@@ -12,6 +12,7 @@ headers = files(
   'array-from-string-literal.hh',
   'base-n.hh',
   'base-nix-32.hh',
+  'bytes.hh',
   'callback.hh',
   'canon-path.hh',
   'checked-arithmetic.hh',

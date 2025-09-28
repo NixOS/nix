@@ -21,6 +21,14 @@ schema_dir = meson.current_source_dir() / 'schema'
 # Get all example files
 schemas = [
   {
+    'stem' : 'file-system-object',
+    'schema' : schema_dir / 'file-system-object-v1.yaml',
+    'files' : [
+      'simple.json',
+      'complex.json',
+    ],
+  },
+  {
     'stem' : 'hash',
     'schema' : schema_dir / 'hash-v1.yaml',
     'files' : [
@@ -64,8 +72,6 @@ foreach schema : schemas
       stem + '-schema-valid',
       jv,
       args : [
-        '--map',
-        './hash-v1.yaml=' + schema_dir / 'hash-v1.yaml',
         'http://json-schema.org/draft-04/schema',
         schema_file,
       ],

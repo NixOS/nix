@@ -12,3 +12,4 @@ s/\\`/`/g
 # As we have more such relative links, more replacements of this nature
 # should appear below.
 s^\(./hash-v1.yaml\)\?#/$defs/algorithm^[JSON format for `Hash`](./hash.html#algorithm)^g
+s^#/\$defs/\(regular\|symlink\|directory\)^In this schema^g
