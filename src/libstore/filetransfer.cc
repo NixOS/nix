@@ -594,10 +594,21 @@ struct curlFileTransfer : public FileTransfer
             }
         };
 
-        bool quit = false;
         std::
             priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator>
                 incoming;
+    private:
+        bool quitting = false;
+    public:
+        void quit()
+        {
+            quitting = true;
+        }
+
+        bool isQuitting()
+        {
+            return quitting;
+        }
     };
 
     Sync<State> state_;
@@ -649,7 +660,7 @@ struct curlFileTransfer : public FileTransfer
         /* Signal the worker thread to exit. */
         {
             auto state(state_.lock());
-            state->quit = true;
+            state->quit();
         }
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
@@ -750,7 +761,7 @@ struct curlFileTransfer : public FileTransfer
                         break;
                     }
                 }
-                quit = state->quit;
+                quit = state->isQuitting();
             }
 
             for (auto & item : incoming) {
@@ -778,7 +789,7 @@ struct curlFileTransfer : public FileTransfer
             auto state(state_.lock());
             while (!state->incoming.empty())
                 state->incoming.pop();
-            state->quit = true;
+            state->quit();
         }
     }
 
@@ -789,7 +800,7 @@ struct curlFileTransfer : public FileTransfer
 
         {
             auto state(state_.lock());
-            if (state->quit)
+            if (state->isQuitting())
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
@@ -845,7 +856,7 @@ ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-    if (fileTransfer->state_.lock()->quit)
+    if (fileTransfer->state_.lock()->isQuitting())
         fileTransfer = makeCurlFileTransfer();
 
     return fileTransfer;
