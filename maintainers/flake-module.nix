@@ -125,8 +125,6 @@
               ''^tests/functional/local-overlay-store/add-lower-inner\.sh$''
               ''^tests/functional/local-overlay-store/add-lower\.sh$''
               ''^tests/functional/local-overlay-store/bad-uris\.sh$''
-              ''^tests/functional/local-overlay-store/build-inner\.sh$''
-              ''^tests/functional/local-overlay-store/build\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
