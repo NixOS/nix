@@ -330,7 +330,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
         throw;
     }
     if (buf.is_absolute())
-        roots[buf].emplace(file.string());
+        roots[buf.string()].emplace(file.string());
 }
 
 static std::string quoteRegexChars(const std::string & raw)
@@ -343,7 +343,7 @@ static std::string quoteRegexChars(const std::string & raw)
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
-        roots[readFile(path)].emplace(path);
+        roots[readFile(path)].emplace(path.string());
     } catch (SysError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
