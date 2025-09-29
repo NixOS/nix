@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/impure-derivations\.sh$''
               ''^tests/functional/impure-eval\.sh$''
               ''^tests/functional/install-darwin\.sh$''
               ''^tests/functional/legacy-ssh-store\.sh$''
