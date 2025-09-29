@@ -603,6 +603,9 @@ struct curlFileTransfer : public FileTransfer
         void quit()
         {
             quitting = true;
+            /* We wil not be processing any more incomming requests */
+            while (!incoming.empty())
+                incoming.pop();
         }
 
         bool isQuitting()
@@ -787,8 +790,6 @@ struct curlFileTransfer : public FileTransfer
 
         {
             auto state(state_.lock());
-            while (!state->incoming.empty())
-                state->incoming.pop();
             state->quit();
         }
     }
