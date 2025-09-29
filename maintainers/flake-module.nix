@@ -127,8 +127,6 @@
               ''^tests/functional/local-overlay-store/bad-uris\.sh$''
               ''^tests/functional/local-overlay-store/build-inner\.sh$''
               ''^tests/functional/local-overlay-store/build\.sh$''
-              ''^tests/functional/local-overlay-store/check-post-init-inner\.sh$''
-              ''^tests/functional/local-overlay-store/check-post-init\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
