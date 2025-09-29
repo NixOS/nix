@@ -168,23 +168,6 @@
               ''^tests/functional/user-envs\.builder\.sh$''
               ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
-
-              # Content-addressed test files that use recursive-*looking* sourcing
-              # (cd .. && source <self>), causing shellcheck to loop
-              # They're small wrapper scripts with not a lot going on
-              ''^tests/functional/ca/build-delete\.sh$''
-              ''^tests/functional/ca/build-dry\.sh$''
-              ''^tests/functional/ca/eval-store\.sh$''
-              ''^tests/functional/ca/gc\.sh$''
-              ''^tests/functional/ca/import-from-derivation\.sh$''
-              ''^tests/functional/ca/multiple-outputs\.sh$''
-              ''^tests/functional/ca/new-build-cmd\.sh$''
-              ''^tests/functional/ca/nix-shell\.sh$''
-              ''^tests/functional/ca/post-hook\.sh$''
-              ''^tests/functional/ca/recursive\.sh$''
-              ''^tests/functional/ca/repl\.sh$''
-              ''^tests/functional/ca/selfref-gc\.sh$''
-              ''^tests/functional/ca/why-depends\.sh$''
             ];
           };
         };
