@@ -301,7 +301,7 @@ nix_err nix_store_drv_from_path(
     void * userdata);
 
 /**
- * @brief Queries for the nix store path info.
+ * @brief Queries for the nix store path info JSON.
  *
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
@@ -314,7 +314,7 @@ nix_err nix_store_query_path_info(
     Store * store,
     const StorePath * store_path,
     void * userdata,
-    void (*callback)(void * userdata, const StorePath * derived_path));
+    nix_get_string_callback callback);
 
 /**
  * @brief Builds the paths, if they are a derivation then they get built.

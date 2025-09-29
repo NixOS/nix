@@ -286,19 +286,15 @@ nix_err nix_store_query_path_info(
     Store * store,
     const StorePath * store_path,
     void * userdata,
-    void (*callback)(void * userdata, const StorePath * derived_path))
+    nix_get_string_callback callback)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto info = store->ptr->queryPathInfo(store_path->path);
         if (callback) {
-            if (auto deriver = info->deriver) {
-                const StorePath deriver_tmp{*info->deriver};
-                callback(userdata, &deriver_tmp);
-            } else {
-                callback(userdata, nullptr);
-            }
+            auto result = info->toJSON(store->ptr->config, true, nix::HashFormat::Nix32).dump();
+            callback(result.data(), result.size(), userdata);
         }
     }
     NIXC_CATCH_ERRS
