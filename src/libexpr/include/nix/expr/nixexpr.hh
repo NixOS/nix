@@ -2,8 +2,10 @@
 ///@file
 
 #include <map>
+#include <span>
 #include <vector>
 #include <memory_resource>
+#include <algorithm>
 
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
@@ -79,9 +81,11 @@ struct AttrName
         : expr(e) {};
 };
 
+static_assert(std::is_trivially_copy_constructible_v<AttrName>);
+
 typedef std::vector<AttrName> AttrPath;
 
-std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
+std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
@@ -288,25 +292,43 @@ struct ExprInheritFrom : ExprVar
 struct ExprSelect : Expr
 {
     PosIdx pos;
+    uint32_t nAttrPath;
     Expr *e, *def;
-    AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def)
+    AttrName * attrPathStart;
+
+    ExprSelect(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        Expr * e,
+        std::span<const AttrName> attrPath,
+        Expr * def)
         : pos(pos)
+        , nAttrPath(attrPath.size())
         , e(e)
         , def(def)
-        , attrPath(std::move(attrPath)) {};
+        , attrPathStart(alloc.allocate_object<AttrName>(nAttrPath))
+    {
+        std::ranges::copy(attrPath, attrPathStart);
+    };
 
-    ExprSelect(const PosIdx & pos, Expr * e, Symbol name)
+    ExprSelect(std::pmr::polymorphic_allocator<char> & alloc, const PosIdx & pos, Expr * e, Symbol name)
         : pos(pos)
+        , nAttrPath(1)
         , e(e)
         , def(0)
+        , attrPathStart((alloc.allocate_object<AttrName>()))
     {
-        attrPath.push_back(AttrName(name));
+        *attrPathStart = AttrName(name);
     };
 
     PosIdx getPos() const override
     {
         return pos;
+    }
+
+    std::span<const AttrName> getAttrPath() const
+    {
+        return {attrPathStart, nAttrPath};
     }
 
     /**
