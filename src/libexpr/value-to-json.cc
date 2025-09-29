@@ -38,9 +38,9 @@ json printValueAsJSON(
 
     case nPath:
         if (copyToStore)
-            out = state.store->printStorePath(state.copyPathToStore(context, v.path()));
+            out = state.store->printStorePath(state.copyPathToStore(context, state.rootPath(v.path())));
         else
-            out = v.path().path.abs();
+            out = v.path().abs();
         break;
 
     case nNull:

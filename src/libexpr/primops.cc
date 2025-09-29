@@ -1968,7 +1968,7 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value ** args, Value
     state.forceValue(*args[0], pos);
     if (args[0]->type() == nPath) {
         auto path = args[0]->path();
-        v.mkPath(path.path.isRoot() ? path : path.parent());
+        v.mkPath(path.parent().value_or(CanonPath::root));
     } else {
         NixStringContext context;
         auto path = state.coerceToString(
@@ -2080,7 +2080,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
     auto path =
         state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.findFile");
 
-    v.mkPath(state.findFile(lookupPath, path, pos));
+    v.mkPath(state.findFile(lookupPath, path, pos).path); // FIXME
 }
 
 static RegisterPrimOp primop_findFile(
@@ -2318,7 +2318,8 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Val
             // detailed node info quickly in this case we produce a thunk to
             // query the file type lazily.
             auto epath = state.allocValue();
-            epath->mkPath(path / name);
+            assert(path.accessor == state.rootFS);
+            epath->mkPath(path.path / name); // FIXME
             if (!readFileType)
                 readFileType = &state.getBuiltin("readFileType");
             attr.mkApp(readFileType, epath);

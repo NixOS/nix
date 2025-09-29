@@ -211,21 +211,19 @@ struct ExprString : Expr
 
 struct ExprPath : Expr
 {
-    ref<SourceAccessor> accessor;
     Value v;
 
-    ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
-        : accessor(accessor)
+    ExprPath(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
         auto len = sv.length();
         if (len == 0) {
-            v.mkPath(&*accessor, "");
+            v.mkPath("");
             return;
         }
         char * s = alloc.allocate(len + 1);
         sv.copy(s, len);
         s[len] = '\0';
-        v.mkPath(&*accessor, s);
+        v.mkPath(s);
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;

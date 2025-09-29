@@ -213,6 +213,8 @@ EvalState::EvalState(
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
+    , corepkgsFS(make_ref<MemorySourceAccessor>())
+    , corepkgsPath(StorePath::random("source"))
     , storeFS(makeMountedSourceAccessor({
           {CanonPath::root, makeEmptySourceAccessor()},
           /* In the pure eval case, we can simply require
@@ -266,7 +268,6 @@ EvalState::EvalState(
 
         return accessor;
     }())
-    , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
           CanonPath("derivation-internal.nix"),
@@ -292,6 +293,9 @@ EvalState::EvalState(
 {
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
+
+    storeFS->mount(CanonPath(store->printStorePath(corepkgsPath)), corepkgsFS);
+    allowPath(corepkgsPath);
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
@@ -852,9 +856,9 @@ void Value::mkStringMove(const char * s, const NixStringContext & context)
     mkStringNoCopy(s, encodeContext(context));
 }
 
-void Value::mkPath(const SourcePath & path)
+void Value::mkPath(const CanonPath & path)
 {
-    mkPath(&*path.accessor, makeImmutableString(path.path.abs()));
+    mkPath(makeImmutableString(path.abs()));
 }
 
 inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
@@ -2127,7 +2131,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 .atPos(pos)
                 .withFrame(env, *this)
                 .debugThrow();
-        v.mkPath(state.rootPath(CanonPath(str())));
+        v.mkPath(CanonPath(str()));
     } else
         v.mkStringMove(c_str(), context);
 }
@@ -2388,8 +2392,8 @@ BackedStringView EvalState::coerceToString(
                    ? // FIXME: hack to preserve path literals that end in a
                      // slash, as in /foo/${x}.
                    v.pathStr()
-                   : copyToStore ? store->printStorePath(copyPathToStore(context, v.path()))
-                                 : std::string(v.path().path.abs());
+                   : copyToStore ? store->printStorePath(copyPathToStore(context, rootPath(v.path())))
+                                 : std::string(v.path().abs());
     }
 
     if (v.type() == nAttrs) {
@@ -2498,7 +2502,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
 
     /* Handle path values directly, without coercing to a string. */
     if (v.type() == nPath)
-        return v.path();
+        return rootPath(v.path());
 
     /* Similarly, handle __toString where the result may be a path
        value. */
@@ -2652,13 +2656,6 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nPath:
-        if (v1.pathAccessor() != v2.pathAccessor()) {
-            error<AssertionError>(
-                "path '%s' is not equal to path '%s' because their accessors are different",
-                ValuePrinter(*this, v1, errorPrintOptions),
-                ValuePrinter(*this, v2, errorPrintOptions))
-                .debugThrow();
-        }
         if (strcmp(v1.pathStr(), v2.pathStr()) != 0) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s'",
@@ -2828,9 +2825,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         return strcmp(v1.c_str(), v2.c_str()) == 0;
 
     case nPath:
-        return
-            // FIXME: compare accessors by their fingerprint.
-            v1.pathAccessor() == v2.pathAccessor() && strcmp(v1.pathStr(), v2.pathStr()) == 0;
+        return strcmp(v1.pathStr(), v2.pathStr()) == 0;
 
     case nNull:
         return true;
@@ -3136,7 +3131,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
     }
 
     if (hasPrefix(path, "nix/"))
-        return {corepkgsFS, CanonPath(path.substr(3))};
+        return rootPath(CanonPath(store->printStorePath(corepkgsPath)) / CanonPath(path.substr(3)));
 
     error<ThrownError>(
         settings.pureEval ? "cannot look up '<%s>' in pure evaluation mode (use '--impure' to override)"

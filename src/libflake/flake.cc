@@ -126,13 +126,7 @@ static FlakeInput parseFlakeInput(
                     url = attr.value->string_view();
                 else if (attr.value->type() == nPath) {
                     auto path = attr.value->path();
-                    if (path.accessor != flakeDir.accessor)
-                        throw Error(
-                            "input attribute path '%s' at %s must be in the same source tree as %s",
-                            path,
-                            state.positions[attr.pos],
-                            flakeDir);
-                    url = "path:" + flakeDir.path.makeRelative(path.path);
+                    url = "path:" + flakeDir.path.makeRelative(attr.value->path());
                 } else
                     throw Error(
                         "expected a string or a path but got %s at %s",
@@ -274,8 +268,8 @@ static Flake readFlake(
                 flake.config.settings.emplace(
                     state.symbols[setting.name], std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                auto storePath =
-                    fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
+                auto storePath = fetchToStore(
+                    state.fetchSettings, *state.store, state.rootPath(setting.value->path()), FetchMode::Copy);
                 flake.config.settings.emplace(state.symbols[setting.name], state.store->printStorePath(storePath));
             } else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
