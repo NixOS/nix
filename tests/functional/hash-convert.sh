@@ -99,7 +99,7 @@ try3() {
     expectStderr 1 nix hash convert --hash-algo "$1" --from nix32 "$4" | grepQuiet "input hash"
 
     # Base-16 hashes can be in uppercase.
-    nix hash convert --hash-algo "$1" --from base16 "$(echo $2 | tr [a-z] [A-Z])"
+    nix hash convert --hash-algo "$1" --from base16 "$(echo "$2" | tr '[:lower:]' '[:upper:]')"
 }
 
 try3 sha1 "800d59cfcd3c05e900cb4e214be48f6b886a08df" "vw46m23bizj4n8afrc0fj19wrp7mj3c0" "gA1Zz808BekAy04hS+SPa4hqCN8="

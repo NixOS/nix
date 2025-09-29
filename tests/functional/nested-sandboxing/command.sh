@@ -1,17 +1,20 @@
+# shellcheck shell=bash
 set -eu -o pipefail
 
-export NIX_BIN_DIR=$(dirname $(type -p nix))
+NIX_BIN_DIR=$(dirname "$(type -p nix)")
+export NIX_BIN_DIR
 # TODO Get Nix and its closure more flexibly
-export EXTRA_SANDBOX="/nix/store $(dirname $NIX_BIN_DIR)"
+EXTRA_SANDBOX="/nix/store $(dirname "$NIX_BIN_DIR")"
+export EXTRA_SANDBOX
 
 badStoreUrl () {
     local altitude=$1
-    echo $TEST_ROOT/store-$altitude
+    echo "$TEST_ROOT"/store-"$altitude"
 }
 
 goodStoreUrl () {
     local altitude=$1
-    echo $("badStoreUrl" "$altitude")?store=/foo-$altitude
+    echo "$("badStoreUrl" "$altitude")"?store=/foo-"$altitude"
 }
 
 # The non-standard sandbox-build-dir helps ensure that we get the same behavior

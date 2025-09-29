@@ -1,29 +1,31 @@
+# shellcheck shell=bash
+# shellcheck disable=SC2154
 echo "DOING $text"
 
 
 # increase counter
-while ! ln -s x $shared.lock 2> /dev/null; do
+while ! ln -s x "$shared".lock 2> /dev/null; do
     sleep 1
 done
-test -f $shared.cur || echo 0 > $shared.cur
-test -f $shared.max || echo 0 > $shared.max
-new=$(($(cat $shared.cur) + 1))
-if test $new -gt $(cat $shared.max); then
-    echo $new > $shared.max
+test -f "$shared".cur || echo 0 > "$shared".cur
+test -f "$shared".max || echo 0 > "$shared".max
+new=$(($(cat "$shared".cur) + 1))
+if test $new -gt "$(cat "$shared".max)"; then
+    echo $new > "$shared".max
 fi
-echo $new > $shared.cur
-rm $shared.lock
+echo $new > "$shared".cur
+rm "$shared".lock
 
 
-echo -n $(cat $inputs)$text > $out
+echo -n "$(cat "$inputs")""$text" > "$out"
 
-sleep $sleepTime
+sleep "$sleepTime"
 
 
 # decrease counter
-while ! ln -s x $shared.lock 2> /dev/null; do
+while ! ln -s x "$shared".lock 2> /dev/null; do
     sleep 1
 done
-test -f $shared.cur || echo 0 > $shared.cur
-echo $(($(cat $shared.cur) - 1)) > $shared.cur
-rm $shared.lock
+test -f "$shared".cur || echo 0 > "$shared".cur
+echo $(($(cat "$shared".cur) - 1)) > "$shared".cur
+rm "$shared".lock
