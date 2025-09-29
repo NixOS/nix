@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <memory_resource>
 
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
@@ -83,6 +84,13 @@ typedef std::vector<AttrName> AttrPath;
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
+
+class Exprs
+{
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+};
 
 /* Abstract syntax of Nix expressions. */
 
@@ -173,13 +181,28 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    std::string s;
     Value v;
 
-    ExprString(std::string && s)
-        : s(std::move(s))
+    /**
+     * This is only for strings already allocated in our polymorphic allocator,
+     * or that live at least that long (e.g. c++ string literals)
+     */
+    ExprString(const char * s)
     {
-        v.mkStringNoCopy(this->s.data());
+        v.mkStringNoCopy(s);
+    };
+
+    ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
+    {
+        auto len = sv.length();
+        if (len == 0) {
+            v.mkStringNoCopy("");
+            return;
+        }
+        char * s = alloc.allocate(len + 1);
+        sv.copy(s, len);
+        s[len] = '\0';
+        v.mkStringNoCopy(s);
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
