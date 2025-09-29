@@ -781,14 +781,18 @@ struct curlFileTransfer : public FileTransfer
 
     void workerThreadEntry()
     {
+        // Unwinding or because someone called `quit`.
+        bool normalExit = true;
         try {
             workerThreadMain();
         } catch (nix::Interrupted & e) {
+            normalExit = false;
         } catch (std::exception & e) {
             printError("unexpected error in download thread: %s", e.what());
+            normalExit = false;
         }
 
-        {
+        if (!normalExit) {
             auto state(state_.lock());
             state->quit();
         }
