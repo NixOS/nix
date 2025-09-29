@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/gc-concurrent2\.builder\.sh$''
               ''^tests/functional/gc-non-blocking\.sh$''
               ''^tests/functional/hash-convert\.sh$''
               ''^tests/functional/impure-derivations\.sh$''
