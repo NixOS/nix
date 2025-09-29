@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/nested-sandboxing/command\.sh$''
               ''^tests/functional/nix-build\.sh$''
               ''^tests/functional/nix-channel\.sh$''
               ''^tests/functional/nix-collect-garbage-d\.sh$''
