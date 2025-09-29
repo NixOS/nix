@@ -141,7 +141,6 @@
               ''^tests/functional/local-overlay-store/redundant-add-inner\.sh$''
               ''^tests/functional/local-overlay-store/redundant-add\.sh$''
               ''^tests/functional/local-overlay-store/remount\.sh$''
-              ''^tests/functional/local-overlay-store/stale-file-handle-inner\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
