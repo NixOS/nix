@@ -122,8 +122,6 @@
               ''^tests/functional/install-darwin\.sh$''
               ''^tests/functional/legacy-ssh-store\.sh$''
               ''^tests/functional/linux-sandbox\.sh$''
-              ''^tests/functional/local-overlay-store/add-lower-inner\.sh$''
-              ''^tests/functional/local-overlay-store/add-lower\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
