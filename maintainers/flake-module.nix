@@ -139,7 +139,6 @@
               ''^tests/functional/local-overlay-store/optimise-inner\.sh$''
               ''^tests/functional/local-overlay-store/optimise\.sh$''
               ''^tests/functional/local-overlay-store/redundant-add-inner\.sh$''
-              ''^tests/functional/local-overlay-store/redundant-add\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
