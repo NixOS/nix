@@ -38,8 +38,8 @@ overlayPath="$storeBRoot/nix/store/$dupFilename"
 lowerInode=$(stat -c %i "$lowerPath")
 upperInode=$(stat -c %i "$upperPath")
 overlayInode=$(stat -c %i "$overlayPath")
-[[ $upperInode == $overlayInode ]]
-[[ $upperInode != $lowerInode ]]
+[[ $upperInode == "$overlayInode" ]]
+[[ $upperInode != "$lowerInode" ]]
 
 # Run optimise to deduplicate store paths
 nix-store --store "$storeB" --optimise

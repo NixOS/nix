@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 source common.sh
 source ../common/init.sh
 

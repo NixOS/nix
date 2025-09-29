@@ -22,14 +22,14 @@ mountOverlayfs
 pathInLowerStore=$(nix-store --store "$storeA" --add ../dummy)
 
 # upper layer should not have it
-expect 1 stat $(toRealPath "$storeBTop/nix/store" "$pathInLowerStore")
+expect 1 stat "$(toRealPath "$storeBTop/nix/store" "$pathInLowerStore")"
 
 pathFromB=$(nix-store --store "$storeB" --add ../dummy)
 
-[[ $pathInLowerStore == $pathFromB ]]
+[[ $pathInLowerStore == "$pathFromB" ]]
 
 # lower store should have it from before
-stat $(toRealPath "$storeA/nix/store" "$pathInLowerStore")
+stat "$(toRealPath "$storeA/nix/store" "$pathInLowerStore")"
 
 # upper layer should still not have it (no redundant copy)
-expect 1 stat $(toRealPath "$storeBTop" "$pathInLowerStore")
+expect 1 stat "$(toRealPath "$storeBTop" "$pathInLowerStore")"

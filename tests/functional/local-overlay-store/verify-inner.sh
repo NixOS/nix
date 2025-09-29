@@ -20,7 +20,7 @@ mountOverlayfs
 ## Initialise stores for test
 
 # Realise a derivation from the lower store to propagate paths to overlay DB
-nix-store --store "$storeB" --realise $drvPath
+nix-store --store "$storeB" --realise "$drvPath"
 
 # Also ensure dummy file exists in overlay DB
 dummyPath=$(nix-store --store "$storeB" --add ../dummy)

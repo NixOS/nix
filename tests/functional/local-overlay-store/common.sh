@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 source ../common/vars.sh
 source ../common/functions.sh
 
@@ -54,6 +55,7 @@ setupStoreDirs () {
   storeA="$storeVolume/store-a"
   storeBTop="$storeVolume/store-b"
   storeBRoot="$storeVolume/merged-store"
+  # shellcheck disable=SC2034
   storeB="local-overlay://?root=$storeBRoot&lower-store=$storeA&upper-layer=$storeBTop"
   # Creating testing directories
   mkdir -p "$storeVolume"/{store-a/nix/store,store-b,merged-store/nix/store,workdir}
@@ -69,8 +71,10 @@ mountOverlayfs () {
     || skipTest "overlayfs is not supported"
 
   cleanupOverlay () {
+    # shellcheck disable=2317
     umount -n "$storeBRoot/nix/store"
-    rm -r $storeVolume/workdir
+    # shellcheck disable=2317
+    rm -r "$storeVolume"/workdir
   }
   trap cleanupOverlay EXIT
 }
@@ -82,7 +86,8 @@ remountOverlayfs () {
 toRealPath () {
   storeDir=$1; shift
   storePath=$1; shift
-  echo $storeDir$(echo $storePath | sed "s^${NIX_STORE_DIR:-/nix/store}^^")
+  # shellcheck disable=SC2001
+  echo "$storeDir""$(echo "$storePath" | sed "s^${NIX_STORE_DIR:-/nix/store}^^")"
 }
 
 initLowerStore () {
@@ -90,8 +95,9 @@ initLowerStore () {
   nix-store --store "$storeA" --add ../dummy
 
   # Build something in lower store
-  drvPath=$(nix-instantiate --store $storeA ../hermetic.nix --arg withFinalRefs true --arg busybox "$busybox" --arg seed 1)
-  pathInLowerStore=$(nix-store --store "$storeA" --realise $drvPath)
+  drvPath=$(nix-instantiate --store "$storeA" ../hermetic.nix --arg withFinalRefs true --arg busybox "$busybox" --arg seed 1)
+  # shellcheck disable=SC2034
+  pathInLowerStore=$(nix-store --store "$storeA" --realise "$drvPath")
 }
 
 addTextToStore() {
