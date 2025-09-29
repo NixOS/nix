@@ -144,7 +144,6 @@
               ''^tests/functional/local-overlay-store/stale-file-handle-inner\.sh$''
               ''^tests/functional/local-overlay-store/stale-file-handle\.sh$''
               ''^tests/functional/local-overlay-store/verify-inner\.sh$''
-              ''^tests/functional/local-overlay-store/verify\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
