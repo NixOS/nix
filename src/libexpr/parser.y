@@ -1,5 +1,7 @@
+%skeleton "lalr1.cc"
 %define api.location.type { ::nix::ParserLocation }
-%define api.pure
+%define api.namespace { ::nix::parser }
+%define api.parser.class { BisonParser }
 %locations
 %define parse.error verbose
 %defines
@@ -26,19 +28,12 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/parser-state.hh"
 
-// Bison seems to have difficulty growing the parser stack when using C++ with
-// a custom location type. This undocumented macro tells Bison that our
-// location type is "trivially copyable" in C++-ese, so it is safe to use the
-// same memcpy macro it uses to grow the stack that it uses with its own
-// default location type. Without this, we get "error: memory exhausted" when
-// parsing some large Nix files. Our other options are to increase the initial
-// stack size (200 by default) to be as large as we ever want to support (so
-// that growing the stack is unnecessary), or redefine the stack-relocation
-// macro ourselves (which is also undocumented).
-#define YYLTYPE_IS_TRIVIAL 1
-
-#define YY_DECL int yylex \
-    (YYSTYPE * yylval_param, YYLTYPE * yylloc_param, yyscan_t yyscanner, nix::ParserState * state)
+#define YY_DECL                                    \
+    int yylex(                                     \
+        nix::Parser::value_type * yylval_param,    \
+        nix::Parser::location_type * yylloc_param, \
+        yyscan_t yyscanner,                        \
+        nix::ParserState * state)
 
 // For efficiency, we only track offsets; not line,column coordinates
 # define YYLLOC_DEFAULT(Current, Rhs, N)                                \
@@ -78,24 +73,30 @@ Expr * parseExprFromBuf(
 
 %{
 
-#include "parser-tab.hh"
-#include "lexer-tab.hh"
+/* The parser is very performance sensitive and loses out on a lot
+   of performance even with basic stdlib assertions. Since those don't
+   affect ABI we can disable those just for this file. */
+#if defined(_GLIBCXX_ASSERTIONS) && !defined(_GLIBCXX_DEBUG)
+#undef _GLIBCXX_ASSERTIONS
+#endif
+
+#include "parser-scanner-decls.hh"
 
 YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->at(yyloc)
+#define CUR_POS state->at(yylhs.location)
 
-
-void yyerror(YYLTYPE * loc, yyscan_t scanner, ParserState * state, const char * error)
+void parser::BisonParser::error(const location_type &loc_, const std::string &error)
 {
+    auto loc = loc_;
     if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
-        loc->beginOffset = loc->endOffset;
+        loc.beginOffset = loc.endOffset;
     }
     throw ParseError({
         .msg = HintFmt(error),
-        .pos = state->positions[state->at(*loc)]
+        .pos = state->positions[state->at(loc)]
     });
 }
 
@@ -182,7 +183,7 @@ start: expr {
   state->result = $1;
 
   // This parser does not use yynerrs; suppress the warning.
-  (void) yynerrs;
+  (void) yynerrs_;
 };
 
 expr: expr_function;
@@ -563,7 +564,8 @@ Expr * parseExprFromBuf(
     Finally _destroy([&] { yylex_destroy(scanner); });
 
     yy_scan_buffer(text, length, scanner);
-    yyparse(scanner, &state);
+    Parser parser(scanner, &state);
+    parser.parse();
 
     return state.result;
 }

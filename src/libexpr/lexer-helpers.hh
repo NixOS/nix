@@ -2,16 +2,12 @@
 
 #include <cstddef>
 
-// including the generated headers twice leads to errors
-#ifndef BISON_HEADER
-#  include "lexer-tab.hh"
-#  include "parser-tab.hh"
-#endif
+#include "parser-scanner-decls.hh"
 
 namespace nix::lexer::internal {
 
-void initLoc(YYLTYPE * loc);
+void initLoc(Parser::location_type * loc);
 
-void adjustLoc(yyscan_t yyscanner, YYLTYPE * loc, const char * s, size_t len);
+void adjustLoc(yyscan_t yyscanner, Parser::location_type * loc, const char * s, size_t len);
 
 } // namespace nix::lexer::internal

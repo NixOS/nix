@@ -82,6 +82,10 @@ static void requireExperimentalFeature(const ExperimentalFeature & feature, cons
 
 }
 
+using enum nix::Parser::token::token_kind_type;
+using YYSTYPE = nix::Parser::value_type;
+using YYLTYPE = nix::Parser::location_type;
+
 // yacc generates code that uses unannotated fallthrough.
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 
