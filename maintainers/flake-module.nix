@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/parallel\.sh$''
               ''^tests/functional/pass-as-file\.sh$''
               ''^tests/functional/path-from-hash-part\.sh$''
               ''^tests/functional/path-info\.sh$''
