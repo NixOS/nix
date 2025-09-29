@@ -172,7 +172,6 @@
               # Content-addressed test files that use recursive-*looking* sourcing
               # (cd .. && source <self>), causing shellcheck to loop
               # They're small wrapper scripts with not a lot going on
-              ''^tests/functional/ca/build-delete\.sh$''
               ''^tests/functional/ca/build-dry\.sh$''
               ''^tests/functional/ca/eval-store\.sh$''
               ''^tests/functional/ca/gc\.sh$''
