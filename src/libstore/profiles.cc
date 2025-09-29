@@ -200,6 +200,12 @@ void deleteGenerationsFilter(
     if (olderThan.has_value()) {
         older = current;
         iterDropUntil(gens, older, [&](auto & g) { return g.creationTime < *olderThan; });
+        /* Take the previous generation
+
+           We don't want delete this one yet because it
+           existed at the requested point in time, and
+           we want to be able to roll back to it. */
+        iterDrop(gens, older);
     }
 
     // Find first generation to delete by clamping between keepMin and keepMax
