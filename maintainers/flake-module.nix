@@ -130,8 +130,6 @@
               ''^tests/functional/local-overlay-store/check-post-init-inner\.sh$''
               ''^tests/functional/local-overlay-store/check-post-init\.sh$''
               ''^tests/functional/local-overlay-store/common\.sh$''
-              ''^tests/functional/local-overlay-store/delete-duplicate-inner\.sh$''
-              ''^tests/functional/local-overlay-store/delete-duplicate\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
