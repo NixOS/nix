@@ -8,7 +8,7 @@
     "BIG_BAD": "WOLF"
   },
   "inputDrvs": {
-    "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
+    "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
       "dynamicOutputs": {},
       "outputs": [
         "cat",
@@ -17,9 +17,10 @@
     }
   },
   "inputSrcs": [
-    "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
+    "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
   ],
   "name": "simple-derivation",
   "outputs": {},
-  "system": "wasm-sel4"
+  "system": "wasm-sel4",
+  "version": 3
 }

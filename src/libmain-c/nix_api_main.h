@@ -30,6 +30,14 @@ extern "C" {
  */
 nix_err nix_init_plugins(nix_c_context * context);
 
+/**
+ * @brief Sets the log format
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] format The string name of the format.
+ */
+nix_err nix_set_log_format(nix_c_context * context, const char * format);
+
 // cffi end
 #ifdef __cplusplus
 }

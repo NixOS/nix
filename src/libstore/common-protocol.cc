@@ -49,13 +49,18 @@ void CommonProto::Serialise<ContentAddress>::write(
 Realisation CommonProto::Serialise<Realisation>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
     std::string rawInput = readString(conn.from);
-    return Realisation::fromJSON(nlohmann::json::parse(rawInput), "remote-protocol");
+    try {
+        return nlohmann::json::parse(rawInput);
+    } catch (Error & e) {
+        e.addTrace({}, "while parsing a realisation object in the remote protocol");
+        throw;
+    }
 }
 
 void CommonProto::Serialise<Realisation>::write(
     const StoreDirConfig & store, CommonProto::WriteConn conn, const Realisation & realisation)
 {
-    conn.to << realisation.toJSON().dump();
+    conn.to << static_cast<nlohmann::json>(realisation).dump();
 }
 
 DrvOutput CommonProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)

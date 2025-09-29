@@ -17,6 +17,7 @@
 #include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -193,6 +194,15 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 
 static constexpr size_t BASE_ENV_SIZE = 128;
 
+EvalMemory::EvalMemory()
+#if NIX_USE_BOEHMGC
+    : valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
+#endif
+{
+    assertGCInitialized();
+}
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
@@ -225,22 +235,25 @@ EvalState::EvalState(
            */
           {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
       }))
-    , rootFS(({
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
+    , rootFS([&] {
+        auto accessor = [&]() -> decltype(rootFS) {
+            /* In pure eval mode, we provide a filesystem that only
+               contains the Nix store. */
+            if (settings.pureEval)
+                return storeFS;
 
-           If we have a chroot store and pure eval is not enabled,
-           use a union accessor to make the chroot store available
-           at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store. */
-        auto accessor = getFSSourceAccessor();
+            /* If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the underlying
+               directory available. This is necessary for instance if
+               we're evaluating a file from the physical /nix/store
+               while using a chroot store. */
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (store->storeDir != realStoreDir)
+                return makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
 
-        auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
-        if (settings.pureEval || store->storeDir != realStoreDir) {
-            accessor = settings.pureEval ? storeFS : makeUnionSourceAccessor({accessor, storeFS});
-        }
+            return getFSSourceAccessor();
+        }();
 
         /* Apply access control if needed. */
         if (settings.restrictEval || settings.pureEval)
@@ -251,8 +264,8 @@ EvalState::EvalState(
                     throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
                 });
 
-        accessor;
-    }))
+        return accessor;
+    }())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{corepkgsFS->addFile(
@@ -270,12 +283,10 @@ EvalState::EvalState(
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
-    , valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &allocEnv(BASE_ENV_SIZE)))
+    , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
 #else
-    , baseEnv(allocEnv(BASE_ENV_SIZE))
+    , baseEnv(mem.allocEnv(BASE_ENV_SIZE))
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
@@ -284,9 +295,8 @@ EvalState::EvalState(
 
     countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
-    assertGCInitialized();
-
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
+    static_assert(sizeof(Counter) == 64, "counters must be 64 bytes");
 
     /* Construct the Nix expression search path. */
     assert(lookupPath.elements.empty());
@@ -333,7 +343,7 @@ EvalState::EvalState(
 
 EvalState::~EvalState() {}
 
-void EvalState::allowPath(const Path & path)
+void EvalState::allowPathLegacy(const Path & path)
 {
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         rootFS2->allowPrefix(CanonPath(path));
@@ -880,11 +890,10 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-ListBuilder::ListBuilder(EvalState & state, size_t size)
+ListBuilder::ListBuilder(size_t size)
     : size(size)
     , elems(size <= 2 ? inlineElems : (Value **) allocBytes(size * sizeof(Value *)))
 {
-    state.nrListElems += size;
 }
 
 Value * EvalState::getBool(bool b)
@@ -892,7 +901,7 @@ Value * EvalState::getBool(bool b)
     return b ? &Value::vTrue : &Value::vFalse;
 }
 
-unsigned long nrThunks = 0;
+static Counter nrThunks;
 
 static inline void mkThunk(Value & v, Env & env, Expr * expr)
 {
@@ -983,10 +992,6 @@ void EvalState::mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v
         });
 }
 
-/* Create a thunk for the delayed computation of the given expression
-   in the given environment.  But if the expression is a variable,
-   then look it up right away.  This significantly reduces the number
-   of thunks allocated. */
 Value * Expr::maybeThunk(EvalState & state, Env & env)
 {
     Value * v = state.allocValue();
@@ -1035,9 +1040,10 @@ Value * ExprPath::maybeThunk(EvalState & state, Env & env)
  * from a thunk, ensuring that every file is parsed/evaluated only
  * once (via the thunk stored in `EvalState::fileEvalCache`).
  */
-struct ExprParseFile : Expr
+struct ExprParseFile : Expr, gc
 {
-    SourcePath & path;
+    // FIXME: make this a reference (see below).
+    SourcePath path;
     bool mustBeTrivial;
 
     ExprParseFile(SourcePath & path, bool mustBeTrivial)
@@ -1088,14 +1094,18 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     }
 
     Value * vExpr;
-    ExprParseFile expr{*resolvedPath, mustBeTrivial};
+    // FIXME: put ExprParseFile on the stack instead of the heap once
+    // https://github.com/NixOS/nix/pull/13930 is merged. That will ensure
+    // the post-condition that `expr` is unreachable after
+    // `forceValue()` returns.
+    auto expr = new ExprParseFile{*resolvedPath, mustBeTrivial};
 
     fileEvalCache->try_emplace_and_cvisit(
         *resolvedPath,
         nullptr,
         [&](auto & i) {
             vExpr = allocValue();
-            vExpr->mkThunk(&baseEnv, &expr);
+            vExpr->mkThunk(&baseEnv, expr);
             i.second = vExpr;
         },
         [&](auto & i) { vExpr = i.second; });
@@ -1177,7 +1187,7 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
 {
-    Env & inheritEnv = state.allocEnv(inheritFromExprs->size());
+    Env & inheritEnv = state.mem.allocEnv(inheritFromExprs->size());
     inheritEnv.up = &up;
 
     Displacement displ = 0;
@@ -1196,7 +1206,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.allocEnv(attrs.size()));
+        Env & env2(state.mem.allocEnv(attrs.size()));
         env2.up = &env;
         dynamicEnv = &env2;
         Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
@@ -1288,7 +1298,7 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.allocEnv(attrs->attrs.size()));
+    Env & env2(state.mem.allocEnv(attrs->attrs.size()));
     env2.up = &env;
 
     Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, env2) : nullptr;
@@ -1494,7 +1504,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             ExprLambda & lambda(*vCur.lambda().fun);
 
             auto size = (!lambda.arg ? 0 : 1) + (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
-            Env & env2(allocEnv(size));
+            Env & env2(mem.allocEnv(size));
             env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
@@ -1783,7 +1793,7 @@ https://nix.dev/manual/nix/stable/language/syntax.html#functions.)",
 
 void ExprWith::eval(EvalState & state, Env & env, Value & v)
 {
-    Env & env2(state.allocEnv(1));
+    Env & env2(state.mem.allocEnv(1));
     env2.up = &env;
     env2.values[0] = attrs->maybeThunk(state, env);
 
@@ -1865,49 +1875,111 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
         || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
 }
 
-void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)
 {
-    Value v1, v2;
-    state.evalAttrs(env, e1, v1, pos, "in the left operand of the update (//) operator");
-    state.evalAttrs(env, e2, v2, pos, "in the right operand of the update (//) operator");
-
     state.nrOpUpdates++;
 
-    if (v1.attrs()->size() == 0) {
+    const Bindings & bindings1 = *v1.attrs();
+    if (bindings1.empty()) {
         v = v2;
         return;
     }
-    if (v2.attrs()->size() == 0) {
+
+    const Bindings & bindings2 = *v2.attrs();
+    if (bindings2.empty()) {
         v = v1;
         return;
     }
 
-    auto attrs = state.buildBindings(v1.attrs()->size() + v2.attrs()->size());
+    /* Simple heuristic for determining whether attrs2 should be "layered" on top of
+       attrs1 instead of copying to a new Bindings. */
+    bool shouldLayer = [&]() -> bool {
+        if (bindings1.isLayerListFull())
+            return false;
+
+        if (bindings2.size() > state.settings.bindingsUpdateLayerRhsSizeThreshold)
+            return false;
+
+        return true;
+    }();
+
+    if (shouldLayer) {
+        auto attrs = state.buildBindings(bindings2.size());
+        attrs.layerOnTopOf(bindings1);
+
+        std::ranges::copy(bindings2, std::back_inserter(attrs));
+        v.mkAttrs(attrs.alreadySorted());
+
+        state.nrOpUpdateValuesCopied += bindings2.size();
+        return;
+    }
+
+    auto attrs = state.buildBindings(bindings1.size() + bindings2.size());
 
     /* Merge the sets, preferring values from the second set.  Make
        sure to keep the resulting vector in sorted order. */
-    auto i = v1.attrs()->begin();
-    auto j = v2.attrs()->begin();
+    auto i = bindings1.begin();
+    auto j = bindings2.begin();
 
-    while (i != v1.attrs()->end() && j != v2.attrs()->end()) {
+    while (i != bindings1.end() && j != bindings2.end()) {
         if (i->name == j->name) {
             attrs.insert(*j);
             ++i;
             ++j;
-        } else if (i->name < j->name)
-            attrs.insert(*i++);
-        else
-            attrs.insert(*j++);
+        } else if (i->name < j->name) {
+            attrs.insert(*i);
+            ++i;
+        } else {
+            attrs.insert(*j);
+            ++j;
+        }
     }
 
-    while (i != v1.attrs()->end())
-        attrs.insert(*i++);
-    while (j != v2.attrs()->end())
-        attrs.insert(*j++);
+    while (i != bindings1.end()) {
+        attrs.insert(*i);
+        ++i;
+    }
+
+    while (j != bindings2.end()) {
+        attrs.insert(*j);
+        ++j;
+    }
 
     v.mkAttrs(attrs.alreadySorted());
 
     state.nrOpUpdateValuesCopied += v.attrs()->size();
+}
+
+void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
+{
+    UpdateQueue q;
+    evalForUpdate(state, env, q);
+
+    v.mkAttrs(&Bindings::emptyBindings);
+    for (auto & rhs : std::views::reverse(q)) {
+        /* Remember that queue is sorted rightmost attrset first. */
+        eval(state, /*v=*/v, /*v1=*/v, /*v2=*/rhs);
+    }
+}
+
+void Expr::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
+{
+    Value v;
+    state.evalAttrs(env, this, v, getPos(), errorCtx);
+    q.push_back(v);
+}
+
+void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q)
+{
+    /* Output rightmost attrset first to the merge queue as the one
+       with the most priority. */
+    e2->evalForUpdate(state, env, q, "in the right operand of the update (//) operator");
+    e1->evalForUpdate(state, env, q, "in the left operand of the update (//) operator");
+}
+
+void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
+{
+    evalForUpdate(state, env, q);
 }
 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
@@ -2828,11 +2900,11 @@ bool EvalState::fullGC()
 #endif
 }
 
+bool Counter::enabled = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
+
 void EvalState::maybePrintStats()
 {
-    bool showStats = getEnv("NIX_SHOW_STATS").value_or("0") != "0";
-
-    if (showStats) {
+    if (Counter::enabled) {
         // Make the final heap size more deterministic.
 #if NIX_USE_BOEHMGC
         if (!fullGC()) {
@@ -2848,10 +2920,12 @@ void EvalState::printStatistics()
     std::chrono::microseconds cpuTimeDuration = getCpuUserTime();
     float cpuTime = std::chrono::duration_cast<std::chrono::duration<float>>(cpuTimeDuration).count();
 
-    uint64_t bEnvs = nrEnvs * sizeof(Env) + nrValuesInEnvs * sizeof(Value *);
-    uint64_t bLists = nrListElems * sizeof(Value *);
-    uint64_t bValues = nrValues * sizeof(Value);
-    uint64_t bAttrsets = nrAttrsets * sizeof(Bindings) + nrAttrsInAttrsets * sizeof(Attr);
+    auto & memstats = mem.getStats();
+
+    uint64_t bEnvs = memstats.nrEnvs * sizeof(Env) + memstats.nrValuesInEnvs * sizeof(Value *);
+    uint64_t bLists = memstats.nrListElems * sizeof(Value *);
+    uint64_t bValues = memstats.nrValues * sizeof(Value);
+    uint64_t bAttrsets = memstats.nrAttrsets * sizeof(Bindings) + memstats.nrAttrsInAttrsets * sizeof(Attr);
 
 #if NIX_USE_BOEHMGC
     GC_word heapSize, totalBytes;
@@ -2877,18 +2951,18 @@ void EvalState::printStatistics()
 #endif
     };
     topObj["envs"] = {
-        {"number", nrEnvs},
-        {"elements", nrValuesInEnvs},
+        {"number", memstats.nrEnvs.load()},
+        {"elements", memstats.nrValuesInEnvs.load()},
         {"bytes", bEnvs},
     };
-    topObj["nrExprs"] = Expr::nrExprs;
+    topObj["nrExprs"] = Expr::nrExprs.load();
     topObj["list"] = {
-        {"elements", nrListElems},
+        {"elements", memstats.nrListElems.load()},
         {"bytes", bLists},
-        {"concats", nrListConcats},
+        {"concats", nrListConcats.load()},
     };
     topObj["values"] = {
-        {"number", nrValues},
+        {"number", memstats.nrValues.load()},
         {"bytes", bValues},
     };
     topObj["symbols"] = {
@@ -2896,9 +2970,9 @@ void EvalState::printStatistics()
         {"bytes", symbols.totalSize()},
     };
     topObj["sets"] = {
-        {"number", nrAttrsets},
+        {"number", memstats.nrAttrsets.load()},
         {"bytes", bAttrsets},
-        {"elements", nrAttrsInAttrsets},
+        {"elements", memstats.nrAttrsInAttrsets.load()},
     };
     topObj["sizes"] = {
         {"Env", sizeof(Env)},
@@ -2906,13 +2980,13 @@ void EvalState::printStatistics()
         {"Bindings", sizeof(Bindings)},
         {"Attr", sizeof(Attr)},
     };
-    topObj["nrOpUpdates"] = nrOpUpdates;
-    topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied;
-    topObj["nrThunks"] = nrThunks;
-    topObj["nrAvoided"] = nrAvoided;
-    topObj["nrLookups"] = nrLookups;
-    topObj["nrPrimOpCalls"] = nrPrimOpCalls;
-    topObj["nrFunctionCalls"] = nrFunctionCalls;
+    topObj["nrOpUpdates"] = nrOpUpdates.load();
+    topObj["nrOpUpdateValuesCopied"] = nrOpUpdateValuesCopied.load();
+    topObj["nrThunks"] = nrThunks.load();
+    topObj["nrAvoided"] = nrAvoided.load();
+    topObj["nrLookups"] = nrLookups.load();
+    topObj["nrPrimOpCalls"] = nrPrimOpCalls.load();
+    topObj["nrFunctionCalls"] = nrFunctionCalls.load();
 #if NIX_USE_BOEHMGC
     topObj["gc"] = {
         {"heapSize", heapSize},
@@ -3113,7 +3187,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
-            allowPath(path.path.abs());
+            allowPathLegacy(path.path.abs());
             if (store->isInStore(path.path.abs())) {
                 try {
                     allowClosure(store->toStorePath(path.path.abs()).first);
@@ -3143,7 +3217,8 @@ Expr * EvalState::parse(
         docComments = &it->second;
     }
 
-    auto result = parseExprFromBuf(text, length, origin, basePath, symbols, settings, positions, *docComments, rootFS);
+    auto result = parseExprFromBuf(
+        text, length, origin, basePath, mem.exprs.alloc, symbols, settings, positions, *docComments, rootFS);
 
     result->bindVars(*this, staticEnv);
 

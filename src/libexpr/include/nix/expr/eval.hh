@@ -16,6 +16,7 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/counter.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
@@ -48,6 +49,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 
 namespace eval_cache {
 class EvalCache;
@@ -300,6 +302,68 @@ struct StaticEvalSymbols
     }
 };
 
+class EvalMemory
+{
+#if NIX_USE_BOEHMGC
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
+    std::shared_ptr<void *> valueAllocCache;
+
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
+    std::shared_ptr<void *> env1AllocCache;
+#endif
+
+public:
+    struct Statistics
+    {
+        Counter nrEnvs;
+        Counter nrValuesInEnvs;
+        Counter nrValues;
+        Counter nrAttrsets;
+        Counter nrAttrsInAttrsets;
+        Counter nrListElems;
+    };
+
+    EvalMemory();
+
+    EvalMemory(const EvalMemory &) = delete;
+    EvalMemory(EvalMemory &&) = delete;
+    EvalMemory & operator=(const EvalMemory &) = delete;
+    EvalMemory & operator=(EvalMemory &&) = delete;
+
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
+
+    Bindings * allocBindings(size_t capacity);
+
+    BindingsBuilder buildBindings(SymbolTable & symbols, size_t capacity)
+    {
+        return BindingsBuilder(*this, symbols, allocBindings(capacity), capacity);
+    }
+
+    ListBuilder buildList(size_t size)
+    {
+        stats.nrListElems += size;
+        return ListBuilder(size);
+    }
+
+    const Statistics & getStats() const &
+    {
+        return stats;
+    }
+
+    /**
+     * Storage for the AST nodes
+     */
+    Exprs exprs;
+
+private:
+    Statistics stats;
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -310,6 +374,8 @@ public:
     SymbolTable symbols;
     PosTable positions;
 
+    EvalMemory mem;
+
     /**
      * If set, force copying files to the Nix store even if they
      * already exist there.
@@ -319,7 +385,7 @@ public:
     /**
      * The accessor corresponding to `store`.
      */
-    const ref<SourceAccessor> storeFS;
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.
@@ -439,18 +505,6 @@ private:
      */
     std::shared_ptr<RegexCache> regexCache;
 
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
-
 public:
 
     EvalState(
@@ -460,6 +514,15 @@ public:
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    /**
+     * A wrapper around EvalMemory::allocValue() to avoid code churn when it
+     * was introduced.
+     */
+    inline Value * allocValue()
+    {
+        return mem.allocValue();
+    }
 
     LookupPath getLookupPath()
     {
@@ -488,8 +551,11 @@ public:
 
     /**
      * Allow access to a path.
+     *
+     * Only for restrict eval: pure eval just whitelist store paths,
+     * never arbitrary paths.
      */
-    void allowPath(const Path & path);
+    void allowPathLegacy(const Path & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to
@@ -829,22 +895,14 @@ public:
      */
     void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
-    /**
-     * Allocation primitives.
-     */
-    inline Value * allocValue();
-    inline Env & allocEnv(size_t size);
-
-    Bindings * allocBindings(size_t capacity);
-
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity), capacity);
+        return mem.buildBindings(symbols, capacity);
     }
 
     ListBuilder buildList(size_t size)
     {
-        return ListBuilder(*this, size);
+        return mem.buildList(size);
     }
 
     /**
@@ -961,19 +1019,13 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    unsigned long nrEnvs = 0;
-    unsigned long nrValuesInEnvs = 0;
-    unsigned long nrValues = 0;
-    unsigned long nrListElems = 0;
-    unsigned long nrLookups = 0;
-    unsigned long nrAttrsets = 0;
-    unsigned long nrAttrsInAttrsets = 0;
-    unsigned long nrAvoided = 0;
-    unsigned long nrOpUpdates = 0;
-    unsigned long nrOpUpdateValuesCopied = 0;
-    unsigned long nrListConcats = 0;
-    unsigned long nrPrimOpCalls = 0;
-    unsigned long nrFunctionCalls = 0;
+    Counter nrLookups;
+    Counter nrAvoided;
+    Counter nrOpUpdates;
+    Counter nrOpUpdateValuesCopied;
+    Counter nrListConcats;
+    Counter nrPrimOpCalls;
+    Counter nrFunctionCalls;
 
     bool countCalls;
 

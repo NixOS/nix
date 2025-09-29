@@ -219,6 +219,7 @@ in
 
       client.succeed("nix registry pin nixpkgs")
       client.succeed("nix flake metadata nixpkgs --tarball-ttl 0 >&2")
+      client.succeed("nix eval nixpkgs#hello --eval-store dummy://?read-only=false >&2")
 
       # Test fetchTree on a github URL.
       hash = client.succeed(f"nix eval --no-trust-tarballs-from-git-forges --raw --expr '(fetchTree {info['url']}).narHash'")

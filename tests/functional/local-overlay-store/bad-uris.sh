@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 source common.sh
 source ../common/init.sh
 
@@ -5,7 +6,7 @@ requireEnvironment
 setupConfig
 setupStoreDirs
 
-mkdir -p $TEST_ROOT/bad_test
+mkdir -p "$TEST_ROOT"/bad_test
 badTestRoot=$TEST_ROOT/bad_test
 storeBadRoot="local-overlay://?root=$badTestRoot&lower-store=$storeA&upper-layer=$storeBTop"
 storeBadLower="local-overlay://?root=$storeBRoot&lower-store=$badTestRoot&upper-layer=$storeBTop"
@@ -18,7 +19,8 @@ declare -a storesBad=(
 TODO_NixOS
 
 for i in "${storesBad[@]}"; do
-    echo $i
+    echo "$i"
+    # shellcheck disable=SC2119
     execUnshare <<EOF
         source common.sh
         setupStoreDirs

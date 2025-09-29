@@ -642,7 +642,7 @@ class ToStringPrimOpTest : public PrimOpTest,
 
 TEST_P(ToStringPrimOpTest, toString)
 {
-    const auto [input, output] = GetParam();
+    const auto & [input, output] = GetParam();
     auto v = eval(input);
     ASSERT_THAT(v, IsStringEq(output));
 }
@@ -798,7 +798,7 @@ class CompareVersionsPrimOpTest : public PrimOpTest,
 
 TEST_P(CompareVersionsPrimOpTest, compareVersions)
 {
-    auto [expression, expectation] = GetParam();
+    const auto & [expression, expectation] = GetParam();
     auto v = eval(expression);
     ASSERT_THAT(v, IsIntEq(expectation));
 }
@@ -834,7 +834,7 @@ class ParseDrvNamePrimOpTest
 
 TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
 {
-    auto [input, expectedName, expectedVersion] = GetParam();
+    const auto & [input, expectedName, expectedVersion] = GetParam();
     const auto expr = fmt("builtins.parseDrvName \"%1%\"", input);
     auto v = eval(expr);
     ASSERT_THAT(v, IsAttrsOfSize(2));

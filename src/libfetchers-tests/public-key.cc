@@ -1,14 +1,14 @@
 #include <gtest/gtest.h>
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/json-utils.hh"
-#include <nlohmann/json.hpp>
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
 using nlohmann::json;
 
-class PublicKeyTest : public CharacterizationTest
+class PublicKeyTest : public JsonCharacterizationTest<fetchers::PublicKey>,
+                      public ::testing::WithParamInterface<std::pair<std::string_view, fetchers::PublicKey>>
 {
     std::filesystem::path unitTestData = getUnitTestData() / "public-key";
 
@@ -19,30 +19,35 @@ public:
     }
 };
 
-#define TEST_JSON(FIXTURE, NAME, VAL)                                                                 \
-    TEST_F(FIXTURE, PublicKey_##NAME##_from_json)                                                     \
-    {                                                                                                 \
-        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
-            fetchers::PublicKey expected{VAL};                                                        \
-            fetchers::PublicKey got = nlohmann::json::parse(encoded_);                                \
-            ASSERT_EQ(got, expected);                                                                 \
-        });                                                                                           \
-    }                                                                                                 \
-                                                                                                      \
-    TEST_F(FIXTURE, PublicKey_##NAME##_to_json)                                                       \
-    {                                                                                                 \
-        writeTest(                                                                                    \
-            #NAME ".json",                                                                            \
-            [&]() -> json { return nlohmann::json(fetchers::PublicKey{VAL}); },                       \
-            [](const auto & file) { return json::parse(readFile(file)); },                            \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
-    }
+TEST_P(PublicKeyTest, from_json)
+{
+    const auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
 
-TEST_JSON(PublicKeyTest, simple, (fetchers::PublicKey{.type = "ssh-rsa", .key = "ABCDE"}))
+TEST_P(PublicKeyTest, to_json)
+{
+    const auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
 
-TEST_JSON(PublicKeyTest, defaultType, fetchers::PublicKey{.key = "ABCDE"})
-
-#undef TEST_JSON
+INSTANTIATE_TEST_SUITE_P(
+    PublicKeyJSON,
+    PublicKeyTest,
+    ::testing::Values(
+        std::pair{
+            "simple",
+            fetchers::PublicKey{
+                .type = "ssh-rsa",
+                .key = "ABCDE",
+            },
+        },
+        std::pair{
+            "defaultType",
+            fetchers::PublicKey{
+                .key = "ABCDE",
+            },
+        }));
 
 TEST_F(PublicKeyTest, PublicKey_noRoundTrip_from_json)
 {

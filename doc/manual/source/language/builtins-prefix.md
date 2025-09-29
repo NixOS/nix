@@ -5,12 +5,28 @@ All built-ins are available through the global [`builtins`](#builtins-builtins) 
 
 Some built-ins are also exposed directly in the global scope:
 
-<!-- TODO(@rhendric, #10970): this list is incomplete -->
-
 - [`derivation`](#builtins-derivation)
-- [`import`](#builtins-import)
+- `derivationStrict`
 - [`abort`](#builtins-abort)
+- [`baseNameOf`](#builtins-baseNameOf)
+- [`break`](#builtins-break)
+- [`dirOf`](#builtins-dirOf)
+- [`false`](#builtins-false)
+- [`fetchGit`](#builtins-fetchGit)
+- `fetchMercurial`
+- [`fetchTarball`](#builtins-fetchTarball)
+- [`fetchTree`](#builtins-fetchTree)
+- [`fromTOML`](#builtins-fromTOML)
+- [`import`](#builtins-import)
+- [`isNull`](#builtins-isNull)
+- [`map`](#builtins-map)
+- [`null`](#builtins-null)
+- [`placeholder`](#builtins-placeholder)
+- [`removeAttrs`](#builtins-removeAttrs)
+- `scopedImport`
 - [`throw`](#builtins-throw)
+- [`toString`](#builtins-toString)
+- [`true`](#builtins-true)
 
 <dl>
   <dt id="builtins-derivation"><a href="#builtins-derivation"><code>derivation <var>attrs</var></code></a></dt>

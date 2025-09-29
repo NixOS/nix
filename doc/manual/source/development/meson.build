@@ -7,5 +7,6 @@ experimental_feature_descriptions_md = custom_target(
     xp_features_json,
   ],
   capture : true,
+  env : nix_env_for_docs,
   output : 'experimental-feature-descriptions.md',
 )

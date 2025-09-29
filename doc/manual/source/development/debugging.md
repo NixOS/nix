@@ -24,6 +24,19 @@ It is also possible to build without debugging for faster build:
 
 (The first line is needed because `fortify` hardening requires at least some optimization.)
 
+## Building Nix with sanitizers
+
+Nix can be built with [Address](https://clang.llvm.org/docs/AddressSanitizer.html) and
+[UB](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html) sanitizers using LLVM
+or GCC. This is useful when debugging memory corruption issues.
+
+```console
+[nix-shell]$ export mesonBuildType=debugoptimized
+[nix-shell]$ appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Disable Boehm
+[nix-shell]$ appendToVar mesonFlags "-Dbindings=false" # Disable nix-perl
+[nix-shell]$ appendToVar mesonFlags "-Db_sanitize=address,undefined"
+```
+
 ## Debugging the Nix Binary
 
 Obtain your preferred debugger within the development shell:

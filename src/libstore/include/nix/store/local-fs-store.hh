@@ -9,6 +9,18 @@ namespace nix {
 
 struct LocalFSStoreConfig : virtual StoreConfig
 {
+private:
+    static OptionalPathSetting makeRootDirSetting(LocalFSStoreConfig & self, std::optional<Path> defaultValue)
+    {
+        return {
+            &self,
+            std::move(defaultValue),
+            "root",
+            "Directory prefixed to all other paths.",
+        };
+    }
+
+public:
     using StoreConfig::StoreConfig;
 
     /**
@@ -20,7 +32,7 @@ struct LocalFSStoreConfig : virtual StoreConfig
      */
     LocalFSStoreConfig(PathView path, const Params & params);
 
-    OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
+    OptionalPathSetting rootDir = makeRootDirSetting(*this, std::nullopt);
 
 private:
 
@@ -68,6 +80,7 @@ struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
 
     void narFromPath(const StorePath & path, Sink & sink) override;
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
 
     /**
      * Creates symlink from the `gcRoot` to the `storePath` and

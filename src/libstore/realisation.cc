@@ -2,6 +2,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/closure.hh"
 #include "nix/util/signature/local-keys.hh"
+#include "nix/util/json-utils.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -60,54 +61,9 @@ void Realisation::closure(Store & store, const std::set<Realisation> & startOutp
         });
 }
 
-nlohmann::json Realisation::toJSON() const
-{
-    auto jsonDependentRealisations = nlohmann::json::object();
-    for (auto & [depId, depOutPath] : dependentRealisations)
-        jsonDependentRealisations.emplace(depId.to_string(), depOutPath.to_string());
-    return nlohmann::json{
-        {"id", id.to_string()},
-        {"outPath", outPath.to_string()},
-        {"signatures", signatures},
-        {"dependentRealisations", jsonDependentRealisations},
-    };
-}
-
-Realisation Realisation::fromJSON(const nlohmann::json & json, const std::string & whence)
-{
-    auto getOptionalField = [&](std::string fieldName) -> std::optional<std::string> {
-        auto fieldIterator = json.find(fieldName);
-        if (fieldIterator == json.end())
-            return std::nullopt;
-        return {*fieldIterator};
-    };
-    auto getField = [&](std::string fieldName) -> std::string {
-        if (auto field = getOptionalField(fieldName))
-            return *field;
-        else
-            throw Error("Drv output info file '%1%' is corrupt, missing field %2%", whence, fieldName);
-    };
-
-    StringSet signatures;
-    if (auto signaturesIterator = json.find("signatures"); signaturesIterator != json.end())
-        signatures.insert(signaturesIterator->begin(), signaturesIterator->end());
-
-    std::map<DrvOutput, StorePath> dependentRealisations;
-    if (auto jsonDependencies = json.find("dependentRealisations"); jsonDependencies != json.end())
-        for (auto & [jsonDepId, jsonDepOutPath] : jsonDependencies->get<StringMap>())
-            dependentRealisations.insert({DrvOutput::parse(jsonDepId), StorePath(jsonDepOutPath)});
-
-    return Realisation{
-        .id = DrvOutput::parse(getField("id")),
-        .outPath = StorePath(getField("outPath")),
-        .signatures = signatures,
-        .dependentRealisations = dependentRealisations,
-    };
-}
-
 std::string Realisation::fingerprint() const
 {
-    auto serialized = toJSON();
+    nlohmann::json serialized = *this;
     serialized.erase("signatures");
     return serialized.dump();
 }
@@ -183,3 +139,43 @@ RealisedPath::Set RealisedPath::closure(Store & store) const
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+Realisation adl_serializer<Realisation>::from_json(const json & json0)
+{
+    auto json = getObject(json0);
+
+    StringSet signatures;
+    if (auto signaturesOpt = optionalValueAt(json, "signatures"))
+        signatures = *signaturesOpt;
+
+    std::map<DrvOutput, StorePath> dependentRealisations;
+    if (auto jsonDependencies = optionalValueAt(json, "dependentRealisations"))
+        for (auto & [jsonDepId, jsonDepOutPath] : getObject(*jsonDependencies))
+            dependentRealisations.insert({DrvOutput::parse(jsonDepId), jsonDepOutPath});
+
+    return Realisation{
+        .id = DrvOutput::parse(valueAt(json, "id")),
+        .outPath = valueAt(json, "outPath"),
+        .signatures = signatures,
+        .dependentRealisations = dependentRealisations,
+    };
+}
+
+void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
+{
+    auto jsonDependentRealisations = nlohmann::json::object();
+    for (auto & [depId, depOutPath] : r.dependentRealisations)
+        jsonDependentRealisations.emplace(depId.to_string(), depOutPath);
+    json = {
+        {"id", r.id.to_string()},
+        {"outPath", r.outPath},
+        {"signatures", r.signatures},
+        {"dependentRealisations", jsonDependentRealisations},
+    };
+}
+
+} // namespace nlohmann

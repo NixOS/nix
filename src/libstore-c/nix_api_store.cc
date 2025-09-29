@@ -166,9 +166,42 @@ void nix_store_path_free(StorePath * sp)
     delete sp;
 }
 
+void nix_derivation_free(nix_derivation * drv)
+{
+    delete drv;
+}
+
 StorePath * nix_store_path_clone(const StorePath * p)
 {
     return new StorePath{p->path};
+}
+
+nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto drv = static_cast<nix::Derivation>(nlohmann::json::parse(json));
+
+        auto drvPath = nix::writeDerivation(*store->ptr, drv, nix::NoRepair, /* read only */ true);
+
+        drv.checkInvariants(*store->ptr, drvPath);
+
+        return new nix_derivation{drv};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto ret = nix::writeDerivation(*store->ptr, derivation->drv, nix::NoRepair);
+
+        return new StorePath{ret};
+    }
+    NIXC_CATCH_ERRS_NULL
 }
 
 nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store * dstStore, StorePath * path)

@@ -11,7 +11,7 @@
 
 namespace nix {
 
-unsigned long Expr::nrExprs = 0;
+Counter Expr::nrExprs;
 
 ExprBlackHole eBlackHole;
 
@@ -40,7 +40,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    printLiteralString(str, s);
+    printLiteralString(str, v.string_view());
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const

@@ -9,6 +9,7 @@ suites += {
   'deps' : [],
   'tests' : [
     'build-cache.sh',
+    'build-delete.sh',
     'build-with-garbage-path.sh',
     'build.sh',
     'concurrent-builds.sh',
@@ -18,6 +19,8 @@ suites += {
     'eval-store.sh',
     'gc.sh',
     'import-from-derivation.sh',
+    'issue-13247.sh',
+    'multiple-outputs.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
     'nix-run.sh',

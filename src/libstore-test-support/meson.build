@@ -29,11 +29,13 @@ rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'derived-path.cc',
   'outputs-spec.cc',
   'path.cc',
+  'test-main.cc',
 )
 
 subdir('include/nix/store/tests')

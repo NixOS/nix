@@ -1,4 +1,7 @@
+#include <nlohmann/json.hpp>
+
 #include "nix/store/store-dir-config.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -75,3 +78,19 @@ StorePath StorePath::random(std::string_view name)
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+StorePath adl_serializer<StorePath>::from_json(const json & json)
+{
+    return StorePath{getString(json)};
+}
+
+void adl_serializer<StorePath>::to_json(json & json, const StorePath & storePath)
+{
+    json = storePath.to_string();
+}
+
+} // namespace nlohmann

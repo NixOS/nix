@@ -1,18 +1,22 @@
-#include "nix/util/source-accessor.hh"
+#include "nix/util/mounted-source-accessor.hh"
+
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
 
-struct MountedSourceAccessor : SourceAccessor
+struct MountedSourceAccessorImpl : MountedSourceAccessor
 {
-    std::map<CanonPath, ref<SourceAccessor>> mounts;
+    boost::concurrent_flat_map<CanonPath, ref<SourceAccessor>> mounts;
 
-    MountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> _mounts)
-        : mounts(std::move(_mounts))
+    MountedSourceAccessorImpl(std::map<CanonPath, ref<SourceAccessor>> _mounts)
     {
         displayPrefix.clear();
 
         // Currently we require a root filesystem. This could be relaxed.
-        assert(mounts.contains(CanonPath::root));
+        assert(_mounts.contains(CanonPath::root));
+
+        for (auto & [path, accessor] : _mounts)
+            mount(path, accessor);
 
         // FIXME: return dummy parent directories automatically?
     }
@@ -52,10 +56,9 @@ struct MountedSourceAccessor : SourceAccessor
         // Find the nearest parent of `path` that is a mount point.
         std::vector<std::string> subpath;
         while (true) {
-            auto i = mounts.find(path);
-            if (i != mounts.end()) {
+            if (auto mount = getMount(path)) {
                 std::reverse(subpath.begin(), subpath.end());
-                return {i->second, CanonPath(subpath)};
+                return {ref(mount), CanonPath(subpath)};
             }
 
             assert(!path.isRoot());
@@ -69,11 +72,24 @@ struct MountedSourceAccessor : SourceAccessor
         auto [accessor, subpath] = resolve(path);
         return accessor->getPhysicalPath(subpath);
     }
+
+    void mount(CanonPath mountPoint, ref<SourceAccessor> accessor) override
+    {
+        mounts.emplace(std::move(mountPoint), std::move(accessor));
+    }
+
+    std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) override
+    {
+        if (auto res = getConcurrent(mounts, mountPoint))
+            return *res;
+        else
+            return nullptr;
+    }
 };
 
-ref<SourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
+ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts)
 {
-    return make_ref<MountedSourceAccessor>(std::move(mounts));
+    return make_ref<MountedSourceAccessorImpl>(std::move(mounts));
 }
 
 } // namespace nix

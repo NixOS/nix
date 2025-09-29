@@ -5,6 +5,15 @@ if not (host_machine.system() == 'windows' and cxx.get_id() == 'gcc')
   deps_private += dependency('threads')
 endif
 
+if host_machine.system() == 'cygwin'
+  # -std=gnu on cygwin defines 'unix', which conflicts with the namespace
+  add_project_arguments(
+    '-D_POSIX_C_SOURCE=200809L',
+    '-D_GNU_SOURCE',
+    language : 'cpp',
+  )
+endif
+
 add_project_arguments(
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
@@ -33,13 +42,5 @@ if cxx.get_id() == 'clang'
   add_project_arguments('-fpch-instantiate-templates', language : 'cpp')
 endif
 
-# Clang gets grumpy about missing libasan symbols if -shared-libasan is not
-# passed when building shared libs, at least on Linux
-if cxx.get_id() == 'clang' and ('address' in get_option('b_sanitize') or 'undefined' in get_option(
-  'b_sanitize',
-))
-  add_project_link_arguments('-shared-libasan', language : 'cpp')
-endif
-
 # Darwin ld doesn't like "X.Y.Zpre"
-nix_soversion = meson.project_version().strip('pre')
+nix_soversion = meson.project_version().split('pre')[0]

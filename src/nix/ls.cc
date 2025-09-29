@@ -115,7 +115,10 @@ struct CmdLsStore : StoreCommand, MixLs
     void run(ref<Store> store) override
     {
         auto [storePath, rest] = store->toStorePath(path);
-        list(store->getFSAccessor(), CanonPath{storePath.to_string()} / CanonPath{rest});
+        auto accessor = store->getFSAccessor(storePath);
+        if (!accessor)
+            throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
+        list(ref{std::move(accessor)}, CanonPath{rest});
     }
 };
 

@@ -3,11 +3,14 @@
 
 #include <map>
 #include <vector>
+#include <memory_resource>
 
+#include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/util/pos-idx.hh"
+#include "nix/expr/counter.hh"
 
 namespace nix {
 
@@ -80,6 +83,15 @@ typedef std::vector<AttrName> AttrPath;
 
 std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
 
+using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
+
+class Exprs
+{
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+};
+
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -89,7 +101,7 @@ struct Expr
         Symbol sub, lessThan, mul, div, or_, findFile, nixPath, body;
     };
 
-    static unsigned long nrExprs;
+    static Counter nrExprs;
 
     Expr()
     {
@@ -99,8 +111,25 @@ struct Expr
     virtual ~Expr() {};
     virtual void show(const SymbolTable & symbols, std::ostream & str) const;
     virtual void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
+
+    /** Normal evaluation, implemented directly by all subclasses. */
     virtual void eval(EvalState & state, Env & env, Value & v);
+
+    /**
+     * Create a thunk for the delayed computation of the given expression
+     * in the given environment. But if the expression is a variable,
+     * then look it up right away. This significantly reduces the number
+     * of thunks allocated.
+     */
     virtual Value * maybeThunk(EvalState & state, Env & env);
+
+    /**
+     * Only called when performing an attrset update: `//` or similar.
+     * Instead of writing to a Value &, this function writes to an UpdateQueue.
+     * This allows the expression to perform multiple updates in a delayed manner, gathering up all the updates before
+     * applying them.
+     */
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx);
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) {};
 
@@ -152,13 +181,28 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
-    std::string s;
     Value v;
 
-    ExprString(std::string && s)
-        : s(std::move(s))
+    /**
+     * This is only for strings already allocated in our polymorphic allocator,
+     * or that live at least that long (e.g. c++ string literals)
+     */
+    ExprString(const char * s)
     {
-        v.mkStringNoCopy(this->s.data());
+        v.mkStringNoCopy(s);
+    };
+
+    ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
+    {
+        auto len = sv.length();
+        if (len == 0) {
+            v.mkStringNoCopy("");
+            return;
+        }
+        char * s = alloc.allocate(len + 1);
+        sv.copy(s, len);
+        s[len] = '\0';
+        v.mkStringNoCopy(s);
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -565,36 +609,39 @@ struct ExprOpNot : Expr
     COMMON_METHODS
 };
 
-#define MakeBinOp(name, s)                                                                   \
-    struct name : Expr                                                                       \
-    {                                                                                        \
-        PosIdx pos;                                                                          \
-        Expr *e1, *e2;                                                                       \
-        name(Expr * e1, Expr * e2)                                                           \
-            : e1(e1)                                                                         \
-            , e2(e2) {};                                                                     \
-        name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
-            : pos(pos)                                                                       \
-            , e1(e1)                                                                         \
-            , e2(e2) {};                                                                     \
-        void show(const SymbolTable & symbols, std::ostream & str) const override            \
-        {                                                                                    \
-            str << "(";                                                                      \
-            e1->show(symbols, str);                                                          \
-            str << " " s " ";                                                                \
-            e2->show(symbols, str);                                                          \
-            str << ")";                                                                      \
-        }                                                                                    \
-        void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
-        {                                                                                    \
-            e1->bindVars(es, env);                                                           \
-            e2->bindVars(es, env);                                                           \
-        }                                                                                    \
-        void eval(EvalState & state, Env & env, Value & v) override;                         \
-        PosIdx getPos() const override                                                       \
-        {                                                                                    \
-            return pos;                                                                      \
-        }                                                                                    \
+#define MakeBinOpMembers(name, s)                                                        \
+    PosIdx pos;                                                                          \
+    Expr *e1, *e2;                                                                       \
+    name(Expr * e1, Expr * e2)                                                           \
+        : e1(e1)                                                                         \
+        , e2(e2){};                                                                      \
+    name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
+        : pos(pos)                                                                       \
+        , e1(e1)                                                                         \
+        , e2(e2){};                                                                      \
+    void show(const SymbolTable & symbols, std::ostream & str) const override            \
+    {                                                                                    \
+        str << "(";                                                                      \
+        e1->show(symbols, str);                                                          \
+        str << " " s " ";                                                                \
+        e2->show(symbols, str);                                                          \
+        str << ")";                                                                      \
+    }                                                                                    \
+    void bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env) override \
+    {                                                                                    \
+        e1->bindVars(es, env);                                                           \
+        e2->bindVars(es, env);                                                           \
+    }                                                                                    \
+    void eval(EvalState & state, Env & env, Value & v) override;                         \
+    PosIdx getPos() const override                                                       \
+    {                                                                                    \
+        return pos;                                                                      \
+    }
+
+#define MakeBinOp(name, s)        \
+    struct name : Expr            \
+    {                             \
+        MakeBinOpMembers(name, s) \
     }
 
 MakeBinOp(ExprOpEq, "==");
@@ -602,8 +649,19 @@ MakeBinOp(ExprOpNEq, "!=");
 MakeBinOp(ExprOpAnd, "&&");
 MakeBinOp(ExprOpOr, "||");
 MakeBinOp(ExprOpImpl, "->");
-MakeBinOp(ExprOpUpdate, "//");
 MakeBinOp(ExprOpConcatLists, "++");
+
+struct ExprOpUpdate : Expr
+{
+private:
+    /** Special case for merging of two attrsets. */
+    void eval(EvalState & state, Value & v, Value & v1, Value & v2);
+    void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q);
+
+public:
+    MakeBinOpMembers(ExprOpUpdate, "//");
+    virtual void evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx) override;
+};
 
 struct ExprConcatStrings : Expr
 {

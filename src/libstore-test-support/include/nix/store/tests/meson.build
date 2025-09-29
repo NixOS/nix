@@ -9,4 +9,5 @@ headers = files(
   'outputs-spec.hh',
   'path.hh',
   'protocol.hh',
+  'test-main.hh',
 )

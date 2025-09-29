@@ -794,9 +794,19 @@ void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
     conn->narFromPath(*this, &conn.daemonException, path, [&](Source & source) { copyNAR(conn->from, sink); });
 }
 
+ref<RemoteFSAccessor> RemoteStore::getRemoteFSAccessor(bool requireValidPath)
+{
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath);
+}
+
 ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()));
+    return getRemoteFSAccessor(requireValidPath);
+}
+
+std::shared_ptr<SourceAccessor> RemoteStore::getFSAccessor(const StorePath & path, bool requireValidPath)
+{
+    return getRemoteFSAccessor(requireValidPath)->accessObject(path);
 }
 
 void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)

@@ -11,6 +11,5 @@ headers = files(
   'git-utils.hh',
   'input-cache.hh',
   'registry.hh',
-  'store-path-accessor.hh',
   'tarball.hh',
 )

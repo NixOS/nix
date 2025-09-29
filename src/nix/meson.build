@@ -56,11 +56,13 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/asan-options')
 subdir('nix-meson-build-support/generate-header')
 
 nix_sources = [ config_priv_h ] + files(
   'add-to-store.cc',
   'app.cc',
+  'asan-options.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',

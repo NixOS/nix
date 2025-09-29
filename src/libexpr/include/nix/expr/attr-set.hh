@@ -4,13 +4,16 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/symbol-table.hh"
 
+#include <boost/container/static_vector.hpp>
+
 #include <algorithm>
 #include <functional>
-#include <concepts>
+#include <ranges>
+#include <optional>
 
 namespace nix {
 
-class EvalState;
+class EvalMemory;
 struct Value;
 
 /**
@@ -48,11 +51,18 @@ static_assert(
  * by its size and its capacity, the capacity being the number of Attr
  * elements allocated after this structure, while the size corresponds to
  * the number of elements already inserted in this structure.
+ *
+ * Bindings can be efficiently `//`-composed into an intrusive linked list of "layers"
+ * that saves on copies and allocations. Each lookup (@see Bindings::get) traverses
+ * this linked list until a matching attribute is found (thus overlays earlier in
+ * the list take precedence). For iteration over the whole Bindings, an on-the-fly
+ * k-way merge is performed by Bindings::iterator class.
  */
 class Bindings
 {
 public:
-    typedef uint32_t size_t;
+    using size_type = uint32_t;
+
     PosIdx pos;
 
     /**
@@ -62,7 +72,32 @@ public:
     static Bindings emptyBindings;
 
 private:
-    size_t size_ = 0;
+    /**
+     * Number of attributes in the attrs FAM (Flexible Array Member).
+     */
+    size_type numAttrs = 0;
+
+    /**
+     * Number of attributes with unique names in the layer chain.
+     *
+     * This is the *real* user-facing size of bindings, whereas @ref numAttrs is
+     * an implementation detail of the data structure.
+     */
+    size_type numAttrsInChain = 0;
+
+    /**
+     * Length of the layers list.
+     */
+    uint32_t numLayers = 1;
+
+    /**
+     * Bindings that this attrset is "layered" on top of.
+     */
+    const Bindings * baseLayer = nullptr;
+
+    /**
+     * Flexible array member of attributes.
+     */
     Attr attrs[0];
 
     Bindings() = default;
@@ -71,15 +106,22 @@ private:
     Bindings & operator=(const Bindings &) = delete;
     Bindings & operator=(Bindings &&) = delete;
 
+    friend class BindingsBuilder;
+
+    /**
+     * Maximum length of the Bindings layer chains.
+     */
+    static constexpr unsigned maxLayers = 8;
+
 public:
-    size_t size() const
+    size_type size() const
     {
-        return size_;
+        return numAttrsInChain;
     }
 
     bool empty() const
     {
-        return !size_;
+        return size() == 0;
     }
 
     class iterator
@@ -94,77 +136,276 @@ public:
         friend class Bindings;
 
     private:
-        pointer ptr = nullptr;
-
-        explicit iterator(pointer ptr)
-            : ptr(ptr)
+        struct BindingsCursor
         {
+            /**
+             * Attr that the cursor currently points to.
+             */
+            pointer current;
+
+            /**
+             * One past the end pointer to the contiguous buffer of Attrs.
+             */
+            pointer end;
+
+            /**
+             * Priority of the value. Lesser values have more priority (i.e. they override
+             * attributes that appear later in the linked list of Bindings).
+             */
+            uint32_t priority;
+
+            pointer operator->() const noexcept
+            {
+                return current;
+            }
+
+            reference get() const noexcept
+            {
+                return *current;
+            }
+
+            bool empty() const noexcept
+            {
+                return current == end;
+            }
+
+            void increment() noexcept
+            {
+                ++current;
+            }
+
+            void consume(Symbol name) noexcept
+            {
+                while (!empty() && current->name <= name)
+                    ++current;
+            }
+
+            GENERATE_CMP(BindingsCursor, me->current->name, me->priority)
+        };
+
+        using QueueStorageType = boost::container::static_vector<BindingsCursor, maxLayers>;
+
+        /**
+         * Comparator implementing the override priority / name ordering
+         * for BindingsCursor.
+         */
+        static constexpr auto comp = std::greater<BindingsCursor>();
+
+        /**
+         * A priority queue used to implement an on-the-fly k-way merge.
+         */
+        QueueStorageType cursorHeap;
+
+        /**
+         * The attribute the iterator currently points to.
+         */
+        pointer current = nullptr;
+
+        /**
+         * Whether iterating over a single attribute and not a merge chain.
+         */
+        bool doMerge = true;
+
+        void push(BindingsCursor cursor) noexcept
+        {
+            cursorHeap.push_back(cursor);
+            std::ranges::make_heap(cursorHeap, comp);
+        }
+
+        [[nodiscard]] BindingsCursor pop() noexcept
+        {
+            std::ranges::pop_heap(cursorHeap, comp);
+            auto cursor = cursorHeap.back();
+            cursorHeap.pop_back();
+            return cursor;
+        }
+
+        iterator & finished() noexcept
+        {
+            current = nullptr;
+            return *this;
+        }
+
+        void next(BindingsCursor cursor) noexcept
+        {
+            current = &cursor.get();
+            cursor.increment();
+
+            if (!cursor.empty())
+                push(cursor);
+        }
+
+        std::optional<BindingsCursor> consumeAllUntilCurrentName() noexcept
+        {
+            auto cursor = pop();
+            Symbol lastHandledName = current->name;
+
+            while (cursor->name <= lastHandledName) {
+                cursor.consume(lastHandledName);
+                if (!cursor.empty())
+                    push(cursor);
+
+                if (cursorHeap.empty())
+                    return std::nullopt;
+
+                cursor = pop();
+            }
+
+            return cursor;
+        }
+
+        explicit iterator(const Bindings & attrs) noexcept
+            : doMerge(attrs.baseLayer)
+        {
+            auto pushBindings = [this, priority = unsigned{0}](const Bindings & layer) mutable {
+                auto first = layer.attrs;
+                push(
+                    BindingsCursor{
+                        .current = first,
+                        .end = first + layer.numAttrs,
+                        .priority = priority++,
+                    });
+            };
+
+            if (!doMerge) {
+                if (attrs.empty())
+                    return;
+
+                current = attrs.attrs;
+                pushBindings(attrs);
+
+                return;
+            }
+
+            const Bindings * layer = &attrs;
+            while (layer) {
+                if (layer->numAttrs != 0)
+                    pushBindings(*layer);
+                layer = layer->baseLayer;
+            }
+
+            if (cursorHeap.empty())
+                return;
+
+            next(pop());
         }
 
     public:
         iterator() = default;
 
-        reference operator*() const
+        reference operator*() const noexcept
         {
-            return *ptr;
+            return *current;
         }
 
-        const value_type * operator->() const
+        pointer operator->() const noexcept
         {
-            return ptr;
+            return current;
         }
 
-        iterator & operator++()
+        iterator & operator++() noexcept
         {
-            ++ptr;
+            if (!doMerge) {
+                ++current;
+                if (current == cursorHeap.front().end)
+                    return finished();
+                return *this;
+            }
+
+            if (cursorHeap.empty())
+                return finished();
+
+            auto cursor = consumeAllUntilCurrentName();
+            if (!cursor)
+                return finished();
+
+            next(*cursor);
             return *this;
         }
 
-        iterator operator++(int)
+        iterator operator++(int) noexcept
         {
-            pointer tmp = ptr;
+            iterator tmp = *this;
             ++*this;
-            return iterator(tmp);
+            return tmp;
         }
 
-        bool operator==(const iterator & rhs) const = default;
+        bool operator==(const iterator & rhs) const noexcept
+        {
+            return current == rhs.current;
+        }
     };
 
     using const_iterator = iterator;
 
     void push_back(const Attr & attr)
     {
-        attrs[size_++] = attr;
+        attrs[numAttrs++] = attr;
+        numAttrsInChain = numAttrs;
     }
 
-    const Attr * get(Symbol name) const
+    /**
+     * Get attribute by name or nullptr if no such attribute exists.
+     */
+    const Attr * get(Symbol name) const noexcept
     {
-        Attr key(name, 0);
-        auto first = attrs;
-        auto last = attrs + size_;
-        const Attr * i = std::lower_bound(first, last, key);
-        if (i != last && i->name == name)
-            return i;
+        auto getInChunk = [key = Attr{name, nullptr}](const Bindings & chunk) -> const Attr * {
+            auto first = chunk.attrs;
+            auto last = first + chunk.numAttrs;
+            const Attr * i = std::lower_bound(first, last, key);
+            if (i != last && i->name == key.name)
+                return i;
+            return nullptr;
+        };
+
+        const Bindings * currentChunk = this;
+        while (currentChunk) {
+            const Attr * maybeAttr = getInChunk(*currentChunk);
+            if (maybeAttr)
+                return maybeAttr;
+            currentChunk = currentChunk->baseLayer;
+        }
+
         return nullptr;
+    }
+
+    /**
+     * Check if the layer chain is full.
+     */
+    bool isLayerListFull() const noexcept
+    {
+        return numLayers == Bindings::maxLayers;
+    }
+
+    /**
+     * Test if the length of the linked list of layers is greater than 1.
+     */
+    bool isLayered() const noexcept
+    {
+        return numLayers > 1;
     }
 
     const_iterator begin() const
     {
-        return const_iterator(attrs);
+        return const_iterator(*this);
     }
 
     const_iterator end() const
     {
-        return const_iterator(attrs + size_);
+        return const_iterator();
     }
 
-    Attr & operator[](size_t pos)
+    Attr & operator[](size_type pos)
     {
+        if (isLayered()) [[unlikely]]
+            unreachable();
         return attrs[pos];
     }
 
-    const Attr & operator[](size_t pos) const
+    const Attr & operator[](size_type pos) const
     {
+        if (isLayered()) [[unlikely]]
+            unreachable();
         return attrs[pos];
     }
 
@@ -176,17 +417,16 @@ public:
     std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
     {
         std::vector<const Attr *> res;
-        res.reserve(size_);
-        for (size_t n = 0; n < size_; n++)
-            res.emplace_back(&attrs[n]);
-        std::sort(res.begin(), res.end(), [&](const Attr * a, const Attr * b) {
+        res.reserve(size());
+        std::ranges::transform(*this, std::back_inserter(res), [](const Attr & a) { return &a; });
+        std::ranges::sort(res, [&](const Attr * a, const Attr * b) {
             std::string_view sa = symbols[a->name], sb = symbols[b->name];
             return sa < sb;
         });
         return res;
     }
 
-    friend class EvalState;
+    friend class EvalMemory;
 };
 
 static_assert(std::forward_iterator<Bindings::iterator>);
@@ -202,23 +442,38 @@ class BindingsBuilder final
 public:
     // needed by std::back_inserter
     using value_type = Attr;
-    using size_type = Bindings::size_t;
+    using size_type = Bindings::size_type;
 
 private:
     Bindings * bindings;
-    Bindings::size_t capacity_;
+    Bindings::size_type capacity_;
 
-    friend class EvalState;
+    friend class EvalMemory;
 
-    BindingsBuilder(EvalState & state, Bindings * bindings, size_type capacity)
+    BindingsBuilder(EvalMemory & mem, SymbolTable & symbols, Bindings * bindings, size_type capacity)
         : bindings(bindings)
         , capacity_(capacity)
-        , state(state)
+        , mem(mem)
+        , symbols(symbols)
     {
     }
 
+    bool hasBaseLayer() const noexcept
+    {
+        return bindings->baseLayer;
+    }
+
+    void finishSizeIfNecessary()
+    {
+        if (hasBaseLayer())
+            /* NOTE: Do not use std::ranges::distance, since Bindings is a sized
+               range, but we are calculating this size here. */
+            bindings->numAttrsInChain = std::distance(bindings->begin(), bindings->end());
+    }
+
 public:
-    std::reference_wrapper<EvalState> state;
+    std::reference_wrapper<EvalMemory> mem;
+    std::reference_wrapper<SymbolTable> symbols;
 
     void insert(Symbol name, Value * value, PosIdx pos = noPos)
     {
@@ -232,8 +487,24 @@ public:
 
     void push_back(const Attr & attr)
     {
-        assert(bindings->size() < capacity_);
+        assert(bindings->numAttrs < capacity_);
         bindings->push_back(attr);
+    }
+
+    /**
+     * "Layer" the newly constructured Bindings on top of another attribute set.
+     *
+     * This effectively performs an attribute set merge, while giving preference
+     * to attributes from the newly constructed Bindings in case of duplicate attribute
+     * names.
+     *
+     * This operation amortizes the need to copy over all attributes and allows
+     * for efficient implementation of attribute set merges (ExprOpUpdate::eval).
+     */
+    void layerOnTopOf(const Bindings & base) noexcept
+    {
+        bindings->baseLayer = &base;
+        bindings->numLayers = base.numLayers + 1;
     }
 
     Value & alloc(Symbol name, PosIdx pos = noPos);
@@ -243,11 +514,13 @@ public:
     Bindings * finish()
     {
         bindings->sort();
+        finishSizeIfNecessary();
         return bindings;
     }
 
     Bindings * alreadySorted()
     {
+        finishSizeIfNecessary();
         return bindings;
     }
 

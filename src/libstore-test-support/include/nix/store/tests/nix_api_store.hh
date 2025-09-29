@@ -12,33 +12,32 @@
 #include <gtest/gtest.h>
 
 namespace nixC {
-class nix_api_store_test : public nix_api_util_context
+
+class nix_api_store_test_base : public nix_api_util_context
 {
 public:
-    nix_api_store_test()
+    nix_api_store_test_base()
     {
         nix_libstore_init(ctx);
-        init_local_store();
     };
 
-    ~nix_api_store_test() override
+    ~nix_api_store_test_base() override
     {
-        nix_store_free(store);
-
-        for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
-            std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+        if (exists(std::filesystem::path{nixDir})) {
+            for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
+                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+            }
+            std::filesystem::remove_all(nixDir);
         }
-        std::filesystem::remove_all(nixDir);
     }
 
-    Store * store;
     std::string nixDir;
     std::string nixStoreDir;
     std::string nixStateDir;
     std::string nixLogDir;
 
 protected:
-    void init_local_store()
+    Store * open_local_store()
     {
 #ifdef _WIN32
         // no `mkdtemp` with MinGW
@@ -66,11 +65,37 @@ protected:
 
         const char ** params[] = {p1, p2, p3, nullptr};
 
-        store = nix_store_open(ctx, "local", params);
+        auto * store = nix_store_open(ctx, "local", params);
         if (!store) {
             std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
-            ASSERT_NE(store, nullptr) << "Could not open store: " << errMsg;
+            EXPECT_NE(store, nullptr) << "Could not open store: " << errMsg;
+            assert(store);
         };
+        return store;
     }
 };
+
+class nix_api_store_test : public nix_api_store_test_base
+{
+public:
+    nix_api_store_test()
+        : nix_api_store_test_base{}
+    {
+        init_local_store();
+    };
+
+    ~nix_api_store_test() override
+    {
+        nix_store_free(store);
+    }
+
+    Store * store;
+
+protected:
+    void init_local_store()
+    {
+        store = open_local_store();
+    }
+};
+
 } // namespace nixC

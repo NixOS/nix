@@ -18,6 +18,7 @@
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/util/terminal.hh"
 
 #include <queue>
 
@@ -808,8 +809,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     if (!builderOut)
         throw SysError("opening pseudoterminal master");
 
-    // FIXME: not thread-safe, use ptsname_r
-    std::string slaveName = ptsname(builderOut.get());
+    std::string slaveName = getPtsName(builderOut.get());
 
     if (buildUser) {
         if (chmod(slaveName.c_str(), 0600))
@@ -923,7 +923,7 @@ void DerivationBuilderImpl::prepareSandbox()
 
 void DerivationBuilderImpl::openSlave()
 {
-    std::string slaveName = ptsname(builderOut.get());
+    std::string slaveName = getPtsName(builderOut.get());
 
     AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
     if (!builderOut)
@@ -1712,6 +1712,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* Path already exists because CA path produced by something
                    else. No moving needed. */
                 assert(newInfo.ca);
+                /* Can delete our scratch copy now. */
+                deletePath(actualPath);
             } else {
                 auto destPath = store.toRealPath(finalDestPath);
                 deletePath(destPath);
