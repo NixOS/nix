@@ -51,7 +51,7 @@ be verified without any additional information such as
 signatures. This means that a command like
 
 ```console
-# nix store build /nix/store/5skmmcb9svys5lj3kbsrjg7vf2irid63-hello-2.10 \
+# nix build /nix/store/5skmmcb9svys5lj3kbsrjg7vf2irid63-hello-2.10 \
     --substituters https://my-cache.example.org
 ```
 
