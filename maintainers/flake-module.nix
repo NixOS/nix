@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/legacy-ssh-store\.sh$''
               ''^tests/functional/linux-sandbox\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
