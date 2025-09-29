@@ -132,8 +132,6 @@
               ''^tests/functional/local-overlay-store/common\.sh$''
               ''^tests/functional/local-overlay-store/delete-duplicate-inner\.sh$''
               ''^tests/functional/local-overlay-store/delete-duplicate\.sh$''
-              ''^tests/functional/local-overlay-store/delete-refs-inner\.sh$''
-              ''^tests/functional/local-overlay-store/delete-refs\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
