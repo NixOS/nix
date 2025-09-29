@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/optimise-store\.sh$''
               ''^tests/functional/output-normalization\.sh$''
               ''^tests/functional/parallel\.builder\.sh$''
               ''^tests/functional/parallel\.sh$''
