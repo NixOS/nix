@@ -136,7 +136,6 @@
               ''^tests/functional/local-overlay-store/delete-refs\.sh$''
               ''^tests/functional/local-overlay-store/gc-inner\.sh$''
               ''^tests/functional/local-overlay-store/gc\.sh$''
-              ''^tests/functional/local-overlay-store/optimise-inner\.sh$''
               ''^tests/functional/logging\.sh$''
               ''^tests/functional/misc\.sh$''
               ''^tests/functional/multiple-outputs\.sh$''
