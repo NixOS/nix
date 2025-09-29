@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/nix-channel\.sh$''
               ''^tests/functional/nix-collect-garbage-d\.sh$''
               ''^tests/functional/nix-copy-ssh-common\.sh$''
               ''^tests/functional/nix-copy-ssh-ng\.sh$''
