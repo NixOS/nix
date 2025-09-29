@@ -16,6 +16,7 @@ nix fmt --help | grep "reformat your code"
 nix fmt run --help | grep "reformat your code"
 nix fmt build --help | grep "build"
 
+# shellcheck disable=SC2154
 cat << EOF > flake.nix
 {
   outputs = _: {

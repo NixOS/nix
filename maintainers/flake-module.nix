@@ -106,8 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/formatter\.sh$''
-              ''^tests/functional/formatter\.simple\.sh$''
               ''^tests/functional/gc-auto\.sh$''
               ''^tests/functional/gc-concurrent\.builder\.sh$''
               ''^tests/functional/gc-concurrent\.sh$''
