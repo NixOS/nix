@@ -650,7 +650,10 @@ struct curlFileTransfer : public FileTransfer
 
     ~curlFileTransfer()
     {
-        stopWorkerThread();
+        {
+            auto state(state_.lock());
+            stopWorkerThread(state);
+        }
 
         workerThread.join();
 
@@ -658,13 +661,10 @@ struct curlFileTransfer : public FileTransfer
             curl_multi_cleanup(curlm);
     }
 
-    void stopWorkerThread()
+    void stopWorkerThread(Sync<State>::WriteLock & state)
     {
         /* Signal the worker thread to exit. */
-        {
-            auto state(state_.lock());
-            state->quit();
-        }
+        state->quit();
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
 #endif
@@ -674,7 +674,10 @@ struct curlFileTransfer : public FileTransfer
     {
 /* Cause this thread to be notified on SIGINT. */
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
-        auto callback = createInterruptCallback([&]() { stopWorkerThread(); });
+        auto callback = createInterruptCallback([&]() {
+            auto state(state_.lock());
+            stopWorkerThread(state);
+        });
 #endif
 
 #ifdef __linux__
