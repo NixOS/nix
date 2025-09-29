@@ -654,12 +654,9 @@ struct curlFileTransfer : public FileTransfer
         setup();
     }
 
-    void tearDown()
+    void tearDown(Sync<State>::WriteLock & state)
     {
-        {
-            auto state(state_.lock());
-            stopWorkerThread(state);
-        }
+        stopWorkerThread(state);
 
         workerThread.join();
 
@@ -669,13 +666,14 @@ struct curlFileTransfer : public FileTransfer
 
     ~curlFileTransfer()
     {
-        tearDown();
+        auto state(state_.lock());
+        tearDown(state);
     }
 
     void restart(Sync<State>::WriteLock state)
     {
         // Same as destructor
-        tearDown();
+        tearDown(state);
 
         // Fresh state, but reuse global mutex
         *state = State{};
