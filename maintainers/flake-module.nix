@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/nix-profile\.sh$''
               ''^tests/functional/nix-shell\.sh$''
               ''^tests/functional/nix_path\.sh$''
               ''^tests/functional/optimise-store\.sh$''
