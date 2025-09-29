@@ -80,14 +80,15 @@ static int main_nix_collect_garbage(int argc, char ** argv)
                 removeOld = true;
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
-                deleteOlderThan = std::optional<time_t> { parseOlderThanTimeSpec(getArg(*arg, arg, end)) };
+                deleteOlderThan = std::optional<time_t>{parseOlderThanTimeSpec(getArg(*arg, arg, end))};
             } else if (*arg == "--keep-min")
-                keepMin = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
+                keepMin = std::optional<GenerationNumber>{
+                    std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1)};
             else if (*arg == "--keep-max") {
                 removeOld = true;
-                keepMax = std::optional<GenerationNumber> { std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1) };
-            }
-            else if (*arg == "--dry-run")
+                keepMax = std::optional<GenerationNumber>{
+                    std::max(getIntArg<GenerationNumber>(*arg, arg, end, false), (GenerationNumber) 1)};
+            } else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--max-freed")
                 options.maxFreed = std::max(getIntArg<int64_t>(*arg, arg, end, true), (int64_t) 0);

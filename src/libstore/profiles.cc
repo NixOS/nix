@@ -163,7 +163,12 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
         ;
 }
 
-void deleteGenerationsFilter(const Path & profile, std::optional<time_t> olderThan, std::optional<GenerationNumber> keepMin, std::optional<GenerationNumber> keepMax, bool dryRun)
+void deleteGenerationsFilter(
+    const Path & profile,
+    std::optional<time_t> olderThan,
+    std::optional<GenerationNumber> keepMin,
+    std::optional<GenerationNumber> keepMax,
+    bool dryRun)
 {
     if (keepMin.has_value() && keepMax.has_value() && *keepMin > *keepMax)
         throw Error("--keep-min cannot be greater than --keep-max");
