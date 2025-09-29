@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/nix-copy-ssh\.sh$''
               ''^tests/functional/nix-daemon-untrusting\.sh$''
               ''^tests/functional/nix-profile\.sh$''
               ''^tests/functional/nix-shell\.sh$''
