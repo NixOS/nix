@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/flakes/run\.sh$''
               ''^tests/functional/flakes/show\.sh$''
               ''^tests/functional/formatter\.sh$''
               ''^tests/functional/formatter\.simple\.sh$''
