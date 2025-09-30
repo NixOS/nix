@@ -25,8 +25,6 @@ typedef struct Store Store;
 typedef struct StorePath StorePath;
 /** @brief Nix Derivation */
 typedef struct nix_derivation nix_derivation;
-/** @brief Nix Derivation Output */
-typedef struct nix_derivation_output nix_derivation_output;
 
 /**
  * @brief Initializes the Nix store library
@@ -352,25 +350,8 @@ nix_err nix_derivation_get_outputs_and_optpaths(
     nix_c_context * context,
     const nix_derivation * drv,
     const Store * store,
-    void (*callback)(
-        void * userdata, const char * name, const nix_derivation_output * drv_output, const StorePath * path),
+    void (*callback)(void * userdata, const char * name, const StorePath * path),
     void * userdata);
-
-/**
- * @brief Copy of a 'nix_derivation_output'
- *
- * @param[in] o the derivation output to copy
- * @return a new 'nix_derivation_output'
- */
-nix_derivation_output * nix_derivation_output_clone(const nix_derivation_output * o);
-
-/**
- * @brief Deallocate a 'nix_derivation_output'
- *
- * Does not fail.
- * @param[in] o the derivation output to free
- */
-void nix_derivation_output_free(nix_derivation_output * o);
 
 // cffi end
 #ifdef __cplusplus

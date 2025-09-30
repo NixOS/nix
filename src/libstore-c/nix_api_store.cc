@@ -333,8 +333,7 @@ nix_err nix_derivation_get_outputs_and_optpaths(
     nix_c_context * context,
     const nix_derivation * drv,
     const Store * store,
-    void (*callback)(
-        void * userdata, const char * name, const nix_derivation_output * drv_output, const StorePath * path),
+    void (*callback)(void * userdata, const char * name, const StorePath * path),
     void * userdata)
 {
     if (context)
@@ -343,28 +342,16 @@ nix_err nix_derivation_get_outputs_and_optpaths(
         auto value = drv->drv.outputsAndOptPaths(store->ptr->config);
         if (callback) {
             for (const auto & [name, result] : value) {
-                const nix_derivation_output tmp_output{result.first};
-
                 if (auto store_path = result.second) {
                     const StorePath tmp_path{*store_path};
-                    callback(userdata, name.c_str(), &tmp_output, &tmp_path);
+                    callback(userdata, name.c_str(), &tmp_path);
                 } else {
-                    callback(userdata, name.c_str(), &tmp_output, nullptr);
+                    callback(userdata, name.c_str(), nullptr);
                 }
             }
         }
     }
     NIXC_CATCH_ERRS
-}
-
-nix_derivation_output * nix_derivation_output_clone(const nix_derivation_output * o)
-{
-    return new nix_derivation_output{o->drv_out};
-}
-
-void nix_derivation_output_free(nix_derivation_output * o)
-{
-    delete o;
 }
 
 } // extern "C"

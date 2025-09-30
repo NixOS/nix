@@ -20,11 +20,6 @@ struct nix_derivation
     nix::Derivation drv;
 };
 
-struct nix_derivation_output
-{
-    nix::DerivationOutput drv_out;
-};
-
 } // extern "C"
 
 #endif
