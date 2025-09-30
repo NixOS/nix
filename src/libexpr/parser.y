@@ -392,8 +392,8 @@ path_start
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
         literal.front() == '/'
-        ? new ExprPath(state->rootFS, std::move(path))
-        : new ExprPath(state->basePath.accessor, std::move(path));
+        ? new ExprPath(state->alloc, state->rootFS, path)
+        : new ExprPath(state->alloc, state->basePath.accessor, path);
   }
   | HPATH {
     if (state->settings.pureEval) {
@@ -403,7 +403,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(ref<SourceAccessor>(state->rootFS), std::move(path));
+    $$ = new ExprPath(state->alloc, ref<SourceAccessor>(state->rootFS), path);
   }
   ;
 
