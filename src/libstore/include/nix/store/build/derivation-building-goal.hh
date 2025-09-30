@@ -147,7 +147,7 @@ private:
      */
     void killChild();
 
-    Done doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs);
+    Done doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs);
 
     Done doneFailure(BuildError ex);
 

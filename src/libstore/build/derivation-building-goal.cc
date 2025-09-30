@@ -90,7 +90,7 @@ void DerivationBuildingGoal::timedOut(Error && ex)
     killChild();
     // We're not inside a coroutine, hence we can't use co_return here.
     // Thus we ignore the return value.
-    [[maybe_unused]] Done _ = doneFailure({BuildResult::TimedOut, std::move(ex)});
+    [[maybe_unused]] Done _ = doneFailure({BuildResult::Failure::TimedOut, std::move(ex)});
 }
 
 /**
@@ -205,7 +205,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                 nrFailed,
                 nrFailed == 1 ? "dependency" : "dependencies");
         msg += showKnownOutputs(worker.store, *drv);
-        co_return doneFailure(BuildError(BuildResult::DependencyFailed, msg));
+        co_return doneFailure(BuildError(BuildResult::Failure::DependencyFailed, msg));
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -256,14 +256,18 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                         return std::nullopt;
 
                     auto & buildResult = (*mEntry)->buildResult;
-                    if (!buildResult.success())
-                        return std::nullopt;
+                    return std::visit(
+                        overloaded{
+                            [](const BuildResult::Failure &) -> std::optional<StorePath> { return std::nullopt; },
+                            [&](const BuildResult::Success & success) -> std::optional<StorePath> {
+                                auto i = get(success.builtOutputs, outputName);
+                                if (!i)
+                                    return std::nullopt;
 
-                    auto i = get(buildResult.builtOutputs, outputName);
-                    if (!i)
-                        return std::nullopt;
-
-                    return i->outPath;
+                                return i->outPath;
+                            },
+                        },
+                        buildResult.inner);
                 });
             if (!attempt) {
                 /* TODO (impure derivations-induced tech debt) (see below):
@@ -306,7 +310,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
             auto resolvedResult = resolvedDrvGoal->buildResult;
 
-            if (resolvedResult.success()) {
+            // No `std::visit` for coroutines yet
+            if (auto * successP = resolvedResult.tryGetSuccess()) {
+                auto & success = *successP;
                 SingleDrvOutputs builtOutputs;
 
                 auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
@@ -324,7 +330,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
                             outputName);
 
                     auto realisation = [&] {
-                        auto take1 = get(resolvedResult.builtOutputs, outputName);
+                        auto take1 = get(success.builtOutputs, outputName);
                         if (take1)
                             return *take1;
 
@@ -360,18 +366,19 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 
                 runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
 
-                auto status = resolvedResult.status;
-                if (status == BuildResult::AlreadyValid)
-                    status = BuildResult::ResolvesToAlreadyValid;
+                auto status = success.status;
+                if (status == BuildResult::Success::AlreadyValid)
+                    status = BuildResult::Success::ResolvesToAlreadyValid;
 
-                co_return doneSuccess(status, std::move(builtOutputs));
-            } else {
+                co_return doneSuccess(success.status, std::move(builtOutputs));
+            } else if (resolvedResult.tryGetFailure()) {
                 co_return doneFailure({
-                    BuildResult::DependencyFailed,
+                    BuildResult::Failure::DependencyFailed,
                     "build of resolved derivation '%s' failed",
                     worker.store.printStorePath(pathResolved),
                 });
-            }
+            } else
+                assert(false);
         }
 
         /* If we get this far, we know no dynamic drvs inputs */
@@ -536,7 +543,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
             outputLocks.setDeletion(true);
             outputLocks.unlock();
-            co_return doneSuccess(BuildResult::AlreadyValid, std::move(validOutputs));
+            co_return doneSuccess(BuildResult::Success::AlreadyValid, std::move(validOutputs));
         }
 
         /* If any of the outputs already exist but are not valid, delete
@@ -628,7 +635,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         /* Check the exit status. */
         if (!statusOk(status)) {
-            auto e = fixupBuilderFailureErrorMessage({BuildResult::MiscFailure, status, ""});
+            auto e = fixupBuilderFailureErrorMessage({BuildResult::Failure::MiscFailure, status, ""});
 
             outputLocks.unlock();
 
@@ -669,7 +676,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         outputLocks.setDeletion(true);
         outputLocks.unlock();
 
-        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
+        co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
     }
 
     co_await yield();
@@ -832,15 +839,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wswitch-enum"
         switch (e.status) {
-        case BuildResult::HashMismatch:
+        case BuildResult::Failure::HashMismatch:
             worker.hashMismatch = true;
             /* See header, the protocols don't know about `HashMismatch`
                yet, so change it to `OutputRejected`, which they expect
                for this case (hash mismatch is a type of output
                rejection). */
-            e.status = BuildResult::OutputRejected;
+            e.status = BuildResult::Failure::OutputRejected;
             break;
-        case BuildResult::NotDeterministic:
+        case BuildResult::Failure::NotDeterministic:
             worker.checkMismatch = true;
             break;
         default:
@@ -866,7 +873,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
            (unlinked) lock files. */
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return doneSuccess(BuildResult::Built, std::move(builtOutputs));
+        co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
     }
 #endif
 }
@@ -1149,7 +1156,7 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
             // We're not inside a coroutine, hence we can't use co_return here.
             // Thus we ignore the return value.
             [[maybe_unused]] Done _ = doneFailure(BuildError(
-                BuildResult::LogLimitExceeded,
+                BuildResult::Failure::LogLimitExceeded,
                 "%s killed after writing more than %d bytes of log output",
                 getName(),
                 settings.maxLogSize));
@@ -1306,16 +1313,16 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
     return {allValid, validOutputs};
 }
 
-Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, SingleDrvOutputs builtOutputs)
+Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs)
 {
-    buildResult.status = status;
-
-    assert(buildResult.success());
+    buildResult.inner = BuildResult::Success{
+        .status = status,
+        .builtOutputs = std::move(builtOutputs),
+    };
 
     mcRunningBuilds.reset();
 
-    buildResult.builtOutputs = std::move(builtOutputs);
-    if (status == BuildResult::Built)
+    if (status == BuildResult::Success::Built)
         worker.doneBuilds++;
 
     worker.updateProgress();
@@ -1325,16 +1332,18 @@ Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Status status, Singl
 
 Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
-    buildResult.status = ex.status;
-    buildResult.errorMsg = fmt("%s", Uncolored(ex.info().msg));
-    if (buildResult.status == BuildResult::TimedOut)
-        worker.timedOut = true;
-    if (buildResult.status == BuildResult::PermanentFailure)
-        worker.permanentFailure = true;
+    buildResult.inner = BuildResult::Failure{
+        .status = ex.status,
+        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+    };
 
     mcRunningBuilds.reset();
 
-    if (ex.status != BuildResult::DependencyFailed)
+    if (ex.status == BuildResult::Failure::TimedOut)
+        worker.timedOut = true;
+    if (ex.status == BuildResult::Failure::PermanentFailure)
+        worker.permanentFailure = true;
+    if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();

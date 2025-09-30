@@ -51,7 +51,7 @@ namespace nix {
 struct NotDeterministic : BuildError
 {
     NotDeterministic(auto &&... args)
-        : BuildError(BuildResult::NotDeterministic, args...)
+        : BuildError(BuildResult::Failure::NotDeterministic, args...)
     {
     }
 };
@@ -519,7 +519,8 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
         cleanupBuild(false);
 
         throw BuilderFailureError{
-            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
+                                                      : BuildResult::Failure::PermanentFailure,
             status,
             diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
         };
@@ -701,7 +702,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
                 fmt("\nNote: run `%s` to run programs for x86_64-darwin",
                     Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
-        throw BuildError(BuildResult::InputRejected, msg);
+        throw BuildError(BuildResult::Failure::InputRejected, msg);
     }
 
     auto buildDir = store.config->getBuildDir();
@@ -1389,7 +1390,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optSt = maybeLstat(actualPath.c_str());
         if (!optSt)
             throw BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at '%s'",
                 store.printStorePath(drvPath),
                 outputName,
@@ -1404,7 +1405,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH)))
             || (buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "suspicious ownership or permission on '%s' for output '%s'; rejecting this build output",
                 actualPath,
                 outputName);
@@ -1442,7 +1443,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             auto orifu = get(outputReferencesIfUnregistered, name);
             if (!orifu)
                 throw BuildError(
-                    BuildResult::OutputRejected,
+                    BuildResult::Failure::OutputRejected,
                     "no output reference for '%s' in build of '%s'",
                     name,
                     store.printStorePath(drvPath));
@@ -1467,7 +1468,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         {[&](const std::string & path, const std::string & parent) {
             // TODO with more -vvvv also show the temporary paths for manual inspection.
             return BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
                 store.printStorePath(drvPath),
                 path,
@@ -1561,12 +1562,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
             auto st = get(outputStats, outputName);
             if (!st)
-                throw BuildError(BuildResult::OutputRejected, "output path %1% without valid stats info", actualPath);
+                throw BuildError(
+                    BuildResult::Failure::OutputRejected, "output path %1% without valid stats info", actualPath);
             if (outputHash.method.getFileIngestionMethod() == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        BuildResult::OutputRejected,
+                        BuildResult::Failure::OutputRejected,
                         "output path '%1%' should be a non-executable regular file "
                         "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);

@@ -164,10 +164,11 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
 
     auto & g = *concreteDrvGoals.begin();
     buildResult = g->buildResult;
-    for (auto & g2 : concreteDrvGoals) {
-        for (auto && [x, y] : g2->buildResult.builtOutputs)
-            buildResult.builtOutputs.insert_or_assign(x, y);
-    }
+    if (auto * successP = buildResult.tryGetSuccess())
+        for (auto & g2 : concreteDrvGoals)
+            if (auto * successP2 = g2->buildResult.tryGetSuccess())
+                for (auto && [x, y] : successP2->builtOutputs)
+                    successP->builtOutputs.insert_or_assign(x, y);
 
     co_return amDone(g->exitCode, g->ex);
 }
