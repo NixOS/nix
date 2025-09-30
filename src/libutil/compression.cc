@@ -223,7 +223,7 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
 {
     if (method == "none" || method == "" || method == "identity")
         return std::make_unique<NoneSink>(nextSink);
-    else if (method == "br")
+    else if (method == "br" || method == "brotli")
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
         return sourceToSink([method, &nextSink](Source & source) {
@@ -298,7 +298,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
     }
     if (method == "none")
         return make_ref<NoneSink>(nextSink);
-    else if (method == "br")
+    else if (method == "br" || method == "brotli")
         return make_ref<BrotliCompressionSink>(nextSink);
     else
         throw UnknownCompressionMethod("unknown compression method '%s'", method);
