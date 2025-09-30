@@ -11,7 +11,33 @@
 
 namespace nix {
 
-Counter Expr::nrExprs;
+Counter Expr::nrCreated;
+Counter ExprInt::nrCreated;
+Counter ExprFloat::nrCreated;
+Counter ExprString::nrCreated;
+Counter ExprPath::nrCreated;
+Counter ExprVar::nrCreated;
+Counter ExprInheritFrom::nrCreated;
+Counter ExprSelect::nrCreated;
+Counter ExprOpHasAttr::nrCreated;
+Counter ExprAttrs::nrCreated;
+Counter ExprList::nrCreated;
+Counter ExprLambda::nrCreated;
+Counter ExprCall::nrCreated;
+Counter ExprLet::nrCreated;
+Counter ExprWith::nrCreated;
+Counter ExprIf::nrCreated;
+Counter ExprAssert::nrCreated;
+Counter ExprOpNot::nrCreated;
+Counter ExprConcatStrings::nrCreated;
+Counter ExprPos::nrCreated;
+Counter ExprOpEq::nrCreated;
+Counter ExprOpNEq::nrCreated;
+Counter ExprOpAnd::nrCreated;
+Counter ExprOpOr::nrCreated;
+Counter ExprOpImpl::nrCreated;
+Counter ExprOpConcatLists::nrCreated;
+Counter ExprOpUpdate::nrCreated;
 
 ExprBlackHole eBlackHole;
 
