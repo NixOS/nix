@@ -9,6 +9,8 @@ let
   pkgs = config.nodes.client.nixpkgs.pkgs;
 
   pkgA = pkgs.cowsay;
+  pkgB = pkgs.busybox;
+  pkgC = pkgs.hello;
 
   accessKey = "BKIKJAA5BMMU2RHO6IBB";
   secretKey = "V7f1CwQqAcwo80UEIJEjc5gVQUSSx5ohQ9GSrr12";
@@ -32,7 +34,11 @@ in
       }:
       {
         virtualisation.writableStore = true;
-        virtualisation.additionalPaths = [ pkgA ];
+        virtualisation.additionalPaths = [
+          pkgA
+          pkgB
+          pkgC
+        ];
         environment.systemPackages = [ pkgs.minio-client ];
         nix.extraOptions = ''
           experimental-features = nix-command
@@ -227,5 +233,76 @@ in
         print("Debug output:")
         print(concurrent_output)
         raise Exception(f"FAILED: Expected at least 5 FileTransfer instances for 5 concurrent fetches, but got {concurrent_transfers}")
+
+      # Test S3-specific compression functionality
+      print("Testing S3 compression features")
+
+      # Create a separate bucket for compression tests
+      server.succeed("mc mb minio/compressed-cache")
+      compressed_store_url = "s3://compressed-cache?endpoint=http://server:9000&region=eu-west-1"
+
+      # Test 1: Upload with narinfo compression (gzip)
+      print("TEST: S3 narinfo compression (gzip)")
+      server.succeed(f"${env} nix copy --to '{compressed_store_url}&narinfo-compression=gzip' ${pkgB}")
+
+      # Verify the .narinfo file has Content-Encoding header
+      pkgB_hash = "${pkgB}".split("/")[-1].split("-")[0]
+      narinfo_path = pkgB_hash + ".narinfo"
+      stat_output = server.succeed("mc stat minio/compressed-cache/" + narinfo_path)
+      if "Content-Encoding" not in stat_output or "gzip" not in stat_output:
+        print("mc stat output:")
+        print(stat_output)
+        raise Exception("Expected Content-Encoding: gzip header on .narinfo file")
+      print("PASS: .narinfo has Content-Encoding: gzip")
+
+      # Verify client can download and decompress
+      client.succeed(f"${env} nix copy --from '{compressed_store_url}' --no-check-sigs ${pkgB}")
+      client.succeed("nix path-info ${pkgB}")
+      print("PASS: Client downloaded and decompressed .narinfo successfully")
+
+      # Test 2: Upload with multiple compression methods
+      print("TEST: S3 mixed compression (narinfo=xz, ls=gzip)")
+      server.succeed(
+          f"${env} nix copy --to '{compressed_store_url}&narinfo-compression=xz&write-nar-listing=true&ls-compression=gzip' ${pkgC}"
+      )
+
+      # Verify .narinfo has xz Content-Encoding
+      pkgC_hash = "${pkgC}".split("/")[-1].split("-")[0]
+      narinfo_stat = server.succeed("mc stat minio/compressed-cache/" + pkgC_hash + ".narinfo")
+      if "Content-Encoding" not in narinfo_stat or "xz" not in narinfo_stat:
+        print("mc stat output:")
+        print(narinfo_stat)
+        raise Exception("Expected Content-Encoding: xz header on .narinfo file")
+      print("PASS: .narinfo has Content-Encoding: xz")
+
+      # Verify .ls file has gzip Content-Encoding
+      ls_stat = server.succeed("mc stat minio/compressed-cache/" + pkgC_hash + ".ls")
+      if "Content-Encoding" not in ls_stat or "gzip" not in ls_stat:
+        print("mc stat output:")
+        print(ls_stat)
+        raise Exception("Expected Content-Encoding: gzip header on .ls file")
+      print("PASS: .ls has Content-Encoding: gzip")
+
+      # Verify client can download with mixed compression
+      client.succeed(f"${env} nix copy --from '{compressed_store_url}' --no-check-sigs ${pkgC}")
+      client.succeed("nix path-info ${pkgC}")
+      print("PASS: Client downloaded package with mixed compression")
+
+      # Test 3: No compression by default (reuse pkgA which is already in additionalPaths)
+      print("TEST: S3 no compression by default")
+      server.succeed("mc mb minio/uncompressed-cache")
+      uncompressed_url = "s3://uncompressed-cache?endpoint=http://server:9000&region=eu-west-1"
+      server.succeed(f"${env} nix copy --to '{uncompressed_url}' ${pkgA}")
+
+      # Verify .narinfo does NOT have Content-Encoding header
+      pkgA_hash = "${pkgA}".split("/")[-1].split("-")[0]
+      narinfo_uncompressed = server.succeed("mc stat minio/uncompressed-cache/" + pkgA_hash + ".narinfo")
+      if "Content-Encoding" in narinfo_uncompressed and ("gzip" in narinfo_uncompressed or "xz" in narinfo_uncompressed):
+        print("mc stat output:")
+        print(narinfo_uncompressed)
+        raise Exception(".narinfo should not have compression Content-Encoding by default")
+      print("PASS: No compression applied by default")
+
+      print("All S3 compression tests passed!")
     '';
 }
