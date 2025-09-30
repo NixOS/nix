@@ -3,6 +3,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store.hh"
+#include "nix/store/realisation.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -108,23 +109,9 @@ public:
 
 } // namespace
 
-struct DummyStore : virtual Store
+struct DummyStoreImpl : DummyStore
 {
     using Config = DummyStoreConfig;
-
-    ref<const Config> config;
-
-    struct PathInfoAndContents
-    {
-        UnkeyedValidPathInfo info;
-        ref<MemorySourceAccessor> contents;
-    };
-
-    /**
-     * This is map conceptually owns the file system objects for each
-     * store object.
-     */
-    boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
 
     /**
      * This view conceptually just borrows the file systems objects of
@@ -135,9 +122,9 @@ struct DummyStore : virtual Store
      */
     ref<WholeStoreViewAccessor> wholeStoreView = make_ref<WholeStoreViewAccessor>();
 
-    DummyStore(ref<const Config> config)
+    DummyStoreImpl(ref<const Config> config)
         : Store{*config}
-        , config(config)
+        , DummyStore{config}
     {
         wholeStoreView->setPathDisplay(config->storeDir);
     }
@@ -258,6 +245,11 @@ struct DummyStore : virtual Store
         return path;
     }
 
+    void registerDrvOutput(const Realisation & output) override
+    {
+        buildTrace.insert({output.id, make_ref<UnkeyedRealisation>(output)});
+    }
+
     void narFromPath(const StorePath & path, Sink & sink) override
     {
         bool visited = contents.cvisit(path, [&](const auto & kv) {
@@ -270,10 +262,13 @@ struct DummyStore : virtual Store
             throw Error("path '%s' is not valid", printStorePath(path));
     }
 
-    void
-    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    void queryRealisationUncached(
+        const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
-        callback(nullptr);
+        bool visited = buildTrace.cvisit(drvOutput, [&](const auto & kv) { callback(kv.second.get_ptr()); });
+
+        if (!visited)
+            callback(nullptr);
     }
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
@@ -289,9 +284,9 @@ struct DummyStore : virtual Store
     }
 };
 
-ref<Store> DummyStore::Config::openStore() const
+ref<DummyStore> DummyStore::Config::openDummyStore() const
 {
-    return make_ref<DummyStore>(ref{shared_from_this()});
+    return make_ref<DummyStoreImpl>(ref{shared_from_this()});
 }
 
 static RegisterStoreImplementation<DummyStore::Config> regDummyStore;

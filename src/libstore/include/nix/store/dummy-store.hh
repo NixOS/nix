@@ -3,7 +3,11 @@
 
 #include "nix/store/store-api.hh"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
+
 namespace nix {
+
+struct DummyStore;
 
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
 {
@@ -42,6 +46,11 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
         return {"dummy"};
     }
 
+    /**
+     * Same as `openStore`, just with a more precise return type.
+     */
+    ref<DummyStore> openDummyStore() const;
+
     ref<Store> openStore() const override;
 
     StoreReference getReference() const override
@@ -55,5 +64,47 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
         };
     }
 };
+
+struct MemorySourceAccessor;
+
+/**
+ * Enough of the Dummy Store exposed for sake of writing unit tests
+ */
+struct DummyStore : virtual Store
+{
+    using Config = DummyStoreConfig;
+
+    ref<const Config> config;
+
+    struct PathInfoAndContents
+    {
+        UnkeyedValidPathInfo info;
+        ref<MemorySourceAccessor> contents;
+    };
+
+    /**
+     * This is map conceptually owns the file system objects for each
+     * store object.
+     */
+    boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
+
+    /**
+     * The build trace maps the pair of a content-addressing (fixed or
+     * floating) derivations an one of its output to a
+     * (content-addressed) store object.
+     */
+    boost::concurrent_flat_map<DrvOutput, ref<UnkeyedRealisation>> buildTrace;
+
+    DummyStore(ref<const Config> config)
+        : Store{*config}
+        , config(config)
+    {
+    }
+};
+
+ref<Store> DummyStoreConfig::openStore() const
+{
+    return openDummyStore();
+}
 
 } // namespace nix

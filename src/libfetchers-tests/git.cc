@@ -183,7 +183,7 @@ TEST_F(GitTest, submodulePeriodSupport)
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
         cfg->readOnly = false;
-        return cfg->openStore();
+        return cfg->openDummyStore();
     }();
 
     auto settings = fetchers::Settings{};

@@ -604,28 +604,28 @@ std::vector<BuiltPathWithResult> Installable::build(
 
 static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const Store & store)
 {
-    std::vector<KeyedBuildResult> failed;
+    std::vector<std::pair<const KeyedBuildResult *, const KeyedBuildResult::Failure *>> failed;
     for (auto & buildResult : buildResults) {
-        if (!buildResult.success()) {
-            failed.push_back(buildResult);
+        if (auto * failure = buildResult.tryGetFailure()) {
+            failed.push_back({&buildResult, failure});
         }
     }
 
     auto failedResult = failed.begin();
     if (failedResult != failed.end()) {
         if (failed.size() == 1) {
-            failedResult->rethrow();
+            failedResult->second->rethrow();
         } else {
             StringSet failedPaths;
             for (; failedResult != failed.end(); failedResult++) {
-                if (!failedResult->errorMsg.empty()) {
+                if (!failedResult->second->errorMsg.empty()) {
                     logError(
                         ErrorInfo{
                             .level = lvlError,
-                            .msg = failedResult->errorMsg,
+                            .msg = failedResult->second->errorMsg,
                         });
                 }
-                failedPaths.insert(failedResult->path.to_string(store));
+                failedPaths.insert(failedResult->first->path.to_string(store));
             }
             throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
         }
@@ -695,12 +695,14 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
         throwBuildErrors(buildResults, *store);
         for (auto & buildResult : buildResults) {
+            // If we didn't throw, they must all be sucesses
+            auto & success = std::get<nix::BuildResult::Success>(buildResult.inner);
             for (auto & aux : backmap[buildResult.path]) {
                 std::visit(
                     overloaded{
                         [&](const DerivedPath::Built & bfd) {
                             std::map<std::string, StorePath> outputs;
-                            for (auto & [outputName, realisation] : buildResult.builtOutputs)
+                            for (auto & [outputName, realisation] : success.builtOutputs)
                                 outputs.emplace(outputName, realisation.outPath);
                             res.push_back(
                                 {aux.installable,
