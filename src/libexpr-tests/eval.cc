@@ -3,6 +3,7 @@
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 namespace nix {
 
@@ -172,6 +173,43 @@ TEST_F(EvalStateTest, getBuiltin_ok)
 TEST_F(EvalStateTest, getBuiltin_fail)
 {
     ASSERT_THROW(state.getBuiltin("nonexistent"), EvalError);
+}
+
+class PureEvalTest : public LibExprTest
+{
+public:
+    PureEvalTest()
+        : LibExprTest(openStore("dummy://", {{"read-only", "false"}}), [](bool & readOnlyMode) {
+            EvalSettings settings{readOnlyMode};
+            settings.pureEval = true;
+            settings.restrictEval = true;
+            return settings;
+        })
+    {
+    }
+};
+
+TEST_F(PureEvalTest, pathExists)
+{
+    ASSERT_THAT(eval("builtins.pathExists /."), IsFalse());
+    ASSERT_THAT(eval("builtins.pathExists /nix"), IsFalse());
+    ASSERT_THAT(eval("builtins.pathExists /nix/store"), IsFalse());
+
+    {
+        std::string contents = "Lorem ipsum";
+
+        StringSource s{contents};
+        auto path = state.store->addToStoreFromDump(
+            s, "source", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256);
+        auto printed = store->printStorePath(path);
+
+        ASSERT_THROW(eval(fmt("builtins.readFile %s", printed)), RestrictedPathError);
+        ASSERT_THAT(eval(fmt("builtins.pathExists %s", printed)), IsFalse());
+
+        ASSERT_THROW(eval("builtins.readDir /."), RestrictedPathError);
+        state.allowPath(path); // FIXME: This shouldn't behave this way.
+        ASSERT_THAT(eval("builtins.readDir /."), IsAttrsOfSize(0));
+    }
 }
 
 } // namespace nix
