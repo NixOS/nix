@@ -26,7 +26,7 @@ void printAmbiguous(
         printLiteralString(str, v.string_view());
         break;
     case nPath:
-        str << v.path().to_string(); // !!! escaping?
+        str << v.path(); // !!! escaping?
         break;
     case nNull:
         str << "null";

@@ -39,6 +39,7 @@ typedef enum {
     tExternal,
     tPrimOp,
     tAttrs,
+    tPath,
     /* layout: Pair of pointers payload */
     tListSmall,
     tPrimOpApp,
@@ -48,7 +49,6 @@ typedef enum {
     /* layout: Single untaggable field */
     tListN,
     tString,
-    tPath,
 } InternalType;
 
 /**
@@ -225,7 +225,6 @@ struct ValueBase
 
     struct Path
     {
-        SourceAccessor * accessor;
         const char * path;
     };
 
@@ -415,7 +414,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
      * That leaves the first 8 bytes free for storing the InternalType in the upper
      * bits.
      *
-     * PrimaryDiscriminator::pdListN - pdPath - Only has 3 available padding bits
+     * PrimaryDiscriminator::pdListN - pdString - Only has 3 available padding bits
      * because:
      * - tListN needs a size, whose lower bits we can't borrow.
      * - tString and tPath have C-string fields, which don't necessarily need to
@@ -436,7 +435,6 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         /* The order of these enumations must be the same as in InternalType. */
         pdListN, //< layout: Single untaggable field.
         pdString,
-        pdPath,
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
 
@@ -469,7 +467,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     template<PrimaryDiscriminator discriminator, typename T, typename U>
     void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
     {
-        static_assert(discriminator >= pdListN && discriminator <= pdPath);
+        static_assert(discriminator >= pdListN && discriminator <= pdString);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
         payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
@@ -515,7 +513,6 @@ protected:
         /* The order must match that of the enumerations defined in InternalType. */
         case pdListN:
         case pdString:
-        case pdPath:
             return static_cast<InternalType>(tListN + (pd - pdListN));
         case pdPairOfPointers:
             return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
@@ -578,6 +575,11 @@ protected:
         attrs = std::bit_cast<Bindings *>(payload[1]);
     }
 
+    void getStorage(Path & path) const noexcept
+    {
+        path.path = std::bit_cast<const char *>(payload[1]);
+    }
+
     void getStorage(List & list) const noexcept
     {
         list.elems = untagPointer<decltype(list.elems)>(payload[0]);
@@ -588,12 +590,6 @@ protected:
     {
         string.context = untagPointer<decltype(string.context)>(payload[0]);
         string.c_str = std::bit_cast<const char *>(payload[1]);
-    }
-
-    void getStorage(Path & path) const noexcept
-    {
-        path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
-        path.path = std::bit_cast<const char *>(payload[1]);
     }
 
     void setStorage(NixInt integer) noexcept
@@ -631,6 +627,11 @@ protected:
         setSingleDWordPayload<tAttrs>(std::bit_cast<PackedPointer>(bindings));
     }
 
+    void setStorage(Path path) noexcept
+    {
+        setSingleDWordPayload<tPath>(std::bit_cast<PackedPointer>(path.path));
+    }
+
     void setStorage(List list) noexcept
     {
         setUntaggablePayload<pdListN>(list.elems, list.size);
@@ -639,11 +640,6 @@ protected:
     void setStorage(StringWithContext string) noexcept
     {
         setUntaggablePayload<pdString>(string.context, string.c_str);
-    }
-
-    void setStorage(Path path) noexcept
-    {
-        setUntaggablePayload<pdPath>(path.accessor, path.path);
     }
 };
 
@@ -1002,11 +998,11 @@ public:
 
     void mkStringMove(const char * s, const NixStringContext & context);
 
-    void mkPath(const SourcePath & path);
+    void mkPath(const CanonPath & path);
 
-    inline void mkPath(SourceAccessor * accessor, const char * path) noexcept
+    inline void mkPath(const char * path) noexcept
     {
-        setStorage(Path{.accessor = accessor, .path = path});
+        setStorage(Path{.path = path});
     }
 
     inline void mkNull() noexcept
@@ -1102,9 +1098,9 @@ public:
      */
     bool isTrivial() const;
 
-    SourcePath path() const
+    CanonPath path() const
     {
-        return SourcePath(ref(pathAccessor()->shared_from_this()), CanonPath(CanonPath::unchecked_t(), pathStr()));
+        return CanonPath(CanonPath::unchecked_t(), pathStr());
     }
 
     std::string_view string_view() const noexcept
@@ -1175,11 +1171,6 @@ public:
     const char * pathStr() const noexcept
     {
         return getStorage<Path>().path;
-    }
-
-    SourceAccessor * pathAccessor() const noexcept
-    {
-        return getStorage<Path>().accessor;
     }
 };
 
