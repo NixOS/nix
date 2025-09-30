@@ -59,6 +59,21 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
           The meaning and accepted values depend on the compression method selected.
           `-1` specifies that the default compression level should be used.
         )"};
+
+    const Setting<std::string> narinfoCompression{
+        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
+
+    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
+
+    const Setting<std::string> logCompression{
+        this,
+        "",
+        "log-compression",
+        R"(
+          Compression method for `log/*` files. It is recommended to
+          use a compression method supported by most web browsers
+          (e.g. `brotli`).
+        )"};
 };
 
 /**

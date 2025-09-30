@@ -4,6 +4,7 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/compression.hh"
 
 namespace nix {
 
@@ -142,8 +143,27 @@ protected:
         const std::string & mimeType) override
     {
         auto req = makeRequest(path);
-        req.data = StreamToSourceAdapter(istream).drain();
+
+        auto data = StreamToSourceAdapter(istream).drain();
+
+        // Determine compression method based on file type
+        std::string compressionMethod;
+        if (hasSuffix(path, ".narinfo"))
+            compressionMethod = config->narinfoCompression;
+        else if (hasSuffix(path, ".ls"))
+            compressionMethod = config->lsCompression;
+        else if (hasPrefix(path, "log/"))
+            compressionMethod = config->logCompression;
+
+        // Apply compression if configured
+        if (!compressionMethod.empty()) {
+            data = compress(compressionMethod, data);
+            req.headers.emplace_back("Content-Encoding", compressionMethod);
+        }
+
+        req.data = std::move(data);
         req.mimeType = mimeType;
+
         try {
             getFileTransfer()->upload(req);
         } catch (FileTransferError & e) {
