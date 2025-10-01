@@ -268,7 +268,7 @@ EvalState::EvalState(
     }())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
-    , derivationInternal{corepkgsFS->addFile(
+    , derivationInternal{internalFS->addFile(
           CanonPath("derivation-internal.nix"),
 #include "primops/derivation.nix.gen.hh"
           )}
