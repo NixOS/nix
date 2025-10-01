@@ -18,6 +18,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/regex.hpp>
 #include <queue>
+#include <thread>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
