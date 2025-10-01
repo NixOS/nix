@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/path-from-hash-part\.sh$''
               ''^tests/functional/path-info\.sh$''
               ''^tests/functional/placeholders\.sh$''
               ''^tests/functional/post-hook\.sh$''
