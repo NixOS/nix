@@ -1,17 +1,17 @@
-#include "nix/store/s3.hh"
-#include "nix/util/split.hh"
-#include "nix/util/url.hh"
-#include "nix/util/util.hh"
-#include "nix/util/canon-path.hh"
-#include "nix/util/strings-inline.hh"
+#include "nix/store/s3-url.hh"
 
-#include <ranges>
+#if NIX_WITH_S3_SUPPORT
 
-namespace nix {
+#  include "nix/util/error.hh"
+#  include "nix/util/split.hh"
+#  include "nix/util/strings-inline.hh"
+
+#  include <ranges>
+#  include <string_view>
 
 using namespace std::string_view_literals;
 
-#if NIX_WITH_S3_SUPPORT
+namespace nix {
 
 ParsedS3URL ParsedS3URL::parse(const ParsedURL & parsed)
 try {
@@ -116,6 +116,6 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
         endpoint);
 }
 
-#endif
-
 } // namespace nix
+
+#endif
