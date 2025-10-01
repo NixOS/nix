@@ -182,8 +182,16 @@ Goal::Co DerivationGoal::haveDerivation()
             }
         }
 
-        if (buildResult.success())
-            assert(buildResult.builtOutputs.count(wantedOutput) > 0);
+        if (buildResult.success()) {
+            /* If the wanted output is not in builtOutputs (e.g., because it
+               was already valid and therefore not re-registered), we need to
+               add it ourselves to ensure we return the correct information. */
+            if (buildResult.builtOutputs.count(wantedOutput) == 0) {
+                debug(
+                    "BUG! wanted output '%s' not in builtOutputs, working around by adding it manually", wantedOutput);
+                buildResult.builtOutputs = {{wantedOutput, assertPathValidity()}};
+            }
+        }
     }
 
     co_return amDone(g->exitCode, g->ex);
