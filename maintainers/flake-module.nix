@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/user-envs-migration\.sh$''
               ''^tests/functional/user-envs-test-case\.sh$''
               ''^tests/functional/user-envs\.builder\.sh$''
               ''^tests/functional/user-envs\.sh$''
