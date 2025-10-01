@@ -158,7 +158,7 @@ test -e "$outPath10"
 
 # Uninstall everything
 nix-env -e '*'
-test "$(nix-env -q '*' -c)" -eq 0
+test "$(nix-env -q '*' | wc -l)" -eq 0
 
 # Installing "foo" should only install the newest foo.
 nix-env -i foo

@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/user-envs\.sh$''
               ''^tests/functional/why-depends\.sh$''
             ];
           };
