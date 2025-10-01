@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/recursive\.sh$''
               ''^tests/functional/referrers\.sh$''
               ''^tests/functional/remote-store\.sh$''
               ''^tests/functional/repair\.sh$''
