@@ -7,10 +7,10 @@ TODO_NixOS
 clearStore
 
 # Ensure "fake ssh" remote store works just as legacy fake ssh would.
-nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store doctor
+nix --store ssh-ng://localhost?remote-store="$TEST_ROOT"/other-store doctor
 
 # Ensure that store info trusted works with ssh-ng://
-nix --store ssh-ng://localhost?remote-store=$TEST_ROOT/other-store store info --json | jq -e '.trusted'
+nix --store ssh-ng://localhost?remote-store="$TEST_ROOT"/other-store store info --json | jq -e '.trusted'
 
 startDaemon
 
@@ -31,8 +31,8 @@ NIX_REMOTE_=$NIX_REMOTE $SHELL ./user-envs-test-case.sh
 
 nix-store --gc --max-freed 1K
 
-nix-store --dump-db > $TEST_ROOT/d1
-NIX_REMOTE= nix-store --dump-db > $TEST_ROOT/d2
-cmp $TEST_ROOT/d1 $TEST_ROOT/d2
+nix-store --dump-db > "$TEST_ROOT"/d1
+NIX_REMOTE='' nix-store --dump-db > "$TEST_ROOT"/d2
+cmp "$TEST_ROOT"/d1 "$TEST_ROOT"/d2
 
 killDaemon

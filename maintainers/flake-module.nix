@@ -104,36 +104,6 @@
           };
           shellcheck = {
             enable = true;
-            excludes = [
-              # We haven't linted these files yet
-              ''^tests/functional/pass-as-file\.sh$''
-              ''^tests/functional/path-from-hash-part\.sh$''
-              ''^tests/functional/path-info\.sh$''
-              ''^tests/functional/placeholders\.sh$''
-              ''^tests/functional/post-hook\.sh$''
-              ''^tests/functional/pure-eval\.sh$''
-              ''^tests/functional/push-to-store-old\.sh$''
-              ''^tests/functional/push-to-store\.sh$''
-              ''^tests/functional/read-only-store\.sh$''
-              ''^tests/functional/readfile-context\.sh$''
-              ''^tests/functional/recursive\.sh$''
-              ''^tests/functional/referrers\.sh$''
-              ''^tests/functional/remote-store\.sh$''
-              ''^tests/functional/repair\.sh$''
-              ''^tests/functional/restricted\.sh$''
-              ''^tests/functional/search\.sh$''
-              ''^tests/functional/secure-drv-outputs\.sh$''
-              ''^tests/functional/selfref-gc\.sh$''
-              ''^tests/functional/shell\.shebang\.sh$''
-              ''^tests/functional/simple\.builder\.sh$''
-              ''^tests/functional/supplementary-groups\.sh$''
-              ''^tests/functional/toString-path\.sh$''
-              ''^tests/functional/user-envs-migration\.sh$''
-              ''^tests/functional/user-envs-test-case\.sh$''
-              ''^tests/functional/user-envs\.builder\.sh$''
-              ''^tests/functional/user-envs\.sh$''
-              ''^tests/functional/why-depends\.sh$''
-            ];
           };
         };
       };
