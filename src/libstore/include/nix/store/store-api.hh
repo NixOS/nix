@@ -598,10 +598,7 @@ public:
      * floating-ca derivations and their dependencies as there's no way to
      * retrieve this information otherwise.
      */
-    virtual void registerDrvOutput(const Realisation & output)
-    {
-        unsupported("registerDrvOutput");
-    }
+    virtual void registerDrvOutput(const Realisation & output) = 0;
 
     virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
     {
