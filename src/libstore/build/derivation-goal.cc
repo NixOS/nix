@@ -182,7 +182,12 @@ Goal::Co DerivationGoal::haveDerivation()
                 }
             }
 
-            assert(success.builtOutputs.count(wantedOutput) > 0);
+            /* If the wanted output is not in builtOutputs (e.g., because it
+               was already valid and therefore not re-registered), we need to
+               add it ourselves to ensure we return the correct information. */
+            if (success.builtOutputs.count(wantedOutput) == 0) {
+                success.builtOutputs = {{wantedOutput, assertPathValidity()}};
+            }
         }
     }
 
