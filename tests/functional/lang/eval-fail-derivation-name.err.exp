@@ -1,20 +1,20 @@
 error:
        … while evaluating the attribute 'outPath'
-         at <nix/derivation-internal.nix>:<number>:<number>:
+         at «nix-internal»/derivation-internal.nix:<number>:<number>:
      <number>|     value = commonAttrs // {
      <number>|       outPath = builtins.getAttr outputName strict;
              |       ^
      <number>|       drvPath = strict.drvPath;
 
        … while calling the 'getAttr' builtin
-         at <nix/derivation-internal.nix>:<number>:<number>:
+         at «nix-internal»/derivation-internal.nix:<number>:<number>:
      <number>|     value = commonAttrs // {
      <number>|       outPath = builtins.getAttr outputName strict;
              |                 ^
      <number>|       drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin
-         at <nix/derivation-internal.nix>:<number>:<number>:
+         at «nix-internal»/derivation-internal.nix:<number>:<number>:
      <number>|
      <number>|   strict = derivationStrict drvAttrs;
              |            ^
