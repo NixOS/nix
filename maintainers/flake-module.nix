@@ -104,10 +104,6 @@
           };
           shellcheck = {
             enable = true;
-            excludes = [
-              # We haven't linted these files yet
-              ''^tests/functional/why-depends\.sh$''
-            ];
           };
         };
       };
