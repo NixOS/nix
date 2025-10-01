@@ -222,3 +222,22 @@ public:
 };
 
 } // namespace nix
+
+template<>
+struct std::hash<nix::Hash>
+{
+    std::size_t operator()(const nix::Hash & hash) const noexcept
+    {
+        assert(hash.hashSize > sizeof(size_t));
+        return *reinterpret_cast<const std::size_t *>(&hash.hash);
+    }
+};
+
+namespace nix {
+
+inline std::size_t hash_value(const Hash & hash)
+{
+    return std::hash<Hash>{}(hash);
+}
+
+} // namespace nix

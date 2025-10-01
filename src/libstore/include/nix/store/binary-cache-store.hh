@@ -95,12 +95,21 @@ private:
 
 protected:
 
-    // The prefix under which realisation infos will be stored
-    const std::string realisationsPrefix = "realisations";
+    /**
+     * The prefix under which realisation infos will be stored
+     */
+    constexpr const static std::string realisationsPrefix = "realisations";
 
-    const std::string cacheInfoFile = "nix-cache-info";
+    constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
     BinaryCacheStore(Config &);
+
+    /**
+     * Compute the path to the given realisation
+     *
+     * It's `${realisationsPrefix}/${drvOutput}.doi`.
+     */
+    std::string makeRealisationPath(const DrvOutput & id);
 
 public:
 
@@ -190,7 +199,7 @@ public:
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

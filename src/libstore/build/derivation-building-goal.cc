@@ -1092,13 +1092,22 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                 // without the `ca-derivations` experimental flag).
                 worker.store.registerDrvOutput(
                     Realisation{
+                        {
+                            .outPath = info.known->path,
+                        },
                         drvOutput,
-                        info.known->path,
                     });
             }
         }
         if (info.known && info.known->isValid())
-            validOutputs.emplace(i.first, Realisation{drvOutput, info.known->path});
+            validOutputs.emplace(
+                i.first,
+                Realisation{
+                    {
+                        .outPath = info.known->path,
+                    },
+                    drvOutput,
+                });
     }
 
     bool allValid = true;

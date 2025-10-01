@@ -3,6 +3,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store-impl.hh"
+#include "nix/store/realisation.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -251,7 +252,10 @@ struct DummyStoreImpl : DummyStore
 
     void registerDrvOutput(const Realisation & output) override
     {
-        unsupported("registerDrvOutput");
+        auto ref = make_ref<UnkeyedRealisation>(output);
+        buildTrace.insert_or_visit({output.id.drvHash, {{output.id.outputName, ref}}}, [&](auto & kv) {
+            kv.second.insert_or_assign(output.id.outputName, make_ref<UnkeyedRealisation>(output));
+        });
     }
 
     void narFromPath(const StorePath & path, Sink & sink) override
@@ -266,10 +270,19 @@ struct DummyStoreImpl : DummyStore
             throw Error("path '%s' is not valid", printStorePath(path));
     }
 
-    void
-    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
+    void queryRealisationUncached(
+        const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
-        callback(nullptr);
+        bool visited = false;
+        buildTrace.cvisit(drvOutput.drvHash, [&](const auto & kv) {
+            if (auto it = kv.second.find(drvOutput.outputName); it != kv.second.end()) {
+                visited = true;
+                callback(it->second.get_ptr());
+            }
+        });
+
+        if (!visited)
+            callback(nullptr);
     }
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
