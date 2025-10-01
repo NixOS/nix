@@ -4,6 +4,7 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
@@ -75,15 +76,26 @@ std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
 }
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
-    const StorePath & drvPath, const Derivation & drv, const OutputName & wantedOutput, BuildMode buildMode)
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    BuildMode buildMode,
+    bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode);
+    return initGoalIfNeeded(
+        derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode, storeDerivation);
 }
 
-std::shared_ptr<DerivationBuildingGoal>
-Worker::makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationResolutionGoal>
+Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
 {
-    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode);
+    return initGoalIfNeeded(derivationResolutionGoals[drvPath], drvPath, drv, *this, buildMode);
+}
+
+std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
+    const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation)
+{
+    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<PathSubstitutionGoal>
@@ -158,6 +170,8 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(drvGoal, derivationTrampolineGoals.map);
     else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
+    else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal))
+        nix::removeGoal(drvResolutionGoal, derivationResolutionGoals);
     else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
         nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
