@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/secure-drv-outputs\.sh$''
               ''^tests/functional/selfref-gc\.sh$''
               ''^tests/functional/shell\.shebang\.sh$''
               ''^tests/functional/simple\.builder\.sh$''
