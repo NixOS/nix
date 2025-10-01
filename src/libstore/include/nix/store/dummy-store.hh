@@ -5,6 +5,8 @@
 
 namespace nix {
 
+struct DummyStore;
+
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
 {
     DummyStoreConfig(const Params & params)
@@ -41,6 +43,11 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
     {
         return {"dummy"};
     }
+
+    /**
+     * Same as `openStore`, just with a more precise return type.
+     */
+    ref<DummyStore> openDummyStore() const;
 
     ref<Store> openStore() const override;
 
