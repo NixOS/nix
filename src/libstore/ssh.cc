@@ -206,7 +206,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 
     // Wait for the SSH connection to be established,
     // So that we don't overwrite the password prompt with our progress bar.
-    if (!fakeSSH && !useMaster && !isMasterRunning()) {
+    if (!fakeSSH && !isMasterRunning()) {
         std::string reply;
         try {
             reply = readLine(out.readSide.get());
