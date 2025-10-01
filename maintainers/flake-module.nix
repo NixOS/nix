@@ -106,7 +106,6 @@
             enable = true;
             excludes = [
               # We haven't linted these files yet
-              ''^tests/functional/post-hook\.sh$''
               ''^tests/functional/pure-eval\.sh$''
               ''^tests/functional/push-to-store-old\.sh$''
               ''^tests/functional/push-to-store\.sh$''
