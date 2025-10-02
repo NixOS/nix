@@ -561,14 +561,22 @@ static void fetch(
                 .hash = *expectedHash,
                 .references = {}});
 
-        if (state.store->isValidPath(expectedPath)) {
+        // Try to get the path from the local store or substituters
+        try {
+            state.store->ensurePath(expectedPath);
+            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;
+        } catch (Error & e) {
+            debug(
+                "substitution of '%s' failed, will try to download: %s",
+                state.store->printStorePath(expectedPath),
+                e.what());
+            // Fall through to download
         }
     }
 
-    // TODO: fetching may fail, yet the path may be substitutable.
-    //       https://github.com/NixOS/nix/issues/4313
+    // Download the file/tarball if substitution failed or no hash was provided
     auto storePath = unpack ? fetchToStore(
                                   state.fetchSettings,
                                   *state.store,

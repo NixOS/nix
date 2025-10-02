@@ -207,5 +207,7 @@ in
 
   fetchurl = runNixOSTest ./fetchurl.nix;
 
+  fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
+
   chrootStore = runNixOSTest ./chroot-store.nix;
 }
