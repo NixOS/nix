@@ -31,39 +31,49 @@ at the first error.
 The following flake output attributes must be derivations:
 
 * `checks.`*system*`.`*name*
-* `defaultPackage.`*system*
-* `devShell.`*system*
+* `devShells.`*system*`.default`
 * `devShells.`*system*`.`*name*
 * `nixosConfigurations.`*name*`.config.system.build.toplevel`
+* `packages.`*system*`.default`
 * `packages.`*system*`.`*name*
 
 The following flake output attributes must be [app
 definitions](./nix3-run.md):
 
+* `apps.`*system*`.default`
 * `apps.`*system*`.`*name*
-* `defaultApp.`*system*
 
 The following flake output attributes must be [template
 definitions](./nix3-flake-init.md):
 
-* `defaultTemplate`
+* `templates.default`
 * `templates.`*name*
 
 The following flake output attributes must be *Nixpkgs overlays*:
 
-* `overlay`
+* `overlays.default`
 * `overlays.`*name*
 
 The following flake output attributes must be *NixOS modules*:
 
-* `nixosModule`
+* `nixosModules.default`
 * `nixosModules.`*name*
 
 The following flake output attributes must be
 [bundlers](./nix3-bundle.md):
 
+* `bundlers.default`
 * `bundlers.`*name*
-* `defaultBundler`
+
+Old default attributes are renamed, they will work but will emit a warning:
+
+* `defaultPackage.<system>` → `packages.`*system*`.default`
+* `defaultApps.<system>` → `apps.`*system*`.default`
+* `defaultTemplate` → `templates.default`
+* `defaultBundler.<system>` → `bundlers.`*system*`.default`
+* `overlay` → `overlays.default`
+* `devShell.<system>` → `devShells.`*system*`.default`
+* `nixosModule` → `nixosModules.default`
 
 In addition, the `hydraJobs` output is evaluated in the same way as
 Hydra's `hydra-eval-jobs` (i.e. as a arbitrarily deeply nested
