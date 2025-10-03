@@ -33,3 +33,10 @@ option(
   value : '/nix/var/log/nix',
   description : 'path to store logs in for Nix',
 )
+
+option(
+  'curl-s3-store',
+  type : 'feature',
+  value : 'disabled',
+  description : 'Enable curl-based S3 binary cache store support (requires aws-crt-cpp and curl >= 7.75.0)',
+)
