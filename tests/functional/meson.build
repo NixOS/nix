@@ -174,6 +174,7 @@ suites = [
       'extra-sandbox-profile.sh',
       'help.sh',
       'symlinks.sh',
+      'external-builders.sh',
     ],
     'workdir' : meson.current_source_dir(),
   },
