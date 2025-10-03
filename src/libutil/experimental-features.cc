@@ -305,6 +305,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "https://github.com/NixOS/nix/milestone/55",
     },
     {
+        .tag = Xp::ExternalBuilders,
+        .name = "external-builders",
+        .description = R"(
+            Enables support for external builders / sandbox providers.
+        )",
+        .trackingUrl = "",
+    },
+    {
         .tag = Xp::BLAKE3Hashes,
         .name = "blake3-hashes",
         .description = R"(

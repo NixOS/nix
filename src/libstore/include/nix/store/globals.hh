@@ -1372,6 +1372,105 @@ public:
           Default is 0, which disables the warning.
           Set it to 1 to warn on all paths.
         )"};
+
+    struct ExternalBuilder
+    {
+        std::vector<std::string> systems;
+        Path program;
+        std::vector<std::string> args;
+    };
+
+    using ExternalBuilders = std::vector<ExternalBuilder>;
+
+    Setting<ExternalBuilders> externalBuilders{
+        this,
+        {},
+        "external-builders",
+        R"(
+          Helper programs that execute derivations.
+
+          The program is passed a JSON document that describes the build environment as the final argument.
+          The JSON document looks like this:
+
+            {
+              "args": [
+                "-e",
+                "/nix/store/vj1c3wf9…-source-stdenv.sh",
+                "/nix/store/shkw4qm9…-default-builder.sh"
+              ],
+              "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+              "env": {
+                "HOME": "/homeless-shelter",
+                "NIX_BUILD_CORES": "14",
+                "NIX_BUILD_TOP": "/build",
+                "NIX_LOG_FD": "2",
+                "NIX_STORE": "/nix/store",
+                "PATH": "/path-not-set",
+                "PWD": "/build",
+                "TEMP": "/build",
+                "TEMPDIR": "/build",
+                "TERM": "xterm-256color",
+                "TMP": "/build",
+                "TMPDIR": "/build",
+                "__structuredAttrs": "",
+                "buildInputs": "",
+                "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+                "cmakeFlags": "",
+                "configureFlags": "",
+                "depsBuildBuild": "",
+                "depsBuildBuildPropagated": "",
+                "depsBuildTarget": "",
+                "depsBuildTargetPropagated": "",
+                "depsHostHost": "",
+                "depsHostHostPropagated": "",
+                "depsTargetTarget": "",
+                "depsTargetTargetPropagated": "",
+                "doCheck": "1",
+                "doInstallCheck": "1",
+                "mesonFlags": "",
+                "name": "hello-2.12.2",
+                "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2",
+                "outputs": "out",
+                "patches": "",
+                "pname": "hello",
+                "postInstallCheck": "stat \"${!outputBin}/bin/hello\"\n",
+                "propagatedBuildInputs": "",
+                "propagatedNativeBuildInputs": "",
+                "src": "/nix/store/dw402azx…-hello-2.12.2.tar.gz",
+                "stdenv": "/nix/store/i8bw5nqg…-stdenv-linux",
+                "strictDeps": "",
+                "system": "aarch64-linux",
+                "version": "2.12.2"
+              },
+              "realStoreDir": "/nix/store",
+              "storeDir": "/nix/store",
+              "system": "aarch64-linux",
+              "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
+              "tmpDirInSandbox": "/build",
+              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0"
+            }
+        )",
+        {},   // aliases
+        true, // document default
+        // NOTE(cole-h): even though we can make the experimental feature required here, the errors
+        // are not as good (it just becomes a warning if you try to use this setting without the
+        // experimental feature)
+        //
+        // With this commented out:
+        //
+        // error: experimental Nix feature 'external-builders' is disabled; add '--extra-experimental-features
+        // external-builders' to enable it
+        //
+        // With this uncommented:
+        //
+        // warning: Ignoring setting 'external-builders' because experimental feature 'external-builders' is not enabled
+        // error: Cannot build '/nix/store/vwsp4qd8…-opentofu-1.10.2.drv'.
+        //        Reason: required system or feature not available
+        //        Required system: 'aarch64-linux' with features {}
+        //        Current system: 'aarch64-darwin' with features {apple-virt, benchmark, big-parallel, nixos-test}
+        // Xp::ExternalBuilders
+    };
 };
 
 // FIXME: don't use a global variable.
