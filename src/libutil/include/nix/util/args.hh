@@ -202,8 +202,12 @@ public:
         Strings labels;
         Handler handler;
         CompleterClosure completer;
+        bool required = false;
 
         std::optional<ExperimentalFeature> experimentalFeature;
+
+        // FIXME: this should be private, but that breaks designated initializers.
+        size_t timesUsed = 0;
     };
 
 protected:
@@ -282,6 +286,8 @@ protected:
     }
 
     StringSet hiddenCategories;
+
+    virtual void checkArgs();
 
     /**
      * Called after all command line flags before the first non-flag
@@ -428,6 +434,8 @@ public:
 protected:
     std::string commandName = "";
     bool aliasUsed = false;
+
+    void checkArgs() override;
 };
 
 Strings argvToStrings(int argc, char ** argv);
