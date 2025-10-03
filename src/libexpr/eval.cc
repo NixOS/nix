@@ -176,7 +176,7 @@ bool Value::isTrivial() const
 {
     return !isa<tApp, tPrimOpApp>()
            && (!isa<tThunk>()
-               || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs.empty())
+               || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->getDynamicAttrs().empty())
                || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr));
 }
 
@@ -1180,11 +1180,12 @@ void ExprPath::eval(EvalState & state, Env & env, Value & v)
 
 Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
 {
-    Env & inheritEnv = state.mem.allocEnv(inheritFromExprs->size());
+    auto inheritFromExprs = getInheritFromExprs();
+    Env & inheritEnv = state.mem.allocEnv(inheritFromExprs.size());
     inheritEnv.up = &up;
 
     Displacement displ = 0;
-    for (auto from : *inheritFromExprs)
+    for (auto from : inheritFromExprs)
         inheritEnv.values[displ++] = from->maybeThunk(state, up);
 
     return &inheritEnv;
@@ -1192,28 +1193,29 @@ Env * ExprAttrs::buildInheritFromEnv(EvalState & state, Env & up)
 
 void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
 {
-    auto bindings = state.buildBindings(attrs.size() + dynamicAttrs.size());
+    auto bindings = state.buildBindings(nAttrs + nDynamicAttrs);
     auto dynamicEnv = &env;
     bool sort = false;
+    auto attrs = getAttrs();
+    auto inheritFromExprs = getInheritFromExprs();
 
     if (recursive) {
         /* Create a new environment that contains the attributes in
            this `rec'. */
-        Env & env2(state.mem.allocEnv(attrs.size()));
+        Env & env2(state.mem.allocEnv(nAttrs));
         env2.up = &env;
         dynamicEnv = &env2;
-        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env2) : nullptr;
+        Env * inheritEnv = inheritFromExprs.empty() ? nullptr : buildInheritFromEnv(state, env2);
 
-        AttrDefs::iterator overrides = attrs.find(state.s.overrides);
-        bool hasOverrides = overrides != attrs.end();
+        AttrDef * overrides = attrs.find(state.s.overrides);
 
         /* The recursive attributes are evaluated in the new
            environment, while the inherited attributes are evaluated
            in the original environment. */
         Displacement displ = 0;
-        for (auto & i : attrs) {
+        for (auto const & i : attrs) {
             Value * vAttr;
-            if (hasOverrides && i.second.kind != AttrDef::Kind::Inherited) {
+            if (overrides && i.second.kind != AttrDef::Kind::Inherited) {
                 vAttr = state.allocValue();
                 mkThunk(*vAttr, *i.second.chooseByKind(&env2, &env, inheritEnv), i.second.e);
             } else
@@ -1230,18 +1232,18 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            still reference the original value, because that value has
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
-        if (hasOverrides) {
-            Value * vOverrides = (*bindings.bindings)[overrides->second.displ].value;
+        if (overrides) {
+            Value * vOverrides = (*bindings.bindings)[attrs.displ(overrides)].value;
             state.forceAttrs(
                 *vOverrides,
                 [&]() { return vOverrides->determinePos(noPos); },
                 "while evaluating the `__overrides` attribute");
             bindings.grow(state.buildBindings(bindings.capacity() + vOverrides->attrs()->size()));
             for (auto & i : *vOverrides->attrs()) {
-                AttrDefs::iterator j = attrs.find(i.name);
-                if (j != attrs.end()) {
-                    (*bindings.bindings)[j->second.displ] = i;
-                    env2.values[j->second.displ] = i.value;
+                AttrDef * j = attrs.find(i.name);
+                if (j) {
+                    (*bindings.bindings)[attrs.displ(j)] = i;
+                    env2.values[attrs.displ(j)] = i.value;
                 } else
                     bindings.push_back(i);
             }
@@ -1250,14 +1252,14 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     }
 
     else {
-        Env * inheritEnv = inheritFromExprs ? buildInheritFromEnv(state, env) : nullptr;
-        for (auto & i : attrs)
+        Env * inheritEnv = inheritFromExprs.empty() ? nullptr : buildInheritFromEnv(state, env);
+        for (auto const & i : attrs)
             bindings.insert(
                 i.first, i.second.e->maybeThunk(state, *i.second.chooseByKind(&env, &env, inheritEnv)), i.second.pos);
     }
 
     /* Dynamic attrs apply *after* rec and __overrides. */
-    for (auto & i : dynamicAttrs) {
+    for (auto & i : getDynamicAttrs()) {
         Value nameVal;
         i.nameExpr->eval(state, *dynamicEnv, nameVal);
         state.forceValue(nameVal, i.pos);
@@ -1291,16 +1293,16 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
-    Env & env2(state.mem.allocEnv(attrs->attrs.size()));
+    Env & env2(state.mem.allocEnv(attrs->nAttrs));
     env2.up = &env;
 
-    Env * inheritEnv = attrs->inheritFromExprs ? attrs->buildInheritFromEnv(state, env2) : nullptr;
+    Env * inheritEnv = attrs->getInheritFromExprs().empty() ? nullptr : attrs->buildInheritFromEnv(state, env2);
 
     /* The recursive attributes are evaluated in the new environment,
        while the inherited attributes are evaluated in the original
        environment. */
     Displacement displ = 0;
-    for (auto & i : attrs->attrs) {
+    for (auto const & i : attrs->getAttrs()) {
         env2.values[displ++] = i.second.e->maybeThunk(state, *i.second.chooseByKind(&env2, &env, inheritEnv));
     }
 
@@ -3223,6 +3225,7 @@ Expr * EvalState::parse(
     auto result = parseExprFromBuf(
         text, length, origin, basePath, mem.exprs.alloc, symbols, settings, positions, *docComments, rootFS);
 
+    // XXX: we're already crawling the whole AST here. we could use this opportunity to do ExprAttrsBuilder -> ExprAttrs transformation
     result->bindVars(*this, staticEnv);
 
     return result;
