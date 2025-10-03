@@ -78,7 +78,7 @@ SSHMaster::SSHMaster(
         oss << authority.host;
         return std::move(oss).str();
     }())
-    , fakeSSH(authority.host == "localhost")
+    , fakeSSH(authority.to_string() == "localhost")
     , keyFile(keyFile)
     , sshPublicHostKey(parsePublicHostKey(authority.host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
