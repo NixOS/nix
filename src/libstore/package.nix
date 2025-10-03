@@ -10,6 +10,7 @@
   boost,
   curl,
   aws-sdk-cpp,
+  aws-crt-cpp,
   libseccomp,
   nlohmann_json,
   sqlite,
@@ -25,6 +26,8 @@
   withAWS ?
     # Default is this way because there have been issues building this dependency
     stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
+
+  withCurlS3 ? false,
 }:
 
 let
@@ -64,7 +67,8 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
-  ++ lib.optional withAWS aws-sdk-cpp;
+  ++ lib.optional withAWS aws-sdk-cpp
+  ++ lib.optional withCurlS3 aws-crt-cpp;
 
   propagatedBuildInputs = [
     nix-util
@@ -74,6 +78,7 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
+    (lib.mesonEnable "curl-s3-store" withCurlS3)
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")

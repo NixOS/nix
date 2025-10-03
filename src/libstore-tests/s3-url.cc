@@ -1,7 +1,7 @@
 #include "nix/store/s3-url.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_S3_SUPPORT || NIX_WITH_CURL_S3
 
 #  include <gtest/gtest.h>
 #  include <gmock/gmock.h>
