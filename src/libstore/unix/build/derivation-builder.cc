@@ -19,6 +19,9 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/aws-creds.hh"
+#include "nix/store/s3-url.hh"
 
 #include <queue>
 
@@ -185,6 +188,47 @@ protected:
      * The daemon worker threads.
      */
     std::vector<std::thread> daemonWorkerThreads;
+
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolved AWS credentials for builtin:fetchurl with S3 URLs.
+     * Resolved in parent process before fork to avoid credential provider recreation.
+     */
+    std::optional<AwsCredentialsForBuilder> preResolvedAwsCredentials;
+
+protected:
+    /**
+     * Pre-resolve AWS credentials for S3 URLs in builtin:fetchurl.
+     * This must be called before forking to ensure credential providers are reused.
+     */
+    void preResolveAwsCredentials()
+    {
+        if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+            auto url = drv.env.find("url");
+            if (url != drv.env.end()) {
+                try {
+                    auto parsedUrl = parseURL(url->second);
+                    if (parsedUrl.scheme == "s3") {
+                        debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
+                        auto s3Url = ParsedS3URL::parse(parsedUrl);
+
+                        // Get credentials from the parent process's cached provider
+                        auto creds = nix::preResolveAwsCredentials(s3Url);
+
+                        preResolvedAwsCredentials = AwsCredentialsForBuilder{
+                            .accessKeyId = creds.accessKeyId,
+                            .secretAccessKey = creds.secretAccessKey,
+                            .sessionToken = creds.sessionToken,
+                            .region = s3Url.region.value_or("us-east-1")};
+                        debug("Successfully pre-resolved AWS credentials in parent process");
+                    }
+                } catch (const std::exception & e) {
+                    debug("Error checking S3 URL: %s", e.what());
+                }
+            }
+        }
+    }
+#endif
 
     const StorePathSet & originalPaths() override
     {
@@ -946,6 +990,11 @@ void DerivationBuilderImpl::openSlave()
 
 void DerivationBuilderImpl::startChild()
 {
+#if NIX_WITH_CURL_S3
+    // Pre-resolve AWS credentials before forking
+    preResolveAwsCredentials();
+#endif
+
     pid = startProcess([&]() {
         openSlave();
         runChild();
@@ -1222,6 +1271,9 @@ void DerivationBuilderImpl::runChild()
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_CURL_S3
+            .awsCredentials = preResolvedAwsCredentials,
+#endif
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {

@@ -3,19 +3,15 @@
 
 #include "nix/store/config.hh"
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_CURL_S3
 
-#  include "nix/store/binary-cache-store.hh"
-
-#  include <atomic>
+#  include "nix/store/http-binary-cache-store.hh"
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : std::enable_shared_from_this<S3BinaryCacheStoreConfig>, virtual BinaryCacheStoreConfig
+struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
 {
-    std::string bucketName;
-
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    using HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig;
 
     S3BinaryCacheStoreConfig(std::string_view uriScheme, std::string_view bucketName, const Params & params);
 
@@ -73,63 +69,16 @@ public:
           > addressing instead of virtual host based addressing.
         )"};
 
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
-
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
-
-    const Setting<std::string> logCompression{
-        this,
-        "",
-        "log-compression",
-        R"(
-          Compression method for `log/*` files. It is recommended to
-          use a compression method supported by most web browsers
-          (e.g. `brotli`).
-        )"};
-
-    const Setting<bool> multipartUpload{this, false, "multipart-upload", "Whether to use multi-part uploads."};
-
-    const Setting<uint64_t> bufferSize{
-        this, 5 * 1024 * 1024, "buffer-size", "Size (in bytes) of each part in multi-part uploads."};
-
     static const std::string name()
     {
         return "S3 Binary Cache Store";
     }
 
-    static StringSet uriSchemes()
-    {
-        return {"s3"};
-    }
+    static StringSet uriSchemes();
 
     static std::string doc();
 
     ref<Store> openStore() const override;
-
-    StoreReference getReference() const override;
-};
-
-struct S3BinaryCacheStore : virtual BinaryCacheStore
-{
-    using Config = S3BinaryCacheStoreConfig;
-
-    ref<Config> config;
-
-    S3BinaryCacheStore(ref<Config>);
-
-    struct Stats
-    {
-        std::atomic<uint64_t> put{0};
-        std::atomic<uint64_t> putBytes{0};
-        std::atomic<uint64_t> putTimeMs{0};
-        std::atomic<uint64_t> get{0};
-        std::atomic<uint64_t> getBytes{0};
-        std::atomic<uint64_t> getTimeMs{0};
-        std::atomic<uint64_t> head{0};
-    };
-
-    virtual const Stats & getS3Stats() = 0;
 };
 
 } // namespace nix

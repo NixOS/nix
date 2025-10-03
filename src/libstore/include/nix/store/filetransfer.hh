@@ -4,12 +4,16 @@
 #include <string>
 #include <future>
 
+#include "nix/store/config.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#endif
 
 namespace nix {
 
@@ -92,6 +96,13 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolved AWS credentials for S3 requests.
+     * When provided, these will be used instead of creating new credential providers.
+     */
+    std::optional<AwsCredentials> preResolvedAwsCredentials;
+#endif
 
     FileTransferRequest(ValidURL uri)
         : uri(std::move(uri))
