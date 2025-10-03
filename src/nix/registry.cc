@@ -117,7 +117,7 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
         if (toRef.subdir != "")
             extraAttrs["dir"] = toRef.subdir;
         registry->remove(fromRef.input);
-        registry->add(fromRef.input, toRef.input, extraAttrs);
+        registry->add(fromRef.input, toRef.input, extraAttrs, false);
         registry->write(getRegistryPath());
     }
 };
@@ -196,7 +196,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "")
             extraAttrs["dir"] = ref.subdir;
-        registry->add(ref.input, resolved, extraAttrs);
+        registry->add(ref.input, resolved, extraAttrs, true);
         registry->write(getRegistryPath());
     }
 };
