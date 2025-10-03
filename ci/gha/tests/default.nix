@@ -12,6 +12,8 @@
   componentTestsPrefix ? "",
   withSanitizers ? false,
   withCoverage ? false,
+  withAWS ? null,
+  withCurlS3 ? null,
   ...
 }:
 
@@ -64,6 +66,12 @@ rec {
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
+
+      # Override AWS configuration if specified
+      nix-store = prev.nix-store.override (
+        lib.optionalAttrs (withAWS != null) { inherit withAWS; }
+        // lib.optionalAttrs (withCurlS3 != null) { inherit withCurlS3; }
+      );
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
       # Unclear how to make Perl bindings work with a dynamically linked ASAN.
