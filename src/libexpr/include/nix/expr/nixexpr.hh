@@ -348,10 +348,14 @@ struct ExprSelect : Expr
 struct ExprOpHasAttr : Expr
 {
     Expr * e;
-    AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, AttrPath attrPath)
+    std::span<AttrName> attrPath;
+
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> alloc, Expr * e, std::vector<AttrName> attrPath)
         : e(e)
-        , attrPath(std::move(attrPath)) {};
+        , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
+    {
+        std::ranges::copy(attrPath, this->attrPath.begin());
+    };
 
     PosIdx getPos() const override
     {

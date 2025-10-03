@@ -261,7 +261,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), $1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr(state->alloc, $1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
     { $$ = new ExprConcatStrings(state->at(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{state->at(@1), $1}, {state->at(@3), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
