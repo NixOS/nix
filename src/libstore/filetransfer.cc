@@ -625,11 +625,8 @@ struct curlFileTransfer : public FileTransfer
 
     std::thread workerThread;
 
-    curlFileTransfer()
-        : mt19937(rd())
+    void setup()
     {
-        static std::once_flag globalInit;
-        std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
 
         curlm = curl_multi_init();
 
@@ -640,17 +637,26 @@ struct curlFileTransfer : public FileTransfer
         curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS, fileTransferSettings.httpConnections.get());
 #endif
 
+        workerThread = std::thread([&]() { workerThreadEntry(); });
+    }
+
+    curlFileTransfer()
+        : mt19937(rd())
+    {
+        static std::once_flag globalInit;
+        std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
+
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         wakeupPipe.create();
         fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
 #endif
 
-        workerThread = std::thread([&]() { workerThreadEntry(); });
+        setup();
     }
 
-    ~curlFileTransfer()
+    void tearDown(Sync<State>::WriteLock & state)
     {
-        stopWorkerThread();
+        stopWorkerThread(state);
 
         workerThread.join();
 
@@ -658,13 +664,27 @@ struct curlFileTransfer : public FileTransfer
             curl_multi_cleanup(curlm);
     }
 
-    void stopWorkerThread()
+    ~curlFileTransfer()
+    {
+        auto state(state_.lock());
+        tearDown(state);
+    }
+
+    void restart(Sync<State>::WriteLock state)
+    {
+        // Same as destructor
+        tearDown(state);
+
+        // Fresh state, but reuse global mutex
+        *state = State{};
+        // Same as constructor
+        setup();
+    }
+
+    void stopWorkerThread(Sync<State>::WriteLock & state)
     {
         /* Signal the worker thread to exit. */
-        {
-            auto state(state_.lock());
-            state->quit();
-        }
+        state->quit();
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
 #endif
@@ -674,7 +694,10 @@ struct curlFileTransfer : public FileTransfer
     {
 /* Cause this thread to be notified on SIGINT. */
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
-        auto callback = createInterruptCallback([&]() { stopWorkerThread(); });
+        auto callback = createInterruptCallback([&]() {
+            auto state(state_.lock());
+            stopWorkerThread(state);
+        });
 #endif
 
 #ifdef __linux__
@@ -861,8 +884,8 @@ ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-    if (fileTransfer->state_.lock()->isQuitting())
-        fileTransfer = makeCurlFileTransfer();
+    if (auto state(fileTransfer->state_.lock()); state->isQuitting())
+        fileTransfer->restart(std::move(state));
 
     return fileTransfer;
 }
