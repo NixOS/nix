@@ -21,6 +21,7 @@ public:
         int id;
         bool wantMassQuery;
         int priority;
+        Path storeDir;
     };
 
     virtual std::optional<CacheInfo> upToDateCacheExists(const std::string & uri) = 0;

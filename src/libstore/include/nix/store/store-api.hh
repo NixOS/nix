@@ -89,14 +89,15 @@ private:
 
 public:
 
-    const PathSetting storeDir_{
+    PathSetting storeDir_{
         this,
         getDefaultNixStoreDir(),
         "store",
         R"(
           Logical location of the Nix store, usually
           `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
+          between stores if they have the same `store` setting,
+          with the exception of fixed-output derivation outputs.
         )"};
 };
 

@@ -239,7 +239,11 @@ public:
             auto cache(queryCacheRaw(*state, uri));
             if (!cache)
                 return std::nullopt;
-            return CacheInfo{.id = cache->id, .wantMassQuery = cache->wantMassQuery, .priority = cache->priority};
+            return CacheInfo{
+                .id = cache->id,
+                .wantMassQuery = cache->wantMassQuery,
+                .priority = cache->priority,
+                .storeDir = cache->storeDir};
         });
     }
 
