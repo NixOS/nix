@@ -183,7 +183,7 @@ public:
         std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(*state, ei.level, toView(oss));
+        log(*state, ei.level, oss.view());
     }
 
     void log(State & state, Verbosity lvl, std::string_view s)
