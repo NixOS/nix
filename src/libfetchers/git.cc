@@ -181,7 +181,7 @@ struct GitInputScheme : InputScheme
                 attrs.emplace(name, value);
             else if (
                 name == "shallow" || name == "submodules" || name == "lfs" || name == "exportIgnore"
-                || name == "allRefs" || name == "verifyCommit")
+                || name == "allRefs" || name == "verifyCommit" || name == "applyFilters")
                 attrs.emplace(name, Explicit<bool>{value == "1"});
             else
                 url2.query.emplace(name, value);
@@ -200,24 +200,9 @@ struct GitInputScheme : InputScheme
     StringSet allowedAttrs() const override
     {
         return {
-            "url",
-            "ref",
-            "rev",
-            "shallow",
-            "submodules",
-            "lfs",
-            "exportIgnore",
-            "lastModified",
-            "revCount",
-            "narHash",
-            "allRefs",
-            "name",
-            "dirtyRev",
-            "dirtyShortRev",
-            "verifyCommit",
-            "keytype",
-            "publicKey",
-            "publicKeys",
+            "url",          "ref",      "rev",       "shallow",    "submodules",   "lfs",      "exportIgnore",
+            "lastModified", "revCount", "narHash",   "allRefs",    "name",         "dirtyRev", "dirtyShortRev",
+            "verifyCommit", "keytype",  "publicKey", "publicKeys", "applyFilters",
         };
     }
 
@@ -266,6 +251,8 @@ struct GitInputScheme : InputScheme
             url.query.insert_or_assign("publicKey", publicKeys.at(0).key);
         } else if (publicKeys.size() > 1)
             url.query.insert_or_assign("publicKeys", publicKeys_to_string(publicKeys));
+        if (maybeGetBoolAttr(input.attrs, "applyFilters").value_or(false))
+            url.query.insert_or_assign("applyFilters", "1");
         return url;
     }
 
@@ -438,6 +425,11 @@ struct GitInputScheme : InputScheme
     bool getAllRefsAttr(const Input & input) const
     {
         return maybeGetBoolAttr(input.attrs, "allRefs").value_or(false);
+    }
+
+    bool getApplyFiltersAttr(const Input & input) const
+    {
+        return maybeGetBoolAttr(input.attrs, "applyFilters").value_or(false);
     }
 
     RepoInfo getRepoInfo(const Input & input) const
@@ -720,7 +712,8 @@ struct GitInputScheme : InputScheme
 
         bool exportIgnore = getExportIgnoreAttr(input);
         bool smudgeLfs = getLfsAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»", smudgeLfs);
+        bool applyFilters = getApplyFiltersAttr(input);
+        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»", smudgeLfs, applyFilters);
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
@@ -752,6 +745,7 @@ struct GitInputScheme : InputScheme
                 }
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{exportIgnore});
+                attrs.insert_or_assign("applyFilters", Explicit<bool>{applyFilters});
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
                 attrs.insert_or_assign("lfs", Explicit<bool>{smudgeLfs});
                 attrs.insert_or_assign("allRefs", Explicit<bool>{true});
@@ -886,7 +880,7 @@ struct GitInputScheme : InputScheme
     {
         auto makeFingerprint = [&](const Hash & rev) {
             return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "")
-                   + (getLfsAttr(input) ? ";l" : "");
+                   + (getLfsAttr(input) ? ";l" : "") + (getApplyFiltersAttr(input) ? ";f" : "");
         };
 
         if (auto rev = input.getRev())
