@@ -8,23 +8,6 @@
 
 namespace nix {
 
-struct view_stringbuf : public std::stringbuf
-{
-    inline std::string_view toView()
-    {
-        auto begin = pbase();
-        return {begin, begin + pubseekoff(0, std::ios_base::cur, std::ios_base::out)};
-    }
-};
-
-__attribute__((no_sanitize("undefined"))) std::string_view toView(const std::ostringstream & os)
-{
-    /* Downcasting like this is very much undefined behavior, so we disable
-       UBSAN for this function. */
-    auto buf = static_cast<view_stringbuf *>(os.rdbuf());
-    return buf->toView();
-}
-
 template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
 template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);

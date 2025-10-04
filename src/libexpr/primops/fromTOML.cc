@@ -139,7 +139,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
                 attrs.alloc("_type").mkString("timestamp");
                 std::ostringstream s;
                 s << t;
-                auto str = toView(s);
+                auto str = s.view();
                 forceNoNullByte(str);
                 attrs.alloc("value").mkString(str);
                 v.mkAttrs(attrs);
