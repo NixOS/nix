@@ -225,12 +225,12 @@ protected:
         } catch (FileTransferError & e) {
             if (e.error == FileTransfer::NotFound)
                 return std::nullopt;
-            if (e.error == FileTransfer::Misc) {
-                maybeDisable();
-                return std::nullopt;
-            }
+
             maybeDisable();
-            throw;
+            if (e.error == FileTransfer::Misc) {
+                /* FIXME It's a bit of an abuse to say that the cache doesn't have info, rather than we just failed to fetch it, but we don't want the caller of this to throw, because that would interfere with trying out subsequent substituters. */
+                return std::nullopt;
+            } else throw;
         }
     }
 
