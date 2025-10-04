@@ -1,6 +1,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 
@@ -27,14 +28,22 @@ StorePath fetchToStore(
 
     std::optional<fetchers::Cache::Key> cacheKey;
 
-    if (!filter && path.accessor->fingerprint) {
-        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *path.accessor->fingerprint, method, path.path.abs());
+    auto [subpath, fingerprint] = filter ? std::pair<CanonPath, std::optional<std::string>>{path.path, std::nullopt}
+                                         : path.accessor->getFingerprint(path.path);
+
+    if (fingerprint) {
+        cacheKey = makeFetchToStoreCacheKey(std::string{name}, *fingerprint, method, subpath.abs());
         if (auto res = settings.getCache()->lookupStorePath(*cacheKey, store)) {
             debug("store path cache hit for '%s'", path);
             return res->storePath;
         }
-    } else
+    } else {
+        static auto barf = getEnv("_NIX_TEST_BARF_ON_UNCACHEABLE").value_or("") == "1";
+        if (barf && !filter)
+            throw Error("source path '%s' is uncacheable (filter=%d)", path, (bool) filter);
+        // FIXME: could still provide in-memory caching keyed on `SourcePath`.
         debug("source path '%s' is uncacheable", path);
+    }
 
     Activity act(
         *logger,

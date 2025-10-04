@@ -81,7 +81,7 @@ nix build -o "$TEST_ROOT/result" "$flake3Dir#sth" --commit-lock-file
 
 nix registry add --registry "$registry" flake3 "git+file://$flake3Dir"
 
-nix build -o "$TEST_ROOT/result" flake3#fnord
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix build -o "$TEST_ROOT/result" flake3#fnord
 [[ $(cat "$TEST_ROOT/result") = FNORD ]]
 
 # Check whether flake input fetching is lazy: flake3#sth does not
@@ -91,16 +91,17 @@ clearStore
 mv "$flake2Dir" "$flake2Dir.tmp"
 mv "$nonFlakeDir" "$nonFlakeDir.tmp"
 nix build -o "$TEST_ROOT/result" flake3#sth
-(! nix build -o "$TEST_ROOT/result" flake3#xyzzy)
-(! nix build -o "$TEST_ROOT/result" flake3#fnord)
+(! _NIX_TEST_BARF_ON_UNCACHEABLE='' nix build -o "$TEST_ROOT/result" flake3#xyzzy)
+(! _NIX_TEST_BARF_ON_UNCACHEABLE='' nix build -o "$TEST_ROOT/result" flake3#fnord)
 mv "$flake2Dir.tmp" "$flake2Dir"
 mv "$nonFlakeDir.tmp" "$nonFlakeDir"
-nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix build -o "$TEST_ROOT/result" flake3#xyzzy flake3#fnord
 
 # Check non-flake inputs have a sourceInfo and an outPath
 #
 # This may look redundant, but the other checks below happen in a command
 # substitution subshell, so failures there will not exit this shell
+export _NIX_TEST_BARF_ON_UNCACHEABLE='' # FIXME
 nix eval --raw flake3#inputs.nonFlake.outPath
 nix eval --raw flake3#inputs.nonFlake.sourceInfo.outPath
 nix eval --raw flake3#inputs.nonFlakeFile.outPath
