@@ -350,7 +350,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> alloc, Expr * e, std::vector<AttrName> attrPath)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::vector<AttrName> attrPath)
         : e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
