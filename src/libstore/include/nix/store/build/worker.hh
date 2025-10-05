@@ -16,7 +16,6 @@ namespace nix {
 /* Forward definition. */
 struct DerivationTrampolineGoal;
 struct DerivationGoal;
-struct DerivationResolutionGoal;
 struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
@@ -112,7 +111,6 @@ private:
     DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>> derivationTrampolineGoals;
 
     std::map<StorePath, std::map<OutputName, std::weak_ptr<DerivationGoal>>> derivationGoals;
-    std::map<StorePath, std::weak_ptr<DerivationResolutionGoal>> derivationResolutionGoals;
     std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
@@ -223,23 +221,13 @@ public:
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
-        BuildMode buildMode = bmNormal,
-        bool storeDerivation = false);
+        BuildMode buildMode = bmNormal);
 
     /**
-     * @ref DerivationResolutionGoal "derivation resolution goal"
+     * @ref DerivationBuildingGoal "derivation goal"
      */
-    std::shared_ptr<DerivationResolutionGoal>
-    makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
-
-    /**
-     * @ref DerivationBuildingGoal "derivation building goal"
-     */
-    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
-        const StorePath & drvPath,
-        const Derivation & drv,
-        BuildMode buildMode = bmNormal,
-        bool storeDerivation = false);
+    std::shared_ptr<DerivationBuildingGoal>
+    makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"

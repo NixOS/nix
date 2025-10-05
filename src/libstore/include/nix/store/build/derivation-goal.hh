@@ -40,16 +40,12 @@ struct DerivationGoal : public Goal
      */
     OutputName wantedOutput;
 
-    /**
-     * @param storeDerivation See `DerivationBuildingGoal`. This is just passed along.
-     */
     DerivationGoal(
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
         Worker & worker,
-        BuildMode buildMode = bmNormal,
-        bool storeDerivation = false);
+        BuildMode buildMode = bmNormal);
     ~DerivationGoal() = default;
 
     void timedOut(Error && ex) override
@@ -84,7 +80,7 @@ private:
     /**
      * The states.
      */
-    Co haveDerivation(bool storeDerivation);
+    Co haveDerivation();
 
     /**
      * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
