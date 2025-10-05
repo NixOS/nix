@@ -324,7 +324,7 @@ void SampleStack::saveProfile()
             std::visit([&](auto && info) { info.symbolize(state, os, posCache); }, pos);
         }
         os << " " << count;
-        writeLine(profileFd.get(), std::move(os).str());
+        writeLine(profileFd.get(), os.str());
         /* Clear ostringstream. */
         os.str("");
         os.clear();
