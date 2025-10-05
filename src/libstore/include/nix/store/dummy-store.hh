@@ -3,8 +3,6 @@
 
 #include "nix/store/store-api.hh"
 
-#include <boost/unordered/concurrent_flat_map.hpp>
-
 namespace nix {
 
 struct DummyStore;

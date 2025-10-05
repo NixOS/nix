@@ -40,16 +40,12 @@ struct DerivationGoal : public Goal
      */
     OutputName wantedOutput;
 
-    /**
-     * @param storeDerivation See `DerivationBuildingGoal`. This is just passed along.
-     */
     DerivationGoal(
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
         Worker & worker,
-        BuildMode buildMode = bmNormal,
-        bool storeDerivation = false);
+        BuildMode buildMode = bmNormal);
     ~DerivationGoal() = default;
 
     void timedOut(Error && ex) override
@@ -84,7 +80,7 @@ private:
     /**
      * The states.
      */
-    Co haveDerivation(bool storeDerivation);
+    Co haveDerivation();
 
     /**
      * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
@@ -93,17 +89,17 @@ private:
      * of the wanted output, and a `PathStatus` with the
      * current status of that output.
      */
-    std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity();
+    std::optional<std::pair<Realisation, PathStatus>> checkPathValidity();
 
     /**
      * Aborts if any output is not valid or corrupt, and otherwise
      * returns a 'Realisation' for the wanted output.
      */
-    UnkeyedRealisation assertPathValidity();
+    Realisation assertPathValidity();
 
     Co repairClosure();
 
-    Done doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
+    Done doneSuccess(BuildResult::Success::Status status, Realisation builtOutput);
 
     Done doneFailure(BuildError ex);
 };

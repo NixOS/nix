@@ -29,21 +29,8 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
-    /**
-     * @param storeDerivation Whether to store the derivation in
-     * `worker.store`. This is useful for newly-resolved derivations. In this
-     * case, the derivation was not created a priori, e.g. purely (or close
-     * enough) from evaluation of the Nix language, but also depends on the
-     * exact content produced by upstream builds. It is strongly advised to
-     * have a permanent record of such a resolved derivation in order to
-     * faithfully reconstruct the build history.
-     */
     DerivationBuildingGoal(
-        const StorePath & drvPath,
-        const Derivation & drv,
-        Worker & worker,
-        BuildMode buildMode = bmNormal,
-        bool storeDerivation = false);
+        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
     ~DerivationBuildingGoal();
 
 private:
@@ -113,7 +100,7 @@ private:
     /**
      * The states.
      */
-    Co gaveUpOnSubstitution(bool storeDerivation);
+    Co gaveUpOnSubstitution();
     Co tryToBuild();
 
     /**
@@ -168,7 +155,7 @@ private:
 
     JobCategory jobCategory() const override
     {
-        return JobCategory::Administration;
+        return JobCategory::Build;
     };
 };
 
