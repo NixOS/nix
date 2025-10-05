@@ -18,7 +18,11 @@ void checkOutputs(
     for (auto & output : outputs)
         outputsByPath.emplace(store.printStorePath(output.second.path), output.second);
 
-    for (auto & [outputName, info] : outputs) {
+    for (auto & pair : outputs) {
+        // We can't use auto destructuring here because
+        // clang-tidy seems to complain about it.
+        const std::string & outputName = pair.first;
+        const auto & info = pair.second;
 
         auto * outputSpec = get(drvOutputs, outputName);
         assert(outputSpec);
