@@ -102,7 +102,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;

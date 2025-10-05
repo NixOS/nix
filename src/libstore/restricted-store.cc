@@ -107,7 +107,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+        const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
@@ -244,7 +244,7 @@ void RestrictedStore::registerDrvOutput(const Realisation & info)
 }
 
 void RestrictedStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
 // XXX: This should probably be allowed if the realisation corresponds to
 // an allowed derivation
 {
