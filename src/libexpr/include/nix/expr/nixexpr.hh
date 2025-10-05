@@ -382,13 +382,12 @@ struct ExprAttrs : Expr
         };
 
         Kind kind;
-        Expr * e;
         PosIdx pos;
-        Displacement displ = 0; // displacement
+        Expr * e;
         AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
             : kind(kind)
-            , e(e)
-            , pos(pos) {};
+            , pos(pos)
+            , e(e) {};
         AttrDef() {};
 
         template<typename T>

@@ -1238,7 +1238,7 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
            been substituted into the bodies of the other attributes.
            Hence we need __overrides.) */
         if (hasOverrides) {
-            Value * vOverrides = (*bindings.bindings)[overrides->second.displ].value;
+            Value * vOverrides = (*bindings.bindings)[std::distance(attrs.begin(), overrides)].value;
             state.forceAttrs(
                 *vOverrides,
                 [&]() { return vOverrides->determinePos(noPos); },
@@ -1247,8 +1247,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
             for (auto & i : *vOverrides->attrs()) {
                 AttrDefs::iterator j = attrs.find(i.name);
                 if (j != attrs.end()) {
-                    (*bindings.bindings)[j->second.displ] = i;
-                    env2.values[j->second.displ] = i.value;
+                    (*bindings.bindings)[std::distance(attrs.begin(), j)] = i;
+                    env2.values[std::distance(attrs.begin(), j)] = i.value;
                 } else
                     bindings.push_back(i);
             }

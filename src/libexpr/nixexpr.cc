@@ -410,7 +410,7 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
 
             Displacement displ = 0;
             for (auto & i : attrs)
-                newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+                newEnv->vars.emplace_back(i.first, displ++);
             return newEnv;
         }();
 
@@ -490,7 +490,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
 
         Displacement displ = 0;
         for (auto & i : attrs->attrs)
-            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            newEnv->vars.emplace_back(i.first, displ++);
         return newEnv;
     }();
 
