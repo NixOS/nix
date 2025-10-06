@@ -64,6 +64,16 @@
 
 ## Performance improvements
 
+- Optimize memory usage of attribute set merges [#13987](https://github.com/NixOS/nix/pull/13987)
+
+  [Attribute set update operations](@docroot@/language/operators.md#update) have been optimized to
+  reduce reallocations in cases when the second operand is small.
+
+  For typical evaluations of nixpkgs this optimization leads to ~20% less memory allocated in total
+  without significantly affecting evaluation performance.
+
+  See [eval-attrset-update-layer-rhs-threshold](@docroot@/command-ref/conf-file.md#conf-eval-attrset-update-layer-rhs-threshold)
+
 - Substituted flake inputs are no longer re-copied to the store [#14041](https://github.com/NixOS/nix/pull/14041)
 
   Since 2.25, Nix would fail to store a cache entry for substituted flake inputs, which in turn would cause them to be re-copied to the store on initial evaluation. Caching these inputs results in a near doubling of performance in some cases — especially on I/O-bound machines and when using commands that fetch many inputs, like `nix flake [archive|prefetch-inputs]`.
