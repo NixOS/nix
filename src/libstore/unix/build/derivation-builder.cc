@@ -230,6 +230,12 @@ protected:
     }
 
     /**
+     * Throw an exception if we can't do this derivation because of
+     * missing system features.
+     */
+    virtual void checkSystem();
+
+    /**
      * Return the paths that should be made available in the sandbox.
      * This includes:
      *
@@ -666,21 +672,8 @@ static bool checkNotWorldWritable(std::filesystem::path path)
     return true;
 }
 
-std::optional<Descriptor> DerivationBuilderImpl::startBuild()
+void DerivationBuilderImpl::checkSystem()
 {
-    if (useBuildUsers()) {
-        if (!buildUser)
-            buildUser = getBuildUser();
-
-        if (!buildUser)
-            return std::nullopt;
-    }
-
-    /* Make sure that no other processes are executing under the
-       sandbox uids. This must be done before any chownToBuilder()
-       calls. */
-    prepareUser();
-
     /* Right platform? */
     if (!drvOptions.canBuildLocally(store, drv)) {
         auto msg =
@@ -704,6 +697,24 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
         throw BuildError(BuildResult::Failure::InputRejected, msg);
     }
+}
+
+std::optional<Descriptor> DerivationBuilderImpl::startBuild()
+{
+    if (useBuildUsers()) {
+        if (!buildUser)
+            buildUser = getBuildUser();
+
+        if (!buildUser)
+            return std::nullopt;
+    }
+
+    checkSystem();
+
+    /* Make sure that no other processes are executing under the
+       sandbox uids. This must be done before any chownToBuilder()
+       calls. */
+    prepareUser();
 
     auto buildDir = store.config->getBuildDir();
 
@@ -1904,12 +1915,16 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 #include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
+#include "external-derivation-builder.cc"
 
 namespace nix {
 
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
+    if (auto builder = ExternalDerivationBuilder::newIfSupported(store, miscMethods, params))
+        return builder;
+
     bool useSandbox = false;
 
     /* Are we doing a sandboxed build? */
