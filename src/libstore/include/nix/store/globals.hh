@@ -1419,7 +1419,8 @@ public:
               "system": "aarch64-linux",
               "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
               "tmpDirInSandbox": "/build",
-              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0"
+              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0",
+              "version": 1
             }
         )",
         {},   // aliases

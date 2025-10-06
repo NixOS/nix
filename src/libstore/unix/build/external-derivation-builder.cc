@@ -49,6 +49,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
         auto json = nlohmann::json::object();
 
+        json.emplace("version", 1);
         json.emplace("builder", drv.builder);
         {
             auto l = nlohmann::json::array();
