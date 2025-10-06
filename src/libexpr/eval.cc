@@ -591,7 +591,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
+            .doc = makeImmutableString(s.view()), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
@@ -1341,7 +1341,7 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
     v = *v2;
 }
 
-static std::string showAttrPath(EvalState & state, Env & env, const AttrPath & attrPath)
+static std::string showAttrPath(EvalState & state, Env & env, std::span<const AttrName> attrPath)
 {
     std::ostringstream out;
     bool first = true;
@@ -1377,10 +1377,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                                          env,
                                          getPos(),
                                          "while evaluating the attribute '%1%'",
-                                         showAttrPath(state, env, attrPath))
+                                         showAttrPath(state, env, getAttrPath()))
                                    : nullptr;
 
-        for (auto & i : attrPath) {
+        for (auto & i : getAttrPath()) {
             state.nrLookups++;
             const Attr * j;
             auto name = getName(i, state, env);
@@ -1418,7 +1418,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             auto origin = std::get_if<SourcePath>(&pos2r.origin);
             if (!(origin && *origin == state.derivationInternal))
                 state.addErrorTrace(
-                    e, pos2, "while evaluating the attribute '%1%'", showAttrPath(state, env, attrPath));
+                    e, pos2, "while evaluating the attribute '%1%'", showAttrPath(state, env, getAttrPath()));
         }
         throw;
     }
@@ -1429,13 +1429,13 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 Symbol ExprSelect::evalExceptFinalSelect(EvalState & state, Env & env, Value & attrs)
 {
     Value vTmp;
-    Symbol name = getName(attrPath[attrPath.size() - 1], state, env);
+    Symbol name = getName(attrPathStart[nAttrPath - 1], state, env);
 
-    if (attrPath.size() == 1) {
+    if (nAttrPath == 1) {
         e->eval(state, env, vTmp);
     } else {
         ExprSelect init(*this);
-        init.attrPath.pop_back();
+        init.nAttrPath--;
         init.eval(state, env, vTmp);
     }
     attrs = vTmp;
@@ -1811,7 +1811,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        auto exprStr = toView(out);
+        auto exprStr = out.view();
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {

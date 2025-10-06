@@ -121,7 +121,7 @@ public:
         std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, toView(oss));
+        log(ei.level, oss.view());
     }
 
     void startActivity(

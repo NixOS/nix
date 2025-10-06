@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "nix/store/dummy-store-impl.hh"
+#include "nix/store/dummy-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/realisation.hh"
 
@@ -13,7 +13,7 @@ TEST(DummyStore, realisation_read)
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
         cfg->readOnly = false;
-        return cfg->openDummyStore();
+        return cfg->openStore();
     }();
 
     auto drvHash = Hash::parseExplicitFormatUnprefixed(
@@ -22,17 +22,6 @@ TEST(DummyStore, realisation_read)
     auto outputName = "foo";
 
     EXPECT_EQ(store->queryRealisation({drvHash, outputName}), nullptr);
-
-    UnkeyedRealisation value{
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
-    };
-
-    store->buildTrace.insert({drvHash, {{outputName, make_ref<UnkeyedRealisation>(value)}}});
-
-    auto value2 = store->queryRealisation({drvHash, outputName});
-
-    ASSERT_TRUE(value2);
-    EXPECT_EQ(*value2, value);
 }
 
 } // namespace nix

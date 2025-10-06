@@ -1841,12 +1841,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, newInfo] : infos) {
         auto oldinfo = get(initialOutputs, outputName);
         assert(oldinfo);
-        auto thisRealisation = Realisation{
-            {
-                .outPath = newInfo.path,
-            },
-            DrvOutput{oldinfo->outputHash, outputName},
-        };
+        auto thisRealisation = Realisation{.id = DrvOutput{oldinfo->outputHash, outputName}, .outPath = newInfo.path};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
             store.signRealisation(thisRealisation);
             store.registerDrvOutput(thisRealisation);

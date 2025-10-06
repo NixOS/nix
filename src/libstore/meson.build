@@ -302,7 +302,6 @@ sources = files(
   'build/derivation-check.cc',
   'build/derivation-env-desugar.cc',
   'build/derivation-goal.cc',
-  'build/derivation-resolution-goal.cc',
   'build/derivation-trampoline-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',

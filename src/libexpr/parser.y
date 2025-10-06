@@ -261,7 +261,7 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), $1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr($1, std::move(*$3)); delete $3; }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr(state->alloc, $1, std::move(*$3)); delete $3; }
   | expr_op '+' expr_op
     { $$ = new ExprConcatStrings(state->at(@2), false, new std::vector<std::pair<PosIdx, Expr *> >({{state->at(@1), $1}, {state->at(@3), $3}})); }
   | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
@@ -282,9 +282,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
+    { $$ = new ExprSelect(state->alloc, CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(CUR_POS, $1, std::move(*$3), $5); delete $3; $5->warnIfCursedOr(state->symbols, state->positions); }
+    { $$ = new ExprSelect(state->alloc, CUR_POS, $1, std::move(*$3), $5); delete $3; $5->warnIfCursedOr(state->symbols, state->positions); }
   | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
        allow stuff like ‘map or [...]’. This production is problematic (see
        https://github.com/NixOS/nix/issues/11118) and will be refactored in the
@@ -343,7 +343,7 @@ expr_simple
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(state->alloc, noPos, $3, state->s.body); }
   | REC '{' binds '}'
     { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
   | '{' binds1 '}'
@@ -447,7 +447,7 @@ binds1
           $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(iPos, from, i.symbol),
+                  new ExprSelect(state->alloc, iPos, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }

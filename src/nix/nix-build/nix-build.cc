@@ -285,10 +285,10 @@ static void main_nix_build(int argc, char ** argv)
                         execArgs,
                         interpreter,
                         escapeShellArgAlways(script),
-                        toView(joined));
+                        joined.view());
             } else {
                 envCommand =
-                    fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), toView(joined));
+                    fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), joined.view());
             }
         }
 

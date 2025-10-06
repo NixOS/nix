@@ -43,10 +43,10 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         outPipe->createAsyncPipe(worker.ioport.get());
 #endif
 
-        auto promise = std::make_shared<std::promise<std::shared_ptr<const UnkeyedRealisation>>>();
+        auto promise = std::make_shared<std::promise<std::shared_ptr<const Realisation>>>();
 
         sub->queryRealisation(
-            id, {[outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const UnkeyedRealisation>> res) {
+            id, {[outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const Realisation>> res) {
                 try {
                     Finally updateStats([&]() { outPipe->writeSide.close(); });
                     promise->set_value(res.get());
@@ -75,7 +75,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
          * The realisation corresponding to the given output id.
          * Will be filled once we can get it.
          */
-        std::shared_ptr<const UnkeyedRealisation> outputInfo;
+        std::shared_ptr<const Realisation> outputInfo;
 
         try {
             outputInfo = promise->get_future().get();
@@ -132,7 +132,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 }
 
 Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
-    Goals waitees, std::shared_ptr<const UnkeyedRealisation> outputInfo, nix::ref<nix::Store> sub)
+    Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub)
 {
     waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
@@ -145,7 +145,7 @@ Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
         co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
     }
 
-    worker.store.registerDrvOutput({*outputInfo, id});
+    worker.store.registerDrvOutput(*outputInfo);
 
     trace("finished");
     co_return amDone(ecSuccess);
