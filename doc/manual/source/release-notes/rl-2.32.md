@@ -78,7 +78,9 @@
 - `fetchTarball` and `fetchurl` now correctly substitute (#14138)
 
   At some point we stopped substituting calls to `fetchTarball` and `fetchurl` with a set `narHash` to avoid incorrectly substituting things in `fetchTree`, even though it would be safe to substitute when calling the legacy `fetch{Tarball,url}`. This fixes that regression where it is safe.
+- Started moving AST allocations into a bump allocator [#14088](https://github.com/NixOS/nix/issues/14088)
 
+  This leaves smaller, immutable structures in the AST. So far this saves about 2% memory on a NixOS config evaluation.
 ## Contributors
 
 This release was made possible by the following 32 contributors:
