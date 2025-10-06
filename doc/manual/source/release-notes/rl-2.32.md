@@ -75,6 +75,10 @@
   This can drastically decrease the time invocations take in environments where
   checks may already be cached (like in CI).
 
+- `fetchTarball` and `fetchurl` now correctly substitute (#14138)
+
+  At some point we stopped substituting calls to `fetchTarball` and `fetchurl` with a set `narHash` to avoid incorrectly substituting things in `fetchTree`, even though it would be safe to substitute when calling the legacy `fetch{Tarball,url}`. This fixes that regression where it is safe.
+
 ## Contributors
 
 This release was made possible by the following 32 contributors:
