@@ -56,6 +56,12 @@
 
   Temporary build directories created during derivation builds no longer include the derivation name in their path to avoid build failures when the derivation name is too long. This change ensures predictable prefix lengths for build directories under `/nix/var/nix/builds`.
 
+- External derivation builders [#14145](https://github.com/NixOS/nix/pull/14145)
+
+  These are helper programs that Nix calls to perform derivations for specified system types, e.g. by using QEMU to emulate a different type of platform. For more information, see the [`external-builders` setting](../command-ref/conf-file.md#conf-external-builders).
+
+  This is currently an experimental feature.
+
 ## Performance improvements
 
 - Substituted flake inputs are no longer re-copied to the store [#14041](https://github.com/NixOS/nix/pull/14041)
