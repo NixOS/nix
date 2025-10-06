@@ -91,7 +91,11 @@ struct ParserState
     void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
     void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
     void addAttr(
-        ExprAttrsBuilder * attrs, AttrPath && attrPath, const ParserLocation & loc, std::variant<Expr *, ExprAttrsBuilder *> & e, const ParserLocation & exprLoc);
+        ExprAttrsBuilder * attrs,
+        AttrPath && attrPath,
+        const ParserLocation & loc,
+        std::variant<Expr *, ExprAttrsBuilder *> & e,
+        const ParserLocation & exprLoc);
     void addAttr(ExprAttrsBuilder * attrs, AttrPath & attrPath, const Symbol & symbol, AttrDefBuilder && def);
     Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
@@ -113,7 +117,11 @@ inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx pre
 }
 
 inline void ParserState::addAttr(
-    ExprAttrsBuilder * attrs, AttrPath && attrPath, const ParserLocation & loc, std::variant<Expr *, ExprAttrsBuilder *> & e, const ParserLocation & exprLoc)
+    ExprAttrsBuilder * attrs,
+    AttrPath && attrPath,
+    const ParserLocation & loc,
+    std::variant<Expr *, ExprAttrsBuilder *> & e,
+    const ParserLocation & exprLoc)
 {
     AttrPath::iterator i;
     // All attrpaths have at least one attr
@@ -126,13 +134,14 @@ inline void ParserState::addAttr(
         if (i->symbol) {
             decltype(attrs->attrs)::iterator j = attrs->attrs.find(i->symbol);
             if (j != attrs->attrs.end()) {
-                std::visit(overloaded {
-                    [&](ExprAttrsBuilder * builder) { nested = builder; },
-                    [&](Expr * expr) {
-                        attrPath.erase(i + 1, attrPath.end());
-                        dupAttr(attrPath, pos, j->second.pos);
-                    }},
-                j->second.e);
+                std::visit(
+                    overloaded{
+                        [&](ExprAttrsBuilder * builder) { nested = builder; },
+                        [&](Expr * expr) {
+                            attrPath.erase(i + 1, attrPath.end());
+                            dupAttr(attrPath, pos, j->second.pos);
+                        }},
+                    j->second.e);
             } else {
                 nested = new ExprAttrsBuilder;
                 attrs->attrs[i->symbol] = AttrDefBuilder(nested, pos);
@@ -153,10 +162,7 @@ inline void ParserState::addAttr(
 
     auto it = lexerState.positionToDocComment.find(pos);
     if (it != lexerState.positionToDocComment.end()) {
-        std::visit(overloaded {
-            [&](Expr * e) { e->setDocComment(it->second); },
-            [](ExprAttrsBuilder * e) {}},
-        e);
+        std::visit(overloaded{[&](Expr * e) { e->setDocComment(it->second); }, [](ExprAttrsBuilder * e) {}}, e);
         lexerState.positionToDocComment.emplace(at(exprLoc), it->second);
     }
 }
@@ -207,17 +213,14 @@ ParserState::addAttr(ExprAttrsBuilder * attrs, AttrPath & attrPath, const Symbol
                     std::make_move_iterator(ae->inheritFromExprs.begin()),
                     std::make_move_iterator(ae->inheritFromExprs.end()));
             }
-            delete(ae);
+            delete (ae);
         } else {
             dupAttr(attrPath, def.pos, j->second.pos);
         }
     } else {
         // This attr path is not defined. Let's create it.
         attrs->attrs.emplace(symbol, def);
-        std::visit(overloaded {
-            [&](Expr * e) { e->setName(symbol); },
-            [](ExprAttrsBuilder * e) {}},
-        def.e);
+        std::visit(overloaded{[&](Expr * e) { e->setName(symbol); }, [](ExprAttrsBuilder * e) {}}, def.e);
     }
 }
 

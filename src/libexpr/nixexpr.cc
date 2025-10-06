@@ -14,23 +14,27 @@ namespace nix {
 Counter Expr::nrExprs;
 
 ExprBlackHole eBlackHole;
+
 AttrDef::AttrDef(std::pmr::polymorphic_allocator<char> & alloc, AttrDefBuilder const & builder)
     : kind(builder.kind)
     , pos(builder.pos)
 {
-    std::visit(overloaded {
-        [&](Expr * expr) { e = expr; },
-        [&](ExprAttrsBuilder * attrs_builder) { e = new ExprAttrs(alloc, attrs_builder); }},
-    builder.e);
+    std::visit(
+        overloaded{
+            [&](Expr * expr) { e = expr; },
+            [&](ExprAttrsBuilder * attrs_builder) { e = new ExprAttrs(alloc, attrs_builder); }},
+        builder.e);
 }
+
 DynamicAttrDef::DynamicAttrDef(std::pmr::polymorphic_allocator<char> & alloc, DynamicAttrDefBuilder const & builder)
     : nameExpr(builder.nameExpr)
     , pos(builder.pos)
 {
-    std::visit(overloaded {
-        [&](Expr * expr) { valueExpr = expr; },
-        [&](ExprAttrsBuilder * attrs_builder) { valueExpr = new ExprAttrs(alloc, attrs_builder); }},
-    builder.valueExpr);
+    std::visit(
+        overloaded{
+            [&](Expr * expr) { valueExpr = expr; },
+            [&](ExprAttrsBuilder * attrs_builder) { valueExpr = new ExprAttrs(alloc, attrs_builder); }},
+        builder.valueExpr);
 }
 
 // FIXME: remove, because *symbols* are abstract and do not have a single

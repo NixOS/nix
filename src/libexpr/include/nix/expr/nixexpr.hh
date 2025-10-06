@@ -405,7 +405,8 @@ struct AttrDefBuilder
     AttrDef::Kind kind;
     PosIdx pos;
     std::variant<Expr *, ExprAttrsBuilder *> e;
-    AttrDefBuilder(std::variant<Expr *, ExprAttrsBuilder *> e, const PosIdx & pos, AttrDef::Kind kind = AttrDef::Kind::Plain)
+    AttrDefBuilder(
+        std::variant<Expr *, ExprAttrsBuilder *> e, const PosIdx & pos, AttrDef::Kind kind = AttrDef::Kind::Plain)
         : kind(kind)
         , pos(pos)
         , e(e) {};
@@ -423,7 +424,7 @@ struct DynamicAttrDef
 
 struct DynamicAttrDefBuilder
 {
-    Expr *nameExpr;
+    Expr * nameExpr;
     std::variant<Expr *, ExprAttrsBuilder *> valueExpr;
     PosIdx pos;
     DynamicAttrDefBuilder(Expr * nameExpr, std::variant<Expr *, ExprAttrsBuilder *> valueExpr, const PosIdx & pos)
@@ -435,7 +436,8 @@ struct DynamicAttrDefBuilder
 /**
  * All of the information for ExprAttrs, but mutable and in a not-optimized layout.
  */
-struct ExprAttrsBuilder {
+struct ExprAttrsBuilder
+{
     bool recursive;
     PosIdx pos;
     std::map<Symbol, AttrDefBuilder> attrs;
@@ -513,17 +515,18 @@ struct ExprAttrs : Expr
     {
     }
 
-
     PosIdx getPos() const override
     {
         return pos;
     }
 
-    std::span<Symbol> getAttrNames() const {
+    std::span<Symbol> getAttrNames() const
+    {
         return {attrNamesStart, nAttrs};
     }
 
-    std::span<AttrDef> getAttrValues() const {
+    std::span<AttrDef> getAttrValues() const
+    {
         return {attrValuesStart, nAttrs};
     }
 
@@ -543,7 +546,8 @@ struct ExprAttrs : Expr
      * without the extra overhead necessary to be mutable. The layout does not
      * need to be optimized as it is created temporarily on-demand
      */
-    struct AttrDefs {
+    struct AttrDefs
+    {
         uint32_t nAttrs;
         Symbol * attrNamesStart;
         AttrDef * attrValuesStart;
@@ -558,7 +562,6 @@ struct ExprAttrs : Expr
 
             auto idx = found - attrNamesStart;
             return &attrValuesStart[idx];
-
         }
 
         inline size_t displ(AttrDef * attr)
@@ -576,7 +579,7 @@ struct ExprAttrs : Expr
         // XXX: help I don't know how to C++ I'm making this up
         class iterator
         {
-        friend struct AttrDefs;
+            friend struct AttrDefs;
         public:
             using value_type = std::pair<Symbol, AttrDef>;
             using pointer_type = std::pair<Symbol *, AttrDef *>;
@@ -591,8 +594,7 @@ struct ExprAttrs : Expr
             iterator(uint32_t idx, Symbol * attrNamesStart, AttrDef * attrValuesStart)
                 : idx(idx)
                 , attrNamesStart(attrNamesStart)
-                , attrValuesStart(attrValuesStart)
-            {};
+                , attrValuesStart(attrValuesStart) {};
         public:
             reference_type operator*() const
             {

@@ -3225,7 +3225,8 @@ Expr * EvalState::parse(
     auto result = parseExprFromBuf(
         text, length, origin, basePath, mem.exprs.alloc, symbols, settings, positions, *docComments, rootFS);
 
-    // XXX: we're already crawling the whole AST here. we could use this opportunity to do ExprAttrsBuilder -> ExprAttrs transformation
+    // XXX: we're already crawling the whole AST here. we could use this opportunity to do ExprAttrsBuilder -> ExprAttrs
+    // transformation
     result->bindVars(*this, staticEnv);
 
     return result;
