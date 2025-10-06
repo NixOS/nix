@@ -68,6 +68,12 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         json.emplace("storeDir", store.storeDir);
         json.emplace("realStoreDir", store.config->realStoreDir.get());
         json.emplace("system", drv.platform);
+        {
+            auto l = nlohmann::json::array();
+            for (auto & i : inputPaths)
+                l.push_back(store.printStorePath(i));
+            json.emplace("inputPaths", std::move(l));
+        }
 
         // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
         // that, see this comment by Eelco about how to make it not suck:
