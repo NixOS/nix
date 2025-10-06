@@ -1403,13 +1403,17 @@ public:
                 "HOME": "/homeless-shelter",
                 "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
                 "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
                 …
               },
               "inputPaths": [
-                "/nix/store/14dciax3mm8j70hjy4c0d68mds9ppx2s-glibc-2.32-54-dev",
-                "/nix/store/1azs5s8zc0z7m6sssvq1np0m7z873zml-gettext-0.21",
+                "/nix/store/14dciax3…-glibc-2.32-54-dev",
+                "/nix/store/1azs5s8z…-gettext-0.21",
                 …
               ],
+              "outputs": {
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+              },
               "realStoreDir": "/nix/store",
               "storeDir": "/nix/store",
               "system": "aarch64-linux",

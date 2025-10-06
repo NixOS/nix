@@ -74,6 +74,12 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 l.push_back(store.printStorePath(i));
             json.emplace("inputPaths", std::move(l));
         }
+        {
+            auto l = nlohmann::json::object();
+            for (auto & i : scratchOutputs)
+                l.emplace(i.first, store.printStorePath(i.second));
+            json.emplace("outputs", std::move(l));
+        }
 
         // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
         // that, see this comment by Eelco about how to make it not suck:
