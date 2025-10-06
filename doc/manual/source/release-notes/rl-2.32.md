@@ -1,9 +1,25 @@
 # Release 2.32.0 (2025-10-06)
 
+## Incompatible changes
+
+- Removed support for daemons and clients older than Nix 2.0 [#13951](https://github.com/NixOS/nix/pull/13951)
+
+  We have dropped support in the daemon worker protocol for daemons and clients that don't speak at least version 18 of the protocol. This first Nix release that supports this version is Nix 2.0, released in February 2018.
+
+- Derivation JSON format now uses store path basenames only [#13570](https://github.com/NixOS/nix/issues/13570) [#13980](https://github.com/NixOS/nix/pull/13980)
+
+  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell) has shown that the use of the store directory in JSON formats is an impediment to systematic JSON formats, because it requires the serializer/deserializer to take an extra paramater (the store directory).
+
+  We ultimately want to rectify this issue with all JSON formats to the extent allowed by our stability promises. To start with, we are changing the JSON format for derivations because the `nix derivation` commands are — in addition to being formally unstable — less widely used than other unstable commands.
+
+  See the documentation on the [JSON format for derivations](@docroot@/protocols/json/derivation.md) for further details.
+
 - C API: `nix_get_attr_name_byidx`, `nix_get_attr_byidx` take a `nix_value *` instead of `const nix_value *` [#13987](https://github.com/NixOS/nix/pull/13987)
 
   In order to accommodate a more optimized internal representation of attribute set merges these functions require
   a mutable `nix_value *` that might be modified on access. This does *not* break the ABI of these functions.
+
+## New features
 
 - C API: Add lazy attribute and list item accessors [#14030](https://github.com/NixOS/nix/pull/14030)
 
@@ -18,37 +34,6 @@
   Additionally, bounds checking has been improved for all `_byidx` functions to properly validate indices before access, preventing potential out-of-bounds errors.
 
   The documentation for `NIX_ERR_KEY` error handling has also been clarified to specify when this error code is returned.
-
-- Substituted flake inputs are no longer re-copied to the store [#14041](https://github.com/NixOS/nix/pull/14041)
-
-  Since 2.25, Nix would fail to store a cache entry for substituted flake inputs,
-  which in turn would cause them to be re-copied to the store on initial
-  evaluation. Caching these inputs results in a near doubling of a performance in
-  some cases — especially on I/O-bound machines and when using commands that
-  fetch many inputs, like `nix flake archive/prefetch-inputs`
-
-- Derivation JSON format now uses store path basenames (no store dir) only [#13570](https://github.com/NixOS/nix/issues/13570) [#13980](https://github.com/NixOS/nix/pull/13980)
-
-  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell), has shown that the use of the store dir in JSON formats is an impediment to systematic JSON formats,
-  because it requires the serializer/deserializer to take an extra paramater (the store dir).
-
-  We ultimately want to rectify this issue with all (non-stable, able to be changed) JSON formats.
-  To start with, we are changing the JSON format for derivations because the `nix derivation` commands are
-  --- in addition to being formally unstable
-  --- less widely used than other unstable commands.
-
-  See the documentation on the [JSON format for derivations](@docroot@/protocols/json/derivation.md) for further details.
-
-- Removed support for daemons and clients older than Nix 2.0 [#13951](https://github.com/NixOS/nix/pull/13951)
-
-  We have dropped support in the daemon worker protocol for daemons and clients that don't speak at least version 18 of the protocol. This first Nix release that supports this version is Nix 2.0, released in February 2018.
-
-- `nix flake check` now skips derivations that can be substituted [#13574](https://github.com/NixOS/nix/pull/13574)
-
-  Previously, `nix flake check` would evaluate and build/substitute all
-  derivations. Now, it will skip downloading derivations that can be substituted.
-  This can drastically decrease the time invocations take in environments where
-  checks may already be cached (like in CI).
 
 - HTTP binary caches now support transparent compression for metadata
 
@@ -71,9 +56,20 @@
 
   Temporary build directories created during derivation builds no longer include the derivation name in their path to avoid build failures when the derivation name is too long. This change ensures predictable prefix lengths for build directories under `/nix/var/nix/builds`.
 
+## Performance improvements
+
+- Substituted flake inputs are no longer re-copied to the store [#14041](https://github.com/NixOS/nix/pull/14041)
+
+  Since 2.25, Nix would fail to store a cache entry for substituted flake inputs, which in turn would cause them to be re-copied to the store on initial evaluation. Caching these inputs results in a near doubling of performance in some cases — especially on I/O-bound machines and when using commands that fetch many inputs, like `nix flake [archive|prefetch-inputs]`.
+
+- `nix flake check` now skips derivations that can be substituted [#13574](https://github.com/NixOS/nix/pull/13574)
+
+  Previously, `nix flake check` would evaluate and build/substitute all
+  derivations. Now, it will skip downloading derivations that can be substituted.
+  This can drastically decrease the time invocations take in environments where
+  checks may already be cached (like in CI).
 
 ## Contributors
-
 
 This release was made possible by the following 32 contributors:
 
