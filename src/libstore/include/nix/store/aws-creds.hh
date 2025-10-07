@@ -58,12 +58,6 @@ AwsCredentials getAwsCredentials(const std::string & profile = "");
 void invalidateAwsCredentials(const std::string & profile);
 
 /**
- * Clear all cached credential providers.
- * Typically called during application cleanup.
- */
-void clearAwsCredentialsCache();
-
-/**
  * Pre-resolve AWS credentials for S3 URLs.
  * Used to cache credentials in parent process before forking.
  */

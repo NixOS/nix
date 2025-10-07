@@ -9,8 +9,13 @@
 #include "nix/util/signals.hh"
 
 #include "store-config-private.hh"
+#include <optional>
 #if NIX_WITH_S3_SUPPORT
 #  include <aws/core/client/ClientConfiguration.h>
+#endif
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
 #endif
 
 #ifdef __linux__
@@ -434,6 +439,16 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
 
+#if NIX_WITH_CURL_S3
+            // Set up AWS SigV4 signing if this is an S3 request
+            // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
+            // The username/password (access key ID and secret key) are set via the general
+            // usernameAuth mechanism above.
+            if (request.awsSigV4Provider) {
+                curl_easy_setopt(req, CURLOPT_AWS_SIGV4, request.awsSigV4Provider->c_str());
+            }
+#endif
+
             result.data.clear();
             result.bodySize = 0;
         }
@@ -808,7 +823,11 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https")
+        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
+#if NIX_WITH_CURL_S3
+            && item->request.uri.scheme() != "s3"
+#endif
+        )
             throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
@@ -826,9 +845,15 @@ struct curlFileTransfer : public FileTransfer
     {
         /* Ugly hack to support s3:// URIs. */
         if (request.uri.scheme() == "s3") {
+#if NIX_WITH_CURL_S3
+            // New curl-based S3 implementation
+            auto modifiedRequest = request;
+            modifiedRequest.setupForS3();
+            enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+#elif NIX_WITH_S3_SUPPORT
+            // Old AWS SDK-based implementation
             // FIXME: do this on a worker thread
             try {
-#if NIX_WITH_S3_SUPPORT
                 auto parsed = ParsedS3URL::parse(request.uri.parsed());
 
                 std::string profile = parsed.profile.value_or("");
@@ -846,13 +871,12 @@ struct curlFileTransfer : public FileTransfer
                 res.data = std::move(*s3Res.data);
                 res.urls.push_back(request.uri.to_string());
                 callback(std::move(res));
-#else
-                throw nix::Error(
-                    "cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
-#endif
             } catch (...) {
                 callback.rethrow();
             }
+#else
+            throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
+#endif
             return;
         }
 
@@ -879,6 +903,41 @@ ref<FileTransfer> makeFileTransfer()
 {
     return makeCurlFileTransfer();
 }
+
+#if NIX_WITH_CURL_S3
+void FileTransferRequest::setupForS3()
+{
+    auto parsedS3 = ParsedS3URL::parse(uri.parsed());
+    // Update the request URI to use HTTPS
+    uri = parsedS3.toHttpsUrl();
+    // This gets used later in a curl setopt
+    awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
+    // check if the request already has pre-resolved credentials
+    std::optional<std::string> sessionToken;
+    if (usernameAuth) {
+        debug("Using pre-resolved AWS credentials from parent process");
+        sessionToken = preResolvedAwsSessionToken;
+    } else {
+        std::string profile = parsedS3.profile.value_or("");
+        try {
+            auto creds = getAwsCredentials(profile);
+            usernameAuth = UsernameAuth{
+                .username = creds.accessKeyId,
+                .password = creds.secretAccessKey,
+            };
+            sessionToken = creds.sessionToken;
+        } catch (const AwsAuthError & e) {
+            warn("AWS authentication failed for S3 request %s: %s", uri, e.what());
+            // Invalidate the cached credentials so next request will retry
+            invalidateAwsCredentials(profile);
+            // Continue without authentication - might be a public bucket
+            return;
+        }
+    }
+    if (sessionToken)
+        headers.emplace_back("x-amz-security-token", *sessionToken);
+}
+#endif
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
 {

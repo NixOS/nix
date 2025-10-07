@@ -11,6 +11,11 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
 
+#include "nix/store/config.hh"
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#endif
+
 namespace nix {
 
 struct FileTransferSettings : Config
@@ -108,6 +113,13 @@ struct FileTransferRequest
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
      */
     std::optional<UsernameAuth> usernameAuth;
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolved AWS session token for S3 requests.
+     * When provided along with usernameAuth, this will be used instead of fetching fresh credentials.
+     */
+    std::optional<std::string> preResolvedAwsSessionToken;
+#endif
 
     FileTransferRequest(ValidURL uri)
         : uri(std::move(uri))
@@ -119,6 +131,13 @@ struct FileTransferRequest
     {
         return data ? "upload" : "download";
     }
+
+#if NIX_WITH_CURL_S3
+private:
+    friend struct curlFileTransfer;
+    void setupForS3();
+    std::optional<std::string> awsSigV4Provider;
+#endif
 };
 
 struct FileTransferResult
