@@ -13,3 +13,13 @@ option(
   value : 'editline',
   description : 'Which library to use for nice line editing with the Nix language REPL',
 )
+
+option(
+  'pch',
+  type : 'combo',
+  choices : [ 'auto', 'enabled', 'disabled' ],
+  value : 'auto',
+  description : 'Use C++ Precompiled Headers to speed up compilation',
+  yield : true,
+)
+

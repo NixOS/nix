@@ -27,3 +27,13 @@ option(
   value : false,
   description : 'Build benchmarks (requires gbenchmark)',
 )
+
+# Emulating 'auto' options, since we don't want auto_features to affect this
+# and there's no other way of conditionally defaulting the value.
+option(
+  'pch',
+  type : 'combo',
+  choices : [ 'auto', 'enabled', 'disabled' ],
+  value : 'auto',
+  description : 'Use C++ Precompiled Headers to speed up compilation',
+)

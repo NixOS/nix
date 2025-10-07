@@ -29,7 +29,11 @@ add_project_arguments(
 )
 
 # GCC doesn't benefit much from precompiled headers.
-do_pch = cxx.get_id() == 'clang'
+if get_option('pch') == 'auto'
+  do_pch = cxx.get_id() == 'clang'
+else
+  do_pch = get_option('pch') == 'enabled'
+endif
 
 # This is a clang-only option for improving build times.
 # It forces the instantiation of templates in the PCH itself and
@@ -38,7 +42,7 @@ do_pch = cxx.get_id() == 'clang'
 # bother checking the version.
 # This feature helps in particular with the expensive nlohmann::json template
 # instantiations in libutil and libstore.
-if cxx.get_id() == 'clang'
+if cxx.get_id() == 'clang' and do_pch
   add_project_arguments('-fpch-instantiate-templates', language : 'cpp')
 endif
 

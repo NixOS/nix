@@ -40,3 +40,13 @@ option(
   value : 'disabled',
   description : 'Enable curl-based S3 binary cache store support (requires aws-crt-cpp and curl >= 7.75.0)',
 )
+
+option(
+  'pch',
+  type : 'combo',
+  choices : [ 'auto', 'enabled', 'disabled' ],
+  value : 'auto',
+  description : 'Use C++ Precompiled Headers to speed up compilation',
+  yield : true,
+)
+

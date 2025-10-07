@@ -5,3 +5,13 @@ option(
   type : 'feature',
   description : 'determine microarchitecture levels with libcpuid (only relevant on x86_64)',
 )
+
+option(
+  'pch',
+  type : 'combo',
+  choices : [ 'auto', 'enabled', 'disabled' ],
+  value : 'auto',
+  description : 'Use C++ Precompiled Headers to speed up compilation',
+  yield : true,
+)
+

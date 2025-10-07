@@ -1,8 +1,4 @@
-option(
-  'gc',
-  type : 'feature',
-  description : 'enable garbage collection in the Nix expression evaluator (requires Boehm GC)',
-)
+# vim: filetype=meson
 
 option(
   'pch',
@@ -12,4 +8,3 @@ option(
   description : 'Use C++ Precompiled Headers to speed up compilation',
   yield : true,
 )
-

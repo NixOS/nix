@@ -7,3 +7,13 @@ option(
   description : 'Build benchmarks (requires gbenchmark)',
   yield : true,
 )
+
+option(
+  'pch',
+  type : 'combo',
+  choices : [ 'auto', 'enabled', 'disabled' ],
+  value : 'auto',
+  description : 'Use C++ Precompiled Headers to speed up compilation',
+  yield : true,
+)
+
