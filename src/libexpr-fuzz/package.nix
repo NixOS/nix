@@ -38,6 +38,7 @@ let
       ./meson.build
       (fileset.fileFilter (file: file.hasExt "cc") ./.)
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
+      ./nix.dict
     ];
 
     buildInputs = [
@@ -134,12 +135,13 @@ let
     LOG_DIR="$OUTPUT_DIR/logs"
     mkdir -p "$LOG_DIR"
 
-    # Start main fuzzer in background
-    echo "Starting main fuzzer (fuzzer-main)..."
+    # Start main fuzzer in background (with dictionary)
+    echo "Starting main fuzzer (fuzzer-main) with Nix dictionary..."
     ${aflplusplus}/bin/afl-fuzz \
       -M fuzzer-main \
       -i "$INPUT_ARG" \
       -o "$OUTPUT_DIR" \
+      -x ${resolvePath ./nix.dict} \
       -- ${fuzzerHarness}/bin/nix-expr-fuzzer \
       > "$LOG_DIR/fuzzer-main.log" 2>&1 &
     MAIN_PID=$!
@@ -147,7 +149,7 @@ let
     # Wait for main to initialize
     sleep 2
 
-    # Start secondary fuzzers
+    # Start secondary fuzzers (also with dictionary)
     for i in $(seq 2 "$NUM_FUZZERS"); do
       FUZZER_NAME="fuzzer-$i"
       echo "Starting secondary fuzzer ($FUZZER_NAME)..."
@@ -155,6 +157,7 @@ let
         -S "$FUZZER_NAME" \
         -i "$INPUT_ARG" \
         -o "$OUTPUT_DIR" \
+        -x ${resolvePath ./nix.dict} \
         -- ${fuzzerHarness}/bin/nix-expr-fuzzer \
         > "$LOG_DIR/$FUZZER_NAME.log" 2>&1 &
       sleep 0.5
@@ -253,8 +256,9 @@ runCommand "nix-expr-fuzz-${version}"
   ''
     mkdir -p $out/bin $out/share/nix-expr-fuzz
 
-    # Install corpus
+    # Install corpus and dictionary
     cp -r ${corpus} $out/share/nix-expr-fuzz/corpus
+    cp ${resolvePath ./nix.dict} $out/share/nix-expr-fuzz/nix.dict
 
     # Install helper scripts
     ln -s ${parallelScript} $out/bin/nix-expr-fuzz-parallel
@@ -266,6 +270,7 @@ runCommand "nix-expr-fuzz-${version}"
       --add-flags "-i $out/share/nix-expr-fuzz/corpus" \
       --add-flags "-o" \
       --add-flags "\''${FUZZ_OUTPUT_DIR:-\$HOME/tmp/nix-fuzz/fuzz-findings}" \
+      --add-flags "-x $out/share/nix-expr-fuzz/nix.dict" \
       --add-flags "--" \
       --add-flags "${fuzzerHarness}/bin/nix-expr-fuzzer" \
       --set AFL_SKIP_CPUFREQ 1 \
