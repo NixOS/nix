@@ -108,7 +108,7 @@ bool createUserEnv(
     auto manifestFile = ({
         std::ostringstream str;
         printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
-        StringSource source{toView(str)};
+        StringSource source{str.view()};
         state.store->addToStoreFromDump(
             source,
             "env-manifest.nix",

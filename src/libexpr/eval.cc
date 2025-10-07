@@ -649,7 +649,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            .doc = makeImmutableString(toView(s)), // NOTE: memory leak when compiled without GC
+            .doc = makeImmutableString(s.view()), // NOTE: memory leak when compiled without GC
         };
     }
     if (isFunctor(v)) {
@@ -1845,7 +1845,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
     if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        auto exprStr = toView(out);
+        auto exprStr = out.view();
 
         if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
             try {
