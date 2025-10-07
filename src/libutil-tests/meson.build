@@ -44,6 +44,7 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'archive.cc',
   'args.cc',
   'base-n.cc',
   'canon-path.cc',

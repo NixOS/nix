@@ -187,8 +187,10 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
                 tag = getString();
             }
 
-            if (tag == "contents")
-                parseContents(crf, source);
+            if (tag != "contents")
+                throw badArchive("expected tag 'contents', got '%s'", tag);
+
+            parseContents(crf, source);
 
             expectTag(")");
         });
