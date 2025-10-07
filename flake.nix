@@ -382,6 +382,9 @@
           nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
+
+          # AFL++ instrumented fuzzer with all dependencies instrumented
+          nix-expr-fuzz = aflInstrumentedComponents.nix-expr-fuzz;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
