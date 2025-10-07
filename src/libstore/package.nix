@@ -34,6 +34,9 @@ let
   inherit (lib) fileset;
 in
 
+assert lib.assertMsg (!withAWS || !withCurlS3)
+  "withAWS and withCurlS3 are mutually exclusive - cannot enable both S3 implementations simultaneously";
+
 mkMesonLibrary (finalAttrs: {
   pname = "nix-store";
   inherit version;
