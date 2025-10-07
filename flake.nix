@@ -357,6 +357,17 @@
 
       packages = forAllSystems (
         system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+
+          # Create AFL++-instrumented components
+          # This rebuilds all dependencies with AFL++ instrumentation
+          aflInstrumentedComponents = import ./packaging/afl-components.nix {
+            inherit lib pkgs;
+            nixComponents = pkgs.nixComponents2;
+            aflplusplus = pkgs.aflplusplus;
+          };
+        in
         {
           # Here we put attributes that map 1:1 into packages.<system>, ie
           # for which we don't apply the full build matrix such as cross or static.
