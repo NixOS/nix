@@ -132,6 +132,40 @@ TEST(CanonPath, concat)
     }
 }
 
+struct NormalizeComponentParam
+{
+    std::string basePath;
+    std::string component;
+    std::string expected;
+};
+
+class NormalizeComponentTest : public testing::TestWithParam<NormalizeComponentParam>
+{};
+
+TEST_P(NormalizeComponentTest, OperatorSlashNormalizes)
+{
+    auto params = GetParam();
+    CanonPath base(params.basePath);
+    ASSERT_EQ((base / params.component).abs(), params.expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    CanonPath,
+    NormalizeComponentTest,
+    testing::Values(
+        // Test normalization of "." component
+        NormalizeComponentParam{"/foo", ".", "/foo"},
+        NormalizeComponentParam{"/foo/bar", ".", "/foo/bar"},
+        NormalizeComponentParam{"/", ".", "/"},
+        // Test normalization of ".." component
+        NormalizeComponentParam{"/foo/bar", "..", "/foo"},
+        NormalizeComponentParam{"/foo", "..", "/"},
+        NormalizeComponentParam{"/", "..", "/"},
+        // Test simple components (normal case)
+        NormalizeComponentParam{"/foo", "bar", "/foo/bar"},
+        NormalizeComponentParam{"/", "foo", "/foo"},
+        NormalizeComponentParam{"/foo/bar", "baz", "/foo/bar/baz"}));
+
 TEST(CanonPath, within)
 {
     ASSERT_TRUE(CanonPath("foo").isWithin(CanonPath("foo")));

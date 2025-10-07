@@ -87,6 +87,17 @@ void CanonPath::push(std::string_view c)
 
 CanonPath CanonPath::operator/(std::string_view c) const
 {
+    // Special case: "." means current directory, no-op
+    if (c == ".")
+        return *this;
+
+    // Special case: ".." means parent directory
+    if (c == "..") {
+        auto p = parent();
+        return p ? *p : root;
+    }
+
+    // Normal case: append the component
     auto res = *this;
     res.push(c);
     return res;
