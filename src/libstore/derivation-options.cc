@@ -99,6 +99,17 @@ DerivationOptions DerivationOptions::fromStructuredAttrs(
     return fromStructuredAttrs(env, parsed ? &*parsed : nullptr);
 }
 
+static void flatten(const nlohmann::json & value, StringSet & res)
+{
+    if (value.is_array())
+        for (auto & v : value)
+            flatten(v, res);
+    else if (value.is_string())
+        res.insert(value);
+    else
+        throw Error("'exportReferencesGraph' value is not an array or a string");
+}
+
 DerivationOptions
 DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn)
 {
@@ -219,12 +230,9 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                     if (!e || !e->is_object())
                         return ret;
                     for (auto & [key, value] : getObject(*e)) {
-                        if (value.is_array())
-                            ret.insert_or_assign(key, value);
-                        else if (value.is_string())
-                            ret.insert_or_assign(key, StringSet{value});
-                        else
-                            throw Error("'exportReferencesGraph' value is not an array or a string");
+                        StringSet ss;
+                        flatten(value, ss);
+                        ret.insert_or_assign(key, std::move(ss));
                     }
                 } else {
                     auto s = getOr(env, "exportReferencesGraph", "");
