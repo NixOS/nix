@@ -126,6 +126,14 @@ jobs:
           --argstr stdenv "${{ matrix.stdenv }}" \
           ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
           ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
+    - name: Run VM tests
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix vmTests -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}" \
+          ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
+          ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
+      if: ${{ matrix.os == 'linux' }}
     - name: Run flake checks and prepare the installer tarball
       run: |
         ci/gha/tests/build-checks
@@ -213,7 +221,7 @@ jobs:
           echo "docker=${{ env._DOCKER_SECRETS != '' }}" >> $GITHUB_OUTPUT
 
   docker_push_image:
-    needs: [tests, vm_tests, check_secrets]
+    needs: [tests, check_secrets]
     permissions:
       contents: read
       packages: write
@@ -266,43 +274,8 @@ jobs:
         docker tag nix:$NIX_VERSION $IMAGE_ID:master
         docker push $IMAGE_ID:master
 
-  vm_tests:
-    needs: basic-checks
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # TODO: remove once curl-based-s3 fully lands
-          - scenario: legacy s3
-            withAWS: true
-            withCurlS3: false
-          - scenario: curl s3
-            withAWS: false
-            withCurlS3: true
-    name: vm_tests (${{ matrix.scenario }})
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/install-nix-action
-        with:
-          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
-          extra_nix_config:
-            experimental-features = nix-command flakes
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - name: Build VM tests
-        run: |
-          nix build -L \
-            --file ci/gha/vm-tests/wrapper.nix \
-            ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
-            ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }} \
-            functional_user \
-            githubFlakes \
-            nix-docker \
-            tarballFlakes
-
   flake_regressions:
-    needs: vm_tests
+    needs: tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix

@@ -79,6 +79,14 @@ rec {
     }
   );
 
+  # Import NixOS tests using the instrumented components
+  nixosTests = import ../../../tests/nixos {
+    inherit lib pkgs;
+    nixComponents = nixComponentsInstrumented;
+    nixpkgs = nixFlake.inputs.nixpkgs;
+    inherit (nixFlake.inputs) nixpkgs-23-11;
+  };
+
   /**
     Top-level tests for the flake outputs, as they would be built by hydra.
     These tests generally can't be overridden to run with sanitizers.
@@ -229,4 +237,24 @@ rec {
     {
       inherit coverageProfileDrvs mergedProfdata coverageReports;
     };
+
+  vmTests = {
+  }
+  # FIXME: when the curlS3 implementation is complete, it should also enable these tests.
+  // lib.optionalAttrs (withAWS == true) {
+    # S3 binary cache store test only runs when S3 support is enabled
+    inherit (nixosTests) s3-binary-cache-store;
+  }
+  // lib.optionalAttrs (!withSanitizers && !withCoverage) {
+    # evalNixpkgs uses non-instrumented components from hydraJobs, so only run it
+    # when not testing with sanitizers to avoid rebuilding nix
+    inherit (hydraJobs.tests) evalNixpkgs;
+    # FIXME: CI times out when building vm tests instrumented
+    inherit (nixosTests)
+      functional_user
+      githubFlakes
+      nix-docker
+      tarballFlakes
+      ;
+  };
 }
