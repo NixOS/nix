@@ -272,9 +272,10 @@ Goal::Co DerivationGoal::repairClosure()
                 bmRepair));
     }
 
+    bool haveWaitees = !waitees.empty();
     co_await await(std::move(waitees));
 
-    if (!waitees.empty()) {
+    if (haveWaitees) {
         trace("closure repaired");
         if (nrFailed > 0)
             throw Error(
