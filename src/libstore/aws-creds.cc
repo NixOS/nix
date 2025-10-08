@@ -24,6 +24,22 @@ namespace nix {
 
 namespace {
 
+// Global credential provider cache using boost's concurrent map
+// Key: profile name (empty string for default profile)
+using CredentialProviderCache =
+    boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>;
+
+static CredentialProviderCache credentialProviderCache;
+
+/**
+ * Clear all cached credential providers.
+ * Called automatically by CrtWrapper destructor during static destruction.
+ */
+static void clearAwsCredentialsCache()
+{
+    credentialProviderCache.clear();
+}
+
 static void initAwsCrt()
 {
     struct CrtWrapper
@@ -95,13 +111,6 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
     return fut.get(); // This will throw if set_exception was called
 }
 
-// Global credential provider cache using boost's concurrent map
-// Key: profile name (empty string for default profile)
-using CredentialProviderCache =
-    boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>;
-
-static CredentialProviderCache credentialProviderCache;
-
 } // anonymous namespace
 
 AwsCredentials getAwsCredentials(const std::string & profile)
@@ -158,11 +167,6 @@ AwsCredentials getAwsCredentials(const std::string & profile)
 void invalidateAwsCredentials(const std::string & profile)
 {
     credentialProviderCache.erase(profile);
-}
-
-void clearAwsCredentialsCache()
-{
-    credentialProviderCache.clear();
 }
 
 AwsCredentials preResolveAwsCredentials(const ParsedS3URL & s3Url)
