@@ -82,4 +82,8 @@ mkDerivation {
   "foo$" = "BAD";
 
   exportReferencesGraph.refs = [ dep ];
+  exportReferencesGraph.refs2 = [
+    dep
+    [ dep ]
+  ]; # regression test for heterogeneous arrays
 }
