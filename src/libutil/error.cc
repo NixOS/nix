@@ -6,6 +6,7 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/position.hh"
 
+#include <cinttypes>
 #include <iostream>
 #include <optional>
 #include "nix/util/serialise.hh"
@@ -436,13 +437,19 @@ void panic(std::string_view msg)
     writeErr("\n\n" ANSI_RED "terminating due to unexpected unrecoverable internal error: " ANSI_NORMAL);
     writeErr(msg);
     writeErr("\n");
-    abort();
+    std::terminate();
 }
 
-void panic(const char * file, int line, const char * func)
+void unreachable(std::source_location loc)
 {
     char buf[512];
-    int n = snprintf(buf, sizeof(buf), "Unexpected condition in %s at %s:%d", func, file, line);
+    int n = snprintf(
+        buf,
+        sizeof(buf),
+        "Unexpected condition in %s at %s:%" PRIuLEAST32,
+        loc.function_name(),
+        loc.file_name(),
+        loc.line());
     if (n < 0)
         panic("Unexpected condition and could not format error message");
     panic(std::string_view(buf, std::min(static_cast<int>(sizeof(buf)), n)));
