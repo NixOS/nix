@@ -18,6 +18,7 @@ writeSimpleFlake() {
       foo = import ./simple.nix;
       fooScript = (import ./shell.nix {}).foo;
       default = foo;
+      noPackage = null;
     };
     packages.someOtherSystem = rec {
       foo = import ./simple.nix;
