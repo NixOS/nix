@@ -77,6 +77,17 @@ extern FileTransferSettings fileTransferSettings;
 
 extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
+/**
+ * Username and optional password for HTTP basic authentication.
+ * These are used with curl's CURLOPT_USERNAME and CURLOPT_PASSWORD options
+ * for various protocols including HTTP, FTP, and others.
+ */
+struct UsernameAuth
+{
+    std::string username;
+    std::optional<std::string> password;
+};
+
 struct FileTransferRequest
 {
     ValidURL uri;
@@ -92,6 +103,11 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+    /**
+     * Optional username and password for HTTP basic authentication.
+     * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
+     */
+    std::optional<UsernameAuth> usernameAuth;
 
     FileTransferRequest(ValidURL uri)
         : uri(std::move(uri))

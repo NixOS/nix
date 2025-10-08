@@ -426,6 +426,14 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 
+            // Set up username/password authentication if provided
+            if (request.usernameAuth) {
+                curl_easy_setopt(req, CURLOPT_USERNAME, request.usernameAuth->username.c_str());
+                if (request.usernameAuth->password) {
+                    curl_easy_setopt(req, CURLOPT_PASSWORD, request.usernameAuth->password->c_str());
+                }
+            }
+
             result.data.clear();
             result.bodySize = 0;
         }
