@@ -126,6 +126,7 @@ jobs:
           --argstr stdenv "${{ matrix.stdenv }}" \
           ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
           ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
+      if: ${{ !(github.event_name == 'push' && github.ref_name == 'master') }}
     - name: Run VM tests
       run: |
         nix build --file ci/gha/tests/wrapper.nix vmTests -L \
@@ -133,11 +134,12 @@ jobs:
           --argstr stdenv "${{ matrix.stdenv }}" \
           ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
           ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
-      if: ${{ matrix.os == 'linux' }}
-    - name: Run flake checks and prepare the installer tarball
-      run: |
-        ci/gha/tests/build-checks
-        ci/gha/tests/prepare-installer-for-github-actions
+      if: ${{ matrix.os == 'linux' && !(github.event_name == 'push' && github.ref_name == 'master') }}
+    - name: Run flake checks
+      run: ci/gha/tests/build-checks
+      if: ${{ matrix.primary && !(github.event_name == 'push' && github.ref_name == 'master') }}
+    - name: Prepare the installer tarball
+      run: ci/gha/tests/prepare-installer-for-github-actions
       if: ${{ matrix.primary }}
     - name: Collect code coverage
       run: |
@@ -148,13 +150,13 @@ jobs:
           ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }} \
           --out-link coverage-reports
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
-      if: ${{ matrix.instrumented }}
+      if: ${{ matrix.instrumented && !(github.event_name == 'push' && github.ref_name == 'master') }}
     - name: Upload coverage reports
       uses: actions/upload-artifact@v4
       with:
         name: coverage-reports
         path: coverage-reports/
-      if: ${{ matrix.instrumented }}
+      if: ${{ matrix.instrumented && !(github.event_name == 'push' && github.ref_name == 'master') }}
     - name: Upload installer tarball
       uses: actions/upload-artifact@v4
       with:
@@ -164,6 +166,7 @@ jobs:
 
   installer_test:
     needs: [tests]
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'master') }}
     strategy:
       fail-fast: false
       matrix:
@@ -276,6 +279,7 @@ jobs:
 
   flake_regressions:
     needs: tests
+    if: ${{ !(github.event_name == 'push' && github.ref_name == 'master') }}
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
