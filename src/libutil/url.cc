@@ -350,7 +350,7 @@ std::string ParsedURL::renderAuthorityAndPath() const
            must either be empty or begin with a slash ("/") character. */
         assert(path.empty() || path.front().empty());
         res += authority->to_string();
-    } else if (std::ranges::equal(std::views::take(path, 2), std::views::repeat("", 2))) {
+    } else if (std::ranges::equal(std::views::take(path, 3), std::views::repeat("", 3))) {
         /* If a URI does not contain an authority component, then the path cannot begin
            with two slash characters ("//") */
         unreachable();
