@@ -69,7 +69,7 @@ struct InstallableFlake : InstallableValue
      */
     std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state) override;
 
-    std::shared_ptr<flake::LockedFlake> getLockedFlake() const;
+    ref<flake::LockedFlake> getLockedFlake() const;
 
     FlakeRef nixpkgsFlakeRef() const;
 };

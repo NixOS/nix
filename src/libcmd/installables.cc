@@ -342,8 +342,7 @@ void completeFlakeRefWithFragment(
                 parseFlakeRef(fetchSettings, expandTilde(flakeRefS), std::filesystem::current_path().string());
 
             auto evalCache = openEvalCache(
-                *evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
+                *evalState, make_ref<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
 
             auto root = evalCache->getRoot();
 
