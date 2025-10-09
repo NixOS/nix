@@ -87,6 +87,4 @@ static inline FlakeRef defaultNixpkgsFlakeRef()
     return FlakeRef::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", "nixpkgs"}});
 }
 
-ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake);
-
 } // namespace nix
