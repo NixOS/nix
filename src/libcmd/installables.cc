@@ -342,8 +342,7 @@ void completeFlakeRefWithFragment(
                 parseFlakeRef(fetchSettings, expandTilde(flakeRefS), std::filesystem::current_path().string());
 
             auto evalCache = openEvalCache(
-                *evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
+                *evalState, make_ref<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
 
             auto root = evalCache->getRoot();
 
@@ -441,42 +440,6 @@ static StorePath getDeriver(ref<Store> store, const Installable & i, const Store
         throw Error("'%s' does not have a known deriver", i.what());
     // FIXME: use all derivers?
     return *derivers.begin();
-}
-
-ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake)
-{
-    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
-                           : std::nullopt;
-    auto rootLoader = [&state, lockedFlake]() {
-        /* For testing whether the evaluation cache is
-           complete. */
-        if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
-            throw Error("not everything is cached, but evaluation is not allowed");
-
-        auto vFlake = state.allocValue();
-        flake::callFlake(state, *lockedFlake, *vFlake);
-
-        state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
-
-        auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
-        assert(aOutputs);
-
-        return aOutputs->value;
-    };
-
-    if (fingerprint) {
-        auto search = state.evalCaches.find(fingerprint.value());
-        if (search == state.evalCaches.end()) {
-            search =
-                state.evalCaches
-                    .emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader))
-                    .first;
-        }
-        return search->second;
-    } else {
-        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
-    }
 }
 
 Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<std::string> ss)
