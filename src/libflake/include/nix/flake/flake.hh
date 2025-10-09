@@ -222,7 +222,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
 /**
  * Open an evaluation cache for a flake.
  */
-ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<LockedFlake> lockedFlake);
+ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake);
 
 } // namespace flake
 
