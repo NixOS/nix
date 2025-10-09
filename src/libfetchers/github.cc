@@ -548,13 +548,10 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto file = store->toRealPath(
-                downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers).storePath);
-            std::ifstream is(file);
-            std::string line;
-            getline(is, line);
+            auto downloadFileResult = downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers);
+            auto contents = nix::ref(store->getFSAccessor(downloadFileResult.storePath))->readFile(CanonPath::root);
 
-            auto remoteLine = git::parseLsRemoteLine(line);
+            auto remoteLine = git::parseLsRemoteLine(getLine(contents).first);
             if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
@@ -564,9 +561,10 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto file = store->toRealPath(
-            downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers).storePath);
-        std::ifstream is(file);
+        auto downloadFileResult =
+            downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers);
+        auto contents = nix::ref(store->getFSAccessor(downloadFileResult.storePath))->readFile(CanonPath::root);
+        std::istringstream is(contents);
 
         std::string line;
         std::optional<std::string> id;
