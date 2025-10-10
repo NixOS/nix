@@ -19,10 +19,9 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
     {
         for (auto & handler : settings.externalBuilders.get()) {
-            for (auto & system : handler.systems)
-                if (params.drv.platform == system)
-                    return std::make_unique<ExternalDerivationBuilder>(
-                        store, std::move(miscMethods), std::move(params), handler);
+            if (handler.systems.contains(params.drv.platform))
+                return std::make_unique<ExternalDerivationBuilder>(
+                    store, std::move(miscMethods), std::move(params), handler);
         }
         return {};
     }

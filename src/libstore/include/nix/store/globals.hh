@@ -1375,7 +1375,7 @@ public:
 
     struct ExternalBuilder
     {
-        std::vector<std::string> systems;
+        StringSet systems;
         Path program;
         std::vector<std::string> args;
     };
