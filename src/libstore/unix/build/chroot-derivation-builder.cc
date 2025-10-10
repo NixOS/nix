@@ -91,10 +91,10 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            nobody account.  The latter is kind of a hack to support
            Samba-in-QEMU. */
         createDirs(chrootRootDir + "/etc");
-        if (drvOptions.useUidRange(drv))
+        if (drv.options.useUidRange(drv))
             chownToBuilder(chrootRootDir + "/etc");
 
-        if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
+        if (drv.options.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
             throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent

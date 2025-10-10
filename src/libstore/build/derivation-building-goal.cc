@@ -34,14 +34,6 @@ DerivationBuildingGoal::DerivationBuildingGoal(
 {
     drv = std::make_unique<Derivation>(drv_);
 
-    try {
-        drvOptions =
-            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs));
-    } catch (Error & e) {
-        e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-        throw;
-    }
-
     name = fmt("building of '%s' from in-memory derivation", worker.store.printStorePath(drvPath));
     trace("created");
 
@@ -559,7 +551,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         /* Don't do a remote build if the derivation has the attribute
            `preferLocalBuild' set.  Also, check and repair modes are only
            supported for local builds. */
-        bool buildLocally = (buildMode != bmNormal || drvOptions->willBuildLocally(worker.store, *drv))
+        bool buildLocally = (buildMode != bmNormal || drv->options.willBuildLocally(worker.store, *drv))
                             && settings.maxBuildJobs.get() != 0;
 
         if (buildLocally) {
@@ -764,7 +756,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             }
 
             try {
-                desugaredEnv = DesugaredEnv::create(worker.store, *drv, *drvOptions, inputPaths);
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drv->options, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 worker.permanentFailure = true;
@@ -780,7 +772,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     .drvPath = drvPath,
                     .buildResult = buildResult,
                     .drv = *drv,
-                    .drvOptions = *drvOptions,
                     .inputPaths = inputPaths,
                     .initialOutputs = initialOutputs,
                     .buildMode = buildMode,
@@ -993,7 +984,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const std::map<std::string, Initi
 
         /* Send the request to the hook. */
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0) << drv->platform
-                          << worker.store.printStorePath(drvPath) << drvOptions->getRequiredSystemFeatures(*drv);
+                          << worker.store.printStorePath(drvPath) << drv->options.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating

@@ -212,7 +212,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(drv.options.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void prepareUser() override
@@ -626,7 +626,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         }
 
         /* Make /etc unwritable */
-        if (!drvOptions.useUidRange(drv))
+        if (!drv.options.useUidRange(drv))
             chmod_(chrootRootDir + "/etc", 0555);
 
         /* Unshare this mount namespace. This is necessary because
