@@ -18,10 +18,12 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     static std::unique_ptr<ExternalDerivationBuilder> newIfSupported(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
     {
-        for (auto & handler : settings.externalBuilders.get()) {
-            if (handler.systems.contains(params.drv.platform))
-                return std::make_unique<ExternalDerivationBuilder>(
-                    store, std::move(miscMethods), std::move(params), handler);
+        if (auto it = std::ranges::find_if(
+                settings.externalBuilders.get(),
+                [&](const auto & handler) { return handler.systems.contains(params.drv.platform); });
+            it != settings.externalBuilders.get().end()) {
+            return std::make_unique<ExternalDerivationBuilder>(
+                store, std::move(miscMethods), std::move(params), *it);
         }
         return {};
     }
