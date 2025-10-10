@@ -44,3 +44,5 @@ endif
 
 # Darwin ld doesn't like "X.Y.Zpre"
 nix_soversion = meson.project_version().split('pre')[0]
+
+subdir('assert-fail')
