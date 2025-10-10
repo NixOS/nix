@@ -377,7 +377,7 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
     return scheme->applyOverrides(*this, ref, rev);
 }
 
-void Input::clone(const Settings & settings, const Path & destDir) const
+void Input::clone(const Settings & settings, const std::filesystem::path & destDir) const
 {
     assert(scheme);
     scheme->clone(settings, *this, destDir);
@@ -493,7 +493,7 @@ void InputScheme::putFile(
     throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
 
-void InputScheme::clone(const Settings & settings, const Input & input, const Path & destDir) const
+void InputScheme::clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const
 {
     throw Error("do not know how to clone input '%s'", input.to_string());
 }

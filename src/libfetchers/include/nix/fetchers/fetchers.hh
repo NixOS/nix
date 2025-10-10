@@ -143,7 +143,7 @@ public:
 
     Input applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const;
 
-    void clone(const Settings & settings, const Path & destDir) const;
+    void clone(const Settings & settings, const std::filesystem::path & destDir) const;
 
     std::optional<std::filesystem::path> getSourcePath() const;
 
@@ -216,7 +216,7 @@ struct InputScheme
 
     virtual Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) const;
 
-    virtual void clone(const Settings & settings, const Input & input, const Path & destDir) const;
+    virtual void clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const;
 
     virtual std::optional<std::filesystem::path> getSourcePath(const Input & input) const;
 
