@@ -258,6 +258,15 @@ Path Settings::getDefaultSSLCertFile()
     return "";
 }
 
+const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
+{
+    if (auto it = std::ranges::find_if(
+            externalBuilders.get(), [&](const auto & handler) { return handler.systems.contains(drv.platform); });
+        it != externalBuilders.get().end())
+        return &*it;
+    return nullptr;
+}
+
 std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
@@ -378,8 +387,6 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
 }
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Settings::ExternalBuilder, systems, program, args);
 
 template<>
 Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
