@@ -523,7 +523,7 @@ struct GitInputScheme : InputScheme
                However, new versions of nix parsing old flake.lock files would pass the dir=
                query parameter in the "url" attribute to git, which will then complain.
 
-               For this reason, we filtering the `dir` query parameter from the URL
+               For this reason, we are filtering the `dir` query parameter from the URL
                before passing it to git. */
             url.query.erase("dir");
             repoInfo.location = url;
