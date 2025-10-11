@@ -69,7 +69,7 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
     CycleEdgeScanSink sink(std::move(hashes), storePrefix);
 
     // Walk the filesystem and scan files using the sink
-    walkAndScanPath(path, sink);
+    walkAndScanPath(std::filesystem::path(path), sink);
 
     // Extract the found edges
     edges = sink.getEdges();
@@ -79,21 +79,20 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * Recursively walk filesystem and stream files into the sink.
  * This reuses RefScanSink's hash-finding logic instead of reimplementing it.
  */
-void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink)
+void walkAndScanPath(const std::filesystem::path & path, CycleEdgeScanSink & sink)
 {
-    auto fsPath = std::filesystem::path(path);
-    auto status = std::filesystem::symlink_status(fsPath);
+    auto status = std::filesystem::symlink_status(path);
 
-    debug("walkAndScanPath: scanning path = %s", path);
+    debug("walkAndScanPath: scanning path = %s", path.string());
 
     if (std::filesystem::is_regular_file(status)) {
         // Handle regular files - stream contents into sink
         // The sink (RefScanSink) handles all hash detection and buffer management
-        sink.setCurrentPath(path);
+        sink.setCurrentPath(path.string());
 
         // Use Nix's portable readFile that streams into a sink
         // This handles all file I/O portably across platforms
-        readFile(path, sink);
+        readFile(path.string(), sink);
     } else if (std::filesystem::is_directory(status)) {
         // Handle directories - recursively scan contents
         std::map<std::string, std::string> unhacked;
@@ -106,14 +105,14 @@ void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink)
             std::string name(entryName);
             size_t pos = entryName.find(caseHackSuffix);
             if (pos != std::string::npos) {
-                debug("removing case hack suffix from '%s'", (fsPath / entryName).string());
+                debug("removing case hack suffix from '%s'", (path / entryName).string());
                 name.erase(pos);
             }
             if (unhacked.find(name) != unhacked.end()) {
                 throw Error(
                     "file name collision between '%1%' and '%2%'",
-                    (fsPath / unhacked[name]).string(),
-                    (fsPath / entryName).string());
+                    (path / unhacked[name]).string(),
+                    (path / entryName).string());
             }
             unhacked[name] = entryName;
 #else
@@ -122,16 +121,16 @@ void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink)
         }
 
         for (auto & [name, actualName] : unhacked) {
-            debug("walkAndScanPath: recursing into %s/%s", path, actualName);
-            walkAndScanPath((fsPath / actualName).string(), sink);
+            debug("walkAndScanPath: recursing into %s/%s", path.string(), actualName);
+            walkAndScanPath(path / actualName, sink);
         }
     } else if (std::filesystem::is_symlink(status)) {
         // Handle symlinks - stream link target into sink
-        auto linkTarget = std::filesystem::read_symlink(fsPath).string();
+        auto linkTarget = std::filesystem::read_symlink(path).string();
 
-        debug("walkAndScanPath: scanning symlink %s -> %s", path, linkTarget);
+        debug("walkAndScanPath: scanning symlink %s -> %s", path.string(), linkTarget);
 
-        sink.setCurrentPath(path);
+        sink.setCurrentPath(path.string());
         sink(std::string_view(linkTarget));
     } else {
         throw Error("file '%1%' has an unsupported type", path);
