@@ -12,9 +12,6 @@
 
 namespace nix {
 
-// Hash length in characters (32 for base32-encoded sha256)
-static constexpr size_t refLength = StorePath::HashLen;
-
 CycleEdgeScanSink::CycleEdgeScanSink(StringSet && hashes, std::string storeDir)
     : RefScanSink(std::move(hashes))
     , storeDir(std::move(storeDir))
