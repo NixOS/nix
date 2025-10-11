@@ -3,7 +3,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/archive.hh"
-#include "nix/util/base-nix-32.hh"
 
 #include <filesystem>
 #include <sys/types.h>
@@ -16,8 +15,50 @@ namespace nix {
 // Hash length in characters (32 for base32-encoded sha256)
 static constexpr size_t refLength = StorePath::HashLen;
 
-// Maximum expected file path length for buffer carry-over
-static constexpr size_t MAX_FILEPATH_LENGTH = 1000;
+CycleEdgeScanSink::CycleEdgeScanSink(
+    StringSet && hashes, std::map<std::string, StorePath> && backMap, std::string storeDir)
+    : RefScanSink(std::move(hashes))
+    , hashPathMap(std::move(backMap))
+    , storeDir(std::move(storeDir))
+{
+}
+
+void CycleEdgeScanSink::setCurrentPath(const std::string & path)
+{
+    currentFilePath = path;
+}
+
+void CycleEdgeScanSink::operator()(std::string_view data)
+{
+    // Track what hashes we've already seen
+    auto seenBefore = getResult();
+
+    // Call parent's operator() to do the actual hash searching
+    // This reuses all the proven buffer boundary handling logic
+    RefScanSink::operator()(data);
+
+    // Check for newly found hashes
+    auto seenAfter = getResult();
+    for (const auto & hash : seenAfter) {
+        if (seenBefore.find(hash) == seenBefore.end()) {
+            // This hash was just found in the current file
+            // Create an edge from current file to the target
+            auto targetPath = storeDir + hash;
+
+            StoreCycleEdge edge;
+            edge.push_back(currentFilePath);
+            edge.push_back(targetPath);
+            edges.push_back(edge);
+
+            debug("found cycle edge: %s → %s (hash: %s)", currentFilePath, targetPath, hash);
+        }
+    }
+}
+
+StoreCycleEdgeVec && CycleEdgeScanSink::getEdges()
+{
+    return std::move(edges);
+}
 
 void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleEdgeVec & edges)
 {
@@ -41,174 +82,46 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
         hashes.insert(hashPart);
     }
 
-    scanForCycleEdges2(path, hashes, edges, storePrefix);
+    // Create sink that reuses RefScanSink's hash-finding logic
+    CycleEdgeScanSink sink(std::move(hashes), std::move(hashPathMap), storePrefix);
+
+    // Walk the filesystem and scan files using the sink
+    scanForCycleEdges2(path, sink);
+
+    // Extract the found edges
+    edges = sink.getEdges();
 }
 
-void scanForCycleEdges2(std::string path, const StringSet & hashes, StoreCycleEdgeVec & edges, std::string storeDir)
+/**
+ * Recursively walk filesystem and stream files into the sink.
+ * This reuses RefScanSink's hash-finding logic instead of reimplementing it.
+ */
+void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
 {
     auto st = lstat(path);
 
     debug("scanForCycleEdges2: scanning path = %s", path);
 
     if (S_ISREG(st.st_mode)) {
-        // Handle regular files - scan contents for hash references
+        // Handle regular files - stream contents into sink
+        // The sink (RefScanSink) handles all hash detection and buffer management
+        sink.setCurrentPath(path);
+
         AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (!fd)
             throw SysError("opening file '%1%'", path);
 
+        // Stream file contents into sink
+        // RefScanSink handles buffer boundaries automatically
         std::vector<char> buf(65536);
-        size_t rest = st.st_size;
-        size_t start = 0;
+        while (true) {
+            ssize_t n = read(fd.get(), buf.data(), buf.size());
+            if (n == -1)
+                throw SysError("reading file '%1%'", path);
+            if (n == 0)
+                break;
 
-        // Buffer to carry data between reads (for references spanning chunks)
-        std::vector<char> bufCarry(MAX_FILEPATH_LENGTH);
-        bool bufCarryUsed = false;
-        size_t bufCarrySize = 0;
-
-        while (rest > 0) {
-            auto n = std::min(rest, buf.size());
-            readFull(fd.get(), buf.data(), n);
-
-            debug("scanForCycleEdges2: read file %s: n = %lu", path, n);
-
-            // Check if we have carry-over data from previous iteration
-            if (bufCarryUsed) {
-                // Search in the overlap region (carry + start of new buffer)
-                size_t searchSize = std::min(bufCarrySize + n, MAX_FILEPATH_LENGTH);
-                std::vector<char> searchBuf(searchSize);
-
-                // Copy carry buffer
-                std::copy(bufCarry.begin(), bufCarry.begin() + bufCarrySize, searchBuf.begin());
-
-                // Copy start of new buffer
-                size_t newDataSize = searchSize - bufCarrySize;
-                std::copy(buf.begin(), buf.begin() + newDataSize, searchBuf.begin() + bufCarrySize);
-
-                // Search for hashes in the overlap region
-                for (size_t i = 0; i + refLength <= searchBuf.size();) {
-                    bool match = true;
-                    for (int j = refLength - 1; j >= 0; --j) {
-                        if (!BaseNix32::lookupReverse(searchBuf[i + j])) {
-                            i += j + 1;
-                            match = false;
-                            break;
-                        }
-                    }
-                    if (!match)
-                        continue;
-
-                    std::string hash(searchBuf.begin() + i, searchBuf.begin() + i + refLength);
-
-                    if (hashes.find(hash) != hashes.end()) {
-                        debug("scanForCycleEdges2: found hash '%s' in overlap region", hash);
-
-                        // Try to find the full path
-                        size_t storeDirLength = storeDir.size();
-                        if (i >= storeDirLength) {
-                            std::string targetPath = storeDir + hash;
-                            StoreCycleEdge edge;
-                            edge.push_back(path);
-                            edge.push_back(targetPath);
-                            edges.push_back(edge);
-                        }
-                    }
-                    ++i;
-                }
-
-                bufCarryUsed = false;
-            }
-
-            // Search in the main buffer
-            for (size_t i = 0; i + refLength <= n;) {
-                bool match = true;
-                for (int j = refLength - 1; j >= 0; --j) {
-                    if (!BaseNix32::lookupReverse(buf[i + j])) {
-                        i += j + 1;
-                        match = false;
-                        break;
-                    }
-                }
-                if (!match)
-                    continue;
-
-                // Found a potential hash
-                std::string hash(buf.begin() + i, buf.begin() + i + refLength);
-
-                if (hashes.find(hash) != hashes.end()) {
-                    debug("scanForCycleEdges2: found reference to hash '%s' at offset %lu", hash, start + i);
-
-                    // Try to reconstruct the full store path
-                    size_t storeDirLength = storeDir.size();
-                    std::string targetPath = storeDir + hash;
-                    std::string targetStorePath;
-
-                    // Check if we have storeDir + hash in the buffer
-                    if (i >= (size_t) storeDirLength
-                        && std::string(buf.begin() + i - storeDirLength, buf.begin() + i + refLength) == targetPath) {
-
-                        debug("scanForCycleEdges2: found store path prefix at offset %lu", start + i - storeDirLength);
-
-                        // Try to find the complete path by checking what exists on disk
-                        // We probe incrementally to find the longest existing path
-                        size_t testNameLength = refLength + 2; // Minimum: hash + "-x"
-                        size_t targetPathLastEnd = 0;
-                        bool foundStorePath = false;
-                        bool foundPath = false;
-
-                        for (; testNameLength < 255 && i + (size_t) targetPathLastEnd + (size_t) testNameLength <= n;
-                             testNameLength++) {
-                            std::string testPath(
-                                buf.begin() + i - storeDirLength, buf.begin() + i + targetPathLastEnd + testNameLength);
-
-                            struct stat testStat;
-                            if (stat(testPath.c_str(), &testStat) == 0) {
-                                debug("scanForCycleEdges2: found existing path: %s", testPath);
-
-                                if (!foundStorePath) {
-                                    // First match is the store path component
-                                    targetStorePath = testPath.substr(storeDirLength);
-                                    foundStorePath = true;
-                                }
-
-                                foundPath = true;
-                                targetPath = testPath;
-
-                                // Check if this is a directory (followed by '/')
-                                if (buf[i + targetPathLastEnd + testNameLength] == '/') {
-                                    debug("scanForCycleEdges2: path is a directory, continuing");
-                                    targetPathLastEnd += testNameLength;
-                                    testNameLength = 1; // Reset for next component
-                                    continue;
-                                }
-                            }
-                        }
-
-                        if (foundPath) {
-                            debug("scanForCycleEdges2: cycle edge: %s -> %s", path, targetPath);
-                        } else {
-                            // Couldn't find exact path, use store path + hash
-                            targetPath = storeDir + hash;
-                        }
-                    }
-
-                    StoreCycleEdge edge;
-                    edge.push_back(path);
-                    edge.push_back(targetPath);
-                    edges.push_back(edge);
-                }
-                ++i;
-            }
-
-            start += n;
-            rest -= n;
-
-            // Carry over the end of the buffer for next iteration
-            if (n == buf.size() && rest > 0) {
-                size_t carrySize = std::min(MAX_FILEPATH_LENGTH, n);
-                std::copy(buf.end() - carrySize, buf.end(), bufCarry.begin());
-                bufCarrySize = carrySize;
-                bufCarryUsed = true;
-            }
+            sink(std::string_view(buf.data(), n));
         }
     } else if (S_ISDIR(st.st_mode)) {
         // Handle directories - recursively scan contents
@@ -237,41 +150,16 @@ void scanForCycleEdges2(std::string path, const StringSet & hashes, StoreCycleEd
 
         for (auto & [name, actualName] : unhacked) {
             debug("scanForCycleEdges2: recursing into %s/%s", path, actualName);
-            scanForCycleEdges2(path + "/" + actualName, hashes, edges, storeDir);
+            scanForCycleEdges2(path + "/" + actualName, sink);
         }
     } else if (S_ISLNK(st.st_mode)) {
-        // Handle symlinks - scan link target for hash references
+        // Handle symlinks - stream link target into sink
         std::string linkTarget = readLink(path);
 
         debug("scanForCycleEdges2: scanning symlink %s -> %s", path, linkTarget);
 
-        for (size_t i = 0; i + refLength <= linkTarget.size();) {
-            bool match = true;
-            for (int j = refLength - 1; j >= 0; --j) {
-                if (!BaseNix32::lookupReverse(linkTarget[i + j])) {
-                    i += j + 1;
-                    match = false;
-                    break;
-                }
-            }
-            if (!match)
-                continue;
-
-            std::string ref(linkTarget.begin() + i, linkTarget.begin() + i + refLength);
-
-            if (hashes.find(ref) != hashes.end()) {
-                debug("scanForCycleEdges2: found reference '%s' in symlink at offset %lu", ref, i);
-
-                // Try to extract full path from link target
-                std::string targetPath = storeDir + ref;
-
-                StoreCycleEdge edge;
-                edge.push_back(path);
-                edge.push_back(targetPath);
-                edges.push_back(edge);
-            }
-            ++i;
-        }
+        sink.setCurrentPath(path);
+        sink(std::string_view(linkTarget));
     } else {
         throw Error("file '%1%' has an unsupported type", path);
     }

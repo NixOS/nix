@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/store/references.hh"
 #include "nix/util/types.hh"
 
 #include <string>
@@ -25,6 +26,41 @@ typedef std::deque<std::string> StoreCycleEdge;
 typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
 
 /**
+ * A sink that extends RefScanSink to track file paths where references are found.
+ *
+ * This reuses the existing reference scanning logic from RefScanSink, but adds
+ * tracking of which file contains which reference. This is essential for providing
+ * detailed cycle error messages.
+ */
+class CycleEdgeScanSink : public RefScanSink
+{
+    std::string currentFilePath;
+    std::map<std::string, StorePath> hashPathMap;
+    std::string storeDir;
+
+public:
+    StoreCycleEdgeVec edges;
+
+    CycleEdgeScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap, std::string storeDir);
+
+    /**
+     * Set the current file path being scanned.
+     * Must be called before processing each file.
+     */
+    void setCurrentPath(const std::string & path);
+
+    /**
+     * Override to intercept when hashes are found and record the file location.
+     */
+    void operator()(std::string_view data) override;
+
+    /**
+     * Get the accumulated cycle edges.
+     */
+    StoreCycleEdgeVec && getEdges();
+};
+
+/**
  * Scan output paths to find cycle edges with detailed file paths.
  *
  * This is the second pass of cycle detection. The first pass (scanForReferences)
@@ -40,16 +76,14 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
 /**
  * Recursively scan files and directories for hash references.
  *
- * This function walks the file system tree and searches for store path hashes
- * in file contents, symlinks, etc. When a hash is found, it attempts to
- * reconstruct the full store path by checking what files actually exist.
+ * This function walks the file system tree, streaming file contents into
+ * the provided sink which performs the actual hash detection. This reuses
+ * the existing RefScanSink infrastructure for robustness.
  *
  * @param path Current path being scanned
- * @param hashes Set of hash strings to look for (32-char base32 hashes)
- * @param edges Output parameter that accumulates found cycle edges
- * @param storeDir The store directory prefix (e.g., "/nix/store/")
+ * @param sink The CycleEdgeScanSink that will detect and record hash references
  */
-void scanForCycleEdges2(std::string path, const StringSet & hashes, StoreCycleEdgeVec & edges, std::string storeDir);
+void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink);
 
 /**
  * Transform individual edges into connected multi-edges (paths).
