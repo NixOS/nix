@@ -26,22 +26,21 @@ CycleEdgeScanSink::CycleEdgeScanSink(
 void CycleEdgeScanSink::setCurrentPath(const std::string & path)
 {
     currentFilePath = path;
+    // Clear tracking for new file
+    recordedForCurrentFile.clear();
 }
 
 void CycleEdgeScanSink::operator()(std::string_view data)
 {
-    // Track what hashes we've already seen
-    auto seenBefore = getResult();
-
     // Call parent's operator() to do the actual hash searching
     // This reuses all the proven buffer boundary handling logic
     RefScanSink::operator()(data);
 
-    // Check for newly found hashes
-    auto seenAfter = getResult();
-    for (const auto & hash : seenAfter) {
-        if (seenBefore.find(hash) == seenBefore.end()) {
-            // This hash was just found in the current file
+    // Check which hashes have been found and not yet recorded for this file
+    // getResult() returns the set of ALL hashes found so far
+    for (const auto & hash : getResult()) {
+        if (recordedForCurrentFile.insert(hash).second) {
+            // This hash was just found and not yet recorded for current file
             // Create an edge from current file to the target
             auto targetPath = storeDir + hash;
 
