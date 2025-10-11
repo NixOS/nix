@@ -107,14 +107,13 @@ void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
         // Stream file contents into sink
         // RefScanSink handles buffer boundaries automatically
         std::vector<char> buf(65536);
-        while (true) {
-            ssize_t n = read(fd.get(), buf.data(), buf.size());
-            if (n == -1)
-                throw SysError("reading file '%1%'", path);
-            if (n == 0)
-                break;
+        size_t remaining = st.st_size;
 
-            sink(std::string_view(buf.data(), n));
+        while (remaining > 0) {
+            size_t toRead = std::min(remaining, buf.size());
+            readFull(fd.get(), buf.data(), toRead);
+            sink(std::string_view(buf.data(), toRead));
+            remaining -= toRead;
         }
     } else if (S_ISDIR(st.st_mode)) {
         // Handle directories - recursively scan contents
