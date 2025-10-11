@@ -46,6 +46,12 @@
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
 
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
+#  include "nix/util/url.hh"
+#endif
+
 namespace nix {
 
 struct NotDeterministic : BuildError
@@ -290,6 +296,15 @@ protected:
      */
     virtual void startChild();
 
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolve AWS credentials for S3 URLs in builtin:fetchurl.
+     * This should be called before forking to ensure credentials are available in child.
+     * Returns the credentials if successfully resolved, or std::nullopt otherwise.
+     */
+    std::optional<AwsCredentials> preResolveAwsCredentials();
+#endif
+
 private:
 
     /**
@@ -340,9 +355,19 @@ protected:
     void writeBuilderFile(const std::string & name, std::string_view contents);
 
     /**
+     * Arguments passed to runChild().
+     */
+    struct RunChildArgs
+    {
+#if NIX_WITH_CURL_S3
+        std::optional<AwsCredentials> awsCredentials;
+#endif
+    };
+
+    /**
      * Run the builder's process.
      */
-    void runChild();
+    void runChild(RunChildArgs args);
 
     /**
      * Move the current process into the chroot, if any. Called early
@@ -920,11 +945,43 @@ void DerivationBuilderImpl::openSlave()
         throw SysError("cannot pipe standard error into log file");
 }
 
+#if NIX_WITH_CURL_S3
+std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
+{
+    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+        auto url = drv.env.find("url");
+        if (url != drv.env.end()) {
+            try {
+                auto parsedUrl = parseURL(url->second);
+                if (parsedUrl.scheme == "s3") {
+                    debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
+                    auto s3Url = ParsedS3URL::parse(parsedUrl);
+
+                    // Use the preResolveAwsCredentials from aws-creds
+                    auto credentials = nix::preResolveAwsCredentials(s3Url);
+                    debug("Successfully pre-resolved AWS credentials in parent process");
+                    return credentials;
+                }
+            } catch (const std::exception & e) {
+                debug("Error pre-resolving S3 credentials: %s", e.what());
+            }
+        }
+    }
+    return std::nullopt;
+}
+#endif
+
 void DerivationBuilderImpl::startChild()
 {
-    pid = startProcess([&]() {
+    RunChildArgs args{
+#if NIX_WITH_CURL_S3
+        .awsCredentials = preResolveAwsCredentials(),
+#endif
+    };
+
+    pid = startProcess([this, args = std::move(args)]() {
         openSlave();
-        runChild();
+        runChild(std::move(args));
     });
 }
 
@@ -1181,7 +1238,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
     chownToBuilder(fd.get(), path);
 }
 
-void DerivationBuilderImpl::runChild()
+void DerivationBuilderImpl::runChild(RunChildArgs args)
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -1198,6 +1255,9 @@ void DerivationBuilderImpl::runChild()
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_CURL_S3
+            .awsCredentials = args.awsCredentials,
+#endif
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
