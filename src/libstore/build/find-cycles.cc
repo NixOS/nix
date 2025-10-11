@@ -39,10 +39,7 @@ void CycleEdgeScanSink::operator()(std::string_view data)
             // Create an edge from current file to the target
             auto targetPath = storeDir + hash;
 
-            StoreCycleEdge edge;
-            edge.push_back(currentFilePath);
-            edge.push_back(targetPath);
-            edges.push_back(edge);
+            edges.push_back({currentFilePath, targetPath});
 
             debug("found cycle edge: %s → %s (hash: %s)", currentFilePath, targetPath, hash);
         }
