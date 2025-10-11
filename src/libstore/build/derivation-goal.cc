@@ -43,9 +43,7 @@ DerivationGoal::DerivationGoal(
 {
     this->drv = std::make_unique<Derivation>(drv);
 
-    name =
-        fmt("building of '%s' from in-memory derivation",
-            DerivedPath::Built{makeConstantStorePathRef(drvPath), drv.outputNames()}.to_string(worker.store));
+    name = fmt("getting output '%s' from derivation '%s'", wantedOutput, worker.store.printStorePath(drvPath));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);

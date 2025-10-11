@@ -31,7 +31,7 @@ DerivationTrampolineGoal::DerivationTrampolineGoal(
 void DerivationTrampolineGoal::commonInit()
 {
     name =
-        fmt("outer obtaining drv from '%s' and then building outputs %s",
+        fmt("obtaining derivation from '%s' and then building outputs %s",
             drvReq->to_string(worker.store),
             std::visit(
                 overloaded{

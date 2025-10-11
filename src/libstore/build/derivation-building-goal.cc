@@ -42,7 +42,7 @@ DerivationBuildingGoal::DerivationBuildingGoal(
         throw;
     }
 
-    name = fmt("building of '%s' from in-memory derivation", worker.store.printStorePath(drvPath));
+    name = fmt("building derivation '%s'", worker.store.printStorePath(drvPath));
     trace("created");
 
     /* Prevent the .chroot directory from being
