@@ -37,7 +37,6 @@ libgit2 = dependency('libgit2')
 deps_private += libgit2
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'access-tokens.cc',

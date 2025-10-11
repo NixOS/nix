@@ -34,7 +34,6 @@ gtest = dependency('gtest', main : true)
 deps_private += gtest
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'flakeref.cc',

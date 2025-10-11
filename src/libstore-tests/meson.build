@@ -52,7 +52,6 @@ gtest = dependency('gmock')
 deps_private += gtest
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'common-protocol.cc',

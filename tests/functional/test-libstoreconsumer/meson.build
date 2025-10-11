@@ -1,6 +1,6 @@
 cxx = meson.get_compiler('cpp')
 
-subdir('nix-meson-build-support/asan-options')
+subdir('nix-meson-build-support/common/asan-options')
 
 libstoreconsumer_tester = executable(
   'test-libstoreconsumer',
