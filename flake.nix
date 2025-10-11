@@ -357,6 +357,17 @@
 
       packages = forAllSystems (
         system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+
+          # Create AFL++-instrumented components
+          # This rebuilds all dependencies with AFL++ instrumentation
+          aflInstrumentedComponents = import ./packaging/afl-components.nix {
+            inherit lib pkgs;
+            nixComponents = pkgs.nixComponents2;
+            aflplusplus = pkgs.aflplusplus;
+          };
+        in
         {
           # Here we put attributes that map 1:1 into packages.<system>, ie
           # for which we don't apply the full build matrix such as cross or static.
@@ -371,6 +382,9 @@
           nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
+
+          # AFL++ instrumented fuzzer with all dependencies instrumented
+          nix-expr-fuzz = aflInstrumentedComponents.nix-expr-fuzz;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //

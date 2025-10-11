@@ -27,3 +27,10 @@ option(
   value : false,
   description : 'Build benchmarks (requires gbenchmark)',
 )
+
+option(
+  'fuzz-targets',
+  type : 'boolean',
+  value : false,
+  description : 'Build fuzzing targets (requires AFL++)',
+)

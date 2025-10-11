@@ -60,3 +60,8 @@ if get_option('unit-tests')
   subproject('libflake-tests')
 endif
 subproject('nix-functional-tests')
+
+# Fuzzing targets
+if get_option('fuzz-targets')
+  subproject('libexpr-fuzz')
+endif
