@@ -86,7 +86,7 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * @param path Current path being scanned
  * @param sink The CycleEdgeScanSink that will detect and record hash references
  */
-void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink);
+void walkAndScanPath(const std::filesystem::path & path, CycleEdgeScanSink & sink);
 
 /**
  * Transform individual edges into connected multi-edges (paths).
