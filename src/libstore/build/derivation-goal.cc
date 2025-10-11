@@ -1,5 +1,6 @@
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
+#include "nix/store/build/derivation-resolution-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -29,8 +30,9 @@ DerivationGoal::DerivationGoal(
     const Derivation & drv,
     const OutputName & wantedOutput,
     Worker & worker,
-    BuildMode buildMode)
-    : Goal(worker, haveDerivation())
+    BuildMode buildMode,
+    bool storeDerivation)
+    : Goal(worker, haveDerivation(storeDerivation))
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
     , outputHash{[&] {
@@ -64,7 +66,7 @@ std::string DerivationGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co DerivationGoal::haveDerivation()
+Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
@@ -146,9 +148,104 @@ Goal::Co DerivationGoal::haveDerivation()
                 worker.store.printStorePath(drvPath));
     }
 
+    auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, *drv, buildMode);
+    {
+        Goals waitees{resolutionGoal};
+        co_await await(std::move(waitees));
+    }
+    if (nrFailed != 0) {
+        co_return doneFailure({BuildResult::Failure::DependencyFailed, "resolution failed"});
+    }
+
+    if (resolutionGoal->resolvedDrv) {
+        auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
+
+        auto resolvedDrvGoal =
+            worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode, /*storeDerivation=*/true);
+        {
+            Goals waitees{resolvedDrvGoal};
+            co_await await(std::move(waitees));
+        }
+
+        trace("resolved derivation finished");
+
+        auto resolvedResult = resolvedDrvGoal->buildResult;
+
+        // No `std::visit` for coroutines yet
+        if (auto * successP = resolvedResult.tryGetSuccess()) {
+            auto & success = *successP;
+            auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+            auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
+
+            StorePathSet outputPaths;
+
+            auto outputHash = get(outputHashes, wantedOutput);
+            auto resolvedHash = get(resolvedHashes, wantedOutput);
+            if ((!outputHash) || (!resolvedHash))
+                throw Error(
+                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
+                    worker.store.printStorePath(drvPath),
+                    wantedOutput);
+
+            auto realisation = [&] {
+                auto take1 = get(success.builtOutputs, wantedOutput);
+                if (take1)
+                    return static_cast<UnkeyedRealisation>(*take1);
+
+                /* The above `get` should work. But stateful tracking of
+                   outputs in resolvedResult, this can get out of sync with the
+                   store, which is our actual source of truth. For now we just
+                   check the store directly if it fails. */
+                auto take2 = worker.evalStore.queryRealisation(
+                    DrvOutput{
+                        .drvHash = *resolvedHash,
+                        .outputName = wantedOutput,
+                    });
+                if (take2)
+                    return *take2;
+
+                throw Error(
+                    "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/realisation)",
+                    worker.store.printStorePath(pathResolved),
+                    wantedOutput);
+            }();
+
+            if (!drv->type().isImpure()) {
+                Realisation newRealisation{
+                    realisation,
+                    {
+                        .drvHash = *outputHash,
+                        .outputName = wantedOutput,
+                    }};
+                newRealisation.signatures.clear();
+                if (!drv->type().isFixed()) {
+                    auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
+                    newRealisation.dependentRealisations =
+                        drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
+                }
+                worker.store.signRealisation(newRealisation);
+                worker.store.registerDrvOutput(newRealisation);
+            }
+            outputPaths.insert(realisation.outPath);
+
+            auto status = success.status;
+            if (status == BuildResult::Success::AlreadyValid)
+                status = BuildResult::Success::ResolvesToAlreadyValid;
+
+            co_return doneSuccess(status, std::move(realisation));
+        } else if (resolvedResult.tryGetFailure()) {
+            co_return doneFailure({
+                BuildResult::Failure::DependencyFailed,
+                "build of resolved derivation '%s' failed",
+                worker.store.printStorePath(pathResolved),
+            });
+        } else
+            assert(false);
+    }
+
     /* Give up on substitution for the output we want, actually build this derivation */
 
-    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode);
+    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode, storeDerivation);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
     g->preserveException = true;
@@ -169,7 +266,16 @@ Goal::Co DerivationGoal::haveDerivation()
             /* In checking mode, the builder will not register any outputs.
                So we want to make sure the ones that we wanted to check are
                properly there. */
-            success.builtOutputs = {{wantedOutput, assertPathValidity()}};
+            success.builtOutputs = {{
+                wantedOutput,
+                {
+                    assertPathValidity(),
+                    {
+                        .drvHash = outputHash,
+                        .outputName = wantedOutput,
+                    },
+                },
+            }};
         } else {
             /* Otherwise the builder will give us info for out output, but
                also for other outputs. Filter down to just our output so as
@@ -188,18 +294,6 @@ Goal::Co DerivationGoal::haveDerivation()
 
     co_return amDone(g->exitCode, g->ex);
 }
-
-/**
- * Used for `inputGoals` local variable below
- */
-struct value_comparison
-{
-    template<typename T>
-    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const
-    {
-        return *lhs < *rhs;
-    }
-};
 
 Goal::Co DerivationGoal::repairClosure()
 {
@@ -285,18 +379,20 @@ Goal::Co DerivationGoal::repairClosure()
     co_return doneSuccess(BuildResult::Success::AlreadyValid, assertPathValidity());
 }
 
-std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValidity()
+std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPathValidity()
 {
     if (drv->type().isImpure())
         return std::nullopt;
 
     auto drvOutput = DrvOutput{outputHash, wantedOutput};
 
-    std::optional<Realisation> mRealisation;
+    std::optional<UnkeyedRealisation> mRealisation;
 
     if (auto * mOutput = get(drv->outputs, wantedOutput)) {
         if (auto mPath = mOutput->path(worker.store, drv->name, wantedOutput)) {
-            mRealisation = Realisation{drvOutput, std::move(*mPath)};
+            mRealisation = UnkeyedRealisation{
+                .outPath = std::move(*mPath),
+            };
         }
     } else {
         throw Error(
@@ -324,7 +420,14 @@ std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValid
             // derivation, and the output path is valid, but we don't have
             // its realisation stored (probably because it has been built
             // without the `ca-derivations` experimental flag).
-            worker.store.registerDrvOutput(*mRealisation);
+            worker.store.registerDrvOutput(
+                Realisation{
+                    *mRealisation,
+                    {
+                        .drvHash = outputHash,
+                        .outputName = wantedOutput,
+                    },
+                });
         }
 
         return {{*mRealisation, status}};
@@ -332,7 +435,7 @@ std::optional<std::pair<Realisation, PathStatus>> DerivationGoal::checkPathValid
         return std::nullopt;
 }
 
-Realisation DerivationGoal::assertPathValidity()
+UnkeyedRealisation DerivationGoal::assertPathValidity()
 {
     auto checkResult = checkPathValidity();
     if (!(checkResult && checkResult->second == PathStatus::Valid))
@@ -340,11 +443,20 @@ Realisation DerivationGoal::assertPathValidity()
     return checkResult->first;
 }
 
-Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, Realisation builtOutput)
+Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput)
 {
     buildResult.inner = BuildResult::Success{
         .status = status,
-        .builtOutputs = {{wantedOutput, std::move(builtOutput)}},
+        .builtOutputs = {{
+            wantedOutput,
+            {
+                std::move(builtOutput),
+                DrvOutput{
+                    .drvHash = outputHash,
+                    .outputName = wantedOutput,
+                },
+            },
+        }},
     };
 
     mcExpectedBuilds.reset();

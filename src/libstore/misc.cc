@@ -360,11 +360,12 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
                 if (!outputHash)
                     throw Error(
                         "output '%s' of derivation '%s' isn't realised", outputName, store.printStorePath(inputDrv));
-                auto thisRealisation = store.queryRealisation(DrvOutput{*outputHash, outputName});
+                DrvOutput key{*outputHash, outputName};
+                auto thisRealisation = store.queryRealisation(key);
                 if (!thisRealisation)
                     throw Error(
                         "output '%s' of derivation '%s' isn’t built", outputName, store.printStorePath(inputDrv));
-                inputRealisations.insert(*thisRealisation);
+                inputRealisations.insert({*thisRealisation, std::move(key)});
             }
         }
         if (!inputNode.value.empty()) {
