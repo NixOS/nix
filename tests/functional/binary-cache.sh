@@ -306,3 +306,68 @@ nix-store --delete "$outPath" "$docPath"
 # -vvv is the level that logs during the loop
 timeout 60 nix-build --no-out-link -E "$expr" --option substituters "file://$cacheDir" \
   --option trusted-binary-caches "file://$cacheDir"  --no-require-sigs
+
+# Check that we can substitute FODs from a substituter with different StoreDir
+
+# preserve quotes variables in the single-quoted string
+# shellcheck disable=SC2016
+expr='
+    with import '"${config_nix}"';
+    mkDerivation {
+        name = "fod";
+        buildCommand = "mkdir $out; echo Foo > $out/foo";
+        outputs = [ "out" ];
+        outputHashMode = "recursive";
+        outputHashAlgo = "sha256";
+        outputHash = "0sfsas2ngwycqq0f712dbbjzcva2ld9yb39hkvfhlv11lvbd78wp";
+    }
+'
+outPath=$(nix-build --no-out-link -E "$expr")
+nix copy --to "file://$cacheDir" "$outPath"
+
+other_store="$TEST_ROOT/other_store"
+rm -rf "$other_store"
+otherOutPath=$(NIX_STORE_DIR="$other_store/nix/store" NIX_STORE="$other_store/nix/store" nix-build --no-out-link -E "$expr" \
+    --option max-jobs 0 \
+    --option store "$other_store" \
+    --option substituters "file://$cacheDir" \
+    --option trusted-binary-caches "file://$cacheDir" \
+    --no-require-sigs)
+
+if ! [[ "$(basename "$otherOutPath")" != "$(basename "$outPath")" ]]; then
+    fail "Store hashes for $otherOutPath and $outPath are the same despite different store dirs"
+fi
+if ! [[ -d "$otherOutPath" ]]; then
+    fail "Could not substitute FOD path from a substituter with a different store dir: $otherOutPath does not exist"
+fi
+if ! diff -r "$otherOutPath" "$outPath"; then
+    fail "The contents of $otherOutPath and $outPath are different even though they should be the same"
+fi
+
+# Check that substituting a non-FOD from a substituter with different StoreDir fails
+
+# preserve quotes variables in the single-quoted string
+# shellcheck disable=SC2016
+expr='
+    with import '"${config_nix}"';
+    mkDerivation {
+        name = "fod";
+        buildCommand = "mkdir $out; echo Foo > $out/foo";
+        outputs = [ "out" ];
+    }
+'
+
+outPath=$(nix-build --no-out-link -E "$expr")
+nix copy --to "file://$cacheDir" "$outPath"
+
+other_store="$TEST_ROOT/other_store"
+
+if NIX_STORE_DIR="$other_store/nix/store" NIX_STORE="$other_store/nix/store" nix-build --no-out-link -E "$expr" \
+    --option max-jobs 0 \
+    --option store "$other_store" \
+    --option substituters "file://$cacheDir" \
+    --option trusted-binary-caches "file://$cacheDir" \
+    --no-require-sigs;
+then
+    fail "Substituting a non-FOD path from a substituter with a different StoreDir should fail"
+fi
