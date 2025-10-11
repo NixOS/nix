@@ -58,11 +58,7 @@ static StorePath pathPartOfReq(const SingleDerivedPath & req)
 
 std::string DerivationTrampolineGoal::key()
 {
-    /* Ensure that derivations get built in order of their name,
-       i.e. a derivation named "aardvark" always comes before "baboon". And
-       substitution goals, derivation goals, and derivation building goals always happen before
-       derivation goals (due to "bt$"). */
-    return "bt$" + std::string(pathPartOfReq(*drvReq).name()) + "$" + DerivedPath::Built{
+    return "da$" + std::string(pathPartOfReq(*drvReq).name()) + "$" + DerivedPath::Built{
         .drvPath = drvReq,
         .outputs = wantedOutputs,
     }.to_string(worker.store);

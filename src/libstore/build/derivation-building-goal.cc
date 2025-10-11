@@ -66,11 +66,7 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
 
 std::string DerivationBuildingGoal::key()
 {
-    /* Ensure that derivations get built in order of their name,
-       i.e. a derivation named "aardvark" always comes before
-       "baboon". And substitution goals always happen before
-       derivation goals (due to "bd$"). */
-    return "bd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
+    return "dd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
 void DerivationBuildingGoal::killChild()
