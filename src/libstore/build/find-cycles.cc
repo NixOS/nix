@@ -2,6 +2,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/archive.hh" // For caseHackSuffix
 
 #include <filesystem>
 
