@@ -18,12 +18,12 @@ namespace nix {
  * Example: {"/nix/store/abc-foo/file1", "/nix/store/def-bar/file2"}
  * represents a reference from file1 to file2.
  */
-typedef std::deque<std::string> StoreCycleEdge;
+using StoreCycleEdge = std::deque<std::string>;
 
 /**
  * A collection of cycle edges found during scanning.
  */
-typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
+using StoreCycleEdgeVec = std::vector<StoreCycleEdge>;
 
 /**
  * A sink that extends RefScanSink to track file paths where references are found.
