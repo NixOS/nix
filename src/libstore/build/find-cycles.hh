@@ -77,7 +77,7 @@ public:
 void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleEdgeVec & edges);
 
 /**
- * Recursively scan files and directories for hash references.
+ * Recursively walk filesystem tree and scan each file for hash references.
  *
  * This function walks the file system tree, streaming file contents into
  * the provided sink which performs the actual hash detection. This reuses
@@ -86,7 +86,7 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * @param path Current path being scanned
  * @param sink The CycleEdgeScanSink that will detect and record hash references
  */
-void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink);
+void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink);
 
 /**
  * Transform individual edges into connected multi-edges (paths).

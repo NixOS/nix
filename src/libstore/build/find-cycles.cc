@@ -69,7 +69,7 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
     CycleEdgeScanSink sink(std::move(hashes), storePrefix);
 
     // Walk the filesystem and scan files using the sink
-    scanForCycleEdges2(path, sink);
+    walkAndScanPath(path, sink);
 
     // Extract the found edges
     edges = sink.getEdges();
@@ -79,12 +79,12 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * Recursively walk filesystem and stream files into the sink.
  * This reuses RefScanSink's hash-finding logic instead of reimplementing it.
  */
-void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
+void walkAndScanPath(const std::string & path, CycleEdgeScanSink & sink)
 {
     auto fsPath = std::filesystem::path(path);
     auto status = std::filesystem::symlink_status(fsPath);
 
-    debug("scanForCycleEdges2: scanning path = %s", path);
+    debug("walkAndScanPath: scanning path = %s", path);
 
     if (std::filesystem::is_regular_file(status)) {
         // Handle regular files - stream contents into sink
@@ -122,14 +122,14 @@ void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
         }
 
         for (auto & [name, actualName] : unhacked) {
-            debug("scanForCycleEdges2: recursing into %s/%s", path, actualName);
-            scanForCycleEdges2((fsPath / actualName).string(), sink);
+            debug("walkAndScanPath: recursing into %s/%s", path, actualName);
+            walkAndScanPath((fsPath / actualName).string(), sink);
         }
     } else if (std::filesystem::is_symlink(status)) {
         // Handle symlinks - stream link target into sink
         auto linkTarget = std::filesystem::read_symlink(fsPath).string();
 
-        debug("scanForCycleEdges2: scanning symlink %s -> %s", path, linkTarget);
+        debug("walkAndScanPath: scanning symlink %s -> %s", path, linkTarget);
 
         sink.setCurrentPath(path);
         sink(std::string_view(linkTarget));
