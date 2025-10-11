@@ -115,23 +115,35 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return readOnly || settings.readOnlyMode ? store.makeFixedOutputPathFromCA(
-                                                   suffix,
-                                                   TextInfo{
-                                                       .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                       .references = std::move(references),
-                                                   })
-                                             : ({
-                                                   StringSource s{contents};
-                                                   store.addToStoreFromDump(
-                                                       s,
-                                                       suffix,
-                                                       FileSerialisationMethod::Flat,
-                                                       ContentAddressMethod::Raw::Text,
-                                                       HashAlgorithm::SHA256,
-                                                       references,
-                                                       repair);
-                                               });
+
+    // Always compute the expected store path first, based on content hash.
+    // This is cheap (just hashing) compared to sending data over the network.
+    auto expectedPath = store.makeFixedOutputPathFromCA(
+        suffix,
+        TextInfo{
+            .hash = hashString(HashAlgorithm::SHA256, contents),
+            .references = references,
+        });
+
+    // If we're in read-only mode, or if the derivation already exists in the store
+    // (and we're not repairing), return the path without sending it again.
+    // This prevents redundant transmission of the same derivation to the daemon.
+    // Fixes: https://github.com/NixOS/nix/issues/14006
+    if (readOnly || settings.readOnlyMode || (store.isValidPath(expectedPath) && repair == NoRepair)) {
+        return expectedPath;
+    }
+
+    // The derivation doesn't exist or we're repairing, so add it to the store.
+    // For RemoteStore, this will send the derivation to the daemon.
+    StringSource s{contents};
+    return store.addToStoreFromDump(
+        s,
+        suffix,
+        FileSerialisationMethod::Flat,
+        ContentAddressMethod::Raw::Text,
+        HashAlgorithm::SHA256,
+        references,
+        repair);
 }
 
 namespace {

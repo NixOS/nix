@@ -210,4 +210,6 @@ in
   fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
+
+  evalCopyLess = runNixOSTest ./eval-copy-less.nix;
 }
