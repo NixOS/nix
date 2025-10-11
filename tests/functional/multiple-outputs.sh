@@ -89,11 +89,19 @@ fi
 echo "building a.first..."
 nix-build multiple-outputs.nix -A a.first --no-out-link
 
-# Cyclic outputs should be rejected.
+# Cyclic outputs should be rejected with detailed error messages.
 echo "building cyclic..."
-if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
+if cyclicOutput=$(nix-build multiple-outputs.nix -A cyclic --no-out-link 2>&1); then
     echo "Cyclic outputs incorrectly accepted!"
     exit 1
+else
+    echo "Cyclic outputs correctly rejected"
+    # Verify that the improved error message with cycle details is present
+    echo "$cyclicOutput" | grepQuiet "Detailed cycle analysis"
+    echo "$cyclicOutput" | grepQuiet "Cycle 1:"
+    # The error should mention actual file paths with subdirectories
+    echo "$cyclicOutput" | grepQuiet "subdir"
+    echo "Enhanced cycle error messages verified"
 fi
 
 # Do a GC. This should leave an empty store.
