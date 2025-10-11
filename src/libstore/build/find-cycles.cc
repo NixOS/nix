@@ -15,10 +15,8 @@ namespace nix {
 // Hash length in characters (32 for base32-encoded sha256)
 static constexpr size_t refLength = StorePath::HashLen;
 
-CycleEdgeScanSink::CycleEdgeScanSink(
-    StringSet && hashes, std::map<std::string, StorePath> && backMap, std::string storeDir)
+CycleEdgeScanSink::CycleEdgeScanSink(StringSet && hashes, std::string storeDir)
     : RefScanSink(std::move(hashes))
-    , hashPathMap(std::move(backMap))
     , storeDir(std::move(storeDir))
 {
 }
@@ -62,7 +60,6 @@ StoreCycleEdgeVec && CycleEdgeScanSink::getEdges()
 void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleEdgeVec & edges)
 {
     StringSet hashes;
-    std::map<std::string, StorePath> hashPathMap;
 
     // Extract the store directory from the path
     // Example: /run/user/1000/nix-test/store/abc-foo -> /run/user/1000/nix-test/store/
@@ -73,16 +70,13 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
     debug("scanForCycleEdges: storePrefixPath = %s", storePrefixPath.string());
     debug("scanForCycleEdges: storePrefix = %s", storePrefix);
 
-    // Build map of hash -> StorePath and collect hashes to search for
+    // Collect hashes to search for
     for (auto & i : refs) {
-        std::string hashPart(i.hashPart());
-        auto inserted = hashPathMap.emplace(hashPart, i).second;
-        assert(inserted);
-        hashes.insert(hashPart);
+        hashes.insert(std::string(i.hashPart()));
     }
 
     // Create sink that reuses RefScanSink's hash-finding logic
-    CycleEdgeScanSink sink(std::move(hashes), std::move(hashPathMap), storePrefix);
+    CycleEdgeScanSink sink(std::move(hashes), storePrefix);
 
     // Walk the filesystem and scan files using the sink
     scanForCycleEdges2(path, sink);
