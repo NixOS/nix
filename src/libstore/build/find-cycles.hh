@@ -36,13 +36,13 @@ class CycleEdgeScanSink : public RefScanSink
 {
     std::string currentFilePath;
     std::string storeDir;
+    StoreCycleEdgeVec edges;
 
     // Track hashes we've already recorded for current file
     // to avoid duplicates
     StringSet recordedForCurrentFile;
 
 public:
-    StoreCycleEdgeVec edges;
 
     CycleEdgeScanSink(StringSet && hashes, std::string storeDir);
 
