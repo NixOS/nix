@@ -18,6 +18,7 @@ headers = [ config_pub_h ] + files(
   'build/derivation-building-misc.hh',
   'build/derivation-env-desugar.hh',
   'build/derivation-goal.hh',
+  'build/derivation-resolution-goal.hh',
   'build/derivation-trampoline-goal.hh',
   'build/drv-output-substitution-goal.hh',
   'build/goal.hh',

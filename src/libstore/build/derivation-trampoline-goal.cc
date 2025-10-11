@@ -68,8 +68,6 @@ std::string DerivationTrampolineGoal::key()
     }.to_string(worker.store);
 }
 
-void DerivationTrampolineGoal::timedOut(Error && ex) {}
-
 Goal::Co DerivationTrampolineGoal::init()
 {
     trace("need to load derivation from file");
