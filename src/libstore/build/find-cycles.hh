@@ -35,7 +35,6 @@ typedef std::vector<StoreCycleEdge> StoreCycleEdgeVec;
 class CycleEdgeScanSink : public RefScanSink
 {
     std::string currentFilePath;
-    std::map<std::string, StorePath> hashPathMap;
     std::string storeDir;
 
     // Track hashes we've already recorded for current file
@@ -45,7 +44,7 @@ class CycleEdgeScanSink : public RefScanSink
 public:
     StoreCycleEdgeVec edges;
 
-    CycleEdgeScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap, std::string storeDir);
+    CycleEdgeScanSink(StringSet && hashes, std::string storeDir);
 
     /**
      * Set the current file path being scanned.
