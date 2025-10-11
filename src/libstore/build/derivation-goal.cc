@@ -33,6 +33,7 @@ DerivationGoal::DerivationGoal(
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
+    , drv{std::make_unique<Derivation>(drv)}
     , outputHash{[&] {
         auto outputHashes = staticOutputHashes(worker.evalStore, drv);
         if (auto * mOutputHash = get(outputHashes, wantedOutput))
@@ -41,7 +42,6 @@ DerivationGoal::DerivationGoal(
     }()}
     , buildMode(buildMode)
 {
-    this->drv = std::make_unique<Derivation>(drv);
 
     name = fmt("getting output '%s' from derivation '%s'", wantedOutput, worker.store.printStorePath(drvPath));
     trace("created");

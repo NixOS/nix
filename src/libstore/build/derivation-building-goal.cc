@@ -27,16 +27,15 @@
 namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv_, Worker & worker, BuildMode buildMode)
+    const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode)
     : Goal(worker, gaveUpOnSubstitution())
     , drvPath(drvPath)
+    , drv{std::make_unique<Derivation>(drv)}
     , buildMode(buildMode)
 {
-    drv = std::make_unique<Derivation>(drv_);
-
     try {
         drvOptions =
-            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs));
+            std::make_unique<DerivationOptions>(DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs));
     } catch (Error & e) {
         e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
         throw;
