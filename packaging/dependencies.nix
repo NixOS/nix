@@ -89,38 +89,4 @@ scope: {
         buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
-
-  libgit2 =
-    if lib.versionAtLeast pkgs.libgit2.version "1.9.0" then
-      pkgs.libgit2
-    else
-      pkgs.libgit2.overrideAttrs (attrs: {
-        # libgit2: Nixpkgs 24.11 has < 1.9.0, which needs our patches
-        nativeBuildInputs =
-          attrs.nativeBuildInputs or [ ]
-          # gitMinimal does not build on Windows. See packbuilder patch.
-          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-            # Needed for `git apply`; see `prePatch`
-            pkgs.buildPackages.gitMinimal
-          ];
-        # Only `git apply` can handle git binary patches
-        prePatch =
-          attrs.prePatch or ""
-          + lib.optionalString (!stdenv.hostPlatform.isWindows) ''
-            patch() {
-              git apply
-            }
-          '';
-        patches =
-          attrs.patches or [ ]
-          ++ [
-            ./patches/libgit2-mempack-thin-packfile.patch
-          ]
-          # gitMinimal does not build on Windows, but fortunately this patch only
-          # impacts interruptibility
-          ++ lib.optionals (!stdenv.hostPlatform.isWindows) [
-            # binary patch; see `prePatch`
-            ./patches/libgit2-packbuilder-callback-interruptible.patch
-          ];
-      });
 }
