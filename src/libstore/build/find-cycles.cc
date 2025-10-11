@@ -155,20 +155,16 @@ void transformEdgesToMultiedges(StoreCycleEdgeVec & edges, StoreCycleEdgeVec & m
 {
     debug("transformEdgesToMultiedges: processing %lu edges", edges.size());
 
+    // First pass: join edges to multiedges
     for (auto & edge2 : edges) {
         bool edge2Joined = false;
 
         for (auto & edge1 : multiedges) {
-            debug("comparing edge1 (size=%lu) with edge2 (size=%lu)", edge1.size(), edge2.size());
-
             // Check if edge1.back() == edge2.front()
             // This means we can extend edge1 by appending edge2
             if (edge1.back() == edge2.front()) {
-                debug("appending: edge1.back()='%s' == edge2.front()='%s'", edge1.back(), edge2.front());
-
                 // Append all but the first element of edge2 (to avoid duplication)
                 for (size_t i = 1; i < edge2.size(); i++) {
-                    debug("  appending edge2[%lu] = %s", i, edge2[i]);
                     edge1.push_back(edge2[i]);
                 }
                 edge2Joined = true;
@@ -178,11 +174,8 @@ void transformEdgesToMultiedges(StoreCycleEdgeVec & edges, StoreCycleEdgeVec & m
             // Check if edge2.back() == edge1.front()
             // This means we can extend edge1 by prepending edge2
             if (edge2.back() == edge1.front()) {
-                debug("prepending: edge2.back()='%s' == edge1.front()='%s'", edge2.back(), edge1.front());
-
                 // Prepend all but the last element of edge2 (to avoid duplication)
                 for (int i = edge2.size() - 2; i >= 0; i--) {
-                    debug("  prepending edge2[%d] = %s", i, edge2[i]);
                     edge1.push_front(edge2[i]);
                 }
                 edge2Joined = true;
@@ -191,8 +184,36 @@ void transformEdgesToMultiedges(StoreCycleEdgeVec & edges, StoreCycleEdgeVec & m
         }
 
         if (!edge2Joined) {
-            debug("edge2 is new, adding as separate multiedge");
             multiedges.push_back(edge2);
+        }
+    }
+
+    // Second pass: merge multiedges that can now be connected
+    // After joining edges, some multiedges might now be connectable
+    bool merged = true;
+    while (merged) {
+        merged = false;
+        for (size_t i = 0; i < multiedges.size() && !merged; i++) {
+            for (size_t j = i + 1; j < multiedges.size() && !merged; j++) {
+                auto & path1 = multiedges[i];
+                auto & path2 = multiedges[j];
+
+                if (path1.back() == path2.front()) {
+                    // Append path2 to path1
+                    for (size_t k = 1; k < path2.size(); k++) {
+                        path1.push_back(path2[k]);
+                    }
+                    multiedges.erase(multiedges.begin() + j);
+                    merged = true;
+                } else if (path2.back() == path1.front()) {
+                    // Prepend path2 to path1
+                    for (int k = path2.size() - 2; k >= 0; k--) {
+                        path1.push_front(path2[k]);
+                    }
+                    multiedges.erase(multiedges.begin() + j);
+                    merged = true;
+                }
+            }
         }
     }
 
