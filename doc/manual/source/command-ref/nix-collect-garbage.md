@@ -4,15 +4,15 @@
 
 # Synopsis
 
-`nix-collect-garbage` [`--delete-old`] [`-d`] [`--delete-older-than` *period*] [`--max-freed` *bytes*] [`--dry-run`]
+`nix-collect-garbage` [`--delete-old`] [`-d`] [`--delete-older-than` *period*] [`--keep-min` *generations*] [`--keep-max` *generations*] [`--max-freed` *bytes*] [`--dry-run`]
 
 # Description
 
 The command `nix-collect-garbage` is mostly an alias of [`nix-store --gc`](@docroot@/command-ref/nix-store/gc.md).
 That is, it deletes all unreachable [store objects] in the Nix store to clean up your system.
 
-However, it provides two additional options,
-[`--delete-old`](#opt-delete-old) and [`--delete-older-than`](#opt-delete-older-than),
+However, it provides more additional options,
+[`--delete-old`](#opt-delete-old), [`--delete-older-than`](#opt-delete-older-than), [`--keep-min`](#opt-keep-min), and [`--keep-max`](#opt-keep-max),
 which also delete old [profiles], allowing potentially more [store objects] to be deleted because profiles are also garbage collection roots.
 These options are the equivalent of running
 [`nix-env --delete-generations`](@docroot@/command-ref/nix-env/delete-generations.md)
@@ -62,7 +62,15 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-time) on each found profile.
   See the documentation of that command for additional information about the *period* argument.
 
-  - <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
+- <span id="opt-keep-min">[`--keep-min`](#opt-keep-min)</span> *generations*
+
+  Minimum amount of generations to keep after deletion.
+
+- <span id="opt-keep-max">[`--keep-max`](#opt-keep-max)</span> *generations*
+
+  Maximum amount of generations to keep after deletion.
+
+- <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
 
 <!-- duplication from https://github.com/NixOS/nix/blob/442a2623e48357ff72c77bb11cf2cf06d94d2f90/doc/manual/source/command-ref/nix-store/gc.md?plain=1#L39-L44 -->
 
@@ -70,12 +78,14 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   then stop. The argument *bytes* can be followed by the
   multiplicative suffix `K`, `M`, `G` or `T`, denoting KiB, MiB, GiB
   or TiB units.
-  
+
 {{#include ./opt-common.md}}
 
 {{#include ./env-common.md}}
 
-# Example
+# Examples
+
+## Delete all older
 
 To delete from the Nix store everything that is not used by the current
 generations of each profile, do
@@ -83,6 +93,17 @@ generations of each profile, do
 ```console
 $ nix-collect-garbage -d
 ```
+
+## Keep most-recent by time (number of days) and trim by amount
+
+This command will delete generations older than a week if possible, while keeping an amount of generations between `10` and `20`.
+
+```console
+$ nix-collect-garbage --delete-older-than 7d --keep-min 10 --keep-max 20
+```
+
+If there were more than 20 generations built in the past week, it will only keep 20 most recent ones.
+If there were less than 10 generations built in the past week, it will keep even older generations, until there is 10.
 
 [profiles]: @docroot@/command-ref/files/profiles.md
 [store objects]: @docroot@/store/store-object.md
