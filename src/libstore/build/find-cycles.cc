@@ -106,12 +106,14 @@ void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
             std::string name(entryName);
             size_t pos = entryName.find(caseHackSuffix);
             if (pos != std::string::npos) {
-                debug("removing case hack suffix from '%s'", path + "/" + entryName);
+                debug("removing case hack suffix from '%s'", (fsPath / entryName).string());
                 name.erase(pos);
             }
             if (unhacked.find(name) != unhacked.end()) {
                 throw Error(
-                    "file name collision between '%1%' and '%2%'", path + "/" + unhacked[name], path + "/" + entryName);
+                    "file name collision between '%1%' and '%2%'",
+                    (fsPath / unhacked[name]).string(),
+                    (fsPath / entryName).string());
             }
             unhacked[name] = entryName;
 #else
@@ -121,7 +123,7 @@ void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
 
         for (auto & [name, actualName] : unhacked) {
             debug("scanForCycleEdges2: recursing into %s/%s", path, actualName);
-            scanForCycleEdges2(path + "/" + actualName, sink);
+            scanForCycleEdges2((fsPath / actualName).string(), sink);
         }
     } else if (std::filesystem::is_symlink(status)) {
         // Handle symlinks - stream link target into sink
