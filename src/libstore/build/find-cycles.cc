@@ -2,13 +2,8 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/archive.hh"
 
 #include <filesystem>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
 
 namespace nix {
 
@@ -85,31 +80,20 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  */
 void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
 {
-    auto st = lstat(path);
+    auto fsPath = std::filesystem::path(path);
+    auto status = std::filesystem::symlink_status(fsPath);
 
     debug("scanForCycleEdges2: scanning path = %s", path);
 
-    if (S_ISREG(st.st_mode)) {
+    if (std::filesystem::is_regular_file(status)) {
         // Handle regular files - stream contents into sink
         // The sink (RefScanSink) handles all hash detection and buffer management
         sink.setCurrentPath(path);
 
-        AutoCloseFD fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-        if (!fd)
-            throw SysError("opening file '%1%'", path);
-
-        // Stream file contents into sink
-        // RefScanSink handles buffer boundaries automatically
-        std::vector<char> buf(65536);
-        size_t remaining = st.st_size;
-
-        while (remaining > 0) {
-            size_t toRead = std::min(remaining, buf.size());
-            readFull(fd.get(), buf.data(), toRead);
-            sink(std::string_view(buf.data(), toRead));
-            remaining -= toRead;
-        }
-    } else if (S_ISDIR(st.st_mode)) {
+        // Use Nix's portable readFile that streams into a sink
+        // This handles all file I/O portably across platforms
+        readFile(path, sink);
+    } else if (std::filesystem::is_directory(status)) {
         // Handle directories - recursively scan contents
         std::map<std::string, std::string> unhacked;
 
@@ -138,9 +122,9 @@ void scanForCycleEdges2(const std::string & path, CycleEdgeScanSink & sink)
             debug("scanForCycleEdges2: recursing into %s/%s", path, actualName);
             scanForCycleEdges2(path + "/" + actualName, sink);
         }
-    } else if (S_ISLNK(st.st_mode)) {
+    } else if (std::filesystem::is_symlink(status)) {
         // Handle symlinks - stream link target into sink
-        std::string linkTarget = readLink(path);
+        auto linkTarget = std::filesystem::read_symlink(fsPath).string();
 
         debug("scanForCycleEdges2: scanning symlink %s -> %s", path, linkTarget);
 
