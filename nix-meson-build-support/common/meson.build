@@ -46,3 +46,4 @@ endif
 nix_soversion = meson.project_version().split('pre')[0]
 
 subdir('assert-fail')
+subdir('asan-options')
