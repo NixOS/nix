@@ -2,7 +2,9 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/archive.hh" // For caseHackSuffix
+#ifdef __APPLE__
+#  include "nix/util/archive.hh" // For caseHackSuffix
+#endif
 
 #include <filesystem>
 
