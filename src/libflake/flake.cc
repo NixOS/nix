@@ -816,6 +816,11 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                                 if (lockFlags.commitLockFileMessage) {
                                     cm += *lockFlags.commitLockFileMessage;
+
+                                    if (lockFlags.commitLockFileMessageIncludeSummary) {
+                                        cm += "\n\nFlake lock file updates:\n\n";
+                                        cm += filterANSIEscapes(diff, true);
+                                    }
                                 } else {
                                     cm = settings.commitLockFileSummary.get();
 
