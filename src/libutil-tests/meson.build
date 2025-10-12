@@ -97,7 +97,7 @@ this_exe = executable(
 test(
   meson.project_name(),
   this_exe,
-  env : asan_test_options_env + {
+  env : {
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
   },
   protocol : 'gtest',

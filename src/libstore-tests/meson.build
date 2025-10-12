@@ -104,7 +104,7 @@ this_exe = executable(
 test(
   meson.project_name(),
   this_exe,
-  env : asan_test_options_env + {
+  env : {
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
     'HOME' : meson.current_build_dir() / 'test-home',
     'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store',
@@ -138,7 +138,7 @@ if get_option('benchmarks')
   benchmark(
     'nix-store-benchmarks',
     benchmark_exe,
-    env : asan_test_options_env + {
+    env : {
       '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
     },
   )

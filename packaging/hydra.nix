@@ -158,6 +158,27 @@ in
     in
     forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
 
+  buildWithSanitizers =
+    let
+      components = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        pkgs.nixComponents2.overrideScope (
+          self: super: {
+            # Boost coroutines fail with ASAN on darwin.
+            withASan = !pkgs.stdenv.buildPlatform.isDarwin;
+            withUBSan = true;
+            nix-expr = super.nix-expr.override { enableGC = false; };
+            # Unclear how to make Perl bindings work with a dynamically linked ASAN.
+            nix-perl-bindings = null;
+          }
+        )
+      );
+    in
+    forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
+
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these

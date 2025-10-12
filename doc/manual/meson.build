@@ -15,7 +15,6 @@ pymod = import('python')
 python = pymod.find_installation('python3')
 
 nix_env_for_docs = {
-  'ASAN_OPTIONS' : 'abort_on_error=1:print_summary=1:detect_leaks=0',
   'HOME' : '/dummy',
   'NIX_CONF_DIR' : '/dummy',
   'NIX_SSL_CERT_FILE' : '/dummy/no-ca-bundle.crt',
