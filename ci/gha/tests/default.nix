@@ -23,16 +23,6 @@ let
   packages' = nixFlake.packages.${system};
   stdenv = (getStdenv pkgs);
 
-  enableSanitizersLayer = finalAttrs: prevAttrs: {
-    mesonFlags =
-      (prevAttrs.mesonFlags or [ ])
-      ++ [ (lib.mesonOption "b_sanitize" "address,undefined") ]
-      ++ (lib.optionals stdenv.cc.isClang [
-        # https://www.github.com/mesonbuild/meson/issues/764
-        (lib.mesonBool "b_lundef" false)
-      ]);
-  };
-
   collectCoverageLayer = finalAttrs: prevAttrs: {
     env =
       let
@@ -55,14 +45,15 @@ let
     '';
   };
 
-  componentOverrides =
-    (lib.optional withSanitizers enableSanitizersLayer)
-    ++ (lib.optional withCoverage collectCoverageLayer);
+  componentOverrides = (lib.optional withCoverage collectCoverageLayer);
 in
 
 rec {
   nixComponentsInstrumented = nixComponents.overrideScope (
     final: prev: {
+      withASan = withSanitizers;
+      withUBSan = withSanitizers;
+
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
