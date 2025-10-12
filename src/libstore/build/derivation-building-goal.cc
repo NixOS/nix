@@ -495,7 +495,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                             Magenta(
                                 "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
                     builder.reset();
+#endif
                     outputLocks.unlock();
                     worker.permanentFailure = true;
                     co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
