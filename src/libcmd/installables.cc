@@ -107,9 +107,7 @@ MixFlakeOptions::MixFlakeOptions()
         .longName = "message",
         .description = "Commit message to use when committing flake's lock file.",
         .category = category,
-        .handler = {[&](std::string s) {
-            lockFlags.commitLockFileMessage.insert(s));
-        }},
+        .handler = {[&](std::string s) { lockFlags.commitLockFileMessage.insert(s)); }},
     });
 
     addFlag({
