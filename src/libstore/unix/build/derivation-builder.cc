@@ -45,7 +45,7 @@
 
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
-#include "build/find-cycles.hh"
+#include "nix/store/build/find-cycles.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"

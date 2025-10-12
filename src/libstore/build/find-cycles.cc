@@ -1,4 +1,4 @@
-#include "find-cycles.hh"
+#include "nix/store/build/find-cycles.hh"
 
 #include "nix/store/store-api.hh"
 #include "nix/util/file-system.hh"
