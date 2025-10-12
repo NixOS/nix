@@ -236,6 +236,10 @@ rec {
     # S3 binary cache store test only runs when S3 support is enabled
     inherit (nixosTests) s3-binary-cache-store;
   }
+  // lib.optionalAttrs (withCurlS3 == true) {
+    # S3 binary cache store test using curl implementation
+    inherit (nixosTests) curl-s3-binary-cache-store;
+  }
   // lib.optionalAttrs (!withSanitizers && !withCoverage) {
     # evalNixpkgs uses non-instrumented components from hydraJobs, so only run it
     # when not testing with sanitizers to avoid rebuilding nix
