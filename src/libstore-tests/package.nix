@@ -83,7 +83,6 @@ mkMesonExecutable (finalAttrs: {
           }
           (
             ''
-              export ASAN_OPTIONS=abort_on_error=1:print_summary=1:detect_leaks=0
               export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
               export NIX_REMOTE=$HOME/store
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}

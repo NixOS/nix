@@ -1,4 +1,4 @@
-extern "C" [[gnu::retain]] const char * __asan_default_options()
+extern "C" [[gnu::retain, gnu::weak]] const char * __asan_default_options()
 {
     // We leak a bunch of memory knowingly on purpose. It's not worthwhile to
     // diagnose that memory being leaked for now.
