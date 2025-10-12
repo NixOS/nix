@@ -814,14 +814,18 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             if (lockFlags.commitLockFile) {
                                 std::string cm;
 
-                                cm = settings.commitLockFileSummary.get();
+                                if (lockFlags.commitLockFileMessage) {
+                                    cm += *lockFlags.commitLockFileMessage;
+                                } else {
+                                    cm = settings.commitLockFileSummary.get();
 
-                                if (cm == "") {
-                                    cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
+                                    if (cm == "") {
+                                        cm = fmt("%s: %s", relPath, lockFileExists ? "Update" : "Add");
+                                    }
+
+                                    cm += "\n\nFlake lock file updates:\n\n";
+                                    cm += filterANSIEscapes(diff, true);
                                 }
-
-                                cm += "\n\nFlake lock file updates:\n\n";
-                                cm += filterANSIEscapes(diff, true);
                                 commitMessage = cm;
                             }
 

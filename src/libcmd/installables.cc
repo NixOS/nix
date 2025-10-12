@@ -104,6 +104,15 @@ MixFlakeOptions::MixFlakeOptions()
     });
 
     addFlag({
+        .longName = "message",
+        .description = "Commit message to use when committing flake's lock file.",
+        .category = category,
+        .handler = {[&](std::string s) {
+            lockFlags.commitLockFileMessage.insert(s));
+        }},
+    });
+
+    addFlag({
         .longName = "update-input",
         .description = R"(
     Update a specific flake input (ignoring its previous entry in the lock file).
