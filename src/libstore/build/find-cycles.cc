@@ -6,7 +6,9 @@
 #  include "nix/util/archive.hh" // For caseHackSuffix
 #endif
 
+#include <algorithm>
 #include <filesystem>
+#include <map>
 
 namespace nix {
 
@@ -143,67 +145,88 @@ void transformEdgesToMultiedges(StoreCycleEdgeVec & edges, StoreCycleEdgeVec & m
 {
     debug("transformEdgesToMultiedges: processing %lu edges", edges.size());
 
-    // First pass: join edges to multiedges
-    for (auto & edge2 : edges) {
-        bool edge2Joined = false;
+    // Maps to track path endpoints for efficient joining
+    // Key: node name, Value: index into multiedges vector
+    std::map<std::string, size_t> pathStartingAt; // Maps start node -> path index
+    std::map<std::string, size_t> pathEndingAt;   // Maps end node -> path index
 
-        for (auto & edge1 : multiedges) {
-            // Check if edge1.back() == edge2.front()
-            // This means we can extend edge1 by appending edge2
-            if (edge1.back() == edge2.front()) {
-                // Append all but the first element of edge2 (to avoid duplication)
-                for (size_t i = 1; i < edge2.size(); i++) {
-                    edge1.push_back(edge2[i]);
-                }
-                edge2Joined = true;
-                break;
-            }
+    for (auto & edge : edges) {
+        if (edge.empty())
+            continue;
 
-            // Check if edge2.back() == edge1.front()
-            // This means we can extend edge1 by prepending edge2
-            if (edge2.back() == edge1.front()) {
-                // Prepend all but the last element of edge2 (to avoid duplication)
-                for (int i = edge2.size() - 2; i >= 0; i--) {
-                    edge1.push_front(edge2[i]);
-                }
-                edge2Joined = true;
-                break;
-            }
-        }
+        const std::string & edgeStart = edge.front();
+        const std::string & edgeEnd = edge.back();
 
-        if (!edge2Joined) {
-            multiedges.push_back(edge2);
+        // Check if this edge can connect to existing paths
+        auto startIt = pathEndingAt.find(edgeStart);
+        auto endIt = pathStartingAt.find(edgeEnd);
+
+        bool canPrepend = (startIt != pathEndingAt.end());
+        bool canAppend = (endIt != pathStartingAt.end());
+
+        if (canPrepend && canAppend && startIt->second == endIt->second) {
+            // Edge connects a path to itself - append it to form a cycle
+            size_t pathIdx = startIt->second;
+            auto & path = multiedges[pathIdx];
+            // Append all but first element of edge (first element is duplicate)
+            path.insert(path.end(), std::next(edge.begin()), edge.end());
+            // Update the end point (start point stays the same for a cycle)
+            pathEndingAt.erase(startIt);
+            pathEndingAt[edgeEnd] = pathIdx;
+        } else if (canPrepend && canAppend) {
+            // Edge joins two different paths - merge them
+            size_t prependIdx = startIt->second;
+            size_t appendIdx = endIt->second;
+            auto & prependPath = multiedges[prependIdx];
+            auto & appendPath = multiedges[appendIdx];
+
+            // Save endpoint before modifying appendPath
+            const std::string appendPathEnd = appendPath.back();
+            const std::string appendPathStart = appendPath.front();
+
+            // Append edge (without first element) to prependPath
+            prependPath.insert(prependPath.end(), std::next(edge.begin()), edge.end());
+            // Append appendPath (without first element) to prependPath
+            prependPath.insert(prependPath.end(), std::next(appendPath.begin()), appendPath.end());
+
+            // Update maps: prependPath now ends where appendPath ended
+            pathEndingAt.erase(startIt);
+            pathEndingAt[appendPathEnd] = prependIdx;
+            pathStartingAt.erase(appendPathStart);
+
+            // Mark appendPath for removal by clearing it
+            appendPath.clear();
+        } else if (canPrepend) {
+            // Edge extends an existing path at its end
+            size_t pathIdx = startIt->second;
+            auto & path = multiedges[pathIdx];
+            // Append all but first element of edge (first element is duplicate)
+            path.insert(path.end(), std::next(edge.begin()), edge.end());
+            // Update the end point
+            pathEndingAt.erase(startIt);
+            pathEndingAt[edgeEnd] = pathIdx;
+        } else if (canAppend) {
+            // Edge extends an existing path at its start
+            size_t pathIdx = endIt->second;
+            auto & path = multiedges[pathIdx];
+            // Prepend all but last element of edge (last element is duplicate)
+            path.insert(path.begin(), edge.begin(), std::prev(edge.end()));
+            // Update the start point
+            pathStartingAt.erase(endIt);
+            pathStartingAt[edgeStart] = pathIdx;
+        } else {
+            // Edge doesn't connect to anything - start a new path
+            size_t newIdx = multiedges.size();
+            multiedges.push_back(edge);
+            pathStartingAt[edgeStart] = newIdx;
+            pathEndingAt[edgeEnd] = newIdx;
         }
     }
 
-    // Second pass: merge multiedges that can now be connected
-    // After joining edges, some multiedges might now be connectable
-    bool merged = true;
-    while (merged) {
-        merged = false;
-        for (size_t i = 0; i < multiedges.size() && !merged; i++) {
-            for (size_t j = i + 1; j < multiedges.size() && !merged; j++) {
-                auto & path1 = multiedges[i];
-                auto & path2 = multiedges[j];
-
-                if (path1.back() == path2.front()) {
-                    // Append path2 to path1
-                    for (size_t k = 1; k < path2.size(); k++) {
-                        path1.push_back(path2[k]);
-                    }
-                    multiedges.erase(multiedges.begin() + j);
-                    merged = true;
-                } else if (path2.back() == path1.front()) {
-                    // Prepend path2 to path1
-                    for (int k = path2.size() - 2; k >= 0; k--) {
-                        path1.push_front(path2[k]);
-                    }
-                    multiedges.erase(multiedges.begin() + j);
-                    merged = true;
-                }
-            }
-        }
-    }
+    // Remove empty paths (those that were merged into others)
+    multiedges.erase(
+        std::remove_if(multiedges.begin(), multiedges.end(), [](const StoreCycleEdge & p) { return p.empty(); }),
+        multiedges.end());
 
     debug("transformEdgesToMultiedges: result has %lu multiedges", multiedges.size());
 }
