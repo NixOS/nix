@@ -85,6 +85,7 @@ public:
         if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
+            config->storeDir = cacheInfo->storeDir;
         } else {
             try {
                 BinaryCacheStore::init();
