@@ -15,8 +15,7 @@ std::string DummyStoreConfig::doc()
         ;
 }
 
-namespace {
-
+// Note: This class is used by DummyStoreImpl and needs to be visible
 class WholeStoreViewAccessor : public SourceAccessor
 {
     using BaseName = std::string;
@@ -106,184 +105,167 @@ public:
     }
 };
 
-} // namespace
-
 ref<Store> DummyStoreConfig::openStore() const
 {
     return openDummyStore();
 }
 
-struct DummyStoreImpl : DummyStore
+// DummyStoreImpl method implementations
+
+DummyStoreImpl::DummyStoreImpl(ref<const Config> config)
+    : Store{*config}
+    , DummyStore{config}
+    , wholeStoreView(make_ref<WholeStoreViewAccessor>())
 {
-    using Config = DummyStoreConfig;
+    wholeStoreView->setPathDisplay(config->storeDir);
+}
 
-    /**
-     * This view conceptually just borrows the file systems objects of
-     * each store object from `contents`, and combines them together
-     * into one store-wide source accessor.
-     *
-     * This is needed just in order to implement `Store::getFSAccessor`.
-     */
-    ref<WholeStoreViewAccessor> wholeStoreView = make_ref<WholeStoreViewAccessor>();
+void DummyStoreImpl::queryPathInfoUncached(
+    const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+{
+    bool visited = contents.cvisit(
+        path, [&](const auto & kv) { callback(std::make_shared<ValidPathInfo>(StorePath{kv.first}, kv.second.info)); });
 
-    DummyStoreImpl(ref<const Config> config)
-        : Store{*config}
-        , DummyStore{config}
-    {
-        wholeStoreView->setPathDisplay(config->storeDir);
-    }
-
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
-    {
-        bool visited = contents.cvisit(path, [&](const auto & kv) {
-            callback(std::make_shared<ValidPathInfo>(StorePath{kv.first}, kv.second.info));
-        });
-
-        if (!visited)
-            callback(nullptr);
-    }
-
-    /**
-     * The dummy store is incapable of *not* trusting! :)
-     */
-    virtual std::optional<TrustedFlag> isTrustedClient() override
-    {
-        return Trusted;
-    }
-
-    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
-    {
-        unsupported("queryPathFromHashPart");
-    }
-
-    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
-    {
-        if (config->readOnly)
-            unsupported("addToStore");
-
-        if (repair)
-            throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
-
-        if (checkSigs)
-            throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
-
-        auto temp = make_ref<MemorySourceAccessor>();
-        MemorySink tempSink{*temp};
-        parseDump(tempSink, source);
-        auto path = info.path;
-
-        auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
-        contents.insert(
-            {path,
-             PathInfoAndContents{
-                 std::move(info),
-                 accessor,
-             }});
-        wholeStoreView->addObject(path.to_string(), accessor);
-    }
-
-    StorePath addToStoreFromDump(
-        Source & source,
-        std::string_view name,
-        FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
-        ContentAddressMethod hashMethod = FileIngestionMethod::NixArchive,
-        HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
-        const StorePathSet & references = StorePathSet(),
-        RepairFlag repair = NoRepair) override
-    {
-        if (config->readOnly)
-            unsupported("addToStoreFromDump");
-
-        if (repair)
-            throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
-
-        auto temp = make_ref<MemorySourceAccessor>();
-
-        {
-            MemorySink tempSink{*temp};
-
-            // TODO factor this out into `restorePath`, same todo on it.
-            switch (dumpMethod) {
-            case FileSerialisationMethod::NixArchive:
-                parseDump(tempSink, source);
-                break;
-            case FileSerialisationMethod::Flat: {
-                // Replace root dir with file so next part succeeds.
-                temp->root = MemorySourceAccessor::File::Regular{};
-                tempSink.createRegularFile(CanonPath::root, [&](auto & sink) { source.drainInto(sink); });
-                break;
-            }
-            }
-        }
-
-        auto hash = hashPath({temp, CanonPath::root}, hashMethod.getFileIngestionMethod(), hashAlgo).first;
-        auto narHash = hashPath({temp, CanonPath::root}, FileIngestionMethod::NixArchive, HashAlgorithm::SHA256);
-
-        auto info = ValidPathInfo::makeFromCA(
-            *this,
-            name,
-            ContentAddressWithReferences::fromParts(
-                hashMethod,
-                std::move(hash),
-                {
-                    .others = references,
-                    // caller is not capable of creating a self-reference, because
-                    // this is content-addressed without modulus
-                    .self = false,
-                }),
-            std::move(narHash.first));
-
-        info.narSize = narHash.second.value();
-
-        auto path = info.path;
-        auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
-        contents.insert(
-            {path,
-             PathInfoAndContents{
-                 std::move(info),
-                 accessor,
-             }});
-        wholeStoreView->addObject(path.to_string(), accessor);
-
-        return path;
-    }
-
-    void registerDrvOutput(const Realisation & output) override
-    {
-        unsupported("registerDrvOutput");
-    }
-
-    void narFromPath(const StorePath & path, Sink & sink) override
-    {
-        bool visited = contents.cvisit(path, [&](const auto & kv) {
-            const auto & [info, accessor] = kv.second;
-            SourcePath sourcePath(accessor);
-            dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
-        });
-
-        if (!visited)
-            throw Error("path '%s' is not valid", printStorePath(path));
-    }
-
-    void
-    queryRealisationUncached(const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override
-    {
+    if (!visited)
         callback(nullptr);
+}
+
+std::optional<TrustedFlag> DummyStoreImpl::isTrustedClient()
+{
+    return Trusted;
+}
+
+std::optional<StorePath> DummyStoreImpl::queryPathFromHashPart(const std::string & hashPart)
+{
+    unsupported("queryPathFromHashPart");
+}
+
+void DummyStoreImpl::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    if (config->readOnly)
+        unsupported("addToStore");
+
+    if (repair)
+        throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
+
+    if (checkSigs)
+        throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
+
+    auto temp = make_ref<MemorySourceAccessor>();
+    MemorySink tempSink{*temp};
+    parseDump(tempSink, source);
+    auto path = info.path;
+
+    auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
+    contents.insert(
+        {path,
+         PathInfoAndContents{
+             std::move(info),
+             accessor,
+         }});
+    wholeStoreView->addObject(path.to_string(), accessor);
+}
+
+StorePath DummyStoreImpl::addToStoreFromDump(
+    Source & source,
+    std::string_view name,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & references,
+    RepairFlag repair)
+{
+    if (config->readOnly)
+        unsupported("addToStoreFromDump");
+
+    if (repair)
+        throw Error("repairing is not supported for '%s' store", config->getHumanReadableURI());
+
+    auto temp = make_ref<MemorySourceAccessor>();
+
+    {
+        MemorySink tempSink{*temp};
+
+        // TODO factor this out into `restorePath`, same todo on it.
+        switch (dumpMethod) {
+        case FileSerialisationMethod::NixArchive:
+            parseDump(tempSink, source);
+            break;
+        case FileSerialisationMethod::Flat: {
+            // Replace root dir with file so next part succeeds.
+            temp->root = MemorySourceAccessor::File::Regular{};
+            tempSink.createRegularFile(CanonPath::root, [&](auto & sink) { source.drainInto(sink); });
+            break;
+        }
+        }
     }
 
-    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
-    {
-        std::shared_ptr<SourceAccessor> res;
-        contents.cvisit(path, [&](const auto & kv) { res = kv.second.contents.get_ptr(); });
-        return res;
-    }
+    auto hash = hashPath({temp, CanonPath::root}, hashMethod.getFileIngestionMethod(), hashAlgo).first;
+    auto narHash = hashPath({temp, CanonPath::root}, FileIngestionMethod::NixArchive, HashAlgorithm::SHA256);
 
-    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
-    {
-        return wholeStoreView;
-    }
-};
+    auto info = ValidPathInfo::makeFromCA(
+        *this,
+        name,
+        ContentAddressWithReferences::fromParts(
+            hashMethod,
+            std::move(hash),
+            {
+                .others = references,
+                // caller is not capable of creating a self-reference, because
+                // this is content-addressed without modulus
+                .self = false,
+            }),
+        std::move(narHash.first));
+
+    info.narSize = narHash.second.value();
+
+    auto path = info.path;
+    auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
+    contents.insert(
+        {path,
+         PathInfoAndContents{
+             std::move(info),
+             accessor,
+         }});
+    wholeStoreView->addObject(path.to_string(), accessor);
+
+    return path;
+}
+
+void DummyStoreImpl::registerDrvOutput(const Realisation & output)
+{
+    unsupported("registerDrvOutput");
+}
+
+void DummyStoreImpl::narFromPath(const StorePath & path, Sink & sink)
+{
+    bool visited = contents.cvisit(path, [&](const auto & kv) {
+        const auto & [info, accessor] = kv.second;
+        SourcePath sourcePath(accessor);
+        dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
+    });
+
+    if (!visited)
+        throw Error("path '%s' is not valid", printStorePath(path));
+}
+
+void DummyStoreImpl::queryRealisationUncached(
+    const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+{
+    callback(nullptr);
+}
+
+std::shared_ptr<SourceAccessor> DummyStoreImpl::getFSAccessor(const StorePath & path, bool requireValidPath)
+{
+    std::shared_ptr<SourceAccessor> res;
+    contents.cvisit(path, [&](const auto & kv) { res = kv.second.contents.get_ptr(); });
+    return res;
+}
+
+ref<SourceAccessor> DummyStoreImpl::getFSAccessor(bool requireValidPath)
+{
+    return wholeStoreView;
+}
 
 ref<DummyStore> DummyStore::Config::openDummyStore() const
 {
