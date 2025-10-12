@@ -95,8 +95,8 @@ void walkAndScanPath(const std::filesystem::path & path, CycleEdgeScanSink & sin
  * longer paths like [A→B→C→A]. This makes it easier to visualize the
  * actual cycle paths.
  *
- * The algorithm is greedy: it tries to extend each edge by finding
- * matching edges to prepend or append.
+ * Uses hashmaps to track path endpoints, enabling O(n) joining of edges
+ * where n is the number of input edges.
  *
  * @param edges Input edges to transform
  * @param multiedges Output parameter with connected paths
