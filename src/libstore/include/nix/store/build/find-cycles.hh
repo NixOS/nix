@@ -83,10 +83,13 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * the provided sink which performs the actual hash detection. This reuses
  * the existing RefScanSink infrastructure for robustness.
  *
+ * @param accessor Source accessor for reading files
  * @param path Current path being scanned
+ * @param displayPath Physical path for error messages
  * @param sink The CycleEdgeScanSink that will detect and record hash references
  */
-void walkAndScanPath(const std::filesystem::path & path, CycleEdgeScanSink & sink);
+void walkAndScanPath(
+    SourceAccessor & accessor, const CanonPath & path, const std::string & displayPath, CycleEdgeScanSink & sink);
 
 /**
  * Transform individual edges into connected multi-edges (paths).

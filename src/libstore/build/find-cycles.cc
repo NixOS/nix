@@ -1,10 +1,7 @@
 #include "nix/store/build/find-cycles.hh"
 
 #include "nix/store/store-api.hh"
-#include "nix/util/file-system.hh"
-#ifdef __APPLE__
-#  include "nix/util/archive.hh" // For caseHackSuffix
-#endif
+#include "nix/util/source-accessor.hh"
 
 #include <algorithm>
 #include <filesystem>
@@ -72,8 +69,9 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
     // Create sink that reuses RefScanSink's hash-finding logic
     CycleEdgeScanSink sink(std::move(hashes), storePrefix);
 
-    // Walk the filesystem and scan files using the sink
-    walkAndScanPath(std::filesystem::path(path), sink);
+    // Get filesystem accessor and walk the tree
+    auto accessor = getFSSourceAccessor();
+    walkAndScanPath(*accessor, CanonPath(path), path, sink);
 
     // Extract the found edges
     edges = sink.getEdges();
@@ -83,61 +81,51 @@ void scanForCycleEdges(const Path & path, const StorePathSet & refs, StoreCycleE
  * Recursively walk filesystem and stream files into the sink.
  * This reuses RefScanSink's hash-finding logic instead of reimplementing it.
  */
-void walkAndScanPath(const std::filesystem::path & path, CycleEdgeScanSink & sink)
+void walkAndScanPath(
+    SourceAccessor & accessor, const CanonPath & path, const std::string & displayPath, CycleEdgeScanSink & sink)
 {
-    auto status = std::filesystem::symlink_status(path);
+    auto stat = accessor.lstat(path);
 
-    debug("walkAndScanPath: scanning path = %s", path.string());
+    debug("walkAndScanPath: scanning path = %s", displayPath);
 
-    if (std::filesystem::is_regular_file(status)) {
+    switch (stat.type) {
+    case SourceAccessor::tRegular: {
         // Handle regular files - stream contents into sink
-        // The sink (RefScanSink) handles all hash detection and buffer management
-        sink.setCurrentPath(path.string());
+        sink.setCurrentPath(displayPath);
+        accessor.readFile(path, sink);
+        break;
+    }
 
-        // Use Nix's portable readFile that streams into a sink
-        // This handles all file I/O portably across platforms
-        readFile(path.string(), sink);
-    } else if (std::filesystem::is_directory(status)) {
+    case SourceAccessor::tDirectory: {
         // Handle directories - recursively scan contents
-        std::map<std::string, std::string> unhacked;
-
-        for (DirectoryIterator i(path); i != DirectoryIterator(); ++i) {
-            std::string entryName = i->path().filename().string();
-
-#ifdef __APPLE__
-            // Handle case-insensitive filesystems on macOS
-            std::string name(entryName);
-            size_t pos = entryName.find(caseHackSuffix);
-            if (pos != std::string::npos) {
-                debug("removing case hack suffix from '%s'", (path / entryName).string());
-                name.erase(pos);
-            }
-            if (unhacked.find(name) != unhacked.end()) {
-                throw Error(
-                    "file name collision between '%1%' and '%2%'",
-                    (path / unhacked[name]).string(),
-                    (path / entryName).string());
-            }
-            unhacked[name] = entryName;
-#else
-            unhacked[entryName] = entryName;
-#endif
+        auto entries = accessor.readDirectory(path);
+        for (const auto & [name, entryType] : entries) {
+            auto childPath = path / name;
+            auto childDisplayPath = displayPath + "/" + name;
+            debug("walkAndScanPath: recursing into %s", childDisplayPath);
+            walkAndScanPath(accessor, childPath, childDisplayPath, sink);
         }
+        break;
+    }
 
-        for (auto & [name, actualName] : unhacked) {
-            debug("walkAndScanPath: recursing into %s/%s", path.string(), actualName);
-            walkAndScanPath(path / actualName, sink);
-        }
-    } else if (std::filesystem::is_symlink(status)) {
+    case SourceAccessor::tSymlink: {
         // Handle symlinks - stream link target into sink
-        auto linkTarget = std::filesystem::read_symlink(path).string();
+        auto linkTarget = accessor.readLink(path);
 
-        debug("walkAndScanPath: scanning symlink %s -> %s", path.string(), linkTarget);
+        debug("walkAndScanPath: scanning symlink %s -> %s", displayPath, linkTarget);
 
-        sink.setCurrentPath(path.string());
+        sink.setCurrentPath(displayPath);
         sink(std::string_view(linkTarget));
-    } else {
-        throw Error("file '%1%' has an unsupported type", path);
+        break;
+    }
+
+    case SourceAccessor::tChar:
+    case SourceAccessor::tBlock:
+    case SourceAccessor::tSocket:
+    case SourceAccessor::tFifo:
+    case SourceAccessor::tUnknown:
+    default:
+        throw Error("file '%1%' has an unsupported type", displayPath);
     }
 }
 
