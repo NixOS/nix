@@ -33,6 +33,7 @@ DerivationGoal::DerivationGoal(
     : Goal(worker, haveDerivation())
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
+    , drv{std::make_unique<Derivation>(drv)}
     , outputHash{[&] {
         auto outputHashes = staticOutputHashes(worker.evalStore, drv);
         if (auto * mOutputHash = get(outputHashes, wantedOutput))
@@ -41,11 +42,8 @@ DerivationGoal::DerivationGoal(
     }()}
     , buildMode(buildMode)
 {
-    this->drv = std::make_unique<Derivation>(drv);
 
-    name =
-        fmt("building of '%s' from in-memory derivation",
-            DerivedPath::Built{makeConstantStorePathRef(drvPath), drv.outputNames()}.to_string(worker.store));
+    name = fmt("getting output '%s' from derivation '%s'", wantedOutput, worker.store.printStorePath(drvPath));
     trace("created");
 
     mcExpectedBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.expectedBuilds);
@@ -54,11 +52,7 @@ DerivationGoal::DerivationGoal(
 
 std::string DerivationGoal::key()
 {
-    /* Ensure that derivations get built in order of their name,
-       i.e. a derivation named "aardvark" always comes before
-       "baboon". And substitution goals always happen before
-       derivation goals (due to "b$"). */
-    return "b$" + std::string(drvPath.name()) + "$" + SingleDerivedPath::Built{
+    return "db$" + std::string(drvPath.name()) + "$" + SingleDerivedPath::Built{
         .drvPath = makeConstantStorePathRef(drvPath),
         .output = wantedOutput,
     }.to_string(worker.store);
@@ -188,18 +182,6 @@ Goal::Co DerivationGoal::haveDerivation()
 
     co_return amDone(g->exitCode, g->ex);
 }
-
-/**
- * Used for `inputGoals` local variable below
- */
-struct value_comparison
-{
-    template<typename T>
-    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const
-    {
-        return *lhs < *rhs;
-    }
-};
 
 Goal::Co DerivationGoal::repairClosure()
 {
