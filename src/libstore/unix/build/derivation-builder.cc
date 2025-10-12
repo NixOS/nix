@@ -45,7 +45,7 @@
 
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
-#include "build/find-cycles.hh"
+#include "nix/store/build/find-cycles.hh"
 
 namespace nix {
 
