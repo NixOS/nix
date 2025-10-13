@@ -56,7 +56,7 @@ schemas = [
   },
   {
     'stem' : 'build-trace-entry',
-    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'schema' : schema_dir / 'build-trace-entry-v2.yaml',
     'files' : [
       'simple.json',
       'with-dependent-realisations.json',
