@@ -31,6 +31,14 @@ schemas = [
     ],
   },
   {
+    'stem' : 'content-address',
+    'schema' : schema_dir / 'content-address-v1.yaml',
+    'files' : [
+      'text.json',
+      'nar.json',
+    ],
+  },
+  {
     'stem' : 'derivation',
     'schema' : schema_dir / 'derivation-v3.yaml',
     'files' : [
@@ -73,8 +81,6 @@ foreach schema : schemas
       stem + '-schema-valid',
       jv,
       args : [
-        '--map',
-        './hash-v1.yaml=' + schema_dir / 'hash-v1.yaml',
         'http://json-schema.org/draft-04/schema',
         schema_file,
       ],
