@@ -25,7 +25,7 @@ is a JSON object with the following fields:
 
   - Version 2: Separate `method` and `hashAlgo` fields in output specs
 
-  - Verison 3: Drop store dir from store paths, just include base name.
+  - Version 3: Drop store dir from store paths, just include base name.
 
   Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
 
@@ -116,5 +116,5 @@ is a JSON object with the following fields:
   The environment passed to the `builder`.
 
 * `structuredAttrs`:
-  [Strucutured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
+  [Structured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
   Structured attributes are JSON, and thus embedded as-is.

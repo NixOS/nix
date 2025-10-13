@@ -118,48 +118,57 @@ AwsCredentials getAwsCredentials(const std::string & profile)
     // Get or create credential provider with caching
     std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
 
-    // Try to find existing provider
-    credentialProviderCache.visit(profile, [&](const auto & pair) { provider = pair.second; });
+    // Use try_emplace_and_cvisit for atomic get-or-create
+    // This prevents race conditions where multiple threads create providers
+    credentialProviderCache.try_emplace_and_cvisit(
+        profile,
+        nullptr, // Placeholder - will be replaced in f1 before any thread can see it
+        [&](auto & kv) {
+            // f1: Called atomically during insertion with non-const reference
+            // Other threads are blocked until we finish, so nullptr is never visible
+            debug(
+                "[pid=%d] creating new AWS credential provider for profile '%s'",
+                getpid(),
+                profile.empty() ? "(default)" : profile.c_str());
 
-    if (!provider) {
-        // Create new provider if not found
-        debug(
-            "[pid=%d] creating new AWS credential provider for profile '%s'",
-            getpid(),
-            profile.empty() ? "(default)" : profile.c_str());
+            try {
+                initAwsCrt();
 
-        try {
-            initAwsCrt();
+                if (profile.empty()) {
+                    Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
+                    config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+                    kv.second = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
+                } else {
+                    Aws::Crt::Auth::CredentialsProviderProfileConfig config;
+                    config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+                    // This is safe because the underlying C library will copy this string
+                    // c.f. https://github.com/awslabs/aws-c-auth/blob/main/source/credentials_provider_profile.c#L220
+                    config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+                    kv.second = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+                }
 
-            if (profile.empty()) {
-                Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-                config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-                provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
-            } else {
-                Aws::Crt::Auth::CredentialsProviderProfileConfig config;
-                config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-                // This is safe because the underlying C library will copy this string
-                // c.f. https://github.com/awslabs/aws-c-auth/blob/main/source/credentials_provider_profile.c#L220
-                config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
-                provider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+                if (!kv.second) {
+                    throw AwsAuthError(
+                        "Failed to create AWS credentials provider for %s",
+                        profile.empty() ? "default profile" : fmt("profile '%s'", profile));
+                }
+
+                provider = kv.second;
+            } catch (Error & e) {
+                // Exception during creation - remove the entry to allow retry
+                credentialProviderCache.erase(profile);
+                e.addTrace({}, "for AWS profile: %s", profile.empty() ? "(default)" : profile);
+                throw;
+            } catch (...) {
+                // Non-Error exception - still need to clean up
+                credentialProviderCache.erase(profile);
+                throw;
             }
-        } catch (Error & e) {
-            e.addTrace(
-                {},
-                "while creating AWS credentials provider for %s",
-                profile.empty() ? "default profile" : fmt("profile '%s'", profile));
-            throw;
-        }
-
-        if (!provider) {
-            throw AwsAuthError(
-                "Failed to create AWS credentials provider for %s",
-                profile.empty() ? "default profile" : fmt("profile '%s'", profile));
-        }
-
-        // Insert into cache (try_emplace is thread-safe and won't overwrite if another thread added it)
-        credentialProviderCache.try_emplace(profile, provider);
-    }
+        },
+        [&](const auto & kv) {
+            // f2: Called if key already exists (const reference)
+            provider = kv.second;
+        });
 
     return getCredentialsFromProvider(provider);
 }

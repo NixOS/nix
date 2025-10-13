@@ -58,10 +58,6 @@ public:
         unreachable();
     };
 
-    /**
-     * We prepend "a$" to the key name to ensure substitution goals
-     * happen before derivation goals.
-     */
     std::string key() override
     {
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);

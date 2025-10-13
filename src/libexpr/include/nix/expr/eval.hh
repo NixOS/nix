@@ -508,8 +508,15 @@ private:
 
 public:
 
+    /**
+     * @param lookupPath     Only used during construction.
+     * @param store          The store to use for instantiation
+     * @param fetchSettings  Must outlive the lifetime of this EvalState!
+     * @param settings       Must outlive the lifetime of this EvalState!
+     * @param buildStore     The store to use for builds ("import from derivation", C API `nix_string_realise`)
+     */
     EvalState(
-        const LookupPath & _lookupPath,
+        const LookupPath & lookupPath,
         ref<Store> store,
         const fetchers::Settings & fetchSettings,
         const EvalSettings & settings,
