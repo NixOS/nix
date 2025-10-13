@@ -86,33 +86,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         if (!outputInfo)
             continue;
 
-        bool failed = false;
-
-        Goals waitees;
-
-        for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
-            if (depId != id) {
-                if (auto localOutputInfo = worker.store.queryRealisation(depId);
-                    localOutputInfo && localOutputInfo->outPath != depPath) {
-                    warn(
-                        "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
-                        "Local:  %s\n"
-                        "Remote: %s",
-                        sub->config.getHumanReadableURI(),
-                        depId.to_string(),
-                        worker.store.printStorePath(localOutputInfo->outPath),
-                        worker.store.printStorePath(depPath));
-                    failed = true;
-                    break;
-                }
-                waitees.insert(worker.makeDrvOutputSubstitutionGoal(depId));
-            }
-        }
-
-        if (failed)
-            continue;
-
-        co_return realisationFetched(std::move(waitees), outputInfo, sub);
+        co_return realisationFetched(outputInfo, sub);
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -131,8 +105,10 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 }
 
 Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
-    Goals waitees, std::shared_ptr<const UnkeyedRealisation> outputInfo, nix::ref<nix::Store> sub)
+    std::shared_ptr<const UnkeyedRealisation> outputInfo, nix::ref<nix::Store> sub)
 {
+    Goals waitees;
+
     waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
     co_await await(std::move(waitees));
