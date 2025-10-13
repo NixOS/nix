@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/error.hh"
 #include <string>
 #include <optional>
 #include <cassert>
@@ -12,6 +13,8 @@
 
 namespace nix {
 
+MakeError(BadCanonPath, Error);
+
 /**
  * A canonical representation of a path. It ensures the following:
  *
@@ -22,6 +25,8 @@ namespace nix {
  * - A slash is never followed by a slash (i.e. no empty components).
  *
  * - There are no components equal to '.' or '..'.
+ *
+ * - It does not contain NUL bytes.
  *
  * `CanonPath` are "virtual" Nix paths for abstract file system objects;
  * they are always Unix-style paths, regardless of what OS Nix is
@@ -51,10 +56,7 @@ public:
      */
     CanonPath(std::string_view raw);
 
-    explicit CanonPath(const char * raw)
-        : CanonPath(std::string_view(raw))
-    {
-    }
+    explicit CanonPath(const char * raw);
 
     struct unchecked_t
     {};
