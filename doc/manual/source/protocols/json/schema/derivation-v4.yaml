@@ -1,8 +1,8 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v3.json"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v4.json"
 title: Derivation
 description: |
-  Experimental JSON representation of a Nix derivation (version 3).
+  Experimental JSON representation of a Nix derivation (version 4).
 
   This schema describes the JSON representation of Nix's `Derivation` type.
 
@@ -17,8 +17,7 @@ required:
   - name
   - version
   - outputs
-  - inputSrcs
-  - inputDrvs
+  - inputs
   - system
   - builder
   - args
@@ -32,10 +31,10 @@ properties:
       Used when calculating store paths for the derivation’s outputs.
 
   version:
-    const: 3
-    title: Format version (must be 3)
+    const: 4
+    title: Format version (must be 4)
     description: |
-      Must be `3`.
+      Must be `4`.
       This is a guard that allows us to continue evolving this format.
       The choice of `3` is fairly arbitrary, but corresponds to this informal version:
 
@@ -46,6 +45,12 @@ properties:
       - Version 2: Separate `method` and `hashAlgo` fields in output specs
 
       - Version 3: Drop store dir from store paths, just include base name.
+
+      - Version 4: Two cleanups, batched together to lesson churn:
+
+        - Reorganize inputs into nested structure (`inputs.srcs` and `inputs.drvs`)
+
+        - Use canonical content address JSON format for floating content addressed derivation outputs.
 
       Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
 
@@ -70,47 +75,56 @@ properties:
     additionalProperties:
       "$ref": "#/$defs/output/overall"
 
-  inputSrcs:
-    type: array
-    title: Input source paths
-    description: |
-      List of store paths on which this derivation depends.
-
-      > **Example**
-      >
-      > ```json
-      > "inputSrcs": [
-      >   "47y241wqdhac3jm5l7nv0x4975mb1975-separate-debug-info.sh",
-      >   "56d0w71pjj9bdr363ym3wj1zkwyqq97j-fix-pop-var-context-error.patch"
-      > ]
-      > ```
-    items:
-      $ref: "store-path-v1.yaml"
-
-  inputDrvs:
+  inputs:
     type: object
-    title: Input derivations
+    title: Derivation inputs
     description: |
-      Mapping of derivation paths to lists of output names they provide.
-
-      > **Example**
-      >
-      > ```json
-      > "inputDrvs": {
-      >   "6lkh5yi7nlb7l6dr8fljlli5zfd9hq58-curl-7.73.0.drv": ["dev"],
-      >   "fn3kgnfzl5dzym26j8g907gq3kbm8bfh-unzip-6.0.drv": ["out"]
-      > }
-      > ```
-      >
-      > specifies that this derivation depends on the `dev` output of `curl`, and the `out` output of `unzip`.
-    patternProperties:
-      "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
-        title: Store Path
+      Input dependencies for the derivation, organized into source paths and derivation dependencies.
+    required:
+      - srcs
+      - drvs
+    properties:
+      srcs:
+        type: array
+        title: Input source paths
         description: |
-          A store path to a derivation, mapped to the outputs of that derivation.
-        oneOf:
-        - "$ref": "#/$defs/outputNames"
-        - "$ref": "#/$defs/dynamicOutputs"
+          List of store paths on which this derivation depends.
+
+          > **Example**
+          >
+          > ```json
+          > "srcs": [
+          >   "47y241wqdhac3jm5l7nv0x4975mb1975-separate-debug-info.sh",
+          >   "56d0w71pjj9bdr363ym3wj1zkwyqq97j-fix-pop-var-context-error.patch"
+          > ]
+          > ```
+        items:
+          $ref: "store-path-v1.yaml"
+      drvs:
+        type: object
+        title: Input derivations
+        description: |
+          Mapping of derivation paths to lists of output names they provide.
+
+          > **Example**
+          >
+          > ```json
+          > "drvs": {
+          >   "6lkh5yi7nlb7l6dr8fljlli5zfd9hq58-curl-7.73.0.drv": ["dev"],
+          >   "fn3kgnfzl5dzym26j8g907gq3kbm8bfh-unzip-6.0.drv": ["out"]
+          > }
+          > ```
+          >
+          > specifies that this derivation depends on the `dev` output of `curl`, and the `out` output of `unzip`.
+        patternProperties:
+          "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
+            title: Store Path
+            description: |
+              A store path to a derivation, mapped to the outputs of that derivation.
+            oneOf:
+            - "$ref": "#/$defs/outputNames"
+            - "$ref": "#/$defs/dynamicOutputs"
+        additionalProperties: false
     additionalProperties: false
 
   system:
@@ -189,24 +203,18 @@ properties:
         The output is content-addressed, and the content-address is fixed in advance.
 
         See [Fixed-output content-addressing](@docroot@/store/derivation/outputs/content-address.md#fixed) for more details.
-      type: object
+      "$ref": "./content-address-v1.yaml"
       required:
         - method
-        - hashAlgo
         - hash
       properties:
         method:
-          "$ref": "./content-address-v1.yaml#/$defs/method"
           description: |
             Method of content addressing used for this output.
-        hashAlgo:
-          title: Hash algorithm
-          "$ref": "./hash-v1.yaml#/$defs/algorithm"
         hash:
-          type: string
           title: Expected hash value
           description: |
-            The expected content hash in base-16.
+            The expected content hash.
       additionalProperties: false
 
     caFloating:

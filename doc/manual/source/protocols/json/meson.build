@@ -13,7 +13,7 @@ schemas = [
   'content-address-v1',
   'store-path-v1',
   'store-object-info-v1',
-  'derivation-v3',
+  'derivation-v4',
   'deriving-path-v1',
   'build-trace-entry-v1',
   'build-result-v1',

@@ -7,20 +7,22 @@
   "env": {
     "BIG_BAD": "WOLF"
   },
-  "inputDrvs": {
-    "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "cat",
-        "dog"
-      ]
-    }
+  "inputs": {
+    "drvs": {
+      "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "cat",
+          "dog"
+        ]
+      }
+    },
+    "srcs": [
+      "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
+    ]
   },
-  "inputSrcs": [
-    "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
-  ],
   "name": "simple-derivation",
   "outputs": {},
   "system": "wasm-sel4",
-  "version": 3
+  "version": 4
 }

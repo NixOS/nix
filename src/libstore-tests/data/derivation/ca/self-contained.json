@@ -10,8 +10,10 @@
     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
     "system": "x86_64-linux"
   },
-  "inputDrvs": {},
-  "inputSrcs": [],
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
   "name": "myname",
   "outputs": {
     "out": {
@@ -20,5 +22,5 @@
     }
   },
   "system": "x86_64-linux",
-  "version": 3
+  "version": 4
 }

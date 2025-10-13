@@ -23,25 +23,27 @@
     "requiredSystemFeatures": "rainbow uid-range",
     "system": "my-system"
   },
-  "inputDrvs": {
-    "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
+  "inputs": {
+    "drvs": {
+      "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      },
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      }
     },
-    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
-    }
+    "srcs": [
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
   },
-  "inputSrcs": [
-    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
-  ],
   "name": "advanced-attributes",
   "outputs": {
     "out": {
@@ -49,5 +51,5 @@
     }
   },
   "system": "my-system",
-  "version": 3
+  "version": 4
 }

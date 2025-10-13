@@ -51,10 +51,12 @@ builtins.outputOf
             "$word": "hello, from $word!",
             "PATH": ${builtins.toJSON path}
           },
-          "inputDrvs": {
-            $inputDrvs
+          "inputs": {
+            "drvs": {
+              $inputDrvs
+            },
+            "srcs": []
           },
-          "inputSrcs": [],
           "name": "build-$word",
           "outputs": {
             "out": {
@@ -63,7 +65,7 @@ builtins.outputOf
             }
           },
           "system": "${system}",
-          "version": 3
+          "version": 4
         }
       EOF
         drvPath=$(echo "$json" | nix derivation add)

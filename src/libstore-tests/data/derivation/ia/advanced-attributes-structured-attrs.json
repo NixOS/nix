@@ -9,25 +9,27 @@
     "dev": "/nix/store/wyfgwsdi8rs851wmy1xfzdxy7y5vrg5l-advanced-attributes-structured-attrs-dev",
     "out": "/nix/store/7cxy4zx1vqc885r4jl2l64pymqbdmhii-advanced-attributes-structured-attrs"
   },
-  "inputDrvs": {
-    "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
+  "inputs": {
+    "drvs": {
+      "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      },
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      }
     },
-    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
-    }
+    "srcs": [
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
   },
-  "inputSrcs": [
-    "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
-  ],
   "name": "advanced-attributes-structured-attrs",
   "outputs": {
     "bin": {
@@ -96,5 +98,5 @@
     "system": "my-system"
   },
   "system": "my-system",
-  "version": 3
+  "version": 4
 }
