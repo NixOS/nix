@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/dummy-store.hh"
+#include "nix/store/derivations.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -29,6 +30,12 @@ struct DummyStore : virtual Store
      * store object.
      */
     boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
+
+    /**
+     * This is map conceptually owns every derivation, allowing us to
+     * avoid "on-disk drv format" serialization round-trips.
+     */
+    boost::concurrent_flat_map<StorePath, Derivation> derivations;
 
     /**
      * The build trace maps the pair of a content-addressing (fixed or

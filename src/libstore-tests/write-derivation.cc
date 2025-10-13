@@ -50,8 +50,8 @@ TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
     EXPECT_EQ(path1, path2);
     EXPECT_THAT(
         [&] { writeDerivation(*store, drv, Repair); },
-        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher(
-            "operation 'addToStoreFromDump' is not supported by store 'dummy://'")));
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("operation 'writeDerivation' is not supported by store 'dummy://'")));
 }
 
 } // namespace nix

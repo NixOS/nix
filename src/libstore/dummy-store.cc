@@ -137,12 +137,35 @@ struct DummyStoreImpl : DummyStore
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
-        bool visited = contents.cvisit(path, [&](const auto & kv) {
-            callback(std::make_shared<ValidPathInfo>(StorePath{kv.first}, kv.second.info));
-        });
+        if (isDerivation(path.name())) {
+            if (derivations.cvisit(path, [&](const auto & kv) {
+                    /* compute path info on demand */
+                    auto accessor = make_ref<MemorySourceAccessor>();
+                    accessor->root = MemorySourceAccessor::File::Regular{
+                        .contents = kv.second.unparse(*this, false),
+                    };
+                    auto narHash = hashPath(
+                        {accessor, CanonPath::root}, FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
+                    auto info =
+                        std::make_shared<ValidPathInfo>(StorePath{kv.first}, UnkeyedValidPathInfo{narHash.hash});
+                    info->narSize = narHash.numBytesDigested;
+                    info->ca = ContentAddress{
+                        .method = ContentAddressMethod::Raw::Text,
+                        .hash = hashString(
+                            HashAlgorithm::SHA256,
+                            std::get<MemorySourceAccessor::File::Regular>(accessor->root->raw).contents),
+                    };
+                    callback(std::move(info));
+                }))
+                return;
+        } else {
+            if (contents.cvisit(path, [&](const auto & kv) {
+                    callback(std::make_shared<ValidPathInfo>(StorePath{kv.first}, kv.second.info));
+                }))
+                return;
+        }
 
-        if (!visited)
-            callback(nullptr);
+        callback(nullptr);
     }
 
     /**
@@ -169,18 +192,25 @@ struct DummyStoreImpl : DummyStore
         if (checkSigs)
             throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
 
-        auto temp = make_ref<MemorySourceAccessor>();
-        MemorySink tempSink{*temp};
+        auto accessor = make_ref<MemorySourceAccessor>();
+        MemorySink tempSink{*accessor};
         parseDump(tempSink, source);
         auto path = info.path;
 
-        auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
-        contents.insert(
-            {path,
-             PathInfoAndContents{
-                 std::move(info),
-                 accessor,
-             }});
+        if (isDerivation(info.path.name())) {
+            warn("back compat supporting `addToStore` for inserting derivations in dummy store");
+            writeDerivation(
+                parseDerivation(*this, accessor->readFile(CanonPath::root), Derivation::nameFromPath(info.path)));
+            return;
+        }
+
+        contents.insert({
+            path,
+            PathInfoAndContents{
+                std::move(info),
+                accessor,
+            },
+        });
         wholeStoreView->addObject(path.to_string(), accessor);
     }
 
@@ -193,6 +223,9 @@ struct DummyStoreImpl : DummyStore
         const StorePathSet & references = StorePathSet(),
         RepairFlag repair = NoRepair) override
     {
+        if (isDerivation(name))
+            throw Error("Do not insert derivation into dummy store with `addToStoreFromDump`");
+
         if (config->readOnly)
             unsupported("addToStoreFromDump");
 
@@ -239,15 +272,45 @@ struct DummyStoreImpl : DummyStore
 
         auto path = info.path;
         auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
-        contents.insert(
-            {path,
-             PathInfoAndContents{
-                 std::move(info),
-                 accessor,
-             }});
+        contents.insert({
+            path,
+            PathInfoAndContents{
+                std::move(info),
+                accessor,
+            },
+        });
         wholeStoreView->addObject(path.to_string(), accessor);
 
         return path;
+    }
+
+    StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair) override
+    {
+        auto drvPath = ::nix::writeDerivation(*this, drv, repair, /*readonly=*/true);
+
+        if (!derivations.contains(drvPath) || repair) {
+            if (config->readOnly)
+                unsupported("writeDerivation");
+            derivations.insert({drvPath, drv});
+        }
+
+        return drvPath;
+    }
+
+    Derivation readDerivation(const StorePath & drvPath) override
+    {
+        if (std::optional res = getConcurrent(derivations, drvPath))
+            return *res;
+        else
+            throw Error("derivation '%s' is not valid", printStorePath(drvPath));
+    }
+
+    /**
+     * No such thing as an "invalid derivation" with the dummy store
+     */
+    Derivation readInvalidDerivation(const StorePath & drvPath) override
+    {
+        return readDerivation(drvPath);
     }
 
     void registerDrvOutput(const Realisation & output) override
