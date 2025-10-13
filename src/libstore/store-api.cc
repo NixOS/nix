@@ -1,6 +1,6 @@
 #include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
-#include "nix/util/source-accessor.hh"
+#include "nix/util/memory-source-accessor.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
@@ -82,6 +82,20 @@ Path Store::followLinksToStore(std::string_view _path) const
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
     return toStorePath(followLinksToStore(path)).first;
+}
+
+void Store::addToStore(const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    auto temp = make_ref<MemorySourceAccessor>();
+    MemorySink tempSink{*temp};
+    parseDump(tempSink, narSource);
+    addToStore(info, {temp}, repair, checkSigs);
+}
+
+void Store::addToStore(const ValidPathInfo & info, const SourcePath & path, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    auto sink = sourceToSink([&](Source & source) { addToStore(info, source, repair, checkSigs); });
+    dumpPath(path, *sink, FileSerialisationMethod::NixArchive);
 }
 
 StorePath Store::addToStore(
