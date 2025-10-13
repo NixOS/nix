@@ -1,5 +1,5 @@
 "$schema": http://json-schema.org/draft-04/schema#
-"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v3.json
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v4.json
 title: Derivation
 description: |
   Experimental JSON representation of a Nix derivation (version 3).
@@ -31,9 +31,9 @@ properties:
       Used when calculating store paths for the derivation’s outputs.
 
   version:
-    const: 3
+    const: 4
     description: |
-      Must be `3`.
+      Must be `4`.
       This is a guard that allows us to continue evolving this format.
       The choice of `3` is fairly arbitrary, but corresponds to this informal version:
 
@@ -44,6 +44,8 @@ properties:
       - Version 2: Separate `method` and `hashAlgo` fields in output specs
 
       - Version 3: Drop store dir from store paths, just include base name.
+
+      - Version 4: Use canonical content address JSON format for floating content addressed derivation outputs.
 
       Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
 
@@ -156,8 +158,10 @@ properties:
 
       hashAlgo:
         "$ref": "./hash-v1.yaml#/$defs/algorithm"
+        description: |
+          For an output which will be [content addressed], but the content address is not specified up front, the name of the hash algorithm used. When the content address is fixed, use `hash.hashAlgo` instead.
 
       hash:
-        type: string
+        "$ref": "./hash-v1.yaml"
         description: |
-          For fixed-output derivations, the expected content hash in base-16.
+          For fixed-output derivations, the expected content hash.

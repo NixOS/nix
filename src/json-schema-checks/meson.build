@@ -40,7 +40,7 @@ schemas = [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml',
+    'schema' : schema_dir / 'derivation-v4.yaml',
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
@@ -49,7 +49,7 @@ schemas = [
   # # Not sure how to make subschema work
   # {
   #   'stem': 'derivation',
-  #   'schema': schema_dir / 'derivation-v3.yaml#output',
+  #   'schema': schema_dir / 'derivation-v4.yaml#output',
   #   'files' : [
   #     'output-caFixedFlat.json',
   #     'output-caFixedNAR.json',
