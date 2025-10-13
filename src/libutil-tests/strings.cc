@@ -494,4 +494,63 @@ TEST(shellSplitString, testUnbalancedQuotes)
     ASSERT_THROW(shellSplitString("foo\"bar\\\""), Error);
 }
 
+/* ----------------------------------------------------------------------------
+ * optionalBracket
+ * --------------------------------------------------------------------------*/
+
+TEST(optionalBracket, emptyContent)
+{
+    ASSERT_EQ(optionalBracket(" (", "", ")"), "");
+}
+
+TEST(optionalBracket, nonEmptyContent)
+{
+    ASSERT_EQ(optionalBracket(" (", "foo", ")"), " (foo)");
+}
+
+TEST(optionalBracket, emptyPrefixAndSuffix)
+{
+    ASSERT_EQ(optionalBracket("", "foo", ""), "foo");
+}
+
+TEST(optionalBracket, emptyContentEmptyBrackets)
+{
+    ASSERT_EQ(optionalBracket("", "", ""), "");
+}
+
+TEST(optionalBracket, complexBrackets)
+{
+    ASSERT_EQ(optionalBracket(" [[[", "content", "]]]"), " [[[content]]]");
+}
+
+TEST(optionalBracket, onlyPrefix)
+{
+    ASSERT_EQ(optionalBracket("prefix", "content", ""), "prefixcontent");
+}
+
+TEST(optionalBracket, onlySuffix)
+{
+    ASSERT_EQ(optionalBracket("", "content", "suffix"), "contentsuffix");
+}
+
+TEST(optionalBracket, optionalWithValue)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>("foo"), ")"), " (foo)");
+}
+
+TEST(optionalBracket, optionalNullopt)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>(std::nullopt), ")"), "");
+}
+
+TEST(optionalBracket, optionalEmptyString)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>(""), ")"), "");
+}
+
+TEST(optionalBracket, optionalStringViewWithValue)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string_view>("bar"), ")"), " (bar)");
+}
+
 } // namespace nix

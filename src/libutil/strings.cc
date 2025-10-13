@@ -138,4 +138,18 @@ std::list<std::string> shellSplitString(std::string_view s)
 
     return result;
 }
+
+std::string optionalBracket(std::string_view prefix, std::string_view content, std::string_view suffix)
+{
+    if (content.empty()) {
+        return "";
+    }
+    std::string result;
+    result.reserve(prefix.size() + content.size() + suffix.size());
+    result.append(prefix);
+    result.append(content);
+    result.append(suffix);
+    return result;
+}
+
 } // namespace nix
