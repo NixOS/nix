@@ -1007,9 +1007,6 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
 
 const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
-std::map<DrvOutput, StorePath>
-drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);
-
 template<>
 struct json_avoids_null<TrustedFlag> : std::true_type
 {};

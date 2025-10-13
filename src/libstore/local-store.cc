@@ -110,8 +110,6 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
-    SQLiteStmt QueryRealisationReferences;
-    SQLiteStmt AddRealisationReference;
 };
 
 LocalStore::LocalStore(ref<const Config> config)
@@ -390,21 +388,6 @@ LocalStore::LocalStore(ref<const Config> config)
                     where drvPath = ?
                     ;
             )");
-        state->stmts->QueryRealisationReferences.create(
-            state->db,
-            R"(
-                select drvPath, outputName from Realisations
-                    join RealisationsRefs on realisationReference = Realisations.id
-                    where referrer = ?;
-            )");
-        state->stmts->AddRealisationReference.create(
-            state->db,
-            R"(
-                insert or replace into RealisationsRefs (referrer, realisationReference)
-                values (
-                    (select id from Realisations where drvPath = ? and outputName = ?),
-                    (select id from Realisations where drvPath = ? and outputName = ?));
-            )");
     }
 }
 
@@ -556,7 +539,7 @@ void LocalStore::openDB(State & state, bool create)
 
     /* Initialise the database schema, if necessary. */
     if (create) {
-        static const char schema[] =
+        constexpr static const char schema[] =
 #include "schema.sql.gen.hh"
             ;
         db.exec(schema);
@@ -577,24 +560,54 @@ void LocalStore::upgradeDBSchema(State & state)
             schemaMigrations.insert(useQuerySchemaMigrations.getStr(0));
     }
 
-    auto doUpgrade = [&](const std::string & migrationName, const std::string & stmt) {
+    auto commitAndMarkMigrations = [&](SQLiteTxn & txn, std::initializer_list<std::string> migrationNames) {
+        for (auto & migrationName : migrationNames)
+            state.db.exec(fmt("insert into SchemaMigrations values('%s')", migrationName));
+        txn.commit();
+        for (auto & migrationName : migrationNames)
+            schemaMigrations.insert(migrationName);
+    };
+
+    [[maybe_unused]] auto doUpgrade = [&](const std::string & migrationName, const std::string & stmt) {
         if (schemaMigrations.contains(migrationName))
             return;
 
         debug("executing Nix database schema migration '%s'...", migrationName);
 
         SQLiteTxn txn(state.db);
-        state.db.exec(stmt + fmt(";\ninsert into SchemaMigrations values('%s')", migrationName));
-        txn.commit();
-
-        schemaMigrations.insert(migrationName);
+        state.db.exec(stmt);
+        commitAndMarkMigrations(txn, {migrationName});
     };
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
-        doUpgrade(
-            "20220326-ca-derivations",
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        if (!schemaMigrations.contains("20220326-ca-derivations")) {
+            /* Freshly enabling this extension: use current schema and
+               mark both migrations as done. */
+            constexpr static const char schema[] =
 #include "ca-specific-schema.sql.gen.hh"
-        );
+                ;
+
+            debug("executing Nix database schema migration '%s'...", "20220326-ca-derivations");
+
+            SQLiteTxn txn(state.db);
+            state.db.exec(schema);
+            commitAndMarkMigrations(
+                txn,
+                {
+                    "20220326-ca-derivations",
+                    "20251013-remove-realisations-refs",
+                });
+        } else if (!schemaMigrations.contains("20251013-remove-realisations-refs")) {
+            /* CA drvs previously enabled with old schema. */
+            throw Error(
+                "Migrating the database schema for the '%s' experimental feature is not yet supported.\n\n"
+                "Either downgrade Nix to a version that supports the old schema, "
+                "or disable the '%s' experimental feature.\n\n"
+                "Note: Disabling the experimental feature will safely leave all existing data intact.",
+                showExperimentalFeature(Xp::CaDerivations),
+                showExperimentalFeature(Xp::CaDerivations));
+        }
+    }
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
@@ -652,25 +665,6 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             state->stmts->RegisterRealisedOutput
                 .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
                     concatStringsSep(" ", info.signatures))
-                .exec();
-        }
-        for (auto & [outputId, depPath] : info.dependentRealisations) {
-            auto localRealisation = queryRealisationCore_(*state, outputId);
-            if (!localRealisation)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on the non existent '%s'",
-                    info.id.to_string(),
-                    outputId.to_string());
-            if (localRealisation->second.outPath != depPath)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on a realisation of '%s' that doesn’t"
-                    "match what we have locally",
-                    info.id.to_string(),
-                    outputId.to_string());
-            state->stmts->AddRealisationReference
-                .use()(info.id.strHash())(info.id.outputName)(outputId.strHash())(outputId.outputName)
                 .exec();
         }
     });
@@ -1605,21 +1599,6 @@ std::optional<const UnkeyedRealisation> LocalStore::queryRealisation_(LocalStore
     if (!maybeCore)
         return std::nullopt;
     auto [realisationDbId, res] = *maybeCore;
-
-    std::map<DrvOutput, StorePath> dependentRealisations;
-    auto useRealisationRefs(state.stmts->QueryRealisationReferences.use()(realisationDbId));
-    while (useRealisationRefs.next()) {
-        auto depId = DrvOutput{
-            Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
-            useRealisationRefs.getStr(1),
-        };
-        auto dependentRealisation = queryRealisationCore_(state, depId);
-        assert(dependentRealisation); // Enforced by the db schema
-        auto outputPath = dependentRealisation->second.outPath;
-        dependentRealisations.insert({depId, outputPath});
-    }
-
-    res.dependentRealisations = dependentRealisations;
 
     return {res};
 }
