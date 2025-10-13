@@ -383,6 +383,7 @@ MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature featu
           showExperimentalFeature(feature),
           Uncolored(optionalBracket(" (", reason, ")")))
     , missingFeature(feature)
+    , reason{reason}
 {
 }
 
