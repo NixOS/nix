@@ -106,7 +106,7 @@ The system type on which the [`builder`](#attr-builder) executable is meant to b
 
 A necessary condition for Nix to schedule a given derivation on some [Nix instance] is for the "system" of that derivation to match that instance's [`system` configuration option] or [`extra-platforms` configuration option].
 
-By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
+By putting the `system` in each derivation, Nix allows *heterogeneous* build plans, where not all steps can be run on the same machine or same sort of machine.
 Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
