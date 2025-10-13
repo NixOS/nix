@@ -160,6 +160,10 @@ struct DummyStoreImpl : DummyStore
     void
     addToStore(const ValidPathInfo & info, const SourcePath & path, RepairFlag repair, CheckSigsFlag checkSigs) override
     {
+        if (!repair && isValidPath(info.path)) {
+            return;
+        }
+
         if (config->readOnly)
             unsupported("addToStore");
 

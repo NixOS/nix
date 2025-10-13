@@ -424,6 +424,12 @@ StorePath RemoteStore::addToStoreFromDump(
 
 void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (!repair && isValidPath(info.path)) {
+        NullFileSystemObjectSink s;
+        parseDump(s, source);
+        return;
+    }
+
     auto conn(getConnection());
 
     conn->to << WorkerProto::Op::AddToStoreNar << printStorePath(info.path)

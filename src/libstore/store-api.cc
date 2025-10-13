@@ -86,6 +86,12 @@ StorePath Store::followLinksToStorePath(std::string_view path) const
 
 void Store::addToStore(const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (!repair && isValidPath(info.path)) {
+        NullFileSystemObjectSink s;
+        parseDump(s, narSource);
+        return;
+    }
+
     auto temp = make_ref<MemorySourceAccessor>();
     MemorySink tempSink{*temp};
     parseDump(tempSink, narSource);
@@ -94,6 +100,10 @@ void Store::addToStore(const ValidPathInfo & info, Source & narSource, RepairFla
 
 void Store::addToStore(const ValidPathInfo & info, const SourcePath & path, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (!repair && isValidPath(info.path)) {
+        return;
+    }
+
     auto sink = sourceToSink([&](Source & source) { addToStore(info, source, repair, checkSigs); });
     dumpPath(path, *sink, FileSerialisationMethod::NixArchive);
 }
