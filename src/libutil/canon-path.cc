@@ -5,7 +5,7 @@
 
 namespace nix {
 
-CanonPath CanonPath::root = CanonPath("/");
+const CanonPath CanonPath::root = CanonPath("/");
 
 static std::string absPathPure(std::string_view path)
 {

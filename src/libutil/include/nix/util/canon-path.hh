@@ -69,7 +69,7 @@ public:
      */
     CanonPath(const std::vector<std::string> & elems);
 
-    static CanonPath root;
+    static const CanonPath root;
 
     /**
      * If `raw` starts with a slash, return
