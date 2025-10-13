@@ -193,7 +193,9 @@ public:
     }
 
     /**
-     * @param pos Nullable `shared_ptr<Pos>`
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
      * @param fs Format string, see `HintFmt`
      * @param args... Format string arguments.
      */
@@ -204,9 +206,11 @@ public:
     }
 
     /**
-     * @param pos Nullable `shared_ptr<Pos>`
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
      * @param hint Formatted error message
-     * @param print Optional, whether to always print (e.g. `addErrorContext`)
+     * @param print Optional, whether to always print (used by `addErrorContext`)
      */
     void addTrace(std::shared_ptr<const Pos> && pos, HintFmt hint, TracePrint print = TracePrint::Default);
 
