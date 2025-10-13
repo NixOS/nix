@@ -143,8 +143,7 @@ properties:
           The output path, if known in advance.
 
       method:
-        type: string
-        enum: [flat, nar, text, git]
+        "$ref": "./content-address-v1.yaml#/$defs/method"
         description: |
           For an output which will be [content addressed](@docroot@/store/derivation/outputs/content-address.md), a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
 
