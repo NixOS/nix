@@ -73,7 +73,7 @@ let
       ]
     );
 in
-{
+rec {
   /**
     An internal check to make sure our package listing is complete.
   */
@@ -145,18 +145,9 @@ in
       )
   );
 
-  buildNoGc =
-    let
-      components = forAllSystems (
-        system:
-        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
-          self: super: {
-            nix-expr = super.nix-expr.override { enableGC = false; };
-          }
-        )
-      );
-    in
-    forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
+  # Builds with sanitizers already have GC disabled, so this buildNoGc can just
+  # point to buildWithSanitizers in order to reduce the load on hydra.
+  buildNoGc = buildWithSanitizers;
 
   buildWithSanitizers =
     let
