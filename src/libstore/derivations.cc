@@ -115,23 +115,25 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return readOnly || settings.readOnlyMode ? store.makeFixedOutputPathFromCA(
-                                                   suffix,
-                                                   TextInfo{
-                                                       .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                       .references = std::move(references),
-                                                   })
-                                             : ({
-                                                   StringSource s{contents};
-                                                   store.addToStoreFromDump(
-                                                       s,
-                                                       suffix,
-                                                       FileSerialisationMethod::Flat,
-                                                       ContentAddressMethod::Raw::Text,
-                                                       HashAlgorithm::SHA256,
-                                                       references,
-                                                       repair);
-                                               });
+    auto hash = hashString(HashAlgorithm::SHA256, contents);
+    auto ca = TextInfo{.hash = hash, .references = references};
+    auto path = store.makeFixedOutputPathFromCA(suffix, ca);
+
+    if (readOnly || settings.readOnlyMode || (store.isValidPath(path) && !repair))
+        return path;
+
+    StringSource s{contents};
+    auto path2 = store.addToStoreFromDump(
+        s,
+        suffix,
+        FileSerialisationMethod::Flat,
+        ContentAddressMethod::Raw::Text,
+        HashAlgorithm::SHA256,
+        references,
+        repair);
+    assert(path2 == path);
+
+    return path;
 }
 
 namespace {

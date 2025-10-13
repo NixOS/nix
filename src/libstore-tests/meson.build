@@ -83,6 +83,7 @@ sources = files(
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol.cc',
+  'write-derivation.cc',
 )
 
 include_dirs = [ include_directories('.') ]
