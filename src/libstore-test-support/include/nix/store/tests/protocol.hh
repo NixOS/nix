@@ -88,15 +88,21 @@ public:
     }
 };
 
-#define VERSIONED_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    TEST_F(FIXTURE, NAME##_read)                                                     \
-    {                                                                                \
-        readProtoTest(STEM, VERSION, VALUE);                                         \
-    }                                                                                \
-    TEST_F(FIXTURE, NAME##_write)                                                    \
-    {                                                                                \
-        writeProtoTest(STEM, VERSION, VALUE);                                        \
+#define VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
+    TEST_F(FIXTURE, NAME##_read)                                                          \
+    {                                                                                     \
+        readProtoTest(STEM, VERSION, VALUE);                                              \
     }
+
+#define VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
+    TEST_F(FIXTURE, NAME##_write)                                                          \
+    {                                                                                      \
+        writeProtoTest(STEM, VERSION, VALUE);                                              \
+    }
+
+#define VERSIONED_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE)  \
+    VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
+    VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE)
 
 #define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)     \
     VERSIONED_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
