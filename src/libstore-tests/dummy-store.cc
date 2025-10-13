@@ -115,6 +115,16 @@ INSTANTIATE_TEST_SUITE_P(DummyStoreJSON, DummyStoreJsonTest, [] {
                     HashAlgorithm::SHA256);
                 return store;
             }(),
+        },
+        std::pair{
+            "one-derivation",
+            [&] {
+                auto store = writeCfg->openDummyStore();
+                Derivation drv;
+                drv.name = "foo";
+                store->writeDerivation(drv);
+                return store;
+            }(),
         });
 }());
 
