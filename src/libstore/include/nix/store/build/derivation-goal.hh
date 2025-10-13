@@ -45,7 +45,7 @@ struct DerivationGoal : public Goal
         const Derivation & drv,
         const OutputName & wantedOutput,
         Worker & worker,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode);
     ~DerivationGoal() = default;
 
     void timedOut(Error && ex) override

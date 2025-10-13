@@ -29,8 +29,7 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
-    DerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode);
     ~DerivationBuildingGoal();
 
 private:
