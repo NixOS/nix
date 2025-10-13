@@ -46,15 +46,21 @@ public:
     }
 };
 
-#define CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
-    TEST_F(CommonProtoTest, NAME##_read)         \
-    {                                            \
-        readProtoTest(STEM, VALUE);              \
-    }                                            \
-    TEST_F(CommonProtoTest, NAME##_write)        \
-    {                                            \
-        writeProtoTest(STEM, VALUE);             \
+#define READ_CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
+    TEST_F(CommonProtoTest, NAME##_read)              \
+    {                                                 \
+        readProtoTest(STEM, VALUE);                   \
     }
+
+#define WRITE_CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
+    TEST_F(CommonProtoTest, NAME##_write)              \
+    {                                                  \
+        writeProtoTest(STEM, VALUE);                   \
+    }
+
+#define CHARACTERIZATION_TEST(NAME, STEM, VALUE)  \
+    READ_CHARACTERIZATION_TEST(NAME, STEM, VALUE) \
+    WRITE_CHARACTERIZATION_TEST(NAME, STEM, VALUE)
 
 CHARACTERIZATION_TEST(
     string,
@@ -132,7 +138,7 @@ CHARACTERIZATION_TEST(
         },
     }))
 
-CHARACTERIZATION_TEST(
+READ_CHARACTERIZATION_TEST(
     realisation_with_deps,
     "realisation-with-deps",
     (std::tuple<Realisation>{
@@ -140,16 +146,6 @@ CHARACTERIZATION_TEST(
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                 .signatures = {"asdf", "qwer"},
-                .dependentRealisations =
-                    {
-                        {
-                            DrvOutput{
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "quux",
-                            },
-                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                        },
-                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
