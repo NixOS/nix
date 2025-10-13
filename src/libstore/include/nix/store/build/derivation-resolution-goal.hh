@@ -35,8 +35,7 @@ struct BuilderFailureError;
  */
 struct DerivationResolutionGoal : public Goal
 {
-    DerivationResolutionGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode = bmNormal);
+    DerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode);
 
     /**
      * If the derivation needed to be resolved, this is resulting

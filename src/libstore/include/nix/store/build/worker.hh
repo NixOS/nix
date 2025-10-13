@@ -210,32 +210,30 @@ private:
     std::shared_ptr<G> initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args &&... args);
 
     std::shared_ptr<DerivationTrampolineGoal> makeDerivationTrampolineGoal(
-        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs, BuildMode buildMode = bmNormal);
+        ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs, BuildMode buildMode);
 
 public:
     std::shared_ptr<DerivationTrampolineGoal> makeDerivationTrampolineGoal(
-        const StorePath & drvPath,
-        const OutputsSpec & wantedOutputs,
-        const Derivation & drv,
-        BuildMode buildMode = bmNormal);
+        const StorePath & drvPath, const OutputsSpec & wantedOutputs, const Derivation & drv, BuildMode buildMode);
 
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode,
+        bool storeDerivation);
 
     /**
      * @ref DerivationResolutionGoal "derivation resolution goal"
      */
     std::shared_ptr<DerivationResolutionGoal>
-    makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
+    makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode);
 
     /**
      * @ref DerivationBuildingGoal "derivation building goal"
      */
-    std::shared_ptr<DerivationBuildingGoal>
-    makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode = bmNormal);
+    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
+        const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"
