@@ -288,7 +288,7 @@ static DerivationOutput parseDerivationOutput(
     if (!hashAlgoStr.empty()) {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output");
         const auto hashAlgo = parseHashAlgo(hashAlgoStr);
         if (hashS == "impure"sv) {
             xpSettings.require(Xp::ImpureDerivations);
@@ -426,7 +426,7 @@ Derivation parseDerivation(
         if (*versionS == "xp-dyn-drv"sv) {
             // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name));
         } else {
             throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
@@ -1301,7 +1301,7 @@ DerivationOutput::fromJSON(const nlohmann::json & _json, const ExperimentalFeatu
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         ContentAddressMethod method = ContentAddressMethod::parse(getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
 
         auto hashAlgo = parseHashAlgo(getString(valueAt(json, "hashAlgo")));
         return {std::move(method), std::move(hashAlgo)};
@@ -1454,7 +1454,7 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
             node.value = getStringSet(valueAt(json, "outputs"));
             auto drvs = getObject(valueAt(json, "dynamicOutputs"));
             for (auto & [outputId, childNode] : drvs) {
-                xpSettings.require(Xp::DynamicDerivations);
+                xpSettings.require(Xp::DynamicDerivations, fmt("dynamic output '%s' in JSON", outputId));
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;
