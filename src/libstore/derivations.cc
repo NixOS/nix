@@ -105,7 +105,7 @@ bool BasicDerivation::isBuiltin() const
     return builder.substr(0, 8) == "builtin:";
 }
 
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+static auto infoForDerivation(Store & store, const Derivation & drv)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs.map)
@@ -117,13 +117,32 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
     auto contents = drv.unparse(store, false);
     auto hash = hashString(HashAlgorithm::SHA256, contents);
     auto ca = TextInfo{.hash = hash, .references = references};
-    auto path = store.makeFixedOutputPathFromCA(suffix, ca);
+    return std::tuple{
+        suffix,
+        contents,
+        references,
+        store.makeFixedOutputPathFromCA(suffix, ca),
+    };
+}
 
-    if (readOnly || settings.readOnlyMode || (store.isValidPath(path) && !repair))
+StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+{
+    if (readOnly || settings.readOnlyMode) {
+        auto [_x, _y, _z, path] = infoForDerivation(store, drv);
+        return path;
+    } else
+        return store.writeDerivation(drv, repair);
+}
+
+StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
+{
+    auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
+
+    if (isValidPath(path) && !repair)
         return path;
 
     StringSource s{contents};
-    auto path2 = store.addToStoreFromDump(
+    auto path2 = addToStoreFromDump(
         s,
         suffix,
         FileSerialisationMethod::Flat,
