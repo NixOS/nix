@@ -95,7 +95,7 @@ struct UsernameAuth
 
 struct FileTransferRequest
 {
-    ValidURL uri;
+    VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
@@ -121,7 +121,7 @@ struct FileTransferRequest
     std::optional<std::string> preResolvedAwsSessionToken;
 #endif
 
-    FileTransferRequest(ValidURL uri)
+    FileTransferRequest(VerbatimURL uri)
         : uri(std::move(uri))
         , parentAct(getCurActivity())
     {
