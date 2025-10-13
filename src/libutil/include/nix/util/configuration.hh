@@ -463,7 +463,7 @@ struct ExperimentalFeatureSettings : Config
      * Require an experimental feature be enabled, throwing an error if it is
      * not.
      */
-    void require(const ExperimentalFeature &) const;
+    void require(const ExperimentalFeature &, std::string reason = "") const;
 
     /**
      * `std::nullopt` pointer means no feature, which means there is nothing that could be

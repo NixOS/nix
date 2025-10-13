@@ -88,7 +88,7 @@ public:
      */
     ExperimentalFeature missingFeature;
 
-    MissingExperimentalFeature(ExperimentalFeature missingFeature);
+    MissingExperimentalFeature(ExperimentalFeature missingFeature, std::string reason = "");
 };
 
 /**
