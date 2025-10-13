@@ -4,6 +4,40 @@ source ./common.sh
 
 requireGit
 
+# Test basic caching: trace should only appear on first evaluation
+basicCacheDir="$TEST_ROOT/basic-cache-flake"
+createGitRepo "$basicCacheDir" ""
+cp "${config_nix}" "$basicCacheDir/"
+git -C "$basicCacheDir" add config.nix
+git -C "$basicCacheDir" commit -m "config.nix"
+
+cat >"$basicCacheDir/flake.nix" <<EOF
+{
+  description = "Basic cache test";
+  outputs = { self }: let inherit (import ./config.nix) mkDerivation; in {
+    packages.$system.default = builtins.trace "basic-test-evaluating" (mkDerivation {
+      name = "cached-build";
+      buildCommand = "echo hello > \\\$out";
+    });
+  };
+}
+EOF
+exec 2>&1
+git -C "$basicCacheDir" add flake.nix
+git -C "$basicCacheDir" commit -m "Init"
+
+clearCache
+
+# First build should show trace
+nix build --no-link "$basicCacheDir" 2>&1 | grepQuiet 'trace: basic-test-evaluating'
+
+# Second build should use cache, no trace output
+nix build --no-link "$basicCacheDir" 2>&1 | grepQuietInverse 'trace: basic-test-evaluating'
+
+# Third build should also use cache, no trace output
+nix build --no-link "$basicCacheDir" 2>&1 | grepQuietInverse 'trace: basic-test-evaluating'
+
+# Test edge cases with separate flake
 flake1Dir="$TEST_ROOT/eval-cache-flake"
 
 createGitRepo "$flake1Dir" ""

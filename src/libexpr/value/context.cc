@@ -1,8 +1,6 @@
 #include "nix/util/util.hh"
 #include "nix/expr/value/context.hh"
 
-#include <optional>
-
 namespace nix {
 
 NixStringContextElem NixStringContextElem::parse(std::string_view s0, const ExperimentalFeatureSettings & xpSettings)

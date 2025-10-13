@@ -9,11 +9,13 @@
 #include "nix/store/derivations.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/evaluation-helpers.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/main/shared.hh"
 #include "nix/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
+#include "nix/expr/coarse-eval-cache.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
@@ -65,12 +67,13 @@ InstallableFlake::InstallableFlake(
     Strings attrPaths,
     Strings prefixes,
     const flake::LockFlags & lockFlags)
-    : InstallableValue(state)
+    : InstallableValue(state, make_ref<CoarseEvalCache>(state))
     , flakeRef(flakeRef)
     , attrPaths(fragment == "" ? attrPaths : Strings{(std::string) fragment})
     , prefixes(fragment == "" ? Strings{} : prefixes)
     , extendedOutputsSpec(std::move(extendedOutputsSpec))
     , lockFlags(lockFlags)
+    , coarseEvalCache(evaluator.cast<CoarseEvalCache>())
 {
     if (cmd && cmd->getAutoArgs(*state)->size())
         throw UsageError("'--arg' and '--argstr' are incompatible with flakes");
@@ -80,35 +83,45 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
     Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
-    auto attr = getCursor(*state);
+    auto root = getRootObject();
 
-    auto attrPath = attr->getAttrPathStr();
+    auto attrPaths = getActualAttrPaths();
+    auto attrResult = expr::helpers::tryAttrPaths(*root, attrPaths, *state);
+    if (!attrResult) {
+        throw Error(
+            attrResult.getSuggestions(),
+            "flake '%s' does not provide attribute %s",
+            flakeRef,
+            showAttrPaths(attrPaths));
+    }
 
-    if (!attr->isDerivation()) {
+    auto [attr, attrPath] = *attrResult;
+
+    if (!expr::helpers::isDerivation(*attr)) {
 
         // FIXME: use eval cache?
-        auto v = attr->forceValue();
+        auto v = attr->defeatCache();
 
         if (std::optional derivedPathWithInfo = trySinglePathToDerivedPaths(
-                v, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath))) {
+                **v, noPos, fmt("while evaluating the flake output attribute '%s'", attrPath))) {
             return {*derivedPathWithInfo};
         } else {
             throw Error(
                 "expected flake output attribute '%s' to be a derivation or path but found %s: %s",
                 attrPath,
-                showType(v),
-                ValuePrinter(*this->state, v, errorPrintOptions));
+                showType(**v),
+                ValuePrinter(*this->state, **v, errorPrintOptions));
         }
     }
 
-    auto drvPath = attr->forceDerivation();
+    auto drvPath = expr::helpers::forceDerivation(*evaluator, *attr, evaluator->getStore());
 
     std::optional<NixInt::Inner> priority;
 
-    if (attr->maybeGetAttr(state->s.outputSpecified)) {
-    } else if (auto aMeta = attr->maybeGetAttr(state->s.meta)) {
+    if (attr->maybeGetAttr(std::string(state->symbols[state->s.outputSpecified]))) {
+    } else if (auto aMeta = attr->maybeGetAttr(std::string(state->symbols[state->s.meta]))) {
         if (auto aPriority = aMeta->maybeGetAttr("priority"))
-            priority = aPriority->getInt().value;
+            priority = aPriority->getInt("while getting priority").value;
     }
 
     return {{
@@ -118,21 +131,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
                 .outputs = std::visit(
                     overloaded{
                         [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                            StringSet outputsToInstall;
-                            if (auto aOutputSpecified = attr->maybeGetAttr(state->s.outputSpecified)) {
-                                if (aOutputSpecified->getBool()) {
-                                    if (auto aOutputName = attr->maybeGetAttr("outputName"))
-                                        outputsToInstall = {aOutputName->getString()};
-                                }
-                            } else if (auto aMeta = attr->maybeGetAttr(state->s.meta)) {
-                                if (auto aOutputsToInstall = aMeta->maybeGetAttr("outputsToInstall"))
-                                    for (auto & s : aOutputsToInstall->getListOfStrings())
-                                        outputsToInstall.insert(s);
-                            }
-
-                            if (outputsToInstall.empty())
-                                outputsToInstall.insert("out");
-
+                            auto outputsToInstall = expr::helpers::getDerivationOutputs(*attr);
                             return OutputsSpec::Names{std::move(outputsToInstall)};
                         },
                         [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec { return e; },
@@ -183,6 +182,13 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
         throw Error(suggestions, "flake '%s' does not provide attribute %s", flakeRef, showAttrPaths(attrPaths));
 
     return res;
+}
+
+ref<Object> InstallableFlake::getRootObject()
+{
+    // openEvalCache is memoized in state.evalCaches by fingerprint
+    auto evalCache = openEvalCache(*state, getLockedFlake());
+    return coarseEvalCache->getRoot(evalCache);
 }
 
 ref<flake::LockedFlake> InstallableFlake::getLockedFlake() const

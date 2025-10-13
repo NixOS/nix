@@ -14,6 +14,9 @@ class EvalCache;
 class AttrCursor;
 } // namespace eval_cache
 
+class Object;
+class Evaluator;
+
 struct App
 {
     std::vector<DerivedPath> context;
@@ -79,8 +82,15 @@ struct InstallableValue : Installable
 {
     ref<EvalState> state;
 
-    InstallableValue(ref<EvalState> state)
+    /**
+     * The evaluator to use for this installable.
+     * Uses Interpreter for attr-path based evaluation, CoarseEvalCache for flake-based evaluation.
+     */
+    ref<Evaluator> evaluator;
+
+    InstallableValue(ref<EvalState> state, ref<Evaluator> evaluator)
         : state(state)
+        , evaluator(evaluator)
     {
     }
 
@@ -89,6 +99,7 @@ struct InstallableValue : Installable
     virtual std::pair<Value *, PosIdx> toValue(EvalState & state) = 0;
 
     /**
+     * @deprecated Use Evaluator and Object instead.
      * Get a cursor to each value this Installable could refer to.
      * However if none exists, throw exception instead of returning
      * empty vector.
@@ -96,10 +107,16 @@ struct InstallableValue : Installable
     virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state);
 
     /**
+     * @deprecated Use Evaluator and Object instead.
      * Get the first and most preferred cursor this Installable could
      * refer to, or throw an exception if none exists.
      */
     virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state);
+
+    /**
+     * Retrieve the root value (e.g. wired-up flake).
+     */
+    virtual ref<Object> getRootObject() = 0;
 
     UnresolvedApp toApp(EvalState & state);
 

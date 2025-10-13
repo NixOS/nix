@@ -1,5 +1,6 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/evaluation-helpers.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/expr/symbol-table.hh"
@@ -283,6 +284,8 @@ EvalState::EvalState(
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
+    assert(settings.maxCallDepth && "max-call-depth must be >0, and EvalSettings must be initialized");
+
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
 
@@ -2526,28 +2529,17 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
 {
     NixStringContext context;
     auto s = forceString(v, context, pos, errorCtx, xpSettings);
-    auto csize = context.size();
-    if (csize != 1)
-        error<EvalError>("string '%s' has %d entries in its context. It should only have exactly one entry", s, csize)
-            .withTrace(pos, errorCtx)
-            .debugThrow();
-    auto derivedPath = std::visit(
-        overloaded{
-            [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath { return std::move(o); },
-            [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
-                error<EvalError>(
-                    "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
-                    s)
-                    .withTrace(pos, errorCtx)
-                    .debugThrow();
-            },
-            [&](NixStringContextElem::Built && b) -> SingleDerivedPath { return std::move(b); },
-        },
-        ((NixStringContextElem &&) *context.begin()).raw);
-    return {
-        std::move(derivedPath),
-        std::move(s),
-    };
+
+    try {
+        auto derivedPath = expr::helpers::coerceToSingleDerivedPathUnchecked(s, context, "");
+        return {
+            std::move(derivedPath),
+            std::move(s),
+        };
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
 }
 
 SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)

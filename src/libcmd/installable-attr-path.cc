@@ -13,6 +13,8 @@
 #include "nix/main/shared.hh"
 #include "nix/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
+#include "nix/expr/interpreter.hh"
+#include "nix/expr/interpreter-object.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
@@ -30,7 +32,7 @@ InstallableAttrPath::InstallableAttrPath(
     Value * v,
     const std::string & attrPath,
     ExtendedOutputsSpec extendedOutputsSpec)
-    : InstallableValue(state)
+    : InstallableValue(state, make_ref<Interpreter>(state))
     , cmd(cmd)
     , v(allocRootValue(v))
     , attrPath(attrPath)
@@ -104,6 +106,13 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
         });
 
     return res;
+}
+
+ref<Object> InstallableAttrPath::getRootObject()
+{
+    // For InstallableAttrPath, we use the Interpreter evaluator
+    // and wrap the value in an InterpreterObject
+    return make_ref<InterpreterObject>(*state, v);
 }
 
 InstallableAttrPath InstallableAttrPath::parse(
