@@ -1293,15 +1293,13 @@ void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutpu
         overloaded{
             [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
             [&](const DerivationOutput::CAFixed & dof) {
-    /* it would be nice to output the path for user convenience, but
-       this would require us to know the store dir. */
+                res = dof.ca;
+        // FIXME print refs?
+        /* it would be nice to output the path for user convenience, but
+           this would require us to know the store dir. */
 #if 0
                 res["path"] = dof.path(store, drvName, outputName);
 #endif
-                res["method"] = std::string{dof.ca.method.render()};
-                res["hashAlgo"] = printHashAlgo(dof.ca.hash.algo);
-                res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
-                // FIXME print refs?
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 res["method"] = std::string{dof.method.render()};
@@ -1341,15 +1339,12 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
         };
     }
 
-    else if (keys == (std::set<std::string_view>{"method", "hashAlgo", "hash"})) {
-        auto [method, hashAlgo] = methodAlgo();
+    else if (keys == (std::set<std::string_view>{"method", "hash"})) {
         auto dof = DerivationOutput::CAFixed{
-            .ca =
-                ContentAddress{
-                    .method = std::move(method),
-                    .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
-                },
+            .ca = static_cast<ContentAddress>(_json),
         };
+        if (dof.ca.method == ContentAddressMethod::Raw::Text)
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
         /* We no longer produce this (denormalized) field (for the
            reasons described above), so we don't need to check it. */
 #if 0
@@ -1392,7 +1387,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 
     res["name"] = d.name;
 
-    res["version"] = 3;
+    res["version"] = 4;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
@@ -1450,8 +1445,8 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     res.name = getString(valueAt(json, "name"));
 
-    if (valueAt(json, "version") != 3)
-        throw Error("Only derivation format version 3 is currently supported.");
+    if (valueAt(json, "version") != 4)
+        throw Error("Only derivation format version 4 is currently supported.");
 
     try {
         auto outputs = getObject(valueAt(json, "outputs"));

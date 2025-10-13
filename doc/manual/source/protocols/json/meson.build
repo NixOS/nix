@@ -12,7 +12,7 @@ schemas = [
   'file-system-object-v1',
   'hash-v1',
   'content-address-v1',
-  'derivation-v3',
+  'derivation-v4',
 ]
 
 schema_files = files()

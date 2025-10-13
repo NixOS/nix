@@ -63,7 +63,7 @@ builtins.outputOf
             }
           },
           "system": "${system}",
-          "version": 3
+          "version": 4
         }
       EOF
         drvPath=$(echo "$json" | nix derivation add)

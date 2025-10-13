@@ -22,5 +22,5 @@
   "name": "simple-derivation",
   "outputs": {},
   "system": "wasm-sel4",
-  "version": 3
+  "version": 4
 }
