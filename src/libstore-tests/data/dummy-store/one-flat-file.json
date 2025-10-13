@@ -30,5 +30,6 @@
       }
     }
   },
+  "derivations": {},
   "store-dir": "/nix/store"
 }

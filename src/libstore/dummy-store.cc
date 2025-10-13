@@ -422,6 +422,8 @@ ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
     }();
     for (auto & [k, v] : getObject(valueAt(obj, "contents")))
         res->contents.insert({StorePath{k}, v});
+    for (auto & [k, v] : getObject(valueAt(obj, "derivations")))
+        res->derivations.insert({StorePath{k}, v});
     for (auto & [k0, v] : getObject(valueAt(obj, "build-trace"))) {
         for (auto & [k1, v2] : getObject(v)) {
             auto vref = make_ref<UnkeyedRealisation>(v2);
@@ -444,6 +446,15 @@ void adl_serializer<ref<DummyStore>>::to_json(json & json, const ref<DummyStore>
          [&] {
              auto obj = json::object();
              val->contents.cvisit_all([&](const auto & kv) {
+                 auto & [k, v] = kv;
+                 obj[k.to_string()] = v;
+             });
+             return obj;
+         }()},
+        {"derivations",
+         [&] {
+             auto obj = json::object();
+             val->derivations.cvisit_all([&](const auto & kv) {
                  auto & [k, v] = kv;
                  obj[k.to_string()] = v;
              });
