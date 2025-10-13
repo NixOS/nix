@@ -17,7 +17,7 @@ schemas = [
   'derivation-v4',
   'derivation-options-v1',
   'deriving-path-v1',
-  'build-trace-entry-v1',
+  'build-trace-entry-v2',
   'build-result-v1',
   'store-v1',
 ]
