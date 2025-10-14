@@ -40,14 +40,4 @@ public:
     virtual std::optional<std::string> getEnv(const std::string & name) = 0;
 };
 
-/**
- * Create a system environment based on evaluation settings and store.
- * @param settings Evaluation settings
- * @param store Reference to the Nix store
- * @param buildStore Optional separate store for building (defaults to store)
- * @return A new Environment instance
- */
-ref<Environment>
-makeSystemEnvironment(const EvalSettings & settings, ref<Store> store, std::shared_ptr<Store> buildStore = nullptr);
-
 } // namespace nix

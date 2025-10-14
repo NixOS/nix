@@ -53,6 +53,12 @@ public:
      */
     ref<SourceAccessor> rootFSAccessor;
 
+    /**
+     * Create a system environment based on evaluation settings and store.
+     * @param settings Evaluation settings
+     * @param store Reference to the Nix store
+     * @param buildStore Optional separate store for building (defaults to store)
+     */
     SystemEnvironment(const EvalSettings & settings, ref<Store> store, std::shared_ptr<Store> buildStore = nullptr);
 
     ref<SourceAccessor> fsRoot() override;
