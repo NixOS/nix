@@ -1130,7 +1130,7 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
 
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
-    auto accessor = store.getFSAccessor(drvPath, requireValidPath);
+    auto accessor = store.requireStoreObjectAccessor(drvPath, requireValidPath);
     try {
         return parseDerivation(store, accessor->readFile(CanonPath::root), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {

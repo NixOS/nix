@@ -332,8 +332,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
 
-            // We just ensured the store object was there
-            auto accessor = ref{store->getFSAccessor(storePath)};
+            auto accessor = store->requireStoreObjectAccessor(storePath);
 
             accessor->fingerprint = getFingerprint(store);
 

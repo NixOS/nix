@@ -138,7 +138,7 @@ struct PathInputScheme : InputScheme
             storePath = store->addToStoreFromDump(*src, "source");
         }
 
-        auto accessor = ref{store->getFSAccessor(*storePath)};
+        auto accessor = store->requireStoreObjectAccessor(*storePath);
 
         // To prevent `fetchToStore()` copying the path again to Nix
         // store, pre-create an entry in the fetcher cache.
