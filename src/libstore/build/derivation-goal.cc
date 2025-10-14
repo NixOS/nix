@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -100,9 +101,24 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
            through substitutes.  If that doesn't work, we'll build
            them. */
         if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
-            if (!checkResult)
-                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
-            else {
+            if (!checkResult) {
+                DrvOutput id{outputHash, wantedOutput};
+                auto g = worker.makeDrvOutputSubstitutionGoal(id);
+                waitees.insert(g);
+                co_await await(std::move(waitees));
+
+                if (nrFailed == 0) {
+                    waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
+                    co_await await(std::move(waitees));
+
+                    trace("output path substituted");
+
+                    if (nrFailed == 0)
+                        worker.store.registerDrvOutput({*g->outputInfo, id});
+                    else
+                        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
+                }
+            } else {
                 auto * cap = getDerivationCA(*drv);
                 waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
                     checkResult->first.outPath,

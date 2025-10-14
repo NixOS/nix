@@ -19,7 +19,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     trace("init");
 
     /* If the derivation already exists, we’re done */
-    if (worker.store.queryRealisation(id)) {
+    if ((outputInfo = worker.store.queryRealisation(id))) {
         co_return amDone(ecSuccess);
     }
 
@@ -77,12 +77,6 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         worker.childTerminated(this);
 
-        /*
-         * The realisation corresponding to the given output id.
-         * Will be filled once we can get it.
-         */
-        std::shared_ptr<const UnkeyedRealisation> outputInfo;
-
         try {
             outputInfo = promise->get_future().get();
         } catch (std::exception & e) {
@@ -92,21 +86,6 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         if (!outputInfo)
             continue;
-
-        Goals waitees;
-
-        waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
-
-        co_await await(std::move(waitees));
-
-        trace("output path substituted");
-
-        if (nrFailed > 0) {
-            debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-            co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
-        }
-
-        worker.store.registerDrvOutput({*outputInfo, id});
 
         trace("finished");
         co_return amDone(ecSuccess);
