@@ -29,12 +29,7 @@ class DrvOutputSubstitutionGoal : public Goal
     DrvOutput id;
 
 public:
-    DrvOutputSubstitutionGoal(
-        const DrvOutput & id,
-        Worker & worker,
-        RepairFlag repair = NoRepair,
-        std::optional<ContentAddress> ca = std::nullopt);
-
+    DrvOutputSubstitutionGoal(const DrvOutput & id, Worker & worker);
 
     Co init();
     Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);

@@ -104,10 +104,9 @@ Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std:
     return initGoalIfNeeded(substitutionGoals[path], path, *this, repair, ca);
 }
 
-std::shared_ptr<DrvOutputSubstitutionGoal>
-Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id)
 {
-    return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this, repair, ca);
+    return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this);
 }
 
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)

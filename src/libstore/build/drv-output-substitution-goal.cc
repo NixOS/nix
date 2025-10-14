@@ -8,8 +8,7 @@
 
 namespace nix {
 
-DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(
-    const DrvOutput & id, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput & id, Worker & worker)
     : Goal(worker, init())
     , id(id)
 {

@@ -240,8 +240,7 @@ public:
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
         const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
-    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(
-        const DrvOutput & id, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+    std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.

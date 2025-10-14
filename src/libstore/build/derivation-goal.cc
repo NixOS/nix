@@ -100,8 +100,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
            them. */
         if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
             if (!checkResult)
-                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                    DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
             else {
                 auto * cap = getDerivationCA(*drv);
                 waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
