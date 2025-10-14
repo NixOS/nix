@@ -529,15 +529,9 @@ bool Worker::pathContentsGood(const StorePath & path)
         return i->second;
     printInfo("checking path '%s'...", store.printStorePath(path));
     auto info = store.queryPathInfo(path);
-    bool res;
-    if (!pathExists(store.printStorePath(path)))
-        res = false;
-    else {
-        auto current = hashPath(
-                           {store.getFSAccessor(), CanonPath(path.to_string())},
-                           FileIngestionMethod::NixArchive,
-                           info->narHash.algo)
-                           .first;
+    bool res = false;
+    if (auto accessor = store.getFSAccessor(path, /*requireValidPath=*/false)) {
+        auto current = hashPath({ref{accessor}}, FileIngestionMethod::NixArchive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
     }
