@@ -588,7 +588,11 @@ static void fetch(
 
     if (expectedHash) {
         auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
-                           : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
+                           : hashPath(
+                                 {state.store->requireStoreObjectAccessor(storePath)},
+                                 FileSerialisationMethod::Flat,
+                                 HashAlgorithm::SHA256)
+                                 .hash;
         if (hash != *expectedHash) {
             state
                 .error<EvalError>(
