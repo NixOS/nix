@@ -4,7 +4,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/config.hh"
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
 #  include "nix/store/aws-creds.hh"
 #endif
 
@@ -18,7 +18,7 @@ struct BuiltinBuilderContext
     std::string caFileData;
     Path tmpDirInSandbox;
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
     /**
      * Pre-resolved AWS credentials for S3 URLs in builtin:fetchurl.
      * When present, these should be used instead of creating new credential providers.

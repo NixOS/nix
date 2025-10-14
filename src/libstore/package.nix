@@ -23,7 +23,7 @@
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
 
-  withCurlS3 ?
+  withAWS ?
     # Default is this way because there have been issues building this dependency
     stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
 }:
@@ -65,7 +65,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
-  ++ lib.optional withCurlS3 aws-crt-cpp;
+  ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
     nix-util
@@ -75,7 +75,7 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
-    (lib.mesonEnable "curl-s3-store" withCurlS3)
+    (lib.mesonEnable "curl-s3-store" withAWS)
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")

@@ -3,7 +3,7 @@
 
 #include "nix/store/config.hh"
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
 
 #  include "nix/store/http-binary-cache-store.hh"
 

@@ -5,7 +5,7 @@
   stdenv ? "stdenv",
   componentTestsPrefix ? "",
   withInstrumentation ? false,
-  withCurlS3 ? null,
+  withAWS ? null,
 }@args:
 import ./. (
   args
@@ -13,6 +13,6 @@ import ./. (
     getStdenv = p: p.${stdenv};
     withSanitizers = withInstrumentation;
     withCoverage = withInstrumentation;
-    inherit withCurlS3;
+    inherit withAWS;
   }
 )

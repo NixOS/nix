@@ -41,7 +41,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             FileTransferRequest request(VerbatimURL{url});
             request.decompress = false;
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
             // Use pre-resolved credentials if available
             if (ctx.awsCredentials && request.uri.scheme() == "s3") {
                 debug("[pid=%d] Using pre-resolved AWS credentials from parent process", getpid());

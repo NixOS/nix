@@ -12,7 +12,7 @@
   componentTestsPrefix ? "",
   withSanitizers ? false,
   withCoverage ? false,
-  withCurlS3 ? null,
+  withAWS ? null,
   ...
 }:
 
@@ -58,9 +58,7 @@ rec {
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
 
       # Override AWS configuration if specified
-      nix-store = prev.nix-store.override (
-        lib.optionalAttrs (withCurlS3 != null) { inherit withCurlS3; }
-      );
+      nix-store = prev.nix-store.override (lib.optionalAttrs (withAWS != null) { inherit withAWS; });
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
       # Unclear how to make Perl bindings work with a dynamically linked ASAN.
@@ -229,7 +227,7 @@ rec {
 
   vmTests = {
   }
-  // lib.optionalAttrs (withCurlS3 == true) {
+  // lib.optionalAttrs (withAWS == true) {
     # S3 binary cache store test using curl implementation
     inherit (nixosTests) curl-s3-binary-cache-store;
   }

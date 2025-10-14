@@ -9,7 +9,7 @@
 
 #include "store-config-private.hh"
 #include <optional>
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
 #  include "nix/store/aws-creds.hh"
 #  include "nix/store/s3-url.hh"
 #endif
@@ -435,7 +435,7 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
             // Set up AWS SigV4 signing if this is an S3 request
             // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
             // The username/password (access key ID and secret key) are set via the general
@@ -820,7 +820,7 @@ struct curlFileTransfer : public FileTransfer
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
             && item->request.uri.scheme() != "s3"
 #endif
         )
@@ -841,7 +841,7 @@ struct curlFileTransfer : public FileTransfer
     {
         /* Ugly hack to support s3:// URIs. */
         if (request.uri.scheme() == "s3") {
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
             // New curl-based S3 implementation
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
@@ -876,7 +876,7 @@ ref<FileTransfer> makeFileTransfer()
     return makeCurlFileTransfer();
 }
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_S3_SUPPORT
 void FileTransferRequest::setupForS3()
 {
     auto parsedS3 = ParsedS3URL::parse(uri.parsed());
