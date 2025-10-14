@@ -1,4 +1,5 @@
 #include "nix/cmd/installable-value.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 
@@ -43,7 +44,8 @@ std::optional<DerivedPathWithInfo>
 InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::string_view errorCtx)
 {
     if (v.type() == nPath) {
-        auto storePath = fetchToStore(state->fetchSettings, *state->store, v.path(), FetchMode::Copy);
+        auto storePath =
+            fetchToStore(state->fetchSettings, *state->systemEnvironment->store, v.path(), FetchMode::Copy);
         return {{
             .path =
                 DerivedPath::Opaque{

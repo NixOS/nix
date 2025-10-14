@@ -1,4 +1,5 @@
 #include "nix/util/users.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/store/sqlite.hh"
 #include "nix/expr/eval.hh"
@@ -63,18 +64,33 @@ struct AttrDb
 
     SymbolTable & symbols;
 
+    // High-level constructor - uses standard cache directory
     AttrDb(const StoreDirConfig & cfg, const Hash & fingerprint, SymbolTable & symbols)
+        : AttrDb(
+              cfg,
+              [&]() {
+                  auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v6";
+                  createDirs(cacheDir);
+                  return cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
+              }(),
+              symbols)
+    {
+    }
+
+    // Low-level constructor - uses explicit database path
+    AttrDb(const StoreDirConfig & cfg, std::filesystem::path dbPath, SymbolTable & symbols)
         : cfg(cfg)
         , _state(std::make_unique<Sync<State>>())
         , symbols(symbols)
     {
         auto state(_state->lock());
 
-        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v6";
-        createDirs(cacheDir);
+        // Ensure parent directory exists
+        if (dbPath.has_parent_path()) {
+            createDirs(dbPath.parent_path());
+        }
 
-        auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
-
+        debug("opening eval cache database: %s", dbPath.string());
         state->db = SQLite(dbPath);
         state->db.isCache();
         state->db.exec(schema);
@@ -243,8 +259,10 @@ struct AttrDb
         auto state(_state->lock());
 
         auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
-        if (!queryAttribute.next())
+        if (!queryAttribute.next()) {
+            debug("did not find cache entry for '%s' (parent=%d)", symbols[key.second], key.first);
             return {};
+        }
 
         auto rowId = (AttrId) queryAttribute.getInt(0);
         auto type = (AttrType) queryAttribute.getInt(1);
@@ -262,9 +280,12 @@ struct AttrDb
         }
         case AttrType::String: {
             NixStringContext context;
-            if (!queryAttribute.isNull(3))
-                for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
+            if (!queryAttribute.isNull(3)) {
+                auto contextStrs = tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), " ");
+                for (auto & s : contextStrs) {
                     context.insert(NixStringContextElem::parse(s));
+                }
+            }
             return {{rowId, string_t{queryAttribute.getStr(2), context}}};
         }
         case AttrType::Bool:
@@ -295,9 +316,27 @@ static std::shared_ptr<AttrDb> makeAttrDb(const StoreDirConfig & cfg, const Hash
     }
 }
 
+static std::shared_ptr<AttrDb>
+makeAttrDb(const StoreDirConfig & cfg, std::filesystem::path dbPath, SymbolTable & symbols)
+{
+    try {
+        return std::make_shared<AttrDb>(cfg, dbPath, symbols);
+    } catch (SQLiteError &) {
+        ignoreExceptionExceptInterrupt();
+        return nullptr;
+    }
+}
+
 EvalCache::EvalCache(
     std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(*state.store, *useCache, state.symbols) : nullptr)
+    : db(useCache ? makeAttrDb(*state.systemEnvironment->store, *useCache, state.symbols) : nullptr)
+    , state(state)
+    , rootLoader(rootLoader)
+{
+}
+
+EvalCache::EvalCache(std::optional<std::filesystem::path> dbPath, EvalState & state, RootLoader rootLoader)
+    : db(dbPath ? makeAttrDb(*state.systemEnvironment->store, *dbPath, state.symbols) : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
@@ -405,9 +444,13 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.c_str(), v.context()), string_t{v.c_str(), {}}};
-        else if (v.type() == nPath) {
+        if (v.type() == nString) {
+            NixStringContext context;
+            copyContext(v, context);
+            cachedValue = {
+                root->db->setString(getKey(), v.c_str(), v.context()), string_t{v.c_str(), std::move(context)}};
+        } else if (v.type() == nPath) {
+            // FIXME: paths are remembered as strings. Lossy, incorrect. Yikes!
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         } else if (v.type() == nBool)
@@ -421,6 +464,33 @@ Value & AttrCursor::forceValue()
     }
 
     return v;
+}
+
+ValueType AttrCursor::getTypeLazy()
+{
+    if (root->db) {
+        fetchCachedValue();
+
+        if (cachedValue) {
+            // Check the variant type to determine the Nix type
+            if (std::get_if<bool>(&cachedValue->second))
+                return nBool;
+            if (std::get_if<int_t>(&cachedValue->second))
+                return nInt;
+            if (std::get_if<string_t>(&cachedValue->second))
+                return nString;
+            if (std::get_if<std::vector<std::string>>(&cachedValue->second))
+                return nList;
+            if (std::get_if<std::vector<Symbol>>(&cachedValue->second))
+                return nAttrs;
+            // misc_t could be various types (nPath, nFloat, nFunction, nExternal, nNull)
+            // placeholder_t means not fully evaluated yet
+            // For these cases, we can't determine type without forcing
+        }
+    }
+
+    // Cannot determine type without forcing evaluation
+    return nThunk;
 }
 
 Suggestions AttrCursor::getSuggestionsForAttr(Symbol name)
@@ -561,7 +631,7 @@ string_t AttrCursor::getStringWithContext()
                             [&](const NixStringContextElem::Opaque & o) -> const StorePath & { return o.path; },
                         },
                         c.raw);
-                    if (!root->state.store->isValidPath(path)) {
+                    if (!root->state.systemEnvironment->store->isValidPath(path)) {
                         valid = false;
                         break;
                     }
@@ -703,15 +773,16 @@ bool AttrCursor::isDerivation()
 StorePath AttrCursor::forceDerivation()
 {
     auto aDrvPath = getAttr(root->state.s.drvPath);
-    auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
+    auto drvPath = root->state.systemEnvironment->store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
-    if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
+    if (!root->state.systemEnvironment->store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
            been garbage-collected. So force it to be regenerated. */
         aDrvPath->forceValue();
-        if (!root->state.store->isValidPath(drvPath))
+        if (!root->state.systemEnvironment->store->isValidPath(drvPath))
             throw Error(
-                "don't know how to recreate store derivation '%s'!", root->state.store->printStorePath(drvPath));
+                "don't know how to recreate store derivation '%s'!",
+                root->state.systemEnvironment->store->printStorePath(drvPath));
     }
     return drvPath;
 }

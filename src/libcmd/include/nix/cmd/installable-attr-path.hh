@@ -48,6 +48,8 @@ class InstallableAttrPath : public InstallableValue
 
     DerivedPathsWithInfo toDerivedPaths() override;
 
+    ref<Object> getRootObject() override;
+
 public:
 
     static InstallableAttrPath parse(

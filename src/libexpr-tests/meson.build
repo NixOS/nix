@@ -47,9 +47,12 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'coarse-eval-cache.cc',
   'derived-path.cc',
   'error_traces.cc',
   'eval.cc',
+  'evaluation-helpers.cc',
+  'evaluator.cc',
   'json.cc',
   'main.cc',
   'nix_api_expr.cc',

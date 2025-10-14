@@ -1,3 +1,4 @@
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/derivations.hh"
@@ -111,7 +112,9 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
             overloaded{
                 [&](const NixStringContextElem::Opaque & c) -> NixStringContextElem::DrvDeep {
                     if (!c.path.isDerivation()) {
-                        state.error<EvalError>("path '%s' is not a derivation", state.store->printStorePath(c.path))
+                        state
+                            .error<EvalError>(
+                                "path '%s' is not a derivation", state.systemEnvironment->store->printStorePath(c.path))
                             .atPos(pos)
                             .debugThrow();
                     }
@@ -197,7 +200,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
                 [&](NixStringContextElem::Built && b) {
                     // FIXME should eventually show string context as is, no
                     // resolving here.
-                    auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
+                    auto drvPath = resolveDerivedPath(*state.systemEnvironment->store, *b.drvPath);
                     contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
                 },
                 [&](NixStringContextElem::Opaque && o) { contextInfos[std::move(o.path)].path = true; },
@@ -221,7 +224,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
                 (list[i] = state.allocValue())->mkString(output);
             infoAttrs.alloc(state.s.outputs).mkList(list);
         }
-        attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);
+        attrs.alloc(state.systemEnvironment->store->printStorePath(info.first)).mkAttrs(infoAttrs);
     }
 
     v.mkAttrs(attrs);
@@ -268,11 +271,11 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
     auto sAllOutputs = state.symbols.create("allOutputs");
     for (auto & i : *args[1]->attrs()) {
         const auto & name = state.symbols[i.name];
-        if (!state.store->isStorePath(name))
+        if (!state.systemEnvironment->store->isStorePath(name))
             state.error<EvalError>("context key '%s' is not a store path", name).atPos(i.pos).debugThrow();
-        auto namePath = state.store->parseStorePath(name);
+        auto namePath = state.systemEnvironment->store->parseStorePath(name);
         if (!settings.readOnlyMode)
-            state.store->ensurePath(namePath);
+            state.systemEnvironment->store->ensurePath(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
 
         if (auto attr = i.value->attrs()->get(sPath)) {

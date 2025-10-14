@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/util/memory-source-accessor.hh"
 
@@ -199,7 +200,7 @@ TEST_F(PureEvalTest, pathExists)
         std::string contents = "Lorem ipsum";
 
         StringSource s{contents};
-        auto path = state.store->addToStoreFromDump(
+        auto path = state.systemEnvironment->store->addToStoreFromDump(
             s, "source", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256);
         auto printed = store->printStorePath(path);
 

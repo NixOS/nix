@@ -6,6 +6,8 @@
 
 namespace nix {
 
+class CoarseEvalCache;
+
 /**
  * Extra info about a \ref DerivedPath "derived path" that ultimately
  * come from a Flake.
@@ -42,6 +44,9 @@ struct InstallableFlake : InstallableValue
     const flake::LockFlags & lockFlags;
     mutable std::shared_ptr<flake::LockedFlake> _lockedFlake;
 
+    // Concrete evaluator type for type-safe access to getRoot(evalCache)
+    ref<CoarseEvalCache> coarseEvalCache;
+
     InstallableFlake(
         SourceExprCommand * cmd,
         ref<EvalState> state,
@@ -64,10 +69,13 @@ struct InstallableFlake : InstallableValue
     std::pair<Value *, PosIdx> toValue(EvalState & state) override;
 
     /**
+     * @deprecated Use Evaluator and Object instead.
      * Get a cursor to every attrpath in getActualAttrPaths() that
      * exists. However if none exists, throw an exception.
      */
     std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state) override;
+
+    ref<Object> getRootObject() override;
 
     ref<flake::LockedFlake> getLockedFlake() const;
 

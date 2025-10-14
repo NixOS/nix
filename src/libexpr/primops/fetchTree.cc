@@ -1,4 +1,5 @@
 #include "nix/fetchers/attrs.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
@@ -194,7 +195,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.systemEnvironment->store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked()) {
         if (input.getNarHash())
@@ -219,7 +220,8 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto cachedInput = state.inputCache->getAccessor(state.store, input, fetchers::UseRegistries::No);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.systemEnvironment->store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
@@ -555,7 +557,7 @@ static void fetch(
 
     // early exit if pinned and already in the store
     if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
-        auto expectedPath = state.store->makeFixedOutputPath(
+        auto expectedPath = state.systemEnvironment->store->makeFixedOutputPath(
             name,
             FixedOutputInfo{
                 .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
@@ -564,31 +566,35 @@ static void fetch(
 
         // Try to get the path from the local store or substituters
         try {
-            state.store->ensurePath(expectedPath);
-            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
+            state.systemEnvironment->store->ensurePath(expectedPath);
+            debug(
+                "using substituted/cached path '%s' for '%s'",
+                state.systemEnvironment->store->printStorePath(expectedPath),
+                *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;
         } catch (Error & e) {
             debug(
                 "substitution of '%s' failed, will try to download: %s",
-                state.store->printStorePath(expectedPath),
+                state.systemEnvironment->store->printStorePath(expectedPath),
                 e.what());
             // Fall through to download
         }
     }
 
     // Download the file/tarball if substitution failed or no hash was provided
-    auto storePath = unpack ? fetchToStore(
-                                  state.fetchSettings,
-                                  *state.store,
-                                  fetchers::downloadTarball(state.store, state.fetchSettings, *url),
-                                  FetchMode::Copy,
-                                  name)
-                            : fetchers::downloadFile(state.store, state.fetchSettings, *url, name).storePath;
+    auto storePath =
+        unpack ? fetchToStore(
+                     state.fetchSettings,
+                     *state.systemEnvironment->store,
+                     fetchers::downloadTarball(state.systemEnvironment->store, state.fetchSettings, *url),
+                     FetchMode::Copy,
+                     name)
+               : fetchers::downloadFile(state.systemEnvironment->store, state.fetchSettings, *url, name).storePath;
 
     if (expectedHash) {
-        auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
-                           : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
+        auto hash = unpack ? state.systemEnvironment->store->queryPathInfo(storePath)->narHash
+                           : hashFile(HashAlgorithm::SHA256, state.systemEnvironment->store->toRealPath(storePath));
         if (hash != *expectedHash) {
             state
                 .error<EvalError>(

@@ -1,4 +1,5 @@
 #include "nix/expr/value-to-json.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/signals.hh"
@@ -38,7 +39,7 @@ json printValueAsJSON(
 
     case nPath:
         if (copyToStore)
-            out = state.store->printStorePath(state.copyPathToStore(context, v.path()));
+            out = state.systemEnvironment->store->printStorePath(state.copyPathToStore(context, v.path()));
         else
             out = v.path().path.abs();
         break;

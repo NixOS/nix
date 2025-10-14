@@ -8,6 +8,10 @@
 #include <functional>
 #include <variant>
 
+namespace nix {
+class CoarseEvalCacheCursorObject;
+}
+
 namespace nix::eval_cache {
 
 struct AttrDb;
@@ -32,6 +36,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 {
     friend class AttrCursor;
     friend struct CachedEvalError;
+    friend class nix::CoarseEvalCacheCursorObject;
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
@@ -44,6 +49,20 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 public:
 
     EvalCache(std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader);
+
+    /**
+     * Create an EvalCache with no caching (convenience overload for std::nullopt).
+     */
+    EvalCache(std::nullopt_t, EvalState & state, RootLoader rootLoader)
+        : EvalCache(std::optional<std::reference_wrapper<const Hash>>(std::nullopt), state, rootLoader)
+    {
+    }
+
+    /**
+     * Create an EvalCache with an explicit database path for testing.
+     * If dbPath is nullopt, no caching is performed.
+     */
+    EvalCache(std::optional<std::filesystem::path> dbPath, EvalState & state, RootLoader rootLoader);
 
     ref<AttrCursor> getRoot();
 };
@@ -97,6 +116,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
     friend class EvalCache;
     friend struct CachedEvalError;
+    friend class nix::CoarseEvalCacheCursorObject;
 
     ref<EvalCache> root;
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
@@ -163,6 +183,12 @@ public:
     bool isDerivation();
 
     Value & forceValue();
+
+    /**
+     * Try to determine the type from the cache without forcing evaluation.
+     * Returns nThunk if the type cannot be determined without forcing.
+     */
+    ValueType getTypeLazy();
 
     /**
      * Force creation of the .drv file in the Nix store.

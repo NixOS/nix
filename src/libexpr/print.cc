@@ -8,6 +8,7 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/english.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/environment/system.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -286,14 +287,14 @@ private:
         if (storePath && !storePath->isDerivation())
             warn(
                 "drvPath attribute '%s' is not a valid store path to a derivation, this value not work properly",
-                state.store->printStorePath(*storePath));
+                state.systemEnvironment->store->printStorePath(*storePath));
 #endif
 
         if (options.ansiColors)
             output << ANSI_GREEN;
         output << "«derivation";
         if (storePath) {
-            output << " " << state.store->printStorePath(*storePath);
+            output << " " << state.systemEnvironment->store->printStorePath(*storePath);
         }
         output << "»";
         if (options.ansiColors)

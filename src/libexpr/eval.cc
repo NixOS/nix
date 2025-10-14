@@ -1,5 +1,7 @@
 #include "nix/expr/eval.hh"
+#include "nix/expr/environment.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/evaluation-helpers.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/expr/symbol-table.hh"
@@ -24,6 +26,9 @@
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
 #include "nix/util/current-process.hh"
+
+// For deprecated systemEnvironment field only
+#include "nix/expr/environment/system.hh"
 
 #include "parser-tab.hh"
 
@@ -209,64 +214,44 @@ EvalState::EvalState(
     const fetchers::Settings & fetchSettings,
     const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
+    : EvalState(
+          lookupPathFromArguments, fetchSettings, settings, make_ref<SystemEnvironment>(settings, store, buildStore))
+{
+}
+
+EvalState::EvalState(
+    const LookupPath & lookupPathFromArguments,
+    const fetchers::Settings & fetchSettings,
+    const EvalSettings & settings,
+    ref<SystemEnvironment> systemEnvironment)
+    : EvalState(
+          lookupPathFromArguments,
+          fetchSettings,
+          settings,
+          systemEnvironment.template cast<Environment>(),
+          systemEnvironment)
+{
+}
+
+EvalState::EvalState(
+    const LookupPath & lookupPathFromArguments,
+    const fetchers::Settings & fetchSettings,
+    const EvalSettings & settings,
+    ref<Environment> environment,
+    ref<SystemEnvironment> systemEnvironment)
     : fetchSettings{fetchSettings}
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
-    , storeFS(makeMountedSourceAccessor({
-          {CanonPath::root, makeEmptySourceAccessor()},
-          /* In the pure eval case, we can simply require
-             valid paths. However, in the *impure* eval
-             case this gets in the way of the union
-             mechanism, because an invalid access in the
-             upper layer will *not* be caught by the union
-             source accessor, but instead abort the entire
-             lookup.
-
-             This happens when the store dir in the
-             ambient file system has a path (e.g. because
-             another Nix store there), but the relocated
-             store does not.
-
-             TODO make the various source accessors doing
-             access control all throw the same type of
-             exception, and make union source accessor
-             catch it, so we don't need to do this hack.
-           */
-          {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
-      }))
-    , rootFS([&] {
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
-
-           Otherwise, use a union accessor to make the augmented store
-           available at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree. */
-        auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
-
-        /* Apply access control if needed. */
-        if (settings.restrictEval || settings.pureEval)
-            accessor = AllowListSourceAccessor::create(
-                accessor, {}, {}, [&settings](const CanonPath & path) -> RestrictedPathError {
-                    auto modeInformation = settings.pureEval ? "in pure evaluation mode (use '--impure' to override)"
-                                                             : "in restricted mode";
-                    throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-                });
-
-        return accessor;
-    }())
+    , environment(environment)
+    , systemEnvironment(systemEnvironment)
+    , rootFS(systemEnvironment->fsRoot())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{internalFS->addFile(
           CanonPath("derivation-internal.nix"),
 #include "primops/derivation.nix.gen.hh"
           )}
-    , store(store)
-    , buildStore(buildStore ? buildStore : store)
     , inputCache(fetchers::InputCache::create())
     , debugRepl(nullptr)
     , debugStop(false)
@@ -283,6 +268,8 @@ EvalState::EvalState(
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
+    assert(settings.maxCallDepth && "max-call-depth must be >0, and EvalSettings must be initialized");
+
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
 
@@ -344,17 +331,19 @@ void EvalState::allowPathLegacy(const Path & path)
 
 void EvalState::allowPath(const StorePath & storePath)
 {
+    // FIXME: this should generally be handled within SystemEnvironment as a consequence of other operations only.
     if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-        rootFS2->allowPrefix(CanonPath(store->printStorePath(storePath)));
+        rootFS2->allowPrefix(CanonPath(systemEnvironment->store->printStorePath(storePath)));
 }
 
 void EvalState::allowClosure(const StorePath & storePath)
 {
+    // FIXME: this should generally be handled within SystemEnvironment as a consequence of other operations only.
     if (!rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
         return;
 
     StorePathSet closure;
-    store->computeFSClosure(storePath, closure);
+    systemEnvironment->store->computeFSClosure(storePath, closure);
     for (auto & p : closure)
         allowPath(p);
 }
@@ -921,8 +910,9 @@ void EvalState::mkPos(Value & v, PosIdx p)
 
 void EvalState::mkStorePathString(const StorePath & p, Value & v)
 {
+    // FIXME: this should query `environment` to find the storeDir
     v.mkString(
-        store->printStorePath(p),
+        systemEnvironment->store->printStorePath(p),
         NixStringContext{
             NixStringContextElem::Opaque{.path = p},
         });
@@ -933,9 +923,10 @@ std::string EvalState::mkOutputStringRaw(
     std::optional<StorePath> optStaticOutputPath,
     const ExperimentalFeatureSettings & xpSettings)
 {
+    // FIXME: this should query `environment` to find the storeDir
     /* In practice, this is testing for the case of CA derivations, or
        dynamic derivations. */
-    return optStaticOutputPath ? store->printStorePath(std::move(*optStaticOutputPath))
+    return optStaticOutputPath ? systemEnvironment->store->printStorePath(std::move(*optStaticOutputPath))
                                /* Downstream we would substitute this for an actual path once
                                   we build the floating CA derivation */
                                : DownstreamPlaceholder::fromSingleDerivedPathBuilt(b, xpSettings).render();
@@ -952,21 +943,22 @@ void EvalState::mkOutputString(
 
 std::string EvalState::mkSingleDerivedPathStringRaw(const SingleDerivedPath & p)
 {
+    // FIXME: do not use systemEnvironment
     return std::visit(
         overloaded{
-            [&](const SingleDerivedPath::Opaque & o) { return store->printStorePath(o.path); },
+            [&](const SingleDerivedPath::Opaque & o) { return systemEnvironment->store->printStorePath(o.path); },
             [&](const SingleDerivedPath::Built & b) {
                 auto optStaticOutputPath = std::visit(
                     overloaded{
                         [&](const SingleDerivedPath::Opaque & o) {
-                            auto drv = store->readDerivation(o.path);
+                            auto drv = systemEnvironment->store->readDerivation(o.path);
                             auto i = drv.outputs.find(b.output);
                             if (i == drv.outputs.end())
                                 throw Error(
                                     "derivation '%s' does not have output '%s'",
-                                    b.drvPath->to_string(*store),
+                                    b.drvPath->to_string(*systemEnvironment->store),
                                     b.output);
-                            return i->second.path(*store, drv.name, b.output);
+                            return i->second.path(*systemEnvironment->store, drv.name, b.output);
                         },
                         [&](const SingleDerivedPath::Built & o) -> std::optional<StorePath> { return std::nullopt; },
                     },
@@ -2377,11 +2369,12 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nPath) {
+        // FIXME: do not use systemEnvironment
         return !canonicalizePath && !copyToStore
                    ? // FIXME: hack to preserve path literals that end in a
                      // slash, as in /foo/${x}.
                    v.pathStr()
-                   : copyToStore ? store->printStorePath(copyPathToStore(context, v.path()))
+                   : copyToStore ? systemEnvironment->store->printStorePath(copyPathToStore(context, v.path()))
                                  : std::string(v.path().path.abs());
     }
 
@@ -2461,9 +2454,10 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     auto dstPathCached = getConcurrent(*srcToStore, path);
 
     auto dstPath = dstPathCached ? *dstPathCached : [&]() {
+        // FIXME: do not use systemEnvironment
         auto dstPath = fetchToStore(
             fetchSettings,
-            *store,
+            *systemEnvironment->store,
             path.resolveSymlinks(SymlinkResolution::Ancestors),
             settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
             path.baseName(),
@@ -2472,7 +2466,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             repair);
         allowPath(dstPath);
         srcToStore->try_emplace(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, systemEnvironment->store->printStorePath(dstPath));
         return dstPath;
     }();
 
@@ -2515,8 +2509,9 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
 StorePath
 EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
+    // FIXME: do not use systemEnvironment
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (auto storePath = store->maybeParseStorePath(path))
+    if (auto storePath = systemEnvironment->store->maybeParseStorePath(path))
         return *storePath;
     error<EvalError>("path '%1%' is not in the Nix store", path).withTrace(pos, errorCtx).debugThrow();
 }
@@ -2526,32 +2521,22 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
 {
     NixStringContext context;
     auto s = forceString(v, context, pos, errorCtx, xpSettings);
-    auto csize = context.size();
-    if (csize != 1)
-        error<EvalError>("string '%s' has %d entries in its context. It should only have exactly one entry", s, csize)
-            .withTrace(pos, errorCtx)
-            .debugThrow();
-    auto derivedPath = std::visit(
-        overloaded{
-            [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath { return std::move(o); },
-            [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
-                error<EvalError>(
-                    "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
-                    s)
-                    .withTrace(pos, errorCtx)
-                    .debugThrow();
-            },
-            [&](NixStringContextElem::Built && b) -> SingleDerivedPath { return std::move(b); },
-        },
-        ((NixStringContextElem &&) *context.begin()).raw);
-    return {
-        std::move(derivedPath),
-        std::move(s),
-    };
+
+    try {
+        auto derivedPath = expr::helpers::coerceToSingleDerivedPathUnchecked(s, context, "");
+        return {
+            std::move(derivedPath),
+            std::move(s),
+        };
+    } catch (Error & e) {
+        e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
 }
 
 SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
 {
+    // FIXME: do not use systemEnvironment
     auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
     auto s = s_;
     auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
@@ -2570,7 +2555,7 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
                         "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
                         s,
                         b.output,
-                        b.drvPath->to_string(*store),
+                        b.drvPath->to_string(*systemEnvironment->store),
                         sExpected)
                         .withTrace(pos, errorCtx)
                         .debugThrow();
@@ -3161,9 +3146,12 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
     };
 
     if (EvalSettings::isPseudoUrl(value)) {
+        // FIXME: do not use systemEnvironment
         try {
-            auto accessor = fetchers::downloadTarball(store, fetchSettings, EvalSettings::resolvePseudoUrl(value));
-            auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
+            auto accessor = fetchers::downloadTarball(
+                systemEnvironment->store, fetchSettings, EvalSettings::resolvePseudoUrl(value));
+            auto storePath =
+                fetchToStore(fetchSettings, *systemEnvironment->store, SourcePath(accessor), FetchMode::Copy);
             return finish(this->storePath(storePath));
         } catch (Error & e) {
             logWarning({.msg = HintFmt("Nix search path entry '%1%' cannot be downloaded, ignoring", value)});
@@ -3181,14 +3169,15 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
     }
 
     {
+        // FIXME: do not use systemEnvironment
         auto path = rootPath(value);
 
         /* Allow access to paths in the search path. */
         if (initAccessControl) {
             allowPathLegacy(path.path.abs());
-            if (store->isInStore(path.path.abs())) {
+            if (systemEnvironment->store->isInStore(path.path.abs())) {
                 try {
-                    allowClosure(store->toStorePath(path.path.abs()).first);
+                    allowClosure(systemEnvironment->store->toStorePath(path.path.abs()).first);
                 } catch (InvalidPath &) {
                 }
             }
