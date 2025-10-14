@@ -155,6 +155,8 @@ sources = files(
   'attr-set.cc',
   'coarse-eval-cache-cursor-object.cc',
   'coarse-eval-cache.cc',
+  'environment.cc',
+  'environment/system.cc',
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',

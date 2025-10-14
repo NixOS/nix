@@ -1,4 +1,5 @@
 #include "nix/store/globals.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/print-ambiguous.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
@@ -76,7 +77,7 @@ void processExpr(
             getDerivations(state, v, "", autoArgs, drvs, false);
             for (auto & i : drvs) {
                 auto drvPath = i.requireDrvPath();
-                auto drvPathS = state.store->printStorePath(drvPath);
+                auto drvPathS = state.systemEnvironment->store->printStorePath(drvPath);
 
                 /* What output do we want? */
                 std::string outputName = i.queryOutputName();
@@ -89,7 +90,7 @@ void processExpr(
                     Path rootName = absPath(gcRoot);
                     if (++rootNr > 1)
                         rootName += "-" + std::to_string(rootNr);
-                    auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
+                    auto store2 = state.systemEnvironment->store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
                         drvPathS = store2->addPermRoot(drvPath, rootName);
                 }

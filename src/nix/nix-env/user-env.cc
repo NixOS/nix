@@ -5,6 +5,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/main/shared.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/profiles.hh"
@@ -41,7 +42,7 @@ bool createUserEnv(
             drvsToBuild.push_back({*drvPath});
 
     debug("building user environment dependencies");
-    state.store->buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
+    state.systemEnvironment->store->buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
@@ -61,22 +62,22 @@ bool createUserEnv(
         auto system = i.querySystem();
         if (!system.empty())
             attrs.alloc(state.s.system).mkString(system);
-        attrs.alloc(state.s.outPath).mkString(state.store->printStorePath(i.queryOutPath()));
+        attrs.alloc(state.s.outPath).mkString(state.systemEnvironment->store->printStorePath(i.queryOutPath()));
         if (drvPath)
-            attrs.alloc(state.s.drvPath).mkString(state.store->printStorePath(*drvPath));
+            attrs.alloc(state.s.drvPath).mkString(state.systemEnvironment->store->printStorePath(*drvPath));
 
         // Copy each output meant for installation.
         auto outputsList = state.buildList(outputs.size());
         for (const auto & [m, j] : enumerate(outputs)) {
             (outputsList[m] = state.allocValue())->mkString(j.first);
             auto outputAttrs = state.buildBindings(2);
-            outputAttrs.alloc(state.s.outPath).mkString(state.store->printStorePath(*j.second));
+            outputAttrs.alloc(state.s.outPath).mkString(state.systemEnvironment->store->printStorePath(*j.second));
             attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(*j.second);
-            state.store->ensurePath(*j.second);
+            state.systemEnvironment->store->addTempRoot(*j.second);
+            state.systemEnvironment->store->ensurePath(*j.second);
 
             references.insert(*j.second);
         }
@@ -109,7 +110,7 @@ bool createUserEnv(
         std::ostringstream str;
         printAmbiguous(manifest, state.symbols, str, nullptr, std::numeric_limits<int>::max());
         StringSource source{str.view()};
-        state.store->addToStoreFromDump(
+        state.systemEnvironment->store->addToStoreFromDump(
             source,
             "env-manifest.nix",
             FileSerialisationMethod::Flat,
@@ -151,10 +152,10 @@ bool createUserEnv(
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
+    state.systemEnvironment->store->buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
-    auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
+    auto store2 = state.systemEnvironment->store.dynamic_pointer_cast<LocalFSStore>();
 
     if (store2) {
         PathLocks lock;

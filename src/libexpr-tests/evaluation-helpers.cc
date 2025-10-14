@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include "nix/expr/evaluation-helpers.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/interpreter-object.hh"
 #include "nix/expr/interpreter.hh"
 #include "nix/expr/tests/libexpr.hh"
@@ -602,7 +603,8 @@ TEST_F(EvaluatorHelpersTest, trySinglePathToDerivedPath_HandlesStringWithOpaqueC
     NixStringContext context;
     context.insert(
         NixStringContextElem::Opaque{
-            .path = state.store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example")});
+            .path =
+                state.systemEnvironment->store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example")});
     v->mkString("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example", context);
     auto obj = std::make_shared<InterpreterObject>(state, allocRootValue(v));
 
@@ -622,7 +624,8 @@ TEST_F(EvaluatorHelpersTest, trySinglePathToDerivedPath_HandlesStringWithBuiltCo
     context.insert(
         NixStringContextElem::Built{
             .drvPath = make_ref<SingleDerivedPath>(SingleDerivedPath::Opaque{
-                .path = state.store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example.drv")}),
+                .path = state.systemEnvironment->store->parseStorePath(
+                    "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example.drv")}),
             .output = "out"});
     v->mkString("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-example", context);
     auto obj = std::make_shared<InterpreterObject>(state, allocRootValue(v));
@@ -647,10 +650,12 @@ TEST_F(EvaluatorHelpersTest, trySinglePathToDerivedPath_ThrowsForStringWithMulti
     NixStringContext context;
     context.insert(
         NixStringContextElem::Opaque{
-            .path = state.store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-first")});
+            .path =
+                state.systemEnvironment->store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-first")});
     context.insert(
         NixStringContextElem::Opaque{
-            .path = state.store->parseStorePath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-second")});
+            .path =
+                state.systemEnvironment->store->parseStorePath("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-second")});
     v->mkString("test string", context);
     auto obj = std::make_shared<InterpreterObject>(state, allocRootValue(v));
 
@@ -686,7 +691,8 @@ TEST_F(EvaluatorHelpersTest, trySinglePathToDerivedPath_ThrowsForStringWithDrvDe
     NixStringContext context;
     context.insert(
         NixStringContextElem::DrvDeep{
-            .drvPath = state.store->parseStorePath("/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example.drv")});
+            .drvPath = state.systemEnvironment->store->parseStorePath(
+                "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-example.drv")});
     v->mkString("test", context);
     auto obj = std::make_shared<InterpreterObject>(state, allocRootValue(v));
 

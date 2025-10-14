@@ -10,6 +10,7 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/store/derivations.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
@@ -139,7 +140,7 @@ MixFlakeOptions::MixFlakeOptions()
             if (n == 0) {
                 completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
             } else if (n == 1) {
-                completeFlakeRef(completions, getEvalState()->store, prefix);
+                completeFlakeRef(completions, getEvalState()->systemEnvironment->store, prefix);
             }
         }},
     });
@@ -193,7 +194,7 @@ MixFlakeOptions::MixFlakeOptions()
             }
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-            completeFlakeRef(completions, getEvalState()->store, prefix);
+            completeFlakeRef(completions, getEvalState()->systemEnvironment->store, prefix);
         }},
     });
 }
@@ -326,7 +327,7 @@ void completeFlakeRefWithFragment(
     try {
         auto hash = prefix.find('#');
         if (hash == std::string::npos) {
-            completeFlakeRef(completions, evalState->store, prefix);
+            completeFlakeRef(completions, evalState->systemEnvironment->store, prefix);
         } else {
             completions.setType(AddCompletions::Type::Attrs);
 
@@ -446,7 +447,7 @@ static StorePath getDeriver(ref<Store> store, const Installable & i, const Store
 ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake)
 {
     auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
+                           ? lockedFlake->getFingerprint(state.systemEnvironment->store, state.fetchSettings)
                            : std::nullopt;
     auto rootLoader = [&state, lockedFlake]() {
         /* For testing whether the evaluation cache is

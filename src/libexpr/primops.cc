@@ -1,5 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
@@ -59,6 +60,7 @@ std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMayb
     return nix::rewriteStrings(rawStr, rewrites);
 }
 
+// FIXME: move into SystemEnvironment?
 StringMap EvalState::realiseContext(const NixStringContext & context, StorePathSet * maybePathsOut, bool isIFD)
 {
     std::vector<DerivedPath::Built> drvs;
@@ -66,8 +68,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
 
     for (auto & c : context) {
         auto ensureValid = [&](const StorePath & p) {
-            if (!store->isValidPath(p))
-                error<InvalidPathError>(store->printStorePath(p)).debugThrow();
+            if (!systemEnvironment->store->isValidPath(p))
+                error<InvalidPathError>(systemEnvironment->store->printStorePath(p)).debugThrow();
         };
         std::visit(
             overloaded{
@@ -101,11 +103,13 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
         if (!settings.enableImportFromDerivation)
             error<IFDError>(
                 "cannot build '%1%' during evaluation because the option 'allow-import-from-derivation' is disabled",
-                drvs.begin()->to_string(*store))
+                drvs.begin()->to_string(*systemEnvironment->store))
                 .debugThrow();
 
         if (settings.traceImportFromDerivation)
-            warn("built '%1%' during evaluation due to an import from derivation", drvs.begin()->to_string(*store));
+            warn(
+                "built '%1%' during evaluation due to an import from derivation",
+                drvs.begin()->to_string(*systemEnvironment->store));
     }
 
     /* Build/substitute the context. */
@@ -113,12 +117,12 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     buildReqs.reserve(drvs.size());
     for (auto & d : drvs)
         buildReqs.emplace_back(DerivedPath{d});
-    buildStore->buildPaths(buildReqs, bmNormal, store);
+    systemEnvironment->buildStore->buildPaths(buildReqs, bmNormal, systemEnvironment->store);
 
     StorePathSet outputsToCopyAndAllow;
 
     for (auto & drv : drvs) {
-        auto outputs = resolveDerivedPath(*buildStore, drv, &*store);
+        auto outputs = resolveDerivedPath(*systemEnvironment->buildStore, drv, &*systemEnvironment->store);
         for (auto & [outputName, outputPath] : outputs) {
             outputsToCopyAndAllow.insert(outputPath);
             if (maybePathsOut)
@@ -133,13 +137,13 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                             .output = outputName,
                         })
                         .render(),
-                    buildStore->printStorePath(outputPath));
+                    systemEnvironment->buildStore->printStorePath(outputPath));
             }
         }
     }
 
-    if (store != buildStore)
-        copyClosure(*buildStore, *store, outputsToCopyAndAllow);
+    if (systemEnvironment->store != systemEnvironment->buildStore)
+        copyClosure(*systemEnvironment->buildStore, *systemEnvironment->store, outputsToCopyAndAllow);
 
     if (isIFD) {
         /* Allow access to the output closures of this derivation. */
@@ -150,24 +154,20 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     return res;
 }
 
-static SourcePath realisePath(
-    EvalState & state,
-    const PosIdx pos,
-    Value & v,
-    std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full)
+SourcePath EvalState::realisePath(const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks)
 {
     NixStringContext context;
 
-    auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
+    auto path = coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty() && path.accessor == state.rootFS) {
-            auto rewrites = state.realiseContext(context);
+        if (!context.empty() && path.accessor == rootFS) {
+            auto rewrites = realiseContext(context);
             path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
-        e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
+        e.addTrace(positions[pos], "while realising the context of path '%s'", path);
         throw;
     }
 }
@@ -198,7 +198,7 @@ static void mkOutputString(
             .drvPath = makeConstantStorePathRef(drvPath),
             .output = o.first,
         },
-        o.second.path(*state.store, Derivation::nameFromPath(drvPath), o.first));
+        o.second.path(*state.systemEnvironment->store, Derivation::nameFromPath(drvPath), o.first));
 }
 
 /**
@@ -214,7 +214,7 @@ void derivationToValue(
     EvalState & state, const PosIdx pos, const SourcePath & path, const StorePath & storePath, Value & v)
 {
     auto path2 = path.path.abs();
-    Derivation drv = state.store->readDerivation(storePath);
+    Derivation drv = state.systemEnvironment->store->readDerivation(storePath);
     auto attrs = state.buildBindings(3 + drv.outputs.size());
     attrs.alloc(state.s.drvPath)
         .mkString(
@@ -286,15 +286,15 @@ static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path,
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath, std::nullopt);
+    auto path = state.realisePath(pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
     // FIXME
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
-        if (!state.store->isStorePath(path2))
+        if (!state.systemEnvironment->store->isStorePath(path2))
             return std::nullopt;
-        auto storePath = state.store->parseStorePath(path2);
-        if (!(state.store->isValidPath(storePath) && isDerivation(path2)))
+        auto storePath = state.systemEnvironment->store->parseStorePath(path2);
+        if (!(state.systemEnvironment->store->isValidPath(storePath) && isDerivation(path2)))
             return std::nullopt;
         return storePath;
     };
@@ -398,7 +398,7 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
 
     std::string sym(
         state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -1120,7 +1120,7 @@ static void prim_getEnv(EvalState & state, const PosIdx pos, Value ** args, Valu
 {
     std::string name(
         state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.getEnv"));
-    v.mkString(state.settings.restrictEval || state.settings.pureEval ? "" : getEnv(name).value_or(""));
+    v.mkString(state.environment->getEnv(name).value_or(""));
 }
 
 static RegisterPrimOp primop_getEnv({
@@ -1618,11 +1618,12 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 [&](const NixStringContextElem::DrvDeep & d) {
                     /* !!! This doesn't work if readOnlyMode is set. */
                     StorePathSet refs;
-                    state.store->computeFSClosure(d.drvPath, refs);
+                    state.systemEnvironment->store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
                         drv.inputSrcs.insert(j);
                         if (j.isDerivation()) {
-                            drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            drv.inputDrvs.map[j].value =
+                                state.systemEnvironment->store->readDerivation(j).outputNames();
                         }
                     }
                 },
@@ -1675,7 +1676,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 },
         };
 
-        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        drv.env["out"] =
+            state.systemEnvironment->store->printStorePath(dof.path(*state.systemEnvironment->store, drvName, "out"));
         drv.outputs.insert_or_assign("out", std::move(dof));
     }
 
@@ -1717,15 +1719,15 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
         }
 
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
+        auto hashModulo = hashDerivationModulo(*state.systemEnvironment->store, Derivation(drv), true);
         switch (hashModulo.kind) {
         case DrvHash::Kind::Regular:
             for (auto & i : outputs) {
                 auto h = get(hashModulo.hashes, i);
                 if (!h)
                     state.error<AssertionError>("derivation produced no hash for output '%s'", i).atPos(v).debugThrow();
-                auto outPath = state.store->makeOutputPath(i, *h, drvName);
-                drv.env[i] = state.store->printStorePath(outPath);
+                auto outPath = state.systemEnvironment->store->makeOutputPath(i, *h, drvName);
+                drv.env[i] = state.systemEnvironment->store->printStorePath(outPath);
                 drv.outputs.insert_or_assign(
                     i,
                     DerivationOutput::InputAddressed{
@@ -1742,8 +1744,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     }
 
     /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(*state.store, drv, state.repair);
-    auto drvPathS = state.store->printStorePath(drvPath);
+    auto drvPath = writeDerivation(*state.systemEnvironment->store, drv, state.repair);
+    auto drvPathS = state.systemEnvironment->store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
@@ -1751,7 +1753,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        auto h = hashDerivationModulo(*state.store, drv, false);
+        auto h = hashDerivationModulo(*state.systemEnvironment->store, drv, false);
         drvHashes.insert_or_assign(drvPath, std::move(h));
     }
 
@@ -1849,13 +1851,13 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
-    if (!state.store->isStorePath(path.abs()))
+    if (!state.systemEnvironment->store->isStorePath(path.abs()))
         path = CanonPath(canonPath(path.abs(), true));
-    if (!state.store->isInStore(path.abs()))
+    if (!state.systemEnvironment->store->isInStore(path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", path).atPos(pos).debugThrow();
-    auto path2 = state.store->toStorePath(path.abs()).first;
+    auto path2 = state.systemEnvironment->store->toStorePath(path.abs()).first;
     if (!settings.readOnlyMode)
-        state.store->ensurePath(path2);
+        state.systemEnvironment->store->ensurePath(path2);
     context.insert(NixStringContextElem::Opaque{.path = path2});
     v.mkString(path.abs(), context);
 }
@@ -1891,7 +1893,7 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value ** args, 
             arg.type() == nString && (arg.string_view().ends_with("/") || arg.string_view().ends_with("/."));
 
         auto symlinkResolution = mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
-        auto path = realisePath(state, pos, arg, symlinkResolution);
+        auto path = state.realisePath(pos, arg, symlinkResolution);
 
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
@@ -1992,16 +1994,18 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         state.error<EvalError>("the contents of the file '%1%' cannot be represented as a Nix string", path)
             .atPos(pos)
             .debugThrow();
     StorePathSet refs;
-    if (state.store->isInStore(path.path.abs())) {
+    if (state.systemEnvironment->store->isInStore(path.path.abs())) {
         try {
-            refs = state.store->queryPathInfo(state.store->toStorePath(path.path.abs()).first)->references;
+            refs = state.systemEnvironment->store
+                       ->queryPathInfo(state.systemEnvironment->store->toStorePath(path.path.abs()).first)
+                       ->references;
         } catch (Error &) { // FIXME: should be InvalidPathError
         }
         // Re-scan references to filter down to just the ones that actually occur in the file.
@@ -2227,7 +2231,7 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value ** args, Va
     if (!ha)
         state.error<EvalError>("unknown hash algorithm '%1%'", algo).atPos(pos).debugThrow();
 
-    auto path = realisePath(state, pos, *args[1]);
+    auto path = state.realisePath(pos, *args[1]);
 
     v.mkString(hashString(*ha, path.readFile()).to_string(HashFormat::Base16, false));
 }
@@ -2279,7 +2283,7 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0], std::nullopt);
+    auto path = state.realisePath(pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
     v = fileTypeToString(state, path.lstat().type);
 }
@@ -2297,7 +2301,7 @@ static RegisterPrimOp primop_readFileType({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
 
     // Retrieve directory entries for all nodes in a directory.
     // This is similar to `getFileType` but is optimized to reduce system calls
@@ -2589,7 +2593,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
                 .debugThrow();
     }
 
-    auto storePath = settings.readOnlyMode ? state.store->makeFixedOutputPathFromCA(
+    auto storePath = settings.readOnlyMode ? state.systemEnvironment->store->makeFixedOutputPathFromCA(
                                                  name,
                                                  TextInfo{
                                                      .hash = hashString(HashAlgorithm::SHA256, contents),
@@ -2597,7 +2601,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
                                                  })
                                            : ({
                                                  StringSource s{contents};
-                                                 state.store->addToStoreFromDump(
+                                                 state.systemEnvironment->store->addToStoreFromDump(
                                                      s,
                                                      name,
                                                      FileSerialisationMethod::Flat,
@@ -2721,7 +2725,8 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+        if (path.accessor == state.systemEnvironment->rootFSAccessor
+            && state.systemEnvironment->store->isInStore(path.path.abs())) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);
@@ -2737,13 +2742,13 @@ static void addPath(
 
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
-            expectedStorePath = state.store->makeFixedOutputPathFromCA(
+            expectedStorePath = state.systemEnvironment->store->makeFixedOutputPathFromCA(
                 name, ContentAddressWithReferences::fromParts(method, *expectedHash, {}));
 
-        if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
+        if (!expectedHash || !state.systemEnvironment->store->isValidPath(*expectedStorePath)) {
             auto dstPath = fetchToStore(
                 state.fetchSettings,
-                *state.store,
+                *state.systemEnvironment->store,
                 path.resolveSymlinks(),
                 settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 name,
@@ -5186,7 +5191,8 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         )",
         });
 
-    v.mkString(store->storeDir);
+    // FIXME
+    v.mkString(systemEnvironment->store->storeDir);
     addConstant(
         "__storeDir",
         v,

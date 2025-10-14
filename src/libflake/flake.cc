@@ -2,6 +2,7 @@
 #include "nix/util/ref.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/flake/flake.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/expr/eval-settings.hh"
@@ -262,9 +263,10 @@ static Flake readFlake(
                 flake.config.settings.emplace(
                     state.symbols[setting.name], std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
             else if (setting.value->type() == nPath) {
-                auto storePath =
-                    fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
-                flake.config.settings.emplace(state.symbols[setting.name], state.store->printStorePath(storePath));
+                auto storePath = fetchToStore(
+                    state.fetchSettings, *state.systemEnvironment->store, setting.value->path(), FetchMode::Copy);
+                flake.config.settings.emplace(
+                    state.symbols[setting.name], state.systemEnvironment->store->printStorePath(storePath));
             } else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
                     state.symbols[setting.name], state.forceInt(*setting.value, setting.pos, "").value);
@@ -327,7 +329,7 @@ static Flake getFlake(
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
-    auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
+    auto cachedInput = state.inputCache->getAccessor(state.systemEnvironment->store, originalRef.input, useRegistries);
 
     auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
@@ -343,7 +345,8 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, fetchers::UseRegistries::No);
+        auto cachedInput2 = state.inputCache->getAccessor(
+            state.systemEnvironment->store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -384,7 +387,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
     if (lockFlags.applyNixConfig) {
         flake.config.apply(settings);
-        state.store->setOptions();
+        state.systemEnvironment->store->setOptions();
     }
 
     try {
@@ -708,7 +711,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto cachedInput = state.inputCache->getAccessor(
-                                        state.store, input.ref->input, useRegistriesInputs);
+                                        state.systemEnvironment->store, input.ref->input, useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
@@ -895,7 +898,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
 
         auto lockedNode = node.dynamic_pointer_cast<const LockedNode>();
 
-        auto [storePath, subdir] = state.store->toStorePath(sourcePath.path.abs());
+        auto [storePath, subdir] = state.systemEnvironment->store->toStorePath(sourcePath.path.abs());
 
         emitTreeAttrs(
             state,
@@ -957,7 +960,7 @@ Flake::~Flake() {}
 ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake)
 {
     auto fingerprint = state.settings.useEvalCache && state.settings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
+                           ? lockedFlake->getFingerprint(state.systemEnvironment->store, state.fetchSettings)
                            : std::nullopt;
     auto rootLoader = [&state, lockedFlake]() {
         /* For testing whether the evaluation cache is

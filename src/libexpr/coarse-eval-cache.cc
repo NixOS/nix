@@ -3,6 +3,7 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/environment/system.hh"
 
 namespace nix {
 
@@ -24,7 +25,7 @@ bool CoarseEvalCache::isReadOnly() const
 
 Store & CoarseEvalCache::getStore()
 {
-    return *state->store;
+    return *state->systemEnvironment->store;
 }
 
 const fetchers::Settings & CoarseEvalCache::getFetchSettings()

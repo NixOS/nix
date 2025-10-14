@@ -1,5 +1,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-flake.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
@@ -148,7 +149,7 @@ struct ProfileManifest
                 auto & e = elem.value();
                 ProfileElement element;
                 for (auto & p : e["storePaths"])
-                    element.storePaths.insert(state.store->parseStorePath((std::string) p));
+                    element.storePaths.insert(state.systemEnvironment->store->parseStorePath((std::string) p));
                 element.active = e["active"];
                 if (e.contains("priority")) {
                     element.priority = e["priority"];
@@ -177,10 +178,12 @@ struct ProfileManifest
 
         else if (std::filesystem::exists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStorePath(profile.string()));
-            state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
+            state.allowPath(state.systemEnvironment->store->followLinksToStorePath(profile.string()));
+            state.allowPath(
+                state.systemEnvironment->store->followLinksToStorePath((profile / "manifest.nix").string()));
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
+            auto packageInfos =
+                queryInstalled(state, state.systemEnvironment->store->followLinksToStore(profile.string()));
 
             for (auto & packageInfo : packageInfos) {
                 ProfileElement element;

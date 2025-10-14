@@ -1,4 +1,5 @@
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/expr/environment/system.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/main/shared.hh"
@@ -33,10 +34,11 @@ EvalSettings evalSettings{
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
                 auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
-                auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+                auto [accessor, lockedRef] =
+                    flakeRef.resolve(state.systemEnvironment->store).lazyFetch(state.systemEnvironment->store);
                 auto storePath = nix::fetchToStore(
                     state.fetchSettings,
-                    *state.store,
+                    *state.systemEnvironment->store,
                     SourcePath(accessor),
                     FetchMode::Copy,
                     lockedRef.input.getName());
@@ -179,17 +181,24 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
-        auto accessor = fetchers::downloadTarball(state.store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
+        auto accessor = fetchers::downloadTarball(
+            state.systemEnvironment->store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
+        auto storePath =
+            fetchToStore(state.fetchSettings, *state.systemEnvironment->store, SourcePath(accessor), FetchMode::Copy);
         return state.storePath(storePath);
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
-        auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
+        auto [accessor, lockedRef] =
+            flakeRef.resolve(state.systemEnvironment->store).lazyFetch(state.systemEnvironment->store);
         auto storePath = nix::fetchToStore(
-            state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+            state.fetchSettings,
+            *state.systemEnvironment->store,
+            SourcePath(accessor),
+            FetchMode::Copy,
+            lockedRef.input.getName());
         state.allowPath(storePath);
         return state.storePath(storePath);
     }

@@ -1,5 +1,6 @@
 #include "nix/expr/interpreter.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/environment/system.hh"
 
 namespace nix {
 
@@ -15,7 +16,7 @@ bool Interpreter::isReadOnly() const
 
 Store & Interpreter::getStore()
 {
-    return *evalState->store;
+    return *evalState->systemEnvironment->store;
 }
 
 const fetchers::Settings & Interpreter::getFetchSettings()

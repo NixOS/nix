@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "nix/expr/environment/system.hh"
 #include "nix/util/error.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/cmd/repl.hh"
@@ -333,8 +334,10 @@ StorePath NixRepl::getDerivationPath(Value & v)
     auto drvPath = packageInfo->queryDrvPath();
     if (!drvPath)
         throw Error("expression did not evaluate to a valid derivation (no 'drvPath' attribute)");
-    if (!state->store->isValidPath(*drvPath))
-        throw Error("expression evaluated to invalid derivation '%s'", state->store->printStorePath(*drvPath));
+    if (!state->systemEnvironment->store->isValidPath(*drvPath))
+        throw Error(
+            "expression evaluated to invalid derivation '%s'",
+            state->systemEnvironment->store->printStorePath(*drvPath));
     return *drvPath;
 }
 
@@ -532,32 +535,32 @@ ProcessLineResult NixRepl::processLine(std::string line)
         state->callFunction(f, v, result, PosIdx());
 
         StorePath drvPath = getDerivationPath(result);
-        runNix("nix-shell", {state->store->printStorePath(drvPath)});
+        runNix("nix-shell", {state->systemEnvironment->store->printStorePath(drvPath)});
     }
 
     else if (command == ":b" || command == ":bl" || command == ":i" || command == ":sh" || command == ":log") {
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
-        Path drvPathRaw = state->store->printStorePath(drvPath);
+        Path drvPathRaw = state->systemEnvironment->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({
+            state->systemEnvironment->store->buildPaths({
                 DerivedPath::Built{
                     .drvPath = makeConstantStorePathRef(drvPath),
                     .outputs = OutputsSpec::All{},
                 },
             });
-            auto drv = state->store->readDerivation(drvPath);
+            auto drv = state->systemEnvironment->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
-                auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
+            for (auto & [outputName, outputPath] : state->systemEnvironment->store->queryDerivationOutputMap(drvPath)) {
+                auto localStore = state->systemEnvironment->store.dynamic_pointer_cast<LocalFSStore>();
                 if (localStore && command == ":bl") {
                     std::string symlink = "repl-result-" + outputName;
                     localStore->addPermRoot(outputPath, absPath(symlink));
-                    logger->cout("  ./%s -> %s", symlink, state->store->printStorePath(outputPath));
+                    logger->cout("  ./%s -> %s", symlink, state->systemEnvironment->store->printStorePath(outputPath));
                 } else {
-                    logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));
+                    logger->cout("  %s -> %s", outputName, state->systemEnvironment->store->printStorePath(outputPath));
                 }
             }
         } else if (command == ":i") {
@@ -567,7 +570,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             Finally roModeReset([&]() { settings.readOnlyMode = false; });
             auto subs = getDefaultSubstituters();
 
-            subs.push_front(state->store);
+            subs.push_front(state->systemEnvironment->store);
 
             bool foundLog = false;
             RunPager pager;

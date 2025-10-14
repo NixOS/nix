@@ -38,6 +38,8 @@ namespace nix {
 constexpr size_t maxPrimOpArity = 8;
 
 class Store;
+class Environment;
+class SystemEnvironment;
 
 namespace fetchers {
 struct Settings;
@@ -384,14 +386,25 @@ public:
     RepairFlag repair;
 
     /**
-     * The accessor corresponding to `store`.
+     * Environment for evaluation I/O operations.
      */
-    const ref<MountedSourceAccessor> storeFS;
+    ref<Environment> environment;
 
     /**
+     * System environment (deprecated: use environment interface instead).
+     * @deprecated Direct access to SystemEnvironment will be removed.
+     */
+    [[deprecated("Use this->environment interface instead, or keep your own reference to the system environment")]]
+    ref<SystemEnvironment> systemEnvironment;
+
+private:
+    /**
      * The accessor for the root filesystem.
+     *
+     * (convenience reference to `environment`'s rootfs)
      */
     const ref<SourceAccessor> rootFS;
+public:
 
     /**
      * The in-memory filesystem for <nix/...> paths.
@@ -405,16 +418,6 @@ public:
     const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
-
-    /**
-     * Store used to materialise .drv files.
-     */
-    const ref<Store> store;
-
-    /**
-     * Store used to build stuff.
-     */
-    const ref<Store> buildStore;
 
     RootValue vImportedDrvToDerivation = nullptr;
 
@@ -514,6 +517,7 @@ public:
         const fetchers::Settings & fetchSettings,
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
+
     ~EvalState();
 
     /**
@@ -982,6 +986,9 @@ public:
      *              The return value is currently not thread safe - just the return value.
      */
     bool fullGC();
+
+    SourcePath realisePath(
+        const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full);
 
     /**
      * Realise the given context
