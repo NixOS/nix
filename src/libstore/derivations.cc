@@ -426,7 +426,9 @@ Derivation parseDerivation(
         if (*versionS == "xp-dyn-drv"sv) {
             // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
-            xpSettings.require(Xp::DynamicDerivations, fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name));
+            xpSettings.require(Xp::DynamicDerivations, [&] {
+                return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
+            });
         } else {
             throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
@@ -1454,7 +1456,8 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
             node.value = getStringSet(valueAt(json, "outputs"));
             auto drvs = getObject(valueAt(json, "dynamicOutputs"));
             for (auto & [outputId, childNode] : drvs) {
-                xpSettings.require(Xp::DynamicDerivations, fmt("dynamic output '%s' in JSON", outputId));
+                xpSettings.require(
+                    Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;

@@ -466,6 +466,19 @@ struct ExperimentalFeatureSettings : Config
     void require(const ExperimentalFeature &, std::string reason = "") const;
 
     /**
+     * Require an experimental feature be enabled, throwing an error if it is
+     * not. The reason is lazily evaluated only if the feature is disabled.
+     */
+    template<typename GetReason>
+        requires std::invocable<GetReason> && std::convertible_to<std::invoke_result_t<GetReason>, std::string>
+    void require(const ExperimentalFeature & feature, GetReason && getReason) const
+    {
+        if (isEnabled(feature))
+            return;
+        require(feature, getReason());
+    }
+
+    /**
      * `std::nullopt` pointer means no feature, which means there is nothing that could be
      * disabled, and so the function returns true in that case.
      */
