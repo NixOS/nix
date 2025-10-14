@@ -500,10 +500,10 @@ bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature)
     return std::find(f.begin(), f.end(), feature) != f.end();
 }
 
-void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature) const
+void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const
 {
     if (!isEnabled(feature))
-        throw MissingExperimentalFeature(feature);
+        throw MissingExperimentalFeature(feature, std::move(reason));
 }
 
 bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeature> & feature) const

@@ -1,5 +1,6 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
@@ -376,11 +377,13 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
     return res;
 }
 
-MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
+MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature, std::string reason)
     : Error(
-          "experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it",
-          showExperimentalFeature(feature))
+          "experimental Nix feature '%1%' is disabled%2%; add '--extra-experimental-features %1%' to enable it",
+          showExperimentalFeature(feature),
+          Uncolored(optionalBracket(" (", reason, ")")))
     , missingFeature(feature)
+    , reason{reason}
 {
 }
 

@@ -1420,7 +1420,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                         .debugThrow();
                 }
             if (ingestionMethod == ContentAddressMethod::Raw::Text)
-                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                experimentalFeatureSettings.require(
+                    Xp::DynamicDerivations, fmt("text-hashed derivation '%s', outputHashMode = \"text\"", drvName));
             if (ingestionMethod == ContentAddressMethod::Raw::Git)
                 experimentalFeatureSettings.require(Xp::GitHashing);
         };

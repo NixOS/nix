@@ -85,7 +85,11 @@ void drvRequireExperiment(const SingleDerivedPath & drv, const ExperimentalFeatu
             [&](const SingleDerivedPath::Opaque &) {
                 // plain drv path; no experimental features required.
             },
-            [&](const SingleDerivedPath::Built &) { xpSettings.require(Xp::DynamicDerivations); },
+            [&](const SingleDerivedPath::Built & b) {
+                xpSettings.require(Xp::DynamicDerivations, [&] {
+                    return fmt("building output '%s' of '%s'", b.output, b.drvPath->getBaseStorePath().to_string());
+                });
+            },
         },
         drv.raw());
 }
