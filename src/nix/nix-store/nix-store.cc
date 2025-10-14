@@ -603,7 +603,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
-                    {ref{store->getFSAccessor(info->path, false)}},
+                    {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 info->narHash = hash.hash;

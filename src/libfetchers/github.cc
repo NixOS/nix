@@ -399,7 +399,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto downloadResult = downloadFile(store, *input.settings, url, "source", headers);
-        auto json = nlohmann::json::parse(store->getFSAccessor(downloadResult.storePath)->readFile(CanonPath::root));
+        auto json = nlohmann::json::parse(
+            store->requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         return RefInfo{
             .rev = Hash::parseAny(std::string{json["sha"]}, HashAlgorithm::SHA1),
@@ -473,7 +474,8 @@ struct GitLabInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto downloadResult = downloadFile(store, *input.settings, url, "source", headers);
-        auto json = nlohmann::json::parse(store->getFSAccessor(downloadResult.storePath)->readFile(CanonPath::root));
+        auto json = nlohmann::json::parse(
+            store->requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
             return RefInfo{.rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)};
@@ -549,7 +551,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         std::string refUri;
         if (ref == "HEAD") {
             auto downloadFileResult = downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers);
-            auto contents = nix::ref(store->getFSAccessor(downloadFileResult.storePath))->readFile(CanonPath::root);
+            auto contents = store->requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
 
             auto remoteLine = git::parseLsRemoteLine(getLine(contents).first);
             if (!remoteLine) {
@@ -563,7 +565,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         auto downloadFileResult =
             downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers);
-        auto contents = nix::ref(store->getFSAccessor(downloadFileResult.storePath))->readFile(CanonPath::root);
+        auto contents = store->requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
         std::istringstream is(contents);
 
         std::string line;
