@@ -186,6 +186,8 @@ nix_err nix_store_real_path(
  * @param[in] path Path to build
  * @param[in] userdata data to pass to every callback invocation
  * @param[in] callback called for every realised output
+ * @return NIX_OK if the build succeeded, or an error code if the build/scheduling/outputs/copying/etc failed.
+ *         On error, the callback is never invoked and error information is stored in context.
  */
 nix_err nix_store_realise(
     nix_c_context * context,

@@ -329,6 +329,141 @@ TEST_F(nix_api_store_test_base, build_from_json)
     nix_store_free(store);
 }
 
+TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
+{
+    // Test that nix_store_realise properly reports errors when the system is invalid
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.substituters = {};
+
+    auto * store = open_local_store();
+
+    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    // Use an invalid system that cannot be built
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", "bogus65-bogusos");
+
+    auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drvPath, nullptr);
+
+    int callbackCount = 0;
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) { callbackCount++; }};
+
+    auto ret = nix_store_realise(
+        ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+
+    // Should fail with an error
+    ASSERT_NE(ret, NIX_OK);
+    ASSERT_EQ(callbackCount, 0) << "Callback should not be invoked when build fails";
+
+    // Check that error message is set
+    std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
+    ASSERT_FALSE(errMsg.empty()) << "Error message should be set";
+    ASSERT_NE(errMsg.find("system"), std::string::npos) << "Error should mention system";
+
+    // Clean up
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
+}
+
+TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
+{
+    // Test that nix_store_realise properly reports errors when the builder fails
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.substituters = {};
+
+    auto * store = open_local_store();
+
+    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    // Replace with current system and make builder command fail
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+    jsonStr = nix::replaceStrings(jsonStr, "echo $name foo > $out", "exit 1");
+
+    auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drvPath, nullptr);
+
+    int callbackCount = 0;
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) { callbackCount++; }};
+
+    auto ret = nix_store_realise(
+        ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+
+    // Should fail with an error
+    ASSERT_NE(ret, NIX_OK);
+    ASSERT_EQ(callbackCount, 0) << "Callback should not be invoked when build fails";
+
+    // Check that error message is set
+    std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
+    ASSERT_FALSE(errMsg.empty()) << "Error message should be set";
+
+    // Clean up
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
+}
+
+TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
+{
+    // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.substituters = {};
+
+    auto * store = open_local_store();
+
+    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    // Replace with current system and make builder succeed but not produce output
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+    jsonStr = nix::replaceStrings(jsonStr, "echo $name foo > $out", "true");
+
+    auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drvPath, nullptr);
+
+    int callbackCount = 0;
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) { callbackCount++; }};
+
+    auto ret = nix_store_realise(
+        ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+
+    // Should fail with an error
+    ASSERT_NE(ret, NIX_OK);
+    ASSERT_EQ(callbackCount, 0) << "Callback should not be invoked when build produces no output";
+
+    // Check that error message is set
+    std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
+    ASSERT_FALSE(errMsg.empty()) << "Error message should be set";
+
+    // Clean up
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
+}
+
 TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_with_outputs)
 {
     // Test closure computation with include_outputs on a derivation path

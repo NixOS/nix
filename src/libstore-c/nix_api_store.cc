@@ -173,6 +173,14 @@ nix_err nix_store_realise(
         const auto nixStore = store->ptr;
         auto results = nixStore->buildPathsWithResults(paths, nix::bmNormal, nixStore);
 
+        assert(results.size() == 1);
+
+        // Check if any builds failed
+        for (auto & result : results) {
+            if (!result.success())
+                result.rethrow();
+        }
+
         if (callback) {
             for (const auto & result : results) {
                 for (const auto & [outputName, realisation] : result.builtOutputs) {
