@@ -1,3 +1,22 @@
+#include <git2/attr.h>
+#include <git2/config.h>
+#include <git2/errors.h>
+#include <git2/remote.h>
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <ctype.h>
+#include <git2/repository.h>
+#include <nlohmann/detail/json_ref.hpp>
+#include <algorithm>
+#include <filesystem>
+#include <list>
+#include <map>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <string_view>
+#include <utility>
+
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
@@ -6,13 +25,13 @@
 #include "nix/util/users.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/ssh.hh"
-
-#include <git2/attr.h>
-#include <git2/config.h>
-#include <git2/errors.h>
-#include <git2/remote.h>
-
-#include <nlohmann/json.hpp>
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
 
 namespace nix::lfs {
 

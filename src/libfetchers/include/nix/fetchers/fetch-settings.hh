@@ -1,15 +1,18 @@
 #pragma once
 ///@file
 
+#include <sys/types.h>
+#include <map>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <string>
+
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/sync.hh"
-
-#include <map>
-#include <limits>
-
-#include <sys/types.h>
+#include "nix/util/experimental-features.hh"
 
 namespace nix::fetchers {
 

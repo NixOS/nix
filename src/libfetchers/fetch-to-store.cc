@@ -1,7 +1,18 @@
+#include <map>
+#include <memory>
+#include <optional>
+#include <utility>
+
 #include "nix/fetchers/fetch-to-store.hh"
-#include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

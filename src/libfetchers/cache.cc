@@ -1,3 +1,10 @@
+#include <nlohmann/json.hpp>
+#include <time.h>
+#include <nlohmann/json_fwd.hpp>
+#include <filesystem>
+#include <map>
+#include <memory>
+
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/users.hh"
@@ -5,8 +12,10 @@
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
 
 namespace nix::fetchers {
 

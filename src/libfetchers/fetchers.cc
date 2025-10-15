@@ -1,12 +1,23 @@
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <vector>
+
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
-#include "nix/fetchers/fetch-to-store.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/fetchers/cache.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/util.hh"
 
 namespace nix::fetchers {
 

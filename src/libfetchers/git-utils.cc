@@ -1,15 +1,3 @@
-#include "nix/fetchers/git-utils.hh"
-#include "nix/fetchers/git-lfs-fetch.hh"
-#include "nix/fetchers/cache.hh"
-#include "nix/fetchers/fetch-settings.hh"
-#include "nix/util/base-n.hh"
-#include "nix/util/finally.hh"
-#include "nix/util/processes.hh"
-#include "nix/util/signals.hh"
-#include "nix/util/users.hh"
-#include "nix/util/fs-sink.hh"
-#include "nix/util/sync.hh"
-
 #include <git2/attr.h>
 #include <git2/blob.h>
 #include <git2/branch.h>
@@ -27,17 +15,60 @@
 #include <git2/revparse.h>
 #include <git2/status.h>
 #include <git2/submodule.h>
-#include <git2/sys/odb_backend.h>
 #include <git2/sys/mempack.h>
 #include <git2/tag.h>
 #include <git2/tree.h>
-
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <assert.h>
+#include <git2/buffer.h>
+#include <git2/oid.h>
+#include <git2/pack.h>
+#include <git2/types.h>
+#include <boost/core/pointer_traits.hpp>
+#include <boost/unordered/detail/foa/table.hpp>
 #include <iostream>
 #include <queue>
 #include <regex>
 #include <span>
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <exception>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string_view>
+#include <system_error>
+#include <typeindex>
+#include <utility>
+
+#include "nix/fetchers/git-utils.hh"
+#include "nix/fetchers/git-lfs-fetch.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/base-n.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/users.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/sync.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/signals-impl.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace std {
 

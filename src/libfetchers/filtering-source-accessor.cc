@@ -1,6 +1,8 @@
-#include "nix/fetchers/filtering-source-accessor.hh"
-
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <filesystem>
+#include <optional>
+
+#include "nix/fetchers/filtering-source-accessor.hh"
 
 namespace nix {
 

@@ -1,7 +1,11 @@
-#include "nix/fetchers/attrs.hh"
-#include "nix/fetchers/fetchers.hh"
-
 #include <nlohmann/json.hpp>
+#include <nlohmann/detail/iterators/iter_impl.hpp>
+#include <nlohmann/detail/iterators/iteration_proxy.hpp>
+#include <utility>
+
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix::fetchers {
 

@@ -1,7 +1,20 @@
 #pragma once
 
+#include <stdint.h>
+#include <filesystem>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <variant>
+#include <vector>
+
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

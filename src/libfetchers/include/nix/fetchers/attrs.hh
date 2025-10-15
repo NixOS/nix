@@ -1,14 +1,15 @@
 #pragma once
 ///@file
 
+#include <nlohmann/json_fwd.hpp>
+#include <stdint.h>
+#include <variant>
+#include <optional>
+#include <map>
+#include <string>
+
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
-
-#include <variant>
-
-#include <nlohmann/json_fwd.hpp>
-
-#include <optional>
 
 namespace nix::fetchers {
 

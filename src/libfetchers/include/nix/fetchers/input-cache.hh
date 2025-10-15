@@ -1,4 +1,11 @@
+#include <map>
+#include <optional>
+#include <string>
+
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix::fetchers {
 

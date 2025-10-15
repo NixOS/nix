@@ -1,14 +1,43 @@
+#include <assert.h>
+#include <stdint.h>
+#include <sys/stat.h>
+#include <filesystem>
+#include <format>
+#include <map>
+#include <memory>
+#include <optional>
+#include <regex>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/fetchers/fetch-settings.hh"
-
-#include <sys/time.h>
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 using namespace std::string_literals;
 

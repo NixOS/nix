@@ -1,28 +1,39 @@
 #pragma once
 ///@file
 
+#include <nlohmann/json_fwd.hpp>
+#include <stdint.h>
+#include <time.h>
+#include <boost/container/detail/std_fwd.hpp>
+#include <memory>
+#include <compare>
+#include <filesystem>
+#include <format>
+#include <map>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/util/url.hh"
-
-#include <memory>
-#include <nlohmann/json_fwd.hpp>
-
 #include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix {
 class Store;
 class StorePath;
-struct SourceAccessor;
 } // namespace nix
 
 namespace nix::fetchers {
 
 struct InputScheme;
-
 struct Settings;
 
 /**

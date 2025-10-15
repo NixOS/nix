@@ -1,8 +1,17 @@
 #pragma once
 
-#include "nix/util/source-path.hh"
-
 #include <boost/unordered/unordered_flat_set_fwd.hpp>
+#include <stdint.h>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "nix/util/source-path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

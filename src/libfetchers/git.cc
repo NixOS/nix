@@ -1,29 +1,53 @@
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
+#include <string_view>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "nix/util/error.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/url-parts.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/git.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/util/logging.hh"
-#include "nix/util/finally.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/mounted-source-accessor.hh"
-
-#include <regex>
-#include <string.h>
-#include <sys/time.h>
-
-#ifndef _WIN32
-#  include <sys/wait.h>
-#endif
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 using namespace std::string_literals;
 
