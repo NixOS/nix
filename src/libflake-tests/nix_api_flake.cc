@@ -1,15 +1,17 @@
+#include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
+
 #include "nix/util/file-system.hh"
 #include "nix_api_store.h"
 #include "nix_api_util.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 #include "nix_api_flake.h"
-
-#include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
-
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include "nix/store/tests/nix_api_store.hh"
+#include "nix/util/tests/nix_api_util.hh"
+#include "nix_api_fetchers.h"
 
 namespace nixC {
 

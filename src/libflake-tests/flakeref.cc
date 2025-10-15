@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
+#include <set>
+#include <string>
+#include <utility>
 
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix {
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "nix/expr/eval.hh"
-#include "nix/flake/settings.hh"
 
 namespace nix {
 namespace flake {

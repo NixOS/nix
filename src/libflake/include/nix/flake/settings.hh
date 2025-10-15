@@ -2,11 +2,9 @@
 ///@file
 
 #include <sys/types.h>
-#include <optional>
 #include <string>
 
 #include "nix/util/configuration.hh"
-#include "nix/util/experimental-features.hh"
 
 namespace nix {
 // Forward declarations
