@@ -1,12 +1,9 @@
 #include "nix/store/s3-binary-cache-store.hh"
 
-#if NIX_WITH_S3_SUPPORT
+#include <cassert>
 
-#  include <cassert>
-
-#  include "nix/store/s3-binary-cache-store.hh"
-#  include "nix/store/http-binary-cache-store.hh"
-#  include "nix/store/store-registration.hh"
+#include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 
@@ -45,5 +42,3 @@ std::string S3BinaryCacheStoreConfig::doc()
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;
 
 } // namespace nix
-
-#endif

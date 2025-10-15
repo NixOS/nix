@@ -15,6 +15,7 @@
 #if NIX_WITH_S3_SUPPORT
 #  include "nix/store/aws-creds.hh"
 #endif
+#include "nix/store/s3-url.hh"
 
 namespace nix {
 
@@ -132,10 +133,10 @@ struct FileTransferRequest
         return data ? "upload" : "download";
     }
 
-#if NIX_WITH_S3_SUPPORT
 private:
     friend struct curlFileTransfer;
     void setupForS3();
+#if NIX_WITH_S3_SUPPORT
     std::optional<std::string> awsSigV4Provider;
 #endif
 };

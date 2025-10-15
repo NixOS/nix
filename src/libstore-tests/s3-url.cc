@@ -1,10 +1,8 @@
 #include "nix/store/s3-url.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
-#if NIX_WITH_S3_SUPPORT
-
-#  include <gtest/gtest.h>
-#  include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 namespace nix {
 
@@ -228,5 +226,3 @@ INSTANTIATE_TEST_SUITE_P(
     [](const ::testing::TestParamInfo<S3ToHttpsConversionTestCase> & info) { return info.param.description; });
 
 } // namespace nix
-
-#endif

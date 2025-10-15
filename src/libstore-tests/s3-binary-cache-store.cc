@@ -1,12 +1,9 @@
 #include "nix/store/s3-binary-cache-store.hh"
+#include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/store/s3-url.hh"
 
-#if NIX_WITH_S3_SUPPORT
-
-#  include "nix/store/http-binary-cache-store.hh"
-#  include "nix/store/filetransfer.hh"
-#  include "nix/store/s3-url.hh"
-
-#  include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 namespace nix {
 
@@ -126,5 +123,3 @@ TEST(S3BinaryCacheStore, parameterFiltering)
 }
 
 } // namespace nix
-
-#endif

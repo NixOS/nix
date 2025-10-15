@@ -265,7 +265,6 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
-  'aws-creds.cc',
   'binary-cache-store.cc',
   'build-result.cc',
   'build/derivation-builder.cc',
@@ -343,6 +342,11 @@ sources = files(
   'worker-protocol-connection.cc',
   'worker-protocol.cc',
 )
+
+# AWS credentials code requires AWS CRT, so only compile when enabled
+if curl_s3_store_opt.enabled()
+  sources += files('aws-creds.cc')
+endif
 
 subdir('include/nix/store')
 

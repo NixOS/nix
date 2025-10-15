@@ -1,13 +1,10 @@
 #include "nix/store/s3-url.hh"
+#include "nix/util/error.hh"
+#include "nix/util/split.hh"
+#include "nix/util/strings-inline.hh"
 
-#if NIX_WITH_S3_SUPPORT
-
-#  include "nix/util/error.hh"
-#  include "nix/util/split.hh"
-#  include "nix/util/strings-inline.hh"
-
-#  include <ranges>
-#  include <string_view>
+#include <ranges>
+#include <string_view>
 
 using namespace std::string_view_literals;
 
@@ -117,5 +114,3 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
 }
 
 } // namespace nix
-
-#endif

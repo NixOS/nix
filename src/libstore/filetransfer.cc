@@ -8,10 +8,10 @@
 #include "nix/util/signals.hh"
 
 #include "store-config-private.hh"
+#include "nix/store/s3-url.hh"
 #include <optional>
 #if NIX_WITH_S3_SUPPORT
 #  include "nix/store/aws-creds.hh"
-#  include "nix/store/s3-url.hh"
 #endif
 
 #ifdef __linux__
@@ -820,10 +820,7 @@ struct curlFileTransfer : public FileTransfer
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
-#if NIX_WITH_S3_SUPPORT
-            && item->request.uri.scheme() != "s3"
-#endif
-        )
+            && item->request.uri.scheme() != "s3")
             throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
@@ -839,16 +836,11 @@ struct curlFileTransfer : public FileTransfer
 
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Ugly hack to support s3:// URIs. */
+        /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
-#if NIX_WITH_S3_SUPPORT
-            // New curl-based S3 implementation
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
             enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-#else
-            throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
-#endif
             return;
         }
 
@@ -876,14 +868,16 @@ ref<FileTransfer> makeFileTransfer()
     return makeCurlFileTransfer();
 }
 
-#if NIX_WITH_S3_SUPPORT
 void FileTransferRequest::setupForS3()
 {
     auto parsedS3 = ParsedS3URL::parse(uri.parsed());
-    // Update the request URI to use HTTPS
+    // Update the request URI to use HTTPS (works without AWS SDK)
     uri = parsedS3.toHttpsUrl();
-    // This gets used later in a curl setopt
+
+#if NIX_WITH_S3_SUPPORT
+    // Auth-specific code only compiled when AWS support is available
     awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
+
     // check if the request already has pre-resolved credentials
     std::optional<std::string> sessionToken;
     if (usernameAuth) {
@@ -908,8 +902,11 @@ void FileTransferRequest::setupForS3()
     }
     if (sessionToken)
         headers.emplace_back("x-amz-security-token", *sessionToken);
-}
+#else
+    // When built without AWS support, just try as public bucket
+    debug("S3 request without authentication (built without AWS support)");
 #endif
+}
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
 {

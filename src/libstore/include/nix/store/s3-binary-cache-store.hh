@@ -2,10 +2,7 @@
 ///@file
 
 #include "nix/store/config.hh"
-
-#if NIX_WITH_S3_SUPPORT
-
-#  include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/http-binary-cache-store.hh"
 
 namespace nix {
 
@@ -77,5 +74,3 @@ public:
 };
 
 } // namespace nix
-
-#endif
