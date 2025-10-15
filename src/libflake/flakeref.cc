@@ -33,7 +33,7 @@ struct SourceAccessor;
 
 namespace fetchers {
 struct Settings;
-}  // namespace fetchers
+} // namespace fetchers
 
 #if 0
 // 'dir' path elements cannot start with a '.'. We also reject

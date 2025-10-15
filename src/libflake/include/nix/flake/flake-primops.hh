@@ -5,8 +5,8 @@
 namespace nix {
 namespace flake {
 struct Settings;
-}  // namespace flake
-}  // namespace nix
+} // namespace flake
+} // namespace nix
 
 namespace nix::flake::primops {
 

@@ -43,7 +43,7 @@
 
 namespace nix {
 class Store;
-}  // namespace nix
+} // namespace nix
 
 namespace nix::flake {
 

@@ -13,9 +13,10 @@
 namespace nix {
 
 class Store;
+
 namespace fetchers {
 struct Settings;
-}  // namespace fetchers
+} // namespace fetchers
 
 typedef std::string FlakeId;
 
