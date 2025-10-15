@@ -2,15 +2,21 @@
 ///@file
 
 #include <regex>
+#include <iosfwd>
+#include <string>
+#include <tuple>
+#include <utility>
 
-#include "nix/util/types.hh"
-#include "nix/fetchers/fetchers.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/fetchers/registry.hh"
 
 namespace nix {
 
 class Store;
+
+namespace fetchers {
+struct Settings;
+} // namespace fetchers
 
 typedef std::string FlakeId;
 
