@@ -68,7 +68,6 @@ jobs:
             primary: true
             stdenv: stdenv
             withAWS: true
-            withCurlS3: false
           # TODO: remove once curl-based-s3 fully lands
           - scenario: on ubuntu (no s3)
             runs-on: ubuntu-24.04
@@ -77,16 +76,6 @@ jobs:
             primary: false
             stdenv: stdenv
             withAWS: false
-            withCurlS3: false
-          # TODO: remove once curl-based-s3 fully lands
-          - scenario: on ubuntu (curl s3)
-            runs-on: ubuntu-24.04
-            os: linux
-            instrumented: false
-            primary: false
-            stdenv: stdenv
-            withAWS: false
-            withCurlS3: true
           - scenario: on macos
             runs-on: macos-14
             os: darwin
@@ -94,7 +83,6 @@ jobs:
             primary: true
             stdenv: stdenv
             withAWS: true
-            withCurlS3: false
           - scenario: on ubuntu (with sanitizers / coverage)
             runs-on: ubuntu-24.04
             os: linux
@@ -102,7 +90,6 @@ jobs:
             primary: false
             stdenv: clangStdenv
             withAWS: true
-            withCurlS3: false
     name: tests ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
@@ -126,15 +113,13 @@ jobs:
         nix build --file ci/gha/tests/wrapper.nix componentTests -L \
           --arg withInstrumentation ${{ matrix.instrumented }} \
           --argstr stdenv "${{ matrix.stdenv }}" \
-          ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
-          ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
+          ${{ format('--arg withAWS {0}', matrix.withAWS) }}
     - name: Run VM tests
       run: |
         nix build --file ci/gha/tests/wrapper.nix vmTests -L \
           --arg withInstrumentation ${{ matrix.instrumented }} \
           --argstr stdenv "${{ matrix.stdenv }}" \
-          ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
-          ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }}
+          ${{ format('--arg withAWS {0}', matrix.withAWS) }}
       if: ${{ matrix.os == 'linux' }}
     - name: Run flake checks and prepare the installer tarball
       run: |
@@ -147,7 +132,6 @@ jobs:
           --arg withInstrumentation ${{ matrix.instrumented }} \
           --argstr stdenv "${{ matrix.stdenv }}" \
           ${{ format('--arg withAWS {0}', matrix.withAWS) }} \
-          ${{ format('--arg withCurlS3 {0}', matrix.withCurlS3) }} \
           --out-link coverage-reports
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}

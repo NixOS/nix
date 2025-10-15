@@ -1,6 +1,6 @@
 #include "nix/store/aws-creds.hh"
 
-#if NIX_WITH_CURL_S3
+#if NIX_WITH_AWS_AUTH
 
 #  include <aws/crt/Types.h>
 #  include "nix/store/s3-url.hh"

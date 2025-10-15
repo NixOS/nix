@@ -1,16 +1,13 @@
 #pragma once
 ///@file
 #include "nix/store/config.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
-#if NIX_WITH_S3_SUPPORT || NIX_WITH_CURL_S3
-
-#  include "nix/util/url.hh"
-#  include "nix/util/util.hh"
-
-#  include <optional>
-#  include <string>
-#  include <variant>
-#  include <vector>
+#include <optional>
+#include <string>
+#include <variant>
+#include <vector>
 
 namespace nix {
 
@@ -56,5 +53,3 @@ struct ParsedS3URL
 };
 
 } // namespace nix
-
-#endif
