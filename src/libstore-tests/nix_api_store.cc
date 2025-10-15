@@ -218,6 +218,66 @@ struct LambdaAdapter
     }
 };
 
+class NixApiStoreTestWithRealisedPath : public nix_api_store_test_base
+{
+public:
+    StorePath * drvPath = nullptr;
+    nix_derivation * drv = nullptr;
+    Store * store = nullptr;
+    StorePath * outPath = nullptr;
+
+    void SetUp() override
+    {
+        nix_api_store_test_base::SetUp();
+
+        nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+        nix::settings.substituters = {};
+
+        store = open_local_store();
+
+        std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+        std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+        std::stringstream buffer;
+        buffer << t.rdbuf();
+
+        drv = nix_derivation_from_json(ctx, store, buffer.str().c_str());
+        assert_ctx_ok();
+        ASSERT_NE(drv, nullptr);
+
+        drvPath = nix_add_derivation(ctx, store, drv);
+        assert_ctx_ok();
+        ASSERT_NE(drvPath, nullptr);
+
+        auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath_) {
+            auto is_valid_path = nix_store_is_valid_path(ctx, store, outPath_);
+            ASSERT_EQ(is_valid_path, true);
+            ASSERT_STREQ(outname, "out") << "Expected single 'out' output";
+            ASSERT_EQ(outPath, nullptr) << "Output path callback should only be called once";
+            outPath = nix_store_path_clone(outPath_);
+        }};
+
+        auto ret = nix_store_realise(
+            ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+        assert_ctx_ok();
+        ASSERT_EQ(ret, NIX_OK);
+        ASSERT_NE(outPath, nullptr) << "Derivation should have produced an output";
+    }
+
+    void TearDown() override
+    {
+        if (drvPath)
+            nix_store_path_free(drvPath);
+        if (outPath)
+            nix_store_path_free(outPath);
+        if (drv)
+            nix_derivation_free(drv);
+        if (store)
+            nix_store_free(store);
+
+        nix_api_store_test_base::TearDown();
+    }
+};
+
 TEST_F(nix_api_store_test_base, build_from_json)
 {
     // FIXME get rid of these
@@ -254,6 +314,186 @@ TEST_F(nix_api_store_test_base, build_from_json)
     nix_store_path_free(drvPath);
     nix_derivation_free(drv);
     nix_store_free(store);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_with_outputs)
+{
+    // Test closure computation with include_outputs on a derivation path
+    struct CallbackData
+    {
+        std::set<std::string> * paths;
+    };
+
+    std::set<std::string> closure_paths;
+    CallbackData data{&closure_paths};
+
+    auto ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        drvPath, // Use derivation path
+        false,   // flip_direction
+        true,    // include_outputs - include the outputs in the closure
+        false,   // include_derivers
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            std::string path_str;
+            nix_store_path_name(path, OBSERVE_STRING(path_str));
+            auto [it, inserted] = data->paths->insert(path_str);
+            ASSERT_TRUE(inserted) << "Duplicate path in closure: " << path_str;
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // The closure should contain the derivation and its outputs
+    ASSERT_GE(closure_paths.size(), 2);
+
+    // Verify the output path is in the closure
+    std::string outPathName;
+    nix_store_path_name(outPath, OBSERVE_STRING(outPathName));
+    ASSERT_EQ(closure_paths.count(outPathName), 1);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_without_outputs)
+{
+    // Test closure computation WITHOUT include_outputs on a derivation path
+    struct CallbackData
+    {
+        std::set<std::string> * paths;
+    };
+
+    std::set<std::string> closure_paths;
+    CallbackData data{&closure_paths};
+
+    auto ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        drvPath, // Use derivation path
+        false,   // flip_direction
+        false,   // include_outputs - do NOT include the outputs
+        false,   // include_derivers
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            std::string path_str;
+            nix_store_path_name(path, OBSERVE_STRING(path_str));
+            auto [it, inserted] = data->paths->insert(path_str);
+            ASSERT_TRUE(inserted) << "Duplicate path in closure: " << path_str;
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Verify the output path is NOT in the closure
+    std::string outPathName;
+    nix_store_path_name(outPath, OBSERVE_STRING(outPathName));
+    ASSERT_EQ(closure_paths.count(outPathName), 0) << "Output path should not be in closure when includeOutputs=false";
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_flip_direction)
+{
+    // Test closure computation with flip_direction on a derivation path
+    // When flip_direction=true, we get the reverse dependencies (what depends on this path)
+    // For a derivation, this should NOT include outputs even with include_outputs=true
+    struct CallbackData
+    {
+        std::set<std::string> * paths;
+    };
+
+    std::set<std::string> closure_paths;
+    CallbackData data{&closure_paths};
+
+    auto ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        drvPath, // Use derivation path
+        true,    // flip_direction - get reverse dependencies
+        true,    // include_outputs
+        false,   // include_derivers
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            std::string path_str;
+            nix_store_path_name(path, OBSERVE_STRING(path_str));
+            auto [it, inserted] = data->paths->insert(path_str);
+            ASSERT_TRUE(inserted) << "Duplicate path in closure: " << path_str;
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Verify the output path is NOT in the closure when direction is flipped
+    std::string outPathName;
+    nix_store_path_name(outPath, OBSERVE_STRING(outPathName));
+    ASSERT_EQ(closure_paths.count(outPathName), 0) << "Output path should not be in closure when flip_direction=true";
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_include_derivers)
+{
+    // Test closure computation with include_derivers on an output path
+    // This should include the derivation that produced the output
+    struct CallbackData
+    {
+        std::set<std::string> * paths;
+    };
+
+    std::set<std::string> closure_paths;
+    CallbackData data{&closure_paths};
+
+    auto ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        outPath, // Use output path (not derivation)
+        false,   // flip_direction
+        false,   // include_outputs
+        true,    // include_derivers - include the derivation
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            std::string path_str;
+            nix_store_path_name(path, OBSERVE_STRING(path_str));
+            auto [it, inserted] = data->paths->insert(path_str);
+            ASSERT_TRUE(inserted) << "Duplicate path in closure: " << path_str;
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Verify the derivation path is in the closure
+    // Deriver is nasty stateful, and this assertion is only guaranteed because
+    // we're using an empty store as our starting point. Otherwise, if the
+    // output happens to exist, the deriver could be anything.
+    std::string drvPathName;
+    nix_store_path_name(drvPath, OBSERVE_STRING(drvPathName));
+    ASSERT_EQ(closure_paths.count(drvPathName), 1) << "Derivation should be in closure when include_derivers=true";
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_error_propagation)
+{
+    // Test that errors in the callback abort the closure computation
+    struct CallbackData
+    {
+        int * count;
+    };
+
+    int call_count = 0;
+    CallbackData data{&call_count};
+
+    auto ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        drvPath, // Use derivation path
+        false,   // flip_direction
+        true,    // include_outputs
+        false,   // include_derivers
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            (*data->count)++;
+            // Set an error immediately
+            nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Test error");
+        });
+
+    // Should have aborted with error
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+    ASSERT_EQ(call_count, 1); // Should have been called exactly once, then aborted
 }
 
 } // namespace nixC
