@@ -240,7 +240,10 @@ public:
         std::stringstream buffer;
         buffer << t.rdbuf();
 
-        drv = nix_derivation_from_json(ctx, store, buffer.str().c_str());
+        // Replace the hardcoded system with the current system
+        std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+
+        drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
         assert_ctx_ok();
         ASSERT_NE(drv, nullptr);
 
@@ -249,6 +252,7 @@ public:
         ASSERT_NE(drvPath, nullptr);
 
         auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath_) {
+            ASSERT_NE(outname, nullptr) << "Output name should not be NULL";
             auto is_valid_path = nix_store_is_valid_path(ctx, store, outPath_);
             ASSERT_EQ(is_valid_path, true);
             ASSERT_STREQ(outname, "out") << "Expected single 'out' output";
@@ -292,7 +296,10 @@ TEST_F(nix_api_store_test_base, build_from_json)
     std::stringstream buffer;
     buffer << t.rdbuf();
 
-    auto * drv = nix_derivation_from_json(ctx, store, buffer.str().c_str());
+    // Replace the hardcoded system with the current system
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+
+    auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
     assert_ctx_ok();
     ASSERT_NE(drv, nullptr);
 
@@ -300,15 +307,21 @@ TEST_F(nix_api_store_test_base, build_from_json)
     assert_ctx_ok();
     ASSERT_NE(drv, nullptr);
 
+    int callbackCount = 0;
     auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) {
+        ASSERT_NE(outname, nullptr);
+        ASSERT_STREQ(outname, "out");
+        ASSERT_NE(outPath, nullptr);
         auto is_valid_path = nix_store_is_valid_path(ctx, store, outPath);
         ASSERT_EQ(is_valid_path, true);
+        callbackCount++;
     }};
 
     auto ret = nix_store_realise(
         ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
     assert_ctx_ok();
     ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(callbackCount, 1) << "Callback should have been invoked exactly once";
 
     // Clean up
     nix_store_path_free(drvPath);
