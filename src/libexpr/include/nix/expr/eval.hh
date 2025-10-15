@@ -16,12 +16,14 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/counter.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
 
-#include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/concurrent_flat_map_fwd.hpp>
+
 #include <map>
 #include <optional>
 #include <functional>
@@ -40,6 +42,7 @@ class Store;
 namespace fetchers {
 struct Settings;
 struct InputCache;
+struct Input;
 } // namespace fetchers
 struct EvalSettings;
 class EvalState;
@@ -47,6 +50,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 
 namespace eval_cache {
 class EvalCache;
@@ -299,6 +303,68 @@ struct StaticEvalSymbols
     }
 };
 
+class EvalMemory
+{
+#if NIX_USE_BOEHMGC
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
+    std::shared_ptr<void *> valueAllocCache;
+
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
+    std::shared_ptr<void *> env1AllocCache;
+#endif
+
+public:
+    struct Statistics
+    {
+        Counter nrEnvs;
+        Counter nrValuesInEnvs;
+        Counter nrValues;
+        Counter nrAttrsets;
+        Counter nrAttrsInAttrsets;
+        Counter nrListElems;
+    };
+
+    EvalMemory();
+
+    EvalMemory(const EvalMemory &) = delete;
+    EvalMemory(EvalMemory &&) = delete;
+    EvalMemory & operator=(const EvalMemory &) = delete;
+    EvalMemory & operator=(EvalMemory &&) = delete;
+
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
+
+    Bindings * allocBindings(size_t capacity);
+
+    BindingsBuilder buildBindings(SymbolTable & symbols, size_t capacity)
+    {
+        return BindingsBuilder(*this, symbols, allocBindings(capacity), capacity);
+    }
+
+    ListBuilder buildList(size_t size)
+    {
+        stats.nrListElems += size;
+        return ListBuilder(size);
+    }
+
+    const Statistics & getStats() const &
+    {
+        return stats;
+    }
+
+    /**
+     * Storage for the AST nodes
+     */
+    Exprs exprs;
+
+private:
+    Statistics stats;
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
@@ -309,6 +375,8 @@ public:
     SymbolTable symbols;
     PosTable positions;
 
+    EvalMemory mem;
+
     /**
      * If set, force copying files to the Nix store even if they
      * already exist there.
@@ -318,7 +386,7 @@ public:
     /**
      * The accessor corresponding to `store`.
      */
-    const ref<SourceAccessor> storeFS;
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.
@@ -403,37 +471,30 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    boost::concurrent_flat_map<SourcePath, StorePath, std::hash<SourcePath>> srcToStore;
+    ref<boost::concurrent_flat_map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    typedef boost::unordered_flat_map<
-        SourcePath,
-        Expr *,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Expr *>>>
-        FileParseCache;
-    FileParseCache fileParseCache;
+    ref<boost::concurrent_flat_map<SourcePath, SourcePath>> importResolutionCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
-    typedef boost::unordered_flat_map<
+    ref<boost::concurrent_flat_map<
         SourcePath,
-        Value,
+        Value *,
         std::hash<SourcePath>,
         std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value>>>
-        FileEvalCache;
-    FileEvalCache fileEvalCache;
+        traceable_allocator<std::pair<const SourcePath, Value *>>>>
+        fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    boost::unordered_flat_map<SourcePath, DocCommentMap, std::hash<SourcePath>> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
@@ -445,27 +506,31 @@ private:
      */
     std::shared_ptr<RegexCache> regexCache;
 
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
-
 public:
 
+    /**
+     * @param lookupPath     Only used during construction.
+     * @param store          The store to use for instantiation
+     * @param fetchSettings  Must outlive the lifetime of this EvalState!
+     * @param settings       Must outlive the lifetime of this EvalState!
+     * @param buildStore     The store to use for builds ("import from derivation", C API `nix_string_realise`)
+     */
     EvalState(
-        const LookupPath & _lookupPath,
+        const LookupPath & lookupPath,
         ref<Store> store,
         const fetchers::Settings & fetchSettings,
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    /**
+     * A wrapper around EvalMemory::allocValue() to avoid code churn when it
+     * was introduced.
+     */
+    inline Value * allocValue()
+    {
+        return mem.allocValue();
+    }
 
     LookupPath getLookupPath()
     {
@@ -494,8 +559,11 @@ public:
 
     /**
      * Allow access to a path.
+     *
+     * Only for restrict eval: pure eval just whitelist store paths,
+     * never arbitrary paths.
      */
-    void allowPath(const Path & path);
+    void allowPathLegacy(const Path & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to
@@ -514,6 +582,11 @@ public:
     void allowAndSetStorePathString(const StorePath & storePath, Value & v);
 
     void checkURI(const std::string & uri);
+
+    /**
+     * Mount an input on the Nix store.
+     */
+    StorePath mountInput(fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor);
 
     /**
      * Parse a Nix expression from the specified file.
@@ -835,22 +908,14 @@ public:
      */
     void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
-    /**
-     * Allocation primitives.
-     */
-    inline Value * allocValue();
-    inline Env & allocEnv(size_t size);
-
-    Bindings * allocBindings(size_t capacity);
-
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity), capacity);
+        return mem.buildBindings(symbols, capacity);
     }
 
     ListBuilder buildList(size_t size)
     {
-        return ListBuilder(*this, size);
+        return mem.buildList(size);
     }
 
     /**
@@ -967,19 +1032,13 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    unsigned long nrEnvs = 0;
-    unsigned long nrValuesInEnvs = 0;
-    unsigned long nrValues = 0;
-    unsigned long nrListElems = 0;
-    unsigned long nrLookups = 0;
-    unsigned long nrAttrsets = 0;
-    unsigned long nrAttrsInAttrsets = 0;
-    unsigned long nrAvoided = 0;
-    unsigned long nrOpUpdates = 0;
-    unsigned long nrOpUpdateValuesCopied = 0;
-    unsigned long nrListConcats = 0;
-    unsigned long nrPrimOpCalls = 0;
-    unsigned long nrFunctionCalls = 0;
+    Counter nrLookups;
+    Counter nrAvoided;
+    Counter nrOpUpdates;
+    Counter nrOpUpdateValuesCopied;
+    Counter nrListConcats;
+    Counter nrPrimOpCalls;
+    Counter nrFunctionCalls;
 
     bool countCalls;
 

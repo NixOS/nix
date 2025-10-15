@@ -226,8 +226,8 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
-    evalSettings.restrictEval = false;
-    evalSettings.pureEval = false;
+    evalSettings.restrictEval = true;
+    evalSettings.pureEval = true;
     EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();

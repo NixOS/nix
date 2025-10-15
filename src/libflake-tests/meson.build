@@ -34,7 +34,6 @@ gtest = dependency('gtest', main : true)
 deps_private += gtest
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'flakeref.cc',
@@ -59,7 +58,7 @@ this_exe = executable(
 test(
   meson.project_name(),
   this_exe,
-  env : asan_test_options_env + {
+  env : {
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
     'NIX_CONFIG' : 'extra-experimental-features = flakes',
     'HOME' : meson.current_build_dir() / 'test-home',

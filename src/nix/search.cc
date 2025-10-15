@@ -159,7 +159,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             logger->cout(
                                 "* %s%s",
                                 wrap("\e[0;1m", hiliteMatches(attrPath2, attrPathMatches, ANSI_GREEN, "\e[0;1m")),
-                                name.version != "" ? " (" + name.version + ")" : "");
+                                optionalBracket(" (", name.version, ")"));
                             if (description != "")
                                 logger->cout(
                                     "  %s", hiliteMatches(description, descriptionMatches, ANSI_GREEN, ANSI_NORMAL));

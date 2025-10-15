@@ -12,6 +12,7 @@
 namespace nix {
 
 struct NarInfo;
+class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
 {
@@ -136,6 +137,11 @@ private:
         CheckSigsFlag checkSigs,
         std::function<ValidPathInfo(HashResult)> mkInfo);
 
+    /**
+     * Same as `getFSAccessor`, but with a more preceise return type.
+     */
+    ref<RemoteFSAccessor> getRemoteFSAccessor(bool requireValidPath = true);
+
 public:
 
     bool isValidPathUncached(const StorePath & path) override;
@@ -174,6 +180,8 @@ public:
     void narFromPath(const StorePath & path, Sink & sink) override;
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath &, bool requireValidPath = true) override;
 
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
 

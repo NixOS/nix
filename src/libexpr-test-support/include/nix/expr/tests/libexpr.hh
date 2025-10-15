@@ -26,11 +26,20 @@ public:
     }
 
 protected:
-    LibExprTest()
+    LibExprTest(ref<Store> store, auto && makeEvalSettings)
         : LibStoreTest()
+        , evalSettings(makeEvalSettings(readOnlyMode))
         , state({}, store, fetchSettings, evalSettings, nullptr)
     {
-        evalSettings.nixPath = {};
+    }
+
+    LibExprTest()
+        : LibExprTest(openStore("dummy://"), [](bool & readOnlyMode) {
+            EvalSettings settings{readOnlyMode};
+            settings.nixPath = {};
+            return settings;
+        })
+    {
     }
 
     Value eval(std::string input, bool forceValue = true)

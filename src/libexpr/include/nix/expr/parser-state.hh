@@ -24,7 +24,6 @@ struct StringToken
     }
 };
 
-// This type must be trivially copyable; see YYLTYPE_IS_TRIVIAL in parser.y.
 struct ParserLocation
 {
     int beginOffset;
@@ -44,9 +43,6 @@ struct ParserLocation
         beginOffset = stashedBeginOffset;
         endOffset = stashedEndOffset;
     }
-
-    /** Latest doc comment position, or 0. */
-    int doc_comment_first_column, doc_comment_last_column;
 };
 
 struct LexerState
@@ -82,6 +78,7 @@ struct LexerState
 struct ParserState
 {
     const LexerState & lexerState;
+    std::pmr::polymorphic_allocator<char> & alloc;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -327,7 +324,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(std::move(s2)));
+            es2->emplace_back(i->first, new ExprString(alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {

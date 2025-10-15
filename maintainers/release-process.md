@@ -142,7 +142,6 @@ release:
   $ git pull
   $ NEW_VERSION=2.13.0
   $ echo $NEW_VERSION > .version
-  $ ... edit .mergify.yml to add the previous version ...
   $ git checkout -b bump-$NEW_VERSION
   $ git commit -a -m 'Bump version'
   $ git push --set-upstream origin bump-$NEW_VERSION

@@ -1,3 +1,4 @@
+# shellcheck disable=all
 #compdef nix
 
 function _nix() {

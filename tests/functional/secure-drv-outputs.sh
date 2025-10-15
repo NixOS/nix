@@ -13,20 +13,20 @@ clearStore
 startDaemon
 
 # Determine the output path of the "good" derivation.
-goodOut=$(nix-store -q $(nix-instantiate ./secure-drv-outputs.nix -A good))
+goodOut=$(nix-store -q "$(nix-instantiate ./secure-drv-outputs.nix -A good)")
 
 # Instantiate the "bad" derivation.
 badDrv=$(nix-instantiate ./secure-drv-outputs.nix -A bad)
-badOut=$(nix-store -q $badDrv)
+badOut=$(nix-store -q "$badDrv")
 
 # Rewrite the bad derivation to produce the output path of the good
 # derivation.
-rm -f $TEST_ROOT/bad.drv
-sed -e "s|$badOut|$goodOut|g" < $badDrv > $TEST_ROOT/bad.drv
+rm -f "$TEST_ROOT"/bad.drv
+sed -e "s|$badOut|$goodOut|g" < "$badDrv" > "$TEST_ROOT"/bad.drv
 
 # Add the manipulated derivation to the store and build it.  This
 # should fail.
-if badDrv2=$(nix-store --add $TEST_ROOT/bad.drv); then
+if badDrv2=$(nix-store --add "$TEST_ROOT"/bad.drv); then
     nix-store -r "$badDrv2"
 fi
 

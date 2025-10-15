@@ -11,6 +11,11 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
 
+#include "nix/store/config.hh"
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#endif
+
 namespace nix {
 
 struct FileTransferSettings : Config
@@ -77,9 +82,20 @@ extern FileTransferSettings fileTransferSettings;
 
 extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
+/**
+ * Username and optional password for HTTP basic authentication.
+ * These are used with curl's CURLOPT_USERNAME and CURLOPT_PASSWORD options
+ * for various protocols including HTTP, FTP, and others.
+ */
+struct UsernameAuth
+{
+    std::string username;
+    std::optional<std::string> password;
+};
+
 struct FileTransferRequest
 {
-    ValidURL uri;
+    VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
     bool verifyTLS = true;
@@ -92,8 +108,20 @@ struct FileTransferRequest
     std::optional<std::string> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
+    /**
+     * Optional username and password for HTTP basic authentication.
+     * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
+     */
+    std::optional<UsernameAuth> usernameAuth;
+#if NIX_WITH_CURL_S3
+    /**
+     * Pre-resolved AWS session token for S3 requests.
+     * When provided along with usernameAuth, this will be used instead of fetching fresh credentials.
+     */
+    std::optional<std::string> preResolvedAwsSessionToken;
+#endif
 
-    FileTransferRequest(ValidURL uri)
+    FileTransferRequest(VerbatimURL uri)
         : uri(std::move(uri))
         , parentAct(getCurActivity())
     {
@@ -103,6 +131,13 @@ struct FileTransferRequest
     {
         return data ? "upload" : "download";
     }
+
+#if NIX_WITH_CURL_S3
+private:
+    friend struct curlFileTransfer;
+    void setupForS3();
+    std::optional<std::string> awsSigV4Provider;
+#endif
 };
 
 struct FileTransferResult

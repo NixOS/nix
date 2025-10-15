@@ -326,10 +326,34 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nList);
+        if (ix >= v.listSize()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "list index out of bounds");
+            return nullptr;
+        }
         auto * p = v.listView()[ix];
         nix_gc_incref(nullptr, p);
         if (p != nullptr)
             state->state.forceValue(*p, nix::noPos);
+        return as_nix_value_ptr(p);
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_value *
+nix_get_list_byidx_lazy(nix_c_context * context, const nix_value * value, EvalState * state, unsigned int ix)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        assert(v.type() == nix::nList);
+        if (ix >= v.listSize()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "list index out of bounds");
+            return nullptr;
+        }
+        auto * p = v.listView()[ix];
+        nix_gc_incref(nullptr, p);
+        // Note: intentionally NOT calling forceValue() to keep the element lazy
         return as_nix_value_ptr(p);
     }
     NIXC_CATCH_ERRS_NULL
@@ -347,6 +371,27 @@ nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value
         if (attr) {
             nix_gc_incref(nullptr, attr->value);
             state->state.forceValue(*attr->value, nix::noPos);
+            return as_nix_value_ptr(attr->value);
+        }
+        nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
+        return nullptr;
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_value *
+nix_get_attr_byname_lazy(nix_c_context * context, const nix_value * value, EvalState * state, const char * name)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        assert(v.type() == nix::nAttrs);
+        nix::Symbol s = state->state.symbols.create(name);
+        auto attr = v.attrs()->get(s);
+        if (attr) {
+            nix_gc_incref(nullptr, attr->value);
+            // Note: intentionally NOT calling forceValue() to keep the attribute lazy
             return as_nix_value_ptr(attr->value);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
@@ -389,10 +434,35 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
     try {
         auto & v = check_value_in(value);
         collapse_attrset_layer_chain_if_needed(v, state);
+        if (i >= v.attrs()->size()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "attribute index out of bounds");
+            return nullptr;
+        }
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
         nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
+        return as_nix_value_ptr(a.value);
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_value * nix_get_attr_byidx_lazy(
+    nix_c_context * context, nix_value * value, EvalState * state, unsigned int i, const char ** name)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        collapse_attrset_layer_chain_if_needed(v, state);
+        if (i >= v.attrs()->size()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "attribute index out of bounds (Nix C API contract violation)");
+            return nullptr;
+        }
+        const nix::Attr & a = (*v.attrs())[i];
+        *name = state->state.symbols[a.name].c_str();
+        nix_gc_incref(nullptr, a.value);
+        // Note: intentionally NOT calling forceValue() to keep the attribute lazy
         return as_nix_value_ptr(a.value);
     }
     NIXC_CATCH_ERRS_NULL
@@ -405,6 +475,10 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value,
     try {
         auto & v = check_value_in(value);
         collapse_attrset_layer_chain_if_needed(v, state);
+        if (i >= v.attrs()->size()) {
+            nix_set_err_msg(context, NIX_ERR_KEY, "attribute index out of bounds (Nix C API contract violation)");
+            return nullptr;
+        }
         const nix::Attr & a = (*v.attrs())[i];
         return state->state.symbols[a.name].c_str();
     }
@@ -605,7 +679,7 @@ nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * b
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_not_null(value);
-        nix::Symbol s = bb->builder.state.get().symbols.create(name);
+        nix::Symbol s = bb->builder.symbols.get().create(name);
         bb->builder.insert(s, &v);
     }
     NIXC_CATCH_ERRS

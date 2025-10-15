@@ -1,6 +1,7 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/error.hh"
 
 #ifdef _WIN32
 #  include <io.h>
@@ -12,6 +13,8 @@
 #endif
 #include <unistd.h>
 #include <widechar_width.h>
+#include <mutex>
+#include <cstdlib> // for ptsname and ptsname_r
 
 namespace {
 
@@ -175,5 +178,32 @@ std::pair<unsigned short, unsigned short> getWindowSize()
 {
     return *windowSize.lock();
 }
+
+#ifndef _WIN32
+std::string getPtsName(int fd)
+{
+#  ifdef __APPLE__
+    static std::mutex ptsnameMutex;
+    // macOS doesn't have ptsname_r, use mutex-protected ptsname
+    std::lock_guard<std::mutex> lock(ptsnameMutex);
+    const char * name = ptsname(fd);
+    if (!name) {
+        throw SysError("getting pseudoterminal slave name");
+    }
+    return name;
+#  else
+    // Use thread-safe ptsname_r on platforms that support it
+    // PTY names are typically short:
+    // - Linux: /dev/pts/N (where N is usually < 1000)
+    // - FreeBSD: /dev/pts/N
+    // 64 bytes is more than sufficient for any Unix PTY name
+    char buf[64];
+    if (ptsname_r(fd, buf, sizeof(buf)) != 0) {
+        throw SysError("getting pseudoterminal slave name");
+    }
+    return buf;
+#  endif
+}
+#endif
 
 } // namespace nix

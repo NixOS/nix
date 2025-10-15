@@ -5,6 +5,7 @@
 #include "nix/flake/flakeref.hh"
 #include "nix/flake/lockfile.hh"
 #include "nix/expr/value.hh"
+#include "nix/expr/eval-cache.hh"
 
 namespace nix {
 
@@ -217,6 +218,11 @@ LockedFlake
 lockFlake(const Settings & settings, EvalState & state, const FlakeRef & flakeRef, const LockFlags & lockFlags);
 
 void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
+
+/**
+ * Open an evaluation cache for a flake.
+ */
+ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake);
 
 } // namespace flake
 

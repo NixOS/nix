@@ -1,13 +1,23 @@
+#pragma once
+///@file
+
 #include "nix/store/store-api.hh"
 
 namespace nix {
 
+struct DummyStore;
+
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    DummyStoreConfig(const Params & params)
+        : StoreConfig(params)
+    {
+        // Disable caching since this a temporary in-memory store.
+        pathInfoCacheSize = 0;
+    }
 
     DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : StoreConfig(params)
+        : DummyStoreConfig(params)
     {
         if (!authority.empty())
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
@@ -34,6 +44,11 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
         return {"dummy"};
     }
 
+    /**
+     * Same as `openStore`, just with a more precise return type.
+     */
+    ref<DummyStore> openDummyStore() const;
+
     ref<Store> openStore() const override;
 
     StoreReference getReference() const override
@@ -43,6 +58,7 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
                 StoreReference::Specified{
                     .scheme = *uriSchemes().begin(),
                 },
+            .params = getQueryParams(),
         };
     }
 };

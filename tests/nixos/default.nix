@@ -187,7 +187,7 @@ in
 
   ca-fd-leak = runNixOSTest ./ca-fd-leak;
 
-  gzip-content-encoding = runNixOSTest ./gzip-content-encoding.nix;
+  content-encoding = runNixOSTest ./content-encoding.nix;
 
   functional_user = runNixOSTest ./functional/as-user.nix;
 
@@ -201,11 +201,15 @@ in
 
   s3-binary-cache-store = runNixOSTest ./s3-binary-cache-store.nix;
 
+  curl-s3-binary-cache-store = runNixOSTest ./curl-s3-binary-cache-store.nix;
+
   fsync = runNixOSTest ./fsync.nix;
 
   cgroups = runNixOSTest ./cgroups;
 
   fetchurl = runNixOSTest ./fetchurl.nix;
+
+  fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
 }

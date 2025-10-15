@@ -1372,6 +1372,76 @@ public:
           Default is 0, which disables the warning.
           Set it to 1 to warn on all paths.
         )"};
+
+    using ExternalBuilders = std::vector<ExternalBuilder>;
+
+    Setting<ExternalBuilders> externalBuilders{
+        this,
+        {},
+        "external-builders",
+        R"(
+          Helper programs that execute derivations.
+
+          The program is passed a JSON document that describes the build environment as the final argument.
+          The JSON document looks like this:
+
+            {
+              "args": [
+                "-e",
+                "/nix/store/vj1c3wf9…-source-stdenv.sh",
+                "/nix/store/shkw4qm9…-default-builder.sh"
+              ],
+              "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+              "env": {
+                "HOME": "/homeless-shelter",
+                "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+                "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+                …
+              },
+              "inputPaths": [
+                "/nix/store/14dciax3…-glibc-2.32-54-dev",
+                "/nix/store/1azs5s8z…-gettext-0.21",
+                …
+              ],
+              "outputs": {
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+              },
+              "realStoreDir": "/nix/store",
+              "storeDir": "/nix/store",
+              "system": "aarch64-linux",
+              "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
+              "tmpDirInSandbox": "/build",
+              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0",
+              "version": 1
+            }
+        )",
+        {},   // aliases
+        true, // document default
+        // NOTE(cole-h): even though we can make the experimental feature required here, the errors
+        // are not as good (it just becomes a warning if you try to use this setting without the
+        // experimental feature)
+        //
+        // With this commented out:
+        //
+        // error: experimental Nix feature 'external-builders' is disabled; add '--extra-experimental-features
+        // external-builders' to enable it
+        //
+        // With this uncommented:
+        //
+        // warning: Ignoring setting 'external-builders' because experimental feature 'external-builders' is not enabled
+        // error: Cannot build '/nix/store/vwsp4qd8…-opentofu-1.10.2.drv'.
+        //        Reason: required system or feature not available
+        //        Required system: 'aarch64-linux' with features {}
+        //        Current system: 'aarch64-darwin' with features {apple-virt, benchmark, big-parallel, nixos-test}
+        // Xp::ExternalBuilders
+    };
+
+    /**
+     * Finds the first external derivation builder that supports this
+     * derivation, or else returns a null pointer.
+     */
+    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 };
 
 // FIXME: don't use a global variable.

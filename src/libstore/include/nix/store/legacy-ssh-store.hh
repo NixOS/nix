@@ -109,7 +109,7 @@ struct LegacySSHStore : public virtual Store
         unsupported("addToStore");
     }
 
-    virtual StorePath addToStoreFromDump(
+    StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
         FileSerialisationMethod dumpMethod = FileSerialisationMethod::NixArchive,
@@ -119,6 +119,11 @@ struct LegacySSHStore : public virtual Store
         RepairFlag repair = NoRepair) override
     {
         unsupported("addToStore");
+    }
+
+    void registerDrvOutput(const Realisation & output) override
+    {
+        unsupported("registerDrvOutput");
     }
 
 public:
@@ -142,7 +147,12 @@ public:
         unsupported("ensurePath");
     }
 
-    virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    {
+        unsupported("getFSAccessor");
+    }
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
     {
         unsupported("getFSAccessor");
     }

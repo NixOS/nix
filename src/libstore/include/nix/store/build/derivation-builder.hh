@@ -1,12 +1,15 @@
 #pragma once
 ///@file
 
+#include <nlohmann/json_fwd.hpp>
+
 #include "nix/store/build-result.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/json-impls.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 
@@ -22,7 +25,7 @@ struct BuilderFailureError : BuildError
 
     std::string extraMsgAfter;
 
-    BuilderFailureError(BuildResult::Status status, int builderStatus, std::string extraMsgAfter)
+    BuilderFailureError(BuildResult::Failure::Status status, int builderStatus, std::string extraMsgAfter)
         : BuildError{
             status,
               /* No message for now, because the caller will make for
@@ -179,9 +182,28 @@ struct DerivationBuilder : RestrictionContext
     virtual bool killChild() = 0;
 };
 
+struct ExternalBuilder
+{
+    StringSet systems;
+    Path program;
+    std::vector<std::string> args;
+};
+
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+
+/**
+ * @param handler Must be chosen such that it supports the given
+ * derivation.
+ */
+std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
+    LocalStore & store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params,
+    const ExternalBuilder & handler);
 #endif
 
 } // namespace nix
+
+JSON_IMPL(nix::ExternalBuilder)

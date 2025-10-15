@@ -4,6 +4,7 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/compression.hh"
 
 namespace nix {
 
@@ -39,7 +40,7 @@ StoreReference HttpBinaryCacheStoreConfig::getReference() const
                 .scheme = cacheUri.scheme,
                 .authority = cacheUri.renderAuthorityAndPath(),
             },
-        .params = cacheUri.query,
+        .params = getQueryParams(),
     };
 }
 
@@ -77,7 +78,11 @@ public:
     void init() override
     {
         // FIXME: do this lazily?
-        if (auto cacheInfo = diskCache->upToDateCacheExists(config->cacheUri.to_string())) {
+        // For consistent cache key handling, use the reference without parameters
+        // This matches what's used in Store::queryPathInfo() lookups
+        auto cacheKey = config->getReference().render(/*withParams=*/false);
+
+        if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
             config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
             config->priority.setDefault(cacheInfo->priority);
         } else {
@@ -86,8 +91,7 @@ public:
             } catch (UploadToHTTP &) {
                 throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
             }
-            diskCache->createCache(
-                config->cacheUri.to_string(), config->storeDir, config->wantMassQuery, config->priority);
+            diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
         }
     }
 
@@ -142,8 +146,27 @@ protected:
         const std::string & mimeType) override
     {
         auto req = makeRequest(path);
-        req.data = StreamToSourceAdapter(istream).drain();
+
+        auto data = StreamToSourceAdapter(istream).drain();
+
+        // Determine compression method based on file type
+        std::string compressionMethod;
+        if (hasSuffix(path, ".narinfo"))
+            compressionMethod = config->narinfoCompression;
+        else if (hasSuffix(path, ".ls"))
+            compressionMethod = config->lsCompression;
+        else if (hasPrefix(path, "log/"))
+            compressionMethod = config->logCompression;
+
+        // Apply compression if configured
+        if (!compressionMethod.empty()) {
+            data = compress(compressionMethod, data);
+            req.headers.emplace_back("Content-Encoding", compressionMethod);
+        }
+
+        req.data = std::move(data);
         req.mimeType = mimeType;
+
         try {
             getFileTransfer()->upload(req);
         } catch (FileTransferError & e) {
@@ -164,7 +187,16 @@ protected:
            field which is
            `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
            (note the query param) and that gets passed here. */
-        return FileTransferRequest(parseURLRelative(path, cacheUriWithTrailingSlash));
+        auto result = parseURLRelative(path, cacheUriWithTrailingSlash);
+
+        /* For S3 URLs, preserve query parameters from the base URL when the
+           relative path doesn't have its own query parameters. This is needed
+           to preserve S3-specific parameters like endpoint and region. */
+        if (config->cacheUri.scheme == "s3" && result.query.empty()) {
+            result.query = config->cacheUri.query;
+        }
+
+        return FileTransferRequest(result);
     }
 
     void getFile(const std::string & path, Sink & sink) override

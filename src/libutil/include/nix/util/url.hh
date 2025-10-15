@@ -6,6 +6,9 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/canon-path.hh"
+#include "nix/util/split.hh"
+#include "nix/util/util.hh"
+#include "nix/util/variant-wrapper.hh"
 
 namespace nix {
 
@@ -342,8 +345,7 @@ ParsedURL fixGitURL(const std::string & url);
 bool isValidSchemeName(std::string_view scheme);
 
 /**
- * Either a ParsedURL or a verbatim string, but the string must be a valid
- * ParsedURL. This is necessary because in certain cases URI must be passed
+ * Either a ParsedURL or a verbatim string. This is necessary because in certain cases URI must be passed
  * verbatim (e.g. in builtin fetchers), since those are specified by the user.
  * In those cases normalizations performed by the ParsedURL might be surprising
  * and undesirable, since Nix must be a universal client that has to work with
@@ -354,23 +356,23 @@ bool isValidSchemeName(std::string_view scheme);
  *
  * Though we perform parsing and validation for internal needs.
  */
-struct ValidURL : private ParsedURL
+struct VerbatimURL
 {
-    std::optional<std::string> encoded;
+    using Raw = std::variant<std::string, ParsedURL>;
+    Raw raw;
 
-    ValidURL(std::string str)
-        : ParsedURL(parseURL(str, /*lenient=*/false))
-        , encoded(std::move(str))
+    VerbatimURL(std::string_view s)
+        : raw(std::string{s})
     {
     }
 
-    ValidURL(std::string_view str)
-        : ValidURL(std::string{str})
+    VerbatimURL(std::string s)
+        : raw(std::move(s))
     {
     }
 
-    ValidURL(ParsedURL parsed)
-        : ParsedURL{std::move(parsed)}
+    VerbatimURL(ParsedURL url)
+        : raw(std::move(url))
     {
     }
 
@@ -379,25 +381,35 @@ struct ValidURL : private ParsedURL
      */
     std::string to_string() const
     {
-        return encoded.or_else([&]() -> std::optional<std::string> { return ParsedURL::to_string(); }).value();
+        return std::visit(
+            overloaded{
+                [](const std::string & str) { return str; }, [](const ParsedURL & url) { return url.to_string(); }},
+            raw);
     }
 
-    const ParsedURL & parsed() const &
+    const ParsedURL parsed() const
     {
-        return *this;
+        return std::visit(
+            overloaded{
+                [](const std::string & str) { return parseURL(str); }, [](const ParsedURL & url) { return url; }},
+            raw);
     }
 
     std::string_view scheme() const &
     {
-        return ParsedURL::scheme;
-    }
-
-    const auto & path() const &
-    {
-        return ParsedURL::path;
+        return std::visit(
+            overloaded{
+                [](std::string_view str) {
+                    auto scheme = splitPrefixTo(str, ':');
+                    if (!scheme)
+                        throw BadURL("URL '%s' doesn't have a scheme", str);
+                    return *scheme;
+                },
+                [](const ParsedURL & url) -> std::string_view { return url.scheme; }},
+            raw);
     }
 };
 
-std::ostream & operator<<(std::ostream & os, const ValidURL & url);
+std::ostream & operator<<(std::ostream & os, const VerbatimURL & url);
 
 } // namespace nix

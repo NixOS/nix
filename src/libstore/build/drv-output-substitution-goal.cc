@@ -153,8 +153,6 @@ Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
 
 std::string DrvOutputSubstitutionGoal::key()
 {
-    /* "a$" ensures substitution goals happen before derivation
-       goals. */
     return "a$" + std::string(id.to_string());
 }
 

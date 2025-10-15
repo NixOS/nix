@@ -4,7 +4,22 @@ namespace nix {
 
 MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, std::optional<File> create)
 {
-    File * cur = &root;
+    bool hasRoot = root.has_value();
+
+    // Special handling of root directory.
+    if (path.isRoot() && !hasRoot) {
+        if (create) {
+            root = std::move(*create);
+            return &root.value();
+        }
+        return nullptr;
+    }
+
+    // Root does not exist.
+    if (!hasRoot)
+        return nullptr;
+
+    File * cur = &root.value();
 
     bool newF = false;
 
@@ -112,6 +127,10 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
 
 SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
 {
+    // Create root directory automatically if necessary as a convenience.
+    if (!root && !path.isRoot())
+        open(CanonPath::root, File::Directory{});
+
     auto * f = open(path, File{File::Regular{}});
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
@@ -189,11 +208,16 @@ void MemorySink::createSymlink(const CanonPath & path, const std::string & targe
 
 ref<SourceAccessor> makeEmptySourceAccessor()
 {
-    static auto empty = make_ref<MemorySourceAccessor>().cast<SourceAccessor>();
-    /* Don't forget to clear the display prefix, as the default constructed
-       SourceAccessor has the «unknown» prefix. Since this accessor is supposed
-       to mimic an empty root directory the prefix needs to be empty. */
-    empty->setPathDisplay("");
+    static auto empty = []() {
+        auto empty = make_ref<MemorySourceAccessor>();
+        MemorySink sink{*empty};
+        sink.createDirectory(CanonPath::root);
+        /* Don't forget to clear the display prefix, as the default constructed
+           SourceAccessor has the «unknown» prefix. Since this accessor is supposed
+           to mimic an empty root directory the prefix needs to be empty. */
+        empty->setPathDisplay("");
+        return empty.cast<SourceAccessor>();
+    }();
     return empty;
 }
 

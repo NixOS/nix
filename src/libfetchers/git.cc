@@ -15,6 +15,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <regex>
 #include <string.h>
@@ -892,8 +893,7 @@ struct GitInputScheme : InputScheme
             return makeFingerprint(*rev);
         else {
             auto repoInfo = getRepoInfo(input);
-            if (auto repoPath = repoInfo.getPath();
-                repoPath && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
+            if (auto repoPath = repoInfo.getPath(); repoPath && repoInfo.workdirInfo.submodules.empty()) {
                 /* Calculate a fingerprint that takes into account the
                    deleted and modified/added files. */
                 HashSink hashSink{HashAlgorithm::SHA512};
@@ -906,7 +906,7 @@ struct GitInputScheme : InputScheme
                     writeString("deleted:", hashSink);
                     writeString(file.abs(), hashSink);
                 }
-                return makeFingerprint(*repoInfo.workdirInfo.headRev)
+                return makeFingerprint(repoInfo.workdirInfo.headRev.value_or(nullRev))
                        + ";d=" + hashSink.finish().hash.to_string(HashFormat::Base16, false);
             }
             return std::nullopt;

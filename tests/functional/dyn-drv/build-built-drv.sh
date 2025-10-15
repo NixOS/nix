@@ -23,4 +23,4 @@ requireDaemonNewerThan "2.30pre20250515"
 
 out2=$(nix build "${drvDep}^out^out" --no-link)
 
-test $out1 == $out2
+test "$out1" == "$out2"

@@ -99,6 +99,17 @@ DerivationOptions DerivationOptions::fromStructuredAttrs(
     return fromStructuredAttrs(env, parsed ? &*parsed : nullptr);
 }
 
+static void flatten(const nlohmann::json & value, StringSet & res)
+{
+    if (value.is_array())
+        for (auto & v : value)
+            flatten(v, res);
+    else if (value.is_string())
+        res.insert(value);
+    else
+        throw Error("'exportReferencesGraph' value is not an array or a string");
+}
+
 DerivationOptions
 DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn)
 {
@@ -219,12 +230,9 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                     if (!e || !e->is_object())
                         return ret;
                     for (auto & [key, value] : getObject(*e)) {
-                        if (value.is_array())
-                            ret.insert_or_assign(key, value);
-                        else if (value.is_string())
-                            ret.insert_or_assign(key, StringSet{value});
-                        else
-                            throw Error("'exportReferencesGraph' value is not an array or a string");
+                        StringSet ss;
+                        flatten(value, ss);
+                        ret.insert_or_assign(key, std::move(ss));
                     }
                 } else {
                     auto s = getOr(env, "exportReferencesGraph", "");
@@ -266,7 +274,9 @@ DerivationOptions::getParsedExportReferencesGraph(const StoreDirConfig & store) 
         for (auto & storePathS : ss) {
             if (!store.isInStore(storePathS))
                 throw BuildError(
-                    BuildResult::InputRejected, "'exportReferencesGraph' contains a non-store path '%1%'", storePathS);
+                    BuildResult::Failure::InputRejected,
+                    "'exportReferencesGraph' contains a non-store path '%1%'",
+                    storePathS);
             storePaths.insert(store.toStorePath(storePathS).first);
         }
         res.insert_or_assign(fileName, storePaths);
@@ -356,7 +366,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
     };
 }
 
-void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o)
+void adl_serializer<DerivationOptions>::to_json(json & json, const DerivationOptions & o)
 {
     json["outputChecks"] = std::visit(
         overloaded{
@@ -398,7 +408,7 @@ DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>:
     };
 }
 
-void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, DerivationOptions::OutputChecks c)
+void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, const DerivationOptions::OutputChecks & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
     json["allowedReferences"] = c.allowedReferences;

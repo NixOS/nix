@@ -29,7 +29,7 @@ testCollectGarbageD
 
 # Run the same test, but forcing the profiles an arbitrary location.
 rm ~/.nix-profile
-ln -s $TEST_ROOT/blah ~/.nix-profile
+ln -s "$TEST_ROOT"/blah ~/.nix-profile
 testCollectGarbageD
 
 # Run the same test, but forcing the profiles at their legacy location under

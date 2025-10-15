@@ -11,4 +11,4 @@ clearStore
 
 out2=$(nix-build ./text-hashed-output.nix -A wrapper --no-out-link)
 
-diff -r $out1 $out2
+diff -r "$out1" "$out2"

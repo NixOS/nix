@@ -100,7 +100,7 @@ struct CmdConfigCheck : StoreCommand
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
-            return checkFail(toView(ss));
+            return checkFail(ss.view());
         }
 
         return checkPass("PATH contains only one nix version.");
@@ -143,7 +143,7 @@ struct CmdConfigCheck : StoreCommand
             for (auto & dir : dirs)
                 ss << "  " << dir << "\n";
             ss << "\n";
-            return checkFail(toView(ss));
+            return checkFail(ss.view());
         }
 
         return checkPass("All profiles are gcroots.");
@@ -162,7 +162,7 @@ struct CmdConfigCheck : StoreCommand
                << "sync with the daemon.\n\n"
                << "Client protocol: " << formatProtocol(clientProto) << "\n"
                << "Store protocol: " << formatProtocol(storeProto) << "\n\n";
-            return checkFail(toView(ss));
+            return checkFail(ss.view());
         }
 
         return checkPass("Client protocol matches store protocol.");

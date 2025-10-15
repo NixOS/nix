@@ -3,6 +3,7 @@
 #include "nix/util/types.hh"
 
 #include <list>
+#include <optional>
 #include <set>
 #include <string_view>
 #include <string>
@@ -11,11 +12,6 @@
 #include <boost/container/small_vector.hpp>
 
 namespace nix {
-
-/*
- * workaround for unavailable view() method (C++20) of std::ostringstream under MacOS with clang-16
- */
-std::string_view toView(const std::ostringstream & os);
 
 /**
  * String tokenizer.
@@ -97,6 +93,44 @@ extern template std::string dropEmptyInitThenConcatStringsSep(std::string_view, 
  * Arguments that need to be passed to ssh with spaces in them.
  */
 std::list<std::string> shellSplitString(std::string_view s);
+
+/**
+ * Conditionally wrap a string with prefix and suffix brackets.
+ *
+ * If `content` is empty, returns an empty string.
+ * Otherwise, returns `prefix + content + suffix`.
+ *
+ * Example:
+ *   optionalBracket(" (", "foo", ")") == " (foo)"
+ *   optionalBracket(" (", "", ")") == ""
+ *
+ * Design note: this would have been called `optionalParentheses`, except this
+ * function is more general and more explicit. Parentheses typically *also* need
+ * to be prefixed with a space in order to fit nicely in a piece of natural
+ * language.
+ */
+std::string optionalBracket(std::string_view prefix, std::string_view content, std::string_view suffix);
+
+/**
+ * Overload for optional content.
+ *
+ * If `content` is nullopt or contains an empty string, returns an empty string.
+ * Otherwise, returns `prefix + *content + suffix`.
+ *
+ * Example:
+ *   optionalBracket(" (", std::optional<std::string>("foo"), ")") == " (foo)"
+ *   optionalBracket(" (", std::nullopt, ")") == ""
+ *   optionalBracket(" (", std::optional<std::string>(""), ")") == ""
+ */
+template<typename T>
+    requires std::convertible_to<T, std::string_view>
+std::string optionalBracket(std::string_view prefix, const std::optional<T> & content, std::string_view suffix)
+{
+    if (!content || std::string_view(*content).empty()) {
+        return "";
+    }
+    return optionalBracket(prefix, std::string_view(*content), suffix);
+}
 
 /**
  * Hash implementation that can be used for zero-copy heterogenous lookup from

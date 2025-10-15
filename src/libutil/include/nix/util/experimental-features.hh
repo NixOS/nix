@@ -37,6 +37,7 @@ enum struct ExperimentalFeature {
     MountedSSHStore,
     VerifiedFetches,
     PipeOperators,
+    ExternalBuilders,
     BLAKE3Hashes,
 };
 
@@ -87,7 +88,9 @@ public:
      */
     ExperimentalFeature missingFeature;
 
-    MissingExperimentalFeature(ExperimentalFeature missingFeature);
+    std::string reason;
+
+    MissingExperimentalFeature(ExperimentalFeature missingFeature, std::string reason = "");
 };
 
 /**

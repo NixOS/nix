@@ -19,14 +19,13 @@ public:
     }
 
 protected:
+    LibStoreTest(ref<Store> store)
+        : store(std::move(store))
+    {
+    }
+
     LibStoreTest()
-        : store(openStore({
-              .variant =
-                  StoreReference::Specified{
-                      .scheme = "dummy",
-                  },
-              .params = {},
-          }))
+        : LibStoreTest(openStore("dummy://"))
     {
     }
 

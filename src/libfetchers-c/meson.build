@@ -32,7 +32,6 @@ add_project_arguments(
 )
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'nix_api_fetchers.cc',

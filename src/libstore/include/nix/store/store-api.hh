@@ -598,10 +598,7 @@ public:
      * floating-ca derivations and their dependencies as there's no way to
      * retrieve this information otherwise.
      */
-    virtual void registerDrvOutput(const Realisation & output)
-    {
-        unsupported("registerDrvOutput");
-    }
+    virtual void registerDrvOutput(const Realisation & output) = 0;
 
     virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
     {
@@ -717,9 +714,37 @@ public:
     };
 
     /**
-     * @return An object to access files in the Nix store.
+     * @return An object to access files in the Nix store, across all
+     * store objects.
      */
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) = 0;
+
+    /**
+     * @return An object to access files for a specific store object in
+     * the Nix store.
+     *
+     * @return nullptr if the store doesn't contain an object at the
+     * given path.
+     */
+    virtual std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) = 0;
+
+    /**
+     * Get an accessor for the store object or throw an Error if it's invalid or
+     * doesn't exist.
+     *
+     * @throws InvalidPath if the store object doesn't exist or (if requireValidPath = true) is
+     * invalid.
+     */
+    [[nodiscard]] ref<SourceAccessor> requireStoreObjectAccessor(const StorePath & path, bool requireValidPath = true)
+    {
+        auto accessor = getFSAccessor(path, requireValidPath);
+        if (!accessor) {
+            throw InvalidPath(
+                requireValidPath ? "path '%1%' is not a valid store path" : "store path '%1%' does not exist",
+                printStorePath(path));
+        }
+        return ref<SourceAccessor>{accessor};
+    }
 
     /**
      * Repair the contents of the given path by redownloading it using

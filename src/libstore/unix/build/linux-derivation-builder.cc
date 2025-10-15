@@ -3,6 +3,7 @@
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
+#  include "nix/util/logging.hh"
 #  include "linux/fchmodat2-compat.hh"
 
 #  include <sys/ioctl.h>
@@ -275,6 +276,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void startChild() override
     {
+        RunChildArgs args{
+#  if NIX_WITH_CURL_S3
+            .awsCredentials = preResolveAwsCredentials(),
+#  endif
+        };
+
         /* Set up private namespaces for the build:
 
            - The PID namespace causes the build to start as PID 1.
@@ -342,7 +349,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (usingUserNamespace)
                     options.cloneFlags |= CLONE_NEWUSER;
 
-                pid_t child = startProcess([&]() { runChild(); }, options);
+                pid_t child = startProcess([this, args = std::move(args)]() { runChild(std::move(args)); }, options);
 
                 writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
                 _exit(0);
@@ -505,8 +512,16 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             createDirs(chrootRootDir + "/dev/shm");
             createDirs(chrootRootDir + "/dev/pts");
             ss.push_back("/dev/full");
-            if (systemFeatures.count("kvm") && pathExists("/dev/kvm"))
-                ss.push_back("/dev/kvm");
+            if (systemFeatures.count("kvm")) {
+                if (pathExists("/dev/kvm")) {
+                    ss.push_back("/dev/kvm");
+                } else {
+                    warn(
+                        "KVM is enabled in system-features but /dev/kvm is not available. "
+                        "QEMU builds may fall back to slow emulation. "
+                        "Consider removing 'kvm' from system-features in nix.conf if KVM is not supported on this system.");
+                }
+            }
             ss.push_back("/dev/null");
             ss.push_back("/dev/random");
             ss.push_back("/dev/tty");

@@ -9,8 +9,13 @@
 #include "nix/util/signals.hh"
 
 #include "store-config-private.hh"
+#include <optional>
 #if NIX_WITH_S3_SUPPORT
 #  include <aws/core/client/ClientConfiguration.h>
+#endif
+#if NIX_WITH_CURL_S3
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
 #endif
 
 #ifdef __linux__
@@ -426,6 +431,24 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 
+            // Set up username/password authentication if provided
+            if (request.usernameAuth) {
+                curl_easy_setopt(req, CURLOPT_USERNAME, request.usernameAuth->username.c_str());
+                if (request.usernameAuth->password) {
+                    curl_easy_setopt(req, CURLOPT_PASSWORD, request.usernameAuth->password->c_str());
+                }
+            }
+
+#if NIX_WITH_CURL_S3
+            // Set up AWS SigV4 signing if this is an S3 request
+            // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
+            // The username/password (access key ID and secret key) are set via the general
+            // usernameAuth mechanism above.
+            if (request.awsSigV4Provider) {
+                curl_easy_setopt(req, CURLOPT_AWS_SIGV4, request.awsSigV4Provider->c_str());
+            }
+#endif
+
             result.data.clear();
             result.bodySize = 0;
         }
@@ -594,10 +617,24 @@ struct curlFileTransfer : public FileTransfer
             }
         };
 
-        bool quit = false;
         std::
             priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator>
                 incoming;
+    private:
+        bool quitting = false;
+    public:
+        void quit()
+        {
+            quitting = true;
+            /* We wil not be processing any more incomming requests */
+            while (!incoming.empty())
+                incoming.pop();
+        }
+
+        bool isQuitting()
+        {
+            return quitting;
+        }
     };
 
     Sync<State> state_;
@@ -649,7 +686,7 @@ struct curlFileTransfer : public FileTransfer
         /* Signal the worker thread to exit. */
         {
             auto state(state_.lock());
-            state->quit = true;
+            state->quit();
         }
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
@@ -750,7 +787,7 @@ struct curlFileTransfer : public FileTransfer
                         break;
                     }
                 }
-                quit = state->quit;
+                quit = state->isQuitting();
             }
 
             for (auto & item : incoming) {
@@ -767,29 +804,35 @@ struct curlFileTransfer : public FileTransfer
 
     void workerThreadEntry()
     {
+        // Unwinding or because someone called `quit`.
+        bool normalExit = true;
         try {
             workerThreadMain();
         } catch (nix::Interrupted & e) {
+            normalExit = false;
         } catch (std::exception & e) {
             printError("unexpected error in download thread: %s", e.what());
+            normalExit = false;
         }
 
-        {
+        if (!normalExit) {
             auto state(state_.lock());
-            while (!state->incoming.empty())
-                state->incoming.pop();
-            state->quit = true;
+            state->quit();
         }
     }
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https")
+        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
+#if NIX_WITH_CURL_S3
+            && item->request.uri.scheme() != "s3"
+#endif
+        )
             throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
             auto state(state_.lock());
-            if (state->quit)
+            if (state->isQuitting())
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
@@ -802,9 +845,15 @@ struct curlFileTransfer : public FileTransfer
     {
         /* Ugly hack to support s3:// URIs. */
         if (request.uri.scheme() == "s3") {
+#if NIX_WITH_CURL_S3
+            // New curl-based S3 implementation
+            auto modifiedRequest = request;
+            modifiedRequest.setupForS3();
+            enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+#elif NIX_WITH_S3_SUPPORT
+            // Old AWS SDK-based implementation
             // FIXME: do this on a worker thread
             try {
-#if NIX_WITH_S3_SUPPORT
                 auto parsed = ParsedS3URL::parse(request.uri.parsed());
 
                 std::string profile = parsed.profile.value_or("");
@@ -822,13 +871,12 @@ struct curlFileTransfer : public FileTransfer
                 res.data = std::move(*s3Res.data);
                 res.urls.push_back(request.uri.to_string());
                 callback(std::move(res));
-#else
-                throw nix::Error(
-                    "cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
-#endif
             } catch (...) {
                 callback.rethrow();
             }
+#else
+            throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri.to_string());
+#endif
             return;
         }
 
@@ -845,7 +893,7 @@ ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-    if (fileTransfer->state_.lock()->quit)
+    if (fileTransfer->state_.lock()->isQuitting())
         fileTransfer = makeCurlFileTransfer();
 
     return fileTransfer;
@@ -855,6 +903,41 @@ ref<FileTransfer> makeFileTransfer()
 {
     return makeCurlFileTransfer();
 }
+
+#if NIX_WITH_CURL_S3
+void FileTransferRequest::setupForS3()
+{
+    auto parsedS3 = ParsedS3URL::parse(uri.parsed());
+    // Update the request URI to use HTTPS
+    uri = parsedS3.toHttpsUrl();
+    // This gets used later in a curl setopt
+    awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
+    // check if the request already has pre-resolved credentials
+    std::optional<std::string> sessionToken;
+    if (usernameAuth) {
+        debug("Using pre-resolved AWS credentials from parent process");
+        sessionToken = preResolvedAwsSessionToken;
+    } else {
+        std::string profile = parsedS3.profile.value_or("");
+        try {
+            auto creds = getAwsCredentials(profile);
+            usernameAuth = UsernameAuth{
+                .username = creds.accessKeyId,
+                .password = creds.secretAccessKey,
+            };
+            sessionToken = creds.sessionToken;
+        } catch (const AwsAuthError & e) {
+            warn("AWS authentication failed for S3 request %s: %s", uri, e.what());
+            // Invalidate the cached credentials so next request will retry
+            invalidateAwsCredentials(profile);
+            // Continue without authentication - might be a public bucket
+            return;
+        }
+    }
+    if (sessionToken)
+        headers.emplace_back("x-amz-security-token", *sessionToken);
+}
+#endif
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
 {

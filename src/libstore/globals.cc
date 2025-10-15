@@ -258,6 +258,15 @@ Path Settings::getDefaultSSLCertFile()
     return "";
 }
 
+const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
+{
+    if (auto it = std::ranges::find_if(
+            externalBuilders.get(), [&](const auto & handler) { return handler.systems.contains(drv.platform); });
+        it != externalBuilders.get().end())
+        return &*it;
+    return nullptr;
+}
+
 std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
@@ -341,10 +350,15 @@ PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const
             i.pop_back();
         }
         size_t p = i.find('=');
-        if (p == std::string::npos)
-            pathsInChroot[i] = {.source = i, .optional = optional};
-        else
-            pathsInChroot[i.substr(0, p)] = {.source = i.substr(p + 1), .optional = optional};
+        std::string inside, outside;
+        if (p == std::string::npos) {
+            inside = i;
+            outside = i;
+        } else {
+            inside = i.substr(0, p);
+            outside = i.substr(p + 1);
+        }
+        pathsInChroot[inside] = {.source = outside, .optional = optional};
     }
     return pathsInChroot;
 }
@@ -372,6 +386,22 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
         else
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
+}
+
+template<>
+Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+{
+    try {
+        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+    } catch (std::exception & e) {
+        throw UsageError("parsing setting '%s': %s", name, e.what());
+    }
+}
+
+template<>
+std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+{
+    return nlohmann::json(value).dump();
 }
 
 template<>

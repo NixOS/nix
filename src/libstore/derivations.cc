@@ -115,23 +115,25 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return readOnly || settings.readOnlyMode ? store.makeFixedOutputPathFromCA(
-                                                   suffix,
-                                                   TextInfo{
-                                                       .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                       .references = std::move(references),
-                                                   })
-                                             : ({
-                                                   StringSource s{contents};
-                                                   store.addToStoreFromDump(
-                                                       s,
-                                                       suffix,
-                                                       FileSerialisationMethod::Flat,
-                                                       ContentAddressMethod::Raw::Text,
-                                                       HashAlgorithm::SHA256,
-                                                       references,
-                                                       repair);
-                                               });
+    auto hash = hashString(HashAlgorithm::SHA256, contents);
+    auto ca = TextInfo{.hash = hash, .references = references};
+    auto path = store.makeFixedOutputPathFromCA(suffix, ca);
+
+    if (readOnly || settings.readOnlyMode || (store.isValidPath(path) && !repair))
+        return path;
+
+    StringSource s{contents};
+    auto path2 = store.addToStoreFromDump(
+        s,
+        suffix,
+        FileSerialisationMethod::Flat,
+        ContentAddressMethod::Raw::Text,
+        HashAlgorithm::SHA256,
+        references,
+        repair);
+    assert(path2 == path);
+
+    return path;
 }
 
 namespace {
@@ -288,7 +290,7 @@ static DerivationOutput parseDerivationOutput(
     if (!hashAlgoStr.empty()) {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output");
         const auto hashAlgo = parseHashAlgo(hashAlgoStr);
         if (hashS == "impure"sv) {
             xpSettings.require(Xp::ImpureDerivations);
@@ -426,7 +428,9 @@ Derivation parseDerivation(
         if (*versionS == "xp-dyn-drv"sv) {
             // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, [&] {
+                return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
+            });
         } else {
             throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
@@ -1257,14 +1261,18 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
-nlohmann::json DerivationOutput::toJSON(std::string_view drvName, OutputNameView outputName) const
+nlohmann::json DerivationOutput::toJSON() const
 {
     nlohmann::json res = nlohmann::json::object();
     std::visit(
         overloaded{
             [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
             [&](const DerivationOutput::CAFixed & dof) {
-                // res["path"] = dof.path(store, drvName, outputName);
+    /* it would be nice to output the path for user convenience, but
+       this would require us to know the store dir. */
+#if 0
+                res["path"] = dof.path(store, drvName, outputName);
+#endif
                 res["method"] = std::string{dof.ca.method.render()};
                 res["hashAlgo"] = printHashAlgo(dof.ca.hash.algo);
                 res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
@@ -1285,11 +1293,8 @@ nlohmann::json DerivationOutput::toJSON(std::string_view drvName, OutputNameView
     return res;
 }
 
-DerivationOutput DerivationOutput::fromJSON(
-    std::string_view drvName,
-    OutputNameView outputName,
-    const nlohmann::json & _json,
-    const ExperimentalFeatureSettings & xpSettings)
+DerivationOutput
+DerivationOutput::fromJSON(const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
     auto & json = getObject(_json);
@@ -1300,7 +1305,7 @@ DerivationOutput DerivationOutput::fromJSON(
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         ContentAddressMethod method = ContentAddressMethod::parse(getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
 
         auto hashAlgo = parseHashAlgo(getString(valueAt(json, "hashAlgo")));
         return {std::move(method), std::move(hashAlgo)};
@@ -1321,6 +1326,8 @@ DerivationOutput DerivationOutput::fromJSON(
                     .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
                 },
         };
+        /* We no longer produce this (denormalized) field (for the
+           reasons described above), so we don't need to check it. */
 #if 0
         if (dof.path(store, drvName, outputName) != static_cast<StorePath>(valueAt(json, "path")))
             throw Error("Path doesn't match derivation output");
@@ -1367,7 +1374,7 @@ nlohmann::json Derivation::toJSON() const
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
         for (auto & [outputName, output] : outputs) {
-            outputsObj[outputName] = output.toJSON(name, outputName);
+            outputsObj[outputName] = output;
         }
     }
 
@@ -1427,8 +1434,7 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
         for (auto & [outputName, output] : outputs) {
-            res.outputs.insert_or_assign(
-                outputName, DerivationOutput::fromJSON(res.name, outputName, output, xpSettings));
+            res.outputs.insert_or_assign(outputName, DerivationOutput::fromJSON(output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");
@@ -1452,7 +1458,8 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
             node.value = getStringSet(valueAt(json, "outputs"));
             auto drvs = getObject(valueAt(json, "dynamicOutputs"));
             for (auto & [outputId, childNode] : drvs) {
-                xpSettings.require(Xp::DynamicDerivations);
+                xpSettings.require(
+                    Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
                 node.childMap[outputId] = doInput(childNode);
             }
             return node;
@@ -1489,12 +1496,22 @@ namespace nlohmann {
 
 using namespace nix;
 
+DerivationOutput adl_serializer<DerivationOutput>::from_json(const json & json)
+{
+    return DerivationOutput::fromJSON(json);
+}
+
+void adl_serializer<DerivationOutput>::to_json(json & json, const DerivationOutput & c)
+{
+    json = c.toJSON();
+}
+
 Derivation adl_serializer<Derivation>::from_json(const json & json)
 {
     return Derivation::fromJSON(json);
 }
 
-void adl_serializer<Derivation>::to_json(json & json, Derivation c)
+void adl_serializer<Derivation>::to_json(json & json, const Derivation & c)
 {
     json = c.toJSON();
 }

@@ -5,10 +5,10 @@ source ../common.sh
 TODO_NixOS
 
 clearStore
-rm -rf $TEST_HOME/.cache $TEST_HOME/.config $TEST_HOME/.local
+rm -rf "$TEST_HOME"/.cache "$TEST_HOME"/.config "$TEST_HOME"/.local
 
-cp ../shell-hello.nix "${config_nix}" $TEST_HOME
-cd $TEST_HOME
+cp ../shell-hello.nix "${config_nix}" "$TEST_HOME"
+cd "$TEST_HOME"
 
 cat <<EOF > flake.nix
 {
@@ -34,8 +34,8 @@ nix run --no-write-lock-file .#pkgAsPkg
 # For instance, we might set an environment variable temporarily to affect some
 # initialization or whatnot, but this must not leak into the environment of the
 # command being run.
-env > $TEST_ROOT/expected-env
-nix run -f shell-hello.nix env > $TEST_ROOT/actual-env
+env > "$TEST_ROOT"/expected-env
+nix run -f shell-hello.nix env > "$TEST_ROOT"/actual-env
 # Remove/reset variables we expect to be different.
 # - PATH is modified by nix shell
 # - we unset TMPDIR on macOS if it contains /var/folders. bad. https://github.com/NixOS/nix/issues/7731
@@ -48,12 +48,12 @@ sed -i \
   -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
   -e '/^__LLVM_PROFILE_RT_INIT_ONCE=.*$/d' \
-  $TEST_ROOT/expected-env $TEST_ROOT/actual-env
-sort $TEST_ROOT/expected-env | uniq > $TEST_ROOT/expected-env.sorted
+  "$TEST_ROOT"/expected-env "$TEST_ROOT"/actual-env
+sort "$TEST_ROOT"/expected-env | uniq > "$TEST_ROOT"/expected-env.sorted
 # nix run appears to clear _. I don't understand why. Is this ok?
-echo "_=..." >> $TEST_ROOT/actual-env
-sort $TEST_ROOT/actual-env | uniq > $TEST_ROOT/actual-env.sorted
-diff $TEST_ROOT/expected-env.sorted $TEST_ROOT/actual-env.sorted
+echo "_=..." >> "$TEST_ROOT"/actual-env
+sort "$TEST_ROOT"/actual-env | uniq > "$TEST_ROOT"/actual-env.sorted
+diff "$TEST_ROOT"/expected-env.sorted "$TEST_ROOT"/actual-env.sorted
 
 clearStore
 

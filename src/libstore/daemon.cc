@@ -102,7 +102,7 @@ struct TunnelLogger : public Logger
         showErrorInfo(oss, ei, false);
 
         StringSink buf;
-        buf << STDERR_NEXT << toView(oss);
+        buf << STDERR_NEXT << oss.view();
         enqueueMsg(buf.s);
     }
 

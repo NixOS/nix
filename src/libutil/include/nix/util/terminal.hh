@@ -36,4 +36,12 @@ void updateWindowSize();
  */
 std::pair<unsigned short, unsigned short> getWindowSize();
 
+/**
+ * Get the slave name of a pseudoterminal in a thread-safe manner.
+ *
+ * @param fd The file descriptor of the pseudoterminal master
+ * @return The slave device name as a string
+ */
+std::string getPtsName(int fd);
+
 } // namespace nix

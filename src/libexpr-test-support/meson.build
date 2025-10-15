@@ -31,7 +31,6 @@ rapidcheck = dependency('rapidcheck')
 deps_public += rapidcheck
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'tests/value/context.cc',

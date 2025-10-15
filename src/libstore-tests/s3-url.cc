@@ -1,12 +1,16 @@
-#include "nix/store/s3.hh"
+#include "nix/store/s3-url.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_S3_SUPPORT || NIX_WITH_CURL_S3
 
 #  include <gtest/gtest.h>
 #  include <gmock/gmock.h>
 
 namespace nix {
+
+// =============================================================================
+// ParsedS3URL Tests
+// =============================================================================
 
 struct ParsedS3URLTestCase
 {
@@ -86,18 +90,41 @@ INSTANTIATE_TEST_SUITE_P(
         }),
     [](const ::testing::TestParamInfo<ParsedS3URLTestCase> & info) { return info.param.description; });
 
-TEST(InvalidParsedS3URLTest, parseS3URLErrors)
+// Parameterized test for invalid S3 URLs
+struct InvalidS3URLTestCase
 {
-    auto invalidBucketMatcher = ::testing::ThrowsMessage<BadURL>(
-        testing::HasSubstrIgnoreANSIMatcher("error: URI has a missing or invalid bucket name"));
+    std::string url;
+    std::string expectedErrorSubstring;
+    std::string description;
+};
 
-    /* Empty bucket (authority) */
-    ASSERT_THAT([]() { ParsedS3URL::parse(parseURL("s3:///key")); }, invalidBucketMatcher);
-    /* Invalid bucket name */
-    ASSERT_THAT([]() { ParsedS3URL::parse(parseURL("s3://127.0.0.1")); }, invalidBucketMatcher);
+class InvalidParsedS3URLTest : public ::testing::WithParamInterface<InvalidS3URLTestCase>, public ::testing::Test
+{};
+
+TEST_P(InvalidParsedS3URLTest, parseS3URLErrors)
+{
+    const auto & testCase = GetParam();
+
+    ASSERT_THAT(
+        [&testCase]() { ParsedS3URL::parse(parseURL(testCase.url)); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher(testCase.expectedErrorSubstring)));
 }
 
-// Parameterized test for s3ToHttpsUrl conversion
+INSTANTIATE_TEST_SUITE_P(
+    InvalidUrls,
+    InvalidParsedS3URLTest,
+    ::testing::Values(
+        InvalidS3URLTestCase{"s3:///key", "error: URI has a missing or invalid bucket name", "empty_bucket"},
+        InvalidS3URLTestCase{"s3://127.0.0.1", "error: URI has a missing or invalid bucket name", "ip_address_bucket"},
+        InvalidS3URLTestCase{"s3://bucket with spaces/key", "is not a valid URL", "bucket_with_spaces"},
+        InvalidS3URLTestCase{"s3://", "error: URI has a missing or invalid bucket name", "completely_empty"},
+        InvalidS3URLTestCase{"s3://bucket", "error: URI has a missing or invalid key", "missing_key"}),
+    [](const ::testing::TestParamInfo<InvalidS3URLTestCase> & info) { return info.param.description; });
+
+// =============================================================================
+// S3 URL to HTTPS Conversion Tests
+// =============================================================================
+
 struct S3ToHttpsConversionTestCase
 {
     ParsedS3URL input;

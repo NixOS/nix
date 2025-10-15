@@ -12,6 +12,8 @@
   componentTestsPrefix ? "",
   withSanitizers ? false,
   withCoverage ? false,
+  withAWS ? null,
+  withCurlS3 ? null,
   ...
 }:
 
@@ -20,16 +22,6 @@ let
   hydraJobs = nixFlake.hydraJobs;
   packages' = nixFlake.packages.${system};
   stdenv = (getStdenv pkgs);
-
-  enableSanitizersLayer = finalAttrs: prevAttrs: {
-    mesonFlags =
-      (prevAttrs.mesonFlags or [ ])
-      ++ [ (lib.mesonOption "b_sanitize" "address,undefined") ]
-      ++ (lib.optionals stdenv.cc.isClang [
-        # https://www.github.com/mesonbuild/meson/issues/764
-        (lib.mesonBool "b_lundef" false)
-      ]);
-  };
 
   collectCoverageLayer = finalAttrs: prevAttrs: {
     env =
@@ -53,23 +45,38 @@ let
     '';
   };
 
-  componentOverrides =
-    (lib.optional withSanitizers enableSanitizersLayer)
-    ++ (lib.optional withCoverage collectCoverageLayer);
+  componentOverrides = (lib.optional withCoverage collectCoverageLayer);
 in
 
 rec {
   nixComponentsInstrumented = nixComponents.overrideScope (
     final: prev: {
+      withASan = withSanitizers;
+      withUBSan = withSanitizers;
+
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
+
+      # Override AWS configuration if specified
+      nix-store = prev.nix-store.override (
+        lib.optionalAttrs (withAWS != null) { inherit withAWS; }
+        // lib.optionalAttrs (withCurlS3 != null) { inherit withCurlS3; }
+      );
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
       # Unclear how to make Perl bindings work with a dynamically linked ASAN.
       nix-perl-bindings = if withSanitizers then null else prev.nix-perl-bindings;
     }
   );
+
+  # Import NixOS tests using the instrumented components
+  nixosTests = import ../../../tests/nixos {
+    inherit lib pkgs;
+    nixComponents = nixComponentsInstrumented;
+    nixpkgs = nixFlake.inputs.nixpkgs;
+    inherit (nixFlake.inputs) nixpkgs-23-11;
+  };
 
   /**
     Top-level tests for the flake outputs, as they would be built by hydra.
@@ -221,4 +228,28 @@ rec {
     {
       inherit coverageProfileDrvs mergedProfdata coverageReports;
     };
+
+  vmTests = {
+  }
+  # FIXME: when the curlS3 implementation is complete, it should also enable these tests.
+  // lib.optionalAttrs (withAWS == true) {
+    # S3 binary cache store test only runs when S3 support is enabled
+    inherit (nixosTests) s3-binary-cache-store;
+  }
+  // lib.optionalAttrs (withCurlS3 == true) {
+    # S3 binary cache store test using curl implementation
+    inherit (nixosTests) curl-s3-binary-cache-store;
+  }
+  // lib.optionalAttrs (!withSanitizers && !withCoverage) {
+    # evalNixpkgs uses non-instrumented components from hydraJobs, so only run it
+    # when not testing with sanitizers to avoid rebuilding nix
+    inherit (hydraJobs.tests) evalNixpkgs;
+    # FIXME: CI times out when building vm tests instrumented
+    inherit (nixosTests)
+      functional_user
+      githubFlakes
+      nix-docker
+      tarballFlakes
+      ;
+  };
 }

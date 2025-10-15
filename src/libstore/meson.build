@@ -164,6 +164,33 @@ if aws_s3.found()
 endif
 deps_other += aws_s3
 
+# Curl-based S3 store support (alternative to AWS SDK)
+# Check if curl supports AWS SigV4 (requires >= 7.75.0)
+curl_supports_aws_sigv4 = curl.version().version_compare('>= 7.75.0')
+# AWS CRT C++ for lightweight credential management
+aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : false)
+
+curl_s3_store_opt = get_option('curl-s3-store').require(
+  curl_supports_aws_sigv4,
+  error_message : 'curl-based S3 support requires curl >= 7.75.0',
+).require(
+  aws_crt_cpp.found(),
+  error_message : 'curl-based S3 support requires aws-crt-cpp',
+)
+
+# Make AWS SDK and curl-based S3 mutually exclusive
+if aws_s3.found() and curl_s3_store_opt.enabled()
+  error(
+    'Cannot enable both AWS SDK S3 support and curl-based S3 support. Please choose one.',
+  )
+endif
+
+if curl_s3_store_opt.enabled()
+  deps_other += aws_crt_cpp
+endif
+
+configdata_pub.set('NIX_WITH_CURL_S3', curl_s3_store_opt.enabled().to_int())
+
 subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
@@ -265,15 +292,17 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
+  'aws-creds.cc',
   'binary-cache-store.cc',
   'build-result.cc',
+  'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
   'build/derivation-env-desugar.cc',
   'build/derivation-goal.cc',
+  'build/derivation-resolution-goal.cc',
   'build/derivation-trampoline-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
@@ -329,7 +358,7 @@ sources = files(
   'remote-store.cc',
   'restricted-store.cc',
   's3-binary-cache-store.cc',
-  's3.cc',
+  's3-url.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',

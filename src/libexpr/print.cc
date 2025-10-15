@@ -461,7 +461,7 @@ private:
 
                 std::ostringstream s;
                 s << state.positions[v.lambda().fun->pos];
-                output << " @ " << filterANSIEscapes(toView(s));
+                output << " @ " << filterANSIEscapes(s.view());
             }
         } else if (v.isPrimOp()) {
             if (v.primOp())

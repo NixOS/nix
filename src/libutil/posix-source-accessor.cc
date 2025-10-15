@@ -95,9 +95,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
-    std::optional<Cache::mapped_type> res;
-    cache.cvisit(absPath, [&](auto & x) { res.emplace(x.second); });
-    if (res)
+    if (auto res = getConcurrent(cache, absPath))
         return *res;
 
     auto st = nix::maybeLstat(absPath.c_str());
@@ -116,6 +114,8 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     auto st = cachedLstat(path);
     if (!st)
         return std::nullopt;
+    // This makes the accessor thread-unsafe, but we only seem to use the actual value in a single threaded context in
+    // `src/libfetchers/path.cc`.
     mtime = std::max(mtime, st->st_mtime);
     return Stat{
         .type = S_ISREG(st->st_mode)   ? tRegular

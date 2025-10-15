@@ -88,7 +88,7 @@ StorePath adl_serializer<StorePath>::from_json(const json & json)
     return StorePath{getString(json)};
 }
 
-void adl_serializer<StorePath>::to_json(json & json, StorePath storePath)
+void adl_serializer<StorePath>::to_json(json & json, const StorePath & storePath)
 {
     json = storePath.to_string();
 }

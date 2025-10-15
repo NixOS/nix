@@ -73,7 +73,7 @@ let
       ]
     );
 in
-{
+rec {
   /**
     An internal check to make sure our package listing is complete.
   */
@@ -145,13 +145,25 @@ in
       )
   );
 
-  buildNoGc =
+  # Builds with sanitizers already have GC disabled, so this buildNoGc can just
+  # point to buildWithSanitizers in order to reduce the load on hydra.
+  buildNoGc = buildWithSanitizers;
+
+  buildWithSanitizers =
     let
       components = forAllSystems (
         system:
-        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        pkgs.nixComponents2.overrideScope (
           self: super: {
+            # Boost coroutines fail with ASAN on darwin.
+            withASan = !pkgs.stdenv.buildPlatform.isDarwin;
+            withUBSan = true;
             nix-expr = super.nix-expr.override { enableGC = false; };
+            # Unclear how to make Perl bindings work with a dynamically linked ASAN.
+            nix-perl-bindings = null;
           }
         )
       );

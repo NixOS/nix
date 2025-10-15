@@ -997,7 +997,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
-                    BuildResult::OutputRejected,
+                    BuildResult::Failure::OutputRejected,
                     "cycle detected in the references of '%s' from '%s'",
                     printStorePath(path),
                     printStorePath(parent));
@@ -1383,7 +1383,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of '%s'", name);
+            printMsg(lvlTalkative, "checking contents of %s", name);
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                                    PosixSourceAccessor::createAtRoot(link.path()),
@@ -1391,10 +1391,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                                    HashAlgorithm::SHA256)
                                    .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError("link '%s' was modified! expected hash '%s', got '%s'", link.path(), name, hash);
+                printError("link %s was modified! expected hash %s, got '%s'", link.path(), name, hash);
                 if (repair) {
                     std::filesystem::remove(link.path());
-                    printInfo("removed link '%s'", link.path());
+                    printInfo("removed link %s", link.path());
                 } else {
                     errors = true;
                 }

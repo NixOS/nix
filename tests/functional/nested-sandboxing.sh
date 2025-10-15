@@ -11,7 +11,7 @@ requiresUnprivilegedUserNamespaces
 
 start="$TEST_ROOT/start"
 mkdir -p "$start"
-cp -r common common.sh ${config_nix} ./nested-sandboxing "$start"
+cp -r common common.sh "${config_nix}" ./nested-sandboxing "$start"
 cp "${_NIX_TEST_BUILD_DIR}/common/subst-vars.sh" "$start/common"
 # N.B. redefine
 _NIX_TEST_SOURCE_DIR="$start"
@@ -20,6 +20,7 @@ cd "$start"
 
 source ./nested-sandboxing/command.sh
 
+# shellcheck disable=SC2016
 expectStderr 100 runNixBuild badStoreUrl 2 | grepQuiet '`sandbox-build-dir` must not contain'
 
 runNixBuild goodStoreUrl 5

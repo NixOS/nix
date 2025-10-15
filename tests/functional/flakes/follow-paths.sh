@@ -11,13 +11,13 @@ flakeFollowsD=$TEST_ROOT/follows/flakeA/flakeD
 flakeFollowsE=$TEST_ROOT/follows/flakeA/flakeE
 
 # Test following path flakerefs.
-createGitRepo $flakeFollowsA
-mkdir -p $flakeFollowsB
-mkdir -p $flakeFollowsC
-mkdir -p $flakeFollowsD
-mkdir -p $flakeFollowsE
+createGitRepo "$flakeFollowsA"
+mkdir -p "$flakeFollowsB"
+mkdir -p "$flakeFollowsC"
+mkdir -p "$flakeFollowsD"
+mkdir -p "$flakeFollowsE"
 
-cat > $flakeFollowsA/flake.nix <<EOF
+cat > "$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -32,7 +32,7 @@ cat > $flakeFollowsA/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsB/flake.nix <<EOF
+cat > "$flakeFollowsB"/flake.nix <<EOF
 {
     description = "Flake B";
     inputs = {
@@ -47,7 +47,7 @@ cat > $flakeFollowsB/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsC/flake.nix <<EOF
+cat > "$flakeFollowsC"/flake.nix <<EOF
 {
     description = "Flake C";
     inputs = {
@@ -58,7 +58,7 @@ cat > $flakeFollowsC/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsD/flake.nix <<EOF
+cat > "$flakeFollowsD"/flake.nix <<EOF
 {
     description = "Flake D";
     inputs = {};
@@ -66,7 +66,7 @@ cat > $flakeFollowsD/flake.nix <<EOF
 }
 EOF
 
-cat > $flakeFollowsE/flake.nix <<EOF
+cat > "$flakeFollowsE"/flake.nix <<EOF
 {
     description = "Flake E";
     inputs = {};
@@ -74,32 +74,32 @@ cat > $flakeFollowsE/flake.nix <<EOF
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix flakeB/flake.nix \
+git -C "$flakeFollowsA" add flake.nix flakeB/flake.nix \
   flakeB/flakeC/flake.nix flakeD/flake.nix flakeE/flake.nix
 
-nix flake metadata $flakeFollowsA
+nix flake metadata "$flakeFollowsA"
 
-nix flake update --flake $flakeFollowsA
+nix flake update --flake "$flakeFollowsA"
 
-nix flake lock $flakeFollowsA
+nix flake lock "$flakeFollowsA"
 
 oldLock="$(cat "$flakeFollowsA/flake.lock")"
 
 # Ensure that locking twice doesn't change anything
 
-nix flake lock $flakeFollowsA
+nix flake lock "$flakeFollowsA"
 
 newLock="$(cat "$flakeFollowsA/flake.lock")"
 
 diff <(echo "$newLock") <(echo "$oldLock")
 
-[[ $(jq -c .nodes.B.inputs.C $flakeFollowsA/flake.lock) = '"C"' ]]
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '["foobar"]' ]]
-[[ $(jq -c .nodes.C.inputs.foobar $flakeFollowsA/flake.lock) = '["B","foobar"]' ]]
+[[ $(jq -c .nodes.B.inputs.C "$flakeFollowsA"/flake.lock) = '"C"' ]]
+[[ $(jq -c .nodes.B.inputs.foobar "$flakeFollowsA"/flake.lock) = '["foobar"]' ]]
+[[ $(jq -c .nodes.C.inputs.foobar "$flakeFollowsA"/flake.lock) = '["B","foobar"]' ]]
 
 # Ensure removing follows from flake.nix removes them from the lockfile
 
-cat > $flakeFollowsA/flake.nix <<EOF
+cat > "$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -112,13 +112,13 @@ cat > $flakeFollowsA/flake.nix <<EOF
 }
 EOF
 
-nix flake lock $flakeFollowsA
+nix flake lock "$flakeFollowsA"
 
-[[ $(jq -c .nodes.B.inputs.foobar $flakeFollowsA/flake.lock) = '"foobar"' ]]
-jq -r -c '.nodes | keys | .[]' $flakeFollowsA/flake.lock | grep "^foobar$"
+[[ $(jq -c .nodes.B.inputs.foobar "$flakeFollowsA"/flake.lock) = '"foobar"' ]]
+jq -r -c '.nodes | keys | .[]' "$flakeFollowsA"/flake.lock | grep "^foobar$"
 
 # Check that path: inputs cannot escape from their root.
-cat > $flakeFollowsA/flake.nix <<EOF
+cat > "$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -128,13 +128,13 @@ cat > $flakeFollowsA/flake.nix <<EOF
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix
+git -C "$flakeFollowsA" add flake.nix
 
-expect 1 nix flake lock $flakeFollowsA 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
-expect 1 nix flake lock --impure $flakeFollowsA 2>&1 | grep '/flakeB.*does not exist'
+expect 1 nix flake lock "$flakeFollowsA" 2>&1 | grep '/flakeB.*is forbidden in pure evaluation mode'
+expect 1 nix flake lock --impure "$flakeFollowsA" 2>&1 | grep "'flakeB' is too short to be a valid store path"
 
 # Test relative non-flake inputs.
-cat > $flakeFollowsA/flake.nix <<EOF
+cat > "$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -145,16 +145,16 @@ cat > $flakeFollowsA/flake.nix <<EOF
 }
 EOF
 
-echo 123 > $flakeFollowsA/foo.nix
+echo 123 > "$flakeFollowsA"/foo.nix
 
-git -C $flakeFollowsA add flake.nix foo.nix
+git -C "$flakeFollowsA" add flake.nix foo.nix
 
-nix flake lock $flakeFollowsA
+nix flake lock "$flakeFollowsA"
 
-[[ $(nix eval --json $flakeFollowsA#e) = 123 ]]
+[[ $(nix eval --json "$flakeFollowsA"#e) = 123 ]]
 
 # Non-existant follows should print a warning.
-cat >$flakeFollowsA/flake.nix <<EOF
+cat >"$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs.B = {
@@ -167,7 +167,7 @@ cat >$flakeFollowsA/flake.nix <<EOF
 }
 EOF
 
-git -C $flakeFollowsA add flake.nix
+git -C "$flakeFollowsA" add flake.nix
 
 nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid'"
 nix flake lock "$flakeFollowsA" 2>&1 | grep "warning: input 'B' has an override for a non-existent input 'invalid2'"
@@ -269,7 +269,7 @@ flakeFollowCycle="$TEST_ROOT/follows/followCycle"
 # Test following path flakerefs.
 mkdir -p "$flakeFollowCycle"
 
-cat > $flakeFollowCycle/flake.nix <<EOF
+cat > "$flakeFollowCycle"/flake.nix <<EOF
 {
     description = "Flake A";
     inputs = {
@@ -281,8 +281,9 @@ cat > $flakeFollowCycle/flake.nix <<EOF
 }
 EOF
 
+# shellcheck disable=SC2015
 checkRes=$(nix flake lock "$flakeFollowCycle" 2>&1 && fail "nix flake lock should have failed." || true)
-echo $checkRes | grep -F "error: follow cycle detected: [baz -> foo -> bar -> baz]"
+echo "$checkRes" | grep -F "error: follow cycle detected: [baz -> foo -> bar -> baz]"
 
 
 # Test transitive input url locking
@@ -362,22 +363,22 @@ echo "$json" | jq .locks.nodes.C.original
 
 # Test deep overrides, e.g. `inputs.B.inputs.C.inputs.D.follows = ...`.
 
-cat <<EOF > $flakeFollowsD/flake.nix
+cat <<EOF > "$flakeFollowsD"/flake.nix
 { outputs = _: {}; }
 EOF
-cat <<EOF > $flakeFollowsC/flake.nix
+cat <<EOF > "$flakeFollowsC"/flake.nix
 {
   inputs.D.url = "path:nosuchflake";
   outputs = _: {};
 }
 EOF
-cat <<EOF > $flakeFollowsB/flake.nix
+cat <<EOF > "$flakeFollowsB"/flake.nix
 {
   inputs.C.url = "path:$flakeFollowsC";
   outputs = _: {};
 }
 EOF
-cat <<EOF > $flakeFollowsA/flake.nix
+cat <<EOF > "$flakeFollowsA"/flake.nix
 {
   inputs.B.url = "path:$flakeFollowsB";
   inputs.D.url = "path:$flakeFollowsD";
@@ -386,26 +387,26 @@ cat <<EOF > $flakeFollowsA/flake.nix
 }
 EOF
 
-nix flake lock $flakeFollowsA
+nix flake lock "$flakeFollowsA"
 
-[[ $(jq -c .nodes.C.inputs.D $flakeFollowsA/flake.lock) = '["D"]' ]]
+[[ $(jq -c .nodes.C.inputs.D "$flakeFollowsA"/flake.lock) = '["D"]' ]]
 
 # Test overlapping flake follows: B has D follow C/D, while A has B/C follow C
 
-cat <<EOF > $flakeFollowsC/flake.nix
+cat <<EOF > "$flakeFollowsC"/flake.nix
 {
   inputs.D.url = "path:$flakeFollowsD";
   outputs = _: {};
 }
 EOF
-cat <<EOF > $flakeFollowsB/flake.nix
+cat <<EOF > "$flakeFollowsB"/flake.nix
 {
   inputs.C.url = "path:nosuchflake";
   inputs.D.follows = "C/D";
   outputs = _: {};
 }
 EOF
-cat <<EOF > $flakeFollowsA/flake.nix
+cat <<EOF > "$flakeFollowsA"/flake.nix
 {
   inputs.B.url = "path:$flakeFollowsB";
   inputs.C.url = "path:$flakeFollowsC";
@@ -415,12 +416,12 @@ cat <<EOF > $flakeFollowsA/flake.nix
 EOF
 
 # bug was not triggered without recreating the lockfile
-nix flake lock $flakeFollowsA --recreate-lock-file
+nix flake lock "$flakeFollowsA" --recreate-lock-file
 
-[[ $(jq -c .nodes.B.inputs.D $flakeFollowsA/flake.lock) = '["B","C","D"]' ]]
+[[ $(jq -c .nodes.B.inputs.D "$flakeFollowsA"/flake.lock) = '["B","C","D"]' ]]
 
 # Check that you can't have both a flakeref and a follows attribute on an input.
-cat <<EOF > $flakeFollowsB/flake.nix
+cat <<EOF > "$flakeFollowsB"/flake.nix
 {
   inputs.C.url = "path:nosuchflake";
   inputs.D.url = "path:nosuchflake";
@@ -429,4 +430,4 @@ cat <<EOF > $flakeFollowsB/flake.nix
 }
 EOF
 
-expectStderr 1 nix flake lock $flakeFollowsA --recreate-lock-file | grepQuiet "flake input has both a flake reference and a follows attribute"
+expectStderr 1 nix flake lock "$flakeFollowsA" --recreate-lock-file | grepQuiet "flake input has both a flake reference and a follows attribute"

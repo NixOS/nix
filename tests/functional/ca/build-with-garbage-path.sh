@@ -8,6 +8,7 @@ requireDaemonNewerThan "2.4pre20210621"
 
 # Get the output path of `rootCA`, and put some garbage instead
 outPath="$(nix-build ./content-addressed.nix -A rootCA --no-out-link)"
+# shellcheck disable=SC2046  # Multiple store paths need to become individual args
 nix-store --delete $(nix-store -q --referrers-closure "$outPath")
 touch "$outPath"
 

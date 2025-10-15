@@ -58,12 +58,22 @@ std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
 Path Store::followLinksToStore(std::string_view _path) const
 {
     Path path = absPath(std::string(_path));
+
+    // Limit symlink follows to prevent infinite loops
+    unsigned int followCount = 0;
+    const unsigned int maxFollow = 1024;
+
     while (!isInStore(path)) {
         if (!std::filesystem::is_symlink(path))
             break;
+
+        if (++followCount >= maxFollow)
+            throw Error("too many symbolic links encountered while resolving '%s'", _path);
+
         auto target = readLink(path);
         path = absPath(target, dirOf(path));
     }
+
     if (!isInStore(path))
         throw BadStorePath("path '%1%' is not in the Nix store", path);
     return path;
@@ -764,7 +774,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     for (auto & storePath : storePaths) {
         if (!inputPaths.count(storePath))
             throw BuildError(
-                BuildResult::InputRejected,
+                BuildResult::Failure::InputRejected,
                 "cannot export references of path '%s' because it is not in the input closure of the derivation",
                 printStorePath(storePath));
 
@@ -1120,10 +1130,9 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
 
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
-    auto accessor = store.getFSAccessor(requireValidPath);
+    auto accessor = store.requireStoreObjectAccessor(drvPath, requireValidPath);
     try {
-        return parseDerivation(
-            store, accessor->readFile(CanonPath(drvPath.to_string())), Derivation::nameFromPath(drvPath));
+        return parseDerivation(store, accessor->readFile(CanonPath::root), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }

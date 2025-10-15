@@ -164,6 +164,24 @@ let
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
+    preConfigure =
+      let
+        interpositionFlags = [
+          "-fno-semantic-interposition"
+          "-Wl,-Bsymbolic-functions"
+        ];
+      in
+      # NOTE: By default GCC disables interprocedular optimizations (in particular inlining) for
+      # position-independent code and thus shared libraries.
+      # Since LD_PRELOAD tricks aren't worth losing out on optimizations, we disable it for good.
+      # This is not the case for Clang, where inlining is done by default even without -fno-semantic-interposition.
+      # https://reviews.llvm.org/D102453
+      # https://fedoraproject.org/wiki/Changes/PythonNoSemanticInterpositionSpeedup
+      prevAttrs.preConfigure or ""
+      + lib.optionalString stdenv.cc.isGNU ''
+        export CFLAGS="''${CFLAGS:-} ${toString interpositionFlags}"
+        export CXXFLAGS="''${CXXFLAGS:-} ${toString interpositionFlags}"
+      '';
     outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
   };
 
@@ -184,6 +202,25 @@ let
     finalAttrs: prevAttrs:
     lib.optionalAttrs stdenv.hostPlatform.isBSD {
       mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
+    };
+
+  enableSanitizersLayer =
+    finalAttrs: prevAttrs:
+    let
+      sanitizers = lib.optional scope.withASan "address" ++ lib.optional scope.withUBSan "undefined";
+    in
+    {
+      mesonFlags =
+        (prevAttrs.mesonFlags or [ ])
+        ++ lib.optionals (lib.length sanitizers > 0) (
+          [
+            (lib.mesonOption "b_sanitize" (lib.concatStringsSep "," sanitizers))
+          ]
+          ++ (lib.optionals stdenv.cc.isClang [
+            # https://www.github.com/mesonbuild/meson/issues/764
+            (lib.mesonBool "b_lundef" false)
+          ])
+        );
     };
 
   nixDefaultsLayer = finalAttrs: prevAttrs: {
@@ -227,6 +264,16 @@ in
   inherit maintainers;
 
   inherit filesetToSource;
+
+  /**
+    Whether meson components are built with [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html).
+  */
+  withASan = false;
+
+  /**
+    Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
+  */
+  withUBSan = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
@@ -314,6 +361,7 @@ in
     setVersionLayer
     mesonLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
@@ -324,6 +372,7 @@ in
     mesonLayer
     mesonBuildLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
@@ -335,6 +384,7 @@ in
     mesonBuildLayer
     mesonLibraryLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
 

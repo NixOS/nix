@@ -40,30 +40,32 @@ nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restrict
 (! nix eval --raw --expr "fetchGit git://github.com/NixOS/patchelf.git" --impure --restrict-eval)
 
 ln -sfn "${_NIX_TEST_SOURCE_DIR}/restricted.nix" "$TEST_ROOT/restricted.nix"
-[[ $(nix-instantiate --eval $TEST_ROOT/restricted.nix) == 3 ]]
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix)
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I $TEST_ROOT)
-(! nix-instantiate --eval --restrict-eval $TEST_ROOT/restricted.nix -I .)
+[[ $(nix-instantiate --eval "$TEST_ROOT"/restricted.nix) == 3 ]]
+(! nix-instantiate --eval --restrict-eval "$TEST_ROOT"/restricted.nix)
+(! nix-instantiate --eval --restrict-eval "$TEST_ROOT"/restricted.nix -I "$TEST_ROOT")
+(! nix-instantiate --eval --restrict-eval "$TEST_ROOT"/restricted.nix -I .)
 nix-instantiate --eval --restrict-eval "$TEST_ROOT/restricted.nix" -I "$TEST_ROOT" -I "${_NIX_TEST_SOURCE_DIR}"
 
+# shellcheck disable=SC2016
 [[ $(nix eval --raw --impure --restrict-eval -I . --expr 'builtins.readFile "${import ./simple.nix}/hello"') == 'Hello World!' ]]
 
 # Check that we can't follow a symlink outside of the allowed paths.
-mkdir -p $TEST_ROOT/tunnel.d $TEST_ROOT/foo2
-ln -sfn .. $TEST_ROOT/tunnel.d/tunnel
-echo foo > $TEST_ROOT/bar
+mkdir -p "$TEST_ROOT"/tunnel.d "$TEST_ROOT"/foo2
+ln -sfn .. "$TEST_ROOT"/tunnel.d/tunnel
+echo foo > "$TEST_ROOT"/bar
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readFile <foo/tunnel/bar>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readFile <foo/tunnel/bar>" -I "$TEST_ROOT"/tunnel.d | grepQuiet "forbidden in restricted mode"
 
-expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel/foo2>" -I $TEST_ROOT/tunnel.d | grepQuiet "forbidden in restricted mode"
+expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel/foo2>" -I "$TEST_ROOT"/tunnel.d | grepQuiet "forbidden in restricted mode"
 
 # Reading the parents of allowed paths should show only the ancestors of the allowed paths.
-[[ $(nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I $TEST_ROOT/tunnel.d) == '{ "tunnel.d" = "directory"; }' ]]
+[[ $(nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I "$TEST_ROOT"/tunnel.d) == '{ "tunnel.d" = "directory"; }' ]]
 
 # Check whether we can leak symlink information through directory traversal.
 traverseDir="${_NIX_TEST_SOURCE_DIR}/restricted-traverse-me"
 ln -sfn "${_NIX_TEST_SOURCE_DIR}/restricted-secret" "${_NIX_TEST_SOURCE_DIR}/restricted-innocent"
 mkdir -p "$traverseDir"
+# shellcheck disable=SC2001
 goUp="..$(echo "$traverseDir" | sed -e 's,[^/]\+,..,g')"
 output="$(nix eval --raw --restrict-eval -I "$traverseDir" \
     --expr "builtins.readFile \"$traverseDir/$goUp${_NIX_TEST_SOURCE_DIR}/restricted-innocent\"" \

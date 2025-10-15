@@ -108,8 +108,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         auto dependencyPath = *optDependencyPath;
         auto dependencyPathHash = dependencyPath.hashPart();
 
-        auto accessor = store->getFSAccessor();
-
         auto const inf = std::numeric_limits<size_t>::max();
 
         struct Node
@@ -172,8 +170,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         {};
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
-            CanonPath pathS(node.path.to_string());
-
             assert(node.dist != inf);
             if (precise) {
                 logger->cout(
@@ -181,7 +177,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     firstPad,
                     node.visited ? "\e[38;5;244m" : "",
                     firstPad != "" ? "→ " : "",
-                    pathS.abs());
+                    store->printStorePath(node.path));
             }
 
             if (node.path == dependencyPath && !all && packagePath != dependencyPath)
@@ -211,13 +207,13 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                contain the reference. */
             std::map<std::string, Strings> hits;
 
-            std::function<void(const CanonPath &)> visitPath;
+            auto accessor = store->requireStoreObjectAccessor(node.path);
 
-            visitPath = [&](const CanonPath & p) {
+            auto visitPath = [&](this auto && recur, const CanonPath & p) -> void {
                 auto st = accessor->maybeLstat(p);
                 assert(st);
 
-                auto p2 = p == pathS ? "/" : p.abs().substr(pathS.abs().size() + 1);
+                auto p2 = p.isRoot() ? p.abs() : p.rel();
 
                 auto getColour = [&](const std::string & hash) {
                     return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
@@ -226,7 +222,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 if (st->type == SourceAccessor::Type::tDirectory) {
                     auto names = accessor->readDirectory(p);
                     for (auto & [name, type] : names)
-                        visitPath(p / name);
+                        recur(p / name);
                 }
 
                 else if (st->type == SourceAccessor::Type::tRegular) {
@@ -264,7 +260,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             // FIXME: should use scanForReferences().
 
             if (precise)
-                visitPath(pathS);
+                visitPath(CanonPath::root);
 
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
@@ -280,13 +276,12 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 }
 
                 if (!precise) {
-                    auto pathS = store->printStorePath(ref.second->path);
                     logger->cout(
                         "%s%s%s%s" ANSI_NORMAL,
                         firstPad,
                         ref.second->visited ? "\e[38;5;244m" : "",
                         last ? treeLast : treeConn,
-                        pathS);
+                        store->printStorePath(ref.second->path));
                     node.visited = true;
                 }
 
