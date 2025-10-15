@@ -5,7 +5,6 @@
   stdenv ? "stdenv",
   componentTestsPrefix ? "",
   withInstrumentation ? false,
-  withAWS ? null,
 }@args:
 import ./. (
   args
@@ -13,6 +12,5 @@ import ./. (
     getStdenv = p: p.${stdenv};
     withSanitizers = withInstrumentation;
     withCoverage = withInstrumentation;
-    inherit withAWS;
   }
 )

@@ -12,7 +12,6 @@
   componentTestsPrefix ? "",
   withSanitizers ? false,
   withCoverage ? false,
-  withAWS ? null,
   ...
 }:
 
@@ -56,9 +55,6 @@ rec {
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
-
-      # Override AWS configuration if specified
-      nix-store = prev.nix-store.override (lib.optionalAttrs (withAWS != null) { inherit withAWS; });
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
       # Unclear how to make Perl bindings work with a dynamically linked ASAN.
@@ -226,9 +222,6 @@ rec {
     };
 
   vmTests = {
-  }
-  // lib.optionalAttrs (withAWS == true) {
-    # S3 binary cache store test using curl implementation
     inherit (nixosTests) curl-s3-binary-cache-store;
   }
   // lib.optionalAttrs (!withSanitizers && !withCoverage) {
