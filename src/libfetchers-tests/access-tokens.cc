@@ -1,10 +1,15 @@
-#include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
+#include <nlohmann/json_fwd.hpp>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <string>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
-#include "nix/util/json-utils.hh"
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/experimental-features.hh"
 
 namespace nix::fetchers {
 

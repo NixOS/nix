@@ -1,5 +1,3 @@
-#include "nix/fetchers/git-utils.hh"
-#include "nix/util/file-system.hh"
 #include <gmock/gmock.h>
 #include <git2/global.h>
 #include <git2/repository.h>
@@ -8,12 +6,18 @@
 #include <git2/object.h>
 #include <git2/tag.h>
 #include <gtest/gtest.h>
-#include "nix/util/fs-sink.hh"
-#include "nix/util/serialise.hh"
-#include "nix/fetchers/git-lfs-fetch.hh"
-
 #include <git2/blob.h>
 #include <git2/tree.h>
+#include <git2/commit.h>
+#include <git2/oid.h>
+#include <string.h>
+#include <functional>
+#include <memory>
+
+#include "nix/fetchers/git-utils.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 

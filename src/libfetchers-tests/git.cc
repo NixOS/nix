@@ -1,14 +1,33 @@
-#include "nix/store/store-open.hh"
+#include <gtest/gtest.h>
+#include <git2/clone.h>
+#include <git2/commit.h>
+#include <git2/errors.h>
+#include <git2/global.h>
+#include <git2/index.h>
+#include <git2/oid.h>
+#include <git2/refs.h>
+#include <git2/repository.h>
+#include <git2/signature.h>
+#include <git2/submodule.h>
+#include <git2/tree.h>
+#include <git2/types.h>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "nix/store/globals.hh"
 #include "nix/store/dummy-store.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/fetchers/git-utils.hh"
-
-#include <git2.h>
-#include <gtest/gtest.h>
-
-#include <filesystem>
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
 
 namespace {
 
