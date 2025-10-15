@@ -1,15 +1,51 @@
-#include "nix/fetchers/fetch-settings.hh"
-#include "nix/flake/settings.hh"
-#include "nix/flake/lockfile.hh"
-#include "nix/store/store-api.hh"
-#include "nix/util/strings.hh"
-
+#include <boost/unordered/unordered_flat_set.hpp>
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <boost/format.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/unordered/unordered_flat_set_fwd.hpp>
+#include <nlohmann/detail/iterators/iter_impl.hpp>
+#include <nlohmann/detail/iterators/iteration_proxy.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <algorithm>
 #include <iomanip>
-
-#include <boost/unordered/unordered_flat_set.hpp>
 #include <iterator>
-#include <nlohmann/json.hpp>
+#include <compare>
+#include <ctime>
+#include <format>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <regex>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/strings.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+namespace nix {
+class Store;
+}  // namespace nix
 
 namespace nix::flake {
 

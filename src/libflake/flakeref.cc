@@ -1,10 +1,28 @@
+#include <assert.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <boost/format.hpp>
+#include <boost/optional/optional.hpp>
+#include <filesystem>
+#include <ostream>
+#include <string_view>
+#include <vector>
+
 #include "nix/flake/flakeref.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
+namespace fetchers {
+struct Settings;
+}  // namespace fetchers
 
 #if 0
 // 'dir' path elements cannot start with a '.'. We also reject

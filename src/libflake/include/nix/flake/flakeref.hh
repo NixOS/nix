@@ -1,16 +1,30 @@
 #pragma once
 ///@file
 
+#include <boost/container/detail/std_fwd.hpp>
 #include <regex>
+#include <compare>
+#include <iosfwd>
+#include <optional>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 
 #include "nix/util/types.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/fetchers/registry.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 
 class Store;
+namespace fetchers {
+struct Settings;
+}  // namespace fetchers
 
 typedef std::string FlakeId;
 

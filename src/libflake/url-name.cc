@@ -1,6 +1,8 @@
-#include "nix/flake/url-name.hh"
 #include <regex>
-#include <iostream>
+
+#include "nix/flake/url-name.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

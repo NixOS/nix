@@ -3,6 +3,12 @@
 #include "nix/expr/eval.hh"
 #include "nix/flake/settings.hh"
 
+namespace nix {
+namespace flake {
+struct Settings;
+}  // namespace flake
+}  // namespace nix
+
 namespace nix::flake::primops {
 
 /**

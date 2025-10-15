@@ -1,9 +1,13 @@
+#include <optional>
+#include <string>
+
 #include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/util/util.hh"
 #include "nix/util/split.hh"
 
 namespace nix {
+struct ParsedURL;
 
 /**
  * Try to extract a reasonably unique and meaningful, human-readable

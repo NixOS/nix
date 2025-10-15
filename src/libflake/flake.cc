@@ -1,3 +1,26 @@
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <boost/container/detail/std_fwd.hpp>
+#include <boost/core/pointer_traits.hpp>
+#include <boost/format.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/unordered/detail/foa/table.hpp>
+#include <algorithm>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <set>
+#include <span>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "nix/util/terminal.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/environment-variables.hh"
@@ -6,7 +29,6 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/flake/lockfile.hh"
-#include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
@@ -14,14 +36,36 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/settings.hh"
 #include "nix/expr/value-to-json.hh"
-#include "nix/store/local-fs-store.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/fetchers/input-cache.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/nixexpr.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/value/context.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/path.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/position.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
+struct SourceAccessor;
 
 using namespace flake;
 

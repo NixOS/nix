@@ -124,6 +124,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
             pkgs.buildPackages.nixfmt-rfc-style
             pkgs.buildPackages.shellcheck
+            pkgs.buildPackages.include-what-you-use
             pkgs.buildPackages.gdb
           ]
           ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
