@@ -16,6 +16,7 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <format>
 
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/cache.hh"

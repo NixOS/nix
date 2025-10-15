@@ -1,11 +1,19 @@
 #include <nlohmann/json.hpp>
 #include <nlohmann/detail/iterators/iter_impl.hpp>
 #include <nlohmann/detail/iterators/iteration_proxy.hpp>
+#include <stdint.h>
+#include <nlohmann/json_fwd.hpp>
 #include <utility>
+#include <map>
+#include <optional>
+#include <string>
+#include <variant>
 
 #include "nix/fetchers/attrs.hh"
 #include "nix/util/error.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/types.hh"
 
 namespace nix::fetchers {
 

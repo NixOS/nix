@@ -2,6 +2,8 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <string>
+#include <string_view>
 
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -13,6 +15,13 @@
 #include "nix/util/logging.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/fetchers/cache.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix {
 

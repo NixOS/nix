@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdint.h>
+#include <time.h>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -8,6 +9,8 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+#include <optional>
+#include <string>
 
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetchers.hh"
@@ -34,6 +37,9 @@
 #include "nix/util/sync.hh"
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
 
 namespace nix::fetchers {
 

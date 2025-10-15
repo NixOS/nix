@@ -1,11 +1,16 @@
 #include <utility>
+#include <map>
+#include <optional>
+#include <string>
 
 #include "nix/fetchers/input-cache.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
-#include "nix/util/source-path.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-path.hh" // IWYU pragma: keep for SourceAccessor to SourcePath conversion for fmt
 
 namespace nix::fetchers {
 

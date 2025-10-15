@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <filesystem>
-#include <format>
 #include <map>
 #include <memory>
 #include <optional>

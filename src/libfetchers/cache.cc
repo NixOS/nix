@@ -4,6 +4,9 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
+#include <string>
+#include <utility>
 
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -16,6 +19,8 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/ref.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/path.hh"
 
 namespace nix::fetchers {
 

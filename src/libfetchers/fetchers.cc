@@ -1,6 +1,18 @@
 #include <nlohmann/json.hpp>
 #include <assert.h>
+#include <stdint.h>
+#include <time.h>
+#include <nlohmann/json_fwd.hpp>
 #include <vector>
+#include <filesystem>
+#include <format>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
@@ -18,6 +30,13 @@
 #include "nix/util/logging.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/util.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 namespace nix::fetchers {
 

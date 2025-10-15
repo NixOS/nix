@@ -27,6 +27,7 @@
 #include <git2/types.h>
 #include <boost/core/pointer_traits.hpp>
 #include <boost/unordered/detail/foa/table.hpp>
+#include <stdint.h>
 #include <iostream>
 #include <queue>
 #include <regex>
@@ -43,6 +44,14 @@
 #include <system_error>
 #include <typeindex>
 #include <utility>
+#include <filesystem>
+#include <format>
+#include <optional>
+#include <set>
+#include <string>
+#include <tuple>
+#include <variant>
+#include <vector>
 
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"
@@ -69,6 +78,11 @@
 #include "nix/util/strings.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace std {
 

@@ -7,6 +7,11 @@
 #include <ctype.h>
 #include <git2/repository.h>
 #include <nlohmann/detail/json_ref.hpp>
+#include <git2/oid.h>
+#include <git2/types.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <nlohmann/json_fwd.hpp>
 #include <algorithm>
 #include <filesystem>
 #include <list>
@@ -16,6 +21,10 @@
 #include <sstream>
 #include <string_view>
 #include <utility>
+#include <format>
+#include <functional>
+#include <string>
+#include <vector>
 
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
@@ -32,6 +41,8 @@
 #include "nix/util/ref.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/types.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix::lfs {
 

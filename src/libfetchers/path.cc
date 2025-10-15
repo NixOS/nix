@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <time.h>
 #include <filesystem>
-#include <format>
 #include <functional>
 #include <memory>
 #include <optional>
