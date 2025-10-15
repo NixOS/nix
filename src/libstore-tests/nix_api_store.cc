@@ -613,6 +613,155 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_include_deriver
     ASSERT_EQ(closure_paths.count(drvPathName), 1) << "Derivation should be in closure when include_derivers=true";
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
+{
+    // Test that nix_store_realise returns outputs in alphabetical order by output name.
+    // This test uses a CA derivation with 10 outputs in randomized input order
+    // to verify that the callback order is deterministic and alphabetical.
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.substituters = {};
+
+    auto * store = open_local_store();
+
+    // Create a CA derivation with 10 outputs using proper placeholders
+    auto outa_ph = nix::hashPlaceholder("outa");
+    auto outb_ph = nix::hashPlaceholder("outb");
+    auto outc_ph = nix::hashPlaceholder("outc");
+    auto outd_ph = nix::hashPlaceholder("outd");
+    auto oute_ph = nix::hashPlaceholder("oute");
+    auto outf_ph = nix::hashPlaceholder("outf");
+    auto outg_ph = nix::hashPlaceholder("outg");
+    auto outh_ph = nix::hashPlaceholder("outh");
+    auto outi_ph = nix::hashPlaceholder("outi");
+    auto outj_ph = nix::hashPlaceholder("outj");
+
+    std::string drvJson = R"({
+        "version": 3,
+        "name": "multi-output-test",
+        "system": ")" + nix::settings.thisSystem.get()
+                          + R"(",
+        "builder": "/bin/sh",
+        "args": ["-c", "echo a > $outa; echo b > $outb; echo c > $outc; echo d > $outd; echo e > $oute; echo f > $outf; echo g > $outg; echo h > $outh; echo i > $outi; echo j > $outj"],
+        "env": {
+            "builder": "/bin/sh",
+            "name": "multi-output-test",
+            "system": ")" + nix::settings.thisSystem.get()
+                          + R"(",
+            "outf": ")" + outf_ph
+                          + R"(",
+            "outd": ")" + outd_ph
+                          + R"(",
+            "outi": ")" + outi_ph
+                          + R"(",
+            "oute": ")" + oute_ph
+                          + R"(",
+            "outh": ")" + outh_ph
+                          + R"(",
+            "outc": ")" + outc_ph
+                          + R"(",
+            "outb": ")" + outb_ph
+                          + R"(",
+            "outg": ")" + outg_ph
+                          + R"(",
+            "outj": ")" + outj_ph
+                          + R"(",
+            "outa": ")" + outa_ph
+                          + R"("
+        },
+        "inputDrvs": {},
+        "inputSrcs": [],
+        "outputs": {
+            "outd": { "hashAlgo": "sha256", "method": "nar" },
+            "outf": { "hashAlgo": "sha256", "method": "nar" },
+            "outg": { "hashAlgo": "sha256", "method": "nar" },
+            "outb": { "hashAlgo": "sha256", "method": "nar" },
+            "outc": { "hashAlgo": "sha256", "method": "nar" },
+            "outi": { "hashAlgo": "sha256", "method": "nar" },
+            "outj": { "hashAlgo": "sha256", "method": "nar" },
+            "outh": { "hashAlgo": "sha256", "method": "nar" },
+            "outa": { "hashAlgo": "sha256", "method": "nar" },
+            "oute": { "hashAlgo": "sha256", "method": "nar" }
+        }
+    })";
+
+    auto * drv = nix_derivation_from_json(ctx, store, drvJson.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drvPath, nullptr);
+
+    // Realise the derivation - capture the order outputs are returned
+    std::map<std::string, nix::StorePath> outputs;
+    std::vector<std::string> output_order;
+    auto cb = LambdaAdapter{.fun = [&](const char * outname, const StorePath * outPath) {
+        ASSERT_NE(outname, nullptr);
+        ASSERT_NE(outPath, nullptr);
+        output_order.push_back(outname);
+        outputs.emplace(outname, outPath->path);
+    }};
+
+    auto ret = nix_store_realise(
+        ctx, store, drvPath, static_cast<void *>(&cb), decltype(cb)::call_void<const char *, const StorePath *>);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(outputs.size(), 10);
+
+    // Verify outputs are returned in alphabetical order by output name
+    std::vector<std::string> expected_order = {
+        "outa", "outb", "outc", "outd", "oute", "outf", "outg", "outh", "outi", "outj"};
+    ASSERT_EQ(output_order, expected_order) << "Outputs should be returned in alphabetical order by output name";
+
+    // Now compute closure with include_outputs and collect paths in order
+    struct CallbackData
+    {
+        std::vector<std::string> * paths;
+    };
+
+    std::vector<std::string> closure_paths;
+    CallbackData data{&closure_paths};
+
+    ret = nix_store_get_fs_closure(
+        ctx,
+        store,
+        drvPath,
+        false, // flip_direction
+        true,  // include_outputs - include the outputs in the closure
+        false, // include_derivers
+        &data,
+        [](nix_c_context * context, void * userdata, const StorePath * path) {
+            auto * data = static_cast<CallbackData *>(userdata);
+            std::string path_str;
+            nix_store_path_name(path, OBSERVE_STRING(path_str));
+            data->paths->push_back(path_str);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Should contain at least the derivation and 10 outputs
+    ASSERT_GE(closure_paths.size(), 11);
+
+    // Verify all outputs are present in the closure
+    for (const auto & [outname, outPath] : outputs) {
+        std::string outPathName = store->ptr->printStorePath(outPath);
+
+        bool found = false;
+        for (const auto & p : closure_paths) {
+            // nix_store_path_name returns just the name part, so match against full path name
+            if (outPathName.find(p) != std::string::npos) {
+                found = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(found) << "Output " << outname << " (" << outPathName << ") not found in closure";
+    }
+
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
+}
+
 TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_error_propagation)
 {
     // Test that errors in the callback abort the closure computation
