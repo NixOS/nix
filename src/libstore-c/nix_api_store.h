@@ -253,9 +253,14 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
  * @param[out] context Optional, stores error information
  * @param[in] store nix store reference
  * @param[in] store_path The path to compute from
- * @param[in] flip_direction
- * @param[in] include_outputs
- * @param[in] include_derivers
+ * @param[in] flip_direction If false, compute the forward closure (paths referenced by any store path in the closure).
+ *                           If true, compute the backward closure (paths that reference any store path in the closure).
+ * @param[in] include_outputs If flip_direction is false: for any derivation in the closure, include its outputs.
+ *                            If flip_direction is true: for any output in the closure, include derivations that produce
+ *                            it.
+ * @param[in] include_derivers If flip_direction is false: for any output in the closure, include the derivation that
+ *                             produced it.
+ *                             If flip_direction is true: for any derivation in the closure, include its outputs.
  * @param[in] callback The function to call for every store path, in no particular order
  * @param[in] userdata The userdata to pass to the callback
  */
