@@ -5,6 +5,7 @@
 #include "nix/util/source-accessor.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/remote-fs-accessor.hh"
 #include "nix/store/nar-info-disk-cache.hh"
@@ -13,6 +14,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/url.hh"
 
 #include <chrono>
 #include <future>
@@ -575,7 +577,10 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSe
 
 std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & path)
 {
-    auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
+    auto storePath = printStorePath(path);
+    auto segments = splitString<std::vector<std::string>>(storePath, "/");
+    auto encodedPath = encodeUrlPath(segments);
+    auto logPath = "log/" + std::string(baseNameOf(encodedPath));
 
     debug("fetching build log from binary cache '%s/%s'", config.getHumanReadableURI(), logPath);
 
