@@ -17,7 +17,6 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/error.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/fmt.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
