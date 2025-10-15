@@ -23,7 +23,6 @@
 #include "nix/store/content-address.hh"
 #include "nix/store/path.hh"
 #include "nix/util/canon-path.hh"
-#include "nix/util/configuration.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/error.hh"
 #include "nix/util/file-system.hh"
@@ -37,6 +36,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/url.hh"
 #include "nix/util/util.hh"
+#include "nix/util/configuration.hh"
 
 using namespace std::string_literals;
 

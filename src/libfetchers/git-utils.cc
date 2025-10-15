@@ -42,16 +42,16 @@
 #include <mutex>
 #include <string_view>
 #include <system_error>
-#include <typeindex>
 #include <utility>
 #include <filesystem>
-#include <format>
 #include <optional>
 #include <set>
 #include <string>
 #include <tuple>
 #include <variant>
 #include <vector>
+#include <format>
+#include <typeindex>
 
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"

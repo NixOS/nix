@@ -22,11 +22,11 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/fmt.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/types.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix::fetchers {
 

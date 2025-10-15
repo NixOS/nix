@@ -1,6 +1,7 @@
-#include <map>
+#pragma once
+///@file
+
 #include <optional>
-#include <string>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/attrs.hh"

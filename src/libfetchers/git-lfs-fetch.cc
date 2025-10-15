@@ -15,16 +15,16 @@
 #include <algorithm>
 #include <filesystem>
 #include <list>
-#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string_view>
 #include <utility>
-#include <format>
 #include <functional>
 #include <string>
 #include <vector>
+#include <format>
+#include <map>
 
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"

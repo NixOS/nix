@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json_fwd.hpp>
 #include <map>
-#include <memory>
 #include <optional>
 #include <set>
 #include <string>

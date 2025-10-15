@@ -14,7 +14,6 @@
 #include <filesystem>
 #include <memory>
 #include <string>
-#include <utility>
 
 #include "nix/store/globals.hh"
 #include "nix/store/dummy-store.hh"

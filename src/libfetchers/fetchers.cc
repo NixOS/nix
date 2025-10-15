@@ -5,7 +5,6 @@
 #include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <filesystem>
-#include <format>
 #include <map>
 #include <memory>
 #include <optional>
@@ -13,6 +12,7 @@
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <format>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"

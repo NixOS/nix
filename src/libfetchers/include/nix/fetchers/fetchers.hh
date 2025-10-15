@@ -6,15 +6,11 @@
 #include <time.h>
 #include <boost/container/detail/std_fwd.hpp>
 #include <memory>
-#include <compare>
 #include <filesystem>
-#include <format>
-#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <variant>
 
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"

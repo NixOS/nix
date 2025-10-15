@@ -6,7 +6,6 @@
 #include <set>
 #include <string>
 #include <tuple>
-#include <variant>
 #include <vector>
 
 #include "nix/fetchers/filtering-source-accessor.hh"

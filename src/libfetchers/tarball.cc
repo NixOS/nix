@@ -5,12 +5,12 @@
 #include <functional>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string_view>
 #include <utility>
 #include <vector>
 #include <optional>
 #include <string>
+#include <mutex>
 
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetchers.hh"

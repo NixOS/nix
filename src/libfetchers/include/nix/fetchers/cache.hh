@@ -3,7 +3,6 @@
 
 #include <boost/container/detail/std_fwd.hpp>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <utility>
 

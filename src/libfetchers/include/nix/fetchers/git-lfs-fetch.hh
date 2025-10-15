@@ -7,7 +7,6 @@
 #include <git2/types.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <format>
 #include <functional>
 #include <string>
 #include <vector>
