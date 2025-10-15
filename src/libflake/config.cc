@@ -1,19 +1,17 @@
 #include <nlohmann/json.hpp>
 #include <assert.h>
 #include <stdint.h>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <cctype>
 #include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
+#include <format>
 
 #include "nix/util/users.hh"
 #include "nix/util/config-global.hh"

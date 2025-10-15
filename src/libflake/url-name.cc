@@ -1,4 +1,6 @@
 #include <regex>
+#include <optional>
+#include <string>
 
 #include "nix/flake/url-name.hh"
 #include "nix/util/strings.hh"

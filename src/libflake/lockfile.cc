@@ -1,8 +1,6 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <nlohmann/json.hpp>
 #include <assert.h>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/unordered/unordered_flat_set_fwd.hpp>
 #include <nlohmann/detail/iterators/iter_impl.hpp>
 #include <nlohmann/detail/iterators/iteration_proxy.hpp>

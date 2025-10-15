@@ -3,8 +3,6 @@
 #include <stdint.h>
 #include <boost/container/detail/std_fwd.hpp>
 #include <boost/core/pointer_traits.hpp>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/unordered/detail/foa/table.hpp>
 #include <algorithm>
 #include <filesystem>
@@ -12,7 +10,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <set>
 #include <span>
 #include <string>
@@ -20,6 +17,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <format>
 
 #include "nix/util/terminal.hh"
 #include "nix/util/ref.hh"
@@ -909,7 +907,7 @@ static ref<SourceAccessor> makeInternalFS()
     internalFS->setPathDisplay("«flakes-internal»", "");
     internalFS->addFile(
         CanonPath("call-flake.nix"),
-#include "call-flake.nix.gen.hh"
+#include "call-flake.nix.gen.hh" // IWYU pragma: keep
     );
     return internalFS;
 }

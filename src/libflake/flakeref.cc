@@ -1,12 +1,15 @@
 #include <assert.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
 #include <filesystem>
 #include <ostream>
 #include <string_view>
 #include <vector>
+#include <optional>
+#include <regex>
+#include <string>
+#include <tuple>
+#include <utility>
 
 #include "nix/flake/flakeref.hh"
 #include "nix/util/url.hh"
@@ -18,8 +21,16 @@
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/util.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
+class Store;
+struct SourceAccessor;
+
 namespace fetchers {
 struct Settings;
 }  // namespace fetchers
