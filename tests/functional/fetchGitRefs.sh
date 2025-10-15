@@ -59,6 +59,9 @@ invalid_ref() {
 }
 
 
+valid_ref 'A/b'
+valid_ref 'AaA/b'
+valid_ref 'FOO/BAR/BAZ'
 valid_ref 'foox'
 valid_ref '1337'
 valid_ref 'foo.baz'
