@@ -100,8 +100,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
            them. */
         if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
             if (!checkResult)
-                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(
-                    DrvOutput{outputHash, wantedOutput}, buildMode == bmRepair ? Repair : NoRepair)));
+                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
             else {
                 auto * cap = getDerivationCA(*drv);
                 waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
@@ -171,8 +170,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
             auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
-            StorePathSet outputPaths;
-
             auto outputHash = get(outputHashes, wantedOutput);
             auto resolvedHash = get(resolvedHashes, wantedOutput);
             if ((!outputHash) || (!resolvedHash))
@@ -212,7 +209,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
-            outputPaths.insert(realisation.outPath);
 
             auto status = success.status;
             if (status == BuildResult::Success::AlreadyValid)
