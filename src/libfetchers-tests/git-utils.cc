@@ -1,23 +1,20 @@
 #include <gmock/gmock.h>
-#include <git2/global.h>
-#include <git2/repository.h>
-#include <git2/signature.h>
-#include <git2/types.h>
-#include <git2/object.h>
-#include <git2/tag.h>
 #include <gtest/gtest.h>
-#include <git2/blob.h>
-#include <git2/tree.h>
-#include <git2/commit.h>
-#include <git2/oid.h>
 #include <string.h>
+#include <git2.h>
 #include <functional>
 #include <memory>
+#include <filesystem>
+#include <string>
 
 #include "nix/fetchers/git-utils.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/error.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 

@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 #include <boost/container/detail/std_fwd.hpp>
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <filesystem>
 #include <string_view>
 #include <utility>
+#include <string>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/tests/json-characterization.hh"

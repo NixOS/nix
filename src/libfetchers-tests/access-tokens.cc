@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include <nlohmann/json_fwd.hpp>
+#include <nlohmann/json.hpp>
 #include <map>
 #include <optional>
 #include <set>
 #include <string>
+#include <memory>
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"

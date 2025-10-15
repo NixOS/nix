@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <string>
 
 #include "nix_api_fetchers.h"
 #include "nix/store/tests/nix_api_store.hh"

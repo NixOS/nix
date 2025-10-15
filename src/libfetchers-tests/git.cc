@@ -1,19 +1,9 @@
 #include <gtest/gtest.h>
-#include <git2/clone.h>
-#include <git2/commit.h>
-#include <git2/errors.h>
-#include <git2/global.h>
-#include <git2/index.h>
-#include <git2/oid.h>
-#include <git2/refs.h>
-#include <git2/repository.h>
-#include <git2/signature.h>
-#include <git2/submodule.h>
-#include <git2/tree.h>
-#include <git2/types.h>
+#include <git2.h>
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "nix/store/globals.hh"
 #include "nix/store/dummy-store.hh"
