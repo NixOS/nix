@@ -32,7 +32,8 @@ public:
     DrvOutputSubstitutionGoal(const DrvOutput & id, Worker & worker);
 
     Co init();
-    Co realisationFetched(Goals waitees, std::shared_ptr<const Realisation> outputInfo, nix::ref<nix::Store> sub);
+    Co
+    realisationFetched(Goals waitees, std::shared_ptr<const UnkeyedRealisation> outputInfo, nix::ref<nix::Store> sub);
 
     void timedOut(Error && ex) override
     {
