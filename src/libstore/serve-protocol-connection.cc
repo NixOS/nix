@@ -93,4 +93,14 @@ void ServeProto::BasicClientConnection::narFromPath(
     fun(from);
 }
 
+void ServeProto::BasicClientConnection::importPaths(const StoreDirConfig & store, std::function<void(Sink &)> fun)
+{
+    to << ServeProto::Command::ImportPaths;
+    fun(to);
+    to.flush();
+
+    if (readInt(from) != 1)
+        throw Error("remote machine failed to import closure");
+}
+
 } // namespace nix
