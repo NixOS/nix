@@ -986,6 +986,16 @@ static void opServe(Strings opFlags, Strings opArgs)
             store->narFromPath(store->parseStorePath(readString(in)), out);
             break;
 
+        case ServeProto::Command::ImportPaths: {
+            if (!writeAllowed)
+                throw Error("importing paths is not allowed");
+            // FIXME: should we skip sig checking?
+            importPaths(*store, in, NoCheckSigs);
+            // indicate success
+            out << 1;
+            break;
+        }
+
         case ServeProto::Command::BuildPaths: {
 
             if (!writeAllowed)
