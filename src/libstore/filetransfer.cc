@@ -10,7 +10,7 @@
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
 #include <optional>
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
 
@@ -435,7 +435,7 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
             // Set up AWS SigV4 signing if this is an S3 request
             // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
             // The username/password (access key ID and secret key) are set via the general
@@ -874,7 +874,7 @@ void FileTransferRequest::setupForS3()
     // Update the request URI to use HTTPS (works without AWS SDK)
     uri = parsedS3.toHttpsUrl();
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
     // Auth-specific code only compiled when AWS support is available
     awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
 

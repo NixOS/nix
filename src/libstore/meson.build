@@ -160,7 +160,7 @@ if curl_s3_store_opt.enabled()
   deps_other += aws_crt_cpp
 endif
 
-configdata_pub.set('NIX_WITH_S3_SUPPORT', curl_s3_store_opt.enabled().to_int())
+configdata_pub.set('NIX_WITH_AWS_AUTH', curl_s3_store_opt.enabled().to_int())
 
 subdir('nix-meson-build-support/generate-header')
 

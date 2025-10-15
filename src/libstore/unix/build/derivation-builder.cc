@@ -46,7 +46,7 @@
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #  include "nix/store/s3-url.hh"
 #  include "nix/util/url.hh"
@@ -296,7 +296,7 @@ protected:
      */
     virtual void startChild();
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
     /**
      * Pre-resolve AWS credentials for S3 URLs in builtin:fetchurl.
      * This should be called before forking to ensure credentials are available in child.
@@ -359,7 +359,7 @@ protected:
      */
     struct RunChildArgs
     {
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
         std::optional<AwsCredentials> awsCredentials;
 #endif
     };
@@ -945,7 +945,7 @@ void DerivationBuilderImpl::openSlave()
         throw SysError("cannot pipe standard error into log file");
 }
 
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
 std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
 {
     if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
@@ -974,7 +974,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
 void DerivationBuilderImpl::startChild()
 {
     RunChildArgs args{
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif
     };
@@ -1255,7 +1255,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
             .awsCredentials = args.awsCredentials,
 #endif
         };

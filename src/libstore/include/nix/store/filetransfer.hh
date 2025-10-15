@@ -12,7 +12,7 @@
 #include "nix/util/url.hh"
 
 #include "nix/store/config.hh"
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
 #include "nix/store/s3-url.hh"
@@ -114,7 +114,7 @@ struct FileTransferRequest
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
      */
     std::optional<UsernameAuth> usernameAuth;
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
     /**
      * Pre-resolved AWS session token for S3 requests.
      * When provided along with usernameAuth, this will be used instead of fetching fresh credentials.
@@ -136,7 +136,7 @@ struct FileTransferRequest
 private:
     friend struct curlFileTransfer;
     void setupForS3();
-#if NIX_WITH_S3_SUPPORT
+#if NIX_WITH_AWS_AUTH
     std::optional<std::string> awsSigV4Provider;
 #endif
 };

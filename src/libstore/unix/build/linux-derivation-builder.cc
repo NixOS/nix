@@ -277,7 +277,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     void startChild() override
     {
         RunChildArgs args{
-#  if NIX_WITH_S3_SUPPORT
+#  if NIX_WITH_AWS_AUTH
             .awsCredentials = preResolveAwsCredentials(),
 #  endif
         };
