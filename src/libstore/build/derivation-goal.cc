@@ -170,8 +170,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
             auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
 
-            StorePathSet outputPaths;
-
             auto outputHash = get(outputHashes, wantedOutput);
             auto resolvedHash = get(resolvedHashes, wantedOutput);
             if ((!outputHash) || (!resolvedHash))
@@ -211,7 +209,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
-            outputPaths.insert(realisation.outPath);
 
             auto status = success.status;
             if (status == BuildResult::Success::AlreadyValid)
