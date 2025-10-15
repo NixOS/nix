@@ -60,7 +60,10 @@ mkMesonDerivation (
     ];
 
     nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
-      nix-cli
+      # Explicitly splice the hostHost variant to fix LLVM tests. The nix-cli
+      # has to be in PATH, but must come from the host context where it's built
+      # with libc++.
+      (nix-cli.__spliced.hostHost or nix-cli)
     ];
 
     buildInputs = [
