@@ -1,17 +1,9 @@
-#include <git2/attr.h>
-#include <git2/config.h>
-#include <git2/errors.h>
-#include <git2/remote.h>
 #include <nlohmann/json.hpp>
 #include <assert.h>
 #include <ctype.h>
-#include <git2/repository.h>
-#include <nlohmann/detail/json_ref.hpp>
-#include <git2/oid.h>
-#include <git2/types.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <nlohmann/json_fwd.hpp>
+#include <git2.h>
 #include <algorithm>
 #include <filesystem>
 #include <list>
@@ -24,7 +16,6 @@
 #include <string>
 #include <vector>
 #include <format>
-#include <map>
 
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"

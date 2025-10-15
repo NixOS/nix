@@ -4,7 +4,6 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 #include <filesystem>
 #include <map>
 #include <memory>

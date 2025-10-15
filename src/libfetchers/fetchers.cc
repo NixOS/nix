@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <stdint.h>
 #include <time.h>
-#include <nlohmann/json_fwd.hpp>
 #include <vector>
 #include <filesystem>
 #include <map>

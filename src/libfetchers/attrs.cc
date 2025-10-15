@@ -1,8 +1,5 @@
 #include <nlohmann/json.hpp>
-#include <nlohmann/detail/iterators/iter_impl.hpp>
-#include <nlohmann/detail/iterators/iteration_proxy.hpp>
 #include <stdint.h>
-#include <nlohmann/json_fwd.hpp>
 #include <utility>
 #include <map>
 #include <optional>

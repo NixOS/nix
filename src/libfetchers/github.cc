@@ -2,9 +2,7 @@
 #include <assert.h>
 #include <stdint.h>
 #include <time.h>
-#include <nlohmann/json_fwd.hpp>
 #include <optional>
-#include <cmath>
 #include <functional>
 #include <iterator>
 #include <map>
