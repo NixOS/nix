@@ -54,6 +54,12 @@ struct ServerManager
 
 TEST(HttpBinaryCacheStore, NixCacheInfoBasicTest)
 {
+// FIXME: MacOS tests on Github actions were not able to bind to any port,
+// it kept returning -1 for the bound port.
+#if !defined(__linux__)
+    GTEST_SKIP() << "Skipping test on non-Linux platform due to unknown networking differences.";
+#endif
+
     httplib::Server server;
     server.Get("/nix-cache-info", [](const httplib::Request &, httplib::Response & res) {
         res.set_content(
@@ -80,6 +86,12 @@ TEST(HttpBinaryCacheStore, NixCacheInfoBasicTest)
 
 TEST(HttpBinaryCacheStore, UrlEncodingPlusSign)
 {
+// FIXME: MacOS tests on Github actions were not able to bind to any port,
+// it kept returning -1 for the bound port.
+#if !defined(__linux__)
+    GTEST_SKIP() << "Skipping test on non-Linux platform due to unknown networking differences.";
+#endif
+
     httplib::Server server;
     const std::string drvNameWithPlus = "bqlpc40ak1qn45zmv44h8cqjx12hphzi-hello+plus-1.0.drv";
     const std::string expectedLogPath = "/log/" + drvNameWithPlus;
