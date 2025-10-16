@@ -22,6 +22,12 @@
 
 namespace nix {
 
+AwsAuthError::AwsAuthError(int errorCode)
+    : Error("AWS authentication error: '%s' (%d)", aws_error_str(errorCode), errorCode)
+    , errorCode(errorCode)
+{
+}
+
 namespace {
 
 static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
@@ -35,8 +41,7 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
 
     provider->GetCredentials([prom](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
         if (errorCode != 0 || !credentials) {
-            prom->set_exception(
-                std::make_exception_ptr(AwsAuthError("Failed to resolve AWS credentials: error code %d", errorCode)));
+            prom->set_exception(std::make_exception_ptr(AwsAuthError(errorCode)));
         } else {
             auto accessKeyId = Aws::Crt::ByteCursorToStringView(credentials->GetAccessKeyId());
             auto secretAccessKey = Aws::Crt::ByteCursorToStringView(credentials->GetSecretAccessKey());

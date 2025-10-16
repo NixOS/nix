@@ -34,10 +34,19 @@ struct AwsCredentials
     }
 };
 
-/**
- * Exception thrown when AWS authentication fails
- */
-MakeError(AwsAuthError, Error);
+class AwsAuthError : public Error
+{
+    std::optional<int> errorCode;
+
+public:
+    using Error::Error;
+    AwsAuthError(int errorCode);
+
+    std::optional<int> getErrorCode() const
+    {
+        return errorCode;
+    }
+};
 
 class AwsCredentialProvider
 {

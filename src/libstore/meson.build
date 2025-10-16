@@ -158,6 +158,8 @@ curl_s3_store_opt = get_option('curl-s3-store').require(
 
 if curl_s3_store_opt.enabled()
   deps_other += aws_crt_cpp
+  aws_c_common = cxx.find_library('aws-c-common', required : true)
+  deps_other += aws_c_common
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', curl_s3_store_opt.enabled().to_int())
