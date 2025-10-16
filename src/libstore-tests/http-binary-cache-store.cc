@@ -62,10 +62,11 @@ TEST(HttpBinaryCacheStore, NixCacheInfoBasicTest)
             "Priority: 40\n",
             "text/plain");
     });
-    int port = server.bind_to_any_port("127.0.0.1");
+    int port = server.bind_to_any_port("localhost");
     ASSERT_GT(port, 0);
 
-    auto serverUrl = "127.0.0.1:" + std::to_string(port);
+    // MacOS Github actions don't seem to have 127.0.0.1
+    auto serverUrl = "localhost:" + std::to_string(port);
     auto serverThread = std::thread([&server]() { server.listen_after_bind(); });
     // Create the RAII guard object. Its destructor will handle cleanup.
     ServerManager manager(server, serverThread);
@@ -92,10 +93,11 @@ TEST(HttpBinaryCacheStore, UrlEncodingPlusSign)
             res.set_content("Not Found: Path was decoded incorrectly.", "text/plain");
         }
     });
-    int port = server.bind_to_any_port("127.0.0.1");
+    int port = server.bind_to_any_port("localhost");
     ASSERT_GT(port, 0);
 
-    auto serverUrl = "127.0.0.1:" + std::to_string(port);
+    // MacOS Github actions don't seem to have 127.0.0.1
+    auto serverUrl = "localhost:" + std::to_string(port);
     auto serverThread = std::thread([&server]() { server.listen_after_bind(); });
     // Create the RAII guard object. Its destructor will handle cleanup.
     ServerManager manager(server, serverThread);
