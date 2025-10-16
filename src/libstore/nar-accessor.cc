@@ -255,7 +255,7 @@ ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBy
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
-GetNarBytes seekableGetNarBytes(const std::string & path)
+GetNarBytes seekableGetNarBytes(const Path & path)
 {
     return [path](uint64_t offset, uint64_t length) {
         AutoCloseFD fd = toDescriptor(open(

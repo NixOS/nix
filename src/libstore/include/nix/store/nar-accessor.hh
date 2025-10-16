@@ -30,7 +30,7 @@ using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
 /**
  * The canonical GetNarBytes function for a seekable Source.
  */
-GetNarBytes seekableGetNarBytes(const std::string & path);
+GetNarBytes seekableGetNarBytes(const Path & path);
 
 ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes);
 
