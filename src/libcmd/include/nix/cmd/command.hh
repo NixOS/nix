@@ -350,6 +350,20 @@ struct MixEnvironment : virtual Args
     void setEnviron();
 };
 
+struct MixNoCheckSigs : virtual Args
+{
+    CheckSigsFlag checkSigs = CheckSigs;
+
+    MixNoCheckSigs()
+    {
+        addFlag({
+            .longName = "no-check-sigs",
+            .description = "Do not require that paths are signed by trusted keys.",
+            .handler = {&checkSigs, NoCheckSigs},
+        });
+    }
+};
+
 void completeFlakeInputAttrPath(
     AddCompletions & completions,
     ref<EvalState> evalState,

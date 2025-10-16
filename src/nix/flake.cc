@@ -1032,11 +1032,9 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
-struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
+struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 {
     std::string dstUri;
-
-    CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
@@ -1047,11 +1045,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
             .handler = {&dstUri},
-        });
-        addFlag({
-            .longName = "no-check-sigs",
-            .description = "Do not require that paths are signed by trusted keys.",
-            .handler = {&checkSigs, NoCheckSigs},
         });
     }
 
