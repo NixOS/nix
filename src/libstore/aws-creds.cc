@@ -90,7 +90,7 @@ public:
         try {
             return getCredentialsRaw(profile);
         } catch (AwsAuthError & e) {
-            warn("AWS authentication failed for S3 request %s: %s", url.toHttpsUrl(), e.what());
+            warn("AWS authentication failed for S3 request %s: %s", url.toHttpsUrl(), e.message());
             credentialProviderCache.erase(profile);
             throw;
         }
