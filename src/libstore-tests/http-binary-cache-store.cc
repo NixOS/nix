@@ -83,13 +83,6 @@ TEST(HttpBinaryCacheStore, UrlEncodingPlusSign)
     httplib::Server server;
     const std::string drvNameWithPlus = "bqlpc40ak1qn45zmv44h8cqjx12hphzi-hello+plus-1.0.drv";
     const std::string expectedLogPath = "/log/" + drvNameWithPlus;
-    server.Get("/nix-cache-info", [](const httplib::Request &, httplib::Response & res) {
-        res.set_content(
-            "StoreDir: /nix/store\n"
-            "WantMassQuery: 1\n"
-            "Priority: 40\n",
-            "text/plain");
-    });
     server.Get(R"(/log/(.+))", [&](const httplib::Request & req, httplib::Response & res) {
         if (req.path == expectedLogPath) {
             res.set_content("correct", "text/plain");
