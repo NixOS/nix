@@ -251,11 +251,10 @@ void WorkerProto::Serialise<ValidPathInfo>::write(
 
 UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
-    auto deriver = readString(conn.from);
+    auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(store, conn);
     auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
     UnkeyedValidPathInfo info(narHash);
-    if (deriver != "")
-        info.deriver = store.parseStorePath(deriver);
+    info.deriver = std::move(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
@@ -269,8 +268,8 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
 void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     const StoreDirConfig & store, WriteConn conn, const UnkeyedValidPathInfo & pathInfo)
 {
-    conn.to << (pathInfo.deriver ? store.printStorePath(*pathInfo.deriver) : "")
-            << pathInfo.narHash.to_string(HashFormat::Base16, false);
+    WorkerProto::write(store, conn, pathInfo.deriver);
+    conn.to << pathInfo.narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(store, conn, pathInfo.references);
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
