@@ -116,6 +116,7 @@ rec {
     ) nixComponentsInstrumented)
     // lib.optionalAttrs (pkgs.stdenv.hostPlatform == pkgs.stdenv.buildPlatform) {
       "${componentTestsPrefix}nix-functional-tests" = nixComponentsInstrumented.nix-functional-tests;
+      "${componentTestsPrefix}nix-json-schema-checks" = nixComponentsInstrumented.nix-json-schema-checks;
     };
 
   codeCoverage =

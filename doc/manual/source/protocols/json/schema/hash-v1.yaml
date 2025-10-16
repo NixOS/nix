@@ -1,0 +1,29 @@
+"$schema": http://json-schema.org/draft-04/schema#
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/hash-v1.json
+title: Hash
+description: |
+  A cryptographic hash value used throughout Nix for content addressing and integrity verification.
+
+  This schema describes the JSON representation of Nix's `Hash` type.
+
+  TODO Work in progress
+type: object
+properties:
+  algorithm:
+    "$ref": "#/$defs/algorithm"
+required:
+- algorithm
+additionalProperties: false
+"$defs":
+  algorithm:
+    type: string
+    enum:
+    - blake3
+    - md5
+    - sha1
+    - sha256
+    - sha512
+    description: |
+      The hash algorithm used to compute the hash value.
+
+      `blake3` is currently experimental and requires the [`blake-hashing`](@docroot@/development/experimental-features.md#xp-feature-blake-hashing) experimental feature.
