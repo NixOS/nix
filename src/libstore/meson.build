@@ -142,27 +142,16 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# Curl-based S3 store support
-# Check if curl supports AWS SigV4 (requires >= 7.75.0)
-curl_supports_aws_sigv4 = curl.version().version_compare('>= 7.75.0')
-# AWS CRT C++ for lightweight credential management
-aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : false)
+s3_aws_auth = get_option('s3-aws-auth')
+aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
 
-curl_s3_store_opt = get_option('curl-s3-store').require(
-  curl_supports_aws_sigv4,
-  error_message : 'curl-based S3 support requires curl >= 7.75.0',
-).require(
-  aws_crt_cpp.found(),
-  error_message : 'curl-based S3 support requires aws-crt-cpp',
-)
-
-if curl_s3_store_opt.enabled()
+if s3_aws_auth.enabled()
   deps_other += aws_crt_cpp
   aws_c_common = cxx.find_library('aws-c-common', required : true)
   deps_other += aws_c_common
 endif
 
-configdata_pub.set('NIX_WITH_AWS_AUTH', curl_s3_store_opt.enabled().to_int())
+configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
 
 subdir('nix-meson-build-support/generate-header')
 
@@ -346,7 +335,7 @@ sources = files(
 )
 
 # AWS credentials code requires AWS CRT, so only compile when enabled
-if curl_s3_store_opt.enabled()
+if s3_aws_auth.enabled()
   sources += files('aws-creds.cc')
 endif
 

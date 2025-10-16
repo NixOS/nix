@@ -35,8 +35,7 @@ option(
 )
 
 option(
-  'curl-s3-store',
+  's3-aws-auth',
   type : 'feature',
-  value : 'disabled',
-  description : 'Enable curl-based S3 binary cache store support (requires aws-crt-cpp and curl >= 7.75.0)',
+  description : 'build support for AWS authentication with S3',
 )
