@@ -5,10 +5,9 @@
 
 using namespace nix;
 
-struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, MixNoCheckSigs
 {
     std::optional<std::filesystem::path> outLink;
-    CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
@@ -24,13 +23,6 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
             .handler = {&outLink},
             .completer = completePath,
         });
-
-        addFlag({
-            .longName = "no-check-sigs",
-            .description = "Do not require that paths are signed by trusted keys.",
-            .handler = {&checkSigs, NoCheckSigs},
-        });
-
         addFlag({
             .longName = "substitute-on-destination",
             .shortName = 's',
