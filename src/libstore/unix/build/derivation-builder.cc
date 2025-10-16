@@ -1742,7 +1742,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
                 replaceValidPath(store.toRealPath(finalDestPath), actualPath);
-                actualPath = store.toRealPath(finalDestPath);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
@@ -1756,7 +1755,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 auto destPath = store.toRealPath(finalDestPath);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
-                actualPath = destPath;
             }
         }
 
@@ -1809,7 +1807,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     debug("unreferenced input: '%1%'", store.printStorePath(i));
             }
 
-            store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+            if (!store.isValidPath(newInfo.path))
+                store.optimisePath(
+                    store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
