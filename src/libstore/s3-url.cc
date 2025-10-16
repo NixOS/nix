@@ -48,6 +48,7 @@ try {
         .profile = getOptionalParam("profile"),
         .region = getOptionalParam("region"),
         .scheme = getOptionalParam("scheme"),
+        .versionId = getOptionalParam("versionId"),
         .endpoint = [&]() -> decltype(ParsedS3URL::endpoint) {
             if (!endpoint)
                 return std::monostate();
@@ -73,6 +74,12 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
     auto regionStr = region.transform(toView).value_or("us-east-1");
     auto schemeStr = scheme.transform(toView).value_or("https");
 
+    // Build query parameters (e.g., versionId if present)
+    StringMap queryParams;
+    if (versionId) {
+        queryParams["versionId"] = *versionId;
+    }
+
     // Handle endpoint configuration using std::visit
     return std::visit(
         overloaded{
@@ -85,6 +92,7 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
                     .scheme = std::string{schemeStr},
                     .authority = ParsedURL::Authority{.host = "s3." + regionStr + ".amazonaws.com"},
                     .path = std::move(path),
+                    .query = std::move(queryParams),
                 };
             },
             [&](const ParsedURL::Authority & auth) {
@@ -96,6 +104,7 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
                     .scheme = std::string{schemeStr},
                     .authority = auth,
                     .path = std::move(path),
+                    .query = std::move(queryParams),
                 };
             },
             [&](const ParsedURL & endpointUrl) {
@@ -107,6 +116,7 @@ ParsedURL ParsedS3URL::toHttpsUrl() const
                     .scheme = endpointUrl.scheme,
                     .authority = endpointUrl.authority,
                     .path = std::move(path),
+                    .query = std::move(queryParams),
                 };
             },
         },
