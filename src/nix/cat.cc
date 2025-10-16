@@ -79,34 +79,7 @@ struct CmdCatNar : StoreCommand, MixCat
         auto source = FdSource{fd.get()};
         auto narAccessor = makeNarAccessor(source);
         auto listing = listNar(narAccessor, CanonPath::root, true);
-        auto cacheFile = narPath;
-
-        // TODO: This is common in remote-fs-accessor.cc
-        // should this be a utility function somewhere?
-        cat(makeLazyNarAccessor(
-                // We already had this as a json object, so this is
-                // a bit wasteful.
-                listing.dump(),
-                [cacheFile](uint64_t offset, uint64_t length) {
-                    AutoCloseFD fd = toDescriptor(open(
-                        cacheFile.c_str(),
-                        O_RDONLY
-#ifndef _WIN32
-                            | O_CLOEXEC
-#endif
-                        ));
-                    if (!fd)
-                        throw SysError("opening NAR cache file '%s'", cacheFile);
-
-                    if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
-                        throw SysError("seeking in '%s'", cacheFile);
-
-                    std::string buf(length, 0);
-                    readFull(fd.get(), buf.data(), length);
-
-                    return buf;
-                }),
-            CanonPath{path});
+        cat(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };
 
