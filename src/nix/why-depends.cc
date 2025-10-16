@@ -160,16 +160,15 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             }
         }
 
+        struct BailOut
+        {};
+
         /* Print the subgraph of nodes that have 'dependency' in their
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        std::function<void(Node &, const std::string &, const std::string &)> printNode;
-
-        struct BailOut
-        {};
-
-        printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
+        auto printNode =
+            [&](this auto & printNode, Node & node, const std::string & firstPad, const std::string & tailPad) -> void {
             assert(node.dist != inf);
             if (precise) {
                 logger->cout(

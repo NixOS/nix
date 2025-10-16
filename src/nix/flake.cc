@@ -269,9 +269,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
             std::set<ref<Node>> visited;
 
-            std::function<void(const Node & node, const std::string & prefix)> recurse;
-
-            recurse = [&](const Node & node, const std::string & prefix) {
+            auto recurse = [&](this auto & recurse, const Node & node, const std::string & prefix) -> void {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
                     bool last = i + 1 == node.inputs.size();
 

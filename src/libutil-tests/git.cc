@@ -284,8 +284,7 @@ TEST_F(GitTest, both_roundrip)
 
         MemorySink sinkFiles2{*files2};
 
-        std::function<void(const CanonPath, const Hash &, BlobMode)> mkSinkHook;
-        mkSinkHook = [&](auto prefix, auto & hash, auto blobMode) {
+        auto mkSinkHook = [&](this auto & mkSinkHook, auto prefix, auto & hash, auto blobMode) -> void {
             StringSource in{cas[hash]};
             parse(
                 sinkFiles2,

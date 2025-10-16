@@ -469,41 +469,31 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
         std::vector<FlakeRef> parents;
 
-        std::function<void(
-            const FlakeInputs & flakeInputs,
-            ref<Node> node,
-            const InputAttrPath & inputAttrPathPrefix,
-            std::shared_ptr<const Node> oldNode,
-            const InputAttrPath & followsPrefix,
-            const SourcePath & sourcePath,
-            bool trustLock)>
-            computeLocks;
-
-        computeLocks = [&](
-                           /* The inputs of this node, either from flake.nix or
-                              flake.lock. */
-                           const FlakeInputs & flakeInputs,
-                           /* The node whose locks are to be updated.*/
-                           ref<Node> node,
-                           /* The path to this node in the lock file graph. */
-                           const InputAttrPath & inputAttrPathPrefix,
-                           /* The old node, if any, from which locks can be
-                              copied. */
-                           std::shared_ptr<const Node> oldNode,
-                           /* The prefix relative to which 'follows' should be
-                              interpreted. When a node is initially locked, it's
-                              relative to the node's flake; when it's already locked,
-                              it's relative to the root of the lock file. */
-                           const InputAttrPath & followsPrefix,
-                           /* The source path of this node's flake. */
-                           const SourcePath & sourcePath,
-                           bool trustLock) {
+        auto computeLocks = [&](this auto & computeLocks,
+                                /* The inputs of this node, either from flake.nix or
+                                   flake.lock. */
+                                const FlakeInputs & flakeInputs,
+                                /* The node whose locks are to be updated.*/
+                                ref<Node> node,
+                                /* The path to this node in the lock file graph. */
+                                const InputAttrPath & inputAttrPathPrefix,
+                                /* The old node, if any, from which locks can be
+                                   copied. */
+                                std::shared_ptr<const Node> oldNode,
+                                /* The prefix relative to which 'follows' should be
+                                   interpreted. When a node is initially locked, it's
+                                   relative to the node's flake; when it's already locked,
+                                   it's relative to the root of the lock file. */
+                                const InputAttrPath & followsPrefix,
+                                /* The source path of this node's flake. */
+                                const SourcePath & sourcePath,
+                                bool trustLock) -> void {
             debug("computing lock file node '%s'", printInputAttrPath(inputAttrPathPrefix));
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
-            std::function<void(const FlakeInput & input, const InputAttrPath & prefix)> addOverrides;
-            addOverrides = [&](const FlakeInput & input, const InputAttrPath & prefix) {
+            auto addOverrides =
+                [&](this auto & addOverrides, const FlakeInput & input, const InputAttrPath & prefix) -> void {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
                     auto inputAttrPath(prefix);
                     inputAttrPath.push_back(idOverride);

@@ -6,15 +6,14 @@ namespace nix {
 template<typename V>
 typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const SingleDerivedPath & k)
 {
-    std::function<ChildNode &(const SingleDerivedPath &)> initIter;
-    initIter = [&](const auto & k) -> auto & {
+    auto initIter = [&](this auto & initIter, const auto & k) -> ChildNode & {
         return std::visit(
             overloaded{
-                [&](const SingleDerivedPath::Opaque & bo) -> auto & {
+                [&](const SingleDerivedPath::Opaque & bo) -> ChildNode & {
                     // will not overwrite if already there
                     return map[bo.path];
                 },
-                [&](const SingleDerivedPath::Built & bfd) -> auto & {
+                [&](const SingleDerivedPath::Built & bfd) -> ChildNode & {
                     auto & n = initIter(*bfd.drvPath);
                     return n.childMap[bfd.output];
                 },
@@ -27,15 +26,14 @@ typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const Sing
 template<typename V>
 typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const SingleDerivedPath & k)
 {
-    std::function<ChildNode *(const SingleDerivedPath &)> initIter;
-    initIter = [&](const auto & k) {
+    auto initIter = [&](this auto & initIter, const auto & k) -> ChildNode * {
         return std::visit(
             overloaded{
-                [&](const SingleDerivedPath::Opaque & bo) {
+                [&](const SingleDerivedPath::Opaque & bo) -> ChildNode * {
                     auto it = map.find(bo.path);
                     return it != map.end() ? &it->second : nullptr;
                 },
-                [&](const SingleDerivedPath::Built & bfd) {
+                [&](const SingleDerivedPath::Built & bfd) -> ChildNode * {
                     auto * n = initIter(*bfd.drvPath);
                     if (!n)
                         return (ChildNode *) nullptr;

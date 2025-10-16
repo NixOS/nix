@@ -2160,9 +2160,7 @@ void EvalState::forceValueDeep(Value & v)
 {
     std::set<const Value *> seen;
 
-    std::function<void(Value & v)> recurse;
-
-    recurse = [&](Value & v) {
+    auto recurse = [&](this auto & recurse, Value & v) {
         if (!seen.insert(&v).second)
             return;
 

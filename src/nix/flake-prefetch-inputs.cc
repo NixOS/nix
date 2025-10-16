@@ -38,8 +38,7 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 
         std::atomic<size_t> nrFailed{0};
 
-        std::function<void(const Node & node)> visit;
-        visit = [&](const Node & node) {
+        auto visit = [&](this auto & visit, const Node & node) -> void {
             if (!state_.lock()->done.insert(&node).second)
                 return;
 

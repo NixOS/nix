@@ -149,9 +149,7 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
 
     std::map<std::string, ref<Node>> nodeMap;
 
-    std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
-
-    getInputs = [&](Node & node, const nlohmann::json & jsonNode) {
+    auto getInputs = [&](this auto & getInputs, Node & node, const nlohmann::json & jsonNode) -> void {
         if (jsonNode.find("inputs") == jsonNode.end())
             return;
         for (auto & i : jsonNode["inputs"].items()) {
@@ -276,9 +274,7 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
 {
     std::set<ref<const Node>> nodes;
 
-    std::function<void(ref<const Node> node)> visit;
-
-    visit = [&](ref<const Node> node) {
+    auto visit = [&](this auto & visit, ref<const Node> node) -> void {
         if (!nodes.insert(node).second)
             return;
         for (auto & i : node->inputs)
@@ -332,9 +328,7 @@ std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
     std::set<ref<Node>> done;
     std::map<InputAttrPath, Node::Edge> res;
 
-    std::function<void(const InputAttrPath & prefix, ref<Node> node)> recurse;
-
-    recurse = [&](const InputAttrPath & prefix, ref<Node> node) {
+    auto recurse = [&](this auto & recurse, const InputAttrPath & prefix, ref<Node> node) -> void {
         if (!done.insert(node).second)
             return;
 

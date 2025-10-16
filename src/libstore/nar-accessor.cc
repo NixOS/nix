@@ -146,9 +146,7 @@ struct NarAccessor : public SourceAccessor
     {
         using json = nlohmann::json;
 
-        std::function<void(NarMember &, const json &)> recurse;
-
-        recurse = [&](NarMember & member, const json & v) {
+        auto recurse = [&](this auto & recurse, NarMember & member, const json & v) -> void {
             std::string type = v["type"];
 
             if (type == "directory") {

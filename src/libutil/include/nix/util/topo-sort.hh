@@ -14,9 +14,7 @@ std::vector<T> topoSort(
     std::vector<T> sorted;
     decltype(items) visited, parents;
 
-    std::function<void(const T & path, const T * parent)> dfsVisit;
-
-    dfsVisit = [&](const T & path, const T * parent) {
+    auto dfsVisit = [&](this auto & dfsVisit, const T & path, const T * parent) -> void {
         if (parents.count(path))
             throw makeCycleError(path, *parent);
 

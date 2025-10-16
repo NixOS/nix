@@ -85,9 +85,8 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", writeTo->string());
 
-            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
-
-            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path) {
+            auto recurse =
+                [&](this auto & recurse, Value & v, const PosIdx pos, const std::filesystem::path & path) -> void {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
