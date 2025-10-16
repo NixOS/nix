@@ -86,6 +86,9 @@
               ''^tests/functional/lang/eval-fail-path-slash\.nix$''
               ''^tests/functional/lang/eval-fail-toJSON-non-utf-8\.nix$''
               ''^tests/functional/lang/eval-fail-set\.nix$''
+
+              # Fuzzing corpus - these are test inputs, not source code
+              ''^src/libexpr-fuzz/corpus/.*\.nix$''
             ];
           };
           clang-format = {

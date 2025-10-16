@@ -407,6 +407,9 @@ in
   nix-expr-test-support = callPackage ../src/libexpr-test-support/package.nix { };
   nix-expr-tests = callPackage ../src/libexpr-tests/package.nix { };
 
+  # Note: nix-expr-fuzz is NOT defined here - it's defined in the AFL-instrumented
+  # scope (see packaging/afl-components.nix) to ensure all dependencies are instrumented
+
   nix-flake = callPackage ../src/libflake/package.nix { };
   nix-flake-c = callPackage ../src/libflake-c/package.nix { };
   nix-flake-tests = callPackage ../src/libflake-tests/package.nix { };
