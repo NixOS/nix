@@ -104,6 +104,7 @@ struct CmdSign : StorePathsCommand
             .labels = {"file"},
             .handler = {&secretKeyFile},
             .completer = completePath,
+            .required = true,
         });
     }
 
@@ -114,9 +115,6 @@ struct CmdSign : StorePathsCommand
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
-        if (secretKeyFile.empty())
-            throw UsageError("you must specify a secret key file using '-k'");
-
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
 
