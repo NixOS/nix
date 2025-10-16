@@ -5,6 +5,7 @@
 #if NIX_WITH_AWS_AUTH
 
 #  include "nix/store/s3-url.hh"
+#  include "nix/util/ref.hh"
 #  include "nix/util/error.hh"
 
 #  include <memory>
@@ -33,35 +34,53 @@ struct AwsCredentials
     }
 };
 
-/**
- * Exception thrown when AWS authentication fails
- */
-MakeError(AwsAuthError, Error);
+class AwsAuthError : public Error
+{
+    std::optional<int> errorCode;
+
+public:
+    using Error::Error;
+    AwsAuthError(int errorCode);
+
+    std::optional<int> getErrorCode() const
+    {
+        return errorCode;
+    }
+};
+
+class AwsCredentialProvider
+{
+public:
+    /**
+     * Get AWS credentials for the given URL.
+     *
+     * @param url The S3 url to get the credentials for
+     * @return AWS credentials
+     * @throws AwsAuthError if credentials cannot be resolved
+     */
+    virtual AwsCredentials getCredentials(const ParsedS3URL & url) = 0;
+
+    std::optional<AwsCredentials> maybeGetCredentials(const ParsedS3URL & url)
+    {
+        try {
+            return getCredentials(url);
+        } catch (AwsAuthError & e) {
+            return std::nullopt;
+        }
+    }
+
+    virtual ~AwsCredentialProvider() {}
+};
 
 /**
- * Get AWS credentials for the given profile.
- * This function automatically caches credential providers to avoid
- * creating multiple providers for the same profile.
- *
- * @param profile The AWS profile name (empty string for default profile)
- * @return AWS credentials
- * @throws AwsAuthError if credentials cannot be resolved
+ * Create a new instancee of AwsCredentialProvider.
  */
-AwsCredentials getAwsCredentials(const std::string & profile = "");
+ref<AwsCredentialProvider> makeAwsCredentialsProvider();
 
 /**
- * Invalidate cached credentials for a profile (e.g., on authentication failure).
- * The next request for this profile will create a new provider.
- *
- * @param profile The AWS profile name to invalidate
+ * Get a reference to the global AwsCredentialProvider.
  */
-void invalidateAwsCredentials(const std::string & profile);
-
-/**
- * Pre-resolve AWS credentials for S3 URLs.
- * Used to cache credentials in parent process before forking.
- */
-AwsCredentials preResolveAwsCredentials(const ParsedS3URL & s3Url);
+ref<AwsCredentialProvider> getAwsCredentialsProvider();
 
 } // namespace nix
 #endif

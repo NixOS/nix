@@ -22,51 +22,13 @@
 
 namespace nix {
 
+AwsAuthError::AwsAuthError(int errorCode)
+    : Error("AWS authentication error: '%s' (%d)", aws_error_str(errorCode), errorCode)
+    , errorCode(errorCode)
+{
+}
+
 namespace {
-
-// Global credential provider cache using boost's concurrent map
-// Key: profile name (empty string for default profile)
-using CredentialProviderCache =
-    boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>;
-
-static CredentialProviderCache credentialProviderCache;
-
-/**
- * Clear all cached credential providers.
- * Called automatically by CrtWrapper destructor during static destruction.
- */
-static void clearAwsCredentialsCache()
-{
-    credentialProviderCache.clear();
-}
-
-static void initAwsCrt()
-{
-    struct CrtWrapper
-    {
-        Aws::Crt::ApiHandle apiHandle;
-
-        CrtWrapper()
-        {
-            apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, static_cast<FILE *>(nullptr));
-        }
-
-        ~CrtWrapper()
-        {
-            try {
-                // CRITICAL: Clear credential provider cache BEFORE AWS CRT shuts down
-                // This ensures all providers (which hold references to ClientBootstrap)
-                // are destroyed while AWS CRT is still valid
-                clearAwsCredentialsCache();
-                // Now it's safe for ApiHandle destructor to run
-            } catch (...) {
-                ignoreExceptionInDestructor();
-            }
-        }
-    };
-
-    static CrtWrapper crt;
-}
 
 static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
 {
@@ -79,8 +41,7 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
 
     provider->GetCredentials([prom](std::shared_ptr<Aws::Crt::Auth::Credentials> credentials, int errorCode) {
         if (errorCode != 0 || !credentials) {
-            prom->set_exception(
-                std::make_exception_ptr(AwsAuthError("Failed to resolve AWS credentials: error code %d", errorCode)));
+            prom->set_exception(std::make_exception_ptr(AwsAuthError(errorCode)));
         } else {
             auto accessKeyId = Aws::Crt::ByteCursorToStringView(credentials->GetAccessKeyId());
             auto secretAccessKey = Aws::Crt::ByteCursorToStringView(credentials->GetSecretAccessKey());
@@ -113,7 +74,35 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
 
 } // anonymous namespace
 
-AwsCredentials getAwsCredentials(const std::string & profile)
+class AwsCredentialProviderImpl : public AwsCredentialProvider
+{
+public:
+    AwsCredentialProviderImpl()
+    {
+        apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, static_cast<FILE *>(nullptr));
+    }
+
+    AwsCredentials getCredentialsRaw(const std::string & profile);
+
+    AwsCredentials getCredentials(const ParsedS3URL & url) override
+    {
+        auto profile = url.profile.value_or("");
+        try {
+            return getCredentialsRaw(profile);
+        } catch (AwsAuthError & e) {
+            warn("AWS authentication failed for S3 request %s: %s", url.toHttpsUrl(), e.message());
+            credentialProviderCache.erase(profile);
+            throw;
+        }
+    }
+
+private:
+    Aws::Crt::ApiHandle apiHandle;
+    boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>
+        credentialProviderCache;
+};
+
+AwsCredentials AwsCredentialProviderImpl::getCredentialsRaw(const std::string & profile)
 {
     // Get or create credential provider with caching
     std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
@@ -132,8 +121,6 @@ AwsCredentials getAwsCredentials(const std::string & profile)
                 profile.empty() ? "(default)" : profile.c_str());
 
             try {
-                initAwsCrt();
-
                 if (profile.empty()) {
                     Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
                     config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
@@ -173,17 +160,15 @@ AwsCredentials getAwsCredentials(const std::string & profile)
     return getCredentialsFromProvider(provider);
 }
 
-void invalidateAwsCredentials(const std::string & profile)
+ref<AwsCredentialProvider> makeAwsCredentialsProvider()
 {
-    credentialProviderCache.erase(profile);
+    return make_ref<AwsCredentialProviderImpl>();
 }
 
-AwsCredentials preResolveAwsCredentials(const ParsedS3URL & s3Url)
+ref<AwsCredentialProvider> getAwsCredentialsProvider()
 {
-    std::string profile = s3Url.profile.value_or("");
-
-    // Get credentials (automatically cached)
-    return getAwsCredentials(profile);
+    static auto instance = makeAwsCredentialsProvider();
+    return instance;
 }
 
 } // namespace nix

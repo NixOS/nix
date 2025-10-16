@@ -958,7 +958,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
                     auto s3Url = ParsedS3URL::parse(parsedUrl);
 
                     // Use the preResolveAwsCredentials from aws-creds
-                    auto credentials = nix::preResolveAwsCredentials(s3Url);
+                    auto credentials = getAwsCredentialsProvider()->getCredentials(s3Url);
                     debug("Successfully pre-resolved AWS credentials in parent process");
                     return credentials;
                 }

@@ -883,22 +883,12 @@ void FileTransferRequest::setupForS3()
     if (usernameAuth) {
         debug("Using pre-resolved AWS credentials from parent process");
         sessionToken = preResolvedAwsSessionToken;
-    } else {
-        std::string profile = parsedS3.profile.value_or("");
-        try {
-            auto creds = getAwsCredentials(profile);
-            usernameAuth = UsernameAuth{
-                .username = creds.accessKeyId,
-                .password = creds.secretAccessKey,
-            };
-            sessionToken = creds.sessionToken;
-        } catch (const AwsAuthError & e) {
-            warn("AWS authentication failed for S3 request %s: %s", uri, e.what());
-            // Invalidate the cached credentials so next request will retry
-            invalidateAwsCredentials(profile);
-            // Continue without authentication - might be a public bucket
-            return;
-        }
+    } else if (auto creds = getAwsCredentialsProvider()->maybeGetCredentials(parsedS3)) {
+        usernameAuth = UsernameAuth{
+            .username = creds->accessKeyId,
+            .password = creds->secretAccessKey,
+        };
+        sessionToken = creds->sessionToken;
     }
     if (sessionToken)
         headers.emplace_back("x-amz-security-token", *sessionToken);
