@@ -134,13 +134,6 @@ struct DerivationOutput
      */
     std::optional<StorePath>
     path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
-
-    nlohmann::json toJSON() const;
-    /**
-     * @param xpSettings Stop-gap to avoid globals during unit tests.
-     */
-    static DerivationOutput
-    fromJSON(const nlohmann::json & json, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 };
 
 typedef std::map<std::string, DerivationOutput> DerivationOutputs;
@@ -389,10 +382,6 @@ struct Derivation : BasicDerivation
         : BasicDerivation(std::move(bd))
     {
     }
-
-    nlohmann::json toJSON() const;
-    static Derivation
-    fromJSON(const nlohmann::json & json, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     bool operator==(const Derivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.

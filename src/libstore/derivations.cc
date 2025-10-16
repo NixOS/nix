@@ -1261,9 +1261,15 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
-nlohmann::json DerivationOutput::toJSON() const
+} // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutput & o)
 {
-    nlohmann::json res = nlohmann::json::object();
+    res = nlohmann::json::object();
     std::visit(
         overloaded{
             [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
@@ -1289,12 +1295,11 @@ nlohmann::json DerivationOutput::toJSON() const
                 res["impure"] = true;
             },
         },
-        raw);
-    return res;
+        o.raw);
 }
 
 DerivationOutput
-DerivationOutput::fromJSON(const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
+adl_serializer<DerivationOutput>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
     auto & json = getObject(_json);
@@ -1362,18 +1367,18 @@ DerivationOutput::fromJSON(const nlohmann::json & _json, const ExperimentalFeatu
     }
 }
 
-nlohmann::json Derivation::toJSON() const
+void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
-    nlohmann::json res = nlohmann::json::object();
+    res = nlohmann::json::object();
 
-    res["name"] = name;
+    res["name"] = d.name;
 
     res["version"] = 3;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
-        for (auto & [outputName, output] : outputs) {
+        for (auto & [outputName, output] : d.outputs) {
             outputsObj[outputName] = output;
         }
     }
@@ -1381,7 +1386,7 @@ nlohmann::json Derivation::toJSON() const
     {
         auto & inputsList = res["inputSrcs"];
         inputsList = nlohmann::json ::array();
-        for (auto & input : inputSrcs)
+        for (auto & input : d.inputSrcs)
             inputsList.emplace_back(input);
     }
 
@@ -1401,24 +1406,22 @@ nlohmann::json Derivation::toJSON() const
         {
             auto & inputDrvsObj = res["inputDrvs"];
             inputDrvsObj = nlohmann::json::object();
-            for (auto & [inputDrv, inputNode] : inputDrvs.map) {
+            for (auto & [inputDrv, inputNode] : d.inputDrvs.map) {
                 inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
             }
         }
     }
 
-    res["system"] = platform;
-    res["builder"] = builder;
-    res["args"] = args;
-    res["env"] = env;
+    res["system"] = d.platform;
+    res["builder"] = d.builder;
+    res["args"] = d.args;
+    res["env"] = d.env;
 
-    if (structuredAttrs)
-        res["structuredAttrs"] = structuredAttrs->structuredAttrs;
-
-    return res;
+    if (d.structuredAttrs)
+        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
 }
 
-Derivation Derivation::fromJSON(const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
+Derivation adl_serializer<Derivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     using nlohmann::detail::value_t;
 
@@ -1434,7 +1437,7 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
         for (auto & [outputName, output] : outputs) {
-            res.outputs.insert_or_assign(outputName, DerivationOutput::fromJSON(output, xpSettings));
+            res.outputs.insert_or_assign(outputName, adl_serializer<DerivationOutput>::from_json(output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");
@@ -1488,33 +1491,6 @@ Derivation Derivation::fromJSON(const nlohmann::json & _json, const Experimental
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
 
     return res;
-}
-
-} // namespace nix
-
-namespace nlohmann {
-
-using namespace nix;
-
-DerivationOutput
-adl_serializer<DerivationOutput>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
-{
-    return DerivationOutput::fromJSON(json, xpSettings);
-}
-
-void adl_serializer<DerivationOutput>::to_json(json & json, const DerivationOutput & c)
-{
-    json = c.toJSON();
-}
-
-Derivation adl_serializer<Derivation>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
-{
-    return Derivation::fromJSON(json, xpSettings);
-}
-
-void adl_serializer<Derivation>::to_json(json & json, const Derivation & c)
-{
-    json = c.toJSON();
 }
 
 } // namespace nlohmann

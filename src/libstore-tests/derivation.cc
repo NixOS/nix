@@ -201,7 +201,8 @@ INSTANTIATE_TEST_SUITE_P(
         const auto & drv = GetParam();                                                             \
         readTest(drv.name + ".drv", [&](auto encoded) {                                            \
             auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);      \
-            ASSERT_EQ(got.toJSON(), drv.toJSON());                                                 \
+            using nlohmann::json;                                                                  \
+            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                             \
             ASSERT_EQ(got, drv);                                                                   \
         });                                                                                        \
     }                                                                                              \
