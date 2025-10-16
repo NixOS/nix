@@ -113,11 +113,38 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
         )"};
 
+#if NIX_WITH_AWS_AUTH
+    const Setting<bool> use_transfer_acceleration{
+        this,
+        false,
+        "use-transfer-acceleration",
+        R"(
+          Whether to use AWS S3 Transfer Acceleration for faster uploads and downloads
+          by routing transfers through CloudFront edge locations. This is particularly
+          useful when accessing S3 buckets from geographically distant locations.
+
+          When enabled, requests are routed to `bucket-name.s3-accelerate.amazonaws.com`
+          instead of the standard regional endpoint.
+
+          > **Note**
+          >
+          > Transfer Acceleration does not support bucket names with dots (periods).
+          > Bucket names like `my.bucket.name` will not work with this setting.
+          >
+          > This setting only applies to AWS S3 buckets. It has no effect when using
+          > custom endpoints for S3-compatible services.
+          >
+          > Additional charges apply for Transfer Acceleration. See AWS documentation
+          > for pricing details.
+        )"};
+#endif
+
     /**
      * Set of settings that are part of the S3 URI itself.
      * These are needed for region specification and other S3-specific settings.
      */
-    const std::set<const AbstractSetting *> s3UriSettings = {&profile, &region, &scheme, &endpoint};
+    const std::set<const AbstractSetting *> s3UriSettings = {
+        &profile, &region, &scheme, &endpoint, &use_transfer_acceleration};
 
     static const std::string name()
     {
