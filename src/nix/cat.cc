@@ -76,6 +76,8 @@ struct CmdCatNar : StoreCommand, MixCat
     void run(ref<Store> store) override
     {
         AutoCloseFD fd = open(narPath.c_str(), O_RDONLY);
+        if (!fd)
+            throw SysError("opening NAR file '%s'", narPath);
         auto source = FdSource{fd.get()};
         auto narAccessor = makeNarAccessor(source);
         auto listing = listNar(narAccessor, CanonPath::root, true);
