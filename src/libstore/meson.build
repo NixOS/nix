@@ -113,7 +113,7 @@ boost = dependency(
 # put in `deps_other`.
 deps_other += boost
 
-curl = dependency('libcurl', 'curl')
+curl = dependency('libcurl', 'curl', version : '>= 7.75.0')
 deps_private += curl
 
 # seccomp only makes sense on Linux
