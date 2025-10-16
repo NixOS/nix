@@ -192,10 +192,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     std::optional<Path> cgroup;
 
     ChrootLinuxDerivationBuilder(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
-        , ChrootDerivationBuilder{store, std::move(miscMethods), std::move(params)}
-        , LinuxDerivationBuilder{store, std::move(miscMethods), std::move(params)}
+        std::unique_ptr<BuildingStore> store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : DerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
+        , ChrootDerivationBuilder{std::move(store), std::move(miscMethods), std::move(params)}
+        , LinuxDerivationBuilder{std::move(store), std::move(miscMethods), std::move(params)}
     {
     }
 
@@ -497,7 +499,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
            Marking chrootRootDir as MS_SHARED causes pivot_root()
            to fail with EINVAL. Don't know why. */
-        Path chrootStoreDir = chrootRootDir + store.storeDir;
+        Path chrootStoreDir = chrootRootDir + storeDirConfig.storeDir;
 
         if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
             throw SysError("unable to bind mount the Nix store", chrootStoreDir);
@@ -687,7 +689,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             throw SysError("setuid failed");
     }
 
-    SingleDrvOutputs unprepareBuild() override
+    std::pair<int, bool> unprepareBuild() override
     {
         sandboxMountNamespace = -1;
         sandboxUserNamespace = -1;
@@ -731,7 +733,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         int status = child.wait();
         if (status != 0)
-            throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
+            throw Error("could not add path '%s' to sandbox", storeDirConfig.printStorePath(path));
     }
 };
 

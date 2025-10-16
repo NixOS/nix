@@ -5,8 +5,10 @@ namespace nix {
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 {
     ChrootDerivationBuilder(
-        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        std::unique_ptr<BuildingStore> store,
+        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : DerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
     {
     }
 
@@ -58,7 +60,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        auto chrootParentDir = store.Store::toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = store->toRealPath(drvPath) + ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
@@ -67,7 +69,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create '%s'", chrootRootDir);
+            throw SysError("cannot create '%s'", chrootParentDir);
 
         chrootRootDir = chrootParentDir + "/root";
 
@@ -117,7 +119,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            can be bind-mounted).  !!! As an extra security
            precaution, make the fake Nix store only writable by the
            build user. */
-        Path chrootStoreDir = chrootRootDir + store.storeDir;
+        Path chrootStoreDir = chrootRootDir + storeDirConfig.storeDir;
         createDirs(chrootStoreDir);
         chmod_(chrootStoreDir, 01775);
 
@@ -127,8 +129,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         pathsInChroot = getPathsInSandbox();
 
         for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
+            auto p = storeDirConfig.printStorePath(i);
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store->toRealPath(p)});
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -136,27 +138,27 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            rebuilding a path that is in settings.sandbox-paths
            (typically the dependencies of /bin/sh).  Throw them
            out. */
-        for (auto & i : drv.outputsAndOptPaths(store)) {
+        for (auto & i : drv.outputsAndOptPaths(storeDirConfig)) {
             /* If the name isn't known a priori (i.e. floating
                content-addressing derivation), the temporary location we use
                should be fresh.  Freshness means it is impossible that the path
                is already in the sandbox, so we don't need to worry about
                removing it.  */
             if (i.second.second)
-                pathsInChroot.erase(store.printStorePath(*i.second.second));
+                pathsInChroot.erase(storeDirConfig.printStorePath(*i.second.second));
         }
     }
 
     Strings getPreBuildHookArgs() override
     {
         assert(!chrootRootDir.empty());
-        return Strings({store.printStorePath(drvPath), chrootRootDir});
+        return Strings({storeDirConfig.printStorePath(drvPath), chrootRootDir});
     }
 
     Path realPathInSandbox(const Path & p) override
     {
         // FIXME: why the needsHashRewrite() conditional?
-        return !needsHashRewrite() ? chrootRootDir + p : store.toRealPath(p);
+        return !needsHashRewrite() ? chrootRootDir + p : store->toRealPath(p);
     }
 
     void cleanupBuild(bool force) override
@@ -171,7 +173,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                     continue;
                 if (buildMode != bmCheck && status.known->isValid())
                     continue;
-                auto p = store.Store::toRealPath(status.known->path);
+                auto p = store->toRealPath(status.known->path);
                 if (pathExists(chrootRootDir + p))
                     std::filesystem::rename((chrootRootDir + p), p);
             }
@@ -183,15 +185,15 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     {
         DerivationBuilderImpl::addDependency(path);
 
-        debug("materialising '%s' in the sandbox", store.printStorePath(path));
+        debug("materialising '%s' in the sandbox", storeDirConfig.printStorePath(path));
 
-        Path source = store.Store::toRealPath(path);
-        Path target = chrootRootDir + store.printStorePath(path);
+        Path source = store->toRealPath(path);
+        Path target = chrootRootDir + storeDirConfig.printStorePath(path);
 
         if (pathExists(target)) {
             // There is a similar debug message in doBind, so only run it in this block to not have double messages.
             debug("bind-mounting %s -> %s", target, source);
-            throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
+            throw Error("store path '%s' already exists in the sandbox", storeDirConfig.printStorePath(path));
         }
 
         return {source, target};

@@ -502,7 +502,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     co_await yield();
 
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
+    auto localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+    if (!localStoreP) {
         throw Error(
             R"(
             Unable to build with a primary store that isn't a local store;
@@ -551,9 +552,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                Path openLogFile() override
+                void openLogFile() override
                 {
-                    return goal.openLogFile();
+                    [[maybe_unused]] Path logFile = goal.openLogFile();
                 }
 
                 void closeLogFile() override
@@ -561,9 +562,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.closeLogFile();
                 }
             };
-
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
 
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
@@ -608,12 +606,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = externalBuilder ? makeExternalDerivationBuilder(
-                                            *localStoreP,
+                                            makeBuildingStoreFromLocalStore(*localStoreP),
                                             std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                                             std::move(params),
                                             *externalBuilder)
                                       : makeDerivationBuilder(
-                                            *localStoreP,
+                                            makeBuildingStoreFromLocalStore(*localStoreP),
                                             std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
                                             std::move(params));
         }
@@ -643,9 +641,27 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     trace("build done");
 
+    auto [status, diskFull] = builder->unprepareBuild();
+
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+
+        builder->cleanupBuild(false);
+        builder.reset();
+        outputLocks.unlock();
+        co_return doneFailure(fixupBuilderFailureErrorMessage({
+            !drv->type().isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        }));
+    }
+
     SingleDrvOutputs builtOutputs;
     try {
-        builtOutputs = builder->unprepareBuild();
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        builtOutputs = builder->registerOutputs(*localStoreP);
+        builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
@@ -891,7 +907,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const std::map<std::string, Initi
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    [[maybe_unused]] Path logFile = openLogFile();
+    openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());

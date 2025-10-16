@@ -108,19 +108,19 @@ struct DerivationBuilderCallbacks
     virtual ~DerivationBuilderCallbacks() = default;
 
     /**
-     * Open a log file and a pipe to it.
+     * Builder tells caller it is time to open a log file and a pipe to it, if they would like to capture logs
      */
-    virtual Path openLogFile() = 0;
+    virtual void openLogFile() {}
 
     /**
-     * Close the log file.
+     *  Builder tells caller it is time to Close the log file.
      */
-    virtual void closeLogFile() = 0;
+    virtual void closeLogFile() {}
 
     /**
      * @todo this should be reworked
      */
-    virtual void childTerminated() = 0;
+    virtual void childTerminated() {}
 };
 
 /**
@@ -168,10 +168,22 @@ struct DerivationBuilder : RestrictionContext
      * processing. A status code and exception are returned, providing
      * more information. The second case indicates success, and
      * realisations for each output of the derivation are returned.
-     *
-     * @throws BuildError
      */
-    virtual SingleDrvOutputs unprepareBuild() = 0;
+    virtual std::pair<int, bool> unprepareBuild() = 0;
+
+    /**
+     * Check that the derivation outputs all exist and register them
+     * as valid.
+     */
+    virtual SingleDrvOutputs registerOutputs(LocalStore & store) = 0;
+
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build suceeded, so don't attempt to
+     * preseve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force) = 0;
 
     /**
      * Forcibly kill the child process, if any.
@@ -189,16 +201,56 @@ struct ExternalBuilder
     std::vector<std::string> args;
 };
 
+/**
+ * This type exists to aid with FFI: we cannot make a full `LocalStore`
+ * with everything (including building, which uses this!) from FFI, but
+ * we do have a chance of making something that just has the methods we
+ * actually need from `LocalStore`.
+ */
+struct BuildingStore : StoreDirConfig
+{
+    virtual ~BuildingStore() = default;
+
+    BuildingStore(const Path & storeDir)
+        : StoreDirConfig{storeDir}
+    {
+    }
+
+    virtual Path getRealStoreDir() const = 0;
+
+    virtual Path getBuildDir() const = 0;
+
+    // virtual ref<const ValidPathInfo> queryPathInfo(const StorePath & path) = 0;
+
+    virtual std::thread startDaemon(
+        Descriptor daemonListeningSocket, RestrictionContext & ctx, std::vector<std::thread> & daemonWorkerThreads) = 0;
+
+    Path toRealPath(const Path & storePath)
+    {
+        assert(isInStore(storePath));
+        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
+    }
+
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
+    }
+};
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore &);
+
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+    std::unique_ptr<BuildingStore> store,
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params);
 
 /**
  * @param handler Must be chosen such that it supports the given
  * derivation.
  */
 std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);
