@@ -70,26 +70,8 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
 
         try {
             listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
-
-            auto narAccessor = makeLazyNarAccessor(listing, [cacheFile](uint64_t offset, uint64_t length) {
-                AutoCloseFD fd = toDescriptor(open(
-                    cacheFile.c_str(),
-                    O_RDONLY
-#ifndef _WIN32
-                        | O_CLOEXEC
-#endif
-                    ));
-                if (!fd)
-                    throw SysError("opening NAR cache file '%s'", cacheFile);
-
-                if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
-                    throw SysError("seeking in '%s'", cacheFile);
-
-                std::string buf(length, 0);
-                readFull(fd.get(), buf.data(), length);
-
-                return buf;
-            });
+            auto listingJson = nlohmann::json::parse(listing);
+            auto narAccessor = makeLazyNarAccessor(listingJson, seekableGetNarBytes(cacheFile));
 
             nars.emplace(storePath.hashPart(), narAccessor);
             return narAccessor;

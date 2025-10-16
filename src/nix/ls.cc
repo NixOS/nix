@@ -145,7 +145,11 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        list(makeNarAccessor(readFile(narPath)), CanonPath{path});
+        AutoCloseFD fd = open(narPath.c_str(), O_RDONLY);
+        auto source = FdSource{fd.get()};
+        auto narAccessor = makeNarAccessor(source);
+        auto listing = listNar(narAccessor, CanonPath::root, true);
+        list(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };
 
