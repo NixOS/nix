@@ -71,6 +71,25 @@ INSTANTIATE_TEST_SUITE_P(
             "with_profile_and_region",
         },
         ParsedS3URLTestCase{
+            "s3://my-bucket/my-key.txt?versionId=abc123xyz",
+            {
+                .bucket = "my-bucket",
+                .key = {"my-key.txt"},
+                .versionId = "abc123xyz",
+            },
+            "with_versionId",
+        },
+        ParsedS3URLTestCase{
+            "s3://bucket/path/to/object?region=eu-west-1&versionId=version456",
+            {
+                .bucket = "bucket",
+                .key = {"path", "to", "object"},
+                .region = "eu-west-1",
+                .versionId = "version456",
+            },
+            "with_region_and_versionId",
+        },
+        ParsedS3URLTestCase{
             "s3://bucket/key?endpoint=https://minio.local&scheme=http",
             {
                 .bucket = "bucket",
@@ -222,6 +241,37 @@ INSTANTIATE_TEST_SUITE_P(
             },
             "https://s3.ap-southeast-2.amazonaws.com/bucket/path/to/file.txt",
             "complex_path_and_region",
+        },
+        S3ToHttpsConversionTestCase{
+            ParsedS3URL{
+                .bucket = "my-bucket",
+                .key = {"my-key.txt"},
+                .versionId = "abc123xyz",
+            },
+            ParsedURL{
+                .scheme = "https",
+                .authority = ParsedURL::Authority{.host = "s3.us-east-1.amazonaws.com"},
+                .path = {"", "my-bucket", "my-key.txt"},
+                .query = {{"versionId", "abc123xyz"}},
+            },
+            "https://s3.us-east-1.amazonaws.com/my-bucket/my-key.txt?versionId=abc123xyz",
+            "with_versionId",
+        },
+        S3ToHttpsConversionTestCase{
+            ParsedS3URL{
+                .bucket = "versioned-bucket",
+                .key = {"path", "to", "object"},
+                .region = "eu-west-1",
+                .versionId = "version456",
+            },
+            ParsedURL{
+                .scheme = "https",
+                .authority = ParsedURL::Authority{.host = "s3.eu-west-1.amazonaws.com"},
+                .path = {"", "versioned-bucket", "path", "to", "object"},
+                .query = {{"versionId", "version456"}},
+            },
+            "https://s3.eu-west-1.amazonaws.com/versioned-bucket/path/to/object?versionId=version456",
+            "with_region_and_versionId",
         }),
     [](const ::testing::TestParamInfo<S3ToHttpsConversionTestCase> & info) { return info.param.description; });
 
