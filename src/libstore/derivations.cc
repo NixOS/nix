@@ -1496,9 +1496,10 @@ namespace nlohmann {
 
 using namespace nix;
 
-DerivationOutput adl_serializer<DerivationOutput>::from_json(const json & json)
+DerivationOutput
+adl_serializer<DerivationOutput>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
 {
-    return DerivationOutput::fromJSON(json);
+    return DerivationOutput::fromJSON(json, xpSettings);
 }
 
 void adl_serializer<DerivationOutput>::to_json(json & json, const DerivationOutput & c)
@@ -1506,9 +1507,9 @@ void adl_serializer<DerivationOutput>::to_json(json & json, const DerivationOutp
     json = c.toJSON();
 }
 
-Derivation adl_serializer<Derivation>::from_json(const json & json)
+Derivation adl_serializer<Derivation>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
 {
-    return Derivation::fromJSON(json);
+    return Derivation::fromJSON(json, xpSettings);
 }
 
 void adl_serializer<Derivation>::to_json(json & json, const Derivation & c)

@@ -537,5 +537,5 @@ std::string hashPlaceholder(const OutputNameView outputName);
 
 } // namespace nix
 
-JSON_IMPL(nix::DerivationOutput)
-JSON_IMPL(nix::Derivation)
+JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
+JSON_IMPL_WITH_XP_FEATURES(nix::Derivation)
