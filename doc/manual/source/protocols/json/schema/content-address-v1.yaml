@@ -1,0 +1,28 @@
+"$schema": http://json-schema.org/draft-04/schema#
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/content-address-v1.json
+title: Content Address
+description: |
+  This schema describes the JSON representation of Nix's `ContentAddress` type.
+type: object
+properties:
+  method:
+    "$ref": "#/$defs/method"
+  hash:
+    "$ref": "./hash-v1.yaml"
+required:
+- method
+- hash
+additionalProperties: false
+"$defs":
+  method:
+    type: string
+    enum: [flat, nar, text, git]
+    description: |
+      A string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
+
+      Valid method strings are:
+
+      - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
+      - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
+      - [`text`](@docroot@/store/store-object/content-address.md#method-text)
+      - [`git`](@docroot@/store/store-object/content-address.md#method-git)

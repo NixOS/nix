@@ -4,6 +4,7 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -121,4 +122,30 @@ struct MemorySink : FileSystemObjectSink
     void createSymlink(const CanonPath & path, const std::string & target) override;
 };
 
+template<>
+struct json_avoids_null<MemorySourceAccessor::File::Regular> : std::true_type
+{};
+
+template<>
+struct json_avoids_null<MemorySourceAccessor::File::Directory> : std::true_type
+{};
+
+template<>
+struct json_avoids_null<MemorySourceAccessor::File::Symlink> : std::true_type
+{};
+
+template<>
+struct json_avoids_null<MemorySourceAccessor::File> : std::true_type
+{};
+
+template<>
+struct json_avoids_null<MemorySourceAccessor> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(MemorySourceAccessor::File::Regular)
+JSON_IMPL(MemorySourceAccessor::File::Directory)
+JSON_IMPL(MemorySourceAccessor::File::Symlink)
+JSON_IMPL(MemorySourceAccessor::File)
+JSON_IMPL(MemorySourceAccessor)

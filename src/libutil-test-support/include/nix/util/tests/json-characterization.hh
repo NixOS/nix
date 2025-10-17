@@ -24,12 +24,12 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
      * @param test hook that takes the contents of the file and does the
      * actual work
      */
-    void readJsonTest(PathView testStem, const T & expected)
+    void readJsonTest(PathView testStem, const T & expected, auto... args)
     {
         using namespace nlohmann;
         readTest(Path{testStem} + ".json", [&](const auto & encodedRaw) {
             auto encoded = json::parse(encodedRaw);
-            T decoded = adl_serializer<T>::from_json(encoded);
+            T decoded = adl_serializer<T>::from_json(encoded, args...);
             ASSERT_EQ(decoded, expected);
         });
     }

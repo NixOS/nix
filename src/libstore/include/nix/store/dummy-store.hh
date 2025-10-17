@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/util/json-impls.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -65,4 +66,10 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
     }
 };
 
+template<>
+struct json_avoids_null<ref<nix::DummyStore>> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::ref<nix::DummyStore>)

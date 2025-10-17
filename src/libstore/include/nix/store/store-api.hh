@@ -779,14 +779,19 @@ public:
     Derivation derivationFromPath(const StorePath & drvPath);
 
     /**
+     * Write a derivation to the Nix store, and return its path.
+     */
+    virtual StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair);
+
+    /**
      * Read a derivation (which must already be valid).
      */
-    Derivation readDerivation(const StorePath & drvPath);
+    virtual Derivation readDerivation(const StorePath & drvPath);
 
     /**
      * Read a derivation from a potentially invalid path.
      */
-    Derivation readInvalidDerivation(const StorePath & drvPath);
+    virtual Derivation readInvalidDerivation(const StorePath & drvPath);
 
     /**
      * @param [out] out Place in here the set of all store paths in the

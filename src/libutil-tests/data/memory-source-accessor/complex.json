@@ -1,0 +1,24 @@
+{
+  "contents": {
+    "bar": {
+      "contents": {
+        "baz": {
+          "contents": "good day,\n",
+          "executable": true,
+          "type": "regular"
+        },
+        "quux": {
+          "target": "/over/there",
+          "type": "symlink"
+        }
+      },
+      "type": "directory"
+    },
+    "foo": {
+      "contents": "hello\n",
+      "executable": false,
+      "type": "regular"
+    }
+  },
+  "type": "directory"
+}
