@@ -10,6 +10,7 @@ description: |
 type: object
 properties:
   algorithm:
+    title: Hash algorithm
     "$ref": "#/$defs/algorithm"
 required:
 - algorithm
