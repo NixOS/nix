@@ -15,6 +15,28 @@ Counter Expr::nrExprs;
 
 ExprBlackHole eBlackHole;
 
+AttrDef::AttrDef(std::pmr::polymorphic_allocator<char> & alloc, AttrDefBuilder const & builder)
+    : kind(builder.kind)
+    , pos(builder.pos)
+{
+    std::visit(
+        overloaded{
+            [&](Expr * expr) { e = expr; },
+            [&](ExprAttrsBuilder * attrs_builder) { e = new ExprAttrs(alloc, attrs_builder); }},
+        builder.e);
+}
+
+DynamicAttrDef::DynamicAttrDef(std::pmr::polymorphic_allocator<char> & alloc, DynamicAttrDefBuilder const & builder)
+    : nameExpr(builder.nameExpr)
+    , pos(builder.pos)
+{
+    std::visit(
+        overloaded{
+            [&](Expr * expr) { valueExpr = expr; },
+            [&](ExprAttrsBuilder * attrs_builder) { valueExpr = new ExprAttrs(alloc, attrs_builder); }},
+        builder.valueExpr);
+}
+
 // FIXME: remove, because *symbols* are abstract and do not have a single
 //        textual representation; see printIdentifier()
 std::ostream & operator<<(std::ostream & str, const SymbolStr & symbol)
@@ -74,12 +96,12 @@ void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) const
 {
-    typedef const decltype(attrs)::value_type * Attr;
+    typedef std::pair<Symbol, AttrDef> Attr;
     std::vector<Attr> sorted;
-    for (auto & i : attrs)
-        sorted.push_back(&i);
+    for (auto const & i : getAttrs())
+        sorted.push_back(i);
     std::sort(sorted.begin(), sorted.end(), [&](Attr a, Attr b) {
-        std::string_view sa = symbols[a->first], sb = symbols[b->first];
+        std::string_view sa = symbols[a.first], sb = symbols[b.first];
         return sa < sb;
     });
     std::vector<Symbol> inherits;
@@ -87,16 +109,16 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     // The assignment of displacements should be deterministic, so that showBindings is deterministic.
     std::map<Displacement, std::vector<Symbol>> inheritsFrom;
     for (auto & i : sorted) {
-        switch (i->second.kind) {
+        switch (i.second.kind) {
         case AttrDef::Kind::Plain:
             break;
         case AttrDef::Kind::Inherited:
-            inherits.push_back(i->first);
+            inherits.push_back(i.first);
             break;
         case AttrDef::Kind::InheritedFrom: {
-            auto & select = dynamic_cast<ExprSelect &>(*i->second.e);
+            auto & select = dynamic_cast<ExprSelect &>(*i.second.e);
             auto & from = dynamic_cast<ExprInheritFrom &>(*select.e);
-            inheritsFrom[from.displ].push_back(i->first);
+            inheritsFrom[from.displ].push_back(i.first);
             break;
         }
         }
@@ -109,20 +131,20 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
     }
     for (const auto & [from, syms] : inheritsFrom) {
         str << "inherit (";
-        (*inheritFromExprs)[from]->show(symbols, str);
+        getInheritFromExprs()[from]->show(symbols, str);
         str << ")";
         for (auto sym : syms)
             str << " " << symbols[sym];
         str << "; ";
     }
     for (auto & i : sorted) {
-        if (i->second.kind == AttrDef::Kind::Plain) {
-            str << symbols[i->first] << " = ";
-            i->second.e->show(symbols, str);
+        if (i.second.kind == AttrDef::Kind::Plain) {
+            str << symbols[i.first] << " = ";
+            i.second.e->show(symbols, str);
             str << "; ";
         }
     }
-    for (auto & i : dynamicAttrs) {
+    for (auto & i : getDynamicAttrs()) {
         str << "\"${";
         i.nameExpr->show(symbols, str);
         str << "}\" = ";
@@ -381,7 +403,9 @@ void ExprOpHasAttr::bindVars(EvalState & es, const std::shared_ptr<const StaticE
 std::shared_ptr<const StaticEnv>
 ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    if (!inheritFromExprs)
+    auto inheritFromExprs = getInheritFromExprs();
+
+    if (inheritFromExprs.empty())
         return nullptr;
 
     // the inherit (from) source values are inserted into an env of its own, which
@@ -393,7 +417,7 @@ ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const Static
     // not even *have* an expr that grabs anything from this env since it's fully
     // invisible, but the evaluator does not allow for this yet.
     auto inner = std::make_shared<StaticEnv>(nullptr, env, 0);
-    for (auto from : *inheritFromExprs)
+    for (auto from : inheritFromExprs)
         from->bindVars(es, env);
 
     return inner;
@@ -401,36 +425,38 @@ ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const Static
 
 void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
+    auto attrs = getAttrs();
+
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
         auto newEnv = [&]() -> std::shared_ptr<const StaticEnv> {
-            auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs.size());
+            auto newEnv = std::make_shared<StaticEnv>(nullptr, env, nAttrs);
 
             Displacement displ = 0;
-            for (auto & i : attrs)
-                newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+            for (auto const & i : attrs)
+                newEnv->vars.emplace_back(i.first, displ++);
             return newEnv;
         }();
 
         // No need to sort newEnv since attrs is in sorted order.
 
         auto inheritFromEnv = bindInheritSources(es, newEnv);
-        for (auto & i : attrs)
+        for (auto const & i : attrs)
             i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
 
-        for (auto & i : dynamicAttrs) {
+        for (auto i : getDynamicAttrs()) {
             i.nameExpr->bindVars(es, newEnv);
             i.valueExpr->bindVars(es, newEnv);
         }
     } else {
         auto inheritFromEnv = bindInheritSources(es, env);
 
-        for (auto & i : attrs)
+        for (auto const & i : attrs)
             i.second.e->bindVars(es, i.second.chooseByKind(env, env, inheritFromEnv));
 
-        for (auto & i : dynamicAttrs) {
+        for (auto i : getDynamicAttrs()) {
             i.nameExpr->bindVars(es, env);
             i.valueExpr->bindVars(es, env);
         }
@@ -486,18 +512,18 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     auto newEnv = [&]() -> std::shared_ptr<const StaticEnv> {
-        auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->attrs.size());
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->nAttrs);
 
         Displacement displ = 0;
-        for (auto & i : attrs->attrs)
-            newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
+        for (auto const & i : attrs->getAttrs())
+            newEnv->vars.emplace_back(i.first, displ++);
         return newEnv;
     }();
 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     auto inheritFromEnv = attrs->bindInheritSources(es, newEnv);
-    for (auto & i : attrs->attrs)
+    for (auto const & i : attrs->getAttrs())
         i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
 
     if (es.debugRepl)

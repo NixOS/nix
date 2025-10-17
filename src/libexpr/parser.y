@@ -125,6 +125,8 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
   nix::Expr * e;
   nix::ExprList * list;
   nix::ExprAttrs * attrs;
+  nix::ExprAttrsBuilder * attrsBuilder;
+  std::variant<nix::Expr *, nix::ExprAttrsBuilder *> * expr_or_attrs;
   nix::Formals * formals;
   nix::Formal * formal;
   nix::NixInt n;
@@ -140,11 +142,17 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
 }
 
-%type <e> start expr expr_function expr_if expr_op
-%type <e> expr_select expr_simple expr_app
+%type <e> start expr expr_function expr_function_no_attrs
+%type <e> expr_if_no_attrs expr_op expr_op_no_attrs
+%type <e> expr_select expr_select_no_attrs
+%type <e> expr_simple expr_simple_no_attrs
+%type <e> expr_app expr_app_no_attrs expr_attrs
 %type <e> expr_pipe_from expr_pipe_into
+%type <expr_or_attrs> expr_or_attrs_to_be
+%type <attrsBuilder> expr_attrs_to_be
 %type <list> expr_list
-%type <attrs> binds binds1
+%type <attrs> binds
+%type <attrsBuilder> binds0 binds1
 %type <formals> formals formal_set
 %type <formal> formal
 %type <attrNames> attrpath
@@ -192,6 +200,11 @@ start: expr {
 expr: expr_function;
 
 expr_function
+  : expr_function_no_attrs
+  | expr_attrs
+  ;
+
+expr_function_no_attrs
   : ID ':' expr_function
     { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3);
       $$ = me;
@@ -221,21 +234,21 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = new ExprWith(CUR_POS, $2, $4); }
   | LET binds IN_KW expr_function
-    { if (!$2->dynamicAttrs.empty())
+    { if ($2->nDynamicAttrs != 0)
         throw ParseError({
             .msg = HintFmt("dynamic attributes not allowed in let"),
             .pos = state->positions[CUR_POS]
         });
       $$ = new ExprLet($2, $4);
     }
-  | expr_if
+  | expr_if_no_attrs
   ;
 
-expr_if
+expr_if_no_attrs
   : IF expr THEN expr ELSE expr { $$ = new ExprIf(CUR_POS, $2, $4, $6); }
   | expr_pipe_from
   | expr_pipe_into
-  | expr_op
+  | expr_op_no_attrs
   ;
 
 expr_pipe_from
@@ -249,6 +262,10 @@ expr_pipe_into
   ;
 
 expr_op
+  : expr_op_no_attrs
+  | expr_attrs
+  ;
+expr_op_no_attrs
   : '!' expr_op %prec NOT { $$ = new ExprOpNot($2); }
   | '-' expr_op %prec NEGATE { $$ = new ExprCall(CUR_POS, new ExprVar(state->s.sub), {new ExprInt(0), $2}); }
   | expr_op EQ expr_op { $$ = new ExprOpEq($1, $3); }
@@ -268,19 +285,29 @@ expr_op
   | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mul), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.div), {$1, $3}); }
   | expr_op CONCAT expr_op { $$ = new ExprOpConcatLists(state->at(@2), $1, $3); }
-  | expr_app
+  | expr_app_no_attrs
   ;
 
 expr_app
+  : expr_app_no_attrs
+  | expr_attrs
+  ;
+
+expr_app_no_attrs
   : expr_app expr_select { $$ = makeCall(CUR_POS, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
   | /* Once a ‘cursed or’ reaches this nonterminal, it is no longer cursed,
        because the uncursed parse would also produce an expr_app. But we need
        to remove the cursed status in order to prevent valid things like
        `f (g or)` from triggering the warning. */
-    expr_select { $$ = $1; $$->resetCursedOr(); }
+    expr_select_no_attrs { $$ = $1; $$->resetCursedOr(); }
   ;
 
 expr_select
+  : expr_select_no_attrs
+  | expr_attrs
+  ;
+
+expr_select_no_attrs
   : expr_simple '.' attrpath
     { $$ = new ExprSelect(state->alloc, CUR_POS, $1, std::move(*$3), nullptr); delete $3; }
   | expr_simple '.' attrpath OR_KW expr_select
@@ -294,10 +321,15 @@ expr_select
        be used to emit a warning when an affected expression is parsed. */
     expr_simple OR_KW
     { $$ = new ExprCall(CUR_POS, $1, {new ExprVar(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
-  | expr_simple
+  | expr_simple_no_attrs
   ;
 
 expr_simple
+  : expr_simple_no_attrs
+  | expr_attrs
+  ;
+
+expr_simple_no_attrs
   : ID {
       std::string_view s = "__curPos";
       if ($1.l == s.size() && strncmp($1.p, s.data(), s.size()) == 0)
@@ -344,13 +376,26 @@ expr_simple
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
     { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(state->alloc, noPos, $3, state->s.body); }
-  | REC '{' binds '}'
-    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
-  | '{' binds1 '}'
-    { $2->pos = CUR_POS; $$ = $2; }
+  | '[' expr_list ']' { $$ = $2; }
+  ;
+
+expr_attrs
+  : '{' binds1 '}'
+    { $2->pos = CUR_POS; $$ = new ExprAttrs(state->alloc, $2); }
+  | REC '{' binds1 '}'
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprAttrs(state->alloc, $3); }
   | '{' '}'
     { $$ = new ExprAttrs(CUR_POS); }
-  | '[' expr_list ']' { $$ = $2; }
+  | REC '{' '}'
+    { $$ = new ExprAttrs(CUR_POS); }
+  ;
+
+expr_attrs_to_be
+  : '{' binds1 '}' { $$ = $2; }
+  | REC '{' binds1 '}'
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
+  | '{' '}' { $$ = new ExprAttrsBuilder; }
+  | REC '{' '}' { $$ = new ExprAttrsBuilder; $$->recursive = true; }
   ;
 
 string_parts
@@ -413,49 +458,58 @@ ind_string_parts
   | { $$ = new std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>; }
   ;
 
+expr_or_attrs_to_be
+  : expr_function_no_attrs{ $$ = new std::variant<Expr *, ExprAttrsBuilder *>($1); }
+  | expr_attrs_to_be { $$ = new std::variant<Expr *, ExprAttrsBuilder *>($1); }
+  ;
+
 binds
-  : binds1
-  | { $$ = new ExprAttrs; }
+  : binds0 { $$ = new ExprAttrs(state->alloc, $1); }
+  ;
+
+binds0
+  : binds1 { $$ = $1; }
+  | { $$ = new ExprAttrsBuilder; }
   ;
 
 binds1
-  : binds1[accum] attrpath '=' expr ';'
+  : binds1[accum] attrpath '=' expr_or_attrs_to_be[expr] ';'
     { $$ = $accum;
-      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+      state->addAttr($$, std::move(*$attrpath), @attrpath, *$expr, @expr);
+      delete $expr;
       delete $attrpath;
     }
-  | binds[accum] INHERIT attrs ';'
+  | binds0[accum] INHERIT attrs ';'
     { $$ = $accum;
       for (auto & [i, iPos] : *$attrs) {
           if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
               state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
           $accum->attrs.emplace(
               i.symbol,
-              ExprAttrs::AttrDef(new ExprVar(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
+              AttrDefBuilder(new ExprVar(iPos, i.symbol), iPos, AttrDef::Kind::Inherited));
       }
       delete $attrs;
     }
-  | binds[accum] INHERIT '(' expr ')' attrs ';'
+  | binds0[accum] INHERIT '(' expr ')' attrs ';'
     { $$ = $accum;
-      if (!$accum->inheritFromExprs)
-          $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
-      $accum->inheritFromExprs->push_back($expr);
-      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
+      $accum->inheritFromExprs.push_back($expr);
+      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs.size() - 1);
       for (auto & [i, iPos] : *$attrs) {
           if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
               state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
           $accum->attrs.emplace(
               i.symbol,
-              ExprAttrs::AttrDef(
+              AttrDefBuilder(
                   new ExprSelect(state->alloc, iPos, from, i.symbol),
                   iPos,
-                  ExprAttrs::AttrDef::Kind::InheritedFrom));
+                  AttrDef::Kind::InheritedFrom));
       }
       delete $attrs;
     }
-  | attrpath '=' expr ';'
-    { $$ = new ExprAttrs;
-      state->addAttr($$, std::move(*$attrpath), @attrpath, $expr, @expr);
+  | attrpath '=' expr_or_attrs_to_be[expr] ';'
+    { $$ = new ExprAttrsBuilder;
+      state->addAttr($$, std::move(*$attrpath), @attrpath, *$expr, @expr);
+      delete $expr;
       delete $attrpath;
     }
   ;
