@@ -20,8 +20,12 @@ if [[ "$(uname)" == "Darwin" ]]; then
     exit 77
 fi
 
+# Find an available port by asking the OS for an ephemeral port
+RANDOM_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
+echo "==> using random port ${RANDOM_PORT}"
+
 echo "==> ping to unopened port should fail"
-if nix store ping --store http://localhost:8080 2>/dev/null; then
+if nix store ping --store "http://localhost:${RANDOM_PORT}" 2>/dev/null; then
     echo "ERROR: ping unexpectedly succeeded before server started"
     exit 1
 fi
@@ -36,26 +40,26 @@ nix copy --to "file://$PWD/cache" "$storePath"
 echo "==> starting HTTP server for cache"
 (
     cd cache || exit 1
-    python3 -m http.server 8080 --bind localhost >/dev/null 2>&1 &
+    python3 -m http.server "${RANDOM_PORT}" --bind localhost >/dev/null 2>&1 &
     echo $! > ../cache_http_pid
 )
 
 # Wait for port to open (simple retry)
 for i in {1..30}; do
-    if curl -sSf -o /dev/null http://localhost:8080/ 2>/dev/null; then
+    if curl -sSf -o /dev/null "http://localhost:${RANDOM_PORT}/" 2>/dev/null; then
         break
     fi
     sleep 0.2
 done
 
-if ! curl -sSf -o /dev/null http://localhost:8080/ 2>/dev/null; then
+if ! curl -sSf -o /dev/null "http://localhost:${RANDOM_PORT}/" 2>/dev/null; then
     echo "ERROR: HTTP server did not start"
     kill "$(cat cache_http_pid)" 2>/dev/null || true
     exit 1
 fi
 
 echo "==> ping should succeed now"
-if ! nix store ping --store http://localhost:8080; then
+if ! nix store ping --store "http://localhost:${RANDOM_PORT}"; then
     echo "ERROR: ping failed while server running"
     kill "$(cat cache_http_pid)" 2>/dev/null || true
     exit 1
@@ -65,13 +69,11 @@ echo "==> stopping HTTP server"
 kill "$(cat cache_http_pid)" 2>/dev/null || true
 rm -f cache_http_pid
 
-# Give kernel a moment to close the port
-sleep 0.5
 
 echo "==> ping should now fail after server shutdown"
 # We expect this command to fail. By placing it in an 'if' condition,
 # we prevent the 'set -e' trap from exiting the script immediately.
-if nix store ping --store http://localhost:8080 &> /dev/null; then
+if nix store ping --store "http://localhost:${RANDOM_PORT}" &> /dev/null; then
     # This block runs if the command SUCCEEDS (exit code 0), which is the bug.
     echo "ERROR: ping unexpectedly SUCCEEDED after server shutdown (bug: info is cached)"
     exit 1
