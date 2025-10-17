@@ -12,6 +12,7 @@
   rsync,
   nix-cli,
   changelog-d,
+  json-schema-for-humans,
   officialRelease,
 
   # Configuration Options
@@ -55,6 +56,7 @@ mkMesonDerivation (finalAttrs: {
     jq
     python3
     rsync
+    json-schema-for-humans
     changelog-d
   ]
   ++ lib.optionals (!officialRelease) [

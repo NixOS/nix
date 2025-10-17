@@ -12,8 +12,7 @@ a Nix expression evaluates.
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
-`nix derivation add` takes a single derivation in the following format:
-
-{{#include ../../protocols/json/derivation.md}}
+`nix derivation add` takes a single derivation in the JSON format.
+See [the manual](@docroot@/protocols/json/derivation.md) for a documentation of this format.
 
 )""
