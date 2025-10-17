@@ -818,6 +818,12 @@ DebugTraceStacker::DebugTraceStacker(EvalState & evalState, DebugTrace t)
 
 void Value::mkString(std::string_view s)
 {
+    if constexpr (ValueStorage::maxSmallStringSize > 0) {
+        if (s.size() <= ValueStorage::maxSmallStringSize) {
+            ValueStorage::setSmallString(s);
+            return;
+        }
+    }
     mkStringNoCopy(makeImmutableString(s));
 }
 
@@ -837,7 +843,12 @@ static const char ** encodeContext(const NixStringContext & context)
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkStringNoCopy(makeImmutableString(s), encodeContext(context));
+    auto encodedContext = encodeContext(context);
+    if (encodedContext == nullptr) {
+        mkString(s);
+        return;
+    }
+    mkStringNoCopy(makeImmutableString(s), encodedContext);
 }
 
 void Value::mkStringMove(const char * s, const NixStringContext & context)
@@ -2038,8 +2049,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     /* c_str() is not str().c_str() because we want to create a string
        Value. allocating a GC'd string directly and moving it into a
        Value lets us avoid an allocation and copy. */
-    const auto c_str = [&] {
-        char * result = allocString(sSize + 1);
+    const auto c_str = [&](char * result) {
         char * tmp = result;
         for (const auto & part : s) {
             memcpy(tmp, part->data(), part->size());
@@ -2121,8 +2131,23 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                 .withFrame(env, *this)
                 .debugThrow();
         v.mkPath(state.rootPath(CanonPath(str())));
-    } else
-        v.mkStringMove(c_str(), context);
+    } else {
+        if (sSize == 0) {
+            v.mkStringMove("", context);
+            return;
+        }
+
+        if (sSize <= Value::maxSmallStringSize) {
+            /* +1 is required for the NUL terminator. */
+            std::array<char, Value::maxSmallStringSize + 1> result;
+            v.mkString(c_str(result.data()), context);
+            return;
+        }
+
+        char * result = allocString(sSize + 1);
+        v.mkStringMove(c_str(result), context);
+        result[sSize] = 0;
+    }
 }
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
