@@ -145,6 +145,12 @@ void LegacySSHStore::queryPathInfoUncached(
 
 void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (!repair && isValidPath(info.path)) {
+        NullFileSystemObjectSink s;
+        parseDump(s, source);
+        return;
+    }
+
     debug("adding path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
 
     auto conn(connections->get());

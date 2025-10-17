@@ -512,13 +512,28 @@ public:
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos);
 
     /**
-     * Import a path into the store.
+     * Import a path into the store, via NAR stream.
+     *
+     * One of these two must be overridden, as the defaults will
+     * infinitely mutually recur.
      */
     virtual void addToStore(
         const ValidPathInfo & info,
         Source & narSource,
         RepairFlag repair = NoRepair,
-        CheckSigsFlag checkSigs = CheckSigs) = 0;
+        CheckSigsFlag checkSigs = CheckSigs);
+
+    /**
+     * Import a path into the store, via arbitrary `SourcePath`.
+     *
+     * One of these two must be overridden, as the defaults will
+     * infinitely mutually recur.
+     */
+    virtual void addToStore(
+        const ValidPathInfo & info,
+        const SourcePath & path,
+        RepairFlag repair = NoRepair,
+        CheckSigsFlag checkSigs = CheckSigs);
 
     /**
      * A list of paths infos along with a source providing the content
