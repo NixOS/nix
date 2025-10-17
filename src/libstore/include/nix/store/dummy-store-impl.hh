@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/dummy-store.hh"
+#include "nix/store/derivations.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -22,6 +23,8 @@ struct DummyStore : virtual Store
     {
         UnkeyedValidPathInfo info;
         ref<MemorySourceAccessor> contents;
+
+        bool operator==(const PathInfoAndContents &) const;
     };
 
     /**
@@ -29,6 +32,12 @@ struct DummyStore : virtual Store
      * store object.
      */
     boost::concurrent_flat_map<StorePath, PathInfoAndContents> contents;
+
+    /**
+     * This is map conceptually owns every derivation, allowing us to
+     * avoid "on-disk drv format" serialization round-trips.
+     */
+    boost::concurrent_flat_map<StorePath, Derivation> derivations;
 
     /**
      * The build trace maps the pair of a content-addressing (fixed or
@@ -40,13 +49,21 @@ struct DummyStore : virtual Store
      * outer map for the derivation, and inner maps for the outputs of a
      * given derivation.
      */
-    boost::concurrent_flat_map<Hash, std::map<std::string, ref<UnkeyedRealisation>>> buildTrace;
+    boost::concurrent_flat_map<StorePath, std::map<std::string, ref<UnkeyedRealisation>>> buildTrace;
 
     DummyStore(ref<const Config> config)
         : Store{*config}
         , config(config)
     {
     }
+
+    bool operator==(const DummyStore &) const;
 };
 
+template<>
+struct json_avoids_null<DummyStore::PathInfoAndContents> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::DummyStore::PathInfoAndContents)

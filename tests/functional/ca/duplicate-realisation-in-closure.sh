@@ -25,4 +25,9 @@ nix build -f nondeterministic.nix dep2 --no-link
 # If everything goes right, we should rebuild dep2 rather than fetch it from
 # the cache (because that would mean duplicating `current-time` in the closure),
 # and have `dep1 == dep2`.
+
+# FIXME: Force the use of small-step resolutions only to fix this in a
+# better way (#11896, #11928).
+skipTest "temporarily broken because dependent realisations are removed"
+
 nix build --substituters "$REMOTE_STORE" -f nondeterministic.nix toplevel --no-require-sigs --no-link

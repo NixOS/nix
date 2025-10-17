@@ -6,6 +6,7 @@
 #include "nix/store/path.hh"
 #include "nix/util/file-content-address.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -308,4 +309,15 @@ struct ContentAddressWithReferences
     Hash getHash() const;
 };
 
+template<>
+struct json_avoids_null<ContentAddressMethod> : std::true_type
+{};
+
+template<>
+struct json_avoids_null<ContentAddress> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::ContentAddressMethod)
+JSON_IMPL(nix::ContentAddress)
