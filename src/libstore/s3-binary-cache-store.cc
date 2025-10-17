@@ -22,7 +22,8 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
     assert(cacheUri.query.empty());
 
     // Only copy S3-specific parameters to the URL query
-    static const std::set<std::string> s3Params = {"region", "endpoint", "profile", "scheme"};
+    static const std::set<std::string> s3Params = {
+        "region", "endpoint", "profile", "scheme", "use-transfer-acceleration"};
     for (const auto & [key, value] : params) {
         if (s3Params.contains(key)) {
             cacheUri.query[key] = value;
