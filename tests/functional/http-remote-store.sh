@@ -21,7 +21,7 @@ echo "==> starting HTTP server for cache"
 (
     cd cache || exit 1
     # Quiet server; redirect output
-    python3 -m http.server 8000 >/dev/null 2>&1 &
+    python3 -m http.server 8000 --bind 127.0.0.1 >/dev/null 2>&1 &
     echo $! > ../cache_http_pid
 )
 # Wait for port to open (simple retry)
