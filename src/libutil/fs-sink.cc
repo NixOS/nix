@@ -196,6 +196,8 @@ void NullFileSystemObjectSink::createRegularFile(
         void isExecutable() override {}
     } crf;
 
+    crf.skipContents = true;
+
     // Even though `NullFileSystemObjectSink` doesn't do anything, it's important
     // that we call the function, to e.g. advance the parser using this
     // sink.
