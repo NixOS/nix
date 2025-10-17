@@ -3,13 +3,13 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/derived-path.hh"
 #include "nix/store/tests/libstore.hh"
 
 namespace nix {
 
-class DerivedPathTest : public CharacterizationTest, public LibStoreTest
+class DerivedPathTest : public virtual CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "derived-path";
 
@@ -123,25 +123,51 @@ RC_GTEST_FIXTURE_PROP(DerivedPathTest, prop_round_rip, (const DerivedPath & o))
 
 using nlohmann::json;
 
-#define TEST_JSON(TYPE, NAME, VAL)                                                                    \
-    static const TYPE NAME = VAL;                                                                     \
-                                                                                                      \
-    TEST_F(DerivedPathTest, NAME##_from_json)                                                         \
-    {                                                                                                 \
-        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
-            auto encoded = json::parse(encoded_);                                                     \
-            TYPE got = static_cast<TYPE>(encoded);                                                    \
-            ASSERT_EQ(got, NAME);                                                                     \
-        });                                                                                           \
-    }                                                                                                 \
-                                                                                                      \
-    TEST_F(DerivedPathTest, NAME##_to_json)                                                           \
-    {                                                                                                 \
-        writeTest(                                                                                    \
-            #NAME ".json",                                                                            \
-            [&]() -> json { return static_cast<json>(NAME); },                                        \
-            [](const auto & file) { return json::parse(readFile(file)); },                            \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+struct SingleDerivedPathJsonTest : DerivedPathTest,
+                                   JsonCharacterizationTest<SingleDerivedPath>,
+                                   ::testing::WithParamInterface<SingleDerivedPath>
+{};
+
+struct DerivedPathJsonTest : DerivedPathTest,
+                             JsonCharacterizationTest<DerivedPath>,
+                             ::testing::WithParamInterface<DerivedPath>
+{};
+
+#define TEST_JSON(TYPE, NAME, VAL)           \
+    static const TYPE NAME = VAL;            \
+                                             \
+    TEST_F(TYPE##JsonTest, NAME##_from_json) \
+    {                                        \
+        readJsonTest(#NAME, NAME);           \
+    }                                        \
+                                             \
+    TEST_F(TYPE##JsonTest, NAME##_to_json)   \
+    {                                        \
+        writeJsonTest(#NAME, NAME);          \
+    }
+
+#define TEST_JSON_XP_DYN(TYPE, NAME, VAL)                                                              \
+    static const TYPE NAME = VAL;                                                                      \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_from_json_throws_without_xp)                                         \
+    {                                                                                                  \
+        std::optional<json> ret;                                                                       \
+        readTest(#NAME ".json", [&](const auto & encoded_) { ret = json::parse(encoded_); });          \
+        if (ret) {                                                                                     \
+            EXPECT_THROW(nlohmann::adl_serializer<TYPE>::from_json(*ret), MissingExperimentalFeature); \
+        }                                                                                              \
+    }                                                                                                  \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_from_json)                                                           \
+    {                                                                                                  \
+        ExperimentalFeatureSettings xpSettings;                                                        \
+        xpSettings.set("experimental-features", "dynamic-derivations");                                \
+        readJsonTest(#NAME, NAME, xpSettings);                                                         \
+    }                                                                                                  \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_to_json)                                                             \
+    {                                                                                                  \
+        writeJsonTest(#NAME, NAME);                                                                    \
     }
 
 TEST_JSON(
@@ -156,7 +182,7 @@ TEST_JSON(
         .output = "bar",
     }));
 
-TEST_JSON(
+TEST_JSON_XP_DYN(
     SingleDerivedPath,
     single_built_built,
     (SingleDerivedPath::Built{
@@ -179,7 +205,7 @@ TEST_JSON(
         .outputs = OutputsSpec::Names{"bar", "baz"},
     }));
 
-TEST_JSON(
+TEST_JSON_XP_DYN(
     DerivedPath,
     multi_built_built,
     (DerivedPath::Built{
@@ -191,7 +217,7 @@ TEST_JSON(
         .outputs = OutputsSpec::Names{"baz", "quux"},
     }));
 
-TEST_JSON(
+TEST_JSON_XP_DYN(
     DerivedPath,
     multi_built_built_wildcard,
     (DerivedPath::Built{

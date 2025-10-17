@@ -108,6 +108,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
           ++ pkgs.nixComponents2.nix-internal-api-docs.nativeBuildInputs
           ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
           ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
+          ++ pkgs.nixComponents2.nix-json-schema-checks.externalNativeBuildInputs
           ++ lib.optional (
             !buildCanExecuteHost
             # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
