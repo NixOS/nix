@@ -1,0 +1,7 @@
+[
+  { "include": ["@<nlohmann/.*>", "private", "<nlohmann/json.hpp>", "public"] },
+
+  # "<git2/XXX.h> => <git2.h> where XXX doesn't contain '/'
+  { "include": ["@<git2/[^/]+\\.h>", "private", "<git2.h>", "public"] },
+
+]

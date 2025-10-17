@@ -1,3 +1,13 @@
+#include <nlohmann/json.hpp>
+#include <algorithm>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
@@ -5,8 +15,17 @@
 #include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix::fetchers {
 

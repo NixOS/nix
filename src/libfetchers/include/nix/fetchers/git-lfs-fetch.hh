@@ -1,13 +1,19 @@
 #pragma once
 ///@file
 
+#include <git2/repository.h>
+#include <nlohmann/json_fwd.hpp>
+#include <git2/oid.h>
+#include <git2/types.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <functional>
+#include <string>
+#include <vector>
+
 #include "nix/util/canon-path.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
-
-#include <git2/repository.h>
-
-#include <nlohmann/json_fwd.hpp>
 
 namespace nix::lfs {
 

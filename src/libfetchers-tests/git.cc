@@ -1,14 +1,22 @@
-#include "nix/store/store-open.hh"
+#include <gtest/gtest.h>
+#include <git2.h>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "nix/store/globals.hh"
 #include "nix/store/dummy-store.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/fetchers/git-utils.hh"
-
-#include <git2.h>
-#include <gtest/gtest.h>
-
-#include <filesystem>
+#include "nix/store/store-api.hh"
+#include "nix/store/store-reference.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/types.hh"
 
 namespace {
 

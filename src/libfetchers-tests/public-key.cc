@@ -1,7 +1,14 @@
 #include <gtest/gtest.h>
+#include <boost/container/detail/std_fwd.hpp>
+#include <nlohmann/json.hpp>
+#include <filesystem>
+#include <string_view>
+#include <utility>
+#include <string>
+
 #include "nix/fetchers/fetchers.hh"
-#include "nix/util/json-utils.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/tests/characterization.hh"
 
 namespace nix {
 

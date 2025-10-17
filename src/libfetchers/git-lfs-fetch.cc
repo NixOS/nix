@@ -1,3 +1,22 @@
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <ctype.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <git2.h>
+#include <algorithm>
+#include <filesystem>
+#include <list>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <string_view>
+#include <utility>
+#include <functional>
+#include <string>
+#include <vector>
+#include <format>
+
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
@@ -6,13 +25,15 @@
 #include "nix/util/users.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/ssh.hh"
-
-#include <git2/attr.h>
-#include <git2/config.h>
-#include <git2/errors.h>
-#include <git2/remote.h>
-
-#include <nlohmann/json.hpp>
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/serialise.hh"
 
 namespace nix::lfs {
 

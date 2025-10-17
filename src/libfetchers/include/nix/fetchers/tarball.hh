@@ -1,6 +1,8 @@
 #pragma once
 
+#include <time.h>
 #include <optional>
+#include <string>
 
 #include "nix/util/hash.hh"
 #include "nix/store/path.hh"

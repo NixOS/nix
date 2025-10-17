@@ -1,7 +1,22 @@
+#include <memory>
+#include <optional>
+#include <ranges>
+#include <regex>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/util/url-parts.hh"
-#include "nix/store/path.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 namespace nix::fetchers {
 

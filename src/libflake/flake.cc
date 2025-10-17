@@ -17,7 +17,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-#include <format>
 
 #include "nix/util/terminal.hh"
 #include "nix/util/ref.hh"
@@ -27,7 +26,6 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/flake/lockfile.hh"
-#include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/finally.hh"
@@ -57,7 +55,6 @@
 #include "nix/util/logging.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/util/pos-table.hh"
-#include "nix/util/position.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"

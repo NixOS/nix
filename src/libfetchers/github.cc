@@ -1,6 +1,23 @@
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <time.h>
+#include <optional>
+#include <functional>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <ranges>
+#include <regex>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <format>
+
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/cache.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/url-parts.hh"
@@ -10,10 +27,19 @@
 #include "nix/fetchers/tarball.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/fetchers/git-utils.hh"
-
-#include <optional>
-#include <nlohmann/json.hpp>
-#include <fstream>
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
 
 namespace nix::fetchers {
 
