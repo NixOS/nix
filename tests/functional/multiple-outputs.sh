@@ -91,9 +91,22 @@ nix-build multiple-outputs.nix -A a.first --no-out-link
 
 # Cyclic outputs should be rejected.
 echo "building cyclic..."
-if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
+if cyclicOutput=$(nix-build multiple-outputs.nix -A cyclic --no-out-link 2>&1); then
     echo "Cyclic outputs incorrectly accepted!"
     exit 1
+else
+    echo "Cyclic outputs correctly rejected"
+    # Verify error message mentions cycles
+    echo "$cyclicOutput" | grepQuiet "cycle"
+    # Check if we got the enhanced error (new nix) or basic error (old daemon)
+    if echo "$cyclicOutput" | grepQuiet "Detailed cycle analysis"; then
+        echo "$cyclicOutput" | grepQuiet "Cycle 1:"
+        # The error should mention actual file paths with subdirectories
+        echo "$cyclicOutput" | grepQuiet "subdir"
+        echo "Enhanced cycle error messages verified"
+    else
+        echo "Basic cycle error verified (daemon may not support detailed analysis)"
+    fi
 fi
 
 # Do a GC. This should leave an empty store.
