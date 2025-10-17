@@ -4,6 +4,14 @@
 
 using namespace nix;
 
+static FdSink getNarSink()
+{
+    auto fd = getStandardOutput();
+    if (isatty(fd))
+        throw UsageError("refusing to write NAR to a terminal");
+    return FdSink(std::move(fd));
+}
+
 struct CmdDumpPath : StorePathCommand
 {
     std::string description() override
@@ -20,7 +28,7 @@ struct CmdDumpPath : StorePathCommand
 
     void run(ref<Store> store, const StorePath & storePath) override
     {
-        FdSink sink(getStandardOutput());
+        auto sink = getNarSink();
         store->narFromPath(storePath, sink);
         sink.flush();
     }
@@ -51,7 +59,7 @@ struct CmdDumpPath2 : Command
 
     void run() override
     {
-        FdSink sink(getStandardOutput());
+        auto sink = getNarSink();
         dumpPath(path, sink);
         sink.flush();
     }
