@@ -25,6 +25,13 @@ import $testDir/undefined-variable.nix
 
 TODO_NixOS
 
+# FIXME: repl tests fail on systems with stack limits
+stack_ulimit="$(ulimit -Hs)"
+stack_required="$((64 * 1024 * 1024))"
+if [[ "$stack_ulimit" != "unlimited" ]]; then
+    ((stack_ulimit < stack_required)) && skipTest "repl tests cannot run on systems with stack size <$stack_required ($stack_ulimit)"
+fi
+
 testRepl () {
     local nixArgs
     nixArgs=("$@")
