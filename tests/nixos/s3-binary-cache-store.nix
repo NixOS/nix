@@ -139,6 +139,7 @@ in
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
+          Cleans up client store after test completion.
 
           Args:
               populate_bucket: List of packages to upload before test runs
@@ -155,6 +156,9 @@ in
                       test_func(bucket)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
+                      # Clean up client store - only delete if path exists
+                      for pkg in PKGS.values():
+                          client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
               return wrapper
           return decorator
 
