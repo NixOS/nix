@@ -135,7 +135,7 @@ in
               print(output)
               raise Exception(f"{error_msg}: expected {expected}, got {actual}")
 
-      def with_test_bucket(populate_with=[]):
+      def setup_s3(populate_with=[]):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
@@ -162,7 +162,7 @@ in
       # Test Functions
       # ============================================================================
 
-      @with_test_bucket()
+      @setup_s3()
       def test_credential_caching(bucket):
           """Verify credential providers are cached and reused"""
           print("\n=== Testing Credential Caching ===")
@@ -182,7 +182,7 @@ in
 
           print("✓ Credential provider created once and cached")
 
-      @with_test_bucket(populate_with=[PKGS['A']])
+      @setup_s3(populate_with=[PKGS['A']])
       def test_fetchurl_basic(bucket):
           """Test builtins.fetchurl works with s3:// URLs"""
           print("\n=== Testing builtins.fetchurl ===")
@@ -198,7 +198,7 @@ in
 
           print("✓ builtins.fetchurl works with s3:// URLs")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_error_message_formatting(bucket):
           """Verify error messages display URLs correctly"""
           print("\n=== Testing Error Message Formatting ===")
@@ -218,7 +218,7 @@ in
 
           print("✓ Error messages format URLs correctly")
 
-      @with_test_bucket(populate_with=[PKGS['A']])
+      @setup_s3(populate_with=[PKGS['A']])
       def test_fork_credential_preresolution(bucket):
           """Test credential pre-resolution in forked processes"""
           print("\n=== Testing Fork Credential Pre-resolution ===")
@@ -298,7 +298,7 @@ in
 
           print("  ✓ Child uses pre-resolved credentials (no new providers)")
 
-      @with_test_bucket(populate_with=[PKGS['A'], PKGS['B'], PKGS['C']])
+      @setup_s3(populate_with=[PKGS['A'], PKGS['B'], PKGS['C']])
       def test_store_operations(bucket):
           """Test nix store info and copy operations"""
           print("\n=== Testing Store Operations ===")
@@ -337,7 +337,7 @@ in
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
-      @with_test_bucket(populate_with=[PKGS['A']])
+      @setup_s3(populate_with=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
           print("\n=== Testing URL Format Variations ===")
@@ -352,7 +352,7 @@ in
           client.succeed(f"{ENV_WITH_CREDS} nix store info --store '{url2}' >&2")
           print("  ✓ Parameter order: endpoint before region works")
 
-      @with_test_bucket(populate_with=[PKGS['A']])
+      @setup_s3(populate_with=[PKGS['A']])
       def test_concurrent_fetches(bucket):
           """Validate thread safety with concurrent S3 operations"""
           print("\n=== Testing Concurrent Fetches ===")
@@ -414,7 +414,7 @@ in
                   f"Expected 5 FileTransfer instances for 5 concurrent fetches, got {transfers_created}"
               )
 
-      @with_test_bucket()
+      @setup_s3()
       def test_compression_narinfo_gzip(bucket):
           """Test narinfo compression with gzip"""
           print("\n=== Testing Compression: narinfo (gzip) ===")
@@ -433,7 +433,7 @@ in
 
           print("  ✓ Client decompressed .narinfo successfully")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_compression_mixed(bucket):
           """Test mixed compression (narinfo=xz, ls=gzip)"""
           print("\n=== Testing Compression: mixed (narinfo=xz, ls=gzip) ===")
@@ -461,7 +461,7 @@ in
 
           print("  ✓ Client downloaded package with mixed compression")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_compression_disabled(bucket):
           """Verify no compression by default"""
           print("\n=== Testing Compression: disabled (default) ===")
