@@ -534,6 +534,69 @@ in
 
           print("  ✓ No compression applied by default")
 
+      @setup_s3()
+      def test_nix_prefetch_url(bucket):
+          """Test that nix-prefetch-url retrieves actual file content from S3, not empty files (issue #8862)"""
+          print("\n=== Testing nix-prefetch-url S3 Content Retrieval (issue #8862) ===")
+
+          # Create a test file with known content
+          test_content = "This is test content to verify S3 downloads work correctly!\n"
+          test_file_size = len(test_content)
+
+          server.succeed(f"echo -n '{test_content}' > /tmp/test-file.txt")
+
+          # Upload to S3
+          server.succeed(f"mc cp /tmp/test-file.txt minio/{bucket}/test-file.txt")
+
+          # Calculate expected hash
+          expected_hash = server.succeed(
+              "nix hash file --type sha256 --base32 /tmp/test-file.txt"
+          ).strip()
+
+          print(f"  ✓ Uploaded test file to S3 ({test_file_size} bytes)")
+
+          # Use nix-prefetch-url to download from S3
+          s3_url = make_s3_url(bucket, path="/test-file.txt")
+
+          prefetch_output = client.succeed(
+              f"{ENV_WITH_CREDS} nix-prefetch-url --print-path '{s3_url}'"
+          )
+
+          # Extract hash and store path
+          # With --print-path, output is: <hash>\n<store-path>
+          lines = prefetch_output.strip().split('\n')
+          prefetch_hash = lines[0]  # First line is the hash
+          store_path = lines[1]  # Second line is the store path
+
+          # Verify hash matches
+          if prefetch_hash != expected_hash:
+              raise Exception(
+                  f"Hash mismatch: expected {expected_hash}, got {prefetch_hash}"
+              )
+
+          print("  ✓ nix-prefetch-url completed with correct hash")
+
+          # Verify the downloaded file is NOT empty (the bug in #8862)
+          file_size = int(client.succeed(f"stat -c %s {store_path}").strip())
+
+          if file_size == 0:
+              raise Exception("Downloaded file is EMPTY - issue #8862 regression detected!")
+
+          if file_size != test_file_size:
+              raise Exception(
+                  f"File size mismatch: expected {test_file_size}, got {file_size}"
+              )
+
+          print(f"  ✓ File has correct size ({file_size} bytes, not empty)")
+
+          # Verify actual content matches by comparing hashes instead of printing entire file
+          downloaded_hash = client.succeed(f"nix hash file --type sha256 --base32 {store_path}").strip()
+
+          if downloaded_hash != expected_hash:
+              raise Exception(f"Content hash mismatch: expected {expected_hash}, got {downloaded_hash}")
+
+          print("  ✓ File content verified correct (hash matches)")
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -562,6 +625,7 @@ in
       test_compression_narinfo_gzip()
       test_compression_mixed()
       test_compression_disabled()
+      test_nix_prefetch_url()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
