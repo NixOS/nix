@@ -1,9 +1,9 @@
 #include "nix/store/s3-binary-cache-store.hh"
-
-#include <cassert>
-
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/store-registration.hh"
+
+#include <cassert>
+#include <ranges>
 
 namespace nix {
 
@@ -17,14 +17,13 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
     : StoreConfig(params)
     , HttpBinaryCacheStoreConfig(scheme, _cacheUri, params)
 {
-    // For S3 stores, preserve S3-specific query parameters as part of the URL
-    // These are needed for region specification and other S3-specific settings
     assert(cacheUri.query.empty());
+    assert(cacheUri.scheme == "s3");
 
-    // Only copy S3-specific parameters to the URL query
-    static const std::set<std::string> s3Params = {"region", "endpoint", "profile", "scheme"};
     for (const auto & [key, value] : params) {
-        if (s3Params.contains(key)) {
+        auto s3Params =
+            std::views::transform(s3UriSettings, [](const AbstractSetting * setting) { return setting->name; });
+        if (std::ranges::contains(s3Params, key)) {
             cacheUri.query[key] = value;
         }
     }
