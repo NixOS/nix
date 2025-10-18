@@ -1,3 +1,6 @@
+# Process JSON schema documentation
+subdir('protocols')
+
 summary_rl_next = custom_target(
   command : [
     bash,

@@ -438,6 +438,11 @@ in
   */
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 
+  /**
+    JSON schema validation checks
+  */
+  nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
+
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
   /**

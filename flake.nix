@@ -413,6 +413,10 @@
                 supportsCross = false;
               };
 
+              "nix-json-schema-checks" = {
+                supportsCross = false;
+              };
+
               "nix-perl-bindings" = {
                 supportsCross = false;
               };

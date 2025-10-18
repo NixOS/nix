@@ -115,6 +115,7 @@ manual = custom_target(
     builtins_md,
     rl_next_generated,
     summary_rl_next,
+    json_schema_generated_files,
     nix_input,
   ],
   output : [
