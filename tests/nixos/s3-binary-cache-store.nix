@@ -103,10 +103,6 @@ in
           bucket_and_path = f"{bucket}{path}" if path else bucket
           return f"s3://{bucket_and_path}?{query}"
 
-      def make_http_url(path):
-          """Build HTTP URL for direct S3 access"""
-          return f"{ENDPOINT}/{path}"
-
       def get_package_hash(pkg_path):
           """Extract store hash from package path"""
           return pkg_path.split("/")[-1].split("-")[0]
@@ -208,7 +204,7 @@ in
           print("\n=== Testing Error Message Formatting ===")
 
           nonexistent_url = make_s3_url(bucket, path="/foo-that-does-not-exist")
-          expected_http_url = make_http_url(f"{bucket}/foo-that-does-not-exist")
+          expected_http_url = f"{ENDPOINT}/{bucket}/foo-that-does-not-exist"
 
           error_msg = client.fail(
               f"{ENV_WITH_CREDS} nix eval --impure --expr "
