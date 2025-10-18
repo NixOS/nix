@@ -418,6 +418,13 @@ in
                   f"Expected 5 FileTransfer instances for 5 concurrent fetches, got {transfers_created}"
               )
 
+          if providers_created != 1:
+              print("Debug output:")
+              print(output)
+              raise Exception(
+                  f"Expected 1 credential provider for concurrent fetches, got {providers_created}"
+              )
+
       @setup_s3()
       def test_compression_narinfo_gzip(bucket):
           """Test narinfo compression with gzip"""
