@@ -75,7 +75,7 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
-    (lib.mesonEnable "curl-s3-store" withAWS)
+    (lib.mesonEnable "s3-aws-auth" withAWS)
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
