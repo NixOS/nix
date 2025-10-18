@@ -13,6 +13,7 @@
 #include "nix/cmd/misc-store-flags.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/url.hh"
 
 #include "man-pages.hh"
 
@@ -56,7 +57,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
 std::tuple<StorePath, Hash> prefetchFile(
     ref<Store> store,
-    std::string_view url,
+    VerbatimURL url,
     std::optional<std::string> name,
     HashAlgorithm hashAlgo,
     std::optional<Hash> expectedHash,
@@ -68,9 +69,24 @@ std::tuple<StorePath, Hash> prefetchFile(
 
     /* Figure out a name in the Nix store. */
     if (!name) {
-        name = baseNameOf(url);
-        if (name->empty())
-            throw Error("cannot figure out file name for '%s'", url);
+        try {
+            // Parse URL to properly extract filename without query parameters
+            auto parsedUrl = url.parsed();
+            // Get last non-empty path segment
+            for (auto it = parsedUrl.path.rbegin(); it != parsedUrl.path.rend(); ++it) {
+                if (!it->empty()) {
+                    name = *it;
+                    break;
+                }
+            }
+            if (!name || name->empty())
+                throw Error("cannot figure out file name from URL '%s'", url.to_string());
+        } catch (BadURL &) {
+            // Fall back to baseNameOf for unparseable URLs
+            name = baseNameOf(url.to_string());
+            if (name->empty())
+                throw Error("cannot figure out file name for '%s'", url.to_string());
+        }
     }
 
     std::optional<StorePath> storePath;
@@ -105,14 +121,14 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             FdSink sink(fd.get());
 
-            FileTransferRequest req(VerbatimURL{url});
+            FileTransferRequest req(url);
             req.decompress = false;
             getFileTransfer()->download(std::move(req), sink);
         }
 
         /* Optionally unpack the file. */
         if (unpack) {
-            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url));
+            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url.to_string()));
             auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
@@ -128,7 +144,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             }
         }
 
-        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url));
+        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url.to_string()));
 
         auto info = store->addToStoreSlow(
             *name, PosixSourceAccessor::createAtRoot(tmpFile), method, hashAlgo, {}, expectedHash);
