@@ -131,7 +131,7 @@ in
               print(output)
               raise Exception(f"{error_msg}: expected {expected}, got {actual}")
 
-      def setup_s3(populate_bucket=[]):
+      def setup_s3(populate_bucket=[], public=False):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
@@ -139,11 +139,14 @@ in
 
           Args:
               populate_bucket: List of packages to upload before test runs
+              public: If True, make the bucket publicly accessible
           """
           def decorator(test_func):
               def wrapper():
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
+                  if public:
+                      server.succeed(f"mc anonymous set download minio/{bucket}")
                   try:
                       if populate_bucket:
                           store_url = make_s3_url(bucket)
