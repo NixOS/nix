@@ -97,6 +97,8 @@ struct Source
     void drainInto(Sink & sink);
 
     std::string drain();
+
+    virtual void skip(size_t len);
 };
 
 /**
@@ -177,6 +179,7 @@ struct FdSource : BufferedSource
     Descriptor fd;
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
+    bool isSeekable = true;
 
     FdSource()
         : fd(INVALID_DESCRIPTOR)
@@ -199,6 +202,8 @@ struct FdSource : BufferedSource
      * read.
      */
     bool hasData();
+
+    void skip(size_t len) override;
 
 protected:
     size_t readUnbuffered(char * data, size_t len) override;

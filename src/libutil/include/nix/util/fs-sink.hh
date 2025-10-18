@@ -14,6 +14,14 @@ namespace nix {
  */
 struct CreateRegularFileSink : Sink
 {
+    /**
+     * If set to true, the sink will not be called with the contents
+     * of the file. `preallocateContents()` will still be called to
+     * convey the file size. Useful for sinks that want to efficiently
+     * discard the contents of the file.
+     */
+    bool skipContents = false;
+
     virtual void isExecutable() = 0;
 
     /**
