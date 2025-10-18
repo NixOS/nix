@@ -83,9 +83,11 @@ in
       ENDPOINT = 'http://server:9000'
       REGION = 'eu-west-1'
 
-      PKG_A = '${pkgA}'
-      PKG_B = '${pkgB}'
-      PKG_C = '${pkgC}'
+      PKGS = {
+          'A': '${pkgA}',
+          'B': '${pkgB}',
+          'C': '${pkgC}',
+      }
 
       ENV_WITH_CREDS = f"AWS_ACCESS_KEY_ID={ACCESS_KEY} AWS_SECRET_ACCESS_KEY={SECRET_KEY}"
 
@@ -168,7 +170,7 @@ in
           store_url = make_s3_url(bucket)
           output = server.succeed(
               f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' "
-              f"{PKG_A} {PKG_B} {PKG_C} 2>&1"
+              f"{PKGS['A']} {PKGS['B']} {PKGS['C']} 2>&1"
           )
 
           assert_count(
@@ -180,7 +182,7 @@ in
 
           print("✓ Credential provider created once and cached")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @with_test_bucket(populate_with=[PKGS['A']])
       def test_fetchurl_basic(bucket):
           """Test builtins.fetchurl works with s3:// URLs"""
           print("\n=== Testing builtins.fetchurl ===")
@@ -216,7 +218,7 @@ in
 
           print("✓ Error messages format URLs correctly")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @with_test_bucket(populate_with=[PKGS['A']])
       def test_fork_credential_preresolution(bucket):
           """Test credential pre-resolution in forked processes"""
           print("\n=== Testing Fork Credential Pre-resolution ===")
@@ -296,7 +298,7 @@ in
 
           print("  ✓ Child uses pre-resolved credentials (no new providers)")
 
-      @with_test_bucket(populate_with=[PKG_A, PKG_B, PKG_C])
+      @with_test_bucket(populate_with=[PKGS['A'], PKGS['B'], PKGS['C']])
       def test_store_operations(bucket):
           """Test nix store info and copy operations"""
           print("\n=== Testing Store Operations ===")
@@ -316,11 +318,11 @@ in
           print(f"  ✓ Store URL: {store_info['url']}")
 
           # Test copy from store
-          client.fail(f"nix path-info {PKG_A}")
+          client.fail(f"nix path-info {PKGS['A']}")
 
           output = client.succeed(
               f"{ENV_WITH_CREDS} nix copy --debug --no-check-sigs "
-              f"--from '{store_url}' {PKG_A} {PKG_B} {PKG_C} 2>&1"
+              f"--from '{store_url}' {PKGS['A']} {PKGS['B']} {PKGS['C']} 2>&1"
           )
 
           assert_count(
@@ -330,12 +332,12 @@ in
               "Client credential provider caching failed"
           )
 
-          client.succeed(f"nix path-info {PKG_A}")
+          client.succeed(f"nix path-info {PKGS['A']}")
 
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @with_test_bucket(populate_with=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
           print("\n=== Testing URL Format Variations ===")
@@ -350,7 +352,7 @@ in
           client.succeed(f"{ENV_WITH_CREDS} nix store info --store '{url2}' >&2")
           print("  ✓ Parameter order: endpoint before region works")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @with_test_bucket(populate_with=[PKGS['A']])
       def test_concurrent_fetches(bucket):
           """Validate thread safety with concurrent S3 operations"""
           print("\n=== Testing Concurrent Fetches ===")
@@ -418,16 +420,16 @@ in
           print("\n=== Testing Compression: narinfo (gzip) ===")
 
           store_url = make_s3_url(bucket, **{'narinfo-compression': 'gzip'})
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_B}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['B']}")
 
-          pkg_hash = get_package_hash(PKG_B)
+          pkg_hash = get_package_hash(PKGS['B'])
           verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "gzip")
 
           print("  ✓ .narinfo has Content-Encoding: gzip")
 
           # Verify client can download and decompress
-          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKG_B}")
-          client.succeed(f"nix path-info {PKG_B}")
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['B']}")
+          client.succeed(f"nix path-info {PKGS['B']}")
 
           print("  ✓ Client decompressed .narinfo successfully")
 
@@ -441,9 +443,9 @@ in
               **{'narinfo-compression': 'xz', 'write-nar-listing': 'true', 'ls-compression': 'gzip'}
           )
 
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_C}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['C']}")
 
-          pkg_hash = get_package_hash(PKG_C)
+          pkg_hash = get_package_hash(PKGS['C'])
 
           # Verify .narinfo has xz compression
           verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "xz")
@@ -454,8 +456,8 @@ in
           print("  ✓ .ls has Content-Encoding: gzip")
 
           # Verify client can download with mixed compression
-          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKG_C}")
-          client.succeed(f"nix path-info {PKG_C}")
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['C']}")
+          client.succeed(f"nix path-info {PKGS['C']}")
 
           print("  ✓ Client downloaded package with mixed compression")
 
@@ -465,9 +467,9 @@ in
           print("\n=== Testing Compression: disabled (default) ===")
 
           store_url = make_s3_url(bucket)
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_A}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['A']}")
 
-          pkg_hash = get_package_hash(PKG_A)
+          pkg_hash = get_package_hash(PKGS['A'])
           verify_no_compression(server, bucket, f"{pkg_hash}.narinfo")
 
           print("  ✓ No compression applied by default")
