@@ -34,6 +34,8 @@ in
               pkgs.ninja
               pkgs.jq
               pkgs.git
+              pkgs.curl
+              pkgs.python3
 
               # Want to avoid `/run/current-system/sw/bin/bash` because we
               # want a store path. Likewise for coreutils.

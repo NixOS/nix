@@ -75,6 +75,15 @@ public:
         diskCache = getNarInfoDiskCache();
     }
 
+    void connect() override
+    {
+        try {
+            BinaryCacheStore::init();
+        } catch (UploadToHTTP &) {
+            throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
+        }
+    }
+
     void init() override
     {
         // FIXME: do this lazily?

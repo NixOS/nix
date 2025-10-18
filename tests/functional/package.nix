@@ -48,6 +48,7 @@ mkMesonDerivation (
       buildPackages.git
       buildPackages.mercurial
       buildPackages.unixtools.script
+      buildPackages.curl
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [
       # For various sandboxing tests that needs a statically-linked shell,
