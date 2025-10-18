@@ -135,22 +135,22 @@ in
               print(output)
               raise Exception(f"{error_msg}: expected {expected}, got {actual}")
 
-      def setup_s3(populate_with=[]):
+      def setup_s3(populate_bucket=[]):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
 
           Args:
-              populate_with: List of packages to upload before test runs
+              populate_bucket: List of packages to upload before test runs
           """
           def decorator(test_func):
               def wrapper():
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
                   try:
-                      if populate_with:
+                      if populate_bucket:
                           store_url = make_s3_url(bucket)
-                          for pkg in populate_with:
+                          for pkg in populate_bucket:
                               server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
                       test_func(bucket)
                   finally:
@@ -182,7 +182,7 @@ in
 
           print("✓ Credential provider created once and cached")
 
-      @setup_s3(populate_with=[PKGS['A']])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_fetchurl_basic(bucket):
           """Test builtins.fetchurl works with s3:// URLs"""
           print("\n=== Testing builtins.fetchurl ===")
@@ -218,7 +218,7 @@ in
 
           print("✓ Error messages format URLs correctly")
 
-      @setup_s3(populate_with=[PKGS['A']])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_fork_credential_preresolution(bucket):
           """Test credential pre-resolution in forked processes"""
           print("\n=== Testing Fork Credential Pre-resolution ===")
@@ -298,7 +298,7 @@ in
 
           print("  ✓ Child uses pre-resolved credentials (no new providers)")
 
-      @setup_s3(populate_with=[PKGS['A'], PKGS['B'], PKGS['C']])
+      @setup_s3(populate_bucket=[PKGS['A'], PKGS['B'], PKGS['C']])
       def test_store_operations(bucket):
           """Test nix store info and copy operations"""
           print("\n=== Testing Store Operations ===")
@@ -337,7 +337,7 @@ in
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
-      @setup_s3(populate_with=[PKGS['A']])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
           print("\n=== Testing URL Format Variations ===")
@@ -352,7 +352,7 @@ in
           client.succeed(f"{ENV_WITH_CREDS} nix store info --store '{url2}' >&2")
           print("  ✓ Parameter order: endpoint before region works")
 
-      @setup_s3(populate_with=[PKGS['A']])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_concurrent_fetches(bucket):
           """Validate thread safety with concurrent S3 operations"""
           print("\n=== Testing Concurrent Fetches ===")
