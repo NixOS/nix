@@ -29,6 +29,19 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
     }
 }
 
+std::string S3BinaryCacheStoreConfig::getHumanReadableURI() const
+{
+    auto reference = getReference();
+    reference.params = [&]() {
+        Params relevantParams;
+        for (auto & setting : s3UriSettings)
+            if (setting->overridden)
+                relevantParams.insert({setting->name, reference.params.at(setting->name)});
+        return relevantParams;
+    }();
+    return reference.render();
+}
+
 std::string S3BinaryCacheStoreConfig::doc()
 {
     return R"(

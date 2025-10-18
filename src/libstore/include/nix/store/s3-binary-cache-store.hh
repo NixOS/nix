@@ -75,6 +75,8 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
     static StringSet uriSchemes();
 
     static std::string doc();
+
+    std::string getHumanReadableURI() const override;
 };
 
 } // namespace nix
