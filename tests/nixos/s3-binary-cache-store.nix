@@ -252,7 +252,7 @@ in
           """.format(id=test_id, url=test_url, hash=cache_info_hash)
 
           output = client.succeed(
-              f"{ENV_WITH_CREDS} nix build --debug --impure --expr '{fetchurl_expr}' 2>&1"
+              f"{ENV_WITH_CREDS} nix build --debug --impure --no-link --expr '{fetchurl_expr}' 2>&1"
           )
 
           # Verify fork behavior
@@ -392,12 +392,12 @@ in
 
           try:
               output = client.succeed(
-                  f"{ENV_WITH_CREDS} nix build --debug --impure "
+                  f"{ENV_WITH_CREDS} nix build --debug --impure --no-link "
                   f"--expr '{concurrent_expr}' --max-jobs 5 2>&1"
               )
           except:
               output = client.fail(
-                  f"{ENV_WITH_CREDS} nix build --debug --impure "
+                  f"{ENV_WITH_CREDS} nix build --debug --impure --no-link "
                   f"--expr '{concurrent_expr}' --max-jobs 5 2>&1"
               )
 
