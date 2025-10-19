@@ -131,6 +131,22 @@ in
               print(output)
               raise Exception(f"{error_msg}: expected {expected}, got {actual}")
 
+      def verify_packages_in_store(machine, pkg_paths, should_exist=True):
+          """
+          Verify whether packages exist in the store.
+
+          Args:
+              machine: The machine to check on
+              pkg_paths: List of package paths to check (or single path)
+              should_exist: If True, verify packages exist; if False, verify they don't
+          """
+          paths = [pkg_paths] if isinstance(pkg_paths, str) else pkg_paths
+          for pkg in paths:
+              if should_exist:
+                  machine.succeed(f"nix path-info {pkg}")
+              else:
+                  machine.fail(f"nix path-info {pkg}")
+
       def setup_s3(populate_bucket=[], public=False):
           """
           Decorator that creates/destroys a unique bucket for each test.
@@ -321,7 +337,7 @@ in
           print(f"  ✓ Store URL: {store_info['url']}")
 
           # Test copy from store
-          client.fail(f"nix path-info {PKGS['A']}")
+          verify_packages_in_store(client, PKGS['A'], should_exist=False)
 
           output = client.succeed(
               f"{ENV_WITH_CREDS} nix copy --debug --no-check-sigs "
@@ -335,7 +351,7 @@ in
               "Client credential provider caching failed"
           )
 
-          client.succeed(f"nix path-info {PKGS['A']}")
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B'], PKGS['C']])
 
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
@@ -361,8 +377,7 @@ in
           print(f"  ✓ Store URL: {store_info['url']}")
 
           # Verify packages are not yet in client store
-          client.fail(f"nix path-info {PKGS['A']}")
-          client.fail(f"nix path-info {PKGS['B']}")
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B']], should_exist=False)
 
           # Test copy from public bucket without credentials
           client.succeed(
@@ -371,8 +386,7 @@ in
           )
 
           # Verify packages were copied successfully
-          client.succeed(f"nix path-info {PKGS['A']}")
-          client.succeed(f"nix path-info {PKGS['B']}")
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B']])
 
           print("  ✓ nix copy from public bucket works without credentials")
 
@@ -475,7 +489,7 @@ in
 
           # Verify client can download and decompress
           client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['B']}")
-          client.succeed(f"nix path-info {PKGS['B']}")
+          verify_packages_in_store(client, PKGS['B'])
 
           print("  ✓ Client decompressed .narinfo successfully")
 
@@ -503,7 +517,7 @@ in
 
           # Verify client can download with mixed compression
           client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['C']}")
-          client.succeed(f"nix path-info {PKGS['C']}")
+          verify_packages_in_store(client, PKGS['C'])
 
           print("  ✓ Client downloaded package with mixed compression")
 
