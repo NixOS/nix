@@ -199,8 +199,8 @@ static void fetchTree(
     if (state.settings.pureEval && !input.isLocked()) {
         if (input.getNarHash())
             warn(
-                "Input '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
-                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                "Input '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
+                "This is not reproducible and will break after garbage collection or when shared.",
                 input.to_string());
         else
             state

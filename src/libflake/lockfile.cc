@@ -77,8 +77,8 @@ LockedNode::LockedNode(const fetchers::Settings & fetchSettings, const nlohmann:
     if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative()) {
         if (lockedRef.input.getNarHash())
             warn(
-                "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
-                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
+                "This is not reproducible and will break after garbage collection or when shared.",
                 lockedRef.to_string());
         else
             throw Error(
