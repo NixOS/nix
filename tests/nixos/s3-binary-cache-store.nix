@@ -340,6 +340,42 @@ in
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
+      @setup_s3(populate_bucket=[PKGS['A'], PKGS['B']], public=True)
+      def test_public_bucket_operations(bucket):
+          """Test store operations on public bucket without credentials"""
+          print("\n=== Testing Public Bucket Operations ===")
+
+          store_url = make_s3_url(bucket)
+
+          # Verify store info works without credentials
+          client.succeed(f"nix store info --store '{store_url}' >&2")
+          print("  ✓ nix store info works without credentials")
+
+          # Get and validate store info JSON
+          info_json = client.succeed(f"nix store info --json --store '{store_url}'")
+          store_info = json.loads(info_json)
+
+          if not store_info.get("url"):
+              raise Exception("Store should have a URL")
+
+          print(f"  ✓ Store URL: {store_info['url']}")
+
+          # Verify packages are not yet in client store
+          client.fail(f"nix path-info {PKGS['A']}")
+          client.fail(f"nix path-info {PKGS['B']}")
+
+          # Test copy from public bucket without credentials
+          client.succeed(
+              f"nix copy --debug --no-check-sigs "
+              f"--from '{store_url}' {PKGS['A']} {PKGS['B']} 2>&1"
+          )
+
+          # Verify packages were copied successfully
+          client.succeed(f"nix path-info {PKGS['A']}")
+          client.succeed(f"nix path-info {PKGS['B']}")
+
+          print("  ✓ nix copy from public bucket works without credentials")
+
       @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
@@ -506,6 +542,7 @@ in
       test_error_message_formatting()
       test_fork_credential_preresolution()
       test_store_operations()
+      test_public_bucket_operations()
       test_url_format_variations()
       test_concurrent_fetches()
       test_compression_narinfo_gzip()
