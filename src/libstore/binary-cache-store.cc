@@ -165,6 +165,10 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     auto now2 = std::chrono::steady_clock::now();
 
     auto info = mkInfo(narHashSink.finish());
+
+    if (checkSigs && info.sigs.empty())
+        throw Error("cannot add path '%s' to binary cache because it is not signed", printStorePath(info.path));
+
     auto narInfo = make_ref<NarInfo>(info);
     narInfo->compression = config.compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
