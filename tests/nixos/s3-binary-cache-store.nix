@@ -83,9 +83,11 @@ in
       ENDPOINT = 'http://server:9000'
       REGION = 'eu-west-1'
 
-      PKG_A = '${pkgA}'
-      PKG_B = '${pkgB}'
-      PKG_C = '${pkgC}'
+      PKGS = {
+          'A': '${pkgA}',
+          'B': '${pkgB}',
+          'C': '${pkgC}',
+      }
 
       ENV_WITH_CREDS = f"AWS_ACCESS_KEY_ID={ACCESS_KEY} AWS_SECRET_ACCESS_KEY={SECRET_KEY}"
 
@@ -100,10 +102,6 @@ in
           query = '&'.join(f"{k}={v}" for k, v in params.items())
           bucket_and_path = f"{bucket}{path}" if path else bucket
           return f"s3://{bucket_and_path}?{query}"
-
-      def make_http_url(path):
-          """Build HTTP URL for direct S3 access"""
-          return f"{ENDPOINT}/{path}"
 
       def get_package_hash(pkg_path):
           """Extract store hash from package path"""
@@ -133,26 +131,49 @@ in
               print(output)
               raise Exception(f"{error_msg}: expected {expected}, got {actual}")
 
-      def with_test_bucket(populate_with=[]):
+      def verify_packages_in_store(machine, pkg_paths, should_exist=True):
+          """
+          Verify whether packages exist in the store.
+
+          Args:
+              machine: The machine to check on
+              pkg_paths: List of package paths to check (or single path)
+              should_exist: If True, verify packages exist; if False, verify they don't
+          """
+          paths = [pkg_paths] if isinstance(pkg_paths, str) else pkg_paths
+          for pkg in paths:
+              if should_exist:
+                  machine.succeed(f"nix path-info {pkg}")
+              else:
+                  machine.fail(f"nix path-info {pkg}")
+
+      def setup_s3(populate_bucket=[], public=False):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
+          Cleans up client store after test completion.
 
           Args:
-              populate_with: List of packages to upload before test runs
+              populate_bucket: List of packages to upload before test runs
+              public: If True, make the bucket publicly accessible
           """
           def decorator(test_func):
               def wrapper():
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
+                  if public:
+                      server.succeed(f"mc anonymous set download minio/{bucket}")
                   try:
-                      if populate_with:
+                      if populate_bucket:
                           store_url = make_s3_url(bucket)
-                          for pkg in populate_with:
+                          for pkg in populate_bucket:
                               server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
                       test_func(bucket)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
+                      # Clean up client store - only delete if path exists
+                      for pkg in PKGS.values():
+                          client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
               return wrapper
           return decorator
 
@@ -160,7 +181,7 @@ in
       # Test Functions
       # ============================================================================
 
-      @with_test_bucket()
+      @setup_s3()
       def test_credential_caching(bucket):
           """Verify credential providers are cached and reused"""
           print("\n=== Testing Credential Caching ===")
@@ -168,7 +189,7 @@ in
           store_url = make_s3_url(bucket)
           output = server.succeed(
               f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' "
-              f"{PKG_A} {PKG_B} {PKG_C} 2>&1"
+              f"{PKGS['A']} {PKGS['B']} {PKGS['C']} 2>&1"
           )
 
           assert_count(
@@ -180,7 +201,7 @@ in
 
           print("✓ Credential provider created once and cached")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_fetchurl_basic(bucket):
           """Test builtins.fetchurl works with s3:// URLs"""
           print("\n=== Testing builtins.fetchurl ===")
@@ -196,13 +217,13 @@ in
 
           print("✓ builtins.fetchurl works with s3:// URLs")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_error_message_formatting(bucket):
           """Verify error messages display URLs correctly"""
           print("\n=== Testing Error Message Formatting ===")
 
           nonexistent_url = make_s3_url(bucket, path="/foo-that-does-not-exist")
-          expected_http_url = make_http_url(f"{bucket}/foo-that-does-not-exist")
+          expected_http_url = f"{ENDPOINT}/{bucket}/foo-that-does-not-exist"
 
           error_msg = client.fail(
               f"{ENV_WITH_CREDS} nix eval --impure --expr "
@@ -216,7 +237,7 @@ in
 
           print("✓ Error messages format URLs correctly")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_fork_credential_preresolution(bucket):
           """Test credential pre-resolution in forked processes"""
           print("\n=== Testing Fork Credential Pre-resolution ===")
@@ -246,7 +267,7 @@ in
           """.format(id=test_id, url=test_url, hash=cache_info_hash)
 
           output = client.succeed(
-              f"{ENV_WITH_CREDS} nix build --debug --impure --expr '{fetchurl_expr}' 2>&1"
+              f"{ENV_WITH_CREDS} nix build --debug --impure --no-link --expr '{fetchurl_expr}' 2>&1"
           )
 
           # Verify fork behavior
@@ -296,7 +317,7 @@ in
 
           print("  ✓ Child uses pre-resolved credentials (no new providers)")
 
-      @with_test_bucket(populate_with=[PKG_A, PKG_B, PKG_C])
+      @setup_s3(populate_bucket=[PKGS['A'], PKGS['B'], PKGS['C']])
       def test_store_operations(bucket):
           """Test nix store info and copy operations"""
           print("\n=== Testing Store Operations ===")
@@ -316,11 +337,11 @@ in
           print(f"  ✓ Store URL: {store_info['url']}")
 
           # Test copy from store
-          client.fail(f"nix path-info {PKG_A}")
+          verify_packages_in_store(client, PKGS['A'], should_exist=False)
 
           output = client.succeed(
               f"{ENV_WITH_CREDS} nix copy --debug --no-check-sigs "
-              f"--from '{store_url}' {PKG_A} {PKG_B} {PKG_C} 2>&1"
+              f"--from '{store_url}' {PKGS['A']} {PKGS['B']} {PKGS['C']} 2>&1"
           )
 
           assert_count(
@@ -330,12 +351,46 @@ in
               "Client credential provider caching failed"
           )
 
-          client.succeed(f"nix path-info {PKG_A}")
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B'], PKGS['C']])
 
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @setup_s3(populate_bucket=[PKGS['A'], PKGS['B']], public=True)
+      def test_public_bucket_operations(bucket):
+          """Test store operations on public bucket without credentials"""
+          print("\n=== Testing Public Bucket Operations ===")
+
+          store_url = make_s3_url(bucket)
+
+          # Verify store info works without credentials
+          client.succeed(f"nix store info --store '{store_url}' >&2")
+          print("  ✓ nix store info works without credentials")
+
+          # Get and validate store info JSON
+          info_json = client.succeed(f"nix store info --json --store '{store_url}'")
+          store_info = json.loads(info_json)
+
+          if not store_info.get("url"):
+              raise Exception("Store should have a URL")
+
+          print(f"  ✓ Store URL: {store_info['url']}")
+
+          # Verify packages are not yet in client store
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B']], should_exist=False)
+
+          # Test copy from public bucket without credentials
+          client.succeed(
+              f"nix copy --debug --no-check-sigs "
+              f"--from '{store_url}' {PKGS['A']} {PKGS['B']} 2>&1"
+          )
+
+          # Verify packages were copied successfully
+          verify_packages_in_store(client, [PKGS['A'], PKGS['B']])
+
+          print("  ✓ nix copy from public bucket works without credentials")
+
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
           print("\n=== Testing URL Format Variations ===")
@@ -350,7 +405,7 @@ in
           client.succeed(f"{ENV_WITH_CREDS} nix store info --store '{url2}' >&2")
           print("  ✓ Parameter order: endpoint before region works")
 
-      @with_test_bucket(populate_with=[PKG_A])
+      @setup_s3(populate_bucket=[PKGS['A']])
       def test_concurrent_fetches(bucket):
           """Validate thread safety with concurrent S3 operations"""
           print("\n=== Testing Concurrent Fetches ===")
@@ -386,12 +441,12 @@ in
 
           try:
               output = client.succeed(
-                  f"{ENV_WITH_CREDS} nix build --debug --impure "
+                  f"{ENV_WITH_CREDS} nix build --debug --impure --no-link "
                   f"--expr '{concurrent_expr}' --max-jobs 5 2>&1"
               )
           except:
               output = client.fail(
-                  f"{ENV_WITH_CREDS} nix build --debug --impure "
+                  f"{ENV_WITH_CREDS} nix build --debug --impure --no-link "
                   f"--expr '{concurrent_expr}' --max-jobs 5 2>&1"
               )
 
@@ -412,26 +467,33 @@ in
                   f"Expected 5 FileTransfer instances for 5 concurrent fetches, got {transfers_created}"
               )
 
-      @with_test_bucket()
+          if providers_created != 1:
+              print("Debug output:")
+              print(output)
+              raise Exception(
+                  f"Expected 1 credential provider for concurrent fetches, got {providers_created}"
+              )
+
+      @setup_s3()
       def test_compression_narinfo_gzip(bucket):
           """Test narinfo compression with gzip"""
           print("\n=== Testing Compression: narinfo (gzip) ===")
 
           store_url = make_s3_url(bucket, **{'narinfo-compression': 'gzip'})
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_B}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['B']}")
 
-          pkg_hash = get_package_hash(PKG_B)
+          pkg_hash = get_package_hash(PKGS['B'])
           verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "gzip")
 
           print("  ✓ .narinfo has Content-Encoding: gzip")
 
           # Verify client can download and decompress
-          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKG_B}")
-          client.succeed(f"nix path-info {PKG_B}")
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['B']}")
+          verify_packages_in_store(client, PKGS['B'])
 
           print("  ✓ Client decompressed .narinfo successfully")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_compression_mixed(bucket):
           """Test mixed compression (narinfo=xz, ls=gzip)"""
           print("\n=== Testing Compression: mixed (narinfo=xz, ls=gzip) ===")
@@ -441,9 +503,9 @@ in
               **{'narinfo-compression': 'xz', 'write-nar-listing': 'true', 'ls-compression': 'gzip'}
           )
 
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_C}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['C']}")
 
-          pkg_hash = get_package_hash(PKG_C)
+          pkg_hash = get_package_hash(PKGS['C'])
 
           # Verify .narinfo has xz compression
           verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "xz")
@@ -454,20 +516,20 @@ in
           print("  ✓ .ls has Content-Encoding: gzip")
 
           # Verify client can download with mixed compression
-          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKG_C}")
-          client.succeed(f"nix path-info {PKG_C}")
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKGS['C']}")
+          verify_packages_in_store(client, PKGS['C'])
 
           print("  ✓ Client downloaded package with mixed compression")
 
-      @with_test_bucket()
+      @setup_s3()
       def test_compression_disabled(bucket):
           """Verify no compression by default"""
           print("\n=== Testing Compression: disabled (default) ===")
 
           store_url = make_s3_url(bucket)
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_A}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['A']}")
 
-          pkg_hash = get_package_hash(PKG_A)
+          pkg_hash = get_package_hash(PKGS['A'])
           verify_no_compression(server, bucket, f"{pkg_hash}.narinfo")
 
           print("  ✓ No compression applied by default")
@@ -494,6 +556,7 @@ in
       test_error_message_formatting()
       test_fork_credential_preresolution()
       test_store_operations()
+      test_public_bucket_operations()
       test_url_format_variations()
       test_concurrent_fetches()
       test_compression_narinfo_gzip()
