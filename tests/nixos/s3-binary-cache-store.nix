@@ -149,7 +149,7 @@ in
                       if populate_with:
                           store_url = make_s3_url(bucket)
                           for pkg in populate_with:
-                              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
+                              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' --no-check-sigs {pkg}")
                       test_func(bucket)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
@@ -167,7 +167,7 @@ in
 
           store_url = make_s3_url(bucket)
           output = server.succeed(
-              f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' "
+              f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' --no-check-sigs "
               f"{PKG_A} {PKG_B} {PKG_C} 2>&1"
           )
 
@@ -418,7 +418,7 @@ in
           print("\n=== Testing Compression: narinfo (gzip) ===")
 
           store_url = make_s3_url(bucket, **{'narinfo-compression': 'gzip'})
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_B}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' --no-check-sigs {PKG_B}")
 
           pkg_hash = get_package_hash(PKG_B)
           verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "gzip")
@@ -441,7 +441,7 @@ in
               **{'narinfo-compression': 'xz', 'write-nar-listing': 'true', 'ls-compression': 'gzip'}
           )
 
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_C}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' --no-check-sigs {PKG_C}")
 
           pkg_hash = get_package_hash(PKG_C)
 
@@ -465,12 +465,71 @@ in
           print("\n=== Testing Compression: disabled (default) ===")
 
           store_url = make_s3_url(bucket)
-          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_A}")
+          server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' --no-check-sigs {PKG_A}")
 
           pkg_hash = get_package_hash(PKG_A)
           verify_no_compression(server, bucket, f"{pkg_hash}.narinfo")
 
           print("  ✓ No compression applied by default")
+
+      @with_test_bucket()
+      def test_store_signatures(bucket):
+          """Test signature verification for binary cache operations (issue #12491)"""
+          print("\n=== Testing Store Signatures ===")
+
+          store_url = make_s3_url(bucket)
+
+          # Generate signing keys
+          server.succeed("nix key generate-secret --key-name server-key > /tmp/server.sec")
+          server.succeed("nix key convert-secret-to-public < /tmp/server.sec > /tmp/server.pub")
+          client.succeed("nix key generate-secret --key-name client-key > /tmp/client.sec")
+          client.succeed("nix key convert-secret-to-public < /tmp/client.sec > /tmp/client.pub")
+
+          server_pub_key = server.succeed("cat /tmp/server.pub").strip()
+          client_pub_key = client.succeed("cat /tmp/client.pub").strip()
+
+          print(f"  • Server key: {server_pub_key[:50]}...")
+          print(f"  • Client key: {client_pub_key[:50]}...")
+
+          # Test 1: Unsigned path should be rejected
+          result = server.fail(
+              f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKG_A} 2>&1"
+          )
+          if "is not signed" not in result:
+              print("Actual error output:")
+              print(result)
+              raise Exception("Expected 'is not signed' error for unsigned path")
+          print("  ✓ Unsigned path rejected")
+
+          # Test 2: Sign and push with valid signature (server trusts its own key)
+          server.succeed(f"nix store sign --key-file /tmp/server.sec {PKG_A}")
+          server.succeed(
+              f"{ENV_WITH_CREDS} nix copy --to '{store_url}' "
+              f"--option trusted-public-keys '{server_pub_key}' {PKG_A}"
+          )
+          print("  ✓ Signed path accepted")
+
+          # Test 3: Download with trusted key on client
+          client.succeed(
+              f"{ENV_WITH_CREDS} nix copy --from '{store_url}' "
+              f"--option trusted-public-keys '{server_pub_key}' {PKG_A}"
+          )
+          client.succeed(f"nix path-info {PKG_A}")
+          print("  ✓ Signed path downloaded with trusted key")
+
+          # Test 4: Try downloading with wrong trusted key
+          client.succeed(f"nix store delete --ignore-liveness {PKG_A}")
+          result = client.fail(
+              f"{ENV_WITH_CREDS} nix copy --from '{store_url}' "
+              f"--option trusted-public-keys '{client_pub_key}' {PKG_A} 2>&1"
+          )
+          if "signature" not in result.lower():
+              raise Exception("Expected signature verification failure with wrong key")
+          print("  ✓ Path rejected with wrong trusted key")
+
+          # Test 5: Bypass with --no-check-sigs
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' --no-check-sigs {PKG_A}")
+          print("  ✓ Signature check bypassed with --no-check-sigs")
 
       # ============================================================================
       # Main Test Execution
@@ -499,6 +558,7 @@ in
       test_compression_narinfo_gzip()
       test_compression_mixed()
       test_compression_disabled()
+      test_store_signatures()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
