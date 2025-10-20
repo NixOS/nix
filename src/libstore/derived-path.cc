@@ -252,20 +252,26 @@ void adl_serializer<DerivedPath::Built>::to_json(json & json, const DerivedPath:
     };
 }
 
-SingleDerivedPath::Built adl_serializer<SingleDerivedPath::Built>::from_json(const json & json0)
+SingleDerivedPath::Built
+adl_serializer<SingleDerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
 {
     auto & json = getObject(json0);
+    auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
+    drvRequireExperiment(*drvPath, xpSettings);
     return {
-        .drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath"))),
+        .drvPath = std::move(drvPath),
         .output = getString(valueAt(json, "output")),
     };
 }
 
-DerivedPath::Built adl_serializer<DerivedPath::Built>::from_json(const json & json0)
+DerivedPath::Built
+adl_serializer<DerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
 {
     auto & json = getObject(json0);
+    auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
+    drvRequireExperiment(*drvPath, xpSettings);
     return {
-        .drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath"))),
+        .drvPath = std::move(drvPath),
         .outputs = adl_serializer<OutputsSpec>::from_json(valueAt(json, "outputs")),
     };
 }
@@ -280,20 +286,21 @@ void adl_serializer<DerivedPath>::to_json(json & json, const DerivedPath & sdp)
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
 
-SingleDerivedPath adl_serializer<SingleDerivedPath>::from_json(const json & json)
+SingleDerivedPath
+adl_serializer<SingleDerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
 {
     if (json.is_string())
         return static_cast<SingleDerivedPath::Opaque>(json);
     else
-        return static_cast<SingleDerivedPath::Built>(json);
+        return adl_serializer<SingleDerivedPath::Built>::from_json(json, xpSettings);
 }
 
-DerivedPath adl_serializer<DerivedPath>::from_json(const json & json)
+DerivedPath adl_serializer<DerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
 {
     if (json.is_string())
         return static_cast<DerivedPath::Opaque>(json);
     else
-        return static_cast<DerivedPath::Built>(json);
+        return adl_serializer<DerivedPath::Built>::from_json(json, xpSettings);
 }
 
 } // namespace nlohmann
