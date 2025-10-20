@@ -365,72 +365,273 @@ struct ExprOpHasAttr : Expr
     COMMON_METHODS
 };
 
+struct AttrDefBuilder;
+
+struct AttrDef
+{
+    enum class Kind {
+        /** `attr = expr;` */
+        Plain,
+        /** `inherit attr1 attrn;` */
+        Inherited,
+        /** `inherit (expr) attr1 attrn;` */
+        InheritedFrom,
+    };
+
+    Kind kind;
+    PosIdx pos;
+    Expr * e;
+    AttrDef(std::pmr::polymorphic_allocator<char> & alloc, AttrDefBuilder const & builder);
+
+    template<typename T>
+    const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
+    {
+        switch (kind) {
+        case Kind::Plain:
+            return plain;
+        case Kind::Inherited:
+            return inherited;
+        default:
+        case Kind::InheritedFrom:
+            return inheritedFrom;
+        }
+    }
+};
+
+struct ExprAttrsBuilder;
+
+struct AttrDefBuilder
+{
+    AttrDef::Kind kind;
+    PosIdx pos;
+    std::variant<Expr *, ExprAttrsBuilder *> e;
+    AttrDefBuilder(
+        std::variant<Expr *, ExprAttrsBuilder *> e, const PosIdx & pos, AttrDef::Kind kind = AttrDef::Kind::Plain)
+        : kind(kind)
+        , pos(pos)
+        , e(e) {};
+    AttrDefBuilder() {};
+};
+
+struct DynamicAttrDefBuilder;
+
+struct DynamicAttrDef
+{
+    Expr *nameExpr, *valueExpr;
+    PosIdx pos;
+    DynamicAttrDef(std::pmr::polymorphic_allocator<char> & alloc, DynamicAttrDefBuilder const & builder);
+};
+
+struct DynamicAttrDefBuilder
+{
+    Expr * nameExpr;
+    std::variant<Expr *, ExprAttrsBuilder *> valueExpr;
+    PosIdx pos;
+    DynamicAttrDefBuilder(Expr * nameExpr, std::variant<Expr *, ExprAttrsBuilder *> valueExpr, const PosIdx & pos)
+        : nameExpr(nameExpr)
+        , valueExpr(valueExpr)
+        , pos(pos) {};
+};
+
+/**
+ * All of the information for ExprAttrs, but mutable and in a not-optimized layout.
+ */
+struct ExprAttrsBuilder
+{
+    bool recursive;
+    PosIdx pos;
+    std::map<Symbol, AttrDefBuilder> attrs;
+    std::vector<Expr *> inheritFromExprs;
+    std::vector<DynamicAttrDefBuilder> dynamicAttrs;
+
+    ExprAttrsBuilder(const PosIdx & pos)
+        : recursive(false)
+        , pos(pos) {};
+    ExprAttrsBuilder()
+        : recursive(false) {};
+};
+
 struct ExprAttrs : Expr
 {
     bool recursive;
     PosIdx pos;
 
-    struct AttrDef
+    uint32_t nAttrs;
+    uint16_t nInheritFromExprs;
+    uint16_t nDynamicAttrs;
+    /**
+     * Both the names and values arrays are sorted according to the order of
+     * the *names*.
+     */
+    Symbol * attrNamesStart;
+    AttrDef * attrValuesStart;
+
+    Expr ** inheritFromExprsStart;
+    DynamicAttrDef * dynamicAttrsStart;
+
+    ExprAttrs(std::pmr::polymorphic_allocator<char> & alloc, ExprAttrsBuilder * builder)
+        : recursive(builder->recursive)
+        , pos(builder->pos)
+        , nAttrs(builder->attrs.size())
+        , nInheritFromExprs(builder->inheritFromExprs.size())
+        , nDynamicAttrs(builder->dynamicAttrs.size())
+        , attrNamesStart(alloc.allocate_object<Symbol>(nAttrs))
+        , attrValuesStart(alloc.allocate_object<AttrDef>(nAttrs))
+        , inheritFromExprsStart(alloc.allocate_object<Expr *>(nInheritFromExprs))
+        , dynamicAttrsStart(alloc.allocate_object<DynamicAttrDef>(nDynamicAttrs))
     {
-        enum class Kind {
-            /** `attr = expr;` */
-            Plain,
-            /** `inherit attr1 attrn;` */
-            Inherited,
-            /** `inherit (expr) attr1 attrn;` */
-            InheritedFrom,
-        };
-
-        Kind kind;
-        Expr * e;
-        PosIdx pos;
-        Displacement displ = 0; // displacement
-        AttrDef(Expr * e, const PosIdx & pos, Kind kind = Kind::Plain)
-            : kind(kind)
-            , e(e)
-            , pos(pos) {};
-        AttrDef() {};
-
-        template<typename T>
-        const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
-        {
-            switch (kind) {
-            case Kind::Plain:
-                return plain;
-            case Kind::Inherited:
-                return inherited;
-            default:
-            case Kind::InheritedFrom:
-                return inheritedFrom;
-            }
+        for (auto const & [n, e] : enumerate(builder->attrs)) {
+            auto & [name, value] = e;
+            attrNamesStart[n] = name;
+            attrValuesStart[n] = AttrDef(alloc, value);
         }
-    };
 
-    typedef std::map<Symbol, AttrDef> AttrDefs;
-    AttrDefs attrs;
-    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
+        std::ranges::copy(builder->inheritFromExprs, inheritFromExprsStart);
 
-    struct DynamicAttrDef
-    {
-        Expr *nameExpr, *valueExpr;
-        PosIdx pos;
-        DynamicAttrDef(Expr * nameExpr, Expr * valueExpr, const PosIdx & pos)
-            : nameExpr(nameExpr)
-            , valueExpr(valueExpr)
-            , pos(pos) {};
-    };
+        for (auto const & [n, dynAttr] : enumerate(builder->dynamicAttrs))
+            dynamicAttrsStart[n] = DynamicAttrDef(alloc, dynAttr);
 
-    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
-    DynamicAttrDefs dynamicAttrs;
+        delete builder;
+    }
+
+    /**
+     * We can skip the circus if the attrs is empty
+     */
     ExprAttrs(const PosIdx & pos)
         : recursive(false)
-        , pos(pos) {};
+        , pos(pos)
+        , nAttrs(0)
+        , nInheritFromExprs(0)
+        , nDynamicAttrs(0)
+        , attrNamesStart(nullptr)
+        , attrValuesStart(nullptr)
+        , inheritFromExprsStart(nullptr)
+        , dynamicAttrsStart(nullptr)
+    {
+    }
+
     ExprAttrs()
-        : recursive(false) {};
+        : ExprAttrs(noPos)
+    {
+    }
 
     PosIdx getPos() const override
     {
         return pos;
+    }
+
+    std::span<Symbol> getAttrNames() const
+    {
+        return {attrNamesStart, nAttrs};
+    }
+
+    std::span<AttrDef> getAttrValues() const
+    {
+        return {attrValuesStart, nAttrs};
+    }
+
+    std::span<Expr *> getInheritFromExprs() const
+    {
+        return {inheritFromExprsStart, nInheritFromExprs};
+    }
+
+    std::span<DynamicAttrDef> getDynamicAttrs() const
+    {
+        return {dynamicAttrsStart, nDynamicAttrs};
+    }
+
+    /**
+     * Association map for looking up a value by name, or iterating over all
+     * (name, value) pairs. This is meant to mimic what std::map can do, but
+     * without the extra overhead necessary to be mutable. The layout does not
+     * need to be optimized as it is created temporarily on-demand
+     */
+    struct AttrDefs
+    {
+        uint32_t nAttrs;
+        Symbol * attrNamesStart;
+        AttrDef * attrValuesStart;
+
+        AttrDef * find(Symbol s)
+        {
+            auto attrNamesEnd = attrNamesStart + nAttrs;
+            auto found = std::lower_bound(attrNamesStart, attrNamesEnd, s);
+
+            if (found == attrNamesEnd || *found != s)
+                return nullptr;
+
+            auto idx = found - attrNamesStart;
+            return &attrValuesStart[idx];
+        }
+
+        inline size_t displ(AttrDef * attr)
+        {
+            assert(attrValuesStart <= attr && attr < attrValuesStart + nAttrs);
+
+            return attr - attrValuesStart;
+        }
+
+        size_t size()
+        {
+            return nAttrs;
+        }
+
+        // XXX: help I don't know how to C++ I'm making this up
+        class iterator
+        {
+            friend struct AttrDefs;
+        public:
+            using value_type = std::pair<Symbol, AttrDef>;
+            using pointer_type = std::pair<Symbol *, AttrDef *>;
+            using reference_type = std::pair<Symbol &, AttrDef &>;
+            using difference_type = uint32_t;
+            using iterator_category = std::input_iterator_tag;
+
+        private:
+            uint32_t idx = 0;
+            Symbol * attrNamesStart;
+            AttrDef * attrValuesStart;
+            iterator(uint32_t idx, Symbol * attrNamesStart, AttrDef * attrValuesStart)
+                : idx(idx)
+                , attrNamesStart(attrNamesStart)
+                , attrValuesStart(attrValuesStart) {};
+        public:
+            reference_type operator*() const
+            {
+                return {attrNamesStart[idx], attrValuesStart[idx]};
+            }
+
+            iterator & operator++()
+            {
+                ++idx;
+                return *this;
+            }
+
+            iterator & operator+=(difference_type diff)
+            {
+                idx += diff;
+                return *this;
+            }
+
+            std::strong_ordering operator<=>(const iterator & rhs) const = default;
+        };
+
+        using const_iterator = iterator;
+
+        iterator begin() const &
+        {
+            return {0, attrNamesStart, attrValuesStart};
+        }
+
+        iterator end() const &
+        {
+            return {nAttrs, attrNamesStart, attrValuesStart};
+        }
+    };
+
+    AttrDefs getAttrs() const
+    {
+        return {nAttrs, attrNamesStart, attrValuesStart};
     }
 
     COMMON_METHODS
