@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <future>
+#include <ranges>
 #include <regex>
 #include <fstream>
 #include <sstream>
@@ -66,6 +67,22 @@ void BinaryCacheStore::init()
                 config.wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
                 config.priority.setDefault(std::stoi(value));
+            } else if (name == "RequiredSignatures") {
+                // Parse whitespace-separated list of public keys
+                for (const auto & keyStr : tokenizeString<Strings>(value, " \t\n\r")) {
+                    if (!keyStr.empty()) {
+                        try {
+                            PublicKey key(keyStr);
+                            requiredSignatures.emplace(key.name, key);
+                        } catch (Error & e) {
+                            e.addTrace(
+                                {},
+                                "while parsing RequiredSignatures field in binary cache '%s'",
+                                config.getHumanReadableURI());
+                            throw;
+                        }
+                    }
+                }
             }
         }
     }
@@ -283,6 +300,44 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     stats.narWriteCompressionTimeMs += duration;
 
     narInfo->sign(*this, signers);
+
+    /* Check if this binary cache requires signatures. Content-addressed paths don't need signatures. */
+    if (!requiredSignatures.empty() && !info.ca) {
+        // Check if path has at least one valid signature from required keys
+        auto validSigs = info.checkSignatures(*this, requiredSignatures);
+        if (validSigs == 0) {
+            // Build list of required key names for error message
+            auto keys = std::views::keys(requiredSignatures);
+            std::vector<std::string> keyNames(keys.begin(), keys.end());
+            std::string requiredKeyNames = concatStringsSep(", ", keyNames);
+
+            if (info.sigs.empty()) {
+                // No signatures at all
+                throw Error(
+                    "refusing to upload unsigned path '%s' to binary cache '%s'\n\n"
+                    "The cache requires paths to be signed by one of these keys:\n  %s\n\n"
+                    "You have not configured any signing keys. To fix this:\n"
+                    "  - Use: %s?secret-key=/path/to/key (not 'secret-key-file'!)\n"
+                    "  - Or set: secret-key-files = /path/to/key in nix.conf\n",
+                    printStorePath(info.path),
+                    config.getHumanReadableURI(),
+                    requiredKeyNames,
+                    config.getHumanReadableURI());
+            } else {
+                // Has signatures, but none from required keys
+                throw Error(
+                    "refusing to upload path '%s' to binary cache '%s'\n\n"
+                    "The cache requires paths to be signed by one of these keys:\n  %s\n\n"
+                    "Current signatures on path:\n  %s\n\n"
+                    "The path is signed, but not by any of the keys this cache requires.\n"
+                    "Make sure you're using the correct signing key for this cache.",
+                    printStorePath(info.path),
+                    config.getHumanReadableURI(),
+                    requiredKeyNames,
+                    concatStringsSep("\n  ", info.sigs));
+            }
+        }
+    }
 
     /* Atomically write the NAR info file.*/
     writeNarInfo(narInfo);

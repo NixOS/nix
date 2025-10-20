@@ -136,6 +136,13 @@ private:
 
     std::string narMagic;
 
+    /**
+     * Public keys that are required to have signed any path uploaded
+     * to this cache. Parsed from the RequiredSignatures field in
+     * nix-cache-info. Empty if no signature requirements.
+     */
+    PublicKeys requiredSignatures;
+
     std::string narInfoFileFor(const StorePath & storePath);
 
     void writeNarInfo(ref<NarInfo> narInfo);
