@@ -94,9 +94,8 @@ void Source::drainInto(Sink & sink)
 {
     std::array<char, 8192> buf;
     while (true) {
-        size_t n;
         try {
-            n = read(buf.data(), buf.size());
+            auto n = read(buf.data(), buf.size());
             sink({buf.data(), n});
         } catch (EndOfFile &) {
             break;
@@ -111,6 +110,16 @@ std::string Source::drain()
     return std::move(s.s);
 }
 
+void Source::skip(size_t len)
+{
+    std::array<char, 8192> buf;
+    while (len) {
+        auto n = read(buf.data(), std::min(len, buf.size()));
+        assert(n <= len);
+        len -= n;
+    }
+}
+
 size_t BufferedSource::read(char * data, size_t len)
 {
     if (!buffer)
@@ -120,7 +129,7 @@ size_t BufferedSource::read(char * data, size_t len)
         bufPosIn = readUnbuffered(buffer.get(), bufSize);
 
     /* Copy out the data in the buffer. */
-    size_t n = len > bufPosIn - bufPosOut ? bufPosIn - bufPosOut : len;
+    auto n = std::min(len, bufPosIn - bufPosOut);
     memcpy(data, buffer.get() + bufPosOut, n);
     bufPosOut += n;
     if (bufPosIn == bufPosOut)
@@ -189,6 +198,39 @@ bool FdSource::hasData()
         }
         return FD_ISSET(fd, &fds);
     }
+}
+
+void FdSource::skip(size_t len)
+{
+    /* Discard data in the buffer. */
+    if (len && buffer && bufPosIn - bufPosOut) {
+        if (len >= bufPosIn - bufPosOut) {
+            len -= bufPosIn - bufPosOut;
+            bufPosIn = bufPosOut = 0;
+        } else {
+            bufPosOut += len;
+            len = 0;
+        }
+    }
+
+#ifndef _WIN32
+    /* If we can, seek forward in the file to skip the rest. */
+    if (isSeekable && len) {
+        if (lseek(fd, len, SEEK_CUR) == -1) {
+            if (errno == ESPIPE)
+                isSeekable = false;
+            else
+                throw SysError("seeking forward in file");
+        } else {
+            read += len;
+            return;
+        }
+    }
+#endif
+
+    /* Otherwise, skip by reading. */
+    if (len)
+        BufferedSource::skip(len);
 }
 
 size_t StringSource::read(char * data, size_t len)
