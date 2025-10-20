@@ -83,6 +83,8 @@ void BinaryCacheStore::init()
                         }
                     }
                 }
+            } else if (name == "RequireAllSignatures") {
+                requireAllSignatures = (value == "1");
             }
         }
     }
@@ -303,38 +305,44 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Check if this binary cache requires signatures. Content-addressed paths don't need signatures. */
     if (!requiredSignatures.empty() && !info.ca) {
-        // Check if path has at least one valid signature from required keys
         auto validSigs = info.checkSignatures(*this, requiredSignatures);
-        if (validSigs == 0) {
-            // Build list of required key names for error message
+        size_t requiredSigs = requireAllSignatures ? requiredSignatures.size() : 1;
+
+        if (validSigs < requiredSigs) {
             auto keys = std::views::keys(requiredSignatures);
             std::vector<std::string> keyNames(keys.begin(), keys.end());
             std::string requiredKeyNames = concatStringsSep(", ", keyNames);
 
             if (info.sigs.empty()) {
-                // No signatures at all
                 throw Error(
                     "refusing to upload unsigned path '%s' to binary cache '%s'\n\n"
-                    "The cache requires paths to be signed by one of these keys:\n  %s\n\n"
+                    "The cache requires paths to be signed by %s:\n  %s\n\n"
                     "You have not configured any signing keys. To fix this:\n"
                     "  - Use: %s?secret-key=/path/to/key (not 'secret-key-file'!)\n"
                     "  - Or set: secret-key-files = /path/to/key in nix.conf\n",
                     printStorePath(info.path),
                     config.getHumanReadableURI(),
+                    requireAllSignatures ? "ALL of these keys" : "at least ONE of these keys",
                     requiredKeyNames,
                     config.getHumanReadableURI());
             } else {
-                // Has signatures, but none from required keys
+                // Has signatures, but insufficient or wrong keys
                 throw Error(
                     "refusing to upload path '%s' to binary cache '%s'\n\n"
-                    "The cache requires paths to be signed by one of these keys:\n  %s\n\n"
+                    "The cache requires paths to be signed by %s:\n  %s\n\n"
+                    "Current valid signatures: %d out of %d required\n"
                     "Current signatures on path:\n  %s\n\n"
-                    "The path is signed, but not by any of the keys this cache requires.\n"
-                    "Make sure you're using the correct signing key for this cache.",
+                    "The path %s.\n"
+                    "Make sure you're using the correct signing key(s) for this cache.",
                     printStorePath(info.path),
                     config.getHumanReadableURI(),
+                    requireAllSignatures ? "ALL of these keys" : "at least ONE of these keys",
                     requiredKeyNames,
-                    concatStringsSep("\n  ", info.sigs));
+                    validSigs,
+                    requiredSigs,
+                    concatStringsSep("\n  ", info.sigs),
+                    validSigs == 0 ? "is signed, but not by any of the keys this cache requires"
+                                   : "is signed by some required keys, but not all of them");
             }
         }
     }

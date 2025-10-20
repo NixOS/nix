@@ -143,6 +143,13 @@ private:
      */
     PublicKeys requiredSignatures;
 
+    /**
+     * If true, paths must be signed by ALL keys in requiredSignatures.
+     * If false, paths need only be signed by at least ONE key.
+     * Parsed from the RequireAllSignatures field in nix-cache-info.
+     */
+    bool requireAllSignatures = false;
+
     std::string narInfoFileFor(const StorePath & storePath);
 
     void writeNarInfo(ref<NarInfo> narInfo);
