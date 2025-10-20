@@ -57,11 +57,12 @@ void BinaryCacheStore::init()
             auto value = trim(line.substr(colon + 1, std::string::npos));
             if (name == "StoreDir") {
                 if (value != storeDir)
-                    throw Error(
+                    warn(
                         "binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
                         config.getHumanReadableURI(),
                         value,
                         storeDir);
+                config.storeDir = value;
             } else if (name == "WantMassQuery") {
                 config.wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
