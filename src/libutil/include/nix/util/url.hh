@@ -408,6 +408,17 @@ struct VerbatimURL
                 [](const ParsedURL & url) -> std::string_view { return url.scheme; }},
             raw);
     }
+
+    /**
+     * Get the last non-empty path segment from the URL.
+     *
+     * This is useful for extracting filenames from URLs.
+     * For example, "https://example.com/path/to/file.txt?query=value"
+     * returns "file.txt".
+     *
+     * @return The last non-empty path segment, or std::nullopt if no such segment exists.
+     */
+    std::optional<std::string> lastPathSegment() const;
 };
 
 std::ostream & operator<<(std::ostream & os, const VerbatimURL & url);
