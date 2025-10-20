@@ -254,10 +254,15 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Remove derivation checks. */
-    drv.env.erase("allowedReferences");
-    drv.env.erase("allowedRequisites");
-    drv.env.erase("disallowedReferences");
-    drv.env.erase("disallowedRequisites");
+    if (drv.structuredAttrs) {
+        drv.structuredAttrs->structuredAttrs.erase("outputChecks");
+    } else {
+        drv.env.erase("allowedReferences");
+        drv.env.erase("allowedRequisites");
+        drv.env.erase("disallowedReferences");
+        drv.env.erase("disallowedRequisites");
+    }
+
     drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
