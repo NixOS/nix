@@ -8,15 +8,19 @@
 let
   pkgs = config.nodes.client.nixpkgs.pkgs;
 
-  # Test packages - minimal packages for fast copying
-  pkgA = pkgs.writeText "test-package-a" "test package a";
-  pkgB = pkgs.writeText "test-package-b" "test package b";
-  pkgC = pkgs.writeText "test-package-c" "test package c";
+  testPkgs = lib.genAttrs [
+    "A"
+    "B"
+    "C"
+    "D"
+    "E"
+    "F"
+    "G"
+  ] (n: pkgs.writeText "test-package-${n}" "test package ${n}");
 
   # S3 configuration
   accessKey = "BKIKJAA5BMMU2RHO6IBB";
   secretKey = "V7f1CwQqAcwo80UEIJEjc5gVQUSSx5ohQ9GSrr12";
-
 in
 {
   name = "curl-s3-binary-cache-store";
@@ -32,11 +36,7 @@ in
       {
         virtualisation.writableStore = true;
         virtualisation.cores = 2;
-        virtualisation.additionalPaths = [
-          pkgA
-          pkgB
-          pkgC
-        ];
+        virtualisation.additionalPaths = lib.attrValues testPkgs;
         environment.systemPackages = [ pkgs.minio-client ];
         nix.extraOptions = ''
           experimental-features = nix-command
@@ -83,11 +83,7 @@ in
       ENDPOINT = 'http://server:9000'
       REGION = 'eu-west-1'
 
-      PKGS = {
-          'A': '${pkgA}',
-          'B': '${pkgB}',
-          'C': '${pkgC}',
-      }
+      PKGS = json.loads('${builtins.toJSON testPkgs}')
 
       ENV_WITH_CREDS = f"AWS_ACCESS_KEY_ID={ACCESS_KEY} AWS_SECRET_ACCESS_KEY={SECRET_KEY}"
 
@@ -147,7 +143,7 @@ in
               else:
                   machine.fail(f"nix path-info {pkg}")
 
-      def setup_s3(populate_bucket=[], public=False):
+      def setup_s3(populate_bucket=[], public=False, required_signatures=[], require_all_signatures=False):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
@@ -156,6 +152,8 @@ in
           Args:
               populate_bucket: List of packages to upload before test runs
               public: If True, make the bucket publicly accessible
+              required_signatures: List of public keys to require in nix-cache-info
+              require_all_signatures: If True, require ALL signatures (not just one)
           """
           def decorator(test_func):
               def wrapper():
@@ -163,6 +161,16 @@ in
                   server.succeed(f"mc mb minio/{bucket}")
                   if public:
                       server.succeed(f"mc anonymous set download minio/{bucket}")
+
+                  # Upload nix-cache-info with optional RequiredSignatures
+                  cache_info = "StoreDir: /nix/store"
+                  if required_signatures:
+                      sigs = " ".join(required_signatures)
+                      cache_info += f"\\nRequiredSignatures: {sigs}"
+                      if require_all_signatures:
+                          cache_info += "\\nRequireAllSignatures: 1"
+                  server.succeed(f"echo -e '{cache_info}' | mc pipe minio/{bucket}/nix-cache-info")
+
                   try:
                       if populate_bucket:
                           store_url = make_s3_url(bucket)
@@ -171,9 +179,8 @@ in
                       test_func(bucket)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
-                      # Clean up client store - only delete if path exists
-                      for pkg in PKGS.values():
-                          client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
+                      # Surprisingly, nix store delete doesn't care if a path does not exist at all
+                      client.succeed(f'nix store delete --ignore-liveness {" ".join(PKGS.values())}')
               return wrapper
           return decorator
 
@@ -597,6 +604,93 @@ in
 
           print("  ✓ File content verified correct (hash matches)")
 
+      def test_required_signatures():
+          """Test RequiredSignatures field enforcement"""
+          print("\n=== Testing RequiredSignatures ===")
+
+          # Generate signing keys
+          server.succeed("nix key generate-secret --key-name cache.example.org > /tmp/sk1")
+          server.succeed("nix key generate-secret --key-name other.example.org > /tmp/sk2")
+
+          pk1 = server.succeed("nix key convert-secret-to-public < /tmp/sk1").strip()
+          pk2 = server.succeed("nix key convert-secret-to-public < /tmp/sk2").strip()
+
+          # Test 1: Unsigned paths are rejected
+          @setup_s3(required_signatures=[pk1])
+          def test_unsigned_rejected(bucket):
+              store_url = make_s3_url(bucket)
+              error = server.fail(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['D']} 2>&1")
+              if "refusing to upload unsigned path" not in error:
+                  raise Exception("Expected error about unsigned path")
+              print("  ✓ Unsigned paths rejected")
+
+          # Test 2: Correctly signed paths are accepted
+          @setup_s3(required_signatures=[pk1])
+          def test_signed_accepted(bucket):
+              server.succeed(f"nix store sign --key-file /tmp/sk1 {PKGS['E']}")
+              store_url = make_s3_url(bucket)
+              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['E']}")
+              print("  ✓ Correctly signed paths accepted")
+
+          # Test 3: Wrong key signatures are rejected
+          @setup_s3(required_signatures=[pk1])
+          def test_wrong_key_rejected(bucket):
+              server.succeed(f"nix store sign --key-file /tmp/sk2 {PKGS['F']}")
+              store_url = make_s3_url(bucket)
+              error = server.fail(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['F']} 2>&1")
+              if "not by any of the keys this cache requires" not in error:
+                  raise Exception("Expected error about wrong key")
+              print("  ✓ Wrong key signatures rejected")
+
+          # Test 4: Content-addressed paths don't need signatures
+          @setup_s3(required_signatures=[pk1])
+          def test_ca_paths(bucket):
+              # Convert an existing package to content-addressed
+              ca_output = server.succeed(f"nix store make-content-addressed --json {PKGS['A']}")
+              ca_info = json.loads(ca_output)
+              ca_path = ca_info["rewrites"][PKGS['A']]
+
+              store_url = make_s3_url(bucket)
+              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {ca_path}")
+              print("  ✓ Content-addressed paths work without signatures")
+
+          # Test 5: Multiple required keys (any one is sufficient)
+          @setup_s3(required_signatures=[pk1, pk2])
+          def test_multiple_keys(bucket):
+              # Path signed with sk1 should succeed
+              server.succeed(f"nix store sign --key-file /tmp/sk1 {PKGS['B']}")
+              store_url = make_s3_url(bucket)
+              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['B']}")
+
+              # Path signed with sk2 should also succeed
+              server.succeed(f"nix store sign --key-file /tmp/sk2 {PKGS['C']}")
+              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['C']}")
+              print("  ✓ Multiple required keys work (any one is sufficient)")
+
+          # Test 6: RequireAllSignatures enforcement
+          @setup_s3(required_signatures=[pk1, pk2], require_all_signatures=True)
+          def test_require_all_signatures(bucket):
+              store_url = make_s3_url(bucket)
+
+              # Path signed with only pk1 should fail
+              server.succeed(f"nix store sign --key-file /tmp/sk1 {PKGS['G']}")
+              error = server.fail(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['G']} 2>&1")
+              if "ALL of these keys" not in error or "1 out of 2 required" not in error:
+                  raise Exception(f"Expected error about ALL keys and signature count. Got: {error}")
+
+              # Path signed with both pk1 and pk2 should succeed
+              server.succeed(f"nix store sign --key-file /tmp/sk2 {PKGS['G']}")
+              server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['G']}")
+              print("  ✓ RequireAllSignatures enforces all keys must sign")
+
+          # Run all sub-tests
+          test_unsigned_rejected()
+          test_signed_accepted()
+          test_wrong_key_rejected()
+          test_ca_paths()
+          test_multiple_keys()
+          test_require_all_signatures()
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -626,6 +720,7 @@ in
       test_compression_mixed()
       test_compression_disabled()
       test_nix_prefetch_url()
+      test_required_signatures()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
