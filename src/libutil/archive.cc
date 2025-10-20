@@ -6,6 +6,7 @@
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/archive.hh"
+#include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/util/source-path.hh"
@@ -133,7 +134,7 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     sink.preallocateContents(size);
 
     if (sink.skipContents) {
-        source.skip(size + (size % 8 ? 8 - (size % 8) : 0));
+        source.skip(alignUp(size, 8));
         return;
     }
 
