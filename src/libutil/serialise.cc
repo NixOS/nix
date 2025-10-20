@@ -112,7 +112,7 @@ std::string Source::drain()
 
 void Source::skip(size_t len)
 {
-    std::array<char, 64 * 1024> buf;
+    std::array<char, 8192> buf;
     while (len) {
         auto n = read(buf.data(), std::min(len, buf.size()));
         assert(n <= len);
