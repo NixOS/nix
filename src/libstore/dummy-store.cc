@@ -165,6 +165,15 @@ struct DummyStoreImpl : DummyStore
     }
 
     /**
+     * Do this to avoid `queryPathInfoUncached` computing `PathInfo`
+     * that we don't need just to return a `bool`.
+     */
+    bool isValidPathUncached(const StorePath & path) override
+    {
+        return path.isDerivation() ? derivations.contains(path) : Store::isValidPathUncached(path);
+    }
+
+    /**
      * The dummy store is incapable of *not* trusting! :)
      */
     std::optional<TrustedFlag> isTrustedClient() override
