@@ -90,6 +90,7 @@ enum struct HttpMethod {
     GET,
     HEAD,
     POST,
+    DELETE,
 };
 
 /**
@@ -148,6 +149,8 @@ struct FileTransferRequest
             return "download";
         case HttpMethod::POST:
             return "upload";
+        case HttpMethod::DELETE:
+            return "delet";
         }
         unreachable();
     }
@@ -220,6 +223,11 @@ struct FileTransfer
      * Synchronously upload a file.
      */
     FileTransferResult upload(const FileTransferRequest & request);
+
+    /**
+     * Synchronously delete a resource.
+     */
+    FileTransferResult deleteResource(const FileTransferRequest & request);
 
     /**
      * Download a file, writing its data to a sink. The sink will be

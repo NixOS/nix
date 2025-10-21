@@ -387,6 +387,9 @@ struct curlFileTransfer : public FileTransfer
             if (request.method == HttpMethod::HEAD)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
+            if (request.method == HttpMethod::DELETE)
+                curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
+
             if (request.data) {
                 if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
@@ -916,6 +919,11 @@ FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
     /* Note: this method is the same as download, but helps in readability */
+    return enqueueFileTransfer(request).get();
+}
+
+FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
+{
     return enqueueFileTransfer(request).get();
 }
 
