@@ -112,7 +112,21 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         if (failed)
             continue;
 
-        co_return realisationFetched(std::move(waitees), outputInfo, sub);
+        waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
+
+        co_await await(std::move(waitees));
+
+        trace("output path substituted");
+
+        if (nrFailed > 0) {
+            debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
+            co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
+        }
+
+        worker.store.registerDrvOutput({*outputInfo, id});
+
+        trace("finished");
+        co_return amDone(ecSuccess);
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -128,26 +142,6 @@ Goal::Co DrvOutputSubstitutionGoal::init()
        In that case the calling derivation should just do a
        build. */
     co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
-}
-
-Goal::Co DrvOutputSubstitutionGoal::realisationFetched(
-    Goals waitees, std::shared_ptr<const UnkeyedRealisation> outputInfo, nix::ref<nix::Store> sub)
-{
-    waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
-
-    co_await await(std::move(waitees));
-
-    trace("output path substituted");
-
-    if (nrFailed > 0) {
-        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-        co_return amDone(nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed);
-    }
-
-    worker.store.registerDrvOutput({*outputInfo, id});
-
-    trace("finished");
-    co_return amDone(ecSuccess);
 }
 
 std::string DrvOutputSubstitutionGoal::key()
