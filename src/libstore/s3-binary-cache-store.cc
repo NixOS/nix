@@ -7,6 +7,36 @@
 
 namespace nix {
 
+class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
+{
+public:
+    S3BinaryCacheStore(ref<S3BinaryCacheStoreConfig> config)
+        : Store{*config}
+        , BinaryCacheStore{*config}
+        , HttpBinaryCacheStore{config}
+        , s3Config{config}
+    {
+    }
+
+    void upsertFile(
+        const std::string & path,
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        const std::string & mimeType,
+        uint64_t sizeHint) override;
+
+private:
+    ref<S3BinaryCacheStoreConfig> s3Config;
+};
+
+void S3BinaryCacheStore::upsertFile(
+    const std::string & path,
+    std::shared_ptr<std::basic_iostream<char>> istream,
+    const std::string & mimeType,
+    uint64_t sizeHint)
+{
+    HttpBinaryCacheStore::upsertFile(path, istream, mimeType, sizeHint);
+}
+
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
 {
     return {"s3"};
@@ -49,6 +79,13 @@ std::string S3BinaryCacheStoreConfig::doc()
 
         This store allows reading and writing a binary cache stored in an AWS S3 bucket.
     )";
+}
+
+ref<Store> S3BinaryCacheStoreConfig::openStore() const
+{
+    auto sharedThis = std::const_pointer_cast<S3BinaryCacheStoreConfig>(
+        std::static_pointer_cast<const S3BinaryCacheStoreConfig>(shared_from_this()));
+    return make_ref<S3BinaryCacheStore>(ref{sharedThis});
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;
