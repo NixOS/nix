@@ -15,6 +15,7 @@ namespace nix {
 
 MakeError(UploadToS3, Error);
 
+static constexpr uint64_t AWS_MIN_PART_SIZE = 5 * 1024 * 1024;           // 5MiB
 static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
 
 class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
@@ -252,6 +253,28 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
         if (std::ranges::contains(s3Params, key)) {
             cacheUri.query[key] = value;
         }
+    }
+
+    if (multipartChunkSize < AWS_MIN_PART_SIZE) {
+        throw UsageError(
+            "multipart-chunk-size must be at least %s, got %s",
+            renderSize(AWS_MIN_PART_SIZE),
+            renderSize(multipartChunkSize.get()));
+    }
+
+    if (multipartChunkSize > AWS_MAX_PART_SIZE) {
+        throw UsageError(
+            "multipart-chunk-size must be at most %s, got %s",
+            renderSize(AWS_MAX_PART_SIZE),
+            renderSize(multipartChunkSize.get()));
+    }
+
+    if (multipartUpload && multipartThreshold < multipartChunkSize) {
+        warn(
+            "multipart-threshold (%s) is less than multipart-chunk-size (%s), "
+            "which may result in single-part multipart uploads",
+            renderSize(multipartThreshold.get()),
+            renderSize(multipartChunkSize.get()));
     }
 }
 
