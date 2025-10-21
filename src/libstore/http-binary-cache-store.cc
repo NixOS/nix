@@ -143,7 +143,8 @@ protected:
     void upsertFile(
         const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & mimeType,
+        uint64_t sizeHint) override
     {
         auto req = makeRequest(path);
 
