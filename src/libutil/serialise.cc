@@ -242,6 +242,15 @@ size_t StringSource::read(char * data, size_t len)
     return n;
 }
 
+void StringSource::skip(size_t len)
+{
+    if (pos + len > s.size()) {
+        pos = s.size();
+        throw EndOfFile("end of string reached");
+    }
+    pos += len;
+}
+
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
 {
     struct SourceToSink : FinishSink
