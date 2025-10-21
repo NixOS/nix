@@ -239,7 +239,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 : buildMode == bmCheck ? "checking outputs of '%s'"
                                        : "building '%s'",
                 worker.store.printStorePath(drvPath));
-        fmt("building '%s'", worker.store.printStorePath(drvPath));
 #ifndef _WIN32 // TODO enable build hook on Windows
         if (hook)
             msg += fmt(" on '%s'", hook->machineName);
