@@ -5,6 +5,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -97,7 +98,11 @@ struct Hash
      * @param explicitFormat cannot be SRI, but must be one of the
      * "bases".
      */
-    static Hash parseExplicitFormatUnprefixed(std::string_view s, HashAlgorithm algo, HashFormat explicitFormat);
+    static Hash parseExplicitFormatUnprefixed(
+        std::string_view s,
+        HashAlgorithm algo,
+        HashFormat explicitFormat,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     static Hash parseSRI(std::string_view original);
 
@@ -188,12 +193,14 @@ std::string_view printHashFormat(HashFormat hashFormat);
 /**
  * Parse a string representing a hash algorithm.
  */
-HashAlgorithm parseHashAlgo(std::string_view s);
+HashAlgorithm
+parseHashAlgo(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Will return nothing on parse error
  */
-std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
+std::optional<HashAlgorithm>
+parseHashAlgoOpt(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * And the reverse.
@@ -221,6 +228,10 @@ public:
     HashResult currentHash();
 };
 
+template<>
+struct json_avoids_null<Hash> : std::true_type
+{};
+
 } // namespace nix
 
 template<>
@@ -241,3 +252,5 @@ inline std::size_t hash_value(const Hash & hash)
 }
 
 } // namespace nix
+
+JSON_IMPL_WITH_XP_FEATURES(Hash)

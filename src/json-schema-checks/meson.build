@@ -21,6 +21,16 @@ schema_dir = meson.current_source_dir() / 'schema'
 # Get all example files
 schemas = [
   {
+    'stem' : 'hash',
+    'schema' : schema_dir / 'hash-v1.yaml',
+    'files' : [
+      'sha256-base64.json',
+      'sha256-base16.json',
+      'sha256-nix32.json',
+      'blake3-base64.json',
+    ],
+  },
+  {
     'stem' : 'derivation',
     'schema' : schema_dir / 'derivation-v3.yaml',
     'files' : [
