@@ -1049,12 +1049,16 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         bool narRead = false;
         Finally cleanup = [&]() {
             if (!narRead) {
-                NullFileSystemObjectSink sink;
-                try {
-                    parseDump(sink, source);
-                } catch (...) {
-                    // TODO: should Interrupted be handled here?
-                    ignoreExceptionInDestructor();
+                if (info.narSize)
+                    source.skip(info.narSize);
+                else {
+                    NullFileSystemObjectSink sink;
+                    try {
+                        parseDump(sink, source);
+                    } catch (...) {
+                        // TODO: should Interrupted be handled here?
+                        ignoreExceptionInDestructor();
+                    }
                 }
             }
         };
