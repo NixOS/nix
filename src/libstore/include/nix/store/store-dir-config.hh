@@ -91,7 +91,7 @@ struct StoreDirConfig
     std::pair<StorePath, Hash> computeStorePath(
         std::string_view name,
         const SourcePath & path,
-        ContentAddressMethod method = FileIngestionMethod::NixArchive,
+        ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
         HashAlgorithm hashAlgo = HashAlgorithm::SHA256,
         const StorePathSet & references = {},
         PathFilter & filter = defaultPathFilter) const;
