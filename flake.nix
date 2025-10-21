@@ -471,6 +471,27 @@
         }
       );
 
+      apps = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
+        in
+        {
+          open-manual = {
+            type = "app";
+            program = "${pkgs.writeShellScript "open-nix-manual" ''
+              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
+              if ! ${opener} "$manual_path"; then
+                echo "Failed to open manual with ${opener}. Manual is located at:"
+                echo "$manual_path"
+              fi
+            ''}";
+            meta.description = "Open the Nix manual in your browser";
+          };
+        }
+      );
+
       devShells =
         let
           makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
