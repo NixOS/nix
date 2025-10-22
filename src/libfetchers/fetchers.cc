@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/url.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -63,6 +64,12 @@ Input Input::fromURL(const Settings & settings, const ParsedURL & url, bool requ
             fixupInput(*res);
             return std::move(*res);
         }
+    }
+
+    // Provide a helpful hint when user tries file+git instead of git+file
+    auto parsedScheme = parseUrlScheme(url.scheme);
+    if (parsedScheme.application == "file" && parsedScheme.transport == "git") {
+        throw Error("input '%s' is unsupported; did you mean 'git+file' instead of 'file+git'?", url);
     }
 
     throw Error("input '%s' is unsupported", url);
