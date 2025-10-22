@@ -226,11 +226,13 @@ jobs:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
+        dogfood: false
+        extra_nix_config: |
+          experimental-features = flakes nix-command
+    - run: echo NIX_VERSION="$(nix eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
+    - run: nix build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
