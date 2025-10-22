@@ -64,6 +64,7 @@ nix_sources = [ config_priv_h ] + files(
   'build.cc',
   'bundle.cc',
   'cat.cc',
+  'check.cc',
   'config-check.cc',
   'config.cc',
   'copy.cc',

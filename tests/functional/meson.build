@@ -129,6 +129,7 @@ suites = [
       'linux-sandbox.sh',
       'supplementary-groups.sh',
       'build-dry.sh',
+      'nix-check.sh',
       'structured-attrs.sh',
       'shell.sh',
       'brotli.sh',
