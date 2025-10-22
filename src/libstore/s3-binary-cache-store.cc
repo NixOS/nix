@@ -44,6 +44,14 @@ private:
 
     std::string createMultipartUpload(
         std::string_view key, std::string_view mimeType, std::optional<std::string_view> contentEncoding);
+
+    struct UploadedPart
+    {
+        uint64_t partNumber;
+        std::string etag;
+    };
+
+    UploadedPart uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -127,6 +135,31 @@ std::string S3BinaryCacheStore::createMultipartUpload(
     }
 
     throw Error("S3 CreateMultipartUpload response missing <UploadId>");
+}
+
+// Uploads a single part of a multipart upload
+// See:
+// https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html#API_UploadPart_RequestSyntax
+S3BinaryCacheStore::UploadedPart
+S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["partNumber"] = std::to_string(partNumber);
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.data = std::move(data);
+    req.mimeType = "application/octet-stream";
+
+    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+
+    if (result.etag.empty()) {
+        throw Error("S3 UploadPart response missing ETag for part %d", partNumber);
+    }
+
+    return UploadedPart{.partNumber = partNumber, .etag = std::move(result.etag)};
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
