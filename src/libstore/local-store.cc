@@ -1048,19 +1048,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         /* In case we are not interested in reading the NAR: discard it. */
         bool narRead = false;
         Finally cleanup = [&]() {
-            if (!narRead) {
-                if (info.narSize)
-                    source.skip(info.narSize);
-                else {
-                    NullFileSystemObjectSink sink;
-                    try {
-                        parseDump(sink, source);
-                    } catch (...) {
-                        // TODO: should Interrupted be handled here?
-                        ignoreExceptionInDestructor();
-                    }
-                }
-            }
+            if (!narRead)
+                source.skip(info.narSize);
         };
 
         addTempRoot(info.path);
