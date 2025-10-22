@@ -16,6 +16,7 @@ namespace nix {
 
 static constexpr uint64_t AWS_MIN_PART_SIZE = 5 * 1024 * 1024;           // 5MiB
 static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
+static constexpr uint64_t AWS_MAX_PART_COUNT = 10000;
 
 class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
 {
@@ -58,6 +59,13 @@ private:
     void completeMultipartUpload(std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts);
 
     void abortMultipartUpload(std::string_view key, std::string_view uploadId);
+
+    void uploadMultipart(
+        std::string_view key,
+        std::shared_ptr<std::basic_iostream<char>> istream,
+        uint64_t sizeHint,
+        std::string_view mimeType,
+        std::optional<std::string_view> contentEncoding);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -76,7 +84,11 @@ void S3BinaryCacheStore::upsertFile(
         contentEncoding = compressionMethod;
     }
 
-    upload(path, istream, sizeHint, mimeType, contentEncoding);
+    if (s3Config->multipartUpload && sizeHint > s3Config->multipartThreshold) {
+        uploadMultipart(path, istream, sizeHint, mimeType, contentEncoding);
+    } else {
+        upload(path, istream, sizeHint, mimeType, contentEncoding);
+    }
 }
 
 void S3BinaryCacheStore::upload(
@@ -104,6 +116,89 @@ void S3BinaryCacheStore::upload(
         getFileTransfer()->upload(req);
     } catch (FileTransferError & e) {
         throw Error("while uploading to S3 binary cache at '%s': %s", config->cacheUri.to_string(), e.msg());
+    }
+}
+
+void S3BinaryCacheStore::uploadMultipart(
+    std::string_view key,
+    std::shared_ptr<std::basic_iostream<char>> istream,
+    uint64_t sizeHint,
+    std::string_view mimeType,
+    std::optional<std::string_view> contentEncoding)
+{
+    debug("using S3 multipart upload for '%s' (%d bytes)", key, sizeHint);
+    uint64_t chunkSize = s3Config->multipartChunkSize;
+    uint64_t estimatedParts = (sizeHint + chunkSize - 1) / chunkSize; // ceil division
+
+    if (estimatedParts > AWS_MAX_PART_COUNT) {
+        // Equivalent to ceil(sizeHint / AWS_MAX_PART_COUNT)
+        uint64_t minChunkSize = (sizeHint + AWS_MAX_PART_COUNT - 1) / AWS_MAX_PART_COUNT;
+
+        if (minChunkSize > AWS_MAX_PART_SIZE) {
+            throw Error(
+                "file too large for S3 multipart upload: %s would require chunk size of %s "
+                "(max %s) to stay within %d part limit",
+                renderSize(sizeHint),
+                renderSize(minChunkSize),
+                renderSize(AWS_MAX_PART_SIZE),
+                AWS_MAX_PART_COUNT);
+        }
+
+        warn(
+            "adjusting S3 multipart chunk size from %s to %s "
+            "to stay within %d part limit for %s file",
+            renderSize(s3Config->multipartChunkSize.get()),
+            renderSize(minChunkSize),
+            AWS_MAX_PART_COUNT,
+            renderSize(sizeHint));
+
+        chunkSize = minChunkSize;
+        estimatedParts = AWS_MAX_PART_COUNT;
+    }
+
+    auto uploadId = createMultipartUpload(key, mimeType, contentEncoding);
+
+    try {
+        std::vector<UploadedPart> parts;
+        parts.reserve(estimatedParts);
+
+        uint64_t partNumber = 1;
+
+        while (!istream->eof() && istream->good()) {
+            std::string chunk(chunkSize, '\0');
+            istream->read(chunk.data(), chunkSize);
+            auto bytesRead = istream->gcount();
+
+            if (bytesRead == 0)
+                break;
+
+            chunk.resize(bytesRead);
+
+            auto uploaded = uploadPart(key, uploadId, partNumber, std::move(chunk));
+            debug("Part %d uploaded, ETag: %s", uploaded.partNumber, uploaded.etag);
+            parts.push_back(std::move(uploaded));
+
+            partNumber++;
+
+            if (partNumber > AWS_MAX_PART_COUNT) {
+                throw Error("S3 multipart upload exceeded %d part limit", AWS_MAX_PART_COUNT);
+            }
+        }
+
+        if (parts.empty()) {
+            throw Error("S3 multipart upload failed: no data read from stream");
+        }
+
+        completeMultipartUpload(key, uploadId, parts);
+
+        debug("S3 multipart upload completed: %d parts uploaded for '%s'", parts.size(), key);
+    } catch (...) {
+        try {
+            abortMultipartUpload(key, uploadId);
+        } catch (std::exception & e) {
+            printError("failed to abort S3 multipart upload '%s': %s", uploadId, e.what());
+        }
+        throw;
     }
 }
 
