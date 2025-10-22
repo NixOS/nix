@@ -282,7 +282,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     }
 
     /* Strip spaces from each line. */
-    auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
+    std::vector<std::pair<PosIdx, Expr *>> es2{};
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -290,7 +290,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     const auto trimExpr = [&](Expr * e) {
         atStartOfLine = false;
         curDropped = 0;
-        es2->emplace_back(i->first, e);
+        es2.emplace_back(i->first, e);
     };
     const auto trimString = [&](const StringToken & t) {
         std::string s2;
@@ -324,7 +324,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(alloc, s2));
+            es2.emplace_back(i->first, new ExprString(alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {
@@ -333,19 +333,17 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
-    if (es2->size() == 0) {
+    if (es2.size() == 0) {
         auto * const result = new ExprString("");
-        delete es2;
         return result;
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
-        auto * const result = (*es2)[0].second;
-        delete es2;
+    if (es2.size() == 1 && dynamic_cast<ExprString *>((es2)[0].second)) {
+        auto * const result = (es2)[0].second;
         return result;
     }
-    return new ExprConcatStrings(pos, true, es2);
+    return new ExprConcatStrings(pos, true, std::move(es2));
 }
 
 inline PosIdx LexerState::at(const ParserLocation & loc)

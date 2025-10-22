@@ -695,11 +695,11 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> * es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
+    std::vector<std::pair<PosIdx, Expr *>> es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> && es)
         : pos(pos)
         , forceString(forceString)
-        , es(es) {};
+        , es(std::move(es)) {};
 
     PosIdx getPos() const override
     {

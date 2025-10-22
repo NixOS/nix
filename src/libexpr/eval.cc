@@ -2050,10 +2050,10 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     };
 
     // List of returned strings. References to these Values must NOT be persisted.
-    SmallTemporaryValueVector<conservativeStackReservation> values(es->size());
+    SmallTemporaryValueVector<conservativeStackReservation> values(es.size());
     Value * vTmpP = values.data();
 
-    for (auto & [i_pos, i] : *es) {
+    for (auto & [i_pos, i] : es) {
         Value & vTmp = *vTmpP++;
         i->eval(state, env, vTmp);
 
@@ -2097,7 +2097,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                     .debugThrow();
         } else {
             if (s.empty())
-                s.reserve(es->size());
+                s.reserve(es.size());
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
