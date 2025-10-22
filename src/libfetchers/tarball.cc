@@ -1,3 +1,17 @@
+#include <assert.h>
+#include <stdint.h>
+#include <time.h>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <optional>
+#include <string>
+#include <mutex>
+
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/cache.hh"
@@ -6,9 +20,26 @@
 #include "nix/util/archive.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/types.hh"
-#include "nix/store/store-api.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/store/content-address.hh"
+#include "nix/store/path-info.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/repair-flag.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/url.hh"
+#include "nix/util/util.hh"
+#include "nix/store/path.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
 
 namespace nix::fetchers {
 

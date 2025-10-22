@@ -1,8 +1,14 @@
 #pragma once
 ///@file
 
+#include <boost/container/detail/std_fwd.hpp>
+#include <optional>
+#include <string_view>
+#include <utility>
+
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/path.hh"
+#include "nix/fetchers/attrs.hh"
 
 namespace nix::fetchers {
 

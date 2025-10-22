@@ -1,6 +1,19 @@
-#include "nix/fetchers/filtering-source-accessor.hh"
-
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <stdint.h>
+#include <boost/unordered/unordered_flat_set_fwd.hpp>
+#include <filesystem>
+#include <optional>
+#include <functional>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+
+#include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix {
 

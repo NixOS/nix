@@ -1,4 +1,12 @@
+#pragma once
+///@file
+
+#include <optional>
+
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix::fetchers {
 
