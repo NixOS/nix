@@ -55,6 +55,8 @@ private:
     UploadedPart uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data);
 
     void completeMultipartUpload(std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts);
+
+    void abortMultipartUpload(std::string_view key, std::string_view uploadId);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -192,6 +194,22 @@ void S3BinaryCacheStore::completeMultipartUpload(
 
     req.data = xml;
     req.mimeType = "text/xml";
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
+}
+
+// Abort a multipart upload
+// See:
+// https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html#API_AbortMultipartUpload_RequestSyntax
+void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_view uploadId)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::DELETE;
 
     getFileTransfer()->enqueueFileTransfer(req).get();
 }
