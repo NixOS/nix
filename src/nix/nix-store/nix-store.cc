@@ -15,6 +15,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
+#include "nix/util/strings.hh"
 
 #include "man-pages.hh"
 
@@ -535,17 +536,9 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     for (auto & i : drv.env)
         logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
 
-    /* Also output the arguments.  This doesn't preserve whitespace in
-       arguments. */
-    cout << "export _args; _args='";
-    bool first = true;
-    for (auto & i : drv.args) {
-        if (!first)
-            cout << ' ';
-        first = false;
-        cout << escapeShellArgAlways(i);
-    }
-    cout << "'\n";
+    /* Also output the arguments. */
+    std::string argsStr = concatStringsSep(" ", drv.args);
+    cout << "export _args; _args=" << escapeShellArgAlways(argsStr) << "\n";
 }
 
 static void opReadLog(Strings opFlags, Strings opArgs)
