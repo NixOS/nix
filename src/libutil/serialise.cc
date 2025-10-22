@@ -244,7 +244,8 @@ size_t StringSource::read(char * data, size_t len)
 
 void StringSource::skip(size_t len)
 {
-    if (pos + len > s.size()) {
+    const size_t remain = s.size() - pos;
+    if (len > remain) {
         pos = s.size();
         throw EndOfFile("end of string reached");
     }
