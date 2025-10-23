@@ -268,16 +268,18 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     try {
         promise.get_future().get();
     } catch (std::exception & e) {
-        printError(e.what());
-
         /* Cause the parent build to fail unless --fallback is given,
            or the substitute has disappeared. The latter case behaves
            the same as the substitute never having existed in the
            first place. */
         try {
             throw;
-        } catch (SubstituteGone &) {
+        } catch (SubstituteGone & sg) {
+            /* Missing NARs are expected when they've been garbage collected.
+               This is not a failure, so log as a warning instead of an error. */
+            logWarning({.msg = sg.info().msg});
         } catch (...) {
+            printError(e.what());
             substituterFailed = true;
         }
 
