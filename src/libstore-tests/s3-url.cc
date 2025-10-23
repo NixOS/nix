@@ -104,6 +104,15 @@ INSTANTIATE_TEST_SUITE_P(
                     },
             },
             "with_absolute_endpoint_uri",
+        },
+        ParsedS3URLTestCase{
+            "s3://public-bucket/data.tar.gz?public=true",
+            {
+                .bucket = "public-bucket",
+                .key = {"data.tar.gz"},
+                .public_ = true,
+            },
+            "public_bucket_true",
         }),
     [](const ::testing::TestParamInfo<ParsedS3URLTestCase> & info) { return info.param.description; });
 

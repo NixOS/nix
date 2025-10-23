@@ -36,6 +36,12 @@ try {
         return it->second;
     };
 
+    auto getBooleanParam = [&](std::string_view key) -> bool {
+        return getOptionalParam(key)
+            .transform([](std::string_view val) { return val == "true" || val == "1"; })
+            .value_or(false);
+    };
+
     auto endpoint = getOptionalParam("endpoint");
     if (parsed.path.size() <= 1 || !parsed.path.front().empty())
         throw BadURL("URI has a missing or invalid key");
@@ -61,6 +67,7 @@ try {
 
             return ParsedURL::Authority::parse(*endpoint);
         }(),
+        .public_ = getBooleanParam("public"),
     };
 } catch (BadURL & e) {
     e.addTrace({}, "while parsing S3 URI: '%s'", parsed.to_string());

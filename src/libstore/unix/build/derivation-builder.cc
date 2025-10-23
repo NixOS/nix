@@ -954,8 +954,15 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
             try {
                 auto parsedUrl = parseURL(url->second);
                 if (parsedUrl.scheme == "s3") {
-                    debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
                     auto s3Url = ParsedS3URL::parse(parsedUrl);
+
+                    // Skip credential pre-resolution for public buckets
+                    if (s3Url.public_) {
+                        debug("Skipping credential pre-resolution for public S3 bucket");
+                        return std::nullopt;
+                    }
+
+                    debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
 
                     // Use the preResolveAwsCredentials from aws-creds
                     auto credentials = getAwsCredentialsProvider()->getCredentials(s3Url);
