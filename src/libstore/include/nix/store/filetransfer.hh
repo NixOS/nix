@@ -135,6 +135,11 @@ struct FileTransferRequest
     {
     }
 
+    /**
+     * Returns the verb root for logging purposes.
+     * The returned string is intended to be concatenated with "ing" to form the gerund,
+     * e.g., "download" + "ing" -> "downloading", "upload" + "ing" -> "uploading".
+     */
     std::string verb() const
     {
         switch (method) {
