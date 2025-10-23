@@ -100,8 +100,11 @@ URI_TEST(local_1, localExample_1)
 
 URI_TEST(local_2, localExample_2)
 
-/* Test path with spaces */
+/* Test path with encoded spaces */
 URI_TEST(local_3, localExample_3)
+
+/* Test path with spaces that are improperly not encoded */
+URI_TEST_READ(local_3_no_percent, localExample_3)
 
 URI_TEST_READ(local_shorthand_1, localExample_1)
 
