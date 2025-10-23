@@ -399,13 +399,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
-            if (request.verifyTLS) {
-                if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
-            } else {
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
-            }
+            if (settings.caFile != "")
+                curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
 
 #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);

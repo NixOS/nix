@@ -99,7 +99,6 @@ struct FileTransferRequest
     VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
-    bool verifyTLS = true;
     bool head = false;
     bool post = false;
     size_t tries = fileTransferSettings.tries;
