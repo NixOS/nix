@@ -388,13 +388,15 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
             if (request.data) {
-                if (request.post)
+                if (request.post) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
-                else
+                    curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->length());
+                } else {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                }
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
-                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
                 curl_easy_setopt(req, CURLOPT_SEEKFUNCTION, seekCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
