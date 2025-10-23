@@ -34,8 +34,10 @@ in
           pkgA
           pkgB
           pkgC
+          pkgs.coreutils
         ];
         environment.systemPackages = [ pkgs.minio-client ];
+        nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
         nix.extraOptions = ''
           experimental-features = nix-command
           substituters =
@@ -709,6 +711,59 @@ in
 
           print("  ✓ Small file uploaded and verified")
 
+      @setup_s3()
+      def test_multipart_with_log_compression(bucket):
+          """Test multipart upload with compressed build logs"""
+          print("\n--- Test: Multipart Upload with Log Compression ---")
+
+          # Create a derivation that produces a large text log (12 MB of base64 output)
+          drv_path = server.succeed(
+              """
+              nix-instantiate --expr '
+                let pkgs = import <nixpkgs> {};
+                in derivation {
+                  name = "large-log-builder";
+                  builder = "/bin/sh";
+                  args = ["-c" "$coreutils/bin/dd if=/dev/urandom bs=1M count=12 | $coreutils/bin/base64; echo success > $out"];
+                  coreutils = pkgs.coreutils;
+                  system = builtins.currentSystem;
+                }
+              '
+              """
+          ).strip()
+
+          print("  Building derivation to generate large log")
+          server.succeed(f"nix-store --realize {drv_path} &>/dev/null")
+
+          # Upload logs with compression and multipart
+          store_url = make_s3_url(
+              bucket,
+              **{
+                  "multipart-upload": "true",
+                  "multipart-threshold": str(5 * 1024 * 1024),
+                  "multipart-chunk-size": str(5 * 1024 * 1024),
+                  "log-compression": "xz",
+              }
+          )
+
+          print("  Uploading build log with compression and multipart")
+          output = server.succeed(
+              f"{ENV_WITH_CREDS} nix store copy-log --to '{store_url}' {drv_path} --debug 2>&1"
+          )
+
+          # Should use multipart for the compressed log
+          if "using S3 multipart upload" not in output or "log/" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected multipart upload to be used for compressed log")
+
+          if "parts uploaded" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected multipart completion message")
+
+          print("  ✓ Compressed log uploaded with multipart")
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -741,6 +796,7 @@ in
       test_versioned_urls()
       test_multipart_upload_basic()
       test_multipart_threshold()
+      test_multipart_with_log_compression()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
