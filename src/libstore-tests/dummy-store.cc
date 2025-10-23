@@ -37,20 +37,19 @@ TEST(DummyStore, realisation_read)
         return cfg->openDummyStore();
     }();
 
-    auto drvHash = Hash::parseExplicitFormatUnprefixed(
-        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", HashAlgorithm::SHA256, HashFormat::Base16);
+    StorePath drvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"};
 
     auto outputName = "foo";
 
-    EXPECT_EQ(store->queryRealisation({drvHash, outputName}), nullptr);
+    EXPECT_EQ(store->queryRealisation({drvPath, outputName}), nullptr);
 
     UnkeyedRealisation value{
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
     };
 
-    store->buildTrace.insert({drvHash, {{outputName, make_ref<UnkeyedRealisation>(value)}}});
+    store->buildTrace.insert({drvPath, {{outputName, make_ref<UnkeyedRealisation>(value)}}});
 
-    auto value2 = store->queryRealisation({drvHash, outputName});
+    auto value2 = store->queryRealisation({drvPath, outputName});
 
     ASSERT_TRUE(value2);
     EXPECT_EQ(*value2, value);
