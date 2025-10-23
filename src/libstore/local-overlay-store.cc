@@ -5,10 +5,107 @@
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
-#include "nix/store/store-open.hh"
+#include "nix/store/store-api.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/config-parse-impl.hh"
 
 namespace nix {
+
+static LocalOverlayStoreConfigT<config::SettingInfoWithDefault> localOverlayStoreConfigDescriptions = {
+    .lowerStoreConfig{
+        {
+            .name = "lower-store",
+            .description = R"(
+              [Store URL](@docroot@/command-ref/new-cli/nix3-help-stores.md#store-url-format)
+              for the lower store. The default is `auto` (i.e. use the Nix daemon or `/nix/store` directly).
+
+              Must be a store with a store dir on the file system.
+              Must be used as OverlayFS lower layer for this store's store dir.
+            )",
+            // It's not actually machine-specific, but we don't yet have a
+            // `to_json` for `StoreConfig`.
+            .documentDefault = false,
+        },
+        {
+            .makeDefault = []() -> ref<const StoreConfig> {
+                return make_ref<LocalStore::Config>(StoreConfig::Params{});
+            },
+        },
+    },
+    .upperLayer{
+        {
+            .name = "upper-layer",
+            .description = R"(
+              Directory containing the OverlayFS upper layer for this store's store dir.
+            )",
+        },
+        {
+            .makeDefault = [] { return Path{}; },
+        },
+    },
+    .checkMount{
+        {
+            .name = "check-mount",
+            .description = R"(
+              Check that the overlay filesystem is correctly mounted.
+
+              Nix does not manage the overlayfs mount point itself, but the correct
+              functioning of the overlay store does depend on this mount point being set up
+              correctly. Rather than just assume this is the case, check that the lowerdir
+              and upperdir options are what we expect them to be. This check is on by
+              default, but can be disabled if needed.
+            )",
+        },
+        {
+            .makeDefault = [] { return true; },
+        },
+    },
+    .remountHook{
+        {
+            .name = "remount-hook",
+            .description = R"(
+              Script or other executable to run when overlay filesystem needs remounting.
+
+              This is occasionally necessary when deleting a store path that exists in both upper and lower layers.
+              In such a situation, bypassing OverlayFS and deleting the path in the upper layer directly
+              is the only way to perform the deletion without creating a "whiteout".
+              However this causes the OverlayFS kernel data structures to get out-of-sync,
+              and can lead to 'stale file handle' errors; remounting solves the problem.
+
+              The store directory is passed as an argument to the invoked executable.
+            )",
+        },
+        {
+            .makeDefault = [] { return Path{}; },
+        },
+    },
+};
+
+#define LOCAL_OVERLAY_STORE_CONFIG_FIELDS(X) X(lowerStoreConfig), X(upperLayer), X(checkMount), X(remountHook),
+
+MAKE_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(LocalOverlayStoreConfig, localOverlayStoreConfig, LOCAL_OVERLAY_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap LocalOverlayStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    ret.merge(LocalStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localOverlayStoreConfigDescriptions;
+        ret.merge(decltype(ret){LOCAL_OVERLAY_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    return ret;
+}
+
+LocalOverlayStore::Config::LocalOverlayStoreConfig(
+    std::string_view scheme, std::string_view authority, const StoreConfig::Params & params)
+    : LocalStore::Config(scheme, authority, params)
+    , LocalOverlayStoreConfigT<config::PlainValue>{localOverlayStoreConfigApplyParse(params)}
+{
+}
 
 std::string LocalOverlayStoreConfig::doc()
 {
@@ -43,13 +140,13 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , LocalFSStore{*config}
     , LocalStore{static_cast<ref<const LocalStore::Config>>(config)}
     , config{config}
-    , lowerStore(openStore(percentDecode(config->lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(config->lowerStoreConfig->openStore().dynamic_pointer_cast<LocalFSStore>())
 {
-    if (config->checkMount.get()) {
+    if (config->checkMount) {
         std::smatch match;
         std::string mountInfo;
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
-        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir.get() + R"( .*(\n|$))");
+        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
         // Loop until the last match, which will be the current state of the mount point.
@@ -62,12 +159,12 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
             return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
         };
 
-        auto expectedLowerDir = lowerStore->config.realStoreDir.get();
+        auto expectedLowerDir = lowerStore->config.realStoreDir;
         if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer)) {
             debug("expected lowerdir: %s", expectedLowerDir);
             debug("expected upperdir: %s", config->upperLayer);
             debug("actual mount: %s", mountInfo);
-            throw Error("overlay filesystem '%s' mounted incorrectly", config->realStoreDir.get());
+            throw Error("overlay filesystem '%s' mounted incorrectly", config->realStoreDir);
         }
     }
 }
@@ -206,7 +303,7 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
 
 void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
 {
-    auto mergedDir = config->realStoreDir.get() + "/";
+    auto mergedDir = config->realStoreDir + "/";
     if (path.substr(0, mergedDir.length()) != mergedDir) {
         warn("local-overlay: unexpected gc path '%s' ", path);
         return;
@@ -260,7 +357,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists(config->realStoreDir.get() + "/" + storePath.to_string());
+        return pathExists(config->realStoreDir + "/" + storePath.to_string());
     };
 
     bool errors = false;
@@ -280,8 +377,8 @@ void LocalOverlayStore::remountIfNecessary()
     if (!_remountRequired)
         return;
 
-    if (config->remountHook.get().empty()) {
-        warn("'%s' needs remounting, set remount-hook to do this automatically", config->realStoreDir.get());
+    if (config->remountHook.empty()) {
+        warn("'%s' needs remounting, set remount-hook to do this automatically", config->realStoreDir);
     } else {
         runProgram(config->remountHook, false, {config->realStoreDir});
     }

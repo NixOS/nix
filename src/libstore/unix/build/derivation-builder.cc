@@ -632,8 +632,7 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-            && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (statvfs(store.config->realStoreDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
@@ -1977,7 +1976,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    if (store.storeDir != store.config->realStoreDir.get()) {
+    if (store.storeDir != store.config->realStoreDir) {
 #ifdef __linux__
         useSandbox = true;
 #else
