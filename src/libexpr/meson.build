@@ -223,7 +223,7 @@ parser_library = static_library(
   # by plonking down GIMPLE in the archive.
   override_options : [
     'b_ndebug=@0@'.format(not get_option('debug')),
-    'b_lto=@0@'.format(cxx.get_id() != 'gcc'),
+    'b_lto=@0@'.format(get_option('b_lto') and cxx.get_id() != 'gcc'),
   ],
 )
 
