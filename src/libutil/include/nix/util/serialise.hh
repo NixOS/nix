@@ -255,6 +255,8 @@ struct StringSource : Source
     }
 
     size_t read(char * data, size_t len) override;
+
+    void skip(size_t len) override;
 };
 
 /**
