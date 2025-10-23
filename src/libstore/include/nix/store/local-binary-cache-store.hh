@@ -3,16 +3,16 @@
 namespace nix {
 
 struct LocalBinaryCacheStoreConfig : std::enable_shared_from_this<LocalBinaryCacheStoreConfig>,
-                                     virtual Store::Config,
+                                     Store::Config,
                                      BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    static config::SettingDescriptionMap descriptions();
 
     /**
      * @param binaryCacheDir `file://` is a short-hand for `file:///`
      * for now.
      */
-    LocalBinaryCacheStoreConfig(std::string_view scheme, PathView binaryCacheDir, const Params & params);
+    LocalBinaryCacheStoreConfig(std::string_view scheme, PathView binaryCacheDir, const StoreConfig::Params & params);
 
     Path binaryCacheDir;
 

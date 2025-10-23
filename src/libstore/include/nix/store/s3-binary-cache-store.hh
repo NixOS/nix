@@ -6,62 +6,23 @@
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
+template<template<typename> class F>
+struct S3BinaryCacheStoreConfigT
 {
-    using HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig;
+    F<std::string>::type profile;
+    F<std::string>::type region;
+    F<std::string>::type scheme;
+    F<std::string>::type endpoint;
+};
 
-    S3BinaryCacheStoreConfig(std::string_view uriScheme, std::string_view bucketName, const Params & params);
+struct S3BinaryCacheStoreConfig : std::enable_shared_from_this<S3BinaryCacheStoreConfig>,
+                                  HttpBinaryCacheStoreConfig,
+                                  S3BinaryCacheStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-    const Setting<std::string> profile{
-        this,
-        "default",
-        "profile",
-        R"(
-          The name of the AWS configuration profile to use. By default
-          Nix uses the `default` profile.
-        )"};
-
-public:
-
-    const Setting<std::string> region{
-        this,
-        "us-east-1",
-        "region",
-        R"(
-          The region of the S3 bucket. If your bucket is not in
-          `us-east-1`, you should always explicitly specify the region
-          parameter.
-        )"};
-
-    const Setting<std::string> scheme{
-        this,
-        "https",
-        "scheme",
-        R"(
-          The scheme used for S3 requests, `https` (default) or `http`. This
-          option allows you to disable HTTPS for binary caches which don't
-          support it.
-
-          > **Note**
-          >
-          > HTTPS should be used if the cache might contain sensitive
-          > information.
-        )"};
-
-    const Setting<std::string> endpoint{
-        this,
-        "",
-        "endpoint",
-        R"(
-          The S3 endpoint to use. When empty (default), uses AWS S3 with
-          region-specific endpoints (e.g., s3.us-east-1.amazonaws.com).
-          For S3-compatible services such as MinIO, set this to your service's endpoint.
-
-          > **Note**
-          >
-          > Custom endpoints must support HTTPS and use path-based
-          > addressing instead of virtual host based addressing.
-        )"};
+    S3BinaryCacheStoreConfig(
+        std::string_view uriScheme, std::string_view bucketName, const StoreConfig::Params & params);
 
     static const std::string name()
     {

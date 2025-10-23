@@ -6,31 +6,24 @@
 
 namespace nix {
 
-struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCacheStoreConfig>,
-                                    virtual Store::Config,
-                                    BinaryCacheStoreConfig
+template<template<typename> class F>
+struct HttpBinaryCacheStoreConfigT
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    F<std::string>::type narinfoCompression;
+    F<std::string>::type lsCompression;
+    F<std::string>::type logCompression;
+};
 
-    HttpBinaryCacheStoreConfig(
-        std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params);
+struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCacheStoreConfig>,
+                                    Store::Config,
+                                    BinaryCacheStoreConfig,
+                                    HttpBinaryCacheStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
+
+    HttpBinaryCacheStoreConfig(std::string_view scheme, std::string_view cacheUri, const StoreConfig::Params & params);
 
     ParsedURL cacheUri;
-
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
-
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
-
-    const Setting<std::string> logCompression{
-        this,
-        "",
-        "log-compression",
-        R"(
-          Compression method for `log/*` files. It is recommended to
-          use a compression method supported by most web browsers
-          (e.g. `brotli`).
-        )"};
 
     static const std::string name()
     {

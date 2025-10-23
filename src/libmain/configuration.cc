@@ -1,12 +1,12 @@
-#include "nix/util/configuration.hh"
-#include "nix/util/args.hh"
-#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/main/configuration.hh"
+#include "nix/main/args.hh"
+#include "nix/main/abstract-setting-to-json.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-system.hh"
 
-#include "nix/util/config-impl.hh"
+#include "nix/main/config-impl.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -492,29 +492,6 @@ std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
 void OptionalPathSetting::operator=(const std::optional<Path> & v)
 {
     this->assign(v);
-}
-
-bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
-{
-    auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
-}
-
-void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const
-{
-    if (!isEnabled(feature))
-        throw MissingExperimentalFeature(feature, std::move(reason));
-}
-
-bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeature> & feature) const
-{
-    return !feature || isEnabled(*feature);
-}
-
-void ExperimentalFeatureSettings::require(const std::optional<ExperimentalFeature> & feature) const
-{
-    if (feature)
-        require(*feature);
 }
 
 } // namespace nix

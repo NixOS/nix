@@ -10,25 +10,27 @@
 
 namespace nix {
 
-struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>, virtual CommonSSHStoreConfig
+template<template<typename> class F>
+struct LegacySSHStoreConfigT
 {
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+    F<Strings>::type remoteProgram;
+    F<int>::type maxConnections;
+};
 
-    LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>,
+                              Store::Config,
+                              CommonSSHStoreConfig,
+                              LegacySSHStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-#ifndef _WIN32
-    // Hack for getting remote build log output.
-    // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
-    // the documentation
-    const Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
-#else
+    /**
+     * Hack for getting remote build log output. Intentionally not a
+     * documented user-visible setting.
+     */
     Descriptor logFD = INVALID_DESCRIPTOR;
-#endif
 
-    const Setting<Strings> remoteProgram{
-        this, {"nix-store"}, "remote-program", "Path to the `nix-store` executable on the remote machine."};
-
-    const Setting<int> maxConnections{this, 1, "max-connections", "Maximum number of concurrent SSH connections."};
+    LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const StoreConfig::Params & params);
 
     /**
      * Hack for hydra

@@ -3,7 +3,6 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/util.hh"
-#include "nix/util/config-global.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/position.hh"
 #include "nix/util/sync.hh"
@@ -16,9 +15,15 @@
 
 namespace nix {
 
-LoggerSettings loggerSettings;
+const extern LoggerSettings<config::PlainValue> loggerSettingsDefaults = {
+    .showTrace = {.value = false},
+    .jsonLogPath =
+        {
+            .value = "",
+        },
+};
 
-static GlobalConfig::Register rLoggerSettings(&loggerSettings);
+LoggerSettings<config::PlainValue> loggerSettings = loggerSettingsDefaults;
 
 static thread_local ActivityId curActivity = 0;
 

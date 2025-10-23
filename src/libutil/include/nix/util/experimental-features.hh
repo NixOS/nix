@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/config-abstract.hh"
 #include "nix/util/error.hh"
 #include "nix/util/types.hh"
 #include "nix/util/json-non-null.hh"

@@ -1,4 +1,4 @@
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/expr/primops.hh"
 
 using namespace nix;
