@@ -97,6 +97,18 @@ public:
 
 protected:
 
+    std::optional<std::string> getCompressionMethod(const std::string & path)
+    {
+        if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+            return config->narinfoCompression;
+        else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+            return config->lsCompression;
+        else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+            return config->logCompression;
+        else
+            return std::nullopt;
+    }
+
     void maybeDisable()
     {
         auto state(_state.lock());
@@ -149,19 +161,9 @@ protected:
 
         auto data = StreamToSourceAdapter(istream).drain();
 
-        // Determine compression method based on file type
-        std::string compressionMethod;
-        if (hasSuffix(path, ".narinfo"))
-            compressionMethod = config->narinfoCompression;
-        else if (hasSuffix(path, ".ls"))
-            compressionMethod = config->lsCompression;
-        else if (hasPrefix(path, "log/"))
-            compressionMethod = config->logCompression;
-
-        // Apply compression if configured
-        if (!compressionMethod.empty()) {
-            data = compress(compressionMethod, data);
-            req.headers.emplace_back("Content-Encoding", compressionMethod);
+        if (auto compressionMethod = getCompressionMethod(path)) {
+            data = compress(*compressionMethod, data);
+            req.headers.emplace_back("Content-Encoding", *compressionMethod);
         }
 
         req.data = std::move(data);
