@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
+#include "nix/util/bytes.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/globals.hh"
@@ -105,7 +106,7 @@ INSTANTIATE_TEST_SUITE_P(DummyStoreJSON, DummyStoreJsonTest, [] {
                             auto sc = make_ref<MemorySourceAccessor>();
                             sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
                                 .executable = false,
-                                .contents = "asdf",
+                                .contents = to_owned(as_bytes("asdf")),
                             }};
                             return sc;
                         }(),

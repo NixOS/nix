@@ -1,5 +1,6 @@
 #include "nix/store/store-registration.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/bytes.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/json-utils.hh"
@@ -160,7 +161,7 @@ struct DummyStoreImpl : DummyStore
                     .method = ContentAddressMethod::Raw::Text,
                     .hash = hashString(
                         HashAlgorithm::SHA256,
-                        std::get<MemorySourceAccessor::File::Regular>(accessor->root->raw).contents),
+                        to_str(std::get<MemorySourceAccessor::File::Regular>(accessor->root->raw).contents)),
                 };
                 callback(std::move(info));
                 return;
@@ -428,7 +429,7 @@ ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
             auto vref = make_ref<UnkeyedRealisation>(v2);
             res->buildTrace.insert_or_visit(
                 {
-                    Hash::parseExplicitFormatUnprefixed(k0, HashAlgorithm::SHA256, HashFormat::Base64),
+                    StorePath{k0},
                     {{k1, vref}},
                 },
                 [&](auto & kv) { kv.second.insert_or_assign(k1, vref); });
@@ -464,7 +465,7 @@ void adl_serializer<ref<DummyStore>>::to_json(json & json, const ref<DummyStore>
              auto obj = json::object();
              val->buildTrace.cvisit_all([&](const auto & kv) {
                  auto & [k, v] = kv;
-                 auto & obj2 = obj[k.to_string(HashFormat::Base64, false)] = json::object();
+                 auto & obj2 = obj[k.to_string()] = json::object();
                  for (auto & [k2, v2] : kv.second)
                      obj2[k2] = *v2;
              });
