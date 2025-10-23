@@ -21,8 +21,6 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           Nix uses the `default` profile.
         )"};
 
-public:
-
     const Setting<std::string> region{
         this,
         "us-east-1",
@@ -63,6 +61,12 @@ public:
           > addressing instead of virtual host based addressing.
         )"};
 
+    /**
+     * Set of settings that are part of the S3 URI itself.
+     * These are needed for region specification and other S3-specific settings.
+     */
+    const std::set<const AbstractSetting *> s3UriSettings = {&profile, &region, &scheme, &endpoint};
+
     static const std::string name()
     {
         return "S3 Binary Cache Store";
@@ -71,6 +75,8 @@ public:
     static StringSet uriSchemes();
 
     static std::string doc();
+
+    std::string getHumanReadableURI() const override;
 };
 
 } // namespace nix
