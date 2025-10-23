@@ -52,6 +52,15 @@ schemas = [
   #     'output-inputAddressed.json',
   #   ],
   # },
+  {
+    'stem' : 'deriving-path',
+    'schema' : schema_dir / 'deriving-path-v1.yaml',
+    'files' : [
+      'single_opaque.json',
+      'single_built.json',
+      'single_built_built.json',
+    ],
+  },
 ]
 
 # Validate each example against the schema
