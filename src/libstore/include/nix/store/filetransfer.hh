@@ -84,6 +84,15 @@ extern FileTransferSettings fileTransferSettings;
 extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 /**
+ * HTTP methods supported by FileTransfer.
+ */
+enum struct HttpMethod {
+    GET,
+    HEAD,
+    POST,
+};
+
+/**
  * Username and optional password for HTTP basic authentication.
  * These are used with curl's CURLOPT_USERNAME and CURLOPT_PASSWORD options
  * for various protocols including HTTP, FTP, and others.
@@ -99,8 +108,7 @@ struct FileTransferRequest
     VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
-    bool head = false;
-    bool post = false;
+    HttpMethod method = HttpMethod::GET;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
@@ -129,7 +137,14 @@ struct FileTransferRequest
 
     std::string verb() const
     {
-        return data ? "upload" : "download";
+        switch (method) {
+        case HttpMethod::HEAD:
+        case HttpMethod::GET:
+            return "download";
+        case HttpMethod::POST:
+            return "upload";
+        }
+        unreachable();
     }
 
 private:

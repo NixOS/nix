@@ -384,11 +384,11 @@ struct curlFileTransfer : public FileTransfer
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.head)
+            if (request.method == HttpMethod::HEAD)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
             if (request.data) {
-                if (request.post) {
+                if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->length());
                 } else {
