@@ -128,4 +128,4 @@ runs:
         diagnostic-endpoint: ''
         use-flakehub: false
         use-gha-cache: true
-        source-revision: c2f46a0afa5f95fd4c184a533afd280c68cf63ff # v0.1.6
+        source-revision: 92d9581367be2233c2d5714a2640e1339f4087d8 # main
