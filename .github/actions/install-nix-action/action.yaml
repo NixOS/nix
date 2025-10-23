@@ -16,13 +16,17 @@ inputs:
   install_url:
     description: "URL of the Nix installer"
     required: false
-    default: "https://releases.nixos.org/nix/nix-2.30.2/install"
+    default: "https://releases.nixos.org/nix/nix-2.32.1/install"
   tarball_url:
     description: "URL of the Nix tarball to use with the experimental installer"
     required: false
   github_token:
     description: "Github token"
     required: true
+  use_cache:
+    description: "Whether to setup magic-nix-cache"
+    default: true
+    required: false
 runs:
   using: "composite"
   steps:
@@ -118,3 +122,10 @@ runs:
         source-url: ${{ inputs.experimental-installer-version != 'latest' && 'https://artifacts.nixos.org/experimental-installer/tag/${{ inputs.experimental-installer-version }}/${{ env.EXPERIMENTAL_INSTALLER_ARTIFACT }}' || '' }}
         nix-package-url: ${{ inputs.dogfood == 'true' && steps.download-nix-installer.outputs.tarball-path || (inputs.tarball_url || '') }}
         extra-conf: ${{ inputs.extra_nix_config }}
+    - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      if: ${{ inputs.use_cache == 'true' }}
+      with:
+        diagnostic-endpoint: ''
+        use-flakehub: false
+        use-gha-cache: true
+        source-revision: c2f46a0afa5f95fd4c184a533afd280c68cf63ff # v0.1.6
