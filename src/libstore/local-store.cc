@@ -1049,7 +1049,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         bool narRead = false;
         Finally cleanup = [&]() {
             if (!narRead)
-                source.skip(info.narSize);
+                try {
+                    source.skip(info.narSize);
+                } catch (...) {
+                    // TODO: should Interrupted be handled here?
+                    ignoreExceptionInDestructor();
+                }
         };
 
         addTempRoot(info.path);
