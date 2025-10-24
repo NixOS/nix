@@ -10,6 +10,7 @@
 #include <cassert>
 #include <ranges>
 #include <regex>
+#include <span>
 
 namespace nix {
 
@@ -52,6 +53,8 @@ private:
     };
 
     UploadedPart uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data);
+
+    void completeMultipartUpload(std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -160,6 +163,37 @@ S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, 
     }
 
     return UploadedPart{.partNumber = partNumber, .etag = std::move(result.etag)};
+}
+
+// Completes a multipart upload by combining all uploaded parts.
+// See:
+// https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html#API_CompleteMultipartUpload_RequestSyntax
+void S3BinaryCacheStore::completeMultipartUpload(
+    std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::POST;
+
+    std::string xml = "<CompleteMultipartUpload>";
+    for (const auto & part : parts) {
+        xml += "<Part>";
+        xml += "<PartNumber>" + std::to_string(part.partNumber) + "</PartNumber>";
+        xml += "<ETag>" + part.etag + "</ETag>";
+        xml += "</Part>";
+    }
+    xml += "</CompleteMultipartUpload>";
+
+    debug("S3 CompleteMultipartUpload XML (%d parts): %s", parts.size(), xml);
+
+    req.data = xml;
+    req.mimeType = "text/xml";
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
