@@ -77,6 +77,8 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
     static std::string doc();
 
     std::string getHumanReadableURI() const override;
+
+    ref<Store> openStore() const override;
 };
 
 } // namespace nix
