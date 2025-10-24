@@ -70,7 +70,7 @@ TEST(valueAt, simpleObject)
 
     auto nested = R"({ "hello": { "world": "" } })"_json;
 
-    ASSERT_EQ(valueAt(valueAt(getObject(nested), "hello"), "world"), "");
+    ASSERT_EQ(valueAt(getObject(valueAt(getObject(nested), "hello")), "world"), "");
 }
 
 TEST(valueAt, missingKey)
@@ -119,10 +119,12 @@ TEST(getArray, wrongAssertions)
 {
     auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
-    ASSERT_THROW(getArray(valueAt(json, "object")), Error);
-    ASSERT_THROW(getArray(valueAt(json, "string")), Error);
-    ASSERT_THROW(getArray(valueAt(json, "int")), Error);
-    ASSERT_THROW(getArray(valueAt(json, "boolean")), Error);
+    auto & obj = getObject(json);
+
+    ASSERT_THROW(getArray(valueAt(obj, "object")), Error);
+    ASSERT_THROW(getArray(valueAt(obj, "string")), Error);
+    ASSERT_THROW(getArray(valueAt(obj, "int")), Error);
+    ASSERT_THROW(getArray(valueAt(obj, "boolean")), Error);
 }
 
 TEST(getString, rightAssertions)
@@ -136,10 +138,12 @@ TEST(getString, wrongAssertions)
 {
     auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
-    ASSERT_THROW(getString(valueAt(json, "object")), Error);
-    ASSERT_THROW(getString(valueAt(json, "array")), Error);
-    ASSERT_THROW(getString(valueAt(json, "int")), Error);
-    ASSERT_THROW(getString(valueAt(json, "boolean")), Error);
+    auto & obj = getObject(json);
+
+    ASSERT_THROW(getString(valueAt(obj, "object")), Error);
+    ASSERT_THROW(getString(valueAt(obj, "array")), Error);
+    ASSERT_THROW(getString(valueAt(obj, "int")), Error);
+    ASSERT_THROW(getString(valueAt(obj, "boolean")), Error);
 }
 
 TEST(getIntegralNumber, rightAssertions)
@@ -156,18 +160,20 @@ TEST(getIntegralNumber, wrongAssertions)
     auto json =
         R"({ "object": {}, "array": [], "string": "", "int": 0, "signed": -256, "large": 128, "boolean": false })"_json;
 
-    ASSERT_THROW(getUnsigned(valueAt(json, "object")), Error);
-    ASSERT_THROW(getUnsigned(valueAt(json, "array")), Error);
-    ASSERT_THROW(getUnsigned(valueAt(json, "string")), Error);
-    ASSERT_THROW(getUnsigned(valueAt(json, "boolean")), Error);
-    ASSERT_THROW(getUnsigned(valueAt(json, "signed")), Error);
+    auto & obj = getObject(json);
 
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "object")), Error);
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "array")), Error);
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "string")), Error);
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "boolean")), Error);
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "large")), Error);
-    ASSERT_THROW(getInteger<int8_t>(valueAt(json, "signed")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(obj, "object")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(obj, "array")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(obj, "string")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(obj, "boolean")), Error);
+    ASSERT_THROW(getUnsigned(valueAt(obj, "signed")), Error);
+
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "object")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "array")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "string")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "boolean")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "large")), Error);
+    ASSERT_THROW(getInteger<int8_t>(valueAt(obj, "signed")), Error);
 }
 
 TEST(getBoolean, rightAssertions)
@@ -181,24 +187,28 @@ TEST(getBoolean, wrongAssertions)
 {
     auto json = R"({ "object": {}, "array": [], "string": "", "int": 0, "boolean": false })"_json;
 
-    ASSERT_THROW(getBoolean(valueAt(json, "object")), Error);
-    ASSERT_THROW(getBoolean(valueAt(json, "array")), Error);
-    ASSERT_THROW(getBoolean(valueAt(json, "string")), Error);
-    ASSERT_THROW(getBoolean(valueAt(json, "int")), Error);
+    auto & obj = getObject(json);
+
+    ASSERT_THROW(getBoolean(valueAt(obj, "object")), Error);
+    ASSERT_THROW(getBoolean(valueAt(obj, "array")), Error);
+    ASSERT_THROW(getBoolean(valueAt(obj, "string")), Error);
+    ASSERT_THROW(getBoolean(valueAt(obj, "int")), Error);
 }
 
 TEST(optionalValueAt, existing)
 {
     auto json = R"({ "string": "ssh-rsa" })"_json;
 
-    ASSERT_EQ(optionalValueAt(json, "string"), std::optional{"ssh-rsa"});
+    auto * ptr = optionalValueAt(getObject(json), "string");
+    ASSERT_TRUE(ptr);
+    ASSERT_EQ(*ptr, R"("ssh-rsa")"_json);
 }
 
 TEST(optionalValueAt, empty)
 {
     auto json = R"({})"_json;
 
-    ASSERT_EQ(optionalValueAt(json, "string"), std::nullopt);
+    ASSERT_EQ(optionalValueAt(getObject(json), "string"), nullptr);
 }
 
 TEST(getNullable, null)
