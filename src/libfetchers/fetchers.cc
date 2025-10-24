@@ -519,10 +519,11 @@ using namespace nix;
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json)
 {
     fetchers::PublicKey res = {};
-    if (auto type = optionalValueAt(json, "type"))
+    auto & obj = getObject(json);
+    if (auto * type = optionalValueAt(obj, "type"))
         res.type = getString(*type);
 
-    res.key = getString(valueAt(json, "key"));
+    res.key = getString(valueAt(obj, "key"));
 
     return res;
 }
