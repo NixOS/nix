@@ -509,7 +509,7 @@ Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatur
     auto & obj = getObject(json);
     auto algo = parseHashAlgo(getString(valueAt(obj, "algorithm")), xpSettings);
     auto format = parseHashFormat(getString(valueAt(obj, "format")));
-    auto & hashS = getString(valueAt(obj, "hash"));
+    auto hashS = getString(valueAt(obj, "hash"));
     return Hash::parseExplicitFormatUnprefixed(hashS, algo, format, xpSettings);
 }
 
