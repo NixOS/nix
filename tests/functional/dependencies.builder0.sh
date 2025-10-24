@@ -17,4 +17,6 @@ ln -s "$out" "$out"/self
 echo program > "$out"/program
 chmod +x "$out"/program
 
+echo '1 + 2' > "$out"/foo.nix
+
 echo FOO

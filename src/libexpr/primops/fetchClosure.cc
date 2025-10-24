@@ -64,6 +64,8 @@ static void runFetchClosureWithRewrite(
              .pos = state.positions[pos]});
     }
 
+    state.allowClosure(toPath);
+
     state.mkStorePathString(toPath, v);
 }
 
@@ -91,6 +93,8 @@ static void runFetchClosureWithContentAddressedPath(
              .pos = state.positions[pos]});
     }
 
+    state.allowClosure(fromPath);
+
     state.mkStorePathString(fromPath, v);
 }
 
@@ -114,6 +118,8 @@ static void runFetchClosureWithInputAddressedPath(
                  state.store->printStorePath(fromPath)),
              .pos = state.positions[pos]});
     }
+
+    state.allowClosure(fromPath);
 
     state.mkStorePathString(fromPath, v);
 }
