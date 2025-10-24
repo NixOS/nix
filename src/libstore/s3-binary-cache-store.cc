@@ -5,6 +5,7 @@
 #include <cassert>
 #include <ranges>
 #include <regex>
+#include <span>
 
 namespace nix {
 
@@ -28,10 +29,18 @@ public:
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
 
+    struct UploadedPart
+    {
+        uint64_t partNumber;
+        std::string etag;
+    };
+
     std::string createMultipartUpload(
         const std::string_view key,
         const std::string_view mimeType,
         const std::optional<std::string_view> contentEncoding);
+    void completeMultipartUpload(
+        const std::string_view key, const std::string_view uploadId, std::span<const UploadedPart> parts);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -77,6 +86,37 @@ std::string S3BinaryCacheStore::createMultipartUpload(
     }
 
     throw Error("S3 CreateMultipartUpload response missing <UploadId>");
+}
+
+// Completes a multipart upload by combining all uploaded parts.
+// See:
+// https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html#API_CompleteMultipartUpload_RequestSyntax
+void S3BinaryCacheStore::completeMultipartUpload(
+    const std::string_view key, const std::string_view uploadId, std::span<const UploadedPart> parts)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::POST;
+
+    std::string xml = "<CompleteMultipartUpload>";
+    for (const auto & part : parts) {
+        xml += "<Part>";
+        xml += "<PartNumber>" + std::to_string(part.partNumber) + "</PartNumber>";
+        xml += "<ETag>" + part.etag + "</ETag>";
+        xml += "</Part>";
+    }
+    xml += "</CompleteMultipartUpload>";
+
+    debug("S3 CompleteMultipartUpload XML (%d parts): %s", parts.size(), xml);
+
+    req.data = xml;
+    req.mimeType = "text/xml";
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
