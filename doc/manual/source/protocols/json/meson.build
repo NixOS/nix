@@ -9,8 +9,10 @@ json_schema_for_humans = find_program('generate-schema-doc', required : false)
 json_schema_config = files('json-schema-for-humans-config.yaml')
 
 schemas = [
+  'file-system-object-v1',
   'hash-v1',
-  'derivation-v3',
+  'content-address-v1',
+  'derivation-v4',
 ]
 
 schema_files = files()

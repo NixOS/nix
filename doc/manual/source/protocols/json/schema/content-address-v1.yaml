@@ -1,0 +1,51 @@
+"$schema": http://json-schema.org/draft-04/schema#
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/content-address-v1.json
+title: Pesudo Content Address
+description: |
+  This schema describes the JSON representation of Nix's `ContentAddress` type.
+
+  This data type is not a simple as a looks, and therefore called a *pseudo* content address.
+  See the description of the `hash` field for why this is.
+
+  When creating the store path of a content-addressed store object, the `hash` from this will be combined with the references of the store object in order to create a content-address that is properly sensitive to the entirety of the store object — file system objects and references alike.
+  So it is that store path that is arguably the *true* content-address for content-addressed store paths, not this data type.
+
+  The only problem with that is that store paths are truncated in various ways from the underlying hashes, so their cryptographic strength can be reasonably doubted.
+  Given that uncertain cryptographic strength, we do need something else.
+  Currently this in conjunction with the reference list captures all the content securely, more concisely.
+  (Though the reference list is still arbitrarily-sized, it is presumably in practice still way smaller than the file system object data).
+  
+  > **Note**
+  >
+  > A hypothetical hash of both of those which is *not* so truncated would be even better, as it would be secure and fixed-size.
+  > A hypothetical new method content-addressing store objects where we compute the store paths just from such a hash, so we don't need to "dereference" the hash to get the underlying reference list and rehash it, would be better still.
+type: object
+properties:
+  method:
+    "$ref": "#/$defs/method"
+  hash:
+    title: Content Address
+    description: |
+      This would be the content-address itself.
+
+      For all current methods, this is just a content address of the file system object of the store object, [as described in the store chapter](@docroot@/store/store-object/content-address.md), and not of the store object as a whole.
+      In particular, the references of the store object are *not* taken into account with this hash (and currently-supported methods).
+    "$ref": "./hash-v1.yaml"
+required:
+- method
+- hash
+additionalProperties: false
+"$defs":
+  method:
+    type: string
+    enum: [flat, nar, text, git]
+    title: Content-Addressing Method
+    description: |
+      A string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
+
+      Valid method strings are:
+
+      - [`flat`](@docroot@/store/store-object/content-address.md#method-flat) (provided the contents are a single file)
+      - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
+      - [`text`](@docroot@/store/store-object/content-address.md#method-text)
+      - [`git`](@docroot@/store/store-object/content-address.md#method-git)

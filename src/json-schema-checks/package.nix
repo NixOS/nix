@@ -20,7 +20,9 @@ mkMesonDerivation (finalAttrs: {
   fileset = lib.fileset.unions [
     ../../.version
     ../../doc/manual/source/protocols/json/schema
+    ../../src/libutil-tests/data/memory-source-accessor
     ../../src/libutil-tests/data/hash
+    ../../src/libstore-tests/data/content-address
     ../../src/libstore-tests/data/derivation
     ./.
   ];

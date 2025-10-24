@@ -1,5 +1,5 @@
 "$schema": http://json-schema.org/draft-04/schema#
-"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v3.json
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v4.json
 title: Derivation
 description: |
   Experimental JSON representation of a Nix derivation (version 3).
@@ -32,10 +32,10 @@ properties:
       Used when calculating store paths for the derivation’s outputs.
 
   version:
-    const: 3
+    const: 4
     title: Format version (must be 3)
     description: |
-      Must be `3`.
+      Must be `4`.
       This is a guard that allows us to continue evolving this format.
       The choice of `3` is fairly arbitrary, but corresponds to this informal version:
 
@@ -46,6 +46,8 @@ properties:
       - Version 2: Separate `method` and `hashAlgo` fields in output specs
 
       - Version 3: Drop store dir from store paths, just include base name.
+
+      - Version 4: Use canonical content address JSON format for floating content addressed derivation outputs.
 
       Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
 
@@ -154,25 +156,18 @@ properties:
           The output path, if known in advance.
 
       method:
-        type: string
-        title: Content addressing method
-        enum: [flat, nar, text, git]
+        "$ref": "./content-address-v1.yaml#/$defs/method"
         description: |
           For an output which will be [content addressed](@docroot@/store/derivation/outputs/content-address.md), a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
-
-          Valid method strings are:
-
-          - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
-          - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
-          - [`text`](@docroot@/store/store-object/content-address.md#method-text)
-          - [`git`](@docroot@/store/store-object/content-address.md#method-git)
-
+          See the linked original definition for further details.
       hashAlgo:
         title: Hash algorithm
         "$ref": "./hash-v1.yaml#/$defs/algorithm"
+        description: |
+          For an output which will be [content addressed], but the content address is not specified up front, the name of the hash algorithm used. When the content address is fixed, use `hash.hashAlgo` instead.
 
       hash:
-        type: string
         title: Expected hash value
         description: |
-          For fixed-output derivations, the expected content hash in base-16.
+          For fixed-output derivations, the expected content hash.
+        "$ref": "./hash-v1.yaml"

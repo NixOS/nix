@@ -21,6 +21,14 @@ schema_dir = meson.current_source_dir() / 'schema'
 # Get all example files
 schemas = [
   {
+    'stem' : 'file-system-object',
+    'schema' : schema_dir / 'file-system-object-v1.yaml',
+    'files' : [
+      'simple.json',
+      'complex.json',
+    ],
+  },
+  {
     'stem' : 'hash',
     'schema' : schema_dir / 'hash-v1.yaml',
     'files' : [
@@ -31,8 +39,16 @@ schemas = [
     ],
   },
   {
+    'stem' : 'content-address',
+    'schema' : schema_dir / 'content-address-v1.yaml',
+    'files' : [
+      'text.json',
+      'nar.json',
+    ],
+  },
+  {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml',
+    'schema' : schema_dir / 'derivation-v4.yaml',
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
@@ -41,7 +57,7 @@ schemas = [
   # # Not sure how to make subschema work
   # {
   #   'stem': 'derivation',
-  #   'schema': schema_dir / 'derivation-v3.yaml#output',
+  #   'schema': schema_dir / 'derivation-v4.yaml#output',
   #   'files' : [
   #     'output-caFixedFlat.json',
   #     'output-caFixedNAR.json',
@@ -64,8 +80,6 @@ foreach schema : schemas
       stem + '-schema-valid',
       jv,
       args : [
-        '--map',
-        './hash-v1.yaml=' + schema_dir / 'hash-v1.yaml',
         'http://json-schema.org/draft-04/schema',
         schema_file,
       ],
