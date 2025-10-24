@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <ranges>
+#include <regex>
 
 namespace nix {
 
@@ -26,6 +27,11 @@ public:
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
+
+    std::string createMultipartUpload(
+        const std::string_view key,
+        const std::string_view mimeType,
+        const std::optional<std::string_view> contentEncoding);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -35,6 +41,42 @@ void S3BinaryCacheStore::upsertFile(
     uint64_t sizeHint)
 {
     HttpBinaryCacheStore::upsertFile(path, istream, mimeType, sizeHint);
+}
+
+// Creates a multipart upload for large objects to S3.
+// See:
+// https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html#API_CreateMultipartUpload_RequestSyntax
+std::string S3BinaryCacheStore::createMultipartUpload(
+    const std::string_view key, const std::string_view mimeType, const std::optional<std::string_view> contentEncoding)
+{
+    auto req = makeRequest(key);
+
+    // setupForS3() converts s3:// to https:// but strips query parameters
+    // So we call it first, then add our multipart parameters
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploads"] = "";
+    req.uri = VerbatimURL(url);
+
+    req.method = HttpMethod::POST;
+    req.data = "";
+    req.mimeType = mimeType;
+
+    if (contentEncoding) {
+        req.headers.emplace_back("Content-Encoding", *contentEncoding);
+    }
+
+    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+
+    std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
+    std::smatch match;
+
+    if (std::regex_search(result.data, match, uploadIdRegex)) {
+        return match[1];
+    }
+
+    throw Error("S3 CreateMultipartUpload response missing <UploadId>");
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
