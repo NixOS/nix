@@ -56,7 +56,8 @@ protected:
     void upsertFile(
         const std::string & path,
         std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & mimeType,
+        uint64_t sizeHint) override
     {
         auto path2 = config->binaryCacheDir + "/" + path;
         static std::atomic<int> counter{0};
