@@ -209,7 +209,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     auto url = api.endpoint + "/objects/batch";
     const auto & authHeader = api.authHeader;
     FileTransferRequest request(parseURL(url));
-    request.post = true;
+    request.method = HttpMethod::POST;
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});

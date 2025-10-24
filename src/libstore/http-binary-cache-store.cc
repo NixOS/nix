@@ -139,7 +139,7 @@ protected:
 
         try {
             FileTransferRequest request(makeRequest(path));
-            request.head = true;
+            request.method = HttpMethod::HEAD;
             getFileTransfer()->download(request);
             return true;
         } catch (FileTransferError & e) {

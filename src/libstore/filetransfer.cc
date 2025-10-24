@@ -384,11 +384,14 @@ struct curlFileTransfer : public FileTransfer
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.head)
+            if (request.method == HttpMethod::HEAD)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
+            if (request.method == HttpMethod::DELETE)
+                curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
+
             if (request.data) {
-                if (request.post) {
+                if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->length());
                 } else {
@@ -916,6 +919,11 @@ FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
     /* Note: this method is the same as download, but helps in readability */
+    return enqueueFileTransfer(request).get();
+}
+
+FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
+{
     return enqueueFileTransfer(request).get();
 }
 

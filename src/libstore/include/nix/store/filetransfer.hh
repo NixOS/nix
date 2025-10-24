@@ -84,6 +84,16 @@ extern FileTransferSettings fileTransferSettings;
 extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 /**
+ * HTTP methods supported by FileTransfer.
+ */
+enum struct HttpMethod {
+    GET,
+    HEAD,
+    POST,
+    DELETE,
+};
+
+/**
  * Username and optional password for HTTP basic authentication.
  * These are used with curl's CURLOPT_USERNAME and CURLOPT_PASSWORD options
  * for various protocols including HTTP, FTP, and others.
@@ -99,8 +109,7 @@ struct FileTransferRequest
     VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
-    bool head = false;
-    bool post = false;
+    HttpMethod method = HttpMethod::GET;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
@@ -127,9 +136,23 @@ struct FileTransferRequest
     {
     }
 
+    /**
+     * Returns the verb root for logging purposes.
+     * The returned string is intended to be concatenated with "ing" to form the gerund,
+     * e.g., "download" + "ing" -> "downloading", "upload" + "ing" -> "uploading".
+     */
     std::string verb() const
     {
-        return data ? "upload" : "download";
+        switch (method) {
+        case HttpMethod::HEAD:
+        case HttpMethod::GET:
+            return "download";
+        case HttpMethod::POST:
+            return "upload";
+        case HttpMethod::DELETE:
+            return "delet";
+        }
+        unreachable();
     }
 
 private:
@@ -200,6 +223,11 @@ struct FileTransfer
      * Synchronously upload a file.
      */
     FileTransferResult upload(const FileTransferRequest & request);
+
+    /**
+     * Synchronously delete a resource.
+     */
+    FileTransferResult deleteResource(const FileTransferRequest & request);
 
     /**
      * Download a file, writing its data to a sink. The sink will be
