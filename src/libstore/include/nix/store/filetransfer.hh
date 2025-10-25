@@ -155,9 +155,10 @@ struct FileTransferRequest
         unreachable();
     }
 
+    void setupForS3();
+
 private:
     friend struct curlFileTransfer;
-    void setupForS3();
 #if NIX_WITH_AWS_AUTH
     std::optional<std::string> awsSigV4Provider;
 #endif
