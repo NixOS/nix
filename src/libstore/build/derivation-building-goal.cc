@@ -677,7 +677,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     {
         builder.reset();
         StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs) {
+        /* In the check case we install no store objects, and so
+           `builtOutputs` is empty. However, per issue #14287, there is
+           an expectation that the post-build hook is still executed.
+           (This is useful for e.g. logging successful deterministic rebuilds.)
+
+           In order to make that work, in the check case just load the
+           (preexisting) infos from scratch, rather than relying on what
+           `DerivationBuilder` returned to us. */
+        for (auto & [_, output] : buildMode == bmCheck ? checkPathValidity(initialOutputs).second : builtOutputs) {
             // for sake of `bmRepair`
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
