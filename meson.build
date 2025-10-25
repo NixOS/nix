@@ -61,3 +61,4 @@ if get_option('unit-tests')
 endif
 subproject('nix-functional-tests')
 subproject('json-schema-checks')
+subproject('kaitai-struct-checks')
