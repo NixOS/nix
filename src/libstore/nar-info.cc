@@ -159,17 +159,19 @@ NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, 
         UnkeyedValidPathInfo::fromJSON(store, json),
     }};
 
+    auto & obj = getObject(json);
+
     if (json.contains("url"))
-        res.url = getString(valueAt(json, "url"));
+        res.url = getString(valueAt(obj, "url"));
 
     if (json.contains("compression"))
-        res.compression = getString(valueAt(json, "compression"));
+        res.compression = getString(valueAt(obj, "compression"));
 
     if (json.contains("downloadHash"))
-        res.fileHash = Hash::parseAny(getString(valueAt(json, "downloadHash")), std::nullopt);
+        res.fileHash = Hash::parseAny(getString(valueAt(obj, "downloadHash")), std::nullopt);
 
     if (json.contains("downloadSize"))
-        res.fileSize = getUnsigned(valueAt(json, "downloadSize"));
+        res.fileSize = getUnsigned(valueAt(obj, "downloadSize"));
 
     return res;
 }
