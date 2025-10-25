@@ -34,8 +34,10 @@ in
           pkgA
           pkgB
           pkgC
+          pkgs.coreutils
         ];
         environment.systemPackages = [ pkgs.minio-client ];
+        nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
         nix.extraOptions = ''
           experimental-features = nix-command
           substituters =
@@ -639,6 +641,129 @@ in
           )
           print("  ✓ Fetch with versionId parameter works")
 
+      @setup_s3()
+      def test_multipart_upload_basic(bucket):
+          """Test basic multipart upload with a large file"""
+          print("\n--- Test: Multipart Upload Basic ---")
+
+          large_file_size = 10 * 1024 * 1024
+          large_pkg = server.succeed(
+              "nix-store --add $(dd if=/dev/urandom of=/tmp/large-file bs=1M count=10 2>/dev/null && echo /tmp/large-file)"
+          ).strip()
+
+          chunk_size = 5 * 1024 * 1024
+          expected_parts = 3  # 10 MB raw becomes ~10.5 MB compressed (NAR + xz overhead)
+
+          store_url = make_s3_url(
+              bucket,
+              **{
+                  "multipart-upload": "true",
+                  "multipart-threshold": str(5 * 1024 * 1024),
+                  "multipart-chunk-size": str(chunk_size),
+              }
+          )
+
+          print(f"  Uploading {large_file_size} byte file (expect {expected_parts} parts)")
+          output = server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {large_pkg} --debug 2>&1")
+
+          if "using S3 multipart upload" not in output:
+              raise Exception("Expected multipart upload to be used")
+
+          expected_msg = f"{expected_parts} parts uploaded"
+          if expected_msg not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception(f"Expected '{expected_msg}' in output")
+
+          print(f"  ✓ Multipart upload used with {expected_parts} parts")
+
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --from '{store_url}' {large_pkg} --no-check-sigs")
+          verify_packages_in_store(client, large_pkg, should_exist=True)
+
+          print("  ✓ Large file downloaded and verified")
+
+      @setup_s3()
+      def test_multipart_threshold(bucket):
+          """Test that files below threshold use regular upload"""
+          print("\n--- Test: Multipart Threshold Behavior ---")
+
+          store_url = make_s3_url(
+              bucket,
+              **{
+                  "multipart-upload": "true",
+                  "multipart-threshold": str(1024 * 1024 * 1024),
+              }
+          )
+
+          print("  Uploading small file with high threshold")
+          output = server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['A']} --debug 2>&1")
+
+          if "using S3 multipart upload" in output:
+              raise Exception("Should not use multipart for file below threshold")
+
+          if "using S3 regular upload" not in output:
+              raise Exception("Expected regular upload to be used")
+
+          print("  ✓ Regular upload used for file below threshold")
+
+          client.succeed(f"{ENV_WITH_CREDS} nix copy --no-check-sigs --from '{store_url}' {PKGS['A']}")
+          verify_packages_in_store(client, PKGS['A'], should_exist=True)
+
+          print("  ✓ Small file uploaded and verified")
+
+      @setup_s3()
+      def test_multipart_with_log_compression(bucket):
+          """Test multipart upload with compressed build logs"""
+          print("\n--- Test: Multipart Upload with Log Compression ---")
+
+          # Create a derivation that produces a large text log (12 MB of base64 output)
+          drv_path = server.succeed(
+              """
+              nix-instantiate --expr '
+                let pkgs = import <nixpkgs> {};
+                in derivation {
+                  name = "large-log-builder";
+                  builder = "/bin/sh";
+                  args = ["-c" "$coreutils/bin/dd if=/dev/urandom bs=1M count=12 | $coreutils/bin/base64; echo success > $out"];
+                  coreutils = pkgs.coreutils;
+                  system = builtins.currentSystem;
+                }
+              '
+              """
+          ).strip()
+
+          print("  Building derivation to generate large log")
+          server.succeed(f"nix-store --realize {drv_path} &>/dev/null")
+
+          # Upload logs with compression and multipart
+          store_url = make_s3_url(
+              bucket,
+              **{
+                  "multipart-upload": "true",
+                  "multipart-threshold": str(5 * 1024 * 1024),
+                  "multipart-chunk-size": str(5 * 1024 * 1024),
+                  "log-compression": "xz",
+              }
+          )
+
+          print("  Uploading build log with compression and multipart")
+          output = server.succeed(
+              f"{ENV_WITH_CREDS} nix store copy-log --to '{store_url}' {drv_path} --debug 2>&1"
+          )
+
+          # Should use multipart for the compressed log
+          if "using S3 multipart upload" not in output or "log/" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected multipart upload to be used for compressed log")
+
+          if "parts uploaded" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected multipart completion message")
+
+          print("  ✓ Compressed log uploaded with multipart")
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -669,6 +794,9 @@ in
       test_compression_disabled()
       test_nix_prefetch_url()
       test_versioned_urls()
+      test_multipart_upload_basic()
+      test_multipart_threshold()
+      test_multipart_with_log_compression()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
