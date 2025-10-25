@@ -21,6 +21,7 @@ headers = [ config_pub_h ] + files(
   'build/derivation-resolution-goal.hh',
   'build/derivation-trampoline-goal.hh',
   'build/drv-output-substitution-goal.hh',
+  'build/find-cycles.hh',
   'build/goal.hh',
   'build/substitution-goal.hh',
   'build/worker.hh',
