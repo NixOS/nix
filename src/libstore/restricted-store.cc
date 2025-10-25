@@ -292,7 +292,7 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     next->computeFSClosure(newPaths, closure);
     for (auto & path : closure)
         goal.addDependency(path);
-    for (auto & real : Realisation::closure(*next, newRealisations))
+    for (auto & real : newRealisations)
         goal.addedDrvOutputs.insert(real.id);
 
     return results;
