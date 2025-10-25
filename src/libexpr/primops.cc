@@ -1374,7 +1374,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             pos,
             "while evaluating the `__structuredAttrs` "
             "attribute passed to builtins.derivationStrict"))
-        jsonObject = StructuredAttrs{.structuredAttrs = json::object()};
+        jsonObject = StructuredAttrs{};
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
