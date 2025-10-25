@@ -64,7 +64,7 @@ boost = dependency(
     'url',
   ],
   include_type : 'system',
-  version : '>=1.82.0',
+  version : '>=1.87.0',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
