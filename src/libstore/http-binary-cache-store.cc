@@ -161,7 +161,7 @@ void HttpBinaryCacheStore::upsertFile(
     }
 }
 
-FileTransferRequest HttpBinaryCacheStore::makeRequest(const std::string & path)
+FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
 {
     /* Otherwise the last path fragment will get discarded. */
     auto cacheUriWithTrailingSlash = config->cacheUri;
