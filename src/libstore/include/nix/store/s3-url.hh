@@ -26,6 +26,7 @@ struct ParsedS3URL
     std::optional<std::string> profile;
     std::optional<std::string> region;
     std::optional<std::string> scheme;
+    std::optional<std::string> versionId;
     /**
      * The endpoint can be either missing, be an absolute URI (with a scheme like `http:`)
      * or an authority (so an IP address or a registered name).

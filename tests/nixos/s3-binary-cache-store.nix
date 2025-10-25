@@ -1,7 +1,5 @@
 {
-  lib,
   config,
-  nixpkgs,
   ...
 }:
 
@@ -147,7 +145,7 @@ in
               else:
                   machine.fail(f"nix path-info {pkg}")
 
-      def setup_s3(populate_bucket=[], public=False):
+      def setup_s3(populate_bucket=[], public=False, versioned=False):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
@@ -156,14 +154,17 @@ in
           Args:
               populate_bucket: List of packages to upload before test runs
               public: If True, make the bucket publicly accessible
+              versioned: If True, enable versioning on the bucket before populating
           """
           def decorator(test_func):
               def wrapper():
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
-                  if public:
-                      server.succeed(f"mc anonymous set download minio/{bucket}")
                   try:
+                      if public:
+                          server.succeed(f"mc anonymous set download minio/{bucket}")
+                      if versioned:
+                          server.succeed(f"mc version enable minio/{bucket}")
                       if populate_bucket:
                           store_url = make_s3_url(bucket)
                           for pkg in populate_bucket:
@@ -597,6 +598,47 @@ in
 
           print("  ✓ File content verified correct (hash matches)")
 
+      @setup_s3(populate_bucket=[PKGS['A']], versioned=True)
+      def test_versioned_urls(bucket):
+          """Test that versionId parameter is accepted in S3 URLs"""
+          print("\n=== Testing Versioned URLs ===")
+
+          # Get the nix-cache-info file
+          cache_info_url = make_s3_url(bucket, path="/nix-cache-info")
+
+          # Fetch without versionId should work
+          client.succeed(
+              f"{ENV_WITH_CREDS} nix eval --impure --expr "
+              f"'builtins.fetchurl {{ name = \"cache-info\"; url = \"{cache_info_url}\"; }}'"
+          )
+          print("  ✓ Fetch without versionId works")
+
+          # List versions to get a version ID
+          # MinIO output format: [timestamp] size tier versionId versionNumber method filename
+          versions_output = server.succeed(f"mc ls --versions minio/{bucket}/nix-cache-info")
+
+          # Extract version ID from output (4th field after STANDARD)
+          import re
+          version_match = re.search(r'STANDARD\s+(\S+)\s+v\d+', versions_output)
+          if not version_match:
+              print(f"Debug: versions output: {versions_output}")
+              raise Exception("Could not extract version ID from MinIO output")
+
+          version_id = version_match.group(1)
+          print(f"  ✓ Found version ID: {version_id}")
+
+          # Version ID should not be "null" since versioning was enabled before upload
+          if version_id == "null":
+              raise Exception("Version ID is 'null' - versioning may not be working correctly")
+
+          # Fetch with versionId parameter
+          versioned_url = f"{cache_info_url}&versionId={version_id}"
+          client.succeed(
+              f"{ENV_WITH_CREDS} nix eval --impure --expr "
+              f"'builtins.fetchurl {{ name = \"cache-info-versioned\"; url = \"{versioned_url}\"; }}'"
+          )
+          print("  ✓ Fetch with versionId parameter works")
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -626,6 +668,7 @@ in
       test_compression_mixed()
       test_compression_disabled()
       test_nix_prefetch_url()
+      test_versioned_urls()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
