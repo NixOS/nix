@@ -117,6 +117,7 @@
 - [Architecture and Design](architecture/architecture.md)
 - [Formats and Protocols](protocols/index.md)
   - [JSON Formats](protocols/json/index.md)
+    - [File System Object](protocols/json/file-system-object.md)
     - [Hash](protocols/json/hash.md)
     - [Store Object Info](protocols/json/store-object-info.md)
     - [Derivation](protocols/json/derivation.md)

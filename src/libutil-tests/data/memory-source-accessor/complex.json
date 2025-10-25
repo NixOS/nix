@@ -1,0 +1,24 @@
+{
+  "contents": {
+    "bar": {
+      "contents": {
+        "baz": {
+          "contents": "Z29vZCBkYXksCg==",
+          "executable": true,
+          "type": "regular"
+        },
+        "quux": {
+          "target": "/over/there",
+          "type": "symlink"
+        }
+      },
+      "type": "directory"
+    },
+    "foo": {
+      "contents": "aGVsbG8K",
+      "executable": false,
+      "type": "regular"
+    }
+  },
+  "type": "directory"
+}
