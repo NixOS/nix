@@ -86,7 +86,7 @@ protected:
         const std::string & mimeType,
         uint64_t sizeHint) override;
 
-    FileTransferRequest makeRequest(const std::string & path);
+    FileTransferRequest makeRequest(std::string_view path);
 
     void getFile(const std::string & path, Sink & sink) override;
 
