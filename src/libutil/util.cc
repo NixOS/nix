@@ -257,9 +257,4 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
     }
 }
 
-std::string showBytes(uint64_t bytes)
-{
-    return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
-}
-
 } // namespace nix
