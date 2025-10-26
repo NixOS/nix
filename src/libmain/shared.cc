@@ -411,7 +411,7 @@ RunPager::~RunPager()
 PrintFreed::~PrintFreed()
 {
     if (show)
-        std::cout << fmt("%d store paths deleted, %s freed\n", results.paths.size(), showBytes(results.bytesFreed));
+        std::cout << fmt("%d store paths deleted, %s freed\n", results.paths.size(), renderSize(results.bytesFreed));
 }
 
 } // namespace nix

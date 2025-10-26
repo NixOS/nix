@@ -362,8 +362,6 @@ struct overloaded : Ts...
 template<class... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-std::string showBytes(uint64_t bytes);
-
 /**
  * Provide an addition operator between strings and string_views
  * inexplicably omitted from the standard library.
