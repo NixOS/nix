@@ -1305,7 +1305,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 showDerivation();
                             else {
                                 auto name = visitor.getAttrPathStr(state->s.name);
-                                logger->warn(fmt("%s must be a derivation", name));
+                                logger->warn(fmt("%s is not a derivation", name));
                             }
                         } catch (IFDError & e) {
                             if (!json) {
