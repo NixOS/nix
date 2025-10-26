@@ -122,6 +122,7 @@ cat >flake.nix <<EOF
 }
 EOF
 nix flake show --json --all-systems > show-output.json
+# shellcheck disable=SC2016
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
