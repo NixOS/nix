@@ -1,5 +1,5 @@
-"$schema": http://json-schema.org/draft-04/schema#
-"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/deriving-path-v1.json
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/deriving-path-v1.json"
 title: Deriving Path
 description: |
   This schema describes the JSON representation of Nix's [Deriving Path](@docroot@/store/derivation/index.md#deriving-path).

@@ -1,5 +1,5 @@
-"$schema": http://json-schema.org/draft-04/schema#
-"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/hash-v1.json
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/hash-v1.json"
 title: Hash
 description: |
   A cryptographic hash value used throughout Nix for content addressing and integrity verification.

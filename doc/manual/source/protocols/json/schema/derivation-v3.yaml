@@ -1,5 +1,5 @@
-"$schema": http://json-schema.org/draft-04/schema#
-"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v3.json
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v3.json"
 title: Derivation
 description: |
   Experimental JSON representation of a Nix derivation (version 3).
@@ -154,19 +154,10 @@ properties:
           The output path, if known in advance.
 
       method:
-        type: string
-        title: Content addressing method
-        enum: [flat, nar, text, git]
+        "$ref": "./content-address-v1.yaml#/$defs/method"
         description: |
           For an output which will be [content addressed](@docroot@/store/derivation/outputs/content-address.md), a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
-
-          Valid method strings are:
-
-          - [`flat`](@docroot@/store/store-object/content-address.md#method-flat)
-          - [`nar`](@docroot@/store/store-object/content-address.md#method-nix-archive)
-          - [`text`](@docroot@/store/store-object/content-address.md#method-text)
-          - [`git`](@docroot@/store/store-object/content-address.md#method-git)
-
+          See the linked original definition for further details.
       hashAlgo:
         title: Hash algorithm
         "$ref": "./hash-v1.yaml#/$defs/algorithm"
