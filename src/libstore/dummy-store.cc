@@ -148,7 +148,7 @@ struct DummyStoreImpl : DummyStore
     /**
      * The dummy store is incapable of *not* trusting! :)
      */
-    virtual std::optional<TrustedFlag> isTrustedClient() override
+    std::optional<TrustedFlag> isTrustedClient() override
     {
         return Trusted;
     }

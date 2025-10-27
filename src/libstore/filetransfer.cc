@@ -622,7 +622,7 @@ struct curlFileTransfer : public FileTransfer
         void quit()
         {
             quitting = true;
-            /* We wil not be processing any more incomming requests */
+            /* We wil not be processing any more incoming requests */
             while (!incoming.empty())
                 incoming.pop();
         }
