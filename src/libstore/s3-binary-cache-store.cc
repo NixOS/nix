@@ -26,6 +26,14 @@ public:
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
+
+    /**
+     * Abort a multipart upload
+     *
+     * @see
+     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html#API_AbortMultipartUpload_RequestSyntax
+     */
+    void abortMultipartUpload(std::string_view key, std::string_view uploadId);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -35,6 +43,19 @@ void S3BinaryCacheStore::upsertFile(
     uint64_t sizeHint)
 {
     HttpBinaryCacheStore::upsertFile(path, istream, mimeType, sizeHint);
+}
+
+void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_view uploadId)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::DELETE;
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
