@@ -258,18 +258,6 @@ struct DummyStoreImpl : DummyStore
         });
     }
 
-    void narFromPath(const StorePath & path, Sink & sink) override
-    {
-        bool visited = contents.cvisit(path, [&](const auto & kv) {
-            const auto & [info, accessor] = kv.second;
-            SourcePath sourcePath(accessor);
-            dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
-        });
-
-        if (!visited)
-            throw Error("path '%s' is not valid", printStorePath(path));
-    }
-
     void queryRealisationUncached(
         const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {

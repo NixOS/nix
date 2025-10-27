@@ -300,6 +300,13 @@ ValidPathInfo Store::addToStoreSlow(
     return info;
 }
 
+void Store::narFromPath(const StorePath & path, Sink & sink)
+{
+    auto accessor = requireStoreObjectAccessor(path);
+    SourcePath sourcePath{accessor};
+    dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
+}
+
 StringSet Store::Config::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
