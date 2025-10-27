@@ -158,6 +158,7 @@ TEST(renderSize, misc)
     ASSERT_EQ(renderSize(972, true), "   0.9 KiB");
     ASSERT_EQ(renderSize(973, true), "   1.0 KiB"); // FIXME: should round down
     ASSERT_EQ(renderSize(1024, true), "   1.0 KiB");
+    ASSERT_EQ(renderSize(-1024, true), "  -1.0 KiB");
     ASSERT_EQ(renderSize(1024 * 1024, true), "1024.0 KiB");
     ASSERT_EQ(renderSize(1100 * 1024, true), "   1.1 MiB");
     ASSERT_EQ(renderSize(2ULL * 1024 * 1024 * 1024, true), "   2.0 GiB");

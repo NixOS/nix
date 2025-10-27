@@ -141,7 +141,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     void printSize(std::ostream & str, uint64_t value)
     {
         if (humanReadable)
-            str << fmt("\t%s", renderSize(value, true));
+            str << fmt("\t%s", renderSize((int64_t) value, true));
         else
             str << fmt("\t%11d", value);
     }
