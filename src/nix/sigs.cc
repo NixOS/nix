@@ -29,6 +29,13 @@ struct CmdCopySigs : StorePathsCommand
         return "copy store path signatures from substituters";
     }
 
+    std::string doc() override
+    {
+        return
+#include "store-copy-sigs.md"
+            ;
+    }
+
     void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
