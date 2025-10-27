@@ -112,13 +112,6 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
     return std::make_shared<PosixSourceAccessor>(std::move(absPath));
 }
 
-void LocalFSStore::narFromPath(const StorePath & path, Sink & sink)
-{
-    if (!isValidPath(path))
-        throw Error("path '%s' is not valid", printStorePath(path));
-    dumpPath(getRealStoreDir() + std::string(printStorePath(path), storeDir.size()), sink);
-}
-
 const std::string LocalFSStore::drvsLogDir = "drvs";
 
 std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)

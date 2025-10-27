@@ -609,7 +609,7 @@ public:
     /**
      * Write a NAR dump of a store path.
      */
-    virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
+    virtual void narFromPath(const StorePath & path, Sink & sink);
 
     /**
      * For each path, if it's a derivation, build it.  Building a
