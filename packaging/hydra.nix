@@ -63,6 +63,7 @@ let
         "nix-cli"
         "nix-functional-tests"
         "nix-json-schema-checks"
+        "nix-kaitai-struct-checks"
       ]
       ++ lib.optionals enableBindings [
         "nix-perl-bindings"

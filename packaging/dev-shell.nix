@@ -109,6 +109,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
           ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
           ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
           ++ pkgs.nixComponents2.nix-json-schema-checks.externalNativeBuildInputs
+          ++ pkgs.nixComponents2.nix-kaitai-struct-checks.externalNativeBuildInputs
           ++ lib.optional (
             !buildCanExecuteHost
             # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
@@ -148,6 +149,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     ++ pkgs.nixComponents2.nix-expr.externalPropagatedBuildInputs
     ++ pkgs.nixComponents2.nix-cmd.buildInputs
     ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.externalBuildInputs
-    ++ lib.optional havePerl pkgs.perl;
+    ++ lib.optional havePerl pkgs.perl
+    ++ pkgs.nixComponents2.nix-kaitai-struct-checks.externalBuildInputs;
   }
 )
