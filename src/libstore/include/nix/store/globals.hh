@@ -77,7 +77,7 @@ public:
 
     Settings();
 
-    unsigned int getDefaultCores() const;
+    static unsigned int getDefaultCores();
 
     Path nixPrefix;
 
