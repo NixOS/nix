@@ -1,5 +1,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/path-references.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/main/shared.hh"
 
@@ -191,7 +192,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
             std::multimap<size_t, Node *> refs;
-            StringSet hashes;
+            StorePathSet refPaths;
 
             for (auto & ref : node.refs) {
                 if (ref == node.path && packagePath != dependencyPath)
@@ -200,7 +201,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 if (node2.dist == inf)
                     continue;
                 refs.emplace(node2.dist, &node2);
-                hashes.insert(std::string(node2.path.hashPart()));
+                refPaths.insert(node2.path);
             }
 
             /* For each reference, find the files and symlinks that
@@ -209,58 +210,50 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
             auto accessor = store->requireStoreObjectAccessor(node.path);
 
-            auto visitPath = [&](this auto && recur, const CanonPath & p) -> void {
-                auto st = accessor->maybeLstat(p);
-                assert(st);
+            auto getColour = [&](const std::string & hash) {
+                return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
+            };
 
-                auto p2 = p.isRoot() ? p.abs() : p.rel();
+            if (precise) {
+                // Use scanForReferencesDeep to find files containing references
+                scanForReferencesDeep(*accessor, CanonPath::root, refPaths, [&](FileRefScanResult result) {
+                    auto p2 = result.filePath.isRoot() ? result.filePath.abs() : result.filePath.rel();
+                    auto st = accessor->lstat(result.filePath);
 
-                auto getColour = [&](const std::string & hash) {
-                    return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
-                };
+                    if (st.type == SourceAccessor::Type::tRegular) {
+                        auto contents = accessor->readFile(result.filePath);
 
-                if (st->type == SourceAccessor::Type::tDirectory) {
-                    auto names = accessor->readDirectory(p);
-                    for (auto & [name, type] : names)
-                        recur(p / name);
-                }
-
-                else if (st->type == SourceAccessor::Type::tRegular) {
-                    auto contents = accessor->readFile(p);
-
-                    for (auto & hash : hashes) {
-                        auto pos = contents.find(hash);
-                        if (pos != std::string::npos) {
-                            size_t margin = 32;
-                            auto pos2 = pos >= margin ? pos - margin : 0;
-                            hits[hash].emplace_back(
-                                fmt("%s: …%s…",
+                        // For each reference found in this file, extract context
+                        for (auto & foundRef : result.foundRefs) {
+                            std::string hash(foundRef.hashPart());
+                            auto pos = contents.find(hash);
+                            if (pos != std::string::npos) {
+                                size_t margin = 32;
+                                auto pos2 = pos >= margin ? pos - margin : 0;
+                                hits[hash].emplace_back(fmt(
+                                    "%s: …%s…",
                                     p2,
                                     hilite(
                                         filterPrintable(std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
                                         pos - pos2,
                                         StorePath::HashLen,
                                         getColour(hash))));
+                            }
+                        }
+                    } else if (st.type == SourceAccessor::Type::tSymlink) {
+                        auto target = accessor->readLink(result.filePath);
+
+                        // For each reference found in this symlink, show it
+                        for (auto & foundRef : result.foundRefs) {
+                            std::string hash(foundRef.hashPart());
+                            auto pos = target.find(hash);
+                            if (pos != std::string::npos)
+                                hits[hash].emplace_back(
+                                    fmt("%s -> %s", p2, hilite(target, pos, StorePath::HashLen, getColour(hash))));
                         }
                     }
-                }
-
-                else if (st->type == SourceAccessor::Type::tSymlink) {
-                    auto target = accessor->readLink(p);
-
-                    for (auto & hash : hashes) {
-                        auto pos = target.find(hash);
-                        if (pos != std::string::npos)
-                            hits[hash].emplace_back(
-                                fmt("%s -> %s", p2, hilite(target, pos, StorePath::HashLen, getColour(hash))));
-                    }
-                }
-            };
-
-            // FIXME: should use scanForReferences().
-
-            if (precise)
-                visitPath(CanonPath::root);
+                });
+            }
 
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
