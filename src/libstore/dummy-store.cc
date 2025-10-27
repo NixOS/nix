@@ -158,8 +158,13 @@ struct DummyStoreImpl : DummyStore
         unsupported("queryPathFromHashPart");
     }
 
-    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
+    void
+    addToStore(const ValidPathInfo & info, const SourcePath & path, RepairFlag repair, CheckSigsFlag checkSigs) override
     {
+        if (!repair && isValidPath(info.path)) {
+            return;
+        }
+
         if (config->readOnly)
             unsupported("addToStore");
 
@@ -169,19 +174,19 @@ struct DummyStoreImpl : DummyStore
         if (checkSigs)
             throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
 
-        auto temp = make_ref<MemorySourceAccessor>();
-        MemorySink tempSink{*temp};
-        parseDump(tempSink, source);
-        auto path = info.path;
+        auto accessor = make_ref<MemorySourceAccessor>();
+        {
+            MemorySink tempSink{*accessor};
+            copyRecursive(*path.accessor, path.path, tempSink, CanonPath::root);
+        }
 
-        auto accessor = make_ref<MemorySourceAccessor>(std::move(*temp));
         contents.insert(
-            {path,
+            {info.path,
              PathInfoAndContents{
-                 std::move(info),
+                 info,
                  accessor,
              }});
-        wholeStoreView->addObject(path.to_string(), accessor);
+        wholeStoreView->addObject(info.path.to_string(), accessor);
     }
 
     StorePath addToStoreFromDump(

@@ -298,8 +298,8 @@ void BinaryCacheStore::addToStore(
     const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (!repair && isValidPath(info.path)) {
-        // FIXME: copyNAR -> null sink
-        narSource.drain();
+        NullFileSystemObjectSink s;
+        parseDump(s, narSource);
         return;
     }
 
