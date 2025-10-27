@@ -345,8 +345,8 @@ string_parts
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $$.emplace_back(state->at(@2), new ExprString(state->alloc, $2)); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $$.emplace_back(state->at(@2), $3); }
+  { $$ = std::move($1); $$.emplace_back(state->at(@2), new ExprString(state->alloc, $2)); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->at(@2), $3); }
   | DOLLAR_CURLY expr '}' { $$.emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$.emplace_back(state->at(@1), new ExprString(state->alloc, $1));
@@ -391,8 +391,8 @@ path_start
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = $1; $$.emplace_back(state->at(@2), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = $1; $$.emplace_back(state->at(@2), $3); }
+  : ind_string_parts IND_STR { $$ = std::move($1); $$.emplace_back(state->at(@2), $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->at(@2), $3); }
   | { }
   ;
 
@@ -440,11 +440,11 @@ binds1
   ;
 
 attrs
-  : attrs attr { $$ = $1; $$.emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
+  : attrs attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($2), state->at(@2)); }
   | attrs string_attr
-    { $$ = $1;
+    { $$ = std::move($1);
       std::visit(overloaded {
-          [&](std::string_view str) { $$.emplace_back(AttrName(state->symbols.create(str)), state->at(@2)); },
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str), state->at(@2)); },
           [&](Expr * expr) {
               throw ParseError({
                   .msg = HintFmt("dynamic attributes not allowed in inherit"),
@@ -457,20 +457,20 @@ attrs
   ;
 
 attrpath
-  : attrpath '.' attr { $$ = $1; $$.push_back(AttrName(state->symbols.create($3))); }
+  : attrpath '.' attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($3)); }
   | attrpath '.' string_attr
-    { $$ = $1;
+    { $$ = std::move($1);
       std::visit(overloaded {
-          [&](std::string_view str) { $$.push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$.push_back(AttrName(expr)); }
-      }, $3);
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
+          [&](Expr * expr) { $$.emplace_back(expr); }
+      }, std::move($3));
     }
-  | attr { $$.push_back(AttrName(state->symbols.create($1))); }
+  | attr { $$.emplace_back(state->symbols.create($1)); }
   | string_attr
     { std::visit(overloaded {
-          [&](std::string_view str) { $$.push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$.push_back(AttrName(expr)); }
-      }, $1);
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
+          [&](Expr * expr) { $$.emplace_back(expr); }
+      }, std::move($1));
     }
   ;
 
@@ -480,7 +480,7 @@ attr
   ;
 
 string_attr
-  : '"' string_parts '"' { $$ = $2; }
+  : '"' string_parts '"' { $$ = std::move($2); }
   | DOLLAR_CURLY expr '}' { $$ = $2; }
   ;
 
