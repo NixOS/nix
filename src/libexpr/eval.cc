@@ -3067,7 +3067,7 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path)
     return parseExprFromFile(path, staticBaseEnv);
 }
 
-Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromFile(const SourcePath & path, const std::shared_ptr<StaticEnv> & staticEnv)
 {
     auto buffer = path.resolveSymlinks().readFile();
     // readFile hopefully have left some extra space for terminators
@@ -3075,8 +3075,8 @@ Expr * EvalState::parseExprFromFile(const SourcePath & path, std::shared_ptr<Sta
     return parse(buffer.data(), buffer.size(), Pos::Origin(path), path.parent(), staticEnv);
 }
 
-Expr *
-EvalState::parseExprFromString(std::string s_, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+Expr * EvalState::parseExprFromString(
+    std::string s_, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv)
 {
     // NOTE this method (and parseStdin) must take care to *fully copy* their input
     // into their respective Pos::Origin until the parser stops overwriting its input
@@ -3210,7 +3210,11 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
 }
 
 Expr * EvalState::parse(
-    char * text, size_t length, Pos::Origin origin, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv)
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    const std::shared_ptr<StaticEnv> & staticEnv)
 {
     DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
     DocCommentMap * docComments = &tmpDocComments;
