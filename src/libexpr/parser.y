@@ -440,11 +440,11 @@ binds1
   ;
 
 attrs
-  : attrs attr { $$ = std::move($1); $$.emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
+  : attrs attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($2), state->at(@2)); }
   | attrs string_attr
     { $$ = std::move($1);
       std::visit(overloaded {
-          [&](std::string_view str) { $$.emplace_back(AttrName(state->symbols.create(str)), state->at(@2)); },
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str), state->at(@2)); },
           [&](Expr * expr) {
               throw ParseError({
                   .msg = HintFmt("dynamic attributes not allowed in inherit"),
@@ -457,19 +457,19 @@ attrs
   ;
 
 attrpath
-  : attrpath '.' attr { $$ = std::move($1); $$.push_back(AttrName(state->symbols.create($3))); }
+  : attrpath '.' attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($3)); }
   | attrpath '.' string_attr
     { $$ = std::move($1);
       std::visit(overloaded {
-          [&](std::string_view str) { $$.push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$.push_back(AttrName(expr)); }
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
+          [&](Expr * expr) { $$.emplace_back(expr); }
       }, std::move($3));
     }
-  | attr { $$.push_back(AttrName(state->symbols.create($1))); }
+  | attr { $$.emplace_back(state->symbols.create($1)); }
   | string_attr
     { std::visit(overloaded {
-          [&](std::string_view str) { $$.push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$.push_back(AttrName(expr)); }
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
+          [&](Expr * expr) { $$.emplace_back(expr); }
       }, std::move($1));
     }
   ;
