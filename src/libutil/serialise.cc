@@ -513,4 +513,41 @@ size_t ChainSource::read(char * data, size_t len)
     }
 }
 
+std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory)
+{
+    struct RestartableSourceImpl : RestartableSource
+    {
+        RestartableSourceImpl(decltype(factory) factory_)
+            : factory_(std::move(factory_))
+            , impl(this->factory_())
+        {
+        }
+
+        decltype(factory) factory_;
+        std::unique_ptr<Source> impl = factory_();
+
+        size_t read(char * data, size_t len) override
+        {
+            return impl->read(data, len);
+        }
+
+        bool good() override
+        {
+            return impl->good();
+        }
+
+        void skip(size_t len) override
+        {
+            return impl->skip(len);
+        }
+
+        void restart() override
+        {
+            impl = factory_();
+        }
+    };
+
+    return std::make_unique<RestartableSourceImpl>(std::move(factory));
+}
+
 } // namespace nix

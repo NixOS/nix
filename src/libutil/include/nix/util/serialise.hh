@@ -231,9 +231,17 @@ struct StringSink : Sink
 };
 
 /**
+ * Source type that can be restarted.
+ */
+struct RestartableSource : Source
+{
+    virtual void restart() = 0;
+};
+
+/**
  * A source that reads data from a string.
  */
-struct StringSource : Source
+struct StringSource : RestartableSource
 {
     std::string_view s;
     size_t pos;
@@ -257,7 +265,21 @@ struct StringSource : Source
     size_t read(char * data, size_t len) override;
 
     void skip(size_t len) override;
+
+    void restart() override
+    {
+        pos = 0;
+    }
 };
+
+/**
+ * Create a restartable Source from a factory function.
+ *
+ * @param factory Factory function that returns a fresh instance of the Source. Gets
+ * called for each source restart.
+ * @pre factory must return an equivalent source for each invocation.
+ */
+std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory);
 
 /**
  * A sink that writes all incoming data to two other sinks.
