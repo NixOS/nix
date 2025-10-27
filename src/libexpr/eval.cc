@@ -1496,7 +1496,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
             ExprLambda & lambda(*vCur.lambda().fun);
 
-            auto size = (!lambda.arg ? 0 : 1) + (lambda.hasFormals() ? lambda.formals->formals.size() : 0);
+            auto size = (!lambda.arg ? 0 : 1) + lambda.nFormals;
             Env & env2(mem.allocEnv(size));
             env2.up = vCur.lambda().env;
 
@@ -1520,7 +1520,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                    there is no matching actual argument but the formal
                    argument has a default, use the default. */
                 size_t attrsUsed = 0;
-                for (auto & i : lambda.formals->formals) {
+                for (auto & i : lambda.getFormals()) {
                     auto j = args[0]->attrs()->get(i.name);
                     if (!j) {
                         if (!i.def) {
@@ -1542,13 +1542,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
                 /* Check that each actual argument is listed as a formal
                    argument (unless the attribute match specifies a `...'). */
-                if (!lambda.formals->ellipsis && attrsUsed != args[0]->attrs()->size()) {
+                if (!lambda.ellipsis && attrsUsed != args[0]->attrs()->size()) {
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs())
-                        if (!lambda.formals->has(i.name)) {
+                        if (!lambda.hasFormal(i.name)) {
                             StringSet formalNames;
-                            for (auto & formal : lambda.formals->formals)
+                            for (auto & formal : lambda.getFormals())
                                 formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
                             error<TypeError>(
@@ -1752,9 +1752,9 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         return;
     }
 
-    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->formals->formals.size()), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->nFormals), args.size()));
 
-    if (fun.lambda().fun->formals->ellipsis) {
+    if (fun.lambda().fun->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
@@ -1762,7 +1762,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
             attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
-        for (auto & i : fun.lambda().fun->formals->formals) {
+        for (auto & i : fun.lambda().fun->getFormals()) {
             auto j = args.get(i.name);
             if (j) {
                 attrs.insert(*j);

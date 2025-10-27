@@ -282,7 +282,7 @@ static Flake readFlake(
         expectType(state, nFunction, *outputs->value, outputs->pos);
 
         if (outputs->value->isLambda() && outputs->value->lambda().fun->hasFormals()) {
-            for (auto & formal : outputs->value->lambda().fun->formals->formals) {
+            for (auto & formal : outputs->value->lambda().fun->getFormals()) {
                 if (formal.name != state.s.self)
                     flake.inputs.emplace(
                         state.symbols[formal.name],

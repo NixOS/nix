@@ -160,7 +160,7 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
         // the natural Symbol ordering is by creation time, which can lead to the
         // same expression being printed in two different ways depending on its
         // context. always use lexicographic ordering to avoid this.
-        for (auto & i : formals->lexicographicOrder(symbols)) {
+        for (auto & i : getFormalsLexicographic(symbols)) {
             if (first)
                 first = false;
             else
@@ -171,7 +171,7 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
                 i.def->show(symbols, str);
             }
         }
-        if (formals->ellipsis) {
+        if (ellipsis) {
             if (!first)
                 str << ", ";
             str << "...";
@@ -451,8 +451,7 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    auto newEnv =
-        std::make_shared<StaticEnv>(nullptr, env, (hasFormals() ? formals->formals.size() : 0) + (!arg ? 0 : 1));
+    auto newEnv = std::make_shared<StaticEnv>(nullptr, env, nFormals + (!arg ? 0 : 1));
 
     Displacement displ = 0;
 
@@ -460,12 +459,12 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         newEnv->vars.emplace_back(arg, displ++);
 
     if (hasFormals()) {
-        for (auto & i : formals->formals)
+        for (auto & i : getFormals())
             newEnv->vars.emplace_back(i.name, displ++);
 
         newEnv->sort();
 
-        for (auto & i : formals->formals)
+        for (auto & i : getFormals())
             if (i.def)
                 i.def->bindVars(es, newEnv);
     }

@@ -112,7 +112,7 @@ TEST_F(ValuePrintingTests, vLambda)
     auto body = ExprInt(0);
     auto formals = Formals{};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), formals, &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -502,7 +502,7 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
     auto body = ExprInt(0);
     auto formals = Formals{};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), formals, &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);

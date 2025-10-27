@@ -3368,7 +3368,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
         return;
     }
 
-    const auto & formals = args[0]->lambda().fun->formals->formals;
+    const auto & formals = args[0]->lambda().fun->getFormals();
     auto attrs = state.buildBindings(formals.size());
     for (auto & i : formals)
         attrs.insert(i.name, state.getBool(i.def), i.pos);

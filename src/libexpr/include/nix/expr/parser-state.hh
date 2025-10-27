@@ -93,7 +93,7 @@ struct ParserState
     void addAttr(
         ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
-    Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
+    void validateFormals(Formals & formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
     PosIdx at(const ParserLocation & loc);
 };
@@ -213,17 +213,17 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
     }
 }
 
-inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Symbol arg)
+inline void ParserState::validateFormals(Formals & formals, PosIdx pos, Symbol arg)
 {
-    std::sort(formals->formals.begin(), formals->formals.end(), [](const auto & a, const auto & b) {
+    std::sort(formals.formals.begin(), formals.formals.end(), [](const auto & a, const auto & b) {
         return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
     });
 
     std::optional<std::pair<Symbol, PosIdx>> duplicate;
-    for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
-        if (formals->formals[i].name != formals->formals[i + 1].name)
+    for (size_t i = 0; i + 1 < formals.formals.size(); i++) {
+        if (formals.formals[i].name != formals.formals[i + 1].name)
             continue;
-        std::pair thisDup{formals->formals[i].name, formals->formals[i + 1].pos};
+        std::pair thisDup{formals.formals[i].name, formals.formals[i + 1].pos};
         duplicate = std::min(thisDup, duplicate.value_or(thisDup));
     }
     if (duplicate)
@@ -231,11 +231,9 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
             {.msg = HintFmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
              .pos = positions[duplicate->second]});
 
-    if (arg && formals->has(arg))
+    if (arg && formals.has(arg))
         throw ParseError(
             {.msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]), .pos = positions[pos]});
-
-    return formals;
 }
 
 inline Expr *

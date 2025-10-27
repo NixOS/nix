@@ -481,16 +481,6 @@ struct Formals
             formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
         return it != formals.end() && it->name == arg;
     }
-
-    std::vector<Formal> lexicographicOrder(const SymbolTable & symbols) const
-    {
-        std::vector<Formal> result(formals.begin(), formals.end());
-        std::sort(result.begin(), result.end(), [&](const Formal & a, const Formal & b) {
-            std::string_view sa = symbols[a.name], sb = symbols[b.name];
-            return sa < sb;
-        });
-        return result;
-    }
 };
 
 struct ExprLambda : Expr
@@ -498,21 +488,42 @@ struct ExprLambda : Expr
     PosIdx pos;
     Symbol name;
     Symbol arg;
-    Formals * formals;
+
+    bool ellipsis;
+    uint16_t nFormals;
+    Formal * formalsStart;
+
     Expr * body;
     DocComment docComment;
 
-    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
+    ExprLambda(
+        std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Symbol arg, const Formals & formals, Expr * body)
         : pos(pos)
         , arg(arg)
-        , formals(formals)
-        , body(body) {};
-
-    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
-        : pos(pos)
-        , formals(formals)
+        , ellipsis(formals.ellipsis)
+        , nFormals(formals.formals.size())
+        , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
     {
+        std::ranges::copy(formals.formals, formalsStart);
+    };
+
+    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Symbol arg, Expr * body)
+        : pos(pos)
+        , arg(arg)
+        , nFormals(0)
+        , formalsStart(nullptr)
+        , body(body) {};
+
+    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Formals formals, Expr * body)
+        : ExprLambda(alloc, pos, Symbol(), formals, body) {};
+
+    bool hasFormal(Symbol arg) const
+    {
+        auto formals = getFormals();
+        auto it = std::lower_bound(
+            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
     }
 
     void setName(Symbol name) override;
@@ -520,12 +531,27 @@ struct ExprLambda : Expr
 
     inline bool hasFormals() const
     {
-        return formals != nullptr;
+        return nFormals > 0;
+    }
+
+    std::vector<Formal> getFormalsLexicographic(const SymbolTable & symbols) const
+    {
+        std::vector<Formal> result(getFormals().begin(), getFormals().end());
+        std::sort(result.begin(), result.end(), [&](const Formal & a, const Formal & b) {
+            std::string_view sa = symbols[a.name], sb = symbols[b.name];
+            return sa < sb;
+        });
+        return result;
     }
 
     PosIdx getPos() const override
     {
         return pos;
+    }
+
+    std::span<Formal> getFormals() const
+    {
+        return {formalsStart, nFormals};
     }
 
     virtual void setDocComment(DocComment docComment) override;

@@ -131,7 +131,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <nix::Expr *> expr_pipe_from expr_pipe_into
 %type <std::vector<Expr *>> list
 %type <nix::ExprAttrs *> binds binds1
-%type <nix::Formals *> formals formal_set
+%type <nix::Formals> formals formal_set
 %type <nix::Formal> formal
 %type <std::vector<nix::AttrName>> attrpath
 %type <std::vector<std::pair<nix::AttrName, nix::PosIdx>>> attrs
@@ -179,26 +179,30 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), 0, $3);
+    { auto me = new ExprLambda(state->alloc, CUR_POS, state->symbols.create($1), $3);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
   | formal_set ':' expr_function[body]
-    { auto me = new ExprLambda(CUR_POS, state->validateFormals($formal_set), $body);
+    {
+      state->validateFormals($formal_set);
+      auto me = new ExprLambda(state->alloc, CUR_POS, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
   | formal_set '@' ID ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+      state->validateFormals($formal_set, CUR_POS, arg);
+      auto me = new ExprLambda(state->alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
   | ID '@' formal_set ':' expr_function[body]
     {
       auto arg = state->symbols.create($ID);
-      auto me = new ExprLambda(CUR_POS, arg, state->validateFormals($formal_set, CUR_POS, arg), $body);
+      state->validateFormals($formal_set, CUR_POS, arg);
+      auto me = new ExprLambda(state->alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -490,18 +494,18 @@ list
   ;
 
 formal_set
-  : '{' formals ',' ELLIPSIS '}' { $$ = $formals;    $$->ellipsis = true; }
-  | '{' ELLIPSIS '}'             { $$ = new Formals; $$->ellipsis = true; }
-  | '{' formals ',' '}'          { $$ = $formals;    $$->ellipsis = false; }
-  | '{' formals '}'              { $$ = $formals;    $$->ellipsis = false; }
-  | '{' '}'                      { $$ = new Formals; $$->ellipsis = false; }
+  : '{' formals ',' ELLIPSIS '}' { $$ = std::move($formals); $$.ellipsis = true; }
+  | '{' ELLIPSIS '}'                                       { $$.ellipsis = true; }
+  | '{' formals ',' '}'          { $$ = std::move($formals); $$.ellipsis = false; }
+  | '{' formals '}'              { $$ = std::move($formals); $$.ellipsis = false; }
+  | '{' '}'                                                { $$.ellipsis = false; }
   ;
 
 formals
   : formals[accum] ',' formal
-    { $$ = $accum; $$->formals.emplace_back(std::move($formal)); }
+    { $$ = std::move($accum); $$.formals.emplace_back(std::move($formal)); }
   | formal
-    { $$ = new Formals; $$->formals.emplace_back(std::move($formal)); }
+    { $$.formals.emplace_back(std::move($formal)); }
   ;
 
 formal
