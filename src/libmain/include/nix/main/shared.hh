@@ -89,8 +89,6 @@ extern volatile ::sig_atomic_t blockInt;
 
 /* GC helpers. */
 
-std::string showBytes(uint64_t bytes);
-
 struct GCResults;
 
 struct PrintFreed
