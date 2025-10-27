@@ -600,7 +600,7 @@ static void main_nix_build(int argc, char ** argv)
             structuredAttrsRC = StructuredAttrs::writeShell(json);
 
             auto attrsJSON = (tmpDir.path() / ".attrs.json").string();
-            writeFile(attrsJSON, json.dump());
+            writeFile(attrsJSON, static_cast<nlohmann::json>(std::move(json)).dump());
 
             auto attrsSH = (tmpDir.path() / ".attrs.sh").string();
             writeFile(attrsSH, structuredAttrsRC);
