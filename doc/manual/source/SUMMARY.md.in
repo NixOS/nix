@@ -118,6 +118,7 @@
 - [Formats and Protocols](protocols/index.md)
   - [JSON Formats](protocols/json/index.md)
     - [Hash](protocols/json/hash.md)
+    - [Content Address](protocols/json/content-address.md)
     - [Store Object Info](protocols/json/store-object-info.md)
     - [Derivation](protocols/json/derivation.md)
     - [Deriving Path](protocols/json/deriving-path.md)
