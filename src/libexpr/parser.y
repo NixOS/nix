@@ -129,7 +129,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <nix::Expr *> start expr expr_function expr_if expr_op
 %type <nix::Expr *> expr_select expr_simple expr_app
 %type <nix::Expr *> expr_pipe_from expr_pipe_into
-%type <nix::ExprList *> expr_list
+%type <std::vector<Expr *>> list
 %type <nix::ExprAttrs *> binds binds1
 %type <nix::Formals *> formals formal_set
 %type <nix::Formal> formal
@@ -334,7 +334,7 @@ expr_simple
     { $2->pos = CUR_POS; $$ = $2; }
   | '{' '}'
     { $$ = new ExprAttrs(CUR_POS); }
-  | '[' expr_list ']' { $$ = $2; }
+  | '[' list ']' { $$ = new ExprList(state->alloc, std::move($2)); }
   ;
 
 string_parts
@@ -484,9 +484,9 @@ string_attr
   | DOLLAR_CURLY expr '}' { $$ = $2; }
   ;
 
-expr_list
-  : expr_list expr_select { $$ = $1; $1->elems.push_back($2); /* !!! dangerous */; $2->warnIfCursedOr(state->symbols, state->positions); }
-  | { $$ = new ExprList; }
+list
+  : list expr_select { $$ = std::move($1); $$.push_back($2); /* !!! dangerous */; $2->warnIfCursedOr(state->symbols, state->positions); }
+  | { }
   ;
 
 formal_set
