@@ -73,7 +73,7 @@ void RemoteStore::initConnection(Connection & conn)
         try {
             auto [protoVersion, features] =
                 WorkerProto::BasicClientConnection::handshake(conn.to, tee, PROTOCOL_VERSION, WorkerProto::allFeatures);
-            if (protoVersion < 256 + 18)
+            if (protoVersion < MINIMUM_PROTOCOL_VERSION)
                 throw Error("the Nix daemon version is too old");
             conn.protoVersion = protoVersion;
             conn.features = features;

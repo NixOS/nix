@@ -13,6 +13,7 @@ namespace nix {
 /* Note: you generally shouldn't change the protocol version. Define a
    new `WorkerProto::Feature` instead. */
 #define PROTOCOL_VERSION (1 << 8 | 38)
+#define MINIMUM_PROTOCOL_VERSION (1 << 8 | 18)
 #define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
 #define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 
