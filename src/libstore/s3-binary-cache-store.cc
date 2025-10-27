@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <ranges>
+#include <regex>
 
 namespace nix {
 
@@ -26,6 +27,32 @@ public:
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
+
+    /**
+     * Creates a multipart upload for large objects to S3.
+     *
+     * @see
+     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html#API_CreateMultipartUpload_RequestSyntax
+     */
+    std::string createMultipartUpload(
+        std::string_view key, std::string_view mimeType, std::optional<std::string_view> contentEncoding);
+
+    /**
+     * Uploads a single part of a multipart upload
+     *
+     * @see https://docs.aws.amazon.com/AmazonS3/latest/API/API_UploadPart.html#API_UploadPart_RequestSyntax
+     *
+     * @returns the [ETag](https://en.wikipedia.org/wiki/HTTP_ETag)
+     */
+    std::string uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data);
+
+    /**
+     * Abort a multipart upload
+     *
+     * @see
+     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_AbortMultipartUpload.html#API_AbortMultipartUpload_RequestSyntax
+     */
+    void abortMultipartUpload(std::string_view key, std::string_view uploadId);
 };
 
 void S3BinaryCacheStore::upsertFile(
@@ -35,6 +62,74 @@ void S3BinaryCacheStore::upsertFile(
     uint64_t sizeHint)
 {
     HttpBinaryCacheStore::upsertFile(path, istream, mimeType, sizeHint);
+}
+
+std::string S3BinaryCacheStore::createMultipartUpload(
+    std::string_view key, std::string_view mimeType, std::optional<std::string_view> contentEncoding)
+{
+    auto req = makeRequest(key);
+
+    // setupForS3() converts s3:// to https:// but strips query parameters
+    // So we call it first, then add our multipart parameters
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploads"] = "";
+    req.uri = VerbatimURL(url);
+
+    req.method = HttpMethod::POST;
+    req.data = "";
+    req.mimeType = mimeType;
+
+    if (contentEncoding) {
+        req.headers.emplace_back("Content-Encoding", *contentEncoding);
+    }
+
+    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+
+    std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
+    std::smatch match;
+
+    if (std::regex_search(result.data, match, uploadIdRegex)) {
+        return match[1];
+    }
+
+    throw Error("S3 CreateMultipartUpload response missing <UploadId>");
+}
+
+std::string
+S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["partNumber"] = std::to_string(partNumber);
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.data = std::move(data);
+    req.mimeType = "application/octet-stream";
+
+    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+
+    if (result.etag.empty()) {
+        throw Error("S3 UploadPart response missing ETag for part %d", partNumber);
+    }
+
+    return std::move(result.etag);
+}
+
+void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_view uploadId)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::DELETE;
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
 }
 
 StringSet S3BinaryCacheStoreConfig::uriSchemes()
