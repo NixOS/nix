@@ -442,8 +442,14 @@ struct ExprAttrs : Expr
 
 struct ExprList : Expr
 {
-    std::vector<Expr *> elems;
-    ExprList() {};
+    std::span<Expr *> elems;
+
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::vector<Expr *> exprs)
+        : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
+    {
+        std::ranges::copy(exprs, elems.begin());
+    };
+
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
 
