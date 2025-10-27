@@ -65,13 +65,25 @@ void setStackSize(size_t stackSize)
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
         savedStackSize = limit.rlim_cur;
-        limit.rlim_cur = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
+        if (limit.rlim_max < static_cast<rlim_t>(stackSize)) {
+            logger->log(
+                lvlWarn,
+                HintFmt(
+                    "Stack size hard limit is %1%, which is less than the desired %2%. If possible, increase the hard limit, e.g. with 'ulimit -Hs %3%'.",
+                    limit.rlim_max,
+                    stackSize,
+                    stackSize / 1024)
+                    .str());
+        }
+        auto requestedSize = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
+        limit.rlim_cur = requestedSize;
         if (setrlimit(RLIMIT_STACK, &limit) != 0) {
             logger->log(
                 lvlError,
                 HintFmt(
-                    "Failed to increase stack size from %1% to %2% (maximum allowed stack size: %3%): %4%",
+                    "Failed to increase stack size from %1% to %2% (desired: %3%, maximum allowed: %4%): %5%",
                     savedStackSize,
+                    requestedSize,
                     stackSize,
                     limit.rlim_max,
                     std::strerror(errno))
