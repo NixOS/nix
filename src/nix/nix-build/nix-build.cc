@@ -415,7 +415,7 @@ static void main_nix_build(int argc, char ** argv)
                 return false;
             }
             bool add = false;
-            if (v.type() == nFunction && v.lambda().fun->hasFormals()) {
+            if (v.type() == nFunction && v.lambda().fun->hasFormals) {
                 for (auto & i : v.lambda().fun->getFormals()) {
                     if (state->symbols[i.name] == "inNixShell") {
                         add = true;

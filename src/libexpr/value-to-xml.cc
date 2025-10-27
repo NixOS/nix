@@ -145,7 +145,7 @@ static void printValueAsXML(
             posToXML(state, xmlAttrs, state.positions[v.lambda().fun->pos]);
         XMLOpenElement _(doc, "function", xmlAttrs);
 
-        if (v.lambda().fun->hasFormals()) {
+        if (v.lambda().fun->hasFormals) {
             XMLAttrs attrs;
             if (v.lambda().fun->arg)
                 attrs["name"] = state.symbols[v.lambda().fun->arg];

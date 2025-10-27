@@ -490,6 +490,7 @@ struct ExprLambda : Expr
     Symbol arg;
 
     bool ellipsis;
+    bool hasFormals;
     uint16_t nFormals;
     Formal * formalsStart;
 
@@ -501,6 +502,7 @@ struct ExprLambda : Expr
         : pos(pos)
         , arg(arg)
         , ellipsis(formals.ellipsis)
+        , hasFormals(true)
         , nFormals(formals.formals.size())
         , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
@@ -511,7 +513,7 @@ struct ExprLambda : Expr
     ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Symbol arg, Expr * body)
         : pos(pos)
         , arg(arg)
-        , nFormals(0)
+        , hasFormals(false)
         , formalsStart(nullptr)
         , body(body) {};
 
@@ -528,11 +530,6 @@ struct ExprLambda : Expr
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
-
-    inline bool hasFormals() const
-    {
-        return nFormals > 0;
-    }
 
     std::vector<Formal> getFormalsLexicographic(const SymbolTable & symbols) const
     {
@@ -551,6 +548,7 @@ struct ExprLambda : Expr
 
     std::span<Formal> getFormals() const
     {
+        assert(hasFormals);
         return {formalsStart, nFormals};
     }
 

@@ -1496,13 +1496,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
             ExprLambda & lambda(*vCur.lambda().fun);
 
-            auto size = (!lambda.arg ? 0 : 1) + lambda.nFormals;
+            auto size = (!lambda.arg ? 0 : 1) + (lambda.hasFormals ? lambda.getFormals().size() : 0);
             Env & env2(mem.allocEnv(size));
             env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
 
-            if (!lambda.hasFormals())
+            if (!lambda.hasFormals)
                 env2.values[displ++] = args[0];
             else {
                 try {
@@ -1747,7 +1747,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         }
     }
 
-    if (!fun.isLambda() || !fun.lambda().fun->hasFormals()) {
+    if (!fun.isLambda() || !fun.lambda().fun->hasFormals) {
         res = fun;
         return;
     }

@@ -3363,7 +3363,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->lambda().fun->hasFormals()) {
+    if (!args[0]->lambda().fun->hasFormals) {
         v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
