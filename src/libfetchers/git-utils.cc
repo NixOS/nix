@@ -9,6 +9,7 @@
 #include "nix/util/users.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/util.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -529,12 +530,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto act = (Activity *) payload;
         act->result(
             resFetchStatus,
-            fmt("%d/%d objects received, %d/%d deltas indexed, %.1f MiB",
+            fmt("%d/%d objects received, %d/%d deltas indexed, %s",
                 stats->received_objects,
                 stats->total_objects,
                 stats->indexed_deltas,
                 stats->total_deltas,
-                stats->received_bytes / (1024.0 * 1024.0)));
+                renderSize(stats->received_bytes)));
         return getInterrupted() ? -1 : 0;
     }
 

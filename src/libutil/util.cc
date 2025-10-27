@@ -132,15 +132,16 @@ std::optional<N> string2Float(const std::string_view s)
 template std::optional<double> string2Float<double>(const std::string_view s);
 template std::optional<float> string2Float<float>(const std::string_view s);
 
-std::string renderSize(uint64_t value, bool align)
+std::string renderSize(int64_t value, bool align)
 {
     static const std::array<char, 9> prefixes{{'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
     size_t power = 0;
-    double res = value;
-    while (res > 1024 && power < prefixes.size()) {
+    double abs_value = std::abs(value);
+    while (abs_value > 1024 && power < prefixes.size()) {
         ++power;
-        res /= 1024;
+        abs_value /= 1024;
     }
+    double res = (double) value / std::pow(1024.0, power);
     return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
@@ -254,11 +255,6 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
             line = line.substr(0, line.size() - 1);
         return {line, s.substr(newline + 1)};
     }
-}
-
-std::string showBytes(uint64_t bytes)
-{
-    return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
 
 } // namespace nix
