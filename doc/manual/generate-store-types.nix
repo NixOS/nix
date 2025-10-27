@@ -24,9 +24,9 @@ let
     in
     concatStringsSep "\n" (map showEntry storesList);
 
-  "index.md" =
-    replaceStrings [ "@store-types@" ] [ index ]
-      (readFile ./source/store/types/index.md.in);
+  "index.md" = replaceStrings [ "@store-types@" ] [ index ] (
+    readFile ./source/store/types/index.md.in
+  );
 
   tableOfContents =
     let

@@ -46,7 +46,7 @@ be many different serialisations.
 For these reasons, Nix has its very own archive format—the Nix Archive (NAR) format,
 which is carefully designed to avoid the problems described above.
 
-The exact specification of the Nix Archive format is in [specified here](../../protocols/nix-archive.md).
+The exact specification of the Nix Archive format is in [specified here](../../protocols/nix-archive/index.md).
 
 ## Content addressing File System Objects beyond a single serialisation pass
 
