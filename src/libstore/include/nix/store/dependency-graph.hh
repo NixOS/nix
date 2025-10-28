@@ -5,6 +5,7 @@
 #include "nix/util/canon-path.hh"
 
 #include <boost/graph/adjacency_list.hpp>
+#include <boost/graph/depth_first_search.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
 #include <boost/graph/reverse_graph.hpp>
 
@@ -136,6 +137,12 @@ public:
         requires(!std::same_as<EdgeProperty, boost::no_property>);
 
     std::vector<NodeId> getAllNodes() const;
+
+    /**
+     * Find all cycles in the graph using DFS.
+     * Returns vector of cycles, each represented as a path that starts and ends at the same node.
+     */
+    std::vector<std::vector<NodeId>> findCycles() const;
 
     size_t numVertices() const
     {

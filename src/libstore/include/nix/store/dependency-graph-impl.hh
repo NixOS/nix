@@ -17,6 +17,7 @@
 #include "nix/util/error.hh"
 
 #include <boost/graph/graph_traits.hpp>
+#include <boost/graph/depth_first_search.hpp>
 #include <boost/graph/reverse_graph.hpp>
 #include <boost/graph/properties.hpp>
 
@@ -220,6 +221,61 @@ DependencyGraph<NodeId, EdgeProperty>::getEdgeProperty(const NodeId & from, cons
     }
 
     return graph[edge];
+}
+
+template<GraphNodeId NodeId, typename EdgeProperty>
+std::vector<std::vector<NodeId>> DependencyGraph<NodeId, EdgeProperty>::findCycles() const
+{
+    using vertex_descriptor = typename boost::graph_traits<Graph>::vertex_descriptor;
+    using edge_descriptor = typename boost::graph_traits<Graph>::edge_descriptor;
+
+    std::vector<std::vector<vertex_descriptor>> cycleDescriptors;
+    std::vector<vertex_descriptor> dfsPath;
+
+    // Custom DFS visitor to detect back edges and extract cycles
+    class CycleFinder : public boost::default_dfs_visitor
+    {
+    public:
+        std::vector<std::vector<vertex_descriptor>> & cycles;
+        std::vector<vertex_descriptor> & dfsPath;
+
+        CycleFinder(std::vector<std::vector<vertex_descriptor>> & cycles, std::vector<vertex_descriptor> & dfsPath)
+            : cycles(cycles)
+            , dfsPath(dfsPath)
+        {
+        }
+
+        void discover_vertex(vertex_descriptor v, const Graph & g)
+        {
+            dfsPath.push_back(v);
+        }
+
+        void finish_vertex(vertex_descriptor v, const Graph & g)
+        {
+            if (!dfsPath.empty() && dfsPath.back() == v) {
+                dfsPath.pop_back();
+            }
+        }
+
+        void back_edge(edge_descriptor e, const Graph & g)
+        {
+            auto target = boost::target(e, g);
+            auto cycleStart = std::ranges::find(dfsPath, target);
+            std::vector<vertex_descriptor> cycle(cycleStart, dfsPath.end());
+            cycle.push_back(target);
+            cycles.push_back(std::move(cycle));
+        }
+    };
+
+    CycleFinder visitor(cycleDescriptors, dfsPath);
+    boost::depth_first_search(graph, boost::visitor(visitor));
+
+    // Convert vertex_descriptors to NodeIds using ranges
+    return cycleDescriptors | std::views::transform([&](const auto & cycleVerts) {
+               return cycleVerts | std::views::transform([&](auto v) { return getNodeId(v); })
+                      | std::ranges::to<std::vector<NodeId>>();
+           })
+           | std::ranges::to<std::vector>();
 }
 
 template<GraphNodeId NodeId, typename EdgeProperty>

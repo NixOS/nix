@@ -94,4 +94,64 @@ TEST(DependencyGraph, EmptyGraph)
     EXPECT_EQ(depGraph.getAllNodes().size(), 0);
 }
 
+/**
+ * Parameters for cycle detection tests
+ */
+struct FindCyclesParams
+{
+    std::string description;
+    std::vector<std::pair<std::string, std::string>> inputEdges;
+    std::vector<std::vector<std::string>> expectedCycles;
+};
+
+class FindCyclesTest : public ::testing::TestWithParam<FindCyclesParams>
+{};
+
+namespace {
+bool compareCycles(const std::vector<std::string> & a, const std::vector<std::string> & b)
+{
+    if (a.size() != b.size())
+        return a.size() < b.size();
+    return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
+}
+} // namespace
+
+TEST_P(FindCyclesTest, FindCycles)
+{
+    const auto & params = GetParam();
+
+    FilePathGraph depGraph;
+    for (const auto & [from, to] : params.inputEdges) {
+        depGraph.addEdge(from, to);
+    }
+
+    auto actualCycles = depGraph.findCycles();
+    EXPECT_EQ(actualCycles.size(), params.expectedCycles.size());
+
+    std::ranges::sort(actualCycles, compareCycles);
+    auto expectedCycles = params.expectedCycles;
+    std::ranges::sort(expectedCycles, compareCycles);
+
+    EXPECT_EQ(actualCycles, expectedCycles);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    FindCycles,
+    FindCyclesTest,
+    ::testing::Values(
+        FindCyclesParams{"empty input", {}, {}},
+        FindCyclesParams{"single edge no cycle", {{"a", "b"}}, {}},
+        FindCyclesParams{"simple cycle", {{"a", "b"}, {"b", "a"}}, {{"a", "b", "a"}}},
+        FindCyclesParams{"three node cycle", {{"a", "b"}, {"b", "c"}, {"c", "a"}}, {{"a", "b", "c", "a"}}},
+        FindCyclesParams{
+            "four node cycle", {{"a", "b"}, {"b", "c"}, {"c", "d"}, {"d", "a"}}, {{"a", "b", "c", "d", "a"}}},
+        FindCyclesParams{
+            "multiple disjoint cycles",
+            {{"a", "b"}, {"b", "a"}, {"c", "d"}, {"d", "c"}},
+            {{"a", "b", "a"}, {"c", "d", "c"}}},
+        FindCyclesParams{"cycle with extra edges", {{"a", "b"}, {"b", "a"}, {"c", "d"}}, {{"a", "b", "a"}}},
+        FindCyclesParams{"self-loop", {{"a", "a"}}, {{"a", "a"}}},
+        FindCyclesParams{"chain no cycle", {{"a", "b"}, {"b", "c"}, {"c", "d"}}, {}},
+        FindCyclesParams{"cycle with tail", {{"x", "a"}, {"a", "b"}, {"b", "c"}, {"c", "a"}}, {{"a", "b", "c", "a"}}}));
+
 } // namespace nix
