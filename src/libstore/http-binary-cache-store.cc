@@ -157,7 +157,9 @@ void HttpBinaryCacheStore::upsertFile(
     try {
         getFileTransfer()->upload(req);
     } catch (FileTransferError & e) {
-        throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", config->cacheUri.to_string(), e.msg());
+        UploadToHTTP err(e.message());
+        err.addTrace({}, "while uploading to HTTP binary cache at '%s'", config->cacheUri.to_string());
+        throw err;
     }
 }
 
