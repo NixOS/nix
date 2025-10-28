@@ -80,8 +80,8 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void
-    upsertFile(const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint) override;
+    void upsertFile(
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
     FileTransferRequest makeRequest(std::string_view path);
 

@@ -53,7 +53,8 @@ protected:
 
     bool fileExists(const std::string & path) override;
 
-    void upsertFile(const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint) override
+    void upsertFile(
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
         auto path2 = config->binaryCacheDir + "/" + path;
         static std::atomic<int> counter{0};

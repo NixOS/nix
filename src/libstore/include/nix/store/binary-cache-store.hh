@@ -100,8 +100,8 @@ public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
-    virtual void
-    upsertFile(const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint) = 0;
+    virtual void upsertFile(
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
 
     void upsertFile(
         const std::string & path,
