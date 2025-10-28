@@ -26,7 +26,7 @@
 {{#include schema/hash-v1/blake3-base64.json}}
 ```
 
-<!--
+<!-- need to convert YAML to JSON first
 ## Raw Schema
 
 [JSON Schema for Hash v1](schema/hash-v1.json)
