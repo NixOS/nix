@@ -135,15 +135,11 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
 }
 
 void HttpBinaryCacheStore::upsertFile(
-    const std::string & path,
-    std::shared_ptr<std::basic_iostream<char>> istream,
-    const std::string & mimeType,
-    uint64_t sizeHint)
+    const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint)
 {
     auto req = makeRequest(path);
     req.method = HttpMethod::PUT;
-    auto data = StreamToSourceAdapter(istream).drain();
-
+    auto data = source.drain();
     auto compressionMethod = getCompressionMethod(path);
 
     if (compressionMethod) {

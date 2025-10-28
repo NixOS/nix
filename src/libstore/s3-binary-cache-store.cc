@@ -20,11 +20,8 @@ public:
     {
     }
 
-    void upsertFile(
-        const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType,
-        uint64_t sizeHint) override;
+    void
+    upsertFile(const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint) override;
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
@@ -70,12 +67,9 @@ private:
 };
 
 void S3BinaryCacheStore::upsertFile(
-    const std::string & path,
-    std::shared_ptr<std::basic_iostream<char>> istream,
-    const std::string & mimeType,
-    uint64_t sizeHint)
+    const std::string & path, Source & source, const std::string & mimeType, uint64_t sizeHint)
 {
-    HttpBinaryCacheStore::upsertFile(path, istream, mimeType, sizeHint);
+    HttpBinaryCacheStore::upsertFile(path, source, mimeType, sizeHint);
 }
 
 std::string S3BinaryCacheStore::createMultipartUpload(
