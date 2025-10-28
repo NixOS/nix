@@ -36,6 +36,7 @@ mkMesonDerivation (finalAttrs: {
         # For example JSON
         ../../src/libutil-tests/data/hash
         ../../src/libstore-tests/data/content-address
+        ../../src/libstore-tests/data/store-path
         ../../src/libstore-tests/data/derived-path
         # Too many different types of files to filter for now
         ../../doc/manual

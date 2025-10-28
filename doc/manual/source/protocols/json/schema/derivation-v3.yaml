@@ -85,7 +85,7 @@ properties:
       > ]
       > ```
     items:
-      type: string
+      $ref: "store-path-v1.yaml"
 
   inputDrvs:
     type: object
@@ -103,13 +103,15 @@ properties:
       > ```
       >
       > specifies that this derivation depends on the `dev` output of `curl`, and the `out` output of `unzip`.
-    additionalProperties:
-      title: Store Path
-      description: |
-        A store path to a derivation, mapped to the outputs of that derivation.
-      oneOf:
-      - "$ref": "#/$defs/outputNames"
-      - "$ref": "#/$defs/dynamicOutputs"
+    patternProperties:
+      "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
+        title: Store Path
+        description: |
+          A store path to a derivation, mapped to the outputs of that derivation.
+        oneOf:
+        - "$ref": "#/$defs/outputNames"
+        - "$ref": "#/$defs/dynamicOutputs"
+    additionalProperties: false
 
   system:
     type: string
@@ -155,7 +157,7 @@ properties:
     type: object
     properties:
       path:
-        type: string
+        $ref: "store-path-v1.yaml"
         title: Output path
         description: |
           The output path, if known in advance.
