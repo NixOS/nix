@@ -48,8 +48,7 @@ The behaviour of the collector is also influenced by the
 configuration file.
 
 By default, the collector prints the total number of freed bytes when it
-finishes (or when it is interrupted). With `--print-dead`, it prints the
-number of bytes that would be freed.
+finishes (or when it is interrupted).
 
 {{#include ./opt-common.md}}
 
