@@ -88,6 +88,7 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
  */
 enum struct HttpMethod {
     GET,
+    PUT,
     HEAD,
     POST,
     DELETE,
@@ -147,7 +148,9 @@ struct FileTransferRequest
         case HttpMethod::HEAD:
         case HttpMethod::GET:
             return "download";
+        case HttpMethod::PUT:
         case HttpMethod::POST:
+            assert(data);
             return "upload";
         case HttpMethod::DELETE:
             return "delet";
