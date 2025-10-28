@@ -56,6 +56,7 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'common-protocol.cc',
   'content-address.cc',
+  'dependency-graph.cc',
   'derivation-advanced-attrs.cc',
   'derivation.cc',
   'derived-path.cc',
