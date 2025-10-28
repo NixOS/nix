@@ -39,6 +39,13 @@ schemas = [
     ],
   },
   {
+    'stem' : 'store-path',
+    'schema' : schema_dir / 'store-path-v1.yaml',
+    'files' : [
+      'simple.json',
+    ],
+  },
+  {
     'stem' : 'derivation',
     'schema' : schema_dir / 'derivation-v3.yaml',
     'files' : [

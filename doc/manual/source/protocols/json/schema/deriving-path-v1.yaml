@@ -7,7 +7,7 @@ oneOf:
   - title: Constant
     description: |
       See [Constant](@docroot@/store/derivation/index.md#deriving-path-constant) deriving path.
-    type: string
+    $ref: "store-path-v1.yaml"
   - title: Output
     description: |
       See [Output](@docroot@/store/derivation/index.md#deriving-path-output) deriving path.

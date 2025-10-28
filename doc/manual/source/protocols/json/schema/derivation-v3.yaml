@@ -85,7 +85,7 @@ properties:
       > ]
       > ```
     items:
-      type: string
+      $ref: "store-path-v1.yaml"
 
   inputDrvs:
     type: object
@@ -103,6 +103,15 @@ properties:
       > ```
       >
       > specifies that this derivation depends on the `dev` output of `curl`, and the `out` output of `unzip`.
+    patternProperties:
+      "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
+        title: Store Path
+        description: |
+          A store path to a derivation, mapped to the outputs of that derivation.
+        oneOf:
+        - "$ref": "#/$defs/outputNames"
+        - "$ref": "#/$defs/dynamicOutputs"
+    additionalProperties: false
 
   system:
     type: string
@@ -148,7 +157,7 @@ properties:
     type: object
     properties:
       path:
-        type: string
+        $ref: "store-path-v1.yaml"
         title: Output path
         description: |
           The output path, if known in advance.
@@ -167,3 +176,28 @@ properties:
         title: Expected hash value
         description: |
           For fixed-output derivations, the expected content hash in base-16.
+
+  outputName:
+    type: string
+    title: Output name
+    description: Name of the derivation output to depend on
+
+  outputNames:
+    type: array
+    title: Output Names
+    description: Set of names of derivation outputs to depend on
+    items:
+      "$ref": "#/$defs/outputName"
+
+  dynamicOutputs:
+    type: object
+    title: Dynamic Outputs
+    description: |
+      **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
+
+      This recursive data type allows for depending on outputs of outputs.
+    properties:
+      outputs:
+        "$ref": "#/$defs/outputNames"
+      dynamicOutputs:
+          "$ref": "#/$defs/dynamicOutputs"

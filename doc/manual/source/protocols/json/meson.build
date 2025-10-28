@@ -11,6 +11,7 @@ json_schema_config = files('json-schema-for-humans-config.yaml')
 schemas = [
   'hash-v1',
   'content-address-v1',
+  'store-path-v1',
   'derivation-v3',
   'deriving-path-v1',
 ]
