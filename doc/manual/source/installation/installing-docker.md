@@ -16,6 +16,8 @@ nix (Nix) 2.3.12
 35ca4ada6e96:/# exit
 ```
 
+> If you want the latest pre-release you can use ghcr.io/nixos/nix and view them at https://github.com/nixos/nix/pkgs/container/nix
+
 # What is included in Nix's Docker image?
 
 The official Docker image is created using `pkgs.dockerTools.buildLayeredImage`
