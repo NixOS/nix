@@ -75,6 +75,15 @@ schemas = [
       'single_built_built.json',
     ],
   },
+  {
+    'stem' : 'build-trace-entry',
+    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'files' : [
+      'simple.json',
+      'with-dependent-realisations.json',
+      'with-signature.json',
+    ],
+  },
   # Match overall
   {
     'stem' : 'store-object-info',
