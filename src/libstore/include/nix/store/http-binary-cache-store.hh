@@ -81,10 +81,7 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(
-        const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType,
-        uint64_t sizeHint) override;
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
     FileTransferRequest makeRequest(std::string_view path);
 

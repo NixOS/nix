@@ -115,7 +115,26 @@ struct FileTransferRequest
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
-    std::optional<std::string> data;
+
+    struct UploadData
+    {
+        UploadData(StringSource & s)
+            : sizeHint(s.s.length())
+            , source(&s)
+        {
+        }
+
+        UploadData(std::size_t sizeHint, RestartableSource & source)
+            : sizeHint(sizeHint)
+            , source(&source)
+        {
+        }
+
+        std::size_t sizeHint = 0;
+        RestartableSource * source = nullptr;
+    };
+
+    std::optional<UploadData> data;
     std::string mimeType;
     std::function<void(std::string_view data)> dataCallback;
     /**

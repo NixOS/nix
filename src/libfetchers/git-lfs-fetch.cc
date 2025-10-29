@@ -219,7 +219,9 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
-    request.data = data.dump();
+    auto payload = data.dump();
+    StringSource source{payload};
+    request.data = {source};
 
     FileTransferResult result = getFileTransfer()->upload(request);
     auto responseString = result.data;
