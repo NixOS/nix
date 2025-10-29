@@ -86,3 +86,40 @@ rm ./my-result
 # Flake outputs check.
 nix flake check
 nix flake show | grep -P "package 'formatter'"
+
+function expectFailWithOutputMatching() {
+    outputMustMatch=$1
+
+    if output=$(nix fmt 2>&1); then
+        echo >&2 "nix fmt unexpectedly succeeded"
+        exit 1
+    fi
+
+    if ! echo "$output" | grep "$outputMustMatch"; then
+        echo >&2 "Expected nix fmt output to match:"
+        echo >&2 "$outputMustMatch"
+        echo >&2 "However, the actual output was:"
+        echo >&2 "$output"
+        exit 1
+    fi
+}
+
+# Try a flake with no formatter.
+cat << EOF > flake.nix
+{
+  outputs = _: {};
+}
+EOF
+expectFailWithOutputMatching "does not provide attribute 'formatter.$system'"
+# Confirm that a null formatter is treated as if there is no formatter.
+cat << EOF > flake.nix
+{
+  outputs = _: {
+    formatter.$system = null;
+  };
+}
+EOF
+if nix fmt | grep "does not provide attribute 'formatter.$system'"; then
+    echo >&2 "nix fmt unexpectedly succeeded"
+    exit 1
+fi
