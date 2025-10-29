@@ -144,11 +144,7 @@ struct NarAccessor : public SourceAccessor
     NarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes)
         : getNarBytes(getNarBytes)
     {
-        using json = nlohmann::json;
-
-        std::function<void(NarMember &, const json &)> recurse;
-
-        recurse = [&](NarMember & member, const json & v) {
+        [&](this const auto & recurse, NarMember & member, const nlohmann::json & v) -> void {
             std::string type = v["type"];
 
             if (type == "directory") {
@@ -167,9 +163,7 @@ struct NarAccessor : public SourceAccessor
                 member.target = v.value("target", "");
             } else
                 return;
-        };
-
-        recurse(root, listing);
+        }(root, listing);
     }
 
     NarMember * find(const CanonPath & path)
