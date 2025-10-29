@@ -5,6 +5,7 @@
 #include <cassert>
 #include <ranges>
 #include <regex>
+#include <span>
 
 namespace nix {
 
@@ -45,6 +46,19 @@ private:
      * @returns the [ETag](https://en.wikipedia.org/wiki/HTTP_ETag)
      */
     std::string uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data);
+
+    struct UploadedPart
+    {
+        uint64_t partNumber;
+        std::string etag;
+    };
+
+    /**
+     * Completes a multipart upload by combining all uploaded parts.
+     * @see
+     * https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html#API_CompleteMultipartUpload_RequestSyntax
+     */
+    void completeMultipartUpload(std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts);
 
     /**
      * Abort a multipart upload
@@ -129,6 +143,34 @@ void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_
     url.query["uploadId"] = uploadId;
     req.uri = VerbatimURL(url);
     req.method = HttpMethod::DELETE;
+
+    getFileTransfer()->enqueueFileTransfer(req).get();
+}
+
+void S3BinaryCacheStore::completeMultipartUpload(
+    std::string_view key, std::string_view uploadId, std::span<const UploadedPart> parts)
+{
+    auto req = makeRequest(key);
+    req.setupForS3();
+
+    auto url = req.uri.parsed();
+    url.query["uploadId"] = uploadId;
+    req.uri = VerbatimURL(url);
+    req.method = HttpMethod::POST;
+
+    std::string xml = "<CompleteMultipartUpload>";
+    for (const auto & part : parts) {
+        xml += "<Part>";
+        xml += "<PartNumber>" + std::to_string(part.partNumber) + "</PartNumber>";
+        xml += "<ETag>" + part.etag + "</ETag>";
+        xml += "</Part>";
+    }
+    xml += "</CompleteMultipartUpload>";
+
+    debug("S3 CompleteMultipartUpload XML (%d parts): %s", parts.size(), xml);
+
+    req.data = xml;
+    req.mimeType = "text/xml";
 
     getFileTransfer()->enqueueFileTransfer(req).get();
 }
