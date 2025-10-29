@@ -467,8 +467,6 @@ public:
 
     std::string getStatus(State & state)
     {
-        auto MiB = 1024.0 * 1024.0;
-
         std::string res;
 
         auto renderActivity =
@@ -516,6 +514,65 @@ public:
                 return s;
             };
 
+        auto renderSizeActivity = [&](ActivityType type, const std::string & itemFmt = "%s") {
+            auto & act = state.activitiesByType[type];
+            uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
+            for (auto & j : act.its) {
+                done += j.second->done;
+                expected += j.second->expected;
+                running += j.second->running;
+                failed += j.second->failed;
+            }
+
+            expected = std::max(expected, act.expected);
+
+            std::optional<SizeUnit> commonUnit;
+            std::string s;
+
+            if (running || done || expected || failed) {
+                if (running)
+                    if (expected != 0) {
+                        commonUnit = getCommonSizeUnit({(int64_t) running, (int64_t) done, (int64_t) expected});
+                        s =
+                            fmt(ANSI_BLUE "%s" ANSI_NORMAL "/" ANSI_GREEN "%s" ANSI_NORMAL "/%s",
+                                commonUnit ? renderSizeWithoutUnit(running, *commonUnit) : renderSize(running),
+                                commonUnit ? renderSizeWithoutUnit(done, *commonUnit) : renderSize(done),
+                                commonUnit ? renderSizeWithoutUnit(expected, *commonUnit) : renderSize(expected));
+                    } else {
+                        commonUnit = getCommonSizeUnit({(int64_t) running, (int64_t) done});
+                        s =
+                            fmt(ANSI_BLUE "%s" ANSI_NORMAL "/" ANSI_GREEN "%s" ANSI_NORMAL,
+                                commonUnit ? renderSizeWithoutUnit(running, *commonUnit) : renderSize(running),
+                                commonUnit ? renderSizeWithoutUnit(done, *commonUnit) : renderSize(done));
+                    }
+                else if (expected != done)
+                    if (expected != 0) {
+                        commonUnit = getCommonSizeUnit({(int64_t) done, (int64_t) expected});
+                        s =
+                            fmt(ANSI_GREEN "%s" ANSI_NORMAL "/%s",
+                                commonUnit ? renderSizeWithoutUnit(done, *commonUnit) : renderSize(done),
+                                commonUnit ? renderSizeWithoutUnit(expected, *commonUnit) : renderSize(expected));
+                    } else {
+                        commonUnit = getSizeUnit(done);
+                        s = fmt(ANSI_GREEN "%s" ANSI_NORMAL, renderSizeWithoutUnit(done, *commonUnit));
+                    }
+                else {
+                    commonUnit = getSizeUnit(done);
+                    s = fmt(done ? ANSI_GREEN "%s" ANSI_NORMAL : "%s", renderSizeWithoutUnit(done, *commonUnit));
+                }
+
+                if (commonUnit)
+                    s = fmt("%s %siB", s, getSizeUnitSuffix(*commonUnit));
+
+                s = fmt(itemFmt, s);
+
+                if (failed)
+                    s += fmt(" (" ANSI_RED "%s failed" ANSI_NORMAL ")", renderSize(failed));
+            }
+
+            return s;
+        };
+
         auto showActivity =
             [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
                 auto s = renderActivity(type, itemFmt, numberFmt, unit);
@@ -529,7 +586,7 @@ public:
         showActivity(actBuilds, "%s built");
 
         auto s1 = renderActivity(actCopyPaths, "%s copied");
-        auto s2 = renderActivity(actCopyPath, "%s MiB", "%.1f", MiB);
+        auto s2 = renderSizeActivity(actCopyPath);
 
         if (!s1.empty() || !s2.empty()) {
             if (!res.empty())
@@ -545,12 +602,12 @@ public:
             }
         }
 
-        showActivity(actFileTransfer, "%s MiB DL", "%.1f", MiB);
+        renderSizeActivity(actFileTransfer, "%s DL");
 
         {
             auto s = renderActivity(actOptimiseStore, "%s paths optimised");
             if (s != "") {
-                s += fmt(", %.1f MiB / %d inodes freed", state.bytesLinked / MiB, state.filesLinked);
+                s += fmt(", %s / %d inodes freed", renderSize(state.bytesLinked), state.filesLinked);
                 if (!res.empty())
                     res += ", ";
                 res += s;
