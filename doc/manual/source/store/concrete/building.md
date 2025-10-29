@@ -101,7 +101,7 @@ If the builder exited successfully, the following steps happen in order to turn 
 
 TODO integrete these with the bullet
 
-Before in the section on [store objects](./object.md), we talked abstractly about scanning for references.
+Before in the section on [store objects](./store-object.md), we talked abstractly about scanning for references.
 Now we can make this concrete.
 
 After the derivation's command is run, Nix needs to process the "raw" output directories to turn them into legit store objects.
