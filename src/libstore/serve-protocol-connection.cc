@@ -1,7 +1,7 @@
-#include "serve-protocol-connection.hh"
-#include "serve-protocol-impl.hh"
-#include "build-result.hh"
-#include "derivations.hh"
+#include "nix/store/serve-protocol-connection.hh"
+#include "nix/store/serve-protocol-impl.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/derivations.hh"
 
 namespace nix {
 
@@ -15,7 +15,7 @@ ServeProto::Version ServeProto::BasicClientConnection::handshake(
     if (magic != SERVE_MAGIC_2)
         throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
     auto remoteVersion = readInt(from);
-    if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200)
+    if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200 || GET_PROTOCOL_MINOR(remoteVersion) < 5)
         throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
     return std::min(remoteVersion, localVersion);
 }
@@ -103,4 +103,4 @@ void ServeProto::BasicClientConnection::importPaths(const StoreDirConfig & store
         throw Error("remote machine failed to import closure");
 }
 
-}
+} // namespace nix

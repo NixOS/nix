@@ -1,15 +1,15 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "common-args.hh"
-#include "nar-info.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/nar-info.hh"
 
 #include <algorithm>
 #include <array>
 
 #include <nlohmann/json.hpp>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 using namespace nix;
 using nlohmann::json;
@@ -28,7 +28,6 @@ static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & clo
     return totalNarSize;
 }
 
-
 /**
  * Write a JSON representation of store object metadata, such as the
  * hash and the references.
@@ -36,10 +35,7 @@ static uint64_t getStoreObjectsTotalSize(Store & store, const StorePathSet & clo
  * @param showClosureSize If true, the closure size of each path is
  * included.
  */
-static json pathInfoToJSON(
-    Store & store,
-    const StorePathSet & storePaths,
-    bool showClosureSize)
+static json pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool showClosureSize)
 {
     json::object_t jsonAllObjects = json::object();
 
@@ -70,7 +66,8 @@ static json pathInfoToJSON(
                         if (auto * depNarInfo = dynamic_cast<const NarInfo *>(&*depInfo))
                             totalDownloadSize += depNarInfo->fileSize;
                         else
-                            throw Error("Missing .narinfo for dep %s of %s",
+                            throw Error(
+                                "Missing .narinfo for dep %s of %s",
                                 store.printStorePath(p),
                                 store.printStorePath(storePath));
                     }
@@ -86,7 +83,6 @@ static json pathInfoToJSON(
     }
     return jsonAllObjects;
 }
-
 
 struct CmdPathInfo : StorePathsCommand, MixJSON
 {
@@ -133,16 +129,19 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "path-info.md"
-          ;
+#include "path-info.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void printSize(std::ostream & str, uint64_t value)
     {
         if (humanReadable)
-            str << fmt("\t%s", renderSize(value, true));
+            str << fmt("\t%s", renderSize((int64_t) value, true));
         else
             str << fmt("\t%11d", value);
     }
@@ -154,11 +153,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
             pathLen = std::max(pathLen, store->printStorePath(storePath).size());
 
         if (json) {
-            logger->cout(pathInfoToJSON(
+            printJSON(pathInfoToJSON(
                 *store,
                 // FIXME: preserve order?
                 StorePathSet(storePaths.begin(), storePaths.end()),
-                showClosureSize).dump());
+                showClosureSize));
         }
 
         else {
@@ -186,15 +185,17 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                 if (showSigs) {
                     str << '\t';
                     Strings ss;
-                    if (info->ultimate) ss.push_back("ultimate");
-                    if (info->ca) ss.push_back("ca:" + renderContentAddress(*info->ca));
-                    for (auto & sig : info->sigs) ss.push_back(sig);
+                    if (info->ultimate)
+                        ss.push_back("ultimate");
+                    if (info->ca)
+                        ss.push_back("ca:" + renderContentAddress(*info->ca));
+                    for (auto & sig : info->sigs)
+                        ss.push_back(sig);
                     str << concatStringsSep(" ", ss);
                 }
 
                 logger->cout(str.str());
             }
-
         }
     }
 };

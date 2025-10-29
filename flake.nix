@@ -1,7 +1,7 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05-small";
 
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
@@ -131,13 +131,90 @@
         }
       );
 
-      overlayFor =
-        getStdenv: final: prev:
+      /**
+        Produce the `nixComponents` and `nixDependencies` package sets (scopes) for
+        a given `pkgs` and `getStdenv`.
+      */
+      packageSetsFor =
         let
-          stdenv = getStdenv final;
+          /**
+            Removes a prefix from the attribute names of a set of splices.
+            This is a completely uninteresting and exists for compatibility only.
+
+            Example:
+            ```nix
+            renameSplicesFrom "pkgs" { pkgsBuildBuild = ...; ... }
+            => { buildBuild = ...; ... }
+            ```
+          */
+          renameSplicesFrom = prefix: x: {
+            buildBuild = x."${prefix}BuildBuild";
+            buildHost = x."${prefix}BuildHost";
+            buildTarget = x."${prefix}BuildTarget";
+            hostHost = x."${prefix}HostHost";
+            hostTarget = x."${prefix}HostTarget";
+            targetTarget = x."${prefix}TargetTarget";
+          };
+
+          /**
+            Adds a prefix to the attribute names of a set of splices.
+            This is a completely uninteresting and exists for compatibility only.
+
+            Example:
+            ```nix
+            renameSplicesTo "self" { buildBuild = ...; ... }
+            => { selfBuildBuild = ...; ... }
+            ```
+          */
+          renameSplicesTo = prefix: x: {
+            "${prefix}BuildBuild" = x.buildBuild;
+            "${prefix}BuildHost" = x.buildHost;
+            "${prefix}BuildTarget" = x.buildTarget;
+            "${prefix}HostHost" = x.hostHost;
+            "${prefix}HostTarget" = x.hostTarget;
+            "${prefix}TargetTarget" = x.targetTarget;
+          };
+
+          /**
+            Takes a function `f` and returns a function that applies `f` pointwise to each splice.
+
+            Example:
+            ```nix
+            mapSplices (x: x * 10) { buildBuild = 1; buildHost = 2; ... }
+            => { buildBuild = 10; buildHost = 20; ... }
+            ```
+          */
+          mapSplices =
+            f:
+            {
+              buildBuild,
+              buildHost,
+              buildTarget,
+              hostHost,
+              hostTarget,
+              targetTarget,
+            }:
+            {
+              buildBuild = f buildBuild;
+              buildHost = f buildHost;
+              buildTarget = f buildTarget;
+              hostHost = f hostHost;
+              hostTarget = f hostTarget;
+              targetTarget = f targetTarget;
+            };
+
         in
-        {
-          nixStable = prev.nix;
+        args@{
+          pkgs,
+          getStdenv ? pkgs: pkgs.stdenv,
+        }:
+        let
+          nixComponentsSplices = mapSplices (
+            pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixComponents
+          ) (renameSplicesFrom "pkgs" pkgs);
+          nixDependenciesSplices = mapSplices (
+            pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixDependencies
+          ) (renameSplicesFrom "pkgs" pkgs);
 
           # A new scope, so that we can use `callPackage` to inject our own interdependencies
           # without "polluting" the top level "`pkgs`" attrset.
@@ -146,56 +223,87 @@
           nixComponents =
             lib.makeScopeWithSplicing'
               {
-                inherit (final) splicePackages;
-                inherit (final.nixDependencies) newScope;
+                inherit (pkgs) splicePackages;
+                inherit (nixDependencies) newScope;
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixComponents";
+                otherSplices = renameSplicesTo "self" nixComponentsSplices;
                 f = import ./packaging/components.nix {
-                  inherit (final) lib;
+                  inherit (pkgs) lib;
                   inherit officialRelease;
-                  pkgs = final;
+                  inherit pkgs;
                   src = self;
+                  maintainers = [ ];
                 };
               };
 
           # The dependencies are in their own scope, so that they don't have to be
-          # in Nixpkgs top level `pkgs` or `nixComponents`.
+          # in Nixpkgs top level `pkgs` or `nixComponents2`.
           nixDependencies =
             lib.makeScopeWithSplicing'
               {
-                inherit (final) splicePackages;
-                inherit (final) newScope; # layered directly on pkgs, unlike nixComponents above
+                inherit (pkgs) splicePackages;
+                inherit (pkgs) newScope; # layered directly on pkgs, unlike nixComponents2 above
               }
               {
-                otherSplices = final.generateSplicesForMkScope "nixDependencies";
+                otherSplices = renameSplicesTo "self" nixDependenciesSplices;
                 f = import ./packaging/dependencies.nix {
-                  inherit inputs stdenv;
-                  pkgs = final;
+                  inherit inputs pkgs;
+                  stdenv = getStdenv pkgs;
                 };
               };
 
-          nix = final.nixComponents.nix-cli;
+          # If the package set is largely empty, we should(?) return empty sets
+          # This is what most package sets in Nixpkgs do. Otherwise, we get
+          # an error message that indicates that some stdenv attribute is missing,
+          # and indeed it will be missing, as seemingly `pkgsTargetTarget` is
+          # very incomplete.
+          fixup = lib.mapAttrs (k: v: if !(pkgs ? nix) then { } else v);
+        in
+        fixup {
+          inherit nixDependencies;
+          inherit nixComponents;
+        };
 
-          # See https://github.com/NixOS/nixpkgs/pull/214409
-          # Remove when fixed in this flake's nixpkgs
-          pre-commit =
-            if prev.stdenv.hostPlatform.system == "i686-linux" then
-              (prev.pre-commit.override (o: {
-                dotnet-sdk = "";
-              })).overridePythonAttrs
-                (o: {
-                  doCheck = false;
-                })
-            else
-              prev.pre-commit;
+      overlayFor =
+        getStdenv: final: prev:
+        let
+          packageSets = packageSetsFor {
+            inherit getStdenv;
+            pkgs = final;
+          };
+        in
+        {
+          nixStable = prev.nix;
+
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixComponents2 = packageSets.nixComponents;
+
+          # The dependencies are in their own scope, so that they don't have to be
+          # in Nixpkgs top level `pkgs` or `nixComponents2`.
+          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
+          nixDependencies2 = packageSets.nixDependencies;
+
+          nix = final.nixComponents2.nix-cli;
         };
 
     in
     {
-      # A Nixpkgs overlay that overrides the 'nix' and
-      # 'nix-perl-bindings' packages.
-      overlays.default = overlayFor (p: p.stdenv);
+      overlays.internal = overlayFor (p: p.stdenv);
+
+      /**
+        A Nixpkgs overlay that sets `nix` to something like `packages.<system>.nix-everything`,
+        except dependencies aren't taken from (flake) `nix.inputs.nixpkgs`, but from the Nixpkgs packages
+        where the overlay is used.
+      */
+      overlays.default =
+        final: prev:
+        let
+          packageSets = packageSetsFor { pkgs = final; };
+        in
+        {
+          nix = packageSets.nixComponents.nix-everything;
+        };
 
       hydraJobs = import ./packaging/hydra.nix {
         inherit
@@ -212,43 +320,11 @@
 
       checks = forAllSystems (
         system:
-        {
-          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
-          installTests = self.hydraJobs.installTests.${system};
-          nixpkgsLibTests = self.hydraJobs.tests.nixpkgsLibTests.${system};
-          rl-next =
-            let
-              pkgs = nixpkgsFor.${system}.native;
-            in
-            pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
-              LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${./doc/manual/rl-next} >$out
-            '';
-          repl-completion = nixpkgsFor.${system}.native.callPackage ./tests/repl-completion.nix { };
-
-          /**
-            Checks for our packaging expressions.
-            This shouldn't build anything significant; just check that things
-            (including derivations) are _set up_ correctly.
-          */
-          packaging-overriding =
-            let
-              pkgs = nixpkgsFor.${system}.native;
-              nix = self.packages.${system}.nix;
-            in
-            assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
-            if pkgs.stdenv.buildPlatform.isDarwin then
-              lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
-            else
-              # If this fails, something might be wrong with how we've wired the scope,
-              # or something could be broken in Nixpkgs.
-              pkgs.testers.testEqualContents {
-                assertion = "trivial patch does not change source contents";
-                expected = "${./.}";
-                actual =
-                  # Same for all components; nix-util is an arbitrary pick
-                  (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src;
-              };
-        }
+        (import ./ci/gha/tests {
+          inherit system;
+          pkgs = nixpkgsFor.${system}.native;
+          nixFlake = self;
+        }).topLevel
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
         }
@@ -261,30 +337,20 @@
         # Add "passthru" tests
         //
           flatMapAttrs
+            {
+              "" = {
+                pkgs = nixpkgsFor.${system}.native;
+              };
+            }
             (
-              {
-                "" = nixpkgsFor.${system}.native;
-              }
-              // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.hostPlatform.isDarwin) {
-                # TODO: enable static builds for darwin, blocked on:
-                #       https://github.com/NixOS/nixpkgs/issues/320448
-                # TODO: disabled to speed up GHA CI.
-                #"static-" = nixpkgsFor.${system}.native.pkgsStatic;
-              }
-            )
-            (
-              nixpkgsPrefix: nixpkgs:
-              flatMapAttrs nixpkgs.nixComponents (
-                pkgName: pkg:
-                flatMapAttrs pkg.tests or { } (
-                  testName: test: {
-                    "${nixpkgsPrefix}${pkgName}-${testName}" = test;
-                  }
-                )
-              )
-              // lib.optionalAttrs (nixpkgs.stdenv.hostPlatform == nixpkgs.stdenv.buildPlatform) {
-                "${nixpkgsPrefix}nix-functional-tests" = nixpkgs.nixComponents.nix-functional-tests;
-              }
+              nixpkgsPrefix: args:
+              (import ./ci/gha/tests (
+                args
+                // {
+                  nixFlake = self;
+                  componentTestsPrefix = nixpkgsPrefix;
+                }
+              )).componentTests
             )
         // devFlake.checks.${system} or { }
       );
@@ -302,9 +368,9 @@
           binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents.nix-manual;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents.nix-external-api-docs;
+          nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
+          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
+          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
@@ -322,6 +388,7 @@
               "nix-store-tests" = { };
 
               "nix-fetchers" = { };
+              "nix-fetchers-c" = { };
               "nix-fetchers-tests" = { };
 
               "nix-expr" = { };
@@ -330,6 +397,7 @@
               "nix-expr-tests" = { };
 
               "nix-flake" = { };
+              "nix-flake-c" = { };
               "nix-flake-tests" = { };
 
               "nix-main" = { };
@@ -345,6 +413,10 @@
                 supportsCross = false;
               };
 
+              "nix-json-schema-checks" = {
+                supportsCross = false;
+              };
+
               "nix-perl-bindings" = {
                 supportsCross = false;
               };
@@ -356,9 +428,9 @@
               }:
               {
                 # These attributes go right into `packages.<system>`.
-                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents.${pkgName};
-                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents.${pkgName};
-                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents.${pkgName};
+                "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
+                "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
+                "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
               }
               // lib.optionalAttrs supportsCross (
                 flatMapAttrs (lib.genAttrs crossSystems (_: { })) (
@@ -366,7 +438,7 @@
                   { }:
                   {
                     # These attributes go right into `packages.<system>`.
-                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents.${pkgName};
+                    "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
                   }
                 )
               )
@@ -376,7 +448,7 @@
                 {
                   # These attributes go right into `packages.<system>`.
                   "${pkgName}-${stdenvName}" =
-                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents.${pkgName};
+                    nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
                 }
               )
             )
@@ -384,8 +456,7 @@
           dockerImage =
             let
               pkgs = nixpkgsFor.${system}.native;
-              image = import ./docker.nix {
-                inherit pkgs;
+              image = pkgs.callPackage ./docker.nix {
                 tag = pkgs.nix.version;
               };
             in
@@ -397,6 +468,27 @@
                 ln -s ${image} $image
                 echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
               '';
+        }
+      );
+
+      apps = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
+        in
+        {
+          open-manual = {
+            type = "app";
+            program = "${pkgs.writeShellScript "open-nix-manual" ''
+              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
+              if ! ${opener} "$manual_path"; then
+                echo "Failed to open manual with ${opener}. Manual is located at:"
+                echo "$manual_path"
+              fi
+            ''}";
+            meta.description = "Open the Nix manual in your browser";
+          };
         }
       );
 
@@ -446,5 +538,53 @@
             default = self.devShells.${system}.native;
           }
         );
+
+      lib = {
+        /**
+          Creates a package set for a given Nixpkgs instance and stdenv.
+
+          # Inputs
+
+          - `pkgs`: The Nixpkgs instance to use.
+
+          - `getStdenv`: _Optional_ A function that takes a package set and returns the stdenv to use.
+            This needs to be a function in order to support cross compilation - the `pkgs` passed to `getStdenv` can be `pkgsBuildHost` or any other variation needed.
+
+          # Outputs
+
+          The return value is a fresh Nixpkgs scope containing all the packages that are defined in the Nix repository,
+          as well as some internals and parameters, which may be subject to change.
+
+          # Example
+
+          ```console
+          nix repl> :lf NixOS/nix
+          nix-repl> ps = lib.makeComponents { pkgs = import inputs.nixpkgs { crossSystem = "riscv64-linux"; }; }
+          nix-repl> ps
+          {
+            appendPatches = «lambda appendPatches @ ...»;
+            callPackage = «lambda callPackageWith @ ...»;
+            overrideAllMesonComponents = «lambda overrideSource @ ...»;
+            overrideSource = «lambda overrideSource @ ...»;
+            # ...
+            nix-everything
+            # ...
+            nix-store
+            nix-store-c
+            # ...
+          }
+          ```
+        */
+        makeComponents =
+          {
+            pkgs,
+            getStdenv ? pkgs: pkgs.stdenv,
+          }:
+
+          let
+            packageSets = packageSetsFor { inherit getStdenv pkgs; };
+          in
+          packageSets.nixComponents;
+      };
     };
 }

@@ -1,6 +1,7 @@
-#include "buildenv.hh"
-#include "derivations.hh"
-#include "signals.hh"
+#include "nix/store/builtins/buildenv.hh"
+#include "nix/store/builtins.hh"
+#include "nix/store/derivations.hh"
+#include "nix/util/signals.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -9,21 +10,25 @@
 
 namespace nix {
 
+namespace {
+
 struct State
 {
     std::map<Path, int> priorities;
     unsigned long symlinks = 0;
 };
 
+} // namespace
+
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
 {
-    std::filesystem::directory_iterator srcFiles;
+    DirectoryIterator srcFiles;
 
     try {
-        srcFiles = std::filesystem::directory_iterator{srcDir};
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::not_a_directory) {
+        srcFiles = DirectoryIterator{srcDir};
+    } catch (SysError & e) {
+        if (e.errNo == ENOTDIR) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
@@ -57,13 +62,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
-        if (hasSuffix(srcFile, "/propagated-build-inputs") ||
-            hasSuffix(srcFile, "/nix-support") ||
-            hasSuffix(srcFile, "/perllocal.pod") ||
-            hasSuffix(srcFile, "/info/dir") ||
-            hasSuffix(srcFile, "/log") ||
-            hasSuffix(srcFile, "/manifest.nix") ||
-            hasSuffix(srcFile, "/manifest.json"))
+        if (hasSuffix(srcFile, "/propagated-build-inputs") || hasSuffix(srcFile, "/nix-support")
+            || hasSuffix(srcFile, "/perllocal.pod") || hasSuffix(srcFile, "/info/dir") || hasSuffix(srcFile, "/log")
+            || hasSuffix(srcFile, "/manifest.nix") || hasSuffix(srcFile, "/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -79,11 +80,14 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
                     if (unlink(dstFile.c_str()) == -1)
                         throw SysError("unlinking '%1%'", dstFile);
-                    if (mkdir(dstFile.c_str()
-                #ifndef _WIN32 // TODO abstract mkdir perms for Windows
-                            , 0755
-                #endif
-                            ) == -1)
+                    if (mkdir(
+                            dstFile.c_str()
+#ifndef _WIN32 // TODO abstract mkdir perms for Windows
+                                ,
+                            0755
+#endif
+                            )
+                        == -1)
                         throw SysError("creating directory '%1%'", dstFile);
                     createLinks(state, target, dstFile, state.priorities[dstFile]);
                     createLinks(state, srcFile, dstFile, priority);
@@ -99,11 +103,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(
-                            readLink(dstFile),
-                            srcFile,
-                            priority
-                        );
+                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
@@ -123,19 +123,21 @@ void buildProfile(const Path & out, Packages && pkgs)
 {
     State state;
 
-    std::set<Path> done, postponed;
+    PathSet done, postponed;
 
     auto addPkg = [&](const Path & pkgDir, int priority) {
-        if (!done.insert(pkgDir).second) return;
+        if (!done.insert(pkgDir).second)
+            return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
-                    readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
         } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR) throw;
+            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+                throw;
         }
     };
 
@@ -157,7 +159,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        std::set<Path> pkgDirs;
+        PathSet pkgDirs;
         postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);
@@ -166,17 +168,16 @@ void buildProfile(const Path & out, Packages && pkgs)
     debug("created %d symlinks in user environment", state.symlinks);
 }
 
-void builtinBuildenv(
-    const BasicDerivation & drv,
-    const std::map<std::string, Path> & outputs)
+static void builtinBuildenv(const BuiltinBuilderContext & ctx)
 {
     auto getAttr = [&](const std::string & name) {
-        auto i = drv.env.find(name);
-        if (i == drv.env.end()) throw Error("attribute '%s' missing", name);
+        auto i = ctx.drv.env.find(name);
+        if (i == ctx.drv.env.end())
+            throw Error("attribute '%s' missing", name);
         return i->second;
     };
 
-    auto out = outputs.at("out");
+    auto out = ctx.outputs.at("out");
     createDirs(out);
 
     /* Convert the stuff we get from the environment back into a
@@ -192,7 +193,7 @@ void builtinBuildenv(
             const int priority = stoi(*itemIt++);
             const size_t outputs = stoul(*itemIt++);
 
-            for (size_t n {0}; n < outputs; n++) {
+            for (size_t n{0}; n < outputs; n++) {
                 pkgs.emplace_back(std::move(*itemIt++), active, priority);
             }
         }
@@ -203,4 +204,6 @@ void builtinBuildenv(
     createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }
 
-}
+static RegisterBuiltinBuilder registerBuildenv("buildenv", builtinBuildenv);
+
+} // namespace nix

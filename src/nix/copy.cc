@@ -1,14 +1,13 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "local-fs-store.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/local-fs-store.hh"
 
 using namespace nix;
 
-struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
+struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, MixNoCheckSigs
 {
     std::optional<std::filesystem::path> outLink;
-    CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
@@ -18,18 +17,12 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
         addFlag({
             .longName = "out-link",
             .shortName = 'o',
-            .description = "Create symlinks prefixed with *path* to the top-level store paths fetched from the source store.",
+            .description =
+                "Create symlinks prefixed with *path* to the top-level store paths fetched from the source store.",
             .labels = {"path"},
             .handler = {&outLink},
-            .completer = completePath
+            .completer = completePath,
         });
-
-        addFlag({
-            .longName = "no-check-sigs",
-            .description = "Do not require that paths are signed by trusted keys.",
-            .handler = {&checkSigs, NoCheckSigs},
-        });
-
         addFlag({
             .longName = "substitute-on-destination",
             .shortName = 's',
@@ -48,11 +41,14 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
     std::string doc() override
     {
         return
-          #include "copy.md"
-          ;
+#include "copy.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> srcStore, BuiltPaths && allPaths, BuiltPaths && rootPaths) override
     {
@@ -65,8 +61,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile
             stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
         }
 
-        copyPaths(
-            *srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
+        copyPaths(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
 
         updateProfile(rootPaths);
 

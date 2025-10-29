@@ -1,30 +1,29 @@
-#include "fetch-settings.hh"
-#include "eval-settings.hh"
-#include "common-eval-args.hh"
-#include "shared.hh"
-#include "config-global.hh"
-#include "filetransfer.hh"
-#include "eval.hh"
-#include "fetchers.hh"
-#include "registry.hh"
-#include "flake/flakeref.hh"
-#include "flake/settings.hh"
-#include "store-api.hh"
-#include "command.hh"
-#include "tarball.hh"
-#include "fetch-to-store.hh"
-#include "compatibility-settings.hh"
-#include "eval-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/util/config-global.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/expr/eval.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/flake/settings.hh"
+#include "nix/store/store-open.hh"
+#include "nix/cmd/command.hh"
+#include "nix/fetchers/tarball.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/cmd/compatibility-settings.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
-
-namespace fs { using namespace std::filesystem; }
 
 fetchers::Settings fetchSettings;
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
 
-EvalSettings evalSettings {
+EvalSettings evalSettings{
     settings.readOnlyMode,
     {
         {
@@ -32,10 +31,15 @@ EvalSettings evalSettings {
             [](EvalState & state, std::string_view rest) {
                 experimentalFeatureSettings.require(Xp::Flakes);
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(fetchSettings, std::string { rest }, {}, true, false);
+                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
-                auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+                auto storePath = nix::fetchToStore(
+                    state.fetchSettings,
+                    *state.store,
+                    SourcePath(accessor),
+                    FetchMode::Copy,
+                    lockedRef.input.getName());
                 state.allowPath(storePath);
                 return state.storePath(storePath);
             },
@@ -45,16 +49,13 @@ EvalSettings evalSettings {
 
 static GlobalConfig::Register rEvalSettings(&evalSettings);
 
-
 flake::Settings flakeSettings;
 
 static GlobalConfig::Register rFlakeSettings(&flakeSettings);
 
-
-CompatibilitySettings compatibilitySettings {};
+CompatibilitySettings compatibilitySettings{};
 
 static GlobalConfig::Register rCompatibilitySettings(&compatibilitySettings);
-
 
 MixEvalArgs::MixEvalArgs()
 {
@@ -63,7 +64,9 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the value *expr* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "expr"},
-        .handler = {[&](std::string name, std::string expr) { autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}}); }}
+        .handler = {[&](std::string name, std::string expr) {
+            autoArgs.insert_or_assign(name, AutoArg{AutoArgExpr{expr}});
+        }},
     });
 
     addFlag({
@@ -71,7 +74,9 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the string *string* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "string"},
-        .handler = {[&](std::string name, std::string s) { autoArgs.insert_or_assign(name, AutoArg{AutoArgString{s}}); }},
+        .handler = {[&](std::string name, std::string s) {
+            autoArgs.insert_or_assign(name, AutoArg{AutoArgString{s}});
+        }},
     });
 
     addFlag({
@@ -79,8 +84,10 @@ MixEvalArgs::MixEvalArgs()
         .description = "Pass the contents of file *path* as the argument *name* to Nix functions.",
         .category = category,
         .labels = {"name", "path"},
-        .handler = {[&](std::string name, std::string path) { autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}}); }},
-        .completer = completePath
+        .handler = {[&](std::string name, std::string path) {
+            autoArgs.insert_or_assign(name, AutoArg{AutoArgFile{path}});
+        }},
+        .completer = completePath,
     });
 
     addFlag({
@@ -103,18 +110,14 @@ MixEvalArgs::MixEvalArgs()
   )",
         .category = category,
         .labels = {"path"},
-        .handler = {[&](std::string s) {
-            lookupPath.elements.emplace_back(LookupPath::Elem::parse(s));
-        }}
+        .handler = {[&](std::string s) { lookupPath.elements.emplace_back(LookupPath::Elem::parse(s)); }},
     });
 
     addFlag({
         .longName = "impure",
         .description = "Allow access to mutable paths and repositories.",
         .category = category,
-        .handler = {[&]() {
-            evalSettings.pureEval = false;
-        }},
+        .handler = {[&]() { evalSettings.pureEval = false; }},
     });
 
     addFlag({
@@ -123,21 +126,22 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, fs::current_path().string());
-            auto to = parseFlakeRef(fetchSettings, _to, fs::current_path().string());
+            auto from = parseFlakeRef(fetchSettings, _from, std::filesystem::current_path().string());
+            auto to = parseFlakeRef(fetchSettings, _to, std::filesystem::current_path().string());
             fetchers::Attrs extraAttrs;
-            if (to.subdir != "") extraAttrs["dir"] = to.subdir;
+            if (to.subdir != "")
+                extraAttrs["dir"] = to.subdir;
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeRef(completions, openStore(), prefix);
-        }}
+        }},
     });
 
     addFlag({
         .longName = "eval-store",
         .description =
-          R"(
+            R"(
             The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
             to use for evaluation, i.e. to store derivations (`.drv` files) and inputs referenced by them.
           )",
@@ -152,20 +156,21 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     auto res = state.buildBindings(autoArgs.size());
     for (auto & [name, arg] : autoArgs) {
         auto v = state.allocValue();
-        std::visit(overloaded {
-            [&](const AutoArgExpr & arg) {
-                state.mkThunk_(*v, state.parseExprFromString(arg.expr, compatibilitySettings.nixShellShebangArgumentsRelativeToScript ? state.rootPath(absPath(getCommandBaseDir())) : state.rootPath(".")));
-            },
-            [&](const AutoArgString & arg) {
-                v->mkString(arg.s);
-            },
-            [&](const AutoArgFile & arg) {
-                v->mkString(readFile(arg.path.string()));
-            },
-            [&](const AutoArgStdin & arg) {
-                v->mkString(readFile(STDIN_FILENO));
-            }
-        }, arg);
+        std::visit(
+            overloaded{
+                [&](const AutoArgExpr & arg) {
+                    state.mkThunk_(
+                        *v,
+                        state.parseExprFromString(
+                            arg.expr,
+                            compatibilitySettings.nixShellShebangArgumentsRelativeToScript
+                                ? state.rootPath(absPath(getCommandBaseDir()))
+                                : state.rootPath(".")));
+                },
+                [&](const AutoArgString & arg) { v->mkString(arg.s); },
+                [&](const AutoArgFile & arg) { v->mkString(readFile(arg.path.string())); },
+                [&](const AutoArgStdin & arg) { v->mkString(readFile(STDIN_FILENO)); }},
+            arg);
         res.insert(state.symbols.create(name), v);
     }
     return res.finish();
@@ -174,11 +179,8 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
-        auto accessor = fetchers::downloadTarball(
-            state.store,
-            state.fetchSettings,
-            EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy);
+        auto accessor = fetchers::downloadTarball(state.store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
+        auto storePath = fetchToStore(state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
         return state.storePath(storePath);
     }
 
@@ -186,7 +188,8 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
         auto [accessor, lockedRef] = flakeRef.resolve(state.store).lazyFetch(state.store);
-        auto storePath = nix::fetchToStore(*state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+        auto storePath = nix::fetchToStore(
+            state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
         state.allowPath(storePath);
         return state.storePath(storePath);
     }
@@ -200,4 +203,4 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
         return state.rootPath(baseDir ? absPath(s, *baseDir) : absPath(s));
 }
 
-}
+} // namespace nix

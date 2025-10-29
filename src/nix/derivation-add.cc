@@ -1,10 +1,10 @@
 // FIXME: rename to 'nix plan add' or 'nix derivation add'?
 
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "archive.hh"
-#include "derivations.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;
@@ -20,17 +20,20 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
     std::string doc() override
     {
         return
-          #include "derivation-add.md"
-          ;
+#include "derivation-add.md"
+            ;
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 
     void run(ref<Store> store) override
     {
         auto json = nlohmann::json::parse(drainFD(STDIN_FILENO));
 
-        auto drv = Derivation::fromJSON(*store, json);
+        auto drv = static_cast<Derivation>(json);
 
         auto drvPath = writeDerivation(*store, drv, NoRepair, /* read only */ dryRun);
 

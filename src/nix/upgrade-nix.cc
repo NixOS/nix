@@ -1,13 +1,14 @@
-#include "processes.hh"
-#include "command.hh"
-#include "common-args.hh"
-#include "store-api.hh"
-#include "filetransfer.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "attr-path.hh"
-#include "names.hh"
-#include "executable-path.hh"
+#include "nix/util/processes.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/store/names.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/store/globals.hh"
 #include "self-exe.hh"
 
 using namespace nix;
@@ -23,14 +24,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .shortName = 'p',
             .description = "The path to the Nix profile to upgrade.",
             .labels = {"profile-dir"},
-            .handler = {&profileDir}
+            .handler = {&profileDir},
         });
 
         addFlag({
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&(std::string&) settings.upgradeNixStorePathUrl}
+            .handler = {&(std::string &) settings.upgradeNixStorePathUrl},
         });
     }
 
@@ -50,11 +51,14 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     std::string doc() override
     {
         return
-          #include "upgrade-nix.md"
-          ;
+#include "upgrade-nix.md"
+            ;
     }
 
-    Category category() override { return catNixInstallation; }
+    Category category() override
+    {
+        return catNixInstallation;
+    }
 
     void run(ref<Store> store) override
     {
@@ -81,7 +85,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         }
 
         {
-            Activity act(*logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", store->printStorePath(storePath)));
+            Activity act(
+                *logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", store->printStorePath(storePath)));
             auto program = store->printStorePath(storePath) + "/bin/nix-env";
             auto s = runProgram(program, false, {"--version"});
             if (s.find("Nix") == std::string::npos)
@@ -91,11 +96,16 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         logger->stop();
 
         {
-            Activity act(*logger, lvlInfo, actUnknown,
+            Activity act(
+                *logger,
+                lvlInfo,
+                actUnknown,
                 fmt("installing '%s' into profile %s...", store->printStorePath(storePath), profileDir));
 
             // FIXME: don't call an external process.
-            runProgram(getNixBin("nix-env").string(), false,
+            runProgram(
+                getNixBin("nix-env").string(),
+                false,
                 {"--profile", profileDir.string(), "-i", store->printStorePath(storePath), "--no-sandbox"});
         }
 
@@ -118,7 +128,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         auto profileDir = where.parent_path();
 
         // Resolve profile to /nix/var/nix/profiles/<name> link.
-        while (canonPath(profileDir.string()).find("/profiles/") == std::string::npos && std::filesystem::is_symlink(profileDir))
+        while (canonPath(profileDir.string()).find("/profiles/") == std::string::npos
+               && std::filesystem::is_symlink(profileDir))
             profileDir = readLink(profileDir.string());
 
         printInfo("found profile %s", profileDir);
@@ -126,7 +137,9 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Path userEnv = canonPath(profileDir.string(), true);
 
         if (std::filesystem::exists(profileDir / "manifest.json"))
-            throw Error("directory %s is managed by 'nix profile' and currently cannot be upgraded by 'nix upgrade-nix'", profileDir);
+            throw Error(
+                "directory %s is managed by 'nix profile' and currently cannot be upgraded by 'nix upgrade-nix'",
+                profileDir);
 
         if (!std::filesystem::exists(profileDir / "manifest.nix"))
             throw Error("directory %s does not appear to be part of a Nix profile", profileDir);
@@ -143,16 +156,17 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = FileTransferRequest((std::string&) settings.upgradeNixStorePathUrl);
+        auto req = FileTransferRequest(parseURL(settings.upgradeNixStorePathUrl.get()));
         auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(LookupPath{}, store, fetchSettings, evalSettings);
         auto v = state->allocValue();
         state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
-        Bindings & bindings(*state->allocBindings(0));
+        Bindings & bindings = Bindings::emptyBindings;
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 
-        return store->parseStorePath(state->forceString(*v2, noPos, "while evaluating the path tho latest nix version"));
+        return store->parseStorePath(
+            state->forceString(*v2, noPos, "while evaluating the path tho latest nix version"));
     }
 };
 

@@ -1,5 +1,5 @@
-#include "source-accessor.hh"
-#include "archive.hh"
+#include <atomic>
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 
@@ -10,17 +10,26 @@ bool SourceAccessor::Stat::isNotNARSerialisable()
     return this->type != tRegular && this->type != tSymlink && this->type != tDirectory;
 }
 
-std::string SourceAccessor::Stat::typeString() {
+std::string SourceAccessor::Stat::typeString()
+{
     switch (this->type) {
-        case tRegular: return "regular";
-        case tSymlink: return "symlink";
-        case tDirectory: return "directory";
-        case tChar: return "character device";
-        case tBlock: return "block device";
-        case tSocket: return "socket";
-        case tFifo: return "fifo";
-        case tUnknown:
-        default: return "unknown";
+    case tRegular:
+        return "regular";
+    case tSymlink:
+        return "symlink";
+    case tDirectory:
+        return "directory";
+    case tChar:
+        return "character device";
+    case tBlock:
+        return "block device";
+    case tSocket:
+        return "socket";
+    case tFifo:
+        return "fifo";
+    case tUnknown:
+    default:
+        return "unknown";
     }
     return "unknown";
 }
@@ -40,32 +49,23 @@ std::string SourceAccessor::readFile(const CanonPath & path)
 {
     StringSink sink;
     std::optional<uint64_t> size;
-    readFile(path, sink, [&](uint64_t _size)
-    {
-        size = _size;
-    });
+    readFile(path, sink, [&](uint64_t _size) { size = _size; });
     assert(size && *size == sink.s.size());
     return std::move(sink.s);
 }
 
-void SourceAccessor::readFile(
-    const CanonPath & path,
-    Sink & sink,
-    std::function<void(uint64_t)> sizeCallback)
+void SourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     auto s = readFile(path);
     sizeCallback(s.size());
     sink(s);
 }
 
-Hash SourceAccessor::hashPath(
-    const CanonPath & path,
-    PathFilter & filter,
-    HashAlgorithm ha)
+Hash SourceAccessor::hashPath(const CanonPath & path, PathFilter & filter, HashAlgorithm ha)
 {
     HashSink sink(ha);
     dumpPath(path, sink, filter);
-    return sink.finish().first;
+    return sink.finish().hash;
 }
 
 SourceAccessor::Stat SourceAccessor::lstat(const CanonPath & path)
@@ -87,9 +87,7 @@ std::string SourceAccessor::showPath(const CanonPath & path)
     return displayPrefix + path.abs() + displaySuffix;
 }
 
-CanonPath SourceAccessor::resolveSymlinks(
-    const CanonPath & path,
-    SymlinkResolution mode)
+CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolution mode)
 {
     auto res = CanonPath::root;
 
@@ -114,9 +112,11 @@ CanonPath SourceAccessor::resolveSymlinks(
                     if (!linksAllowed--)
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
-                    res.pop();
-                    if (isAbsolute(target))
+                    if (isAbsolute(target)) {
                         res = CanonPath::root;
+                    } else {
+                        res.pop();
+                    }
                     todo.splice(todo.begin(), tokenizeString<std::list<std::string>>(target, "/"));
                 }
             }
@@ -126,4 +126,4 @@ CanonPath SourceAccessor::resolveSymlinks(
     return res;
 }
 
-}
+} // namespace nix

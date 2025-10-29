@@ -1,19 +1,23 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "common-args.hh"
-#include "names.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/common-args.hh"
+#include "nix/store/names.hh"
 
 #include <regex>
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
+
+namespace {
 
 struct Info
 {
     std::string outputName;
 };
+
+} // namespace
 
 // name -> version -> store paths
 typedef std::map<std::string, std::map<std::string, std::map<StorePath, Info>>> GroupedPaths;
@@ -41,40 +45,39 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
         }
 
         DrvName drvName(name);
-        groupedPaths[drvName.name][drvName.version].emplace(path, Info { .outputName = outputName });
+        groupedPaths[drvName.name][drvName.version].emplace(path, Info{.outputName = outputName});
     }
 
     return groupedPaths;
 }
 
-std::string showVersions(const std::set<std::string> & versions)
+std::string showVersions(const StringSet & versions)
 {
-    if (versions.empty()) return "∅";
-    std::set<std::string> versions2;
+    if (versions.empty())
+        return "∅";
+    StringSet versions2;
     for (auto & version : versions)
         versions2.insert(version.empty() ? "ε" : version);
     return concatStringsSep(", ", versions2);
 }
 
 void printClosureDiff(
-    ref<Store> store,
-    const StorePath & beforePath,
-    const StorePath & afterPath,
-    std::string_view indent)
+    ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent)
 {
     auto beforeClosure = getClosureInfo(store, beforePath);
     auto afterClosure = getClosureInfo(store, afterPath);
 
-    std::set<std::string> allNames;
-    for (auto & [name, _] : beforeClosure) allNames.insert(name);
-    for (auto & [name, _] : afterClosure) allNames.insert(name);
+    StringSet allNames;
+    for (auto & [name, _] : beforeClosure)
+        allNames.insert(name);
+    for (auto & [name, _] : afterClosure)
+        allNames.insert(name);
 
     for (auto & name : allNames) {
         auto & beforeVersions = beforeClosure[name];
         auto & afterVersions = afterClosure[name];
 
-        auto totalSize = [&](const std::map<std::string, std::map<StorePath, Info>> & versions)
-        {
+        auto totalSize = [&](const std::map<std::string, std::map<StorePath, Info>> & versions) {
             uint64_t sum = 0;
             for (auto & [_, paths] : versions)
                 for (auto & [path, _] : paths)
@@ -87,26 +90,30 @@ void printClosureDiff(
         auto sizeDelta = (int64_t) afterSize - (int64_t) beforeSize;
         auto showDelta = std::abs(sizeDelta) >= 8 * 1024;
 
-        std::set<std::string> removed, unchanged;
+        StringSet removed, unchanged;
         for (auto & [version, _] : beforeVersions)
-            if (!afterVersions.count(version)) removed.insert(version); else unchanged.insert(version);
+            if (!afterVersions.count(version))
+                removed.insert(version);
+            else
+                unchanged.insert(version);
 
-        std::set<std::string> added;
+        StringSet added;
         for (auto & [version, _] : afterVersions)
-            if (!beforeVersions.count(version)) added.insert(version);
+            if (!beforeVersions.count(version))
+                added.insert(version);
 
         if (showDelta || !removed.empty() || !added.empty()) {
             std::vector<std::string> items;
             if (!removed.empty() || !added.empty())
                 items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
             if (showDelta)
-                items.push_back(fmt("%s%+.1f KiB" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, sizeDelta / 1024.0));
+                items.push_back(fmt("%s%s" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, renderSize(sizeDelta)));
             logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
         }
     }
 }
 
-}
+} // namespace nix
 
 using namespace nix;
 
@@ -128,8 +135,8 @@ struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
     std::string doc() override
     {
         return
-          #include "diff-closures.md"
-          ;
+#include "diff-closures.md"
+            ;
     }
 
     void run(ref<Store> store) override

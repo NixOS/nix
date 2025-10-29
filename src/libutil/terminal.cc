@@ -1,17 +1,20 @@
-#include "terminal.hh"
-#include "environment-variables.hh"
-#include "sync.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/error.hh"
 
-#if _WIN32
-# include <io.h>
-# define WIN32_LEAN_AND_MEAN
-# include <windows.h>
-# define isatty _isatty
+#ifdef _WIN32
+#  include <io.h>
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  define isatty _isatty
 #else
-# include <sys/ioctl.h>
+#  include <sys/ioctl.h>
 #endif
 #include <unistd.h>
 #include <widechar_width.h>
+#include <mutex>
+#include <cstdlib> // for ptsname and ptsname_r
 
 namespace {
 
@@ -57,16 +60,14 @@ inline std::pair<int, size_t> charWidthUTF8Helper(std::string_view s)
     return {width, bytes};
 }
 
-}
+} // namespace
 
 namespace nix {
 
 bool isTTY()
 {
-    static const bool tty =
-        isatty(STDERR_FILENO)
-        && getEnv("TERM").value_or("dumb") != "dumb"
-        && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+    static const bool tty = isatty(STDERR_FILENO) && getEnv("TERM").value_or("dumb") != "dumb"
+                            && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
 
     return tty;
 }
@@ -87,20 +88,35 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
             if (i != s.end() && *i == '[') {
                 e += *i++;
                 // eat parameter bytes
-                while (i != s.end() && *i >= 0x30 && *i <= 0x3f) e += *i++;
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
+                    e += *i++;
                 // eat intermediate bytes
-                while (i != s.end() && *i >= 0x20 && *i <= 0x2f) e += *i++;
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
+                    e += *i++;
                 // eat final byte
-                if (i != s.end() && *i >= 0x40 && *i <= 0x7e) e += last = *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e)
+                    e += last = *i++;
             } else if (i != s.end() && *i == ']') {
                 // OSC
                 e += *i++;
-                // eat ESC
-                while (i != s.end() && *i != '\e') e += *i++;
-                // eat backslash
-                if (i != s.end() && *i == '\\') e += last = *i++;
+                // https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda defines
+                // two forms of a URI separator:
+                // 1. ESC '\' (standard)
+                // 2. BEL ('\a') (xterm-style, used by gcc)
+
+                // eat ESC or BEL
+                while (i != s.end() && *i != '\e' && *i != '\a')
+                    e += *i++;
+                if (i != s.end()) {
+                    char v = *i;
+                    e += *i++;
+                    // eat backslash after ESC
+                    if (i != s.end() && v == '\e' && *i == '\\')
+                        e += last = *i++;
+                }
             } else {
-                if (i != s.end() && *i >= 0x40 && *i <= 0x5f) e += *i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f)
+                    e += *i++;
             }
 
             if (!filterAll && last == 'm')
@@ -137,17 +153,16 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
 static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
 
-
 void updateWindowSize()
 {
-    #ifndef _WIN32
+#ifndef _WIN32
     struct winsize ws;
     if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
         auto windowSize_(windowSize.lock());
         windowSize_->first = ws.ws_row;
         windowSize_->second = ws.ws_col;
     }
-    #else
+#else
     CONSOLE_SCREEN_BUFFER_INFO info;
     // From https://stackoverflow.com/a/12642749
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) != 0) {
@@ -156,13 +171,39 @@ void updateWindowSize()
         windowSize_->first = info.srWindow.Bottom - info.srWindow.Top + 1;
         windowSize_->second = info.dwSize.X;
     }
-    #endif
+#endif
 }
-
 
 std::pair<unsigned short, unsigned short> getWindowSize()
 {
     return *windowSize.lock();
 }
 
+#ifndef _WIN32
+std::string getPtsName(int fd)
+{
+#  ifdef __APPLE__
+    static std::mutex ptsnameMutex;
+    // macOS doesn't have ptsname_r, use mutex-protected ptsname
+    std::lock_guard<std::mutex> lock(ptsnameMutex);
+    const char * name = ptsname(fd);
+    if (!name) {
+        throw SysError("getting pseudoterminal slave name");
+    }
+    return name;
+#  else
+    // Use thread-safe ptsname_r on platforms that support it
+    // PTY names are typically short:
+    // - Linux: /dev/pts/N (where N is usually < 1000)
+    // - FreeBSD: /dev/pts/N
+    // 64 bytes is more than sufficient for any Unix PTY name
+    char buf[64];
+    if (ptsname_r(fd, buf, sizeof(buf)) != 0) {
+        throw SysError("getting pseudoterminal slave name");
+    }
+    return buf;
+#  endif
 }
+#endif
+
+} // namespace nix

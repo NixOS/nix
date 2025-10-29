@@ -1,8 +1,8 @@
 #include <poll.h>
 
-#include "logging.hh"
-#include "util.hh"
-#include "muxable-pipe.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
+#include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 
@@ -44,4 +44,4 @@ void MuxablePipePollState::iterate(
     }
 }
 
-}
+} // namespace nix

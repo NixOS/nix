@@ -1,12 +1,14 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "eval.hh"
-#include "tests/libexpr.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/tests/libexpr.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 namespace nix {
 
-TEST(nix_isAllowedURI, http_example_com) {
+TEST(nix_isAllowedURI, http_example_com)
+{
     Strings allowed;
     allowed.push_back("http://example.com");
 
@@ -20,7 +22,8 @@ TEST(nix_isAllowedURI, http_example_com) {
     ASSERT_FALSE(isAllowedURI("http://example.org/foo", allowed));
 }
 
-TEST(nix_isAllowedURI, http_example_com_foo) {
+TEST(nix_isAllowedURI, http_example_com_foo)
+{
     Strings allowed;
     allowed.push_back("http://example.com/foo");
 
@@ -34,7 +37,8 @@ TEST(nix_isAllowedURI, http_example_com_foo) {
     // ASSERT_TRUE(isAllowedURI("http://example.com/foo?ok=1", allowed));
 }
 
-TEST(nix_isAllowedURI, http) {
+TEST(nix_isAllowedURI, http)
+{
     Strings allowed;
     allowed.push_back("http://");
 
@@ -48,7 +52,8 @@ TEST(nix_isAllowedURI, http) {
     ASSERT_FALSE(isAllowedURI("http:foo", allowed));
 }
 
-TEST(nix_isAllowedURI, https) {
+TEST(nix_isAllowedURI, https)
+{
     Strings allowed;
     allowed.push_back("https://");
 
@@ -58,7 +63,8 @@ TEST(nix_isAllowedURI, https) {
     ASSERT_FALSE(isAllowedURI("http://example.com/https:", allowed));
 }
 
-TEST(nix_isAllowedURI, absolute_path) {
+TEST(nix_isAllowedURI, absolute_path)
+{
     Strings allowed;
     allowed.push_back("/var/evil"); // bad idea
 
@@ -76,7 +82,8 @@ TEST(nix_isAllowedURI, absolute_path) {
     ASSERT_FALSE(isAllowedURI("http://example.com//var/evil/foo", allowed));
 }
 
-TEST(nix_isAllowedURI, file_url) {
+TEST(nix_isAllowedURI, file_url)
+{
     Strings allowed;
     allowed.push_back("file:///var/evil"); // bad idea
 
@@ -103,7 +110,8 @@ TEST(nix_isAllowedURI, file_url) {
     ASSERT_FALSE(isAllowedURI("file://", allowed));
 }
 
-TEST(nix_isAllowedURI, github_all) {
+TEST(nix_isAllowedURI, github_all)
+{
     Strings allowed;
     allowed.push_back("github:");
     ASSERT_TRUE(isAllowedURI("github:", allowed));
@@ -117,7 +125,8 @@ TEST(nix_isAllowedURI, github_all) {
     ASSERT_FALSE(isAllowedURI("github", allowed));
 }
 
-TEST(nix_isAllowedURI, github_org) {
+TEST(nix_isAllowedURI, github_org)
+{
     Strings allowed;
     allowed.push_back("github:foo");
     ASSERT_FALSE(isAllowedURI("github:", allowed));
@@ -130,7 +139,8 @@ TEST(nix_isAllowedURI, github_org) {
     ASSERT_FALSE(isAllowedURI("file:///github:foo/bar/archive/master.tar.gz", allowed));
 }
 
-TEST(nix_isAllowedURI, non_scheme_colon) {
+TEST(nix_isAllowedURI, non_scheme_colon)
+{
     Strings allowed;
     allowed.push_back("https://foo/bar:");
     ASSERT_TRUE(isAllowedURI("https://foo/bar:", allowed));
@@ -138,16 +148,19 @@ TEST(nix_isAllowedURI, non_scheme_colon) {
     ASSERT_FALSE(isAllowedURI("https://foo/bar:baz", allowed));
 }
 
-class EvalStateTest : public LibExprTest {};
+class EvalStateTest : public LibExprTest
+{};
 
-TEST_F(EvalStateTest, getBuiltins_ok) {
+TEST_F(EvalStateTest, getBuiltins_ok)
+{
     auto evaled = maybeThunk("builtins");
     auto & builtins = state.getBuiltins();
     ASSERT_TRUE(builtins.type() == nAttrs);
     ASSERT_EQ(evaled, &builtins);
 }
 
-TEST_F(EvalStateTest, getBuiltin_ok) {
+TEST_F(EvalStateTest, getBuiltin_ok)
+{
     auto & builtin = state.getBuiltin("toString");
     ASSERT_TRUE(builtin.type() == nFunction);
     // FIXME
@@ -157,8 +170,46 @@ TEST_F(EvalStateTest, getBuiltin_ok) {
     ASSERT_EQ(state.forceBool(builtin2, noPos, "in unit test"), true);
 }
 
-TEST_F(EvalStateTest, getBuiltin_fail) {
+TEST_F(EvalStateTest, getBuiltin_fail)
+{
     ASSERT_THROW(state.getBuiltin("nonexistent"), EvalError);
+}
+
+class PureEvalTest : public LibExprTest
+{
+public:
+    PureEvalTest()
+        : LibExprTest(openStore("dummy://", {{"read-only", "false"}}), [](bool & readOnlyMode) {
+            EvalSettings settings{readOnlyMode};
+            settings.pureEval = true;
+            settings.restrictEval = true;
+            return settings;
+        })
+    {
+    }
+};
+
+TEST_F(PureEvalTest, pathExists)
+{
+    ASSERT_THAT(eval("builtins.pathExists /."), IsFalse());
+    ASSERT_THAT(eval("builtins.pathExists /nix"), IsFalse());
+    ASSERT_THAT(eval("builtins.pathExists /nix/store"), IsFalse());
+
+    {
+        std::string contents = "Lorem ipsum";
+
+        StringSource s{contents};
+        auto path = state.store->addToStoreFromDump(
+            s, "source", FileSerialisationMethod::Flat, ContentAddressMethod::Raw::Text, HashAlgorithm::SHA256);
+        auto printed = store->printStorePath(path);
+
+        ASSERT_THROW(eval(fmt("builtins.readFile %s", printed)), RestrictedPathError);
+        ASSERT_THAT(eval(fmt("builtins.pathExists %s", printed)), IsFalse());
+
+        ASSERT_THROW(eval("builtins.readDir /."), RestrictedPathError);
+        state.allowPath(path); // FIXME: This shouldn't behave this way.
+        ASSERT_THAT(eval("builtins.readDir /."), IsAttrsOfSize(0));
+    }
 }
 
 } // namespace nix

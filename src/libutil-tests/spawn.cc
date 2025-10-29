@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "processes.hh"
+#include "nix/util/processes.hh"
 
 namespace nix {
 
@@ -33,4 +33,4 @@ TEST(SpawnTest, windowsEscape)
     ASSERT_EQ(space, R"("hello world")");
 }
 #endif
-}
+} // namespace nix

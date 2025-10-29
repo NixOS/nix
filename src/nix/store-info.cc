@@ -1,13 +1,13 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "finally.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/finally.hh"
 
 #include <nlohmann/json.hpp>
 
 using namespace nix;
 
-struct CmdPingStore : StoreCommand, MixJSON
+struct CmdInfoStore : StoreCommand, MixJSON
 {
     std::string description() override
     {
@@ -17,14 +17,14 @@ struct CmdPingStore : StoreCommand, MixJSON
     std::string doc() override
     {
         return
-          #include "store-info.md"
-          ;
+#include "store-info.md"
+            ;
     }
 
     void run(ref<Store> store) override
     {
         if (!json) {
-            notice("Store URL: %s", store->getUri());
+            notice("Store URL: %s", store->config.getReference().render(/*withParams=*/true));
             store->connect();
             if (auto version = store->getVersion())
                 notice("Version: %s", *version);
@@ -32,11 +32,9 @@ struct CmdPingStore : StoreCommand, MixJSON
                 notice("Trusted: %s", *trusted);
         } else {
             nlohmann::json res;
-            Finally printRes([&]() {
-                logger->cout("%s", res);
-            });
+            Finally printRes([&]() { printJSON(res); });
 
-            res["url"] = store->getUri();
+            res["url"] = store->config.getReference().render(/*withParams=*/true);
             store->connect();
             if (auto version = store->getVersion())
                 res["version"] = *version;
@@ -46,15 +44,4 @@ struct CmdPingStore : StoreCommand, MixJSON
     }
 };
 
-struct CmdInfoStore : CmdPingStore
-{
-    void run(nix::ref<nix::Store> store) override
-    {
-        warn("'nix store ping' is a deprecated alias for 'nix store info'");
-        CmdPingStore::run(store);
-    }
-};
-
-
-static auto rCmdPingStore = registerCommand2<CmdPingStore>({"store", "info"});
-static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "ping"});
+static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "info"});

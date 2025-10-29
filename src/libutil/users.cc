@@ -1,7 +1,7 @@
-#include "util.hh"
-#include "users.hh"
-#include "environment-variables.hh"
-#include "file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -19,7 +19,6 @@ Path getCacheDir()
         }
     }
 }
-
 
 Path getConfigDir()
 {
@@ -41,13 +40,12 @@ std::vector<Path> getConfigDirs()
     Path configHome = getConfigDir();
     auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
     std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
-    for (auto& p : result) {
+    for (auto & p : result) {
         p += "/nix";
     }
     result.insert(result.begin(), configHome);
     return result;
 }
-
 
 Path getDataDir()
 {
@@ -86,7 +84,6 @@ Path createNixStateDir()
     return dir;
 }
 
-
 std::string expandTilde(std::string_view path)
 {
     // TODO: expand ~user ?
@@ -97,4 +94,4 @@ std::string expandTilde(std::string_view path)
         return std::string(path);
 }
 
-}
+} // namespace nix

@@ -1,33 +1,33 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "nar-accessor.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/nar-accessor.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
+
+#include <nlohmann/json.hpp>
 
 using namespace nix;
 
 struct MixCat : virtual Args
 {
-    std::string path;
-
-    void cat(ref<SourceAccessor> accessor)
+    void cat(ref<SourceAccessor> accessor, CanonPath path)
     {
-        auto st = accessor->lstat(CanonPath(path));
+        auto st = accessor->lstat(path);
         if (st.type != SourceAccessor::Type::tRegular)
-            throw Error("path '%1%' is not a regular file", path);
+            throw Error("path '%1%' is not a regular file", path.abs());
         logger->stop();
 
-        writeFull(getStandardOutput(), accessor->readFile(CanonPath(path)));
+        writeFull(getStandardOutput(), accessor->readFile(path));
     }
 };
 
 struct CmdCatStore : StoreCommand, MixCat
 {
+    std::string path;
+
     CmdCatStore()
     {
-        expectArgs({
-            .label = "path",
-            .handler = {&path},
-            .completer = completePath
-        });
+        expectArgs({.label = "path", .handler = {&path}, .completer = completePath});
     }
 
     std::string description() override
@@ -38,13 +38,14 @@ struct CmdCatStore : StoreCommand, MixCat
     std::string doc() override
     {
         return
-          #include "store-cat.md"
-          ;
+#include "store-cat.md"
+            ;
     }
 
     void run(ref<Store> store) override
     {
-        cat(store->getFSAccessor());
+        auto [storePath, rest] = store->toStorePath(path);
+        cat(store->requireStoreObjectAccessor(storePath), CanonPath{rest});
     }
 };
 
@@ -52,13 +53,11 @@ struct CmdCatNar : StoreCommand, MixCat
 {
     Path narPath;
 
+    std::string path;
+
     CmdCatNar()
     {
-        expectArgs({
-            .label = "nar",
-            .handler = {&narPath},
-            .completer = completePath
-        });
+        expectArgs({.label = "nar", .handler = {&narPath}, .completer = completePath});
         expectArg("path", &path);
     }
 
@@ -70,13 +69,19 @@ struct CmdCatNar : StoreCommand, MixCat
     std::string doc() override
     {
         return
-          #include "nar-cat.md"
-          ;
+#include "nar-cat.md"
+            ;
     }
 
     void run(ref<Store> store) override
     {
-        cat(makeNarAccessor(readFile(narPath)));
+        AutoCloseFD fd = open(narPath.c_str(), O_RDONLY);
+        if (!fd)
+            throw SysError("opening NAR file '%s'", narPath);
+        auto source = FdSource{fd.get()};
+        auto narAccessor = makeNarAccessor(source);
+        auto listing = listNar(narAccessor, CanonPath::root, true);
+        cat(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };
 

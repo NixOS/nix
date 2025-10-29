@@ -1,7 +1,9 @@
-project('nix-fetchers', 'cpp',
+project(
+  'nix-fetchers',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -16,8 +18,7 @@ subdir('nix-meson-build-support/deps-lists')
 
 configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
@@ -27,17 +28,8 @@ subdir('nix-meson-build-support/subprojects')
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
-libgit2 = dependency('libgit2')
+libgit2 = dependency('libgit2', version : '>= 1.9')
 deps_private += libgit2
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  # '-include', 'config-fetchers.h',
-  language : 'cpp',
-)
 
 subdir('nix-meson-build-support/common')
 
@@ -53,38 +45,31 @@ sources = files(
   'git.cc',
   'github.cc',
   'indirect.cc',
+  'input-cache.cc',
   'mercurial.cc',
   'path.cc',
   'registry.cc',
-  'store-path-accessor.cc',
   'tarball.cc',
 )
 
-include_dirs = [include_directories('.')]
+subdir('include/nix/fetchers')
 
-headers = files(
-  'attrs.hh',
-  'cache.hh',
-  'fetch-settings.hh',
-  'fetch-to-store.hh',
-  'fetchers.hh',
-  'filtering-source-accessor.hh',
-  'git-lfs-fetch.hh',
-  'git-utils.hh',
-  'registry.hh',
-  'store-path-accessor.hh',
-  'tarball.hh',
-)
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixfetchers',
   sources,
+  soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/fetchers', preserve_path : true)
 
 libraries_private = []
 

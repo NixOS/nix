@@ -25,6 +25,13 @@ import $testDir/undefined-variable.nix
 
 TODO_NixOS
 
+# FIXME: repl tests fail on systems with stack limits
+stack_ulimit="$(ulimit -Hs)"
+stack_required="$((64 * 1024 * 1024))"
+if [[ "$stack_ulimit" != "unlimited" ]]; then
+    ((stack_ulimit < stack_required)) && skipTest "repl tests cannot run on systems with stack size <$stack_required ($stack_ulimit)"
+fi
+
 testRepl () {
     local nixArgs
     nixArgs=("$@")
@@ -56,6 +63,10 @@ testRepl () {
     nix repl "${nixArgs[@]}" 2>&1 <<< "builtins.currentSystem" \
       | grep "$(nix-instantiate --eval -E 'builtins.currentSystem')"
 
+    # regression test for #12163
+    replOutput=$(nix repl "${nixArgs[@]}" 2>&1 <<< ":sh import $testDir/simple.nix")
+    echo "$replOutput" | grepInverse "error: Cannot run 'nix-shell'"
+
     expectStderr 1 nix repl "${testDir}/simple.nix" \
       | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
 }
@@ -63,7 +74,7 @@ testRepl () {
 # Simple test, try building a drv
 testRepl
 # Same thing (kind-of), but with a remote store.
-testRepl --store "$TEST_ROOT/store?real=$NIX_STORE_DIR"
+testRepl --store "$TEST_ROOT/other-root?real=$NIX_STORE_DIR"
 
 # Remove ANSI escape sequences. They can prevent grep from finding a match.
 stripColors () {
@@ -153,20 +164,64 @@ foo + baz
 ' "3" \
     ./flake ./flake\#bar --experimental-features 'flakes'
 
+testReplResponse $'
+:a { a = 1; b = 2; longerName = 3; "with spaces" = 4; }
+' 'Added 4 variables.
+a, b, longerName, "with spaces"
+'
+
+cat <<EOF > attribute-set.nix
+{
+    a = 1;
+    b = 2;
+    longerName = 3;
+    "with spaces" = 4;
+}
+EOF
+testReplResponse '
+:l ./attribute-set.nix
+' 'Added 4 variables.
+a, b, longerName, "with spaces"
+'
+
+testReplResponseNoRegex $'
+:a builtins.foldl\' (x: y: x // y) {} (map (x: { ${builtins.toString x} = x; }) (builtins.genList (x: x) 23))
+' 'Added 23 variables.
+"0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "3", "4", "5", "6"
+... and 3 more; view with :ll'
+
 # Test the `:reload` mechansim with flakes:
 # - Eval `./flake#changingThing`
 # - Modify the flake
 # - Re-eval it
 # - Check that the result has changed
-replResult=$( (
-echo "changingThing"
-sleep 1 # Leave the repl the time to eval 'foo'
+mkfifo repl_fifo
+touch repl_output
+nix repl ./flake --experimental-features 'flakes' < repl_fifo >> repl_output 2>&1 &
+repl_pid=$!
+exec 3>repl_fifo # Open fifo for writing
+echo "changingThing" >&3
+for i in $(seq 1 1000); do
+    if grep -q "beforeChange" repl_output; then
+        break
+    fi
+    cat repl_output
+    sleep 0.1
+done
+if [[ "$i" -eq 100 ]]; then
+    echo "Timed out waiting for beforeChange"
+    exit 1
+fi
+
 sed -i 's/beforeChange/afterChange/' flake/flake.nix
-echo ":reload"
-echo "changingThing"
-) | nix repl ./flake --experimental-features 'flakes')
-echo "$replResult" | grepQuiet -s beforeChange
-echo "$replResult" | grepQuiet -s afterChange
+
+# Send reload and second command
+echo ":reload" >&3
+echo "changingThing" >&3
+echo "exit" >&3
+exec 3>&- # Close fifo
+wait $repl_pid # Wait for process to finish
+grep -q "afterChange" repl_output
 
 # Test recursive printing and formatting
 # Normal output should print attributes in lexicographical order non-recursively
@@ -256,6 +311,12 @@ testReplResponseNoRegex '
 }
 '
 
+# Don't prompt for more input when getting unexpected EOF in imported files.
+testReplResponse "
+import $testDir/lang/parse-fail-eof-pos.nix
+" \
+'.*error: syntax error, unexpected end of file.*'
+
 # TODO: move init to characterisation/framework.sh
 badDiff=0
 badExitCode=0
@@ -301,7 +362,8 @@ runRepl () {
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
       -e "s@$nixVersion@<nix version>@g" \
-      -e "s@Added [0-9]* variables@Added <number omitted> variables@g" \
+      -e "/Added [0-9]* variables/{s@ [0-9]* @ <number omitted> @;n;d}" \
+      -e '/\.\.\. and [0-9]* more; view with :ll/d' \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
     ;
 }

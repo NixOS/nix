@@ -1,14 +1,10 @@
-#include "environment-variables.hh"
-#include "executable-path.hh"
-#include "strings-inline.hh"
-#include "util.hh"
-#include "file-path-impl.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/util/strings-inline.hh"
+#include "nix/util/util.hh"
+#include "nix/util/file-path-impl.hh"
 
 namespace nix {
-
-namespace fs {
-using namespace std::filesystem;
-}
 
 constexpr static const OsStringView path_var_separator{
     &ExecutablePath::separator,
@@ -28,7 +24,7 @@ ExecutablePath ExecutablePath::parse(const OsString & path)
     auto strings = path.empty() ? (std::list<OsString>{})
                                 : basicSplitString<std::list<OsString>, OsChar>(path, path_var_separator);
 
-    std::vector<fs::path> ret;
+    std::vector<std::filesystem::path> ret;
     ret.reserve(strings.size());
 
     std::transform(
@@ -36,7 +32,7 @@ ExecutablePath ExecutablePath::parse(const OsString & path)
         std::make_move_iterator(strings.end()),
         std::back_inserter(ret),
         [](OsString && str) {
-            return fs::path{
+            return std::filesystem::path{
                 str.empty()
                     // "A zero-length prefix is a legacy feature that
                     // indicates the current working directory. It
@@ -62,13 +58,13 @@ OsString ExecutablePath::render() const
     return basicConcatStringsSep(path_var_separator, path2);
 }
 
-std::optional<fs::path>
-ExecutablePath::findName(const OsString & exe, std::function<bool(const fs::path &)> isExecutable) const
+std::optional<std::filesystem::path>
+ExecutablePath::findName(const OsString & exe, std::function<bool(const std::filesystem::path &)> isExecutable) const
 {
     // "If the pathname being sought contains a <slash>, the search
     // through the path prefixes shall not be performed."
     // https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html#tag_08_03
-    assert(OsPathTrait<fs::path::value_type>::rfindPathSep(exe) == exe.npos);
+    assert(OsPathTrait<std::filesystem::path::value_type>::rfindPathSep(exe) == exe.npos);
 
     for (auto & dir : directories) {
         auto candidate = dir / exe;
@@ -79,7 +75,8 @@ ExecutablePath::findName(const OsString & exe, std::function<bool(const fs::path
     return std::nullopt;
 }
 
-fs::path ExecutablePath::findPath(const fs::path & exe, std::function<bool(const fs::path &)> isExecutable) const
+std::filesystem::path ExecutablePath::findPath(
+    const std::filesystem::path & exe, std::function<bool(const std::filesystem::path &)> isExecutable) const
 {
     // "If the pathname being sought contains a <slash>, the search
     // through the path prefixes shall not be performed."

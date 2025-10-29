@@ -1,6 +1,6 @@
 #include <cstdlib>
 
-#include "environment-variables.hh"
+#include "nix/util/environment-variables.hh"
 
 namespace nix {
 
@@ -19,4 +19,4 @@ int setEnvOs(const OsString & name, const OsString & value)
     return setEnv(name.c_str(), value.c_str());
 }
 
-}
+} // namespace nix

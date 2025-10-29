@@ -1,21 +1,21 @@
-#include "globals.hh"
-#include "installable-attr-path.hh"
-#include "outputs-spec.hh"
-#include "util.hh"
-#include "command.hh"
-#include "attr-path.hh"
-#include "common-eval-args.hh"
-#include "derivations.hh"
-#include "eval-inline.hh"
-#include "eval.hh"
-#include "get-drvs.hh"
-#include "store-api.hh"
-#include "shared.hh"
-#include "flake/flake.hh"
-#include "eval-cache.hh"
-#include "url.hh"
-#include "registry.hh"
-#include "build-result.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/installable-attr-path.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/util.hh"
+#include "nix/cmd/command.hh"
+#include "nix/expr/attr-path.hh"
+#include "nix/cmd/common-eval-args.hh"
+#include "nix/store/derivations.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/get-drvs.hh"
+#include "nix/store/store-api.hh"
+#include "nix/main/shared.hh"
+#include "nix/flake/flake.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/util/url.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/store/build-result.hh"
 
 #include <regex>
 #include <queue>
@@ -35,7 +35,8 @@ InstallableAttrPath::InstallableAttrPath(
     , v(allocRootValue(v))
     , attrPath(attrPath)
     , extendedOutputsSpec(std::move(extendedOutputsSpec))
-{ }
+{
+}
 
 std::pair<Value *, PosIdx> InstallableAttrPath::toValue(EvalState & state)
 {
@@ -48,12 +49,9 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 {
     auto [v, pos] = toValue(*state);
 
-    if (std::optional derivedPathWithInfo = trySinglePathToDerivedPaths(
-        *v,
-        pos,
-        fmt("while evaluating the attribute '%s'", attrPath)))
-    {
-        return { *derivedPathWithInfo };
+    if (std::optional derivedPathWithInfo =
+            trySinglePathToDerivedPaths(*v, pos, fmt("while evaluating the attribute '%s'", attrPath))) {
+        return {*derivedPathWithInfo};
     }
 
     Bindings & autoArgs = *cmd.getAutoArgs(*state);
@@ -70,19 +68,19 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
         if (!drvPath)
             throw Error("'%s' is not a derivation", what());
 
-        auto newOutputs = std::visit(overloaded {
-            [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
-                std::set<std::string> outputsToInstall;
-                for (auto & output : packageInfo.queryOutputs(false, true))
-                    outputsToInstall.insert(output.first);
-                if (outputsToInstall.empty())
-                    outputsToInstall.insert("out");
-                return OutputsSpec::Names { std::move(outputsToInstall) };
+        auto newOutputs = std::visit(
+            overloaded{
+                [&](const ExtendedOutputsSpec::Default & d) -> OutputsSpec {
+                    StringSet outputsToInstall;
+                    for (auto & output : packageInfo.queryOutputs(false, true))
+                        outputsToInstall.insert(output.first);
+                    if (outputsToInstall.empty())
+                        outputsToInstall.insert("out");
+                    return OutputsSpec::Names{std::move(outputsToInstall)};
+                },
+                [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec { return e; },
             },
-            [&](const ExtendedOutputsSpec::Explicit & e) -> OutputsSpec {
-                return e;
-            },
-        }, extendedOutputsSpec.raw);
+            extendedOutputsSpec.raw);
 
         auto [iter, didInsert] = byDrvPath.emplace(*drvPath, newOutputs);
 
@@ -93,11 +91,12 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
     DerivedPathsWithInfo res;
     for (auto & [drvPath, outputs] : byDrvPath)
         res.push_back({
-            .path = DerivedPath::Built {
-                .drvPath = makeConstantStorePathRef(drvPath),
-                .outputs = outputs,
-            },
-            .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value {
+            .path =
+                DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(drvPath),
+                    .outputs = outputs,
+                },
+            .info = make_ref<ExtraPathInfoValue>(ExtraPathInfoValue::Value{
                 .extendedOutputsSpec = outputs,
                 /* FIXME: reconsider backwards compatibility above
                    so we can fill in this info. */
@@ -115,10 +114,12 @@ InstallableAttrPath InstallableAttrPath::parse(
     ExtendedOutputsSpec extendedOutputsSpec)
 {
     return {
-        state, cmd, v,
-        prefix == "." ? "" : std::string { prefix },
+        state,
+        cmd,
+        v,
+        prefix == "." ? "" : std::string{prefix},
         std::move(extendedOutputsSpec),
     };
 }
 
-}
+} // namespace nix

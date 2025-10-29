@@ -29,6 +29,7 @@ nix-env -f user-envs.nix -i bar-0.1
 # Migrate to the new profile dir, and ensure that everything’s there
 export PATH="$PATH_WITH_NEW_NIX"
 nix-env -q # Trigger the migration
+# shellcheck disable=SC2235
 ( [[ -L ~/.nix-profile ]] && \
     [[ $(readlink ~/.nix-profile) == ~/.local/share/nix/profiles/profile ]] ) || \
     fail "The nix profile should point to the new location"

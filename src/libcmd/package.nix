@@ -46,13 +46,15 @@ mkMesonLibrary (finalAttrs: {
     ./.version
     ./meson.build
     ./meson.options
+    ./include/nix/cmd/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
 
   buildInputs = [
     ({ inherit editline readline; }.${readlineFlavor})
-  ] ++ lib.optional enableMarkdown lowdown;
+  ]
+  ++ lib.optional enableMarkdown lowdown;
 
   propagatedBuildInputs = [
     nix-util

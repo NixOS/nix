@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "position.hh"
+#include "nix/util/position.hh"
 
 namespace nix {
 
@@ -15,6 +15,7 @@ TEST(Position, getSnippetUpTo_0)
     Pos p(1, 1, o);
     ASSERT_EQ(p.getSnippetUpTo(p), "");
 }
+
 TEST(Position, getSnippetUpTo_1)
 {
     Pos::Origin o = makeStdin("x");
@@ -56,6 +57,7 @@ TEST(Position, getSnippetUpTo_1)
         ASSERT_EQ(end.getSnippetUpTo(start), std::nullopt);
     }
 }
+
 TEST(Position, getSnippetUpTo_2)
 {
     Pos::Origin o = makeStdin("asdf\njkl\nqwer");

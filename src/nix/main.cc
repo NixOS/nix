@@ -1,63 +1,55 @@
-#include "args/root.hh"
-#include "current-process.hh"
-#include "command.hh"
-#include "common-args.hh"
-#include "eval.hh"
-#include "eval-settings.hh"
-#include "globals.hh"
-#include "legacy.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "filetransfer.hh"
-#include "finally.hh"
-#include "loggers.hh"
-#include "markdown.hh"
-#include "memory-source-accessor.hh"
-#include "terminal.hh"
-#include "users.hh"
-#include "network-proxy.hh"
-#include "eval-cache.hh"
-#include "flake/flake.hh"
+#include "nix/util/args/root.hh"
+#include "nix/util/current-process.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
+#include "nix/cmd/legacy.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/store-registration.hh"
+#include "nix/store/filetransfer.hh"
+#include "nix/util/finally.hh"
+#include "nix/main/loggers.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/users.hh"
+#include "nix/cmd/network-proxy.hh"
+#include "nix/expr/eval-cache.hh"
+#include "nix/flake/flake.hh"
+#include "nix/flake/settings.hh"
+#include "nix/util/json-utils.hh"
+
 #include "self-exe.hh"
-#include "json-utils.hh"
+#include "crash-handler.hh"
+#include "cli-config-private.hh"
 
 #include <sys/types.h>
 #include <regex>
 #include <nlohmann/json.hpp>
 
 #ifndef _WIN32
-# include <sys/socket.h>
-# include <ifaddrs.h>
-# include <netdb.h>
-# include <netinet/in.h>
+#  include <sys/socket.h>
+#  include <ifaddrs.h>
+#  include <netdb.h>
+#  include <netinet/in.h>
 #endif
 
-#if __linux__
-# include "namespaces.hh"
+#ifdef __linux__
+#  include "nix/util/linux-namespaces.hh"
 #endif
 
 #ifndef _WIN32
 extern std::string chrootHelperName;
 
-void chrootHelper(int argc, char * * argv);
+void chrootHelper(int argc, char ** argv);
 #endif
 
-#include "strings.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
-
-enum struct AliasStatus {
-    /** Aliases that don't go away */
-    AcceptedShorthand,
-    /** Aliases that will go away */
-    Deprecated,
-};
-
-/** An alias, except for the original syntax, which is in the map key. */
-struct AliasInfo {
-    AliasStatus status;
-    std::vector<std::string> replacement;
-};
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()
@@ -71,19 +63,21 @@ static bool haveInternet()
     Finally free([&]() { freeifaddrs(addrs); });
 
     for (auto i = addrs; i; i = i->ifa_next) {
-        if (!i->ifa_addr) continue;
+        if (!i->ifa_addr)
+            continue;
         if (i->ifa_addr->sa_family == AF_INET) {
             if (ntohl(((sockaddr_in *) i->ifa_addr)->sin_addr.s_addr) != INADDR_LOOPBACK) {
                 return true;
             }
         } else if (i->ifa_addr->sa_family == AF_INET6) {
-            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr) &&
-                !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
+            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr)
+                && !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
                 return true;
         }
     }
 
-    if (haveNetworkProxyConnection()) return true;
+    if (haveNetworkProxyConnection())
+        return true;
 
     return false;
 #else
@@ -101,7 +95,9 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     bool helpRequested = false;
     bool showVersion = false;
 
-    NixArgs() : MultiCommand("", RegisterCommand::getCommandsFor({})), MixCommonArgs("nix")
+    NixArgs()
+        : MultiCommand("", RegisterCommand::getCommandsFor({}))
+        , MixCommonArgs("nix")
     {
         categories.clear();
         categories[catHelp] = "Help commands";
@@ -149,53 +145,33 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
             .handler = {[&]() { refresh = true; }},
             .experimentalFeature = Xp::NixCommand,
         });
-    }
 
-    std::map<std::string, AliasInfo> aliases = {
-        {"add-to-store", { AliasStatus::Deprecated, {"store", "add-path"}}},
-        {"cat-nar", { AliasStatus::Deprecated, {"nar", "cat"}}},
-        {"cat-store", { AliasStatus::Deprecated, {"store", "cat"}}},
-        {"copy-sigs", { AliasStatus::Deprecated, {"store", "copy-sigs"}}},
-        {"dev-shell", { AliasStatus::Deprecated, {"develop"}}},
-        {"diff-closures", { AliasStatus::Deprecated, {"store", "diff-closures"}}},
-        {"dump-path", { AliasStatus::Deprecated, {"store", "dump-path"}}},
-        {"hash-file", { AliasStatus::Deprecated, {"hash", "file"}}},
-        {"hash-path", { AliasStatus::Deprecated, {"hash", "path"}}},
-        {"ls-nar", { AliasStatus::Deprecated, {"nar", "ls"}}},
-        {"ls-store", { AliasStatus::Deprecated, {"store", "ls"}}},
-        {"make-content-addressable", { AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
-        {"optimise-store", { AliasStatus::Deprecated, {"store", "optimise"}}},
-        {"ping-store", { AliasStatus::Deprecated, {"store", "info"}}},
-        {"sign-paths", { AliasStatus::Deprecated, {"store", "sign"}}},
-        {"shell", { AliasStatus::AcceptedShorthand, {"env", "shell"}}},
-        {"show-derivation", { AliasStatus::Deprecated, {"derivation", "show"}}},
-        {"show-config", { AliasStatus::Deprecated, {"config", "show"}}},
-        {"to-base16", { AliasStatus::Deprecated, {"hash", "to-base16"}}},
-        {"to-base32", { AliasStatus::Deprecated, {"hash", "to-base32"}}},
-        {"to-base64", { AliasStatus::Deprecated, {"hash", "to-base64"}}},
-        {"verify", { AliasStatus::Deprecated, {"store", "verify"}}},
-        {"doctor", { AliasStatus::Deprecated, {"config", "check"}}},
+        aliases = {
+            {"add-to-store", {AliasStatus::Deprecated, {"store", "add-path"}}},
+            {"cat-nar", {AliasStatus::Deprecated, {"nar", "cat"}}},
+            {"cat-store", {AliasStatus::Deprecated, {"store", "cat"}}},
+            {"copy-sigs", {AliasStatus::Deprecated, {"store", "copy-sigs"}}},
+            {"dev-shell", {AliasStatus::Deprecated, {"develop"}}},
+            {"diff-closures", {AliasStatus::Deprecated, {"store", "diff-closures"}}},
+            {"dump-path", {AliasStatus::Deprecated, {"store", "dump-path"}}},
+            {"hash-file", {AliasStatus::Deprecated, {"hash", "file"}}},
+            {"hash-path", {AliasStatus::Deprecated, {"hash", "path"}}},
+            {"ls-nar", {AliasStatus::Deprecated, {"nar", "ls"}}},
+            {"ls-store", {AliasStatus::Deprecated, {"store", "ls"}}},
+            {"make-content-addressable", {AliasStatus::Deprecated, {"store", "make-content-addressed"}}},
+            {"optimise-store", {AliasStatus::Deprecated, {"store", "optimise"}}},
+            {"ping-store", {AliasStatus::Deprecated, {"store", "info"}}},
+            {"sign-paths", {AliasStatus::Deprecated, {"store", "sign"}}},
+            {"shell", {AliasStatus::AcceptedShorthand, {"env", "shell"}}},
+            {"show-derivation", {AliasStatus::Deprecated, {"derivation", "show"}}},
+            {"show-config", {AliasStatus::Deprecated, {"config", "show"}}},
+            {"to-base16", {AliasStatus::Deprecated, {"hash", "to-base16"}}},
+            {"to-base32", {AliasStatus::Deprecated, {"hash", "to-base32"}}},
+            {"to-base64", {AliasStatus::Deprecated, {"hash", "to-base64"}}},
+            {"verify", {AliasStatus::Deprecated, {"store", "verify"}}},
+            {"doctor", {AliasStatus::Deprecated, {"config", "check"}}},
+        };
     };
-
-    bool aliasUsed = false;
-
-    Strings::iterator rewriteArgs(Strings & args, Strings::iterator pos) override
-    {
-        if (aliasUsed || command || pos == args.end()) return pos;
-        auto arg = *pos;
-        auto i = aliases.find(arg);
-        if (i == aliases.end()) return pos;
-        auto & info = i->second;
-        if (info.status == AliasStatus::Deprecated) {
-            warn("'%s' is a deprecated alias for '%s'",
-                arg, concatStringsSep(" ", info.replacement));
-        }
-        pos = args.erase(pos);
-        for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
-            pos = args.insert(pos, *j);
-        aliasUsed = true;
-        return pos;
-    }
 
     std::string description() override
     {
@@ -205,8 +181,8 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
     std::string doc() override
     {
         return
-          #include "nix.md"
-          ;
+#include "nix.md"
+            ;
     }
 
     // Plugins may add new subcommands.
@@ -222,13 +198,12 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
         res["args"] = toJSON();
 
         auto stores = nlohmann::json::object();
-        for (auto & implem : *Implementations::registered) {
-            auto storeConfig = implem.getConfig();
-            auto storeName = storeConfig->name();
+        for (auto & [storeName, implem] : Implementations::registered()) {
             auto & j = stores[storeName];
-            j["doc"] = storeConfig->doc();
-            j["settings"] = storeConfig->toJSON();
-            j["experimentalFeature"] = storeConfig->experimentalFeature();
+            j["doc"] = implem.doc;
+            j["uri-schemes"] = implem.uriSchemes;
+            j["settings"] = implem.getConfig()->toJSON();
+            j["experimentalFeature"] = implem.experimentalFeature;
         }
         res["stores"] = std::move(stores);
         res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
@@ -241,38 +216,48 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
    lowdown. */
 static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 {
+    // Check for aliases if subcommand has exactly one element
+    if (subcommand.size() == 1) {
+        auto alias = toplevel.aliases.find(subcommand[0]);
+        if (alias != toplevel.aliases.end()) {
+            subcommand = alias->second.replacement;
+        }
+    }
+
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
-    evalSettings.restrictEval = false;
-    evalSettings.pureEval = false;
+    evalSettings.restrictEval = true;
+    evalSettings.pureEval = true;
     EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();
-    state.eval(state.parseExprFromString(
-        #include "generate-manpage.nix.gen.hh"
-        , state.rootPath(CanonPath::root)), *vGenerateManpage);
+    state.eval(
+        state.parseExprFromString(
+#include "generate-manpage.nix.gen.hh"
+            , state.rootPath(CanonPath::root)),
+        *vGenerateManpage);
 
     state.corepkgsFS->addFile(
         CanonPath("utils.nix"),
-        #include "utils.nix.gen.hh"
-        );
+#include "utils.nix.gen.hh"
+    );
 
     state.corepkgsFS->addFile(
         CanonPath("/generate-settings.nix"),
-        #include "generate-settings.nix.gen.hh"
-        );
+#include "generate-settings.nix.gen.hh"
+    );
 
     state.corepkgsFS->addFile(
         CanonPath("/generate-store-info.nix"),
-        #include "generate-store-info.nix.gen.hh"
-        );
+#include "generate-store-info.nix.gen.hh"
+    );
 
     auto vDump = state.allocValue();
     vDump->mkString(toplevel.dumpCli());
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
-    state.callFunction(*vRes, *vDump, *vRes, noPos);
+    Value * args[]{&state.getBuiltin("false"), vDump};
+    state.callFunction(*vGenerateManpage, args, *vRes, noPos);
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -309,17 +294,21 @@ struct CmdHelp : Command
     std::string doc() override
     {
         return
-          #include "help.md"
-          ;
+#include "help.md"
+            ;
     }
 
-    Category category() override { return catHelp; }
+    Category category() override
+    {
+        return catHelp;
+    }
 
     void run() override
     {
         assert(parent);
         MultiCommand * toplevel = parent;
-        while (toplevel->parent) toplevel = toplevel->parent;
+        while (toplevel->parent)
+            toplevel = toplevel->parent;
         showHelp(subcommand, getNixArgs(*this));
     }
 };
@@ -336,11 +325,14 @@ struct CmdHelpStores : Command
     std::string doc() override
     {
         return
-          #include "help-stores.md.gen.hh"
-          ;
+#include "help-stores.md.gen.hh"
+            ;
     }
 
-    Category category() override { return catHelp; }
+    Category category() override
+    {
+        return catHelp;
+    }
 
     void run() override
     {
@@ -350,9 +342,11 @@ struct CmdHelpStores : Command
 
 static auto rCmdHelpStores = registerCommand<CmdHelpStores>("help-stores");
 
-void mainWrapped(int argc, char * * argv)
+void mainWrapped(int argc, char ** argv)
 {
     savedArgv = argv;
+
+    registerCrashHandler();
 
     /* The chroot helper needs to be run before any threads have been
        started. */
@@ -365,7 +359,7 @@ void mainWrapped(int argc, char * * argv)
 
     initNix();
     initGC();
-    flake::initLib(flakeSettings);
+    flakeSettings.configureEvalSettings(evalSettings);
 
     /* Set the build hook location
 
@@ -373,20 +367,22 @@ void mainWrapped(int argc, char * * argv)
        self-aware. That is, it has to know where it is installed. We
        don't think it's sentient.
      */
-    settings.buildHook.setDefault(Strings {
-        getNixBin({}).string(),
-        "__build-remote",
-    });
+    settings.buildHook.setDefault(
+        Strings{
+            getNixBin({}).string(),
+            "__build-remote",
+        });
 
-    #if __linux__
+#ifdef __linux__
     if (isRootUser()) {
         try {
             saveMountNamespace();
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("setting up a private mount namespace");
-        } catch (Error & e) { }
+        } catch (Error & e) {
+        }
     }
-    #endif
+#endif
 
     programPath = argv[0];
     auto programName = std::string(baseNameOf(programPath));
@@ -396,12 +392,14 @@ void mainWrapped(int argc, char * * argv)
 
     if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         programName = "build-remote";
-        argv++; argc--;
+        argv++;
+        argc--;
     }
 
     {
-        auto legacy = (*RegisterLegacyCommand::commands)[programName];
-        if (legacy) return legacy(argc, argv);
+        auto legacy = RegisterLegacyCommand::commands()[programName];
+        if (legacy)
+            return legacy(argc, argv);
     }
 
     evalSettings.pureEval = true;
@@ -436,9 +434,11 @@ void mainWrapped(int argc, char * * argv)
         for (auto & builtinPtr : state.getBuiltins().attrs()->lexicographicOrder(state.symbols)) {
             auto & builtin = *builtinPtr;
             auto b = nlohmann::json::object();
-            if (!builtin.value->isPrimOp()) continue;
+            if (!builtin.value->isPrimOp())
+                continue;
             auto primOp = builtin.value->primOp();
-            if (!primOp->doc) continue;
+            if (!primOp->doc)
+                continue;
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(primOp->doc));
             if (primOp->experimentalFeature)
@@ -447,7 +447,8 @@ void mainWrapped(int argc, char * * argv)
         }
         for (auto & [name, info] : state.constantInfos) {
             auto b = nlohmann::json::object();
-            if (!info.doc) continue;
+            if (!info.doc)
+                continue;
             b["doc"] = trim(stripIndentation(info.doc));
             b["type"] = showType(info.type, false);
             if (info.impureOnly)
@@ -463,16 +464,18 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
-    Finally printCompletions([&]()
-    {
+    Finally printCompletions([&]() {
         if (args.completions) {
             switch (args.completions->type) {
             case Completions::Type::Normal:
-                logger->cout("normal"); break;
+                logger->cout("normal");
+                break;
             case Completions::Type::Filenames:
-                logger->cout("filenames"); break;
+                logger->cout("filenames");
+                break;
             case Completions::Type::Attrs:
-                logger->cout("attrs"); break;
+                logger->cout("attrs");
+                break;
             }
             for (auto & s : args.completions->completions)
                 logger->cout(s.completion + "\t" + trim(s.description));
@@ -482,10 +485,13 @@ void mainWrapped(int argc, char * * argv)
     try {
         auto isNixCommand = std::regex_search(programName, std::regex("nix$"));
         auto allowShebang = isNixCommand && argc > 1;
-        args.parseCmdline(argvToStrings(argc, argv),allowShebang);
+        args.parseCmdline(argvToStrings(argc, argv), allowShebang);
     } catch (UsageError &) {
-        if (!args.helpRequested && !args.completions) throw;
+        if (!args.helpRequested && !args.completions)
+            throw;
     }
+
+    applyJSONLogger();
 
     if (args.helpRequested) {
         std::vector<std::string> subcommand;
@@ -501,7 +507,8 @@ void mainWrapped(int argc, char * * argv)
         return;
     }
 
-    if (args.completions) return;
+    if (args.completions)
+        return;
 
     if (args.showVersion) {
         printVersion(programName);
@@ -511,8 +518,7 @@ void mainWrapped(int argc, char * * argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    experimentalFeatureSettings.require(
-        args.command->second->experimentalFeature());
+    experimentalFeatureSettings.require(args.command->second->experimentalFeature());
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");
@@ -551,9 +557,9 @@ void mainWrapped(int argc, char * * argv)
     }
 }
 
-}
+} // namespace nix
 
-int main(int argc, char * * argv)
+int main(int argc, char ** argv)
 {
     // The CLI has a more detailed version than the libraries; see nixVersion.
     nix::nixVersion = NIX_CLI_VERSION;
@@ -563,7 +569,5 @@ int main(int argc, char * * argv)
     nix::setStackSize(64 * 1024 * 1024);
 #endif
 
-    return nix::handleExceptions(argv[0], [&]() {
-        nix::mainWrapped(argc, argv);
-    });
+    return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });
 }

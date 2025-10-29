@@ -9,12 +9,12 @@ needLocalStore "The test uses --store always so we would just be bypassing the d
 
 TODO_NixOS
 
+# shellcheck disable=SC2119
 execUnshare <<EOF
   source common.sh
 
   # Avoid store dir being inside sandbox build-dir
   unset NIX_STORE_DIR
-  unset NIX_STATE_DIR
 
   setLocalStore () {
     export NIX_REMOTE=\$TEST_ROOT/\$1
@@ -27,12 +27,12 @@ execUnshare <<EOF
   setLocalStore store1
   expectStderr 1 "\${cmd[@]}" | grepQuiet "setgroups failed"
 
-  # Fails with `require-drop-supplementary-groups`
+  # Fails with $(require-drop-supplementary-groups)
   setLocalStore store2
   NIX_CONFIG='require-drop-supplementary-groups = true' \
     expectStderr 1 "\${cmd[@]}" | grepQuiet "setgroups failed"
 
-  # Works without `require-drop-supplementary-groups`
+  # Works without $(require-drop-supplementary-groups)
   setLocalStore store3
   NIX_CONFIG='require-drop-supplementary-groups = false' \
     "\${cmd[@]}"

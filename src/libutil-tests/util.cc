@@ -1,8 +1,9 @@
-#include "util.hh"
-#include "types.hh"
-#include "file-system.hh"
-#include "terminal.hh"
-#include "strings.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/base-n.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -46,60 +47,6 @@ TEST(hasSuffix, trivialCase)
 {
     ASSERT_TRUE(hasSuffix("foo", "foo"));
     ASSERT_TRUE(hasSuffix("foobar", "bar"));
-}
-
-/* ----------------------------------------------------------------------------
- * base64Encode
- * --------------------------------------------------------------------------*/
-
-TEST(base64Encode, emptyString)
-{
-    ASSERT_EQ(base64Encode(""), "");
-}
-
-TEST(base64Encode, encodesAString)
-{
-    ASSERT_EQ(base64Encode("quod erat demonstrandum"), "cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0=");
-}
-
-TEST(base64Encode, encodeAndDecode)
-{
-    auto s = "quod erat demonstrandum";
-    auto encoded = base64Encode(s);
-    auto decoded = base64Decode(encoded);
-
-    ASSERT_EQ(decoded, s);
-}
-
-TEST(base64Encode, encodeAndDecodeNonPrintable)
-{
-    char s[256];
-    std::iota(std::rbegin(s), std::rend(s), 0);
-
-    auto encoded = base64Encode(s);
-    auto decoded = base64Decode(encoded);
-
-    EXPECT_EQ(decoded.length(), 255);
-    ASSERT_EQ(decoded, s);
-}
-
-/* ----------------------------------------------------------------------------
- * base64Decode
- * --------------------------------------------------------------------------*/
-
-TEST(base64Decode, emptyString)
-{
-    ASSERT_EQ(base64Decode(""), "");
-}
-
-TEST(base64Decode, decodeAString)
-{
-    ASSERT_EQ(base64Decode("cXVvZCBlcmF0IGRlbW9uc3RyYW5kdW0="), "quod erat demonstrandum");
-}
-
-TEST(base64Decode, decodeThrowsOnInvalidChar)
-{
-    ASSERT_THROW(base64Decode("cXVvZCBlcm_0IGRlbW9uc3RyYW5kdW0="), Error);
 }
 
 /* ----------------------------------------------------------------------------
@@ -211,6 +158,7 @@ TEST(renderSize, misc)
     ASSERT_EQ(renderSize(972, true), "   0.9 KiB");
     ASSERT_EQ(renderSize(973, true), "   1.0 KiB"); // FIXME: should round down
     ASSERT_EQ(renderSize(1024, true), "   1.0 KiB");
+    ASSERT_EQ(renderSize(-1024, true), "  -1.0 KiB");
     ASSERT_EQ(renderSize(1024 * 1024, true), "1024.0 KiB");
     ASSERT_EQ(renderSize(1100 * 1024, true), "   1.1 MiB");
     ASSERT_EQ(renderSize(2ULL * 1024 * 1024 * 1024, true), "   2.0 GiB");

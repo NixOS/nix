@@ -1,7 +1,9 @@
-project('nix-main', 'cpp',
+project(
+  'nix-main',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -16,11 +18,14 @@ subdir('nix-meson-build-support/deps-lists')
 
 configdata = configuration_data()
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
+  # FIXME: This is only here for the NIX_USE_BOEHMGC macro dependency
+  #        Removing nix-expr will make the build more concurrent and is
+  #        architecturally nice, perhaps.
+  dependency('nix-expr'),
 ]
 subdir('nix-meson-build-support/subprojects')
 
@@ -39,21 +44,12 @@ int main() {
 configdata.set(
   'HAVE_PUBSETBUF',
   cxx.compiles(pubsetbuf_test).to_int(),
-  description: 'Optionally used for buffering on standard error'
+  description : 'Optionally used for buffering on standard error',
 )
 
-config_h = configure_file(
+config_priv_h = configure_file(
   configuration : configdata,
-  output : 'config-main.hh',
-)
-
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-main.hh',
-  language : 'cpp',
+  output : 'main-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
@@ -72,25 +68,24 @@ if host_machine.system() != 'windows'
   )
 endif
 
-include_dirs = [include_directories('.')]
+subdir('include/nix/main')
 
-headers = [config_h] + files(
-  'common-args.hh',
-  'loggers.hh',
-  'plugin.hh',
-  'progress-bar.hh',
-  'shared.hh',
-)
+subdir('nix-meson-build-support/export-all-symbols')
+subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixmain',
   sources,
+  config_priv_h,
+  soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
+  include_directories : include_dirs,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
 )
 
-install_headers(headers, subdir : 'nix', preserve_path : true)
+install_headers(headers, subdir : 'nix/main', preserve_path : true)
 
 libraries_private = []
 

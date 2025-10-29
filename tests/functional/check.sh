@@ -22,6 +22,11 @@ clearStore
 nix-build dependencies.nix --no-out-link
 nix-build dependencies.nix --no-out-link --check
 
+# Make sure checking just one output works (#13293)
+nix-build multiple-outputs.nix -A a --no-out-link
+nix-store --delete "$(nix-build multiple-outputs.nix -A a.second --no-out-link)"
+nix-build multiple-outputs.nix -A a.first --no-out-link --check
+
 # Build failure exit codes (100, 104, etc.) are from
 # doc/manual/source/command-ref/status-build-failure.md
 
@@ -47,10 +52,10 @@ test_custom_build_dir() {
   nix-build check.nix -A failed --argstr checkBuildId "$checkBuildId" \
       --no-out-link --keep-failed --option build-dir "$TEST_ROOT/custom-build-dir" 2> "$TEST_ROOT/log" || status=$?
   [ "$status" = "100" ]
-  [[ 1 == "$(count "$customBuildDir/nix-build-"*)" ]]
-  local buildDir=("$customBuildDir/nix-build-"*)
+  [[ 1 == "$(count "$customBuildDir/nix-"*)" ]]
+  local buildDir=("$customBuildDir/nix-"*)
   if [[ "${#buildDir[@]}" -ne 1 ]]; then
-    echo "expected one nix-build-* directory, got: ${buildDir[*]}" >&2
+    echo "expected one nix-* directory, got: ${buildDir[*]}" >&2
     exit 1
   fi
   if [[ -e ${buildDir[*]}/build ]]; then

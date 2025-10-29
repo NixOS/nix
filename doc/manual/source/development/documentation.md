@@ -25,19 +25,30 @@ nix build .#nix-manual
 and open `./result/share/doc/nix/manual/index.html`.
 
 
-To build the manual incrementally, [enter the development shell](./building.md) and run:
+To build the manual incrementally, [enter the development shell](./building.md) and configure with `doc-gen` enabled:
+
+**If using interactive `nix develop`:**
 
 ```console
-make manual-html-open -j $NIX_BUILD_CORES
+$ nix develop
+$ mesonFlags="$mesonFlags -Ddoc-gen=true" mesonConfigurePhase
 ```
 
-In order to reflect changes to the [Makefile for the manual], clear all generated files before re-building:
-
-[Makefile for the manual]: https://github.com/NixOS/nix/blob/master/doc/manual/local.mk
+**If using direnv:**
 
 ```console
-rm $(git ls-files doc/manual/ -o | grep -F '.md') && rmdir doc/manual/source/command-ref/new-cli && make manual-html -j $NIX_BUILD_CORES
+$ direnv allow
+$ bash -c 'source $stdenv/setup && mesonFlags="$mesonFlags -Ddoc-gen=true" mesonConfigurePhase'
 ```
+
+Then build the manual:
+
+```console
+$ cd build
+$ meson compile manual
+```
+
+The HTML manual will be generated at `build/src/nix-manual/manual/index.html`.
 
 ## Style guide
 

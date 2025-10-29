@@ -1,6 +1,6 @@
 generated_headers += gen_header.process(
   'derivation.nix',
-  preserve_path_from: meson.project_source_root(),
+  preserve_path_from : meson.project_source_root(),
 )
 
 sources += files(

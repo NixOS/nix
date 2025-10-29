@@ -6,6 +6,7 @@
 
   nix-util,
   nix-store,
+  nix-expr,
 
   # Configuration Options
 
@@ -27,11 +28,16 @@ mkMesonLibrary (finalAttrs: {
     ../../.version
     ./.version
     ./meson.build
+    ./include/nix/main/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
 
   propagatedBuildInputs = [
+    # FIXME: This is only here for the NIX_USE_BOEHMGC macro dependency
+    #        Removing nix-expr will make the build more concurrent and is
+    #        architecturally nice, perhaps.
+    nix-expr
     nix-util
     nix-store
     openssl

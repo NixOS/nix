@@ -1,4 +1,5 @@
 {
+  stdenv,
   lib,
   mkMesonExecutable,
 
@@ -32,15 +33,7 @@ mkMesonExecutable (finalAttrs: {
 
       # Symbolic links to other dirs
       ## exes
-      ./build-remote
       ./doc
-      ./nix-build
-      ./nix-channel
-      ./nix-collect-garbage
-      ./nix-copy-closure
-      ./nix-env
-      ./nix-instantiate
-      ./nix-store
       ## dirs
       ./scripts
       ../../scripts
@@ -54,8 +47,8 @@ mkMesonExecutable (finalAttrs: {
       ../../doc/manual/generate-store-info.nix
 
       # Other files to be included as string literals
-      ../nix-channel/unpack-channel.nix
-      ../nix-env/buildenv.nix
+      ./nix-channel/unpack-channel.nix
+      ./nix-env/buildenv.nix
       ./get-env.sh
       ./help-stores.md
       ../../doc/manual/source/store/types/index.md.in
@@ -64,24 +57,11 @@ mkMesonExecutable (finalAttrs: {
 
       # Files
     ]
-    ++
-      lib.concatMap
-        (dir: [
-          (fileset.fileFilter (file: file.hasExt "cc") dir)
-          (fileset.fileFilter (file: file.hasExt "hh") dir)
-          (fileset.fileFilter (file: file.hasExt "md") dir)
-        ])
-        [
-          ./.
-          ../build-remote
-          ../nix-build
-          ../nix-channel
-          ../nix-collect-garbage
-          ../nix-copy-closure
-          ../nix-env
-          ../nix-instantiate
-          ../nix-store
-        ]
+    ++ [
+      (fileset.fileFilter (file: file.hasExt "cc") ./.)
+      (fileset.fileFilter (file: file.hasExt "hh") ./.)
+      (fileset.fileFilter (file: file.hasExt "md") ./.)
+    ]
   );
 
   buildInputs = [
@@ -93,6 +73,11 @@ mkMesonExecutable (finalAttrs: {
 
   mesonFlags = [
   ];
+
+  postInstall = lib.optionalString stdenv.hostPlatform.isStatic ''
+    mkdir -p $out/nix-support
+    echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
+  '';
 
   meta = {
     mainProgram = "nix";

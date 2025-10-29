@@ -145,7 +145,7 @@ in
   testScript =
     { nodes, ... }:
     ''
-      http_dns.wait_for_unit("network-online.target")
+      http_dns.wait_for_unit("network-addresses-eth1.service")
       http_dns.wait_for_unit("nginx")
       http_dns.wait_for_open_port(80)
       http_dns.wait_for_unit("unbound")
@@ -153,7 +153,7 @@ in
 
       client.start()
       client.wait_for_unit('multi-user.target')
-      client.wait_for_unit('network-online.target')
+      client.wait_for_unit('network-addresses-eth1.service')
 
       with subtest("can fetch data from a remote server outside sandbox"):
           client.succeed("nix --version >&2")

@@ -23,7 +23,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenv
 ```
 
 > **Note**
@@ -34,7 +34,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
+[nix-shell]$ out="$(pwd)/outputs/out" dev=$out debug=$out mesonFlags+=" --prefix=${out}"
 [nix-shell]$ dontAddPrefix=1 configurePhase
 [nix-shell]$ buildPhase
 ```
@@ -195,28 +195,38 @@ Nix uses a string with the following format to identify the *system type* or *pl
 <cpu>-<os>[-<abi>]
 ```
 
-It is set when Nix is compiled for the given system, and based on the output of [`config.guess`](https://github.com/nixos/nix/blob/master/config/config.guess) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.guess)):
+It is set when Nix is compiled for the given system, and based on the output of Meson's [`host_machine` information](https://mesonbuild.com/Reference-manual_builtin_host_machine.html)>
 
 ```
 <cpu>-<vendor>-<os>[<version>][-<abi>]
 ```
 
-When Nix is built such that `./configure` is passed any of the `--host`, `--build`, `--target` options, the value is based on the output of [`config.sub`](https://github.com/nixos/nix/blob/master/config/config.sub) ([upstream](https://git.savannah.gnu.org/cgit/config.git/tree/config.sub)):
+When cross-compiling Nix with Meson for local development, you need to specify a [cross-file](https://mesonbuild.com/Cross-compilation.html) using the `--cross-file` option. Cross-files define the target architecture and toolchain. When cross-compiling Nix with Nix, Nixpkgs takes care of this for you.
+
+In the nix flake we also have some cross-compilation targets available:
 
 ```
-<cpu>-<vendor>[-<kernel>]-<os>
+nix build .#nix-everything-riscv64-unknown-linux-gnu
+nix build .#nix-everything-armv7l-unknown-linux-gnueabihf
+nix build .#nix-everything-armv7l-unknown-linux-gnueabihf
+nix build .#nix-everything-x86_64-unknown-freebsd
+nix build .#nix-everything-x86_64-w64-mingw32
 ```
 
-For historic reasons and backward-compatibility, some CPU and OS identifiers are translated from the GNU Autotools naming convention in [`configure.ac`](https://github.com/nixos/nix/blob/master/configure.ac) as follows:
+For historic reasons and backward-compatibility, some CPU and OS identifiers are translated as follows:
 
-| `config.guess`             | Nix                 |
-|----------------------------|---------------------|
-| `amd64`                    | `x86_64`            |
-| `i*86`                     | `i686`              |
-| `arm6`                     | `arm6l`             |
-| `arm7`                     | `arm7l`             |
-| `linux-gnu*`               | `linux`             |
-| `linux-musl*`              | `linux`             |
+| `host_machine.cpu_family()` | `host_machine.endian()` | Nix                 |
+|-----------------------------|-------------------------|---------------------|
+| `x86`                       |                         | `i686`              |
+| `arm`                       |                         | `host_machine.cpu()`|
+| `ppc`                       | `little`                | `powerpcle`         |
+| `ppc64`                     | `little`                | `powerpc64le`       |
+| `ppc`                       | `big`                   | `powerpc`           |
+| `ppc64`                     | `big`                   | `powerpc64`         |
+| `mips`                      | `little`                | `mipsel`            |
+| `mips64`                    | `little`                | `mips64el`          |
+| `mips`                      | `big`                   | `mips`              |
+| `mips64`                    | `big`                   | `mips64`            |
 
 ## Compilation environments
 
@@ -230,18 +240,18 @@ Nix can be compiled using multiple environments:
 To build with one of those environments, you can use
 
 ```console
-$ nix build .#nix-ccacheStdenv
+$ nix build .#nix-cli-ccacheStdenv
 ```
 
 for flake-enabled Nix, or
 
 ```console
-$ nix-build --attr nix-ccacheStdenv
+$ nix-build --attr nix-cli-ccacheStdenv
 ```
 
 for classic Nix.
 
-You can use any of the other supported environments in place of `nix-ccacheStdenv`.
+You can use any of the other supported environments in place of `nix-cli-ccacheStdenv`.
 
 ## Editor integration
 

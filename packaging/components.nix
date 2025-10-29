@@ -3,6 +3,7 @@
   pkgs,
   src,
   officialRelease,
+  maintainers,
 }:
 
 scope:
@@ -51,14 +52,14 @@ let
 
   setVersionLayer = finalAttrs: prevAttrs: {
     preConfigure =
-      prevAttrs.prevAttrs or ""
+      prevAttrs.preConfigure or ""
       +
-        # Update the repo-global .version file.
-        # Symlink ./.version points there, but by default only workDir is writable.
-        ''
-          chmod u+w ./.version
-          echo ${finalAttrs.version} > ./.version
-        '';
+      # Update the repo-global .version file.
+      # Symlink ./.version points there, but by default only workDir is writable.
+      ''
+        chmod u+w ./.version
+        echo ${finalAttrs.version} > ./.version
+      '';
   };
 
   localSourceLayer =
@@ -110,7 +111,7 @@ let
         let
           n = lib.length finalScope.patches;
         in
-        if n == 0 then finalAttrs.version else finalAttrs.version + "+${toString n}";
+        if n == 0 then prevAttrs.version else prevAttrs.version + "+${toString n}";
 
       # Clear what `derivation` can't/shouldn't serialize; see prevAttrs.workDir.
       fileset = null;
@@ -147,7 +148,8 @@ let
     nativeBuildInputs = [
       meson
       ninja
-    ] ++ prevAttrs.nativeBuildInputs or [ ];
+    ]
+    ++ prevAttrs.nativeBuildInputs or [ ];
     mesonCheckFlags = prevAttrs.mesonCheckFlags or [ ] ++ [
       "--print-errorlogs"
     ];
@@ -159,17 +161,39 @@ let
     ];
     separateDebugInfo = !stdenv.hostPlatform.isStatic;
     hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
-    env =
-      prevAttrs.env or { }
-      // lib.optionalAttrs (
-        stdenv.isLinux
-        && !(stdenv.hostPlatform.isStatic && stdenv.system == "aarch64-linux")
-        && !(stdenv.hostPlatform.useLLVM or false)
-      ) { LDFLAGS = "-fuse-ld=gold"; };
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
+    preConfigure =
+      let
+        interpositionFlags = [
+          "-fno-semantic-interposition"
+          "-Wl,-Bsymbolic-functions"
+        ];
+      in
+      # NOTE: By default GCC disables interprocedular optimizations (in particular inlining) for
+      # position-independent code and thus shared libraries.
+      # Since LD_PRELOAD tricks aren't worth losing out on optimizations, we disable it for good.
+      # This is not the case for Clang, where inlining is done by default even without -fno-semantic-interposition.
+      # https://reviews.llvm.org/D102453
+      # https://fedoraproject.org/wiki/Changes/PythonNoSemanticInterpositionSpeedup
+      prevAttrs.preConfigure or ""
+      + lib.optionalString stdenv.cc.isGNU ''
+        export CFLAGS="''${CFLAGS:-} ${toString interpositionFlags}"
+        export CXXFLAGS="''${CXXFLAGS:-} ${toString interpositionFlags}"
+      '';
     outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
+  };
+
+  fixupStaticLayer = finalAttrs: prevAttrs: {
+    postFixup =
+      prevAttrs.postFixup or ""
+      + lib.optionalString (stdenv.hostPlatform.isStatic) ''
+        # HACK: Otherwise the result will have the entire buildInputs closure
+        # injected by the pkgsStatic stdenv
+        # <https://github.com/NixOS/nixpkgs/issues/83667>
+        rm -f $out/nix-support/propagated-build-inputs
+      '';
   };
 
   # Work around weird `--as-needed` linker behavior with BSD, see
@@ -180,9 +204,43 @@ let
       mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
     };
 
-  miscGoodPractice = finalAttrs: prevAttrs: {
+  enableSanitizersLayer =
+    finalAttrs: prevAttrs:
+    let
+      sanitizers = lib.optional scope.withASan "address" ++ lib.optional scope.withUBSan "undefined";
+    in
+    {
+      mesonFlags =
+        (prevAttrs.mesonFlags or [ ])
+        ++ lib.optionals (lib.length sanitizers > 0) (
+          [
+            (lib.mesonOption "b_sanitize" (lib.concatStringsSep "," sanitizers))
+          ]
+          ++ (lib.optionals stdenv.cc.isClang [
+            # https://www.github.com/mesonbuild/meson/issues/764
+            (lib.mesonBool "b_lundef" false)
+          ])
+        );
+    };
+
+  nixDefaultsLayer = finalAttrs: prevAttrs: {
     strictDeps = prevAttrs.strictDeps or true;
     enableParallelBuilding = true;
+    pos = builtins.unsafeGetAttrPos "pname" prevAttrs;
+    meta = prevAttrs.meta or { } // {
+      homepage = prevAttrs.meta.homepage or "https://nixos.org/nix";
+      longDescription =
+        prevAttrs.longDescription or ''
+          Nix is a powerful package manager for mainly Linux and other Unix systems that
+          makes package management reliable and reproducible. It provides atomic
+          upgrades and rollbacks, side-by-side installation of multiple versions of
+          a package, multi-user package management and easy setup of build
+          environments.
+        '';
+      license = prevAttrs.meta.license or lib.licenses.lgpl21Plus;
+      maintainers = prevAttrs.meta.maintainers or [ ] ++ scope.maintainers;
+      platforms = prevAttrs.meta.platforms or (lib.platforms.unix ++ lib.platforms.windows);
+    };
   };
 
   /**
@@ -202,8 +260,20 @@ in
 {
   version = baseVersion + versionSuffix;
   inherit versionSuffix;
+  inherit officialRelease;
+  inherit maintainers;
 
   inherit filesetToSource;
+
+  /**
+    Whether meson components are built with [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html).
+  */
+  withASan = false;
+
+  /**
+    Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
+  */
+  withUBSan = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
@@ -237,6 +307,10 @@ in
     but it does make the build non-granular; all components will use a complete source.
 
     Packaging expressions will be ignored.
+
+    Single argument: the source to use.
+
+    See also `appendPatches`
   */
   overrideSource =
     src:
@@ -265,6 +339,7 @@ in
               }
             );
         resolvePath = p: finalScope.patchedSrc + "/${resolveRelPath p}";
+        filesetToSource = { root, fileset }: finalScope.resolvePath root;
         appendPatches = appendPatches finalScope;
       }
     );
@@ -281,29 +356,35 @@ in
     (scope.overrideSource "${./..}").appendPatches patches;
 
   mkMesonDerivation = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     scope.sourceLayer
     setVersionLayer
     mesonLayer
+    fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     bsdNoLinkAsNeeded
     scope.sourceLayer
     setVersionLayer
     mesonLayer
     mesonBuildLayer
+    fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
-    miscGoodPractice
+    nixDefaultsLayer
     bsdNoLinkAsNeeded
     scope.sourceLayer
     mesonLayer
     setVersionLayer
     mesonBuildLayer
     mesonLibraryLayer
+    fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
 
@@ -318,6 +399,7 @@ in
   nix-store-tests = callPackage ../src/libstore-tests/package.nix { };
 
   nix-fetchers = callPackage ../src/libfetchers/package.nix { };
+  nix-fetchers-c = callPackage ../src/libfetchers-c/package.nix { };
   nix-fetchers-tests = callPackage ../src/libfetchers-tests/package.nix { };
 
   nix-expr = callPackage ../src/libexpr/package.nix { };
@@ -334,20 +416,40 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
+  /**
+    The Nix command line interface. Note that this does not include its tests, whereas `nix-everything` does.
+  */
   nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
   };
 
+  /**
+    The manual as would be published on https://nix.dev/reference/nix-manual
+  */
   nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for C++ code
+  */
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for the public C API
+  */
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
+
+  /**
+    JSON schema validation checks
+  */
+  nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
+  /**
+    Combined package that has the CLI, libraries, and (assuming non-cross, no overrides) it requires that all tests succeed.
+  */
   nix-everything = callPackage ../packaging/everything.nix { } // {
-    # Note: no `passthru.overrideAllMesonComponents`
+    # Note: no `passthru.overrideAllMesonComponents` etc
     #       This would propagate into `nix.overrideAttrs f`, but then discard
     #       `f` when `.overrideAllMesonComponents` is used.
     #       Both "methods" should be views on the same fixpoint overriding mechanism
@@ -355,6 +457,8 @@ in
     #       two-fixpoint solution.
     /**
       Apply an extension function (i.e. overlay-shaped) to all component derivations, and return the nix package.
+
+      Single argument: the extension function to apply (finalAttrs: prevAttrs: { ... })
     */
     overrideAllMesonComponents = f: (scope.overrideAllMesonComponents f).nix-everything;
 
@@ -363,6 +467,10 @@ in
       This affects all components.
 
       Changes to the packaging expressions will be ignored.
+
+      Single argument: list of patches to apply
+
+      See also `overrideSource`
     */
     appendPatches = ps: (scope.appendPatches ps).nix-everything;
 
@@ -371,8 +479,26 @@ in
       but it does make the build non-granular; all components will use a complete source.
 
       Packaging expressions will be ignored.
+
+      Filesets in the packaging expressions will be ignored.
+
+      Single argument: the source to use.
+
+      See also `appendPatches`
     */
     overrideSource = src: (scope.overrideSource src).nix-everything;
+
+    /**
+      Override any internals of the Nix package set.
+
+      Single argument: the extension function to apply to the package set (finalScope: prevScope: { ... })
+
+      Example:
+      ```
+      overrideScope (finalScope: prevScope: { aws-crt-cpp = null; })
+      ```
+    */
+    overrideScope = f: (scope.overrideScope f).nix-everything;
 
   };
 }

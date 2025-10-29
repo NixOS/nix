@@ -22,7 +22,7 @@ assignees: ''
 - [ ] checked [latest Nix manual] \([source])
 - [ ] checked [open documentation issues and pull requests] for possible duplicates
 
-[latest Nix manual]: https://nixos.org/manual/nix/unstable/
+[latest Nix manual]: https://nix.dev/manual/nix/development/
 [source]: https://github.com/NixOS/nix/tree/master/doc/manual/source
 [open documentation issues and pull requests]: https://github.com/NixOS/nix/labels/documentation
 

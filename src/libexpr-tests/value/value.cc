@@ -1,6 +1,6 @@
-#include "value.hh"
+#include "nix/expr/value.hh"
 
-#include "tests/libstore.hh"
+#include "nix/store/tests/libstore.hh"
 
 namespace nix {
 

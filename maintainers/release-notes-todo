@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+# debug:
+# set -x
+
+START_REF="${1}"
+END_REF="${2:-upstream/master}"
+
+# Get the merge base
+MERGE_BASE=$(git merge-base "$START_REF" "$END_REF")
+unset START_REF
+
+# Get date range
+START_DATE=$(git show -s --format=%cI "$MERGE_BASE")
+END_DATE=$(git show -s --format=%cI "$END_REF")
+
+echo "Checking PRs merged between $START_DATE and $END_DATE" >&2
+
+# Get all commits between merge base and HEAD
+COMMITS=$(git rev-list "$MERGE_BASE..$END_REF")
+
+# Convert to set for fast lookup
+declare -A commit_set
+for commit in $COMMITS; do
+    commit_set["$commit"]=1
+done
+
+# Get the current changelog
+LOG_DONE="$(changelog-d doc/manual/rl-next)"
+is_done(){
+    local nr="$1"
+    echo "$LOG_DONE" | grep -E "^- .*/pull/$nr)"
+}
+
+# Query merged PRs in date range
+gh pr list \
+    --repo NixOS/nix \
+    --state merged \
+    --limit 1000 \
+    --json number,title,author,mergeCommit \
+    --search "merged:$START_DATE..$END_DATE" | \
+jq -r '.[] | [.number, .mergeCommit.oid, .title, .author.login] | @tsv' | \
+while IFS=$'\t' read -r pr_num merge_commit _title author; do
+    # Check if this PR's merge commit is in our branch
+    if [[ -n "${commit_set[$merge_commit]:-}" ]]; then
+        # Full detail, not suitable for comment due to mass ping and duplicate title
+        # echo "- #$pr_num $_title (@$author)"
+        echo "- #$pr_num ($author)"
+        if is_done "$pr_num"
+        then
+            echo "  - [x] has note"
+        else
+            echo "  - [ ] has note"
+        fi
+        echo "  - [ ] skip"
+    fi
+done

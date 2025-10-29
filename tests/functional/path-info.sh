@@ -2,14 +2,14 @@
 
 source common.sh
 
-echo foo > $TEST_ROOT/foo
-foo=$(nix store add-file $TEST_ROOT/foo)
+echo foo > "$TEST_ROOT"/foo
+foo=$(nix store add-file "$TEST_ROOT"/foo)
 
-echo bar > $TEST_ROOT/bar
-bar=$(nix store add-file $TEST_ROOT/bar)
+echo bar > "$TEST_ROOT"/bar
+bar=$(nix store add-file "$TEST_ROOT"/bar)
 
-echo baz > $TEST_ROOT/baz
-baz=$(nix store add-file $TEST_ROOT/baz)
+echo baz > "$TEST_ROOT"/baz
+baz=$(nix store add-file "$TEST_ROOT"/baz)
 nix-store --delete "$baz"
 
 diff --unified --color=always \

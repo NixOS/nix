@@ -7,5 +7,4 @@ include_dirs += include_directories(
   #'build',
 )
 
-headers += files(
-)
+headers += files()

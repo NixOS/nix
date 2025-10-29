@@ -1,96 +1,124 @@
 {
+  # Core dependencies
   pkgs ? import <nixpkgs> { },
   lib ? pkgs.lib,
+  dockerTools ? pkgs.dockerTools,
+  runCommand ? pkgs.runCommand,
+  buildPackages ? pkgs.buildPackages,
+  # Image configuration
   name ? "nix",
   tag ? "latest",
   bundleNixpkgs ? true,
   channelName ? "nixpkgs",
   channelURL ? "https://nixos.org/channels/nixpkgs-unstable",
   extraPkgs ? [ ],
-  maxLayers ? 100,
+  maxLayers ? 70,
   nixConf ? { },
   flake-registry ? null,
   uid ? 0,
   gid ? 0,
   uname ? "root",
   gname ? "root",
+  Labels ? {
+    "org.opencontainers.image.title" = "Nix";
+    "org.opencontainers.image.source" = "https://github.com/NixOS/nix";
+    "org.opencontainers.image.vendor" = "Nix project";
+    "org.opencontainers.image.version" = nix.version;
+    "org.opencontainers.image.description" = "Nix container image";
+  },
+  Cmd ? [ (lib.getExe bashInteractive) ],
+  # Default Packages
+  nix ? pkgs.nix,
+  bashInteractive ? pkgs.bashInteractive,
+  coreutils-full ? pkgs.coreutils-full,
+  gnutar ? pkgs.gnutar,
+  gzip ? pkgs.gzip,
+  gnugrep ? pkgs.gnugrep,
+  which ? pkgs.which,
+  curl ? pkgs.curl,
+  less ? pkgs.less,
+  wget ? pkgs.wget,
+  man ? pkgs.man,
+  cacert ? pkgs.cacert,
+  findutils ? pkgs.findutils,
+  iana-etc ? pkgs.iana-etc,
+  gitMinimal ? pkgs.gitMinimal,
+  openssh ? pkgs.openssh,
+  # Other dependencies
+  shadow ? pkgs.shadow,
 }:
 let
-  defaultPkgs =
-    with pkgs;
-    [
-      nix
-      bashInteractive
-      coreutils-full
-      gnutar
-      gzip
-      gnugrep
-      which
-      curl
-      less
-      wget
-      man
-      cacert.out
-      findutils
-      iana-etc
-      git
-      openssh
-    ]
-    ++ extraPkgs;
+  defaultPkgs = [
+    nix
+    bashInteractive
+    coreutils-full
+    gnutar
+    gzip
+    gnugrep
+    which
+    curl
+    less
+    wget
+    man
+    cacert.out
+    findutils
+    iana-etc
+    gitMinimal
+    openssh
+  ]
+  ++ extraPkgs;
 
-  users =
-    {
+  users = {
 
-      root = {
-        uid = 0;
-        shell = "${pkgs.bashInteractive}/bin/bash";
-        home = "/root";
-        gid = 0;
-        groups = [ "root" ];
-        description = "System administrator";
-      };
-
-      nobody = {
-        uid = 65534;
-        shell = "${pkgs.shadow}/bin/nologin";
-        home = "/var/empty";
-        gid = 65534;
-        groups = [ "nobody" ];
-        description = "Unprivileged account (don't use!)";
-      };
-
-    }
-    // lib.optionalAttrs (uid != 0) {
-      "${uname}" = {
-        uid = uid;
-        shell = "${pkgs.bashInteractive}/bin/bash";
-        home = "/home/${uname}";
-        gid = gid;
-        groups = [ "${gname}" ];
-        description = "Nix user";
-      };
-    }
-    // lib.listToAttrs (
-      map (n: {
-        name = "nixbld${toString n}";
-        value = {
-          uid = 30000 + n;
-          gid = 30000;
-          groups = [ "nixbld" ];
-          description = "Nix build user ${toString n}";
-        };
-      }) (lib.lists.range 1 32)
-    );
-
-  groups =
-    {
-      root.gid = 0;
-      nixbld.gid = 30000;
-      nobody.gid = 65534;
-    }
-    // lib.optionalAttrs (gid != 0) {
-      "${gname}".gid = gid;
+    root = {
+      uid = 0;
+      shell = lib.getExe bashInteractive;
+      home = "/root";
+      gid = 0;
+      groups = [ "root" ];
+      description = "System administrator";
     };
+
+    nobody = {
+      uid = 65534;
+      shell = lib.getExe' shadow "nologin";
+      home = "/var/empty";
+      gid = 65534;
+      groups = [ "nobody" ];
+      description = "Unprivileged account (don't use!)";
+    };
+
+  }
+  // lib.optionalAttrs (uid != 0) {
+    "${uname}" = {
+      uid = uid;
+      shell = lib.getExe bashInteractive;
+      home = "/home/${uname}";
+      gid = gid;
+      groups = [ "${gname}" ];
+      description = "Nix user";
+    };
+  }
+  // lib.listToAttrs (
+    map (n: {
+      name = "nixbld${toString n}";
+      value = {
+        uid = 30000 + n;
+        gid = 30000;
+        groups = [ "nixbld" ];
+        description = "Nix build user ${toString n}";
+      };
+    }) (lib.lists.range 1 32)
+  );
+
+  groups = {
+    root.gid = 0;
+    nixbld.gid = 30000;
+    nobody.gid = 65534;
+  }
+  // lib.optionalAttrs (gid != 0) {
+    "${gname}".gid = gid;
+  };
 
   userToPasswd = (
     k:
@@ -147,41 +175,42 @@ let
     "${k}:x:${toString gid}:${lib.concatStringsSep "," members}";
   groupContents = (lib.concatStringsSep "\n" (lib.attrValues (lib.mapAttrs groupToGroup groups)));
 
-  defaultNixConf = {
-    sandbox = "false";
-    build-users-group = "nixbld";
-    trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
-  };
+  toConf =
+    with pkgs.lib.generators;
+    toKeyValue {
+      mkKeyValue = mkKeyValueDefault {
+        mkValueString = v: if lib.isList v then lib.concatStringsSep " " v else mkValueStringDefault { } v;
+      } " = ";
+    };
 
-  nixConfContents =
-    (lib.concatStringsSep "\n" (
-      lib.mapAttrsFlatten (
-        n: v:
-        let
-          vStr = if builtins.isList v then lib.concatStringsSep " " v else v;
-        in
-        "${n} = ${vStr}"
-      ) (defaultNixConf // nixConf)
-    ))
-    + "\n";
+  nixConfContents = toConf (
+    {
+      sandbox = false;
+      build-users-group = "nixbld";
+      trusted-public-keys = [ "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=" ];
+    }
+    // nixConf
+  );
 
   userHome = if uid == 0 then "/root" else "/home/${uname}";
 
   baseSystem =
     let
       nixpkgs = pkgs.path;
-      channel = pkgs.runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
+      channel = runCommand "channel-nixos" { inherit bundleNixpkgs; } ''
         mkdir $out
         if [ "$bundleNixpkgs" ]; then
-          ln -s ${nixpkgs} $out/nixpkgs
+          ln -s ${
+            builtins.path {
+              path = nixpkgs;
+              name = "source";
+            }
+          } $out/nixpkgs
           echo "[]" > $out/manifest.nix
         fi
       '';
-      rootEnv = pkgs.buildPackages.buildEnv {
-        name = "root-profile-env";
-        paths = defaultPkgs;
-      };
-      manifest = pkgs.buildPackages.runCommand "manifest.nix" { } ''
+      # doc/manual/source/command-ref/files/manifest.nix.md
+      manifest = buildPackages.runCommand "manifest.nix" { } ''
         cat > $out <<EOF
         [
         ${lib.concatStringsSep "\n" (
@@ -210,11 +239,15 @@ let
         ]
         EOF
       '';
-      profile = pkgs.buildPackages.runCommand "user-environment" { } ''
-        mkdir $out
-        cp -a ${rootEnv}/* $out/
-        ln -s ${manifest} $out/manifest.nix
-      '';
+      profile = buildPackages.buildEnv {
+        name = "root-profile-env";
+        paths = defaultPkgs;
+
+        postBuild = ''
+          mv $out/manifest $out/manifest.nix
+        '';
+        inherit manifest;
+      };
       flake-registry-path =
         if (flake-registry == null) then
           null
@@ -223,7 +256,7 @@ let
         else
           flake-registry;
     in
-    pkgs.runCommand "base-system"
+    runCommand "base-system"
       {
         inherit
           passwdContents
@@ -246,8 +279,12 @@ let
           set -x
           mkdir -p $out/etc
 
+          # may get replaced by pkgs.dockerTools.caCertificates
           mkdir -p $out/etc/ssl/certs
+          # Old NixOS compatibility.
           ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs
+          # NixOS canonical location
+          ln -s /nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt $out/etc/ssl/certs/ca-certificates.crt
 
           cat $passwdContentsPath > $out/etc/passwd
           echo "" >> $out/etc/passwd
@@ -273,20 +310,24 @@ let
           mkdir -p $out${userHome}
           mkdir -p $out/nix/var/nix/profiles/per-user/${uname}
 
+          # see doc/manual/source/command-ref/files/profiles.md
           ln -s ${profile} $out/nix/var/nix/profiles/default-1-link
           ln -s /nix/var/nix/profiles/default-1-link $out/nix/var/nix/profiles/default
           ln -s /nix/var/nix/profiles/default $out${userHome}/.nix-profile
 
+          # see doc/manual/source/command-ref/files/channels.md
           ln -s ${channel} $out/nix/var/nix/profiles/per-user/${uname}/channels-1-link
           ln -s /nix/var/nix/profiles/per-user/${uname}/channels-1-link $out/nix/var/nix/profiles/per-user/${uname}/channels
 
+          # see doc/manual/source/command-ref/files/default-nix-expression.md
           mkdir -p $out${userHome}/.nix-defexpr
           ln -s /nix/var/nix/profiles/per-user/${uname}/channels $out${userHome}/.nix-defexpr/channels
           echo "${channelURL} ${channelName}" > $out${userHome}/.nix-channels
 
+          # may get replaced by pkgs.dockerTools.binSh & pkgs.dockerTools.usrBinEnv
           mkdir -p $out/bin $out/usr/bin
-          ln -s ${pkgs.coreutils}/bin/env $out/usr/bin/env
-          ln -s ${pkgs.bashInteractive}/bin/bash $out/bin/sh
+          ln -s ${lib.getExe' coreutils-full "env"} $out/usr/bin/env
+          ln -s ${lib.getExe bashInteractive} $out/bin/sh
 
         ''
         + (lib.optionalString (flake-registry-path != null) ''
@@ -295,13 +336,13 @@ let
           globalFlakeRegistryPath="$nixCacheDir/flake-registry.json"
           ln -s ${flake-registry-path} $out$globalFlakeRegistryPath
           mkdir -p $out/nix/var/nix/gcroots/auto
-          rootName=$(${pkgs.nix}/bin/nix --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
+          rootName=$(${lib.getExe' nix "nix"} --extra-experimental-features nix-command hash file --type sha1 --base32 <(echo -n $globalFlakeRegistryPath))
           ln -s $globalFlakeRegistryPath $out/nix/var/nix/gcroots/auto/$rootName
         '')
       );
 
 in
-pkgs.dockerTools.buildLayeredImageWithNixDb {
+dockerTools.buildLayeredImageWithNixDb {
 
   inherit
     name
@@ -327,7 +368,7 @@ pkgs.dockerTools.buildLayeredImageWithNixDb {
   '';
 
   config = {
-    Cmd = [ "${userHome}/.nix-profile/bin/bash" ];
+    inherit Cmd Labels;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"

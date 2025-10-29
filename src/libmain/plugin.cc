@@ -4,8 +4,9 @@
 
 #include <filesystem>
 
-#include "config-global.hh"
-#include "signals.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -18,7 +19,7 @@ struct PluginFilesSetting : public BaseSetting<Paths>
         const Paths & def,
         const std::string & name,
         const std::string & description,
-        const std::set<std::string> & aliases = {})
+        const StringSet & aliases = {})
         : BaseSetting<Paths>(def, true, name, description, aliases)
     {
         options->addSetting(this);
@@ -42,9 +43,9 @@ struct PluginSettings : Config
         {},
         "plugin-files",
         R"(
-          A list of plugin files to be loaded by Nix. Each of these files will
-          be dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
-          this symbol will be called. Alternatively, they can affect execution
+          A list of plugin files to be loaded by Nix. Each of these files is
+          dlopened by Nix. If they contain the symbol `nix_plugin_entry()`,
+          this symbol is called. Alternatively, they can affect execution
           through static initialization. In particular, these plugins may construct
           static instances of RegisterPrimOp to add new primops or constants to the
           expression language, RegisterStoreImplementation to add new store
@@ -59,7 +60,7 @@ struct PluginSettings : Config
           itself, they must be DSOs compatible with the instance of Nix
           running at the time (i.e. compiled against the same headers, not
           linked to any incompatible libraries). They should not be linked to
-          any Nix libs directly, as those will be available already at load
+          any Nix libraries directly, as those are already available at load
           time.
 
           If an entry in the list is a directory, all files in the directory
@@ -77,13 +78,13 @@ void initPlugins()
     for (const auto & pluginFile : pluginSettings.pluginFiles.get()) {
         std::vector<std::filesystem::path> pluginFiles;
         try {
-            auto ents = std::filesystem::directory_iterator{pluginFile};
+            auto ents = DirectoryIterator{pluginFile};
             for (const auto & ent : ents) {
                 checkInterrupt();
                 pluginFiles.emplace_back(ent.path());
             }
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() != std::errc::not_a_directory)
+        } catch (SysError & e) {
+            if (e.errNo != ENOTDIR)
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }
@@ -116,4 +117,4 @@ void initPlugins()
     pluginSettings.pluginFiles.pluginsLoaded = true;
 }
 
-}
+} // namespace nix

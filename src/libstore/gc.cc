@@ -1,23 +1,25 @@
-#include "derivations.hh"
-#include "globals.hh"
-#include "local-store.hh"
-#include "finally.hh"
-#include "unix-domain-socket.hh"
-#include "signals.hh"
-#include "posix-fs-canonicalise.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/path.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/unix-domain-socket.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+
+#include "store-config-private.hh"
 
 #if !defined(__linux__)
 // For shelling out to lsof
-#  include "processes.hh"
+#  include "nix/util/processes.hh"
 #endif
 
-#include <functional>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/regex.hpp>
 #include <queue>
-#include <algorithm>
-#include <regex>
-#include <random>
-
-#include <climits>
+#include <thread>
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -37,21 +39,20 @@ namespace nix {
 static std::string gcSocketPath = "/gc-socket/socket";
 static std::string gcRootsDir = "gcroots";
 
-
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
-    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", stateDir, gcRootsDir, hash));
+    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", config->stateDir, gcRootsDir, hash));
     makeSymlink(realRoot, path);
 }
-
 
 void LocalStore::createTempRootsFile()
 {
     auto fdTempRoots(_fdTempRoots.lock());
 
     /* Create the temporary roots file for this process. */
-    if (*fdTempRoots) return;
+    if (*fdTempRoots)
+        return;
 
     while (1) {
         if (pathExists(fnTempRoots))
@@ -69,7 +70,8 @@ void LocalStore::createTempRootsFile()
         struct stat st;
         if (fstat(fromDescriptorReadOnly(fdTempRoots->get()), &st) == -1)
             throw SysError("statting '%1%'", fnTempRoots);
-        if (st.st_size == 0) break;
+        if (st.st_size == 0)
+            break;
 
         /* The garbage collector deleted this file before we could get
            a lock.  (It won't delete the file after we get a lock.)
@@ -77,12 +79,12 @@ void LocalStore::createTempRootsFile()
     }
 }
 
-
 void LocalStore::addTempRoot(const StorePath & path)
 {
-    if (readOnly) {
-      debug("Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
-      return;
+    if (config->readOnly) {
+        debug(
+            "Read-only store doesn't support creating lock files for temp roots, but nothing can be deleted anyways.");
+        return;
     }
 
     createTempRootsFile();
@@ -94,7 +96,7 @@ void LocalStore::addTempRoot(const StorePath & path)
             *fdGCLock = openGCLock();
     }
 
- restart:
+restart:
     /* Try to acquire a shared global GC lock (non-blocking). This
        only succeeds if the garbage collector is not currently
        running. */
@@ -107,7 +109,7 @@ void LocalStore::addTempRoot(const StorePath & path)
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
-            auto socketPath = stateDir.get() + gcSocketPath;
+            auto socketPath = config->stateDir.get() + gcSocketPath;
             debug("connecting to '%s'", socketPath);
             *fdRootsSocket = createUnixDomainSocket();
             try {
@@ -154,15 +156,13 @@ void LocalStore::addTempRoot(const StorePath & path)
     writeFull(_fdTempRoots.lock()->get(), s);
 }
 
-
 static std::string censored = "{censored}";
-
 
 void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 {
     /* Read the `temproots' directory for per-process temporary root
        files. */
-    for (auto & i : std::filesystem::directory_iterator{tempRootsDir}) {
+    for (auto & i : DirectoryIterator{tempRootsDir}) {
         checkInterrupt();
         auto name = i.path().filename().string();
         if (name[0] == '.') {
@@ -175,14 +175,17 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         pid_t pid = std::stoi(name);
 
         debug("reading temporary root file '%1%'", path);
-        AutoCloseFD fd(toDescriptor(open(path.c_str(),
+        AutoCloseFD fd(toDescriptor(open(
+            path.c_str(),
 #ifndef _WIN32
             O_CLOEXEC |
 #endif
-            O_RDWR, 0666)));
+                O_RDWR,
+            0666)));
         if (!fd) {
             /* It's okay if the file has disappeared. */
-            if (errno == ENOENT) continue;
+            if (errno == ENOENT)
+                continue;
             throw SysError("opening temporary roots file '%1%'", path);
         }
 
@@ -211,7 +214,6 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     }
 }
 
-
 void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, Roots & roots)
 {
     auto foundRoot = [&](const Path & path, const Path & target) {
@@ -221,7 +223,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
                 roots[std::move(storePath)].emplace(path);
             else
                 printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
-        } catch (BadStorePath &) { }
+        } catch (BadStorePath &) {
+        }
     };
 
     try {
@@ -230,7 +233,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             type = std::filesystem::symlink_status(path).type();
 
         if (type == std::filesystem::file_type::directory) {
-            for (auto & i : std::filesystem::directory_iterator{path}) {
+            for (auto & i : DirectoryIterator{path}) {
                 checkInterrupt();
                 findRoots(i.path().string(), i.symlink_status().type(), roots);
             }
@@ -245,14 +248,16 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, stateDir + "/" + gcRootsDir + "/auto")) {
+                    if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
                 } else {
-                    if (!std::filesystem::is_symlink(target)) return;
+                    if (!std::filesystem::is_symlink(target))
+                        return;
                     Path target2 = readLink(target);
-                    if (isInStore(target2)) foundRoot(target, target2);
+                    if (isInStore(target2))
+                        foundRoot(target, target2);
                 }
             }
         }
@@ -267,7 +272,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 
     catch (std::filesystem::filesystem_error & e) {
         /* We only ignore permanent failures. */
-        if (e.code() == std::errc::permission_denied || e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::not_a_directory)
+        if (e.code() == std::errc::permission_denied || e.code() == std::errc::no_such_file_or_directory
+            || e.code() == std::errc::not_a_directory)
             printInfo("cannot read potential root '%1%'", path);
         else
             throw;
@@ -282,19 +288,17 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
     }
 }
 
-
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    findRoots(config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
+    findRoots(config->stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
        the set of roots (to prevent them from being garbage collected). */
     findRuntimeRoots(roots, censor);
 }
-
 
 Roots LocalStore::findRoots(bool censor)
 {
@@ -309,7 +313,12 @@ Roots LocalStore::findRoots(bool censor)
 /**
  * Key is a mere string because cannot has path with macOS's libc++
  */
-typedef std::unordered_map<std::string, std::unordered_set<std::string>> UncheckedRoots;
+typedef boost::unordered_flat_map<
+    std::string,
+    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
+    StringViewHash,
+    std::equal_to<>>
+    UncheckedRoots;
 
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
@@ -317,9 +326,8 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
     try {
         buf = std::filesystem::read_symlink(file);
     } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::no_such_file_or_directory
-                || e.code() == std::errc::permission_denied
-                || e.code() == std::errc::no_such_process)
+        if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::permission_denied
+            || e.code() == std::errc::no_such_process)
             return;
         throw;
     }
@@ -329,15 +337,15 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 
 static std::string quoteRegexChars(const std::string & raw)
 {
-    static auto specialRegex = std::regex(R"([.^$\\*+?()\[\]{}|])");
-    return std::regex_replace(raw, specialRegex, R"(\$&)");
+    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
+    return boost::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
-#if __linux__
+#ifdef __linux__
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
     try {
-        roots[readFile(path)].emplace(path);
+        roots[readFile(path)].emplace(path.string());
     } catch (SysError & e) {
         if (e.errNo != ENOENT && e.errNo != EACCES)
             throw;
@@ -352,14 +360,14 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
-        auto digitsRegex = std::regex(R"(^\d+$)");
-        auto mapRegex = std::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = std::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        static const auto digitsRegex = boost::regex(R"(^\d+$)");
+        static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
+        auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
-            if (std::regex_match(ent->d_name, digitsRegex)) {
+            if (boost::regex_match(ent->d_name, digitsRegex)) {
                 try {
-                    readProcLink(fmt("/proc/%s/exe" ,ent->d_name), unchecked);
+                    readProcLink(fmt("/proc/%s/exe", ent->d_name), unchecked);
                     readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
 
                     auto fdStr = fmt("/proc/%s/fd", ent->d_name);
@@ -384,15 +392,17 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
                     std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
                     auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile.string()), "\n");
                     for (const auto & line : mapLines) {
-                        auto match = std::smatch{};
-                        if (std::regex_match(line, match, mapRegex))
+                        auto match = boost::smatch{};
+                        if (boost::regex_match(line, match, mapRegex))
                             unchecked[match[1]].emplace(mapFile.string());
                     }
 
                     auto envFile = fmt("/proc/%s/environ", ent->d_name);
                     auto envString = readFile(envFile);
-                    auto env_end = std::sregex_iterator{};
-                    for (auto i = std::sregex_iterator{envString.begin(), envString.end(), storePathRegex}; i != env_end; ++i)
+                    auto env_end = boost::sregex_iterator{};
+                    for (auto i = boost::sregex_iterator{envString.begin(), envString.end(), storePathRegex};
+                         i != env_end;
+                         ++i)
                         unchecked[i->str()].emplace(envFile);
                 } catch (SystemError & e) {
                     if (errno == ENOENT || errno == EACCES || errno == ESRCH)
@@ -411,12 +421,12 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     // Because of this we disable lsof when running the tests.
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
-            std::regex lsofRegex(R"(^n(/.*)$)");
+            boost::regex lsofRegex(R"(^n(/.*)$)");
             auto lsofLines =
-                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, { "-n", "-w", "-F", "n" }), "\n");
+                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, {"-n", "-w", "-F", "n"}), "\n");
             for (const auto & line : lsofLines) {
-                std::smatch match;
-                if (std::regex_match(line, match, lsofRegex))
+                boost::smatch match;
+                if (boost::regex_match(line, match, lsofRegex))
                     unchecked[match[1].str()].emplace("{lsof}");
             }
         } catch (ExecError & e) {
@@ -425,29 +435,31 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 #endif
 
-#if __linux__
+#ifdef __linux__
     readFileRoots("/proc/sys/kernel/modprobe", unchecked);
     readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
     readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
     for (auto & [target, links] : unchecked) {
-        if (!isInStore(target)) continue;
+        if (!isInStore(target))
+            continue;
         try {
             auto path = toStorePath(target).first;
-            if (!isValidPath(path)) continue;
+            if (!isValidPath(path))
+                continue;
             debug("got additional root '%1%'", printStorePath(path));
             if (censor)
                 roots[path].insert(censored);
             else
                 roots[path].insert(links.begin(), links.end());
-        } catch (BadStorePath &) { }
+        } catch (BadStorePath &) {
+        }
     }
 }
 
-
-struct GCLimitReached { };
-
+struct GCLimitReached
+{};
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
@@ -455,13 +467,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
 
-    std::unordered_set<StorePath> roots, dead, alive;
+    boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
 
     struct Shared
     {
         // The temp roots only store the hash part to make it easier to
         // ignore suffixes like '.lock', '.chroot' and '.check'.
-        std::unordered_set<std::string> tempRoots;
+        boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>> tempRoots;
 
         // Hash part of the store path currently being deleted, if
         // any.
@@ -496,7 +508,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Start the server for receiving new roots. */
-    auto socketPath = stateDir.get() + gcSocketPath;
+    auto socketPath = config->stateDir.get() + gcSocketPath;
     createDirs(dirOf(socketPath));
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
@@ -518,7 +530,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             fdServer.close();
             while (true) {
                 auto item = remove_begin(*connections.lock());
-                if (!item) break;
+                if (!item)
+                    break;
                 auto & [fd, thread] = *item;
                 shutdown(fd, SHUT_RDWR);
                 thread.join();
@@ -540,7 +553,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 /* Accept a new connection. */
                 assert(fds[1].revents & POLLIN);
                 AutoCloseFD fdClient = accept(fdServer.get(), nullptr, nullptr);
-                if (!fdClient) continue;
+                if (!fdClient)
+                    continue;
 
                 debug("GC roots server accepted new client");
 
@@ -568,9 +582,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                             auto storePath = maybeParseStorePath(path);
                             if (storePath) {
                                 debug("got new GC root '%s'", path);
-                                auto hashPart = std::string(storePath->hashPart());
+                                auto hashPart = storePath->hashPart();
                                 auto shared(_shared.lock());
-                                shared->tempRoots.insert(hashPart);
+                                shared->tempRoots.emplace(hashPart);
                                 /* If this path is currently being
                                    deleted, then we have to wait until
                                    deletion is finished to ensure that
@@ -601,7 +615,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     Finally stopServer([&]() {
         writeFull(shutdownPipe.writeSide.get(), "x", false);
         wakeup.notify_all();
-        if (serverThread.joinable()) serverThread.join();
+        if (serverThread.joinable())
+            serverThread.join();
     });
 
 #endif
@@ -613,14 +628,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (!options.ignoreLiveness)
         findRootsNoTemp(rootMap, true);
 
-    for (auto & i : rootMap) roots.insert(i.first);
+    for (auto & i : rootMap)
+        roots.insert(i.first);
 
     /* Read the temporary roots created before we acquired the global
        GC root. Any new roots will be sent to our socket. */
     Roots tempRoots;
     findTempRoots(tempRoots, true);
     for (auto & root : tempRoots) {
-        _shared.lock()->tempRoots.insert(std::string(root.first.hashPart()));
+        _shared.lock()->tempRoots.emplace(root.first.hashPart());
         roots.insert(root.first);
     }
 
@@ -630,10 +646,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
-    auto deleteFromStore = [&](std::string_view baseName)
-    {
+    auto deleteFromStore = [&](std::string_view baseName) {
         Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = realStoreDir + "/" + std::string(baseName);
+        Path realPath = config->realStoreDir + "/" + std::string(baseName);
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
@@ -661,7 +676,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    std::unordered_map<StorePath, StorePathSet> referrersCache;
+    boost::unordered_flat_map<StorePath, StorePathSet, std::hash<StorePath>> referrersCache;
 
     /* Helper function that visits all paths reachable from `start`
        via the referrers edges and optionally derivers and derivation
@@ -698,19 +713,24 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             /* If we've previously deleted this path, we don't have to
                handle it again. */
-            if (dead.count(*path)) continue;
+            if (dead.count(*path))
+                continue;
 
-            auto markAlive = [&]()
-            {
+            auto markAlive = [&]() {
                 alive.insert(*path);
                 alive.insert(start);
                 try {
                     StorePathSet closure;
-                    computeFSClosure(*path, closure,
-                        /* flipDirection */ false, gcKeepOutputs, gcKeepDerivations);
+                    computeFSClosure(
+                        *path,
+                        closure,
+                        /* flipDirection */ false,
+                        gcKeepOutputs,
+                        gcKeepDerivations);
                     for (auto & p : closure)
                         alive.insert(p);
-                } catch (InvalidPath &) { }
+                } catch (InvalidPath &) {
+                }
             };
 
             /* If this is a root, bail out. */
@@ -719,12 +739,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            if (options.action == GCOptions::gcDeleteSpecific
-                && !options.pathsToDelete.count(*path))
+            if (options.action == GCOptions::gcDeleteSpecific && !options.pathsToDelete.count(*path))
                 return;
 
             {
-                auto hashPart = std::string(path->hashPart());
+                auto hashPart = path->hashPart();
                 auto shared(_shared.lock());
                 if (shared->tempRoots.count(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
@@ -750,9 +769,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                    derivation, then visit the derivation outputs. */
                 if (gcKeepDerivations && path->isDerivation()) {
                     for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*path))
-                        if (maybeOutPath &&
-                            isValidPath(*maybeOutPath) &&
-                            queryPathInfo(*maybeOutPath)->deriver == *path)
+                        if (maybeOutPath && isValidPath(*maybeOutPath)
+                            && queryPathInfo(*maybeOutPath)->deriver == *path)
                             enqueue(*maybeOutPath);
                 }
 
@@ -765,14 +783,15 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             }
         }
         for (auto & path : topoSortPaths(visited)) {
-            if (!dead.insert(path).second) continue;
+            if (!dead.insert(path).second)
+                continue;
             if (shouldDelete) {
                 try {
                     invalidatePathChecked(path);
                     deleteFromStore(path.to_string());
                     referrersCache.erase(path);
-                } catch (PathInUse &e) {
-                    // If we end up here, it's likely a new occurence
+                } catch (PathInUse & e) {
+                    // If we end up here, it's likely a new occurrence
                     // of https://github.com/NixOS/nix/issues/11923
                     printError("BUG: %s", e.what());
                 }
@@ -802,25 +821,25 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             printInfo("determining live/dead paths...");
 
         try {
-            AutoCloseDir dir(opendir(realStoreDir.get().c_str()));
-            if (!dir) throw SysError("opening directory '%1%'", realStoreDir);
+            AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
+            if (!dir)
+                throw SysError("opening directory '%1%'", config->realStoreDir);
 
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
             auto linksName = baseNameOf(linksDir);
-            Paths entries;
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
                 std::string name = dirent->d_name;
-                if (name == "." || name == ".." || name == linksName) continue;
+                if (name == "." || name == ".." || name == linksName)
+                    continue;
 
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                     deleteReferrersClosure(*storePath);
                 else
                     deleteFromStore(name);
-
             }
         } catch (GCLimitReached & e) {
         }
@@ -847,7 +866,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         printInfo("deleting unused links...");
 
         AutoCloseDir dir(opendir(linksDir.c_str()));
-        if (!dir) throw SysError("opening directory '%1%'", linksDir);
+        if (!dir)
+            throw SysError("opening directory '%1%'", linksDir);
 
         int64_t actualSize = 0, unsharedSize = 0;
 
@@ -855,7 +875,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         while (errno = 0, dirent = readdir(dir.get())) {
             checkInterrupt();
             std::string name = dirent->d_name;
-            if (name == "." || name == "..") continue;
+            if (name == "." || name == "..")
+                continue;
             Path path = linksDir + "/" + name;
 
             auto st = lstat(path);
@@ -886,14 +907,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 #endif
             ;
 
-        printInfo("note: currently hard linking saves %.2f MiB",
-            ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
+        printInfo("note: currently hard linking saves %s", renderSize(unsharedSize - actualSize - overhead));
     }
 
     /* While we're at it, vacuum the database. */
-    //if (options.action == GCOptions::gcDeleteDead) vacuumDB();
+    // if (options.action == GCOptions::gcDeleteDead) vacuumDB();
 }
-
 
 void LocalStore::autoGC(bool sync)
 {
@@ -905,8 +924,8 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", realStoreDir);
+        if (statvfs(config->realStoreDir.get().c_str(), &st))
+            throw SysError("getting filesystem info about '%s'", config->realStoreDir);
 
         return (uint64_t) st.f_bavail * st.f_frsize;
     };
@@ -914,7 +933,7 @@ void LocalStore::autoGC(bool sync)
     std::shared_future<void> future;
 
     {
-        auto state(_state.lock());
+        auto state(_state->lock());
 
         if (state->gcRunning) {
             future = state->gcFuture;
@@ -924,15 +943,18 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval)) return;
+        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval))
+            return;
 
         auto avail = getAvail();
 
         state->lastGCCheck = now;
 
-        if (avail >= settings.minFree || avail >= settings.maxFree) return;
+        if (avail >= settings.minFree || avail >= settings.maxFree)
+            return;
 
-        if (avail > state->availAfterGC * 0.97) return;
+        if (avail > state->availAfterGC * 0.97)
+            return;
 
         state->gcRunning = true;
 
@@ -940,12 +962,11 @@ void LocalStore::autoGC(bool sync)
         future = state->gcFuture = promise.get_future().share();
 
         std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
-
             try {
 
                 /* Wake up any threads waiting for the auto-GC to finish. */
                 Finally wakeup([&]() {
-                    auto state(_state.lock());
+                    auto state(_state->lock());
                     state->gcRunning = false;
                     state->lastGCCheck = std::chrono::steady_clock::now();
                     promise.set_value();
@@ -960,22 +981,21 @@ void LocalStore::autoGC(bool sync)
 
                 collectGarbage(options, results);
 
-                _state.lock()->availAfterGC = getAvail();
+                _state->lock()->availAfterGC = getAvail();
 
             } catch (...) {
                 // FIXME: we could propagate the exception to the
                 // future, but we don't really care. (what??)
                 ignoreExceptionInDestructor();
             }
-
         }).detach();
     }
 
- sync:
+sync:
     // Wait for the future outside of the state lock.
-    if (sync) future.get();
+    if (sync)
+        future.get();
 #endif
 }
 
-
-}
+} // namespace nix

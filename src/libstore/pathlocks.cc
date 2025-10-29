@@ -1,11 +1,10 @@
-#include "pathlocks.hh"
-#include "util.hh"
-#include "sync.hh"
-#include "signals.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/util.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/signals.hh"
 
 #include <cerrno>
 #include <cstdlib>
-
 
 namespace nix {
 
@@ -14,13 +13,11 @@ PathLocks::PathLocks()
 {
 }
 
-
 PathLocks::PathLocks(const PathSet & paths, const std::string & waitMsg)
     : deletePaths(false)
 {
     lockPaths(paths, waitMsg);
 }
-
 
 PathLocks::~PathLocks()
 {
@@ -31,11 +28,9 @@ PathLocks::~PathLocks()
     }
 }
 
-
 void PathLocks::setDeletion(bool deletePaths)
 {
     this->deletePaths = deletePaths;
 }
 
-
-}
+} // namespace nix

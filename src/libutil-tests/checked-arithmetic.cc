@@ -5,9 +5,9 @@
 #include <rapidcheck/gtest.h>
 #include <rapidcheck/gen/Arbitrary.hpp>
 
-#include <checked-arithmetic.hh>
+#include "nix/util/checked-arithmetic.hh"
 
-#include "tests/gtest-with-params.hh"
+#include "nix/util/tests/gtest-with-params.hh"
 
 namespace rc {
 using namespace nix;
@@ -21,7 +21,7 @@ struct Arbitrary<nix::checked::Checked<T>>
     }
 };
 
-}
+} // namespace rc
 
 namespace nix::checked {
 
@@ -155,4 +155,4 @@ TEST(Checked, div_signed_special_cases)
     checkDivision<int16_t, int64_t>(0, 0);
 }
 
-}
+} // namespace nix::checked

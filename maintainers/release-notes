@@ -2,6 +2,8 @@
 # vim: set filetype=bash:
 #!nix shell .#changelog-d --command bash
 
+set -euo pipefail
+
 # --- CONFIGURATION ---
 
 # This does double duty for
@@ -155,7 +157,7 @@ section_title="Release $version_full ($DATE)"
 
   if ! $IS_PATCH; then
     echo
-    echo "# Contributors"
+    echo "## Contributors"
     echo
     VERSION=$version_full ./maintainers/release-credits
   fi

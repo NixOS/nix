@@ -1,8 +1,10 @@
-#include "markdown.hh"
-#include "environment-variables.hh"
-#include "error.hh"
-#include "finally.hh"
-#include "terminal.hh"
+#include "nix/cmd/markdown.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/terminal.hh"
+
+#include "cmd-config-private.hh"
 
 #if HAVE_LOWDOWN
 #  include <sys/queue.h>
@@ -16,28 +18,35 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
 {
     int windowWidth = getWindowSize().second;
 
-#if HAVE_LOWDOWN_1_4
-    struct lowdown_opts_term opts_term {
+#  if HAVE_LOWDOWN_1_4
+    struct lowdown_opts_term opts_term{
         .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
     };
-#endif
-    struct lowdown_opts opts
-    {
+#  endif
+    struct lowdown_opts opts{
         .type = LOWDOWN_TERM,
-#if HAVE_LOWDOWN_1_4
+#  if HAVE_LOWDOWN_1_4
         .term = opts_term,
-#endif
+#  endif
         .maxdepth = 20,
-#if !HAVE_LOWDOWN_1_4
+#  if !HAVE_LOWDOWN_1_4
         .cols = (size_t) std::max(windowWidth - 5, 60),
         .hmargin = 0,
         .vmargin = 0,
-#endif
+#  endif
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
-        .oflags = LOWDOWN_TERM_NOLINK,
+        .oflags =
+#  if HAVE_LOWDOWN_1_4
+            LOWDOWN_TERM_NORELLINK // To render full links while skipping relative ones
+#  else
+            LOWDOWN_TERM_NOLINK
+#  endif
     };
+
+    if (!isTTY())
+        opts.oflags |= LOWDOWN_TERM_NOANSI;
 
     auto doc = lowdown_doc_new(&opts);
     if (!doc)
@@ -64,7 +73,7 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
     if (!rndr_res)
         throw Error("allocation error while rendering Markdown");
 
-    return filterANSIEscapes(std::string(buf->data, buf->size), !isTTY());
+    return std::string(buf->data, buf->size);
 }
 
 std::string renderMarkdownToTerminal(std::string_view markdown)

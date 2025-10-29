@@ -1,4 +1,4 @@
-#include "indirect-root-store.hh"
+#include "nix/store/indirect-root-store.hh"
 
 namespace nix {
 
@@ -42,4 +42,4 @@ Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _g
     return gcRoot;
 }
 
-}
+} // namespace nix

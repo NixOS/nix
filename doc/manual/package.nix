@@ -11,6 +11,9 @@
   python3,
   rsync,
   nix-cli,
+  changelog-d,
+  json-schema-for-humans,
+  officialRelease,
 
   # Configuration Options
 
@@ -30,6 +33,11 @@ mkMesonDerivation (finalAttrs: {
     fileset.difference
       (fileset.unions [
         ../../.version
+        # For example JSON
+        ../../src/libutil-tests/data/hash
+        ../../src/libstore-tests/data/content-address
+        ../../src/libstore-tests/data/store-path
+        ../../src/libstore-tests/data/derived-path
         # Too many different types of files to filter for now
         ../../doc/manual
         ./.
@@ -53,6 +61,14 @@ mkMesonDerivation (finalAttrs: {
     jq
     python3
     rsync
+    json-schema-for-humans
+    changelog-d
+  ]
+  ++ lib.optionals (!officialRelease) [
+    # When not an official release, we likely have changelog entries that have
+    # yet to be rendered.
+    # When released, these are rendered into a committed file to save a dependency.
+    changelog-d
   ];
 
   nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [

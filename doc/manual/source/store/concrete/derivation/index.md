@@ -8,7 +8,7 @@ This is where Nix distinguishes itself.
 
 ## Store Derivation {#store-derivation}
 
-A derivation is a specification for running an executable on precisely defined input to produce on more [store objects][store object].
+A derivation is a specification for running an executable on precisely defined input to produce one or more [store objects][store object].
 These store objects are known as the derivation's *outputs*.
 
 Derivations are *built*, in which case the process is spawned according to the spec, and when it exits, required to leave behind files which will (after post-processing) become the outputs of the derivation.
@@ -124,7 +124,7 @@ The system type on which the [`builder`](#attr-builder) executable is meant to b
 
 A necessary condition for Nix to schedule a given derivation on some [Nix instance] is for the "system" of that derivation to match that instance's [`system` configuration option] or [`extra-platforms` configuration option].
 
-By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
+By putting the `system` in each derivation, Nix allows *heterogeneous* build plans, where not all steps can be run on the same machine or same sort of machine.
 Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
@@ -156,6 +156,17 @@ See [Wikipedia](https://en.wikipedia.org/wiki/Argv) for details.
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
+#### Structured Attributes {#structured-attrs}
+
+Nix also has special support for embedding JSON in the derivations.
+
+The environment variable `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
+
+As a convenience to Bash builders, Nix writes a script that initialises shell variables corresponding to all attributes that are representable in Bash.
+The environment variable `NIX_ATTRS_SH_FILE` points to the exact location of the script, both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
+This includes non-nested (associative) arrays.
+For example, the attribute `hardening.format = true` ends up as the Bash associative array element `${hardening[format]}`.
+
 ### Placeholders
 
 Placeholders are opaque values used within the [process creation fields] to [store objects] for which we don't yet know [store path]s.
@@ -180,7 +191,7 @@ There are two types of placeholder, corresponding to the two cases where this pr
 
 > **Explanation**
 >
-> In general, we need to realise [realise] a [store object] in order to be sure to have a store object for it.
+> In general, we need to [realise] a [store object] in order to be sure to have a store object for it.
 > But for these two cases this is either impossible or impractical:
 >
 > - In the output case this is impossible:
@@ -213,7 +224,7 @@ This ensures that there is a canonical [store path] used to refer to the derivat
 > **Note**
 >
 > Currently, the canonical encoding for every derivation is the "ATerm" format,
-> but this is subject to change for types derivations which are not yet stable.
+> but this is subject to change for the types of derivations which are not yet stable.
 
 Regardless of the format used, when serializing a derivation to a store object, that store object will be content-addressed.
 
@@ -299,7 +310,7 @@ type DerivingPath = ConstantPath | OutputPath;
 
 Under this extended model, `DerivingPath`s are thus inductively built up from a root `ConstantPath`, wrapped with zero or more outer `OutputPath`s.
 
-### Encoding {#deriving-path-encoding}
+### Encoding {#deriving-path-encoding-higher-order}
 
 The encoding is adjusted in the natural way, encoding the `drv` field recursively using the same deriving path encoding.
 The result of this is that it is possible to have a chain of `^<output-name>` at the end of the final string, as opposed to just a single one.

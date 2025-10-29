@@ -1,10 +1,10 @@
-#include "current-process.hh"
-#include "environment-variables.hh"
-#include "executable-path.hh"
-#include "signals.hh"
-#include "processes.hh"
-#include "finally.hh"
-#include "serialise.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/serialise.hh"
 
 #include <cerrno>
 #include <cstdlib>
@@ -20,47 +20,44 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
-# include <sys/syscall.h>
+#  include <sys/syscall.h>
 #endif
 
 #ifdef __linux__
-# include <sys/prctl.h>
-# include <sys/mman.h>
+#  include <sys/prctl.h>
+#  include <sys/mman.h>
 #endif
 
+#include "util-config-private.hh"
+#include "util-unix-config-private.hh"
 
 namespace nix {
 
-Pid::Pid()
-{
-}
-
+Pid::Pid() {}
 
 Pid::Pid(pid_t pid)
     : pid(pid)
 {
 }
 
-
 Pid::~Pid()
 {
-    if (pid != -1) kill();
+    if (pid != -1)
+        kill();
 }
 
-
-void Pid::operator =(pid_t pid)
+void Pid::operator=(pid_t pid)
 {
-    if (this->pid != -1 && this->pid != pid) kill();
+    if (this->pid != -1 && this->pid != pid)
+        kill();
     this->pid = pid;
     killSignal = SIGKILL; // reset signal to default
 }
-
 
 Pid::operator pid_t()
 {
     return pid;
 }
-
 
 int Pid::kill()
 {
@@ -75,7 +72,7 @@ int Pid::kill()
         /* On BSDs, killing a process group will return EPERM if all
            processes in the group are zombies (or something like
            that). So try to detect and ignore that situation. */
-#if __FreeBSD__ || __APPLE__
+#if defined(__FreeBSD__) || defined(__APPLE__)
         if (errno != EPERM || ::kill(pid, 0) != 0)
 #endif
             logError(SysError("killing process %d", pid).info());
@@ -83,7 +80,6 @@ int Pid::kill()
 
     return wait();
 }
-
 
 int Pid::wait()
 {
@@ -101,18 +97,15 @@ int Pid::wait()
     }
 }
 
-
 void Pid::setSeparatePG(bool separatePG)
 {
     this->separatePG = separatePG;
 }
 
-
 void Pid::setKillSignal(int signal)
 {
     this->killSignal = signal;
 }
-
 
 pid_t Pid::release()
 {
@@ -120,7 +113,6 @@ pid_t Pid::release()
     pid = -1;
     return p;
 }
-
 
 void killUser(uid_t uid)
 {
@@ -133,7 +125,6 @@ void killUser(uid_t uid)
        fork a process, switch to uid, and send a mass kill. */
 
     Pid pid = startProcess([&] {
-
         if (setuid(uid) == -1)
             throw SysError("setting uid");
 
@@ -144,11 +135,14 @@ void killUser(uid_t uid)
                calling process. In the OSX libc, it's set to true,
                which means "follow POSIX", which we don't want here
                  */
-            if (syscall(SYS_kill, -1, SIGKILL, false) == 0) break;
+            if (syscall(SYS_kill, -1, SIGKILL, false) == 0)
+                break;
 #else
-            if (kill(-1, SIGKILL) == 0) break;
+            if (kill(-1, SIGKILL) == 0)
+                break;
 #endif
-            if (errno == ESRCH || errno == EPERM) break; /* no more processes */
+            if (errno == ESRCH || errno == EPERM)
+                break; /* no more processes */
             if (errno != EINTR)
                 throw SysError("cannot kill processes for uid '%1%'", uid);
         }
@@ -166,7 +160,6 @@ void killUser(uid_t uid)
        uid | grep -q $uid'. */
 }
 
-
 //////////////////////////////////////////////////////////////////////
 
 using ChildWrapperFunction = std::function<void()>;
@@ -174,6 +167,7 @@ using ChildWrapperFunction = std::function<void()>;
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
 static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun) __attribute__((noinline));
+
 static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 {
 #ifdef __linux__
@@ -181,24 +175,24 @@ static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
 #else
     pid_t pid = fork();
 #endif
-    if (pid != 0) return pid;
+    if (pid != 0)
+        return pid;
     fun();
     unreachable();
 }
 
-
-#if __linux__
+#ifdef __linux__
 static int childEntry(void * arg)
 {
-    auto & fun = *reinterpret_cast<ChildWrapperFunction*>(arg);
+    auto & fun = *reinterpret_cast<ChildWrapperFunction *>(arg);
     fun();
     return 1;
 }
 #endif
 
-
 pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 {
+    auto newLogger = makeSimpleLogger();
     ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork) {
             /* Set a simple logger, while releasing (not destroying)
@@ -207,10 +201,10 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
                ~ProgressBar() tries to join a thread that doesn't
                exist. */
             logger.release();
-            logger = makeSimpleLogger();
+            logger = std::move(newLogger);
         }
         try {
-#if __linux__
+#ifdef __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
@@ -218,8 +212,10 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
         } catch (std::exception & e) {
             try {
                 std::cerr << options.errorPrefix << e.what() << "\n";
-            } catch (...) { }
-        } catch (...) { }
+            } catch (...) {
+            }
+        } catch (...) {
+        }
         if (options.runExitHandlers)
             exit(1);
         else
@@ -229,34 +225,41 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
     pid_t pid = -1;
 
     if (options.cloneFlags) {
-        #ifdef __linux__
+#ifdef __linux__
         // Not supported, since then we don't know when to free the stack.
         assert(!(options.cloneFlags & CLONE_VM));
 
         size_t stackSize = 1 * 1024 * 1024;
-        auto stack = static_cast<char *>(mmap(0, stackSize,
-            PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
-        if (stack == MAP_FAILED) throw SysError("allocating stack");
+        auto stack = static_cast<char *>(
+            mmap(0, stackSize, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
+        if (stack == MAP_FAILED)
+            throw SysError("allocating stack");
 
         Finally freeStack([&] { munmap(stack, stackSize); });
 
         pid = clone(childEntry, stack + stackSize, options.cloneFlags | SIGCHLD, &wrapper);
-        #else
+#else
         throw Error("clone flags are only supported on Linux");
-        #endif
+#endif
     } else
         pid = doFork(options.allowVfork, wrapper);
 
-    if (pid == -1) throw SysError("unable to fork");
+    if (pid == -1)
+        throw SysError("unable to fork");
 
     return pid;
 }
 
-
-std::string runProgram(Path program, bool lookupPath, const Strings & args,
-    const std::optional<std::string> & input, bool isInteractive)
+std::string runProgram(
+    Path program, bool lookupPath, const Strings & args, const std::optional<std::string> & input, bool isInteractive)
 {
-    auto res = runProgram(RunOptions {.program = program, .lookupPath = lookupPath, .args = args, .input = input, .isInteractive = isInteractive});
+    auto res = runProgram(
+        RunOptions{
+            .program = program,
+            .lookupPath = lookupPath,
+            .args = args,
+            .input = input,
+            .isInteractive = isInteractive});
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
@@ -297,8 +300,10 @@ void runProgram2(const RunOptions & options)
 
     /* Create a pipe. */
     Pipe out, in;
-    if (options.standardOut) out.create();
-    if (source) in.create();
+    if (options.standardOut)
+        out.create();
+    if (source)
+        in.create();
 
     ProcessOptions processOptions;
     // vfork implies that the environment of the main process and the fork will
@@ -306,52 +311,46 @@ void runProgram2(const RunOptions & options)
     // case), so we can't use it if we alter the environment
     processOptions.allowVfork = !options.environment;
 
-    std::optional<Finally<std::function<void()>>> resumeLoggerDefer;
-    if (options.isInteractive) {
-        logger->pause();
-        resumeLoggerDefer.emplace(
-            []() {
-                logger->resume();
-            }
-        );
-    }
+    auto suspension = logger->suspendIf(options.isInteractive);
 
     /* Fork. */
-    Pid pid = startProcess([&] {
-        if (options.environment)
-            replaceEnv(*options.environment);
-        if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-            throw SysError("dupping stdout");
-        if (options.mergeStderrToStdout)
-            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                throw SysError("cannot dup stdout into stderr");
-        if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping stdin");
+    Pid pid = startProcess(
+        [&] {
+            if (options.environment)
+                replaceEnv(*options.environment);
+            if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (options.mergeStderrToStdout)
+                if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                    throw SysError("cannot dup stdout into stderr");
+            if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping stdin");
 
-        if (options.chdir && chdir((*options.chdir).c_str()) == -1)
-            throw SysError("chdir failed");
-        if (options.gid && setgid(*options.gid) == -1)
-            throw SysError("setgid failed");
-        /* Drop all other groups if we're setgid. */
-        if (options.gid && setgroups(0, 0) == -1)
-            throw SysError("setgroups failed");
-        if (options.uid && setuid(*options.uid) == -1)
-            throw SysError("setuid failed");
+            if (options.chdir && chdir((*options.chdir).c_str()) == -1)
+                throw SysError("chdir failed");
+            if (options.gid && setgid(*options.gid) == -1)
+                throw SysError("setgid failed");
+            /* Drop all other groups if we're setgid. */
+            if (options.gid && setgroups(0, 0) == -1)
+                throw SysError("setgroups failed");
+            if (options.uid && setuid(*options.uid) == -1)
+                throw SysError("setuid failed");
 
-        Strings args_(options.args);
-        args_.push_front(options.program);
+            Strings args_(options.args);
+            args_.push_front(options.program);
 
-        restoreProcessContext();
+            restoreProcessContext();
 
-        if (options.lookupPath)
-            execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+            if (options.lookupPath)
+                execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
             // This allows you to refer to a program with a pathname relative
             // to the PATH variable.
-        else
-            execv(options.program.c_str(), stringsToCharPtrs(args_).data());
+            else
+                execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
-        throw SysError("executing '%1%'", options.program);
-    }, processOptions);
+            throw SysError("executing '%1%'", options.program);
+        },
+        processOptions);
 
     out.writeSide.close();
 
@@ -363,7 +362,6 @@ void runProgram2(const RunOptions & options)
         if (writerThread.joinable())
             writerThread.join();
     });
-
 
     if (source) {
         in.readSide.close();
@@ -394,7 +392,8 @@ void runProgram2(const RunOptions & options)
     int status = pid.wait();
 
     /* Wait for the writer thread to finish. */
-    if (source) promise.get_future().get();
+    if (source)
+        promise.get_future().get();
 
     if (status)
         throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
@@ -415,12 +414,11 @@ std::string statusToString(int status)
 #else
             return fmt("failed due to signal %1%", sig);
 #endif
-        }
-        else
+        } else
             return "died abnormally";
-    } else return "succeeded";
+    } else
+        return "succeeded";
 }
-
 
 bool statusOk(int status)
 {
@@ -432,7 +430,7 @@ int execvpe(const char * file0, const char * const argv[], const char * const en
     auto file = ExecutablePath::load().findPath(file0);
     // `const_cast` is safe. See the note in
     // https://pubs.opengroup.org/onlinepubs/9799919799/functions/exec.html
-    return execve(file.c_str(), const_cast<char *const *>(argv), const_cast<char *const *>(envp));
+    return execve(file.c_str(), const_cast<char * const *>(argv), const_cast<char * const *>(envp));
 }
 
-}
+} // namespace nix

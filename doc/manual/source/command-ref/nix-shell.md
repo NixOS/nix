@@ -242,16 +242,21 @@ print(t)
 ```
 
 Similarly, the following is a Perl script that specifies that it
-requires Perl and the `HTML::TokeParser::Simple` and `LWP` packages:
+requires Perl and the `HTML::TokeParser::Simple`, `LWP` and
+`LWP::Protocol::Https` packages:
 
 ```perl
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl --packages perl perlPackages.HTMLTokeParserSimple perlPackages.LWP
+#! nix-shell -i perl 
+#! nix-shell --packages perl 
+#! nix-shell --packages perlPackages.HTMLTokeParserSimple 
+#! nix-shell --packages perlPackages.LWP
+#! nix-shell --packages perlPackages.LWPProtocolHttps
 
 use HTML::TokeParser::Simple;
 
 # Fetch nixos.org and print all hrefs.
-my $p = HTML::TokeParser::Simple->new(url => 'http://nixos.org/');
+my $p = HTML::TokeParser::Simple->new(url => 'https://nixos.org/');
 
 while (my $token = $p->get_tag("a")) {
     my $href = $token->get_attr("href");
@@ -316,7 +321,7 @@ contains:
 ```nix
 with import <nixpkgs> {};
 
-runCommand "dummy" { buildInputs = [ python pythonPackages.prettytable ]; } ""
+runCommand "dummy" { buildInputs = [ python3 python3Packages.prettytable ]; } ""
 ```
 
 The script's file name is passed as the first argument to the interpreter specified by the `-i` flag.

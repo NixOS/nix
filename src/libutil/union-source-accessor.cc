@@ -1,4 +1,4 @@
-#include "source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 
 namespace nix {
 
@@ -72,6 +72,18 @@ struct UnionSourceAccessor : SourceAccessor
         }
         return std::nullopt;
     }
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override
+    {
+        if (fingerprint)
+            return {path, fingerprint};
+        for (auto & accessor : accessors) {
+            auto [subpath, fingerprint] = accessor->getFingerprint(path);
+            if (fingerprint)
+                return {subpath, fingerprint};
+        }
+        return {path, std::nullopt};
+    }
 };
 
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors)
@@ -79,4 +91,4 @@ ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && 
     return make_ref<UnionSourceAccessor>(std::move(accessors));
 }
 
-}
+} // namespace nix

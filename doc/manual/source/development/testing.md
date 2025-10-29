@@ -30,7 +30,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > src
 > ├── libexpr
 > │   ├── meson.build
-> │   ├── value/context.hh
+> │   ├── include/nix/expr/value/context.hh
 > │   ├── value/context.cc
 > │   …
 > │
@@ -46,8 +46,12 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > │   │
 > │   ├── libexpr-test-support
 > │   │   ├── meson.build
+> │   │   ├── include/nix/expr
+> │   │   │   ├── meson.build
+> │   │   │   └── tests
+> │   │   │       ├── value/context.hh
+> │   │   │       …
 > │   │   └── tests
-> │   │       ├── value/context.hh
 > │   │       ├── value/context.cc
 > │   │       …
 > │   │
@@ -59,7 +63,7 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > ```
 
 The tests for each Nix library (`libnixexpr`, `libnixstore`, etc..) live inside a directory `src/${library_name_without-nix}-test`.
-Given an interface (header) and implementation pair in the original library, say, `src/libexpr/value/context.{hh,cc}`, we write tests for it in `src/libexpr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/tests/value/context.{hh,cc}`.
+Given an interface (header) and implementation pair in the original library, say, `src/libexpr/include/nix/expr/value/context.hh` and `src/libexpr/value/context.cc`, we write tests for it in `src/libexpr-tests/value/context.cc`, and (possibly) declare/define additional interfaces for testing purposes in `src/libexpr-test-support/include/nix/expr/tests/value/context.hh` and `src/libexpr-test-support/tests/value/context.cc`.
 
 Data for unit tests is stored in a `data` subdir of the directory for each unit test executable.
 For example, `libnixstore` code is in `src/libstore`, and its test data is in `src/libstore-tests/data`.
@@ -67,7 +71,7 @@ The path to the `src/${library_name_without-nix}-test/data` directory is passed 
 Note that each executable only gets the data for its tests.
 
 The unit test libraries are in `src/${library_name_without-nix}-test-support`.
-All headers are in a `tests` subdirectory so they are included with `#include "tests/"`.
+All headers are in a `tests` subdirectory so they are included with `#include "nix/tests/"`.
 
 The use of all these separate directories for the unit tests might seem inconvenient, as for example the tests are not "right next to" the part of the code they are testing.
 But organizing the tests this way has one big benefit:

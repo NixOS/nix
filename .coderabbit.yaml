@@ -1,0 +1,14 @@
+# Disable CodeRabbit auto-review to prevent verbose comments on PRs.
+# When enabled: false, CodeRabbit won't attempt reviews and won't post
+# "Review skipped" or other automated comments.
+reviews:
+  auto_review:
+    enabled: false
+  review_status: false
+  high_level_summary: false
+  poem: false
+  sequence_diagrams: false
+  changed_files_summary: false
+  tools:
+    github-checks:
+      enabled: false

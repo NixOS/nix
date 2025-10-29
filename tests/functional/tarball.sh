@@ -73,7 +73,8 @@ test_tarball .gz gzip
 # All entries in tree.tar.gz refer to the same file, and all have the same inode when unpacked by GNU tar.
 # We don't preserve the hard links, because that's an optimization we think is not worth the complexity,
 # so we only make sure that the contents are copied correctly.
-nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" --out-link "$TEST_ROOT/result"
+json=$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" --out-link "$TEST_ROOT/result")
+[[ $json =~ ^'{"hash":"sha256-'.*'","locked":{"lastModified":'.*',"narHash":"sha256-'.*'","type":"tarball","url":"file:///'.*'/tree.tar.gz"},"original":{"type":"tarball","url":"file:///'.*'/tree.tar.gz"},"storePath":"'.*'/store/'.*'-source"}'$ ]]
 [[ $(cat "$TEST_ROOT/result/a/b/foo") = bar ]]
 [[ $(cat "$TEST_ROOT/result/a/b/xyzzy") = bar ]]
 [[ $(cat "$TEST_ROOT/result/a/yyy") = bar ]]

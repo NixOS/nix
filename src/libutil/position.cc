@@ -1,20 +1,10 @@
-#include "position.hh"
+#include "nix/util/position.hh"
 
 namespace nix {
 
-Pos::Pos(const Pos * other)
+Pos::operator std::shared_ptr<const Pos>() const
 {
-    if (!other) {
-        return;
-    }
-    line = other->line;
-    column = other->column;
-    origin = other->origin;
-}
-
-Pos::operator std::shared_ptr<Pos>() const
-{
-    return std::make_shared<Pos>(&*this);
+    return std::make_shared<const Pos>(*this);
 }
 
 std::optional<LinesOfCode> Pos::getCodeLines() const
@@ -41,40 +31,46 @@ std::optional<LinesOfCode> Pos::getCodeLines() const
     return std::nullopt;
 }
 
-
 std::optional<std::string> Pos::getSource() const
 {
-    return std::visit(overloaded {
-        [](const std::monostate &) -> std::optional<std::string> {
-            return std::nullopt;
-        },
-        [](const Pos::Stdin & s) -> std::optional<std::string> {
-            // Get rid of the null terminators added by the parser.
-            return std::string(s.source->c_str());
-        },
-        [](const Pos::String & s) -> std::optional<std::string> {
-            // Get rid of the null terminators added by the parser.
-            return std::string(s.source->c_str());
-        },
-        [](const SourcePath & path) -> std::optional<std::string> {
-            try {
-                return path.readFile();
-            } catch (Error &) {
-                return std::nullopt;
-            }
-        }
-    }, origin);
+    return std::visit(
+        overloaded{
+            [](const std::monostate &) -> std::optional<std::string> { return std::nullopt; },
+            [](const Pos::Stdin & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const Pos::String & s) -> std::optional<std::string> {
+                // Get rid of the null terminators added by the parser.
+                return std::string(s.source->c_str());
+            },
+            [](const SourcePath & path) -> std::optional<std::string> {
+                try {
+                    return path.readFile();
+                } catch (Error &) {
+                    return std::nullopt;
+                }
+            }},
+        origin);
+}
+
+std::optional<SourcePath> Pos::getSourcePath() const
+{
+    if (auto * path = std::get_if<SourcePath>(&origin))
+        return *path;
+    return std::nullopt;
 }
 
 void Pos::print(std::ostream & out, bool showOrigin) const
 {
     if (showOrigin) {
-        std::visit(overloaded {
-            [&](const std::monostate &) { out << "«none»"; },
-            [&](const Pos::Stdin &) { out << "«stdin»"; },
-            [&](const Pos::String & s) { out << "«string»"; },
-            [&](const SourcePath & path) { out << path; }
-        }, origin);
+        std::visit(
+            overloaded{
+                [&](const std::monostate &) { out << "«none»"; },
+                [&](const Pos::Stdin &) { out << "«stdin»"; },
+                [&](const Pos::String & s) { out << "«string»"; },
+                [&](const SourcePath & path) { out << path; }},
+            origin);
         out << ":";
     }
     out << line;
@@ -110,7 +106,8 @@ void Pos::LinesIterator::bump(bool atFirst)
     input.remove_prefix(eol);
 }
 
-std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const {
+std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const
+{
     assert(this->origin == end.origin);
 
     if (end.line < this->line)
@@ -155,5 +152,4 @@ std::optional<std::string> Pos::getSnippetUpTo(const Pos & end) const {
     return std::nullopt;
 }
 
-
-}
+} // namespace nix

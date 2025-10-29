@@ -1,13 +1,15 @@
-project('nix', 'cpp',
+project(
+  'nix',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
     'localstatedir=/nix/var',
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.4',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -26,8 +28,7 @@ deps_private_maybe_subproject = [
   dependency('nix-main'),
   dependency('nix-cmd'),
 ]
-deps_public_maybe_subproject = [
-]
+deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
 subdir('nix-meson-build-support/export-all-symbols')
@@ -39,44 +40,34 @@ configdata = configuration_data()
 configdata.set_quoted('NIX_CLI_VERSION', meson.project_version())
 
 fs = import('fs')
+prefix = get_option('prefix')
 
 bindir = get_option('bindir')
-if not fs.is_absolute(bindir)
-  bindir = get_option('prefix') / bindir
-endif
+bindir = fs.is_absolute(bindir) ? bindir : prefix / bindir
 configdata.set_quoted('NIX_BIN_DIR', bindir)
 
-config_h = configure_file(
-  configuration : configdata,
-  output : 'config-nix-cli.hh',
-)
+mandir = get_option('mandir')
+mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
+configdata.set_quoted('NIX_MAN_DIR', mandir)
 
-add_project_arguments(
-  # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-  # It would be nice for our headers to be idempotent instead.
-  '-include', 'config-util.hh',
-  '-include', 'config-store.hh',
-  '-include', 'config-expr.hh',
-  #'-include', 'config-fetchers.hh',
-  '-include', 'config-main.hh',
-  '-include', 'config-cmd.hh',
-  '-include', 'config-nix-cli.hh',
-  language : 'cpp',
+config_priv_h = configure_file(
+  configuration : configdata,
+  output : 'cli-config-private.hh',
 )
 
 subdir('nix-meson-build-support/common')
 subdir('nix-meson-build-support/generate-header')
 
-nix_sources = [config_h] + files(
+nix_sources = [ config_priv_h ] + files(
   'add-to-store.cc',
   'app.cc',
-  'self-exe.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',
   'config-check.cc',
   'config.cc',
   'copy.cc',
+  'crash-handler.cc',
   'derivation-add.cc',
   'derivation-show.cc',
   'derivation.cc',
@@ -86,8 +77,9 @@ nix_sources = [config_h] + files(
   'edit.cc',
   'env.cc',
   'eval.cc',
+  'flake-prefetch-inputs.cc',
   'flake.cc',
-  'fmt.cc',
+  'formatter.cc',
   'hash.cc',
   'log.cc',
   'ls.cc',
@@ -105,6 +97,7 @@ nix_sources = [config_h] + files(
   'repl.cc',
   'run.cc',
   'search.cc',
+  'self-exe.cc',
   'sigs.cc',
   'store-copy-log.cc',
   'store-delete.cc',
@@ -186,26 +179,16 @@ if host_machine.system() != 'windows'
   ]
 endif
 
-fs = import('fs')
-prefix = get_option('prefix')
-
-mandir = get_option('mandir')
-mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
-
-cpp_args= [
-  '-DNIX_MAN_DIR="@0@"'.format(mandir)
-]
-
-include_dirs = [include_directories('.')]
+include_dirs = [ include_directories('.') ]
 
 this_exe = executable(
   meson.project_name(),
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
-  cpp_args : cpp_args,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 meson.override_find_program('nix', this_exe)
@@ -229,6 +212,7 @@ if host_machine.system() == 'windows'
   executable_suffix = '.exe'
 endif
 
+nix_symlinks_targets = []
 foreach linkname : nix_symlinks
   install_symlink(
     linkname + executable_suffix,
@@ -236,37 +220,38 @@ foreach linkname : nix_symlinks
     pointing_to : fs.name(this_exe),
     install_dir : get_option('bindir'),
     # The 'runtime' tag is what executables default to, which we want to emulate here.
-    install_tag : 'runtime'
+    install_tag : 'runtime',
   )
-  custom_target(
-    command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-    output: linkname + executable_suffix,
+  symlink_target = custom_target(
+    command : [ 'ln', '-sf', fs.name(this_exe), '@OUTPUT@' ],
+    output : linkname + executable_suffix,
     # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
-    env : { 'MSYS' : 'winsymlinks:lnk' },
+    env : {'MSYS' : 'winsymlinks:lnk'},
     # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
-    build_by_default: true
+    build_by_default : true,
   )
-  # TODO(Ericson3214): Dosen't yet work
+  # TODO(Ericson3214): Doesn't yet work
   #meson.override_find_program(linkname, t)
+  nix_symlinks_targets += symlink_target
 endforeach
 
 install_symlink(
   'build-remote',
-  pointing_to : '..' / '..'/ get_option('bindir') / fs.name(this_exe),
+  pointing_to : '..' / '..' / get_option('bindir') / fs.name(this_exe),
   install_dir : get_option('libexecdir') / fs.name(this_exe),
   # The 'runtime' tag is what executables default to, which we want to emulate here.
-  install_tag : 'runtime'
+  install_tag : 'runtime',
 )
 
 custom_target(
-  command: ['ln', '-sf', fs.name(this_exe), '@OUTPUT@'],
-  output: 'build-remote' + executable_suffix,
+  command : [ 'ln', '-sf', fs.name(this_exe), '@OUTPUT@' ],
+  output : 'build-remote' + executable_suffix,
   # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
-  env : { 'MSYS' : 'winsymlinks:lnk' },
+  env : {'MSYS' : 'winsymlinks:lnk'},
   # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
-  build_by_default: true
+  build_by_default : true,
 )
-# TODO(Ericson3214): Dosen't yet work
+# TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 
 localstatedir = nix_store.get_variable(

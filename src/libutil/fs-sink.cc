@@ -1,49 +1,42 @@
 #include <fcntl.h>
 
-#include "error.hh"
-#include "config-global.hh"
-#include "fs-sink.hh"
+#include "nix/util/error.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/fs-sink.hh"
 
-#if _WIN32
-# include <fileapi.h>
-# include "file-path.hh"
-# include "windows-error.hh"
+#ifdef _WIN32
+#  include <fileapi.h>
+#  include "nix/util/file-path.hh"
+#  include "nix/util/windows-error.hh"
 #endif
+
+#include "util-config-private.hh"
 
 namespace nix {
 
-void copyRecursive(
-    SourceAccessor & accessor, const CanonPath & from,
-    FileSystemObjectSink & sink, const CanonPath & to)
+void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystemObjectSink & sink, const CanonPath & to)
 {
     auto stat = accessor.lstat(from);
 
     switch (stat.type) {
-    case SourceAccessor::tSymlink:
-    {
+    case SourceAccessor::tSymlink: {
         sink.createSymlink(to, accessor.readLink(from));
         break;
     }
 
-    case SourceAccessor::tRegular:
-    {
+    case SourceAccessor::tRegular: {
         sink.createRegularFile(to, [&](CreateRegularFileSink & crf) {
             if (stat.isExecutable)
                 crf.isExecutable();
-            accessor.readFile(from, crf, [&](uint64_t size) {
-                crf.preallocateContents(size);
-            });
+            accessor.readFile(from, crf, [&](uint64_t size) { crf.preallocateContents(size); });
         });
         break;
     }
 
-    case SourceAccessor::tDirectory:
-    {
+    case SourceAccessor::tDirectory: {
         sink.createDirectory(to);
         for (auto & [name, _] : accessor.readDirectory(from)) {
-            copyRecursive(
-                accessor, from / name,
-                sink, to / name);
+            copyRecursive(accessor, from / name, sink, to / name);
             break;
         }
         break;
@@ -59,11 +52,10 @@ void copyRecursive(
     }
 }
 
-
 struct RestoreSinkSettings : Config
 {
-    Setting<bool> preallocateContents{this, false, "preallocate-contents",
-        "Whether to preallocate files when writing objects with known size."};
+    Setting<bool> preallocateContents{
+        this, false, "preallocate-contents", "Whether to preallocate files when writing objects with known size."};
 };
 
 static RestoreSinkSettings restoreSinkSettings;
@@ -85,7 +77,8 @@ void RestoreSink::createDirectory(const CanonPath & path)
         throw Error("path '%s' already exists", p.string());
 };
 
-struct RestoreRegularFile : CreateRegularFileSink {
+struct RestoreRegularFile : CreateRegularFileSink
+{
     AutoCloseFD fd;
     bool startFsync = false;
 
@@ -99,7 +92,7 @@ struct RestoreRegularFile : CreateRegularFileSink {
             fd.startFsync();
     }
 
-    void operator () (std::string_view data) override;
+    void operator()(std::string_view data) override;
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
@@ -112,12 +105,20 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
     crf.startFsync = startFsync;
     crf.fd =
 #ifdef _WIN32
-        CreateFileW(p.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL)
+        CreateFileW(
+            p.c_str(),
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            NULL,
+            CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL,
+            NULL)
 #else
         open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
 #endif
         ;
-    if (!crf.fd) throw NativeSysError("creating file '%1%'", p);
+    if (!crf.fd)
+        throw NativeSysError("creating file '%1%'", p);
     func(crf);
 }
 
@@ -152,7 +153,7 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
 #endif
 }
 
-void RestoreRegularFile::operator () (std::string_view data)
+void RestoreRegularFile::operator()(std::string_view data)
 {
     writeFull(fd.get(), data);
 }
@@ -163,32 +164,44 @@ void RestoreSink::createSymlink(const CanonPath & path, const std::string & targ
     nix::createSymlink(target, p.string());
 }
 
-
 void RegularFileSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    struct CRF : CreateRegularFileSink {
+    struct CRF : CreateRegularFileSink
+    {
         RegularFileSink & back;
-        CRF(RegularFileSink & back) : back(back) {}
-        void operator () (std::string_view data) override
+
+        CRF(RegularFileSink & back)
+            : back(back)
+        {
+        }
+
+        void operator()(std::string_view data) override
         {
             back.sink(data);
         }
+
         void isExecutable() override {}
-    } crf { *this };
+    } crf{*this};
+
     func(crf);
 }
 
-
-void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createRegularFile(
+    const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
 {
-    struct : CreateRegularFileSink {
-        void operator () (std::string_view data) override {}
+    struct : CreateRegularFileSink
+    {
+        void operator()(std::string_view data) override {}
+
         void isExecutable() override {}
     } crf;
+
+    crf.skipContents = true;
+
     // Even though `NullFileSystemObjectSink` doesn't do anything, it's important
     // that we call the function, to e.g. advance the parser using this
     // sink.
     func(crf);
 }
 
-}
+} // namespace nix

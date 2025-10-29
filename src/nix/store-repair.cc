@@ -1,5 +1,5 @@
-#include "command.hh"
-#include "store-api.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-api.hh"
 
 using namespace nix;
 
@@ -13,8 +13,8 @@ struct CmdStoreRepair : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-repair.md"
-          ;
+#include "store-repair.md"
+            ;
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override

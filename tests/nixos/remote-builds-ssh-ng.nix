@@ -102,12 +102,12 @@ in
         client.succeed("chmod 600 /root/.ssh/id_ed25519")
 
         # Install the SSH key on the builder.
-        client.wait_for_unit("network-online.target")
+        client.wait_for_unit("network-addresses-eth1.service")
         builder.succeed("mkdir -p -m 700 /root/.ssh")
         builder.copy_from_host("key.pub", "/root/.ssh/authorized_keys")
         builder.wait_for_unit("sshd")
         builder.wait_for_unit("multi-user.target")
-        builder.wait_for_unit("network-online.target")
+        builder.wait_for_unit("network-addresses-eth1.service")
 
         client.succeed(f"ssh -o StrictHostKeyChecking=no {builder.name} 'echo hello world'")
 

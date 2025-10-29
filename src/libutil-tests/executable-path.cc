@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "executable-path.hh"
+#include "nix/util/executable-path.hh"
 
 namespace nix {
 
@@ -61,4 +61,4 @@ TEST(ExecutablePath, elementyElemNormalize)
     EXPECT_EQ(s2, OS_STR("." PATH_VAR_SEP "." PATH_VAR_SEP "." PATH_VAR_SEP "."));
 }
 
-}
+} // namespace nix

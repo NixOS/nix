@@ -1,10 +1,10 @@
 #ifdef _WIN32
 #  include <ioapiset.h>
-#  include "windows-error.hh"
+#  include "nix/util/windows-error.hh"
 
-#  include "logging.hh"
-#  include "util.hh"
-#  include "muxable-pipe.hh"
+#  include "nix/util/logging.hh"
+#  include "nix/util/util.hh"
+#  include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 
@@ -68,5 +68,5 @@ void MuxablePipePollState::iterate(
     }
 }
 
-}
+} // namespace nix
 #endif

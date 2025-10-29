@@ -6,10 +6,10 @@ TODO_NixOS
 
 clearStore
 
-rm -f $TEST_ROOT/result
+rm -f "$TEST_ROOT"/result
 
 export REMOTE_STORE=file:$TEST_ROOT/remote_store
-echo 'require-sigs = false' >> $test_nix_conf
+echo 'require-sigs = false' >> "$test_nix_conf"
 
 restartDaemon
 
@@ -20,11 +20,14 @@ else
 fi
 
 # Build the dependencies and push them to the remote store.
-nix-build -o $TEST_ROOT/result dependencies.nix --post-build-hook "$pushToStore"
+nix-build -o "$TEST_ROOT"/result dependencies.nix --post-build-hook "$pushToStore"
 # See if all outputs are passed to the post-build hook by only specifying one
 # We're not able to test CA tests this way
-export BUILD_HOOK_ONLY_OUT_PATHS=$([ ! $NIX_TESTS_CA_BY_DEFAULT ])
-nix-build -o $TEST_ROOT/result-mult multiple-outputs.nix -A a.first --post-build-hook "$pushToStore"
+#
+# FIXME: This export is hiding error condition
+# shellcheck disable=SC2155
+export BUILD_HOOK_ONLY_OUT_PATHS=$([ ! "$NIX_TESTS_CA_BY_DEFAULT" ])
+nix-build -o "$TEST_ROOT"/result-mult multiple-outputs.nix -A a.first --post-build-hook "$pushToStore"
 
 clearStore
 

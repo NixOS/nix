@@ -1,15 +1,13 @@
-#include "util.hh"
-#include "users.hh"
-#include "environment-variables.hh"
-#include "file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/users.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 
 #include <pwd.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 namespace nix {
-
-namespace fs { using namespace std::filesystem; }
 
 std::string getUserName()
 {
@@ -25,16 +23,14 @@ Path getHomeOf(uid_t userId)
     std::vector<char> buf(16384);
     struct passwd pwbuf;
     struct passwd * pw;
-    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0
-        || !pw || !pw->pw_dir || !pw->pw_dir[0])
+    if (getpwuid_r(userId, &pwbuf, buf.data(), buf.size(), &pw) != 0 || !pw || !pw->pw_dir || !pw->pw_dir[0])
         throw Error("cannot determine user's home directory");
     return pw->pw_dir;
 }
 
 Path getHome()
 {
-    static Path homeDir = []()
-    {
+    static Path homeDir = []() {
         std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
         if (homeDir) {
@@ -43,7 +39,10 @@ Path getHome()
             int result = stat(homeDir->c_str(), &st);
             if (result != 0) {
                 if (errno != ENOENT) {
-                    warn("couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file", *homeDir, errno);
+                    warn(
+                        "couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file",
+                        *homeDir,
+                        errno);
                     homeDir.reset();
                 }
             } else if (st.st_uid != geteuid()) {
@@ -53,7 +52,10 @@ Path getHome()
         if (!homeDir) {
             homeDir = getHomeOf(geteuid());
             if (unownedUserHomeDir.has_value() && unownedUserHomeDir != homeDir) {
-                warn("$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')", *unownedUserHomeDir, *homeDir);
+                warn(
+                    "$HOME ('%s') is not owned by you, falling back to the one defined in the 'passwd' file ('%s')",
+                    *unownedUserHomeDir,
+                    *homeDir);
             }
         }
         return *homeDir;
@@ -61,8 +63,9 @@ Path getHome()
     return homeDir;
 }
 
-bool isRootUser() {
+bool isRootUser()
+{
     return getuid() == 0;
 }
 
-}
+} // namespace nix

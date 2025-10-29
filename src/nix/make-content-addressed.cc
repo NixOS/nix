@@ -1,7 +1,7 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "make-content-addressed.hh"
-#include "common-args.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/make-content-addressed.hh"
+#include "nix/main/common-args.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -24,16 +24,16 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
     std::string doc() override
     {
         return
-          #include "make-content-addressed.md"
-          ;
+#include "make-content-addressed.md"
+            ;
     }
 
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
         auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
 
-        auto remappings = makeContentAddressed(*srcStore, *dstStore,
-            StorePathSet(storePaths.begin(), storePaths.end()));
+        auto remappings =
+            makeContentAddressed(*srcStore, *dstStore, StorePathSet(storePaths.begin(), storePaths.end()));
 
         if (json) {
             auto jsonRewrites = json::object();
@@ -44,14 +44,12 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
             }
             auto json = json::object();
             json["rewrites"] = jsonRewrites;
-            logger->cout("%s", json);
+            printJSON(json);
         } else {
             for (auto & path : storePaths) {
                 auto i = remappings.find(path);
                 assert(i != remappings.end());
-                notice("rewrote '%s' to '%s'",
-                    srcStore->printStorePath(path),
-                    srcStore->printStorePath(i->second));
+                notice("rewrote '%s' to '%s'", srcStore->printStorePath(path), srcStore->printStorePath(i->second));
             }
         }
     }

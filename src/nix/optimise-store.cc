@@ -1,6 +1,6 @@
-#include "command.hh"
-#include "shared.hh"
-#include "store-api.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
 
 #include <atomic>
 
@@ -16,8 +16,8 @@ struct CmdOptimiseStore : StoreCommand
     std::string doc() override
     {
         return
-          #include "optimise-store.md"
-          ;
+#include "optimise-store.md"
+            ;
     }
 
     void run(ref<Store> store) override

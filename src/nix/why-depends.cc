@@ -1,21 +1,16 @@
-#include "command.hh"
-#include "store-api.hh"
-#include "source-accessor.hh"
-#include "shared.hh"
+#include "nix/cmd/command.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/path-references.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/main/shared.hh"
 
 #include <queue>
 
 using namespace nix;
 
-static std::string hilite(const std::string & s, size_t pos, size_t len,
-    const std::string & colour = ANSI_RED)
+static std::string hilite(const std::string & s, size_t pos, size_t len, const std::string & colour = ANSI_RED)
 {
-    return
-        std::string(s, 0, pos)
-        + colour
-        + std::string(s, pos, len)
-        + ANSI_NORMAL
-        + std::string(s, pos + len);
+    return std::string(s, 0, pos) + colour + std::string(s, pos, len) + ANSI_NORMAL + std::string(s, pos + len);
 }
 
 static std::string filterPrintable(const std::string & s)
@@ -49,13 +44,15 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         addFlag({
             .longName = "all",
             .shortName = 'a',
-            .description = "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
+            .description =
+                "Show all edges in the dependency graph leading from *package* to *dependency*, rather than just a shortest path.",
             .handler = {&all, true},
         });
 
         addFlag({
             .longName = "precise",
-            .description = "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
+            .description =
+                "For each edge in the dependency graph, show the files in the parent that cause the dependency.",
             .handler = {&precise, true},
         });
     }
@@ -68,11 +65,14 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
     std::string doc() override
     {
         return
-          #include "why-depends.md"
-          ;
+#include "why-depends.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store) override
     {
@@ -109,8 +109,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         auto dependencyPath = *optDependencyPath;
         auto dependencyPathHash = dependencyPath.hashPart();
 
-        auto accessor = store->getFSAccessor();
-
         auto const inf = std::numeric_limits<size_t>::max();
 
         struct Node
@@ -127,11 +125,12 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         std::map<StorePath, Node> graph;
 
         for (auto & path : closure)
-            graph.emplace(path, Node {
-                .path = path,
-                .refs = store->queryPathInfo(path)->references,
-                .dist = path == dependencyPath ? 0 : inf
-            });
+            graph.emplace(
+                path,
+                Node{
+                    .path = path,
+                    .refs = store->queryPathInfo(path)->references,
+                    .dist = path == dependencyPath ? 0 : inf});
 
         // Transpose the graph.
         for (auto & node : graph)
@@ -159,7 +158,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                         queue.push(&node2);
                     }
                 }
-
             }
         }
 
@@ -169,95 +167,93 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
            and `dependency`. */
         std::function<void(Node &, const std::string &, const std::string &)> printNode;
 
-        struct BailOut { };
+        struct BailOut
+        {};
 
         printNode = [&](Node & node, const std::string & firstPad, const std::string & tailPad) {
-            CanonPath pathS(store->printStorePath(node.path));
-
             assert(node.dist != inf);
             if (precise) {
-                logger->cout("%s%s%s%s" ANSI_NORMAL,
+                logger->cout(
+                    "%s%s%s%s" ANSI_NORMAL,
                     firstPad,
                     node.visited ? "\e[38;5;244m" : "",
                     firstPad != "" ? "→ " : "",
-                    pathS.abs());
+                    store->printStorePath(node.path));
             }
 
-            if (node.path == dependencyPath && !all
-                && packagePath != dependencyPath)
+            if (node.path == dependencyPath && !all && packagePath != dependencyPath)
                 throw BailOut();
 
-            if (node.visited) return;
-            if (precise) node.visited = true;
+            if (node.visited)
+                return;
+            if (precise)
+                node.visited = true;
 
             /* Sort the references by distance to `dependency` to
                ensure that the shortest path is printed first. */
             std::multimap<size_t, Node *> refs;
-            std::set<std::string> hashes;
+            StorePathSet refPaths;
 
             for (auto & ref : node.refs) {
-                if (ref == node.path && packagePath != dependencyPath) continue;
+                if (ref == node.path && packagePath != dependencyPath)
+                    continue;
                 auto & node2 = graph.at(ref);
-                if (node2.dist == inf) continue;
+                if (node2.dist == inf)
+                    continue;
                 refs.emplace(node2.dist, &node2);
-                hashes.insert(std::string(node2.path.hashPart()));
+                refPaths.insert(node2.path);
             }
 
             /* For each reference, find the files and symlinks that
                contain the reference. */
             std::map<std::string, Strings> hits;
 
-            std::function<void(const CanonPath &)> visitPath;
+            auto accessor = store->requireStoreObjectAccessor(node.path);
 
-            visitPath = [&](const CanonPath & p) {
-                auto st = accessor->maybeLstat(p);
-                assert(st);
-
-                auto p2 = p == pathS ? "/" : p.abs().substr(pathS.abs().size() + 1);
-
-                auto getColour = [&](const std::string & hash) {
-                    return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
-                };
-
-                if (st->type == SourceAccessor::Type::tDirectory) {
-                    auto names = accessor->readDirectory(p);
-                    for (auto & [name, type] : names)
-                        visitPath(p / name);
-                }
-
-                else if (st->type == SourceAccessor::Type::tRegular) {
-                    auto contents = accessor->readFile(p);
-
-                    for (auto & hash : hashes) {
-                        auto pos = contents.find(hash);
-                        if (pos != std::string::npos) {
-                            size_t margin = 32;
-                            auto pos2 = pos >= margin ? pos - margin : 0;
-                            hits[hash].emplace_back(fmt("%s: …%s…",
-                                    p2,
-                                    hilite(filterPrintable(
-                                            std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
-                                        pos - pos2, StorePath::HashLen,
-                                        getColour(hash))));
-                        }
-                    }
-                }
-
-                else if (st->type == SourceAccessor::Type::tSymlink) {
-                    auto target = accessor->readLink(p);
-
-                    for (auto & hash : hashes) {
-                        auto pos = target.find(hash);
-                        if (pos != std::string::npos)
-                            hits[hash].emplace_back(fmt("%s -> %s", p2,
-                                    hilite(target, pos, StorePath::HashLen, getColour(hash))));
-                    }
-                }
+            auto getColour = [&](const std::string & hash) {
+                return hash == dependencyPathHash ? ANSI_GREEN : ANSI_BLUE;
             };
 
-            // FIXME: should use scanForReferences().
+            if (precise) {
+                // Use scanForReferencesDeep to find files containing references
+                scanForReferencesDeep(*accessor, CanonPath::root, refPaths, [&](FileRefScanResult result) {
+                    auto p2 = result.filePath.isRoot() ? result.filePath.abs() : result.filePath.rel();
+                    auto st = accessor->lstat(result.filePath);
 
-            if (precise) visitPath(pathS);
+                    if (st.type == SourceAccessor::Type::tRegular) {
+                        auto contents = accessor->readFile(result.filePath);
+
+                        // For each reference found in this file, extract context
+                        for (auto & foundRef : result.foundRefs) {
+                            std::string hash(foundRef.hashPart());
+                            auto pos = contents.find(hash);
+                            if (pos != std::string::npos) {
+                                size_t margin = 32;
+                                auto pos2 = pos >= margin ? pos - margin : 0;
+                                hits[hash].emplace_back(fmt(
+                                    "%s: …%s…",
+                                    p2,
+                                    hilite(
+                                        filterPrintable(std::string(contents, pos2, pos - pos2 + hash.size() + margin)),
+                                        pos - pos2,
+                                        StorePath::HashLen,
+                                        getColour(hash))));
+                            }
+                        }
+                    } else if (st.type == SourceAccessor::Type::tSymlink) {
+                        auto target = accessor->readLink(result.filePath);
+
+                        // For each reference found in this symlink, show it
+                        for (auto & foundRef : result.foundRefs) {
+                            std::string hash(foundRef.hashPart());
+                            auto pos = target.find(hash);
+                            if (pos != std::string::npos)
+                                hits[hash].emplace_back(
+                                    fmt("%s -> %s", p2, hilite(target, pos, StorePath::HashLen, getColour(hash))));
+                        }
+                    }
+                });
+            }
 
             for (auto & ref : refs) {
                 std::string hash(ref.second->path.hashPart());
@@ -266,25 +262,23 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
-                    logger->cout("%s%s%s", tailPad,
-                              (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)),
-                              hit);
-                    if (!all) break;
+                    logger->cout(
+                        "%s%s%s", tailPad, (first ? (last ? treeLast : treeConn) : (last ? treeNull : treeLine)), hit);
+                    if (!all)
+                        break;
                 }
 
                 if (!precise) {
-                    auto pathS = store->printStorePath(ref.second->path);
-                    logger->cout("%s%s%s%s" ANSI_NORMAL,
+                    logger->cout(
+                        "%s%s%s%s" ANSI_NORMAL,
                         firstPad,
                         ref.second->visited ? "\e[38;5;244m" : "",
                         last ? treeLast : treeConn,
-                        pathS);
+                        store->printStorePath(ref.second->path));
                     node.visited = true;
                 }
 
-                printNode(*ref.second,
-                    tailPad + (last ? treeNull : treeLine),
-                    tailPad + (last ? treeNull : treeLine));
+                printNode(*ref.second, tailPad + (last ? treeNull : treeLine), tailPad + (last ? treeNull : treeLine));
             }
         };
 
@@ -294,7 +288,8 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
             }
             printNode(graph.at(packagePath), "", "");
-        } catch (BailOut & ) { }
+        } catch (BailOut &) {
+        }
     }
 };
 

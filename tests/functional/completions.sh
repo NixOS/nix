@@ -53,7 +53,9 @@ cd ..
 ## With multiple input flakes
 [[ "$(NIX_GET_COMPLETIONS=5 nix build ./foo ./bar --override-input '')" == $'normal\na\t\nb\t' ]]
 ## With tilde expansion
+# shellcheck disable=SC2088
 [[ "$(HOME=$PWD NIX_GET_COMPLETIONS=4 nix build '~/foo' --override-input '')" == $'normal\na\t' ]]
+# shellcheck disable=SC2088
 [[ "$(HOME=$PWD NIX_GET_COMPLETIONS=5 nix flake update --flake '~/foo' '')" == $'normal\na\t' ]]
 ## Out of order
 [[ "$(NIX_GET_COMPLETIONS=3 nix build --override-input '' '' ./foo)" == $'normal\na\t' ]]

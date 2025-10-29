@@ -1,24 +1,27 @@
-#include "command-installable-value.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "eval.hh"
-#include "eval-inline.hh"
-#include "value-to-json.hh"
+#include "nix/cmd/command-installable-value.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/expr/eval.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/value-to-json.hh"
 
 #include <nlohmann/json.hpp>
 
 using namespace nix;
 
-namespace nix::fs { using namespace std::filesystem; }
+namespace nix::fs {
+using namespace std::filesystem;
+}
 
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
     bool raw = false;
     std::optional<std::string> apply;
-    std::optional<fs::path> writeTo;
+    std::optional<std::filesystem::path> writeTo;
 
-    CmdEval() : InstallableValueCommand()
+    CmdEval()
+        : InstallableValueCommand()
     {
         addFlag({
             .longName = "raw",
@@ -49,11 +52,14 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
     std::string doc() override
     {
         return
-          #include "eval.md"
-          ;
+#include "eval.md"
+            ;
     }
 
-    Category category() override { return catSecondary; }
+    Category category() override
+    {
+        return catSecondary;
+    }
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
@@ -76,19 +82,18 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         if (writeTo) {
             logger->stop();
 
-            if (fs::symlink_exists(*writeTo))
+            if (pathExists(*writeTo))
                 throw Error("path '%s' already exists", writeTo->string());
 
-            std::function<void(Value & v, const PosIdx pos, const fs::path & path)> recurse;
+            std::function<void(Value & v, const PosIdx pos, const std::filesystem::path & path)> recurse;
 
-            recurse = [&](Value & v, const PosIdx pos, const fs::path & path)
-            {
+            recurse = [&](Value & v, const PosIdx pos, const std::filesystem::path & path) {
                 state->forceValue(v, pos);
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path.string(), v.string_view());
                 else if (v.type() == nAttrs) {
-                    [[maybe_unused]] bool directoryCreated = fs::create_directory(path);
+                    [[maybe_unused]] bool directoryCreated = std::filesystem::create_directory(path);
                     // Directory should not already exist
                     assert(directoryCreated);
                     for (auto & attr : *v.attrs()) {
@@ -99,14 +104,13 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                             recurse(*attr.value, attr.pos, path / name);
                         } catch (Error & e) {
                             e.addTrace(
-                                state->positions[attr.pos],
-                                HintFmt("while evaluating the attribute '%s'", name));
+                                state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }
-                }
-                else
-                    state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos]).debugThrow();
+                } else
+                    state->error<TypeError>("value at '%s' is not a string or an attribute set", state->positions[pos])
+                        .debugThrow();
             };
 
             recurse(*v, pos, *writeTo);
@@ -114,25 +118,17 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             logger->stop();
-            writeFull(getStandardOutput(), *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            writeFull(
+                getStandardOutput(),
+                *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {
-            logger->cout("%s", printValueAsJSON(*state, true, *v, pos, context, false));
+            printJSON(printValueAsJSON(*state, true, *v, pos, context, false));
         }
 
         else {
-            logger->cout(
-                "%s",
-                ValuePrinter(
-                    *state,
-                    *v,
-                    PrintOptions {
-                        .force = true,
-                        .derivationPaths = true
-                    }
-                )
-            );
+            logger->cout("%s", ValuePrinter(*state, *v, PrintOptions{.force = true, .derivationPaths = true}));
         }
     }
 };

@@ -5,18 +5,22 @@ configure_file(
 )
 
 suites += {
-  'name': 'ca',
-  'deps': [],
-  'tests': [
+  'name' : 'ca',
+  'deps' : [],
+  'tests' : [
+    'build-cache.sh',
+    'build-delete.sh',
     'build-with-garbage-path.sh',
     'build.sh',
-    'build-cache.sh',
     'concurrent-builds.sh',
+    'derivation-advanced-attributes.sh',
     'derivation-json.sh',
     'duplicate-realisation-in-closure.sh',
     'eval-store.sh',
     'gc.sh',
     'import-from-derivation.sh',
+    'issue-13247.sh',
+    'multiple-outputs.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
     'nix-run.sh',
@@ -29,5 +33,5 @@ suites += {
     'substitute.sh',
     'why-depends.sh',
   ],
-  'workdir': meson.current_source_dir(),
+  'workdir' : meson.current_source_dir(),
 }

@@ -1,8 +1,8 @@
-#include "signals.hh"
-#include "util.hh"
-#include "error.hh"
-#include "sync.hh"
-#include "terminal.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/util.hh"
+#include "nix/util/error.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/terminal.hh"
 
 #include <thread>
 
@@ -34,15 +34,14 @@ void unix::_interrupted()
     }
 }
 
-
 //////////////////////////////////////////////////////////////////////
-
 
 /* We keep track of interrupt callbacks using integer tokens, so we can iterate
    safely without having to lock the data structure while executing arbitrary
    functions.
  */
-struct InterruptCallbacks {
+struct InterruptCallbacks
+{
     typedef int64_t Token;
 
     /* We use unique tokens so that we can't accidentally delete the wrong
@@ -97,30 +96,11 @@ void unix::triggerInterrupt()
     }
 }
 
-
 static sigset_t savedSignalMask;
 static bool savedSignalMaskIsSet = false;
 
-void unix::setChildSignalMask(sigset_t * sigs)
+void unix::saveSignalMask()
 {
-    assert(sigs); // C style function, but think of sigs as a reference
-
-#if _POSIX_C_SOURCE >= 1 || _XOPEN_SOURCE || _POSIX_SOURCE
-    sigemptyset(&savedSignalMask);
-    // There's no "assign" or "copy" function, so we rely on (math) idempotence
-    // of the or operator: a or a = a.
-    sigorset(&savedSignalMask, sigs, sigs);
-#else
-    // Without sigorset, our best bet is to assume that sigset_t is a type that
-    // can be assigned directly, such as is the case for a sigset_t defined as
-    // an integer type.
-    savedSignalMask = *sigs;
-#endif
-
-    savedSignalMaskIsSet = true;
-}
-
-void unix::saveSignalMask() {
     if (sigprocmask(SIG_BLOCK, nullptr, &savedSignalMask))
         throw SysError("querying signal mask");
 
@@ -166,11 +146,11 @@ void unix::restoreSignals()
         throw SysError("restoring signals");
 }
 
-
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
     InterruptCallbacks::Token token;
+
     ~InterruptCallbackImpl() override
     {
         auto interruptCallbacks(_interruptCallbacks.lock());
@@ -184,10 +164,10 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     auto token = interruptCallbacks->nextToken++;
     interruptCallbacks->callbacks.emplace(token, callback);
 
-    std::unique_ptr<InterruptCallbackImpl> res {new InterruptCallbackImpl{}};
+    std::unique_ptr<InterruptCallbackImpl> res{new InterruptCallbackImpl{}};
     res->token = token;
 
     return std::unique_ptr<InterruptCallback>(res.release());
 }
 
-}
+} // namespace nix

@@ -1,13 +1,12 @@
+cxx = meson.get_compiler('cpp')
+
+deps_other = []
+subdir('nix-meson-build-support/common/asan-options')
+
 libstoreconsumer_tester = executable(
   'test-libstoreconsumer',
   'main.cc',
-  cpp_args : [
-    # TODO(Qyriad): Yes this is how the autoconf+Make system did it.
-    # It would be nice for our headers to be idempotent instead.
-    '-include', 'config-util.hh',
-    '-include', 'config-store.hh',
-  ],
-  dependencies : [
+  dependencies : deps_other + [
     dependency('nix-store'),
   ],
   build_by_default : false,

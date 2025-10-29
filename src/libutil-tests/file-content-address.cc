@@ -1,6 +1,7 @@
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "file-content-address.hh"
+#include "nix/util/file-content-address.hh"
 
 namespace nix {
 
@@ -8,54 +9,64 @@ namespace nix {
  * parseFileSerialisationMethod, renderFileSerialisationMethod
  * --------------------------------------------------------------------------*/
 
-TEST(FileSerialisationMethod, testRoundTripPrintParse_1) {
+TEST(FileSerialisationMethod, testRoundTripPrintParse_1)
+{
     for (const FileSerialisationMethod fim : {
-        FileSerialisationMethod::Flat,
-        FileSerialisationMethod::NixArchive,
-    }) {
+             FileSerialisationMethod::Flat,
+             FileSerialisationMethod::NixArchive,
+         }) {
         EXPECT_EQ(parseFileSerialisationMethod(renderFileSerialisationMethod(fim)), fim);
     }
 }
 
-TEST(FileSerialisationMethod, testRoundTripPrintParse_2) {
+TEST(FileSerialisationMethod, testRoundTripPrintParse_2)
+{
     for (const std::string_view fimS : {
-        "flat",
-        "nar",
-    }) {
+             "flat",
+             "nar",
+         }) {
         EXPECT_EQ(renderFileSerialisationMethod(parseFileSerialisationMethod(fimS)), fimS);
     }
 }
 
-TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException) {
-    EXPECT_THROW(parseFileSerialisationMethod("narwhal"), UsageError);
+TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException)
+{
+    EXPECT_THAT(
+        []() { parseFileSerialisationMethod("narwhal"); },
+        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
 }
 
 /* ----------------------------------------------------------------------------
  * parseFileIngestionMethod, renderFileIngestionMethod
  * --------------------------------------------------------------------------*/
 
-TEST(FileIngestionMethod, testRoundTripPrintParse_1) {
+TEST(FileIngestionMethod, testRoundTripPrintParse_1)
+{
     for (const FileIngestionMethod fim : {
-        FileIngestionMethod::Flat,
-        FileIngestionMethod::NixArchive,
-        FileIngestionMethod::Git,
-    }) {
+             FileIngestionMethod::Flat,
+             FileIngestionMethod::NixArchive,
+             FileIngestionMethod::Git,
+         }) {
         EXPECT_EQ(parseFileIngestionMethod(renderFileIngestionMethod(fim)), fim);
     }
 }
 
-TEST(FileIngestionMethod, testRoundTripPrintParse_2) {
+TEST(FileIngestionMethod, testRoundTripPrintParse_2)
+{
     for (const std::string_view fimS : {
-        "flat",
-        "nar",
-        "git",
-    }) {
+             "flat",
+             "nar",
+             "git",
+         }) {
         EXPECT_EQ(renderFileIngestionMethod(parseFileIngestionMethod(fimS)), fimS);
     }
 }
 
-TEST(FileIngestionMethod, testParseFileIngestionMethodOptException) {
-    EXPECT_THROW(parseFileIngestionMethod("narwhal"), UsageError);
+TEST(FileIngestionMethod, testParseFileIngestionMethodOptException)
+{
+    EXPECT_THAT(
+        []() { parseFileIngestionMethod("narwhal"); },
+        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
 }
 
-}
+} // namespace nix

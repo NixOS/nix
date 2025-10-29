@@ -1,4 +1,4 @@
-#include "command-installable-value.hh"
+#include "nix/cmd/command-installable-value.hh"
 
 namespace nix {
 
@@ -8,4 +8,4 @@ void InstallableValueCommand::run(ref<Store> store, ref<Installable> installable
     run(store, installableValue);
 }
 
-}
+} // namespace nix

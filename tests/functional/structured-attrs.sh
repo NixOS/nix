@@ -2,9 +2,8 @@
 
 source common.sh
 
-# 27ce722638 required some incompatible changes to the nix file, so skip this
-# tests for the older versions
-requireDaemonNewerThan "2.4pre20210712"
+# https://github.com/NixOS/nix/pull/14189
+requireDaemonNewerThan "2.33"
 
 clearStoreIfPossible
 
@@ -40,3 +39,14 @@ jsonOut="$(nix print-dev-env -f structured-attrs-shell.nix --json)"
 test "$(<<<"$jsonOut" jq '.structuredAttrs|keys|.[]' -r)" = "$(printf ".attrs.json\n.attrs.sh")"
 
 test "$(<<<"$jsonOut" jq '.variables.outputs.value.out' -r)" = "$(<<<"$jsonOut" jq '.structuredAttrs.".attrs.json"' -r | jq -r '.outputs.out')"
+
+# Hacky way of making structured attrs. We should preserve for now for back compat, but also deprecate.
+
+hackyExpr='derivation { name = "a"; system = "foo"; builder = "/bin/sh"; __json = builtins.toJSON { a = 1; }; }'
+
+# Check for deprecation message
+expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "In derivation 'a': setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead."
+
+# Check it works with the expected structured attrs
+hacky=$(nix-instantiate --expr "$hackyExpr")
+nix derivation show "$hacky" | jq --exit-status '."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'

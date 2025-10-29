@@ -2,41 +2,27 @@
 #include <string>
 #include <sstream>
 
-#include "strings-inline.hh"
-#include "os-string.hh"
-#include "error.hh"
+#include "nix/util/strings-inline.hh"
+#include "nix/util/os-string.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
-struct view_stringbuf : public std::stringbuf
-{
-    inline std::string_view toView()
-    {
-        auto begin = pbase();
-        return {begin, begin + pubseekoff(0, std::ios_base::cur, std::ios_base::out)};
-    }
-};
-
-std::string_view toView(const std::ostringstream & os)
-{
-    auto buf = static_cast<view_stringbuf *>(os.rdbuf());
-    return buf->toView();
-}
-
 template std::list<std::string> tokenizeString(std::string_view s, std::string_view separators);
-template std::set<std::string> tokenizeString(std::string_view s, std::string_view separators);
+template StringSet tokenizeString(std::string_view s, std::string_view separators);
 template std::vector<std::string> tokenizeString(std::string_view s, std::string_view separators);
 
 template std::list<std::string> splitString(std::string_view s, std::string_view separators);
-template std::set<std::string> splitString(std::string_view s, std::string_view separators);
+template StringSet splitString(std::string_view s, std::string_view separators);
 template std::vector<std::string> splitString(std::string_view s, std::string_view separators);
 
 template std::list<OsString>
 basicSplitString(std::basic_string_view<OsChar> s, std::basic_string_view<OsChar> separators);
 
 template std::string concatStringsSep(std::string_view, const std::list<std::string> &);
-template std::string concatStringsSep(std::string_view, const std::set<std::string> &);
+template std::string concatStringsSep(std::string_view, const StringSet &);
 template std::string concatStringsSep(std::string_view, const std::vector<std::string> &);
+template std::string concatStringsSep(std::string_view, const boost::container::small_vector<std::string, 64> &);
 
 typedef std::string_view strings_2[2];
 template std::string concatStringsSep(std::string_view, const strings_2 &);
@@ -46,7 +32,7 @@ typedef std::string_view strings_4[4];
 template std::string concatStringsSep(std::string_view, const strings_4 &);
 
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::list<std::string> &);
-template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::set<std::string> &);
+template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const StringSet &);
 template std::string dropEmptyInitThenConcatStringsSep(std::string_view, const std::vector<std::string> &);
 
 /**
@@ -152,4 +138,18 @@ std::list<std::string> shellSplitString(std::string_view s)
 
     return result;
 }
+
+std::string optionalBracket(std::string_view prefix, std::string_view content, std::string_view suffix)
+{
+    if (content.empty()) {
+        return "";
+    }
+    std::string result;
+    result.reserve(prefix.size() + content.size() + suffix.size());
+    result.append(prefix);
+    result.append(content);
+    result.append(suffix);
+    return result;
+}
+
 } // namespace nix

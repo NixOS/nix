@@ -1,60 +1,63 @@
-#include "ssh-store.hh"
-#include "local-fs-store.hh"
-#include "remote-store-connection.hh"
-#include "source-accessor.hh"
-#include "archive.hh"
-#include "worker-protocol.hh"
-#include "worker-protocol-impl.hh"
-#include "pool.hh"
-#include "ssh.hh"
+#include "nix/store/ssh-store.hh"
+#include "nix/store/local-fs-store.hh"
+#include "nix/store/remote-store-connection.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/archive.hh"
+#include "nix/store/worker-protocol.hh"
+#include "nix/store/worker-protocol-impl.hh"
+#include "nix/util/pool.hh"
+#include "nix/store/ssh.hh"
+#include "nix/store/store-registration.hh"
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(
-    std::string_view scheme,
-    std::string_view authority,
-    const Params & params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, authority, params)
+SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+    : Store::Config{params}
+    , RemoteStore::Config{params}
+    , CommonSSHStoreConfig{scheme, authority, params}
 {
 }
 
 std::string SSHStoreConfig::doc()
 {
     return
-      #include "ssh-store.md"
-      ;
+#include "ssh-store.md"
+        ;
 }
 
-class SSHStore : public virtual SSHStoreConfig, public virtual RemoteStore
+StoreReference SSHStoreConfig::getReference() const
 {
-public:
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = authority.to_string(),
+            },
+        .params = getQueryParams(),
+    };
+}
 
-    SSHStore(
-        std::string_view scheme,
-        std::string_view host,
-        const Params & params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(scheme, host, params)
-        , Store(params)
-        , RemoteStore(params)
-        , master(createSSHMaster(
-            // Use SSH master only if using more than 1 connection.
-            connections->capacity() > 1))
-    {
-    }
+struct SSHStore : virtual RemoteStore
+{
+    using Config = SSHStoreConfig;
 
-    std::string getUri() override
+    ref<const Config> config;
+
+    SSHStore(ref<const Config> config)
+        : Store{*config}
+        , RemoteStore{*config}
+        , config{config}
+        , master(config->createSSHMaster(
+              // Use SSH master only if using more than 1 connection.
+              connections->capacity() > 1))
     {
-        return *uriSchemes().begin() + "://" + host;
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
-    { unsupported("getBuildLogExact"); }
+    {
+        unsupported("getBuildLogExact");
+    }
 
 protected:
 
@@ -70,14 +73,11 @@ protected:
 
     ref<RemoteStore::Connection> openConnection() override;
 
-    std::string host;
-
     std::vector<std::string> extraRemoteProgramArgs;
 
     SSHMaster master;
 
-    void setOptions(RemoteStore::Connection & conn) override
-    {
+    void setOptions(RemoteStore::Connection & conn) override {
         /* TODO Add a way to explicitly ask for some options to be
            forwarded. One option: A way to query the daemon for its
            settings, and then a series of params to SSHStore like
@@ -86,7 +86,6 @@ protected:
         */
     };
 };
-
 
 MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
     : StoreConfig(params)
@@ -101,7 +100,7 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::strin
     : StoreConfig(params)
     , RemoteStoreConfig(params)
     , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(params)
+    , SSHStoreConfig(scheme, host, params)
     , LocalFSStoreConfig(params)
 {
 }
@@ -109,10 +108,9 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::strin
 std::string MountedSSHStoreConfig::doc()
 {
     return
-      #include "mounted-ssh-store.md"
-      ;
+#include "mounted-ssh-store.md"
+        ;
 }
-
 
 /**
  * The mounted ssh store assumes that filesystems on the remote host are
@@ -121,50 +119,41 @@ std::string MountedSSHStoreConfig::doc()
  * store.
  *
  * MountedSSHStore is very similar to UDSRemoteStore --- ignoring the
- * superficial differnce of SSH vs Unix domain sockets, they both are
+ * superficial difference of SSH vs Unix domain sockets, they both are
  * accessing remote stores, and they both assume the store will be
  * mounted in the local filesystem.
  *
  * The difference lies in how they manage GC roots. See addPermRoot
  * below for details.
  */
-class MountedSSHStore : public virtual MountedSSHStoreConfig, public virtual SSHStore, public virtual LocalFSStore
+struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 {
-public:
+    using Config = MountedSSHStoreConfig;
 
-    MountedSSHStore(
-        std::string_view scheme,
-        std::string_view host,
-        const Params & params)
-        : StoreConfig(params)
-        , RemoteStoreConfig(params)
-        , CommonSSHStoreConfig(scheme, host, params)
-        , SSHStoreConfig(params)
-        , LocalFSStoreConfig(params)
-        , MountedSSHStoreConfig(params)
-        , Store(params)
-        , RemoteStore(params)
-        , SSHStore(scheme, host, params)
-        , LocalFSStore(params)
+    MountedSSHStore(ref<const Config> config)
+        : Store{*config}
+        , RemoteStore{*config}
+        , SSHStore{config}
+        , LocalFSStore{*config}
     {
         extraRemoteProgramArgs = {
             "--process-ops",
         };
     }
 
-    std::string getUri() override
-    {
-        return *uriSchemes().begin() + "://" + host;
-    }
-
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        return LocalFSStore::narFromPath(path, sink);
+        return Store::narFromPath(path, sink);
     }
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
         return LocalFSStore::getFSAccessor(requireValidPath);
+    }
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
+    {
+        return LocalFSStore::getFSAccessor(path, requireValidPath);
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override
@@ -198,24 +187,33 @@ public:
     }
 };
 
+ref<Store> SSHStore::Config::openStore() const
+{
+    return make_ref<SSHStore>(ref{shared_from_this()});
+}
+
+ref<Store> MountedSSHStore::Config::openStore() const
+{
+    return make_ref<MountedSSHStore>(ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())});
+}
+
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
     auto conn = make_ref<Connection>();
-    Strings command = remoteProgram.get();
+    Strings command = config->remoteProgram.get();
     command.push_back("--stdio");
-    if (remoteStore.get() != "") {
+    if (config->remoteStore.get() != "") {
         command.push_back("--store");
-        command.push_back(remoteStore.get());
+        command.push_back(config->remoteStore.get());
     }
-    command.insert(command.end(),
-        extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
+    command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
     conn->sshConn = master.startCommand(std::move(command));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;
 }
 
-static RegisterStoreImplementation<SSHStore, SSHStoreConfig> regSSHStore;
-static RegisterStoreImplementation<MountedSSHStore, MountedSSHStoreConfig> regMountedSSHStore;
+static RegisterStoreImplementation<SSHStore::Config> regSSHStore;
+static RegisterStoreImplementation<MountedSSHStore::Config> regMountedSSHStore;
 
-}
+} // namespace nix

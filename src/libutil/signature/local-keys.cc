@@ -1,7 +1,8 @@
-#include "signature/local-keys.hh"
+#include "nix/util/signature/local-keys.hh"
 
-#include "file-system.hh"
-#include "util.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/base-n.hh"
+#include "nix/util/util.hh"
 #include <sodium.h>
 
 namespace nix {
@@ -25,7 +26,7 @@ Key::Key(std::string_view s, bool sensitiveValue)
         if (name == "" || key == "")
             throw FormatError("key is corrupt");
 
-        key = base64Decode(key);
+        key = base64::decode(key);
     } catch (Error & e) {
         std::string extra;
         if (!sensitiveValue)
@@ -37,7 +38,7 @@ Key::Key(std::string_view s, bool sensitiveValue)
 
 std::string Key::to_string() const
 {
-    return name + ":" + base64Encode(key);
+    return name + ":" + base64::encode(std::as_bytes(std::span<const char>{key}));
 }
 
 SecretKey::SecretKey(std::string_view s)
@@ -51,9 +52,8 @@ std::string SecretKey::signDetached(std::string_view data) const
 {
     unsigned char sig[crypto_sign_BYTES];
     unsigned long long sigLen;
-    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(),
-        (unsigned char *) key.data());
-    return name + ":" + base64Encode(std::string((char *) sig, sigLen));
+    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
+    return name + ":" + base64::encode(std::as_bytes(std::span<const unsigned char>(sig, sigLen)));
 }
 
 PublicKey SecretKey::toPublicKey() const
@@ -84,7 +84,8 @@ bool PublicKey::verifyDetached(std::string_view data, std::string_view sig) cons
 {
     auto ss = BorrowedCryptoValue::parse(sig);
 
-    if (ss.name != std::string_view { name }) return false;
+    if (ss.name != std::string_view{name})
+        return false;
 
     return verifyDetachedAnon(data, ss.payload);
 }
@@ -93,16 +94,16 @@ bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) 
 {
     std::string sig2;
     try {
-        sig2 = base64Decode(sig);
+        sig2 = base64::decode(sig);
     } catch (Error & e) {
         e.addTrace({}, "while decoding signature '%s'", sig);
     }
     if (sig2.size() != crypto_sign_BYTES)
         throw Error("signature is not valid");
 
-    return crypto_sign_verify_detached((unsigned char *) sig2.data(),
-        (unsigned char *) data.data(), data.size(),
-        (unsigned char *) key.data()) == 0;
+    return crypto_sign_verify_detached(
+               (unsigned char *) sig2.data(), (unsigned char *) data.data(), data.size(), (unsigned char *) key.data())
+           == 0;
 }
 
 bool verifyDetached(std::string_view data, std::string_view sig, const PublicKeys & publicKeys)
@@ -110,9 +111,10 @@ bool verifyDetached(std::string_view data, std::string_view sig, const PublicKey
     auto ss = BorrowedCryptoValue::parse(sig);
 
     auto key = publicKeys.find(std::string(ss.name));
-    if (key == publicKeys.end()) return false;
+    if (key == publicKeys.end())
+        return false;
 
     return key->second.verifyDetachedAnon(data, ss.payload);
 }
 
-}
+} // namespace nix

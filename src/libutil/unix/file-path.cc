@@ -3,14 +3,14 @@
 #include <iostream>
 #include <locale>
 
-#include "file-path.hh"
-#include "util.hh"
+#include "nix/util/file-path.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
 std::optional<std::filesystem::path> maybePath(PathView path)
 {
-    return { path };
+    return {path};
 }
 
 std::filesystem::path pathNG(PathView path)
@@ -18,4 +18,4 @@ std::filesystem::path pathNG(PathView path)
     return path;
 }
 
-}
+} // namespace nix

@@ -1,11 +1,13 @@
-#include "command.hh"
+#include "nix/cmd/command.hh"
 
 using namespace nix;
 
 struct CmdNar : NixMultiCommand
 {
-    CmdNar() : NixMultiCommand("nar", RegisterCommand::getCommandsFor({"nar"}))
-    { }
+    CmdNar()
+        : NixMultiCommand("nar", RegisterCommand::getCommandsFor({"nar"}))
+    {
+    }
 
     std::string description() override
     {
@@ -15,11 +17,14 @@ struct CmdNar : NixMultiCommand
     std::string doc() override
     {
         return
-          #include "nar.md"
-          ;
+#include "nar.md"
+            ;
     }
 
-    Category category() override { return catUtility; }
+    Category category() override
+    {
+        return catUtility;
+    }
 };
 
 static auto rCmdNar = registerCommand<CmdNar>("nar");

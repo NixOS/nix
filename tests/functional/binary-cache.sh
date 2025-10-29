@@ -111,7 +111,13 @@ clearStore
 
 mv "$cacheDir/nar" "$cacheDir/nar2"
 
-nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result"
+nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result" 2>&1 | tee "$TEST_ROOT/log"
+
+# Verify that missing NARs produce warnings, not errors
+# The build should succeed despite the warnings
+grepQuiet "does not exist in binary cache" "$TEST_ROOT/log"
+# Ensure the message is not at error level by checking that the command succeeded
+[ -e "$TEST_ROOT/result" ]
 
 mv "$cacheDir/nar2" "$cacheDir/nar"
 
@@ -151,8 +157,11 @@ nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -
 grepQuiet "don't know how to build" "$TEST_ROOT/log"
 grepQuiet "building.*input-1" "$TEST_ROOT/log"
 grepQuiet "building.*input-2" "$TEST_ROOT/log"
-grepQuiet "copying path.*input-0" "$TEST_ROOT/log"
-grepQuiet "copying path.*top" "$TEST_ROOT/log"
+
+# Removed for now since 299141ecbd08bae17013226dbeae71e842b4fdd7 / issue #77 is reverted
+
+#grepQuiet "copying path.*input-0" "$TEST_ROOT/log"
+#grepQuiet "copying path.*top" "$TEST_ROOT/log"
 
 
 # Create a signed binary cache.

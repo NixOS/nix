@@ -1,9 +1,9 @@
-#include "util.hh"
-#include "types.hh"
-#include "file-system.hh"
-#include "processes.hh"
-#include "terminal.hh"
-#include "strings.hh"
+#include "nix/util/util.hh"
+#include "nix/util/types.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/processes.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -203,12 +203,10 @@ TEST(isInDir, notInDir)
     ASSERT_EQ(p1, false);
 }
 
-// XXX: hm, bug or feature? :) Looking at the implementation
-// this might be problematic.
 TEST(isInDir, emptyDir)
 {
     auto p1 = isInDir("/zes/foo/bar", "");
-    ASSERT_EQ(p1, true);
+    ASSERT_EQ(p1, false);
 }
 
 /* ----------------------------------------------------------------------------
@@ -233,14 +231,12 @@ TEST(isDirOrInDir, falseForDisjunctPaths)
 
 TEST(isDirOrInDir, relativePaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), true);
+    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), false);
 }
 
-// XXX: while it is possible to use "." or ".." in the
-// first argument this doesn't seem to work in the second.
-TEST(isDirOrInDir, DISABLED_shouldWork)
+TEST(isDirOrInDir, relativePathsTwice)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), true);
+    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), false);
 }
 
 /* ----------------------------------------------------------------------------
@@ -275,4 +271,51 @@ TEST(makeParentCanonical, root)
 {
     ASSERT_EQ(makeParentCanonical("/"), "/");
 }
+
+/* ----------------------------------------------------------------------------
+ * chmodIfNeeded
+ * --------------------------------------------------------------------------*/
+
+TEST(chmodIfNeeded, works)
+{
+    auto [autoClose_, tmpFile] = nix::createTempFile();
+    auto deleteTmpFile = AutoDelete(tmpFile);
+
+    auto modes = std::vector<mode_t>{0755, 0644, 0422, 0600, 0777};
+    for (mode_t oldMode : modes) {
+        for (mode_t newMode : modes) {
+            chmod(tmpFile.c_str(), oldMode);
+            bool permissionsChanged = false;
+            ASSERT_NO_THROW(permissionsChanged = chmodIfNeeded(tmpFile, newMode));
+            ASSERT_EQ(permissionsChanged, oldMode != newMode);
+        }
+    }
 }
+
+TEST(chmodIfNeeded, nonexistent)
+{
+    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SysError);
+}
+
+/* ----------------------------------------------------------------------------
+ * DirectoryIterator
+ * --------------------------------------------------------------------------*/
+
+TEST(DirectoryIterator, works)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir + "/somefile", "");
+
+    for (auto path : DirectoryIterator(tmpDir)) {
+        ASSERT_EQ(path.path().string(), tmpDir + "/somefile");
+    }
+}
+
+TEST(DirectoryIterator, nonexistent)
+{
+    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
+}
+
+} // namespace nix

@@ -1,11 +1,11 @@
-#include "globals.hh"
-#include "store-api.hh"
-#include "build-result.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/store-open.hh"
+#include "nix/store/build-result.hh"
 #include <iostream>
 
 using namespace nix;
 
-int main (int argc, char **argv)
+int main(int argc, char ** argv)
 {
     try {
         if (argc != 2) {
@@ -21,18 +21,16 @@ int main (int argc, char **argv)
 
         // build the derivation
 
-        std::vector<DerivedPath> paths {
-            DerivedPath::Built {
-                .drvPath = makeConstantStorePathRef(store->parseStorePath(drvPath)),
-                .outputs = OutputsSpec::Names{"out"}
-            }
-        };
+        std::vector<DerivedPath> paths{DerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(store->parseStorePath(drvPath)), .outputs = OutputsSpec::Names{"out"}}};
 
         const auto results = store->buildPathsWithResults(paths, bmNormal, store);
 
         for (const auto & result : results) {
-            for (const auto & [outputName, realisation] : result.builtOutputs) {
-                std::cout << store->printStorePath(realisation.outPath) << "\n";
+            if (auto * successP = result.tryGetSuccess()) {
+                for (const auto & [outputName, realisation] : successP->builtOutputs) {
+                    std::cout << store->printStorePath(realisation.outPath) << "\n";
+                }
             }
         }
 

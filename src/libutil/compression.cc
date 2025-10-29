@@ -1,8 +1,8 @@
-#include "compression.hh"
-#include "signals.hh"
-#include "tarfile.hh"
-#include "finally.hh"
-#include "logging.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/signals.hh"
+#include "nix/util/tarfile.hh"
+#include "nix/util/finally.hh"
+#include "nix/util/logging.hh"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -39,12 +39,15 @@ struct ArchiveDecompressionSource : Source
     std::unique_ptr<TarArchive> archive = 0;
     Source & src;
     std::optional<std::string> compressionMethod;
+
     ArchiveDecompressionSource(Source & src, std::optional<std::string> compressionMethod = std::nullopt)
         : src(src)
         , compressionMethod(std::move(compressionMethod))
     {
     }
+
     ~ArchiveDecompressionSource() override {}
+
     size_t read(char * data, size_t len) override
     {
         struct archive_entry * ae;
@@ -139,16 +142,19 @@ private:
 struct NoneSink : CompressionSink
 {
     Sink & nextSink;
+
     NoneSink(Sink & nextSink, int level = COMPRESSION_LEVEL_DEFAULT)
         : nextSink(nextSink)
     {
         if (level != COMPRESSION_LEVEL_DEFAULT)
             warn("requested compression level '%d' not supported by compression method 'none'", level);
     }
+
     void finish() override
     {
         flush();
     }
+
     void writeUnbuffered(std::string_view data) override
     {
         nextSink(data);
@@ -215,7 +221,7 @@ std::string decompress(const std::string & method, std::string_view in)
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
 {
-    if (method == "none" || method == "")
+    if (method == "none" || method == "" || method == "identity")
         return std::make_unique<NoneSink>(nextSink);
     else if (method == "br")
         return std::make_unique<BrotliDecompressionSink>(nextSink);
@@ -307,4 +313,4 @@ std::string compress(const std::string & method, std::string_view in, const bool
     return std::move(ssink.s);
 }
 
-}
+} // namespace nix

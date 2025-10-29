@@ -1,14 +1,15 @@
 #include <limits>
-#include <unordered_set>
 #include <sstream>
 
-#include "print.hh"
-#include "ansicolor.hh"
-#include "signals.hh"
-#include "store-api.hh"
-#include "terminal.hh"
-#include "english.hh"
-#include "eval.hh"
+#include "nix/expr/print.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/store-api.hh"
+#include "nix/util/terminal.hh"
+#include "nix/util/english.hh"
+#include "nix/expr/eval.hh"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -28,9 +29,7 @@ void printElided(
         output << ANSI_NORMAL;
 }
 
-
-std::ostream &
-printLiteralString(std::ostream & str, const std::string_view string, size_t maxLength, bool ansiColors)
+std::ostream & printLiteralString(std::ostream & str, const std::string_view string, size_t maxLength, bool ansiColors)
 {
     size_t charsPrinted = 0;
     if (ansiColors)
@@ -43,12 +42,18 @@ printLiteralString(std::ostream & str, const std::string_view string, size_t max
             return str;
         }
 
-        if (*i == '\"' || *i == '\\') str << "\\" << *i;
-        else if (*i == '\n') str << "\\n";
-        else if (*i == '\r') str << "\\r";
-        else if (*i == '\t') str << "\\t";
-        else if (*i == '$' && *(i+1) == '{') str << "\\" << *i;
-        else str << *i;
+        if (*i == '\"' || *i == '\\')
+            str << "\\" << *i;
+        else if (*i == '\n')
+            str << "\\n";
+        else if (*i == '\r')
+            str << "\\r";
+        else if (*i == '\t')
+            str << "\\t";
+        else if (*i == '$' && *(i + 1) == '{')
+            str << "\\" << *i;
+        else
+            str << *i;
         charsPrinted++;
     }
     str << "\"";
@@ -57,14 +62,12 @@ printLiteralString(std::ostream & str, const std::string_view string, size_t max
     return str;
 }
 
-std::ostream &
-printLiteralString(std::ostream & str, const std::string_view string)
+std::ostream & printLiteralString(std::ostream & str, const std::string_view string)
 {
     return printLiteralString(str, string, std::numeric_limits<size_t>::max(), false);
 }
 
-std::ostream &
-printLiteralBool(std::ostream & str, bool boolean)
+std::ostream & printLiteralBool(std::ostream & str, bool boolean)
 {
     str << (boolean ? "true" : "false");
     return str;
@@ -79,14 +82,13 @@ printLiteralBool(std::ostream & str, bool boolean)
 // For example `or' doesn't need to be quoted.
 bool isReservedKeyword(const std::string_view str)
 {
-    static const std::unordered_set<std::string_view> reservedKeywords = {
-        "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit"
-    };
+    static const boost::unordered_flat_set<std::string_view> reservedKeywords = {
+        "if", "then", "else", "assert", "with", "let", "in", "rec", "inherit"};
     return reservedKeywords.contains(str);
 }
 
-std::ostream &
-printIdentifier(std::ostream & str, std::string_view s) {
+std::ostream & printIdentifier(std::ostream & str, std::string_view s)
+{
     if (s.empty())
         str << "\"\"";
     else if (isReservedKeyword(s))
@@ -98,10 +100,8 @@ printIdentifier(std::ostream & str, std::string_view s) {
             return str;
         }
         for (auto c : s)
-            if (!((c >= 'a' && c <= 'z') ||
-                  (c >= 'A' && c <= 'Z') ||
-                  (c >= '0' && c <= '9') ||
-                  c == '_' || c == '\'' || c == '-')) {
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '\''
+                  || c == '-')) {
                 printLiteralString(str, s);
                 return str;
             }
@@ -112,21 +112,22 @@ printIdentifier(std::ostream & str, std::string_view s) {
 
 static bool isVarName(std::string_view s)
 {
-    if (s.size() == 0) return false;
-    if (isReservedKeyword(s)) return false;
+    if (s.size() == 0)
+        return false;
+    if (isReservedKeyword(s))
+        return false;
     char c = s[0];
-    if ((c >= '0' && c <= '9') || c == '-' || c == '\'') return false;
+    if ((c >= '0' && c <= '9') || c == '-' || c == '\'')
+        return false;
     for (auto & i : s)
-        if (!((i >= 'a' && i <= 'z') ||
-              (i >= 'A' && i <= 'Z') ||
-              (i >= '0' && i <= '9') ||
-              i == '_' || i == '-' || i == '\''))
+        if (!((i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9') || i == '_' || i == '-'
+              || i == '\''))
             return false;
     return true;
 }
 
-std::ostream &
-printAttributeName(std::ostream & str, std::string_view name) {
+std::ostream & printAttributeName(std::ostream & str, std::string_view name)
+{
     if (isVarName(name))
         str << name;
     else
@@ -134,7 +135,7 @@ printAttributeName(std::ostream & str, std::string_view name) {
     return str;
 }
 
-bool isImportantAttrName(const std::string& attrName)
+bool isImportantAttrName(const std::string & attrName)
 {
     return attrName == "type" || attrName == "_type";
 }
@@ -144,12 +145,11 @@ typedef std::pair<std::string, Value *> AttrPair;
 struct ImportantFirstAttrNameCmp
 {
 
-    bool operator()(const AttrPair& lhs, const AttrPair& rhs) const
+    bool operator()(const AttrPair & lhs, const AttrPair & rhs) const
     {
         auto lhsIsImportant = isImportantAttrName(lhs.first);
         auto rhsIsImportant = isImportantAttrName(rhs.first);
-        return std::forward_as_tuple(!lhsIsImportant, lhs.first)
-            < std::forward_as_tuple(!rhsIsImportant, rhs.first);
+        return std::forward_as_tuple(!lhsIsImportant, lhs.first) < std::forward_as_tuple(!rhsIsImportant, rhs.first);
     }
 };
 
@@ -273,9 +273,10 @@ private:
     void printDerivation(Value & v)
     {
         std::optional<StorePath> storePath;
-        if (auto i = v.attrs()->get(state.sDrvPath)) {
+        if (auto i = v.attrs()->get(state.s.drvPath)) {
             NixStringContext context;
-            storePath = state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
+            storePath =
+                state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
         }
 
         /* This unfortunately breaks printing nested values because of
@@ -415,8 +416,8 @@ private:
         if (depth < options.maxDepth) {
             increaseIndent();
             output << "[";
-            auto listItems = v.listItems();
-            auto prettyPrint = shouldPrettyPrintList(listItems);
+            auto listItems = v.listView();
+            auto prettyPrint = shouldPrettyPrintList(listItems.span());
 
             size_t currentListItemsPrinted = 0;
 
@@ -453,14 +454,14 @@ private:
 
         if (v.isLambda()) {
             output << "lambda";
-            if (v.payload.lambda.fun) {
-                if (v.payload.lambda.fun->name) {
-                    output << " " << state.symbols[v.payload.lambda.fun->name];
+            if (v.lambda().fun) {
+                if (v.lambda().fun->name) {
+                    output << " " << state.symbols[v.lambda().fun->name];
                 }
 
                 std::ostringstream s;
-                s << state.positions[v.payload.lambda.fun->pos];
-                output << " @ " << filterANSIEscapes(toView(s));
+                s << state.positions[v.lambda().fun->pos];
+                output << " @ " << filterANSIEscapes(s.view());
             }
         } else if (v.isPrimOp()) {
             if (v.primOp())
@@ -499,10 +500,10 @@ private:
                 output << ANSI_NORMAL;
         } else if (v.isThunk() || v.isApp()) {
             if (options.ansiColors)
-                    output << ANSI_MAGENTA;
+                output << ANSI_MAGENTA;
             output << "«thunk»";
             if (options.ansiColors)
-                    output << ANSI_NORMAL;
+                output << ANSI_NORMAL;
         } else {
             unreachable();
         }
@@ -593,8 +594,7 @@ private:
             }
         } catch (Error & e) {
             if (options.errors == ErrorPrintBehavior::Throw
-                || (options.errors == ErrorPrintBehavior::ThrowTopLevel
-                    && depth == 0)) {
+                || (options.errors == ErrorPrintBehavior::ThrowTopLevel && depth == 0)) {
                 throw;
             }
             printError_(e);
@@ -603,7 +603,11 @@ private:
 
 public:
     Printer(std::ostream & output, EvalState & state, PrintOptions options)
-        : output(output), state(state), options(options) { }
+        : output(output)
+        , state(state)
+        , options(options)
+    {
+    }
 
     void print(Value & v)
     {
@@ -636,8 +640,8 @@ std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)
 template<>
 HintFmt & HintFmt::operator%(const ValuePrinter & value)
 {
-        fmt % value;
-        return *this;
+    fmt % value;
+    return *this;
 }
 
-}
+} // namespace nix

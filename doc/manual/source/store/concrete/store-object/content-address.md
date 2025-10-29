@@ -45,12 +45,12 @@ Self-references however cannot be referred to by their path, because we are in t
 > As far as we know, this is equivalent to finding a hash collision.
 
 Instead we have a "has self-reference" boolean, which ends up affecting the digest:
-In all currently-supported store object content-addressing methods, when hashing the file system object data, any occurence of store object's own store path in the digested data is replaced with a [sentinel value](https://en.wikipedia.org/wiki/Sentinel_value).
+In all currently-supported store object content-addressing methods, when hashing the file system object data, any occurrence of store object's own store path in the digested data is replaced with a [sentinel value](https://en.wikipedia.org/wiki/Sentinel_value).
 The hashes of these modified input streams are used instead.
 
 When validating the content address of a store object after the fact, the above process works as written.
 However, when first creating the store object we don't know the store object's store path, as explained just above.
-We therefore, strictly speaking, do not know what value we will be replacing with the sentinental value in the inputs to hash functions.
+We therefore, strictly speaking, do not know what value we will be replacing with the sentinel value in the inputs to hash functions.
 What instead happens is that the provisional store object --- the data from which we wish to create a store object --- is paired with a provisional "scratch" store path (that presumably was chosen when the data was created).
 That provisional store path is instead what is replaced with the sentinel value, rather than the final store object which we do not yet know.
 

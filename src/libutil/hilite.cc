@@ -1,20 +1,16 @@
-#include "hilite.hh"
+#include "nix/util/hilite.hh"
 
 namespace nix {
 
-std::string hiliteMatches(
-    std::string_view s,
-    std::vector<std::smatch> matches,
-    std::string_view prefix,
-    std::string_view postfix)
+std::string
+hiliteMatches(std::string_view s, std::vector<std::smatch> matches, std::string_view prefix, std::string_view postfix)
 {
     // Avoid extra work on zero matches
     if (matches.size() == 0)
         return std::string(s);
 
-    std::sort(matches.begin(), matches.end(), [](const auto & a, const auto & b) {
-        return a.position() < b.position();
-    });
+    std::sort(
+        matches.begin(), matches.end(), [](const auto & a, const auto & b) { return a.position() < b.position(); });
 
     std::string out;
     ssize_t last_end = 0;
@@ -23,7 +19,7 @@ std::string hiliteMatches(
         auto m = *it;
         size_t start = m.position();
         out.append(s.substr(last_end, m.position() - last_end));
-        // Merge continous matches
+        // Merge continuous matches
         ssize_t end = start + m.length();
         while (++it != matches.end() && (*it).position() <= end) {
             auto n = *it;
@@ -41,4 +37,4 @@ std::string hiliteMatches(
     return out;
 }
 
-}
+} // namespace nix

@@ -1,22 +1,22 @@
-#include "command.hh"
-#include "common-args.hh"
-#include "shared.hh"
-#include "store-api.hh"
-#include "store-cast.hh"
-#include "gc-store.hh"
+#include "nix/cmd/command.hh"
+#include "nix/main/common-args.hh"
+#include "nix/main/shared.hh"
+#include "nix/store/store-api.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/gc-store.hh"
 
 using namespace nix;
 
 struct CmdStoreDelete : StorePathsCommand
 {
-    GCOptions options { .action = GCOptions::gcDeleteSpecific };
+    GCOptions options{.action = GCOptions::gcDeleteSpecific};
 
     CmdStoreDelete()
     {
         addFlag({
             .longName = "ignore-liveness",
             .description = "Do not check whether the paths are reachable from a root.",
-            .handler = {&options.ignoreLiveness, true}
+            .handler = {&options.ignoreLiveness, true},
         });
     }
 
@@ -28,8 +28,8 @@ struct CmdStoreDelete : StorePathsCommand
     std::string doc() override
     {
         return
-          #include "store-delete.md"
-          ;
+#include "store-delete.md"
+            ;
     }
 
     void run(ref<Store> store, StorePaths && storePaths) override
