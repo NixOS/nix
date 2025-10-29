@@ -101,6 +101,7 @@ std::string
 S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, uint64_t partNumber, std::string data)
 {
     auto req = makeRequest(key);
+    req.method = HttpMethod::PUT;
     req.setupForS3();
 
     auto url = req.uri.parsed();

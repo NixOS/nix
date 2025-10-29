@@ -141,7 +141,7 @@ void HttpBinaryCacheStore::upsertFile(
     uint64_t sizeHint)
 {
     auto req = makeRequest(path);
-
+    req.method = HttpMethod::PUT;
     auto data = StreamToSourceAdapter(istream).drain();
 
     auto compressionMethod = getCompressionMethod(path);

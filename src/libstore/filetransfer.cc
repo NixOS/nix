@@ -394,9 +394,11 @@ struct curlFileTransfer : public FileTransfer
                 if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->length());
-                } else {
+                } else if (request.method == HttpMethod::PUT) {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
                     curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
+                } else {
+                    unreachable();
                 }
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
