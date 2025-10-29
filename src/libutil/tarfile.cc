@@ -51,6 +51,26 @@ void TarArchive::check(int err, const std::string & reason)
     checkLibArchive(archive, err, reason);
 }
 
+/// @brief Normalize compression method names from legacy HTTP Content-Encoding values.
+///
+/// Per RFC 9110 Section 8.4.1.3, HTTP recipients should treat legacy "x-*" compression
+/// names as equivalent to their standard counterparts:
+/// - "x-gzip" is equivalent to "gzip"
+/// - "x-compress" is equivalent to "compress"
+///
+/// This function maps these legacy names to their libarchive-compatible equivalents.
+static std::string normalizeCompressionMethod(const std::string & method)
+{
+    if (method == "x-gzip")
+        return "gzip";
+    else if (method == "x-compress")
+        return "compress";
+    else if (method == "x-bzip2")
+        return "bzip2";
+    else
+        return method;
+}
+
 /// @brief Get filter_code from its name.
 ///
 /// libarchive does not provide a convenience function like archive_write_add_filter_by_name but for reading.
@@ -59,9 +79,10 @@ void TarArchive::check(int err, const std::string & reason)
 /// hand-rolling the equivalent function that is better implemented in libarchive.
 int getArchiveFilterCodeByName(const std::string & method)
 {
+    auto normalizedMethod = normalizeCompressionMethod(method);
     auto * ar = archive_write_new();
     auto cleanup = Finally{[&ar]() { checkLibArchive(ar, archive_write_close(ar), "failed to close archive: %s"); }};
-    auto err = archive_write_add_filter_by_name(ar, method.c_str());
+    auto err = archive_write_add_filter_by_name(ar, normalizedMethod.c_str());
     checkLibArchive(ar, err, "failed to get libarchive filter by name: %s");
     auto code = archive_filter_code(ar, 0);
     return code;
