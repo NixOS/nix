@@ -598,7 +598,14 @@ struct curlFileTransfer : public FileTransfer
                     decompressionSink.reset();
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    fileTransfer.enqueueItem(shared_from_this());
+                    try {
+                        fileTransfer.enqueueItem(shared_from_this());
+                    } catch (const nix::Error & e) {
+                        // If enqueue fails (e.g., during shutdown), fail the transfer properly
+                        // instead of letting the exception propagate, which would leave done=false
+                        // and cause the destructor to attempt a second callback invocation
+                        fail(std::move(exc));
+                    }
                 } else
                     fail(std::move(exc));
             }
