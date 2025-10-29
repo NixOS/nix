@@ -245,7 +245,7 @@ If those other derivations *also* abide by this common case (and likewise for tr
   >                                                           note the ".drv"
   > ```
 
-## Extending the model to be higher-order
+## Extending the model to be higher-order {#dynamic}
 
 **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 
