@@ -4,10 +4,13 @@
  * @brief Bindings to the Nix language evaluator
  *
  * See *[Embedding the Nix Evaluator](@ref nix_evaluator_example)* for an example.
- * @{
  */
 /** @file
  * @brief Main entry for the libexpr C bindings
+ */
+/** @defgroup libexpr_init Initialization
+ * @ingroup libexpr
+ * @{
  */
 
 #include "nix_api_store.h"
@@ -45,7 +48,10 @@ typedef struct nix_eval_state_builder nix_eval_state_builder;
  */
 typedef struct EvalState EvalState; // nix::EvalState
 
+/** @} */
+
 /** @brief A Nix language value, or thunk that may evaluate to a value.
+ * @ingroup value
  *
  * Values are the primary objects manipulated in the Nix language.
  * They are considered to be immutable from a user's perspective, but the process of evaluating a value changes its
@@ -56,7 +62,8 @@ typedef struct EvalState EvalState; // nix::EvalState
  *
  * The evaluator manages its own memory, but your use of the C API must follow the reference counting rules.
  *
- * @see value_manip
+ * @struct nix_value
+ * @see value_create, value_extract
  * @see nix_value_incref, nix_value_decref
  */
 typedef struct nix_value nix_value;
@@ -65,6 +72,7 @@ NIX_DEPRECATED("use nix_value instead") typedef nix_value Value;
 // Function prototypes
 /**
  * @brief Initialize the Nix language evaluator.
+ * @ingroup libexpr_init
  *
  * This function must be called at least once,
  * at some point before constructing a EvalState for the first time.
@@ -77,6 +85,7 @@ nix_err nix_libexpr_init(nix_c_context * context);
 
 /**
  * @brief Parses and evaluates a Nix expression from a string.
+ * @ingroup value_create
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
@@ -93,6 +102,7 @@ nix_err nix_expr_eval_from_string(
 
 /**
  * @brief Calls a Nix function with an argument.
+ * @ingroup value_create
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
@@ -107,6 +117,7 @@ nix_err nix_value_call(nix_c_context * context, EvalState * state, nix_value * f
 
 /**
  * @brief Calls a Nix function with multiple arguments.
+ * @ingroup value_create
  *
  * Technically these are functions that return functions. It is common for Nix
  * functions to be curried, so this function is useful for calling them.
@@ -126,10 +137,12 @@ nix_err nix_value_call_multi(
 
 /**
  * @brief Calls a Nix function with multiple arguments.
+ * @ingroup value_create
  *
  * Technically these are functions that return functions. It is common for Nix
  * functions to be curried, so this function is useful for calling them.
  *
+ * @def NIX_VALUE_CALL
  * @param[out] context Optional, stores error information
  * @param[in] state The state of the evaluation.
  * @param[out] value The result of the function call.
@@ -147,6 +160,7 @@ nix_err nix_value_call_multi(
 
 /**
  * @brief Forces the evaluation of a Nix value.
+ * @ingroup value_create
  *
  * The Nix interpreter is lazy, and not-yet-evaluated values can be
  * of type NIX_TYPE_THUNK instead of their actual value.
@@ -180,18 +194,20 @@ nix_err nix_value_force_deep(nix_c_context * context, EvalState * state, nix_val
 
 /**
  * @brief Create a new nix_eval_state_builder
+ * @ingroup libexpr_init
  *
  * The settings are initialized to their default value.
  * Values can be sourced elsewhere with nix_eval_state_builder_load.
  *
  * @param[out] context Optional, stores error information
  * @param[in] store The Nix store to use.
- * @return A new nix_eval_state_builder or NULL on failure.
+ * @return A new nix_eval_state_builder or NULL on failure. Call nix_eval_state_builder_free() when you're done.
  */
 nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Store * store);
 
 /**
  * @brief Read settings from the ambient environment
+ * @ingroup libexpr_init
  *
  * Settings are sourced from environment variables and configuration files,
  * as documented in the Nix manual.
@@ -204,6 +220,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
 
 /**
  * @brief Set the lookup path for `<...>` expressions
+ * @ingroup libexpr_init
  *
  * @param[in] context Optional, stores error information
  * @param[in] builder The builder to modify.
@@ -214,18 +231,21 @@ nix_err nix_eval_state_builder_set_lookup_path(
 
 /**
  * @brief Create a new Nix language evaluator state
+ * @ingroup libexpr_init
  *
- * Remember to nix_eval_state_builder_free after building the state.
+ * The builder becomes unusable after this call. Remember to call nix_eval_state_builder_free()
+ * after building the state.
  *
  * @param[out] context Optional, stores error information
  * @param[in] builder The builder to use and free
- * @return A new Nix state or NULL on failure.
+ * @return A new Nix state or NULL on failure. Call nix_state_free() when you're done.
  * @see nix_eval_state_builder_new, nix_eval_state_builder_free
  */
 EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder);
 
 /**
  * @brief Free a nix_eval_state_builder
+ * @ingroup libexpr_init
  *
  * Does not fail.
  *
@@ -235,19 +255,21 @@ void nix_eval_state_builder_free(nix_eval_state_builder * builder);
 
 /**
  * @brief Create a new Nix language evaluator state
+ * @ingroup libexpr_init
  *
  * For more control, use nix_eval_state_builder
  *
  * @param[out] context Optional, stores error information
  * @param[in] lookupPath Null-terminated array of strings corresponding to entries in NIX_PATH.
  * @param[in] store The Nix store to use.
- * @return A new Nix state or NULL on failure.
+ * @return A new Nix state or NULL on failure. Call nix_state_free() when you're done.
  * @see nix_state_builder_new
  */
 EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, Store * store);
 
 /**
  * @brief Frees a Nix state.
+ * @ingroup libexpr_init
  *
  * Does not fail.
  *
@@ -256,6 +278,7 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath, 
 void nix_state_free(EvalState * state);
 
 /** @addtogroup GC
+ * @ingroup libexpr
  * @brief Reference counting and garbage collector operations
  *
  * The Nix language evaluator uses a garbage collector. To ease C interop, we implement
@@ -286,6 +309,9 @@ nix_err nix_gc_incref(nix_c_context * context, const void * object);
 /**
  * @brief Decrement the garbage collector reference counter for the given object
  *
+ * @deprecated We are phasing out the general nix_gc_decref() in favor of type-specified free functions, such as
+ * nix_value_decref().
+ *
  * We also provide typed `nix_*_decref` functions, which are
  *   - safer to use
  *   - easier to integrate when deriving bindings
@@ -314,12 +340,11 @@ void nix_gc_now();
  */
 void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * obj, void * cd));
 
-/** @} */
+/** @} */ // doxygen group GC
+
 // cffi end
 #ifdef __cplusplus
 }
 #endif
-
-/** @} */
 
 #endif // NIX_API_EXPR_H
