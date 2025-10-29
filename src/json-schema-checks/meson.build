@@ -53,20 +53,19 @@ schemas = [
       'simple-derivation.json',
     ],
   },
-  # # Not sure how to make subschema work
-  # {
-  #   'stem': 'derivation',
-  #   'schema': schema_dir / 'derivation-v3.yaml#output',
-  #   'files' : [
-  #     'output-caFixedFlat.json',
-  #     'output-caFixedNAR.json',
-  #     'output-caFixedText.json',
-  #     'output-caFloating.json',
-  #     'output-deferred.json',
-  #     'output-impure.json',
-  #     'output-inputAddressed.json',
-  #   ],
-  # },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+      'output-caFloating.json',
+      'output-deferred.json',
+      'output-impure.json',
+      'output-inputAddressed.json',
+    ],
+  },
   {
     'stem' : 'deriving-path',
     'schema' : schema_dir / 'deriving-path-v1.yaml',
