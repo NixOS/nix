@@ -1,0 +1,34 @@
+name: "Coverity Scan"
+
+on:
+  # FIXME: This is here for testing, should be removed before merging
+  pull_request:
+  push:
+    branches:
+      - master
+      - coverity-test
+
+permissions: read-all
+
+jobs:
+  coverity:
+    name: Coverity static analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: false
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: configure
+        run: nix develop --configure
+      - uses: vapier/coverity-scan-action@v1
+        with:
+          project: NixOS/nix
+          token: ${{ secrets.COVERITY_SCAN_TOKEN }}
+          email: foo@example.com
+          build_language: cxx
+          command: nix develop --build
+          version: ${{ github.sha }}
