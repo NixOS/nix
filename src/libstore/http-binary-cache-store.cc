@@ -134,27 +134,41 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
     }
 }
 
-void HttpBinaryCacheStore::upsertFile(
-    const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
+void HttpBinaryCacheStore::upload(
+    std::string_view path,
+    RestartableSource & source,
+    uint64_t sizeHint,
+    std::string_view mimeType,
+    std::optional<std::string_view> contentEncoding)
 {
     auto req = makeRequest(path);
     req.method = HttpMethod::PUT;
-    auto compressionMethod = getCompressionMethod(path);
 
-    std::optional<CompressedSource> compressed;
-
-    if (compressionMethod) {
-        compressed = CompressedSource(source, *compressionMethod);
-        req.headers.emplace_back("Content-Encoding", *compressionMethod);
-        req.data = {compressed->size(), *compressed};
-    } else {
-        req.data = {sizeHint, source};
+    if (contentEncoding) {
+        req.headers.emplace_back("Content-Encoding", *contentEncoding);
     }
 
+    req.data = {sizeHint, source};
     req.mimeType = mimeType;
 
+    getFileTransfer()->upload(req);
+}
+
+void HttpBinaryCacheStore::upload(std::string_view path, CompressedSource & source, std::string_view mimeType)
+{
+    upload(path, static_cast<RestartableSource &>(source), source.size(), mimeType, source.getCompressionMethod());
+}
+
+void HttpBinaryCacheStore::upsertFile(
+    const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
+{
     try {
-        getFileTransfer()->upload(req);
+        if (auto compressionMethod = getCompressionMethod(path)) {
+            CompressedSource compressed(source, *compressionMethod);
+            upload(path, compressed, mimeType);
+        } else {
+            upload(path, source, sizeHint, mimeType, std::nullopt);
+        }
     } catch (FileTransferError & e) {
         UploadToHTTP err(e.message());
         err.addTrace({}, "while uploading to HTTP binary cache at '%s'", config->cacheUri.to_string());

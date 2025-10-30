@@ -85,6 +85,37 @@ protected:
 
     FileTransferRequest makeRequest(std::string_view path);
 
+    /**
+     * Uploads data to the binary cache.
+     *
+     * This is a lower-level method that handles the actual upload after
+     * compression has been applied. It does not handle compression or
+     * error wrapping - those are the caller's responsibility.
+     *
+     * @param path The path in the binary cache to upload to
+     * @param source The data source (should already be compressed if needed)
+     * @param sizeHint Size hint for the data
+     * @param mimeType The MIME type of the content
+     * @param contentEncoding Optional Content-Encoding header value (e.g., "xz", "br")
+     */
+    void upload(
+        std::string_view path,
+        RestartableSource & source,
+        uint64_t sizeHint,
+        std::string_view mimeType,
+        std::optional<std::string_view> contentEncoding);
+
+    /**
+     * Uploads data to the binary cache (CompressedSource overload).
+     *
+     * This overload infers both the size and compression method from the CompressedSource.
+     *
+     * @param path The path in the binary cache to upload to
+     * @param source The compressed source (knows size and compression method)
+     * @param mimeType The MIME type of the content
+     */
+    void upload(std::string_view path, CompressedSource & source, std::string_view mimeType);
+
     void getFile(const std::string & path, Sink & sink) override;
 
     void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept override;
