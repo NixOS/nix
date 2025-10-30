@@ -7,6 +7,7 @@
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -175,3 +176,5 @@ struct KeyedBuildResult : BuildResult
 };
 
 } // namespace nix
+
+JSON_IMPL(nix::BuildResult)

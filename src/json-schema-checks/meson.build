@@ -150,6 +150,15 @@ schemas += [
       'impure.json',
     ],
   },
+  {
+    'stem' : 'build-result',
+    'schema' : schema_dir / 'build-result-v1.yaml',
+    'files' : [
+      'success.json',
+      'output-rejected.json',
+      'not-deterministic.json',
+    ],
+  },
   # Match exact variant
   {
     'stem' : 'store-object-info',
