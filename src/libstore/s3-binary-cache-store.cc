@@ -1,6 +1,10 @@
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 #include <cassert>
 #include <ranges>
@@ -8,6 +12,10 @@
 #include <span>
 
 namespace nix {
+
+MakeError(UploadToS3, Error);
+
+static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
 
 class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
 {
@@ -25,6 +33,26 @@ public:
 
 private:
     ref<S3BinaryCacheStoreConfig> s3Config;
+
+    /**
+     * Uploads a file to S3 using a regular (non-multipart) upload.
+     *
+     * This method is suitable for files up to 5GiB in size. For larger files,
+     * multipart upload should be used instead.
+     *
+     * @see https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html
+     */
+    void upload(
+        std::string_view path,
+        RestartableSource & source,
+        uint64_t sizeHint,
+        std::string_view mimeType,
+        std::optional<std::string_view> contentEncoding);
+
+    /**
+     * Uploads a file to S3 (CompressedSource overload).
+     */
+    void upload(std::string_view path, CompressedSource & source, std::string_view mimeType);
 
     /**
      * Creates a multipart upload for large objects to S3.
@@ -69,7 +97,40 @@ private:
 void S3BinaryCacheStore::upsertFile(
     const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
-    HttpBinaryCacheStore::upsertFile(path, source, mimeType, sizeHint);
+    if (auto compressionMethod = getCompressionMethod(path)) {
+        CompressedSource compressed(source, *compressionMethod);
+        upload(path, compressed, mimeType);
+    } else {
+        upload(path, source, sizeHint, mimeType, std::nullopt);
+    }
+}
+
+void S3BinaryCacheStore::upload(
+    std::string_view path,
+    RestartableSource & source,
+    uint64_t sizeHint,
+    std::string_view mimeType,
+    std::optional<std::string_view> contentEncoding)
+{
+    debug("using S3 regular upload for '%s' (%d bytes)", path, sizeHint);
+    if (sizeHint > AWS_MAX_PART_SIZE)
+        throw Error(
+            "file too large for S3 upload without multipart: %s would exceed maximum size of %s. Consider enabling multipart-upload.",
+            renderSize(sizeHint),
+            renderSize(AWS_MAX_PART_SIZE));
+
+    try {
+        HttpBinaryCacheStore::upload(path, source, sizeHint, mimeType, contentEncoding);
+    } catch (FileTransferError & e) {
+        UploadToS3 err(e.message());
+        err.addTrace({}, "while uploading to S3 binary cache at '%s'", config->cacheUri.to_string());
+        throw err;
+    }
+}
+
+void S3BinaryCacheStore::upload(std::string_view path, CompressedSource & source, std::string_view mimeType)
+{
+    upload(path, static_cast<RestartableSource &>(source), source.size(), mimeType, source.getCompressionMethod());
 }
 
 std::string S3BinaryCacheStore::createMultipartUpload(
