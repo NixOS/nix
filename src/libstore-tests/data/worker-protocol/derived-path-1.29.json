@@ -1,0 +1,16 @@
+[
+  "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+  {
+    "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "outputs": [
+      "*"
+    ]
+  },
+  {
+    "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "outputs": [
+      "x",
+      "y"
+    ]
+  }
+]

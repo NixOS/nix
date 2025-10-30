@@ -153,4 +153,20 @@ BuildResult adl_serializer<BuildResult>::from_json(const json & _json)
     return br;
 }
 
+KeyedBuildResult adl_serializer<KeyedBuildResult>::from_json(const json & json0)
+{
+    auto json = getObject(json0);
+
+    return KeyedBuildResult{
+        adl_serializer<BuildResult>::from_json(json0),
+        valueAt(json, "path"),
+    };
+}
+
+void adl_serializer<KeyedBuildResult>::to_json(json & json, const KeyedBuildResult & kbr)
+{
+    adl_serializer<BuildResult>::to_json(json, kbr);
+    json["path"] = kbr.path;
+}
+
 } // namespace nlohmann

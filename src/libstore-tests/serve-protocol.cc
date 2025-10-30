@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/store/serve-protocol-connection.hh"
@@ -334,7 +335,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         }),
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_1,
     "build-options-2.1",
@@ -344,7 +345,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         .buildTimeout = 6,
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_2,
     "build-options-2.2",
@@ -355,7 +356,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         .maxLogSize = 7,
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_3,
     "build-options-2.3",
@@ -368,7 +369,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         .enforceDeterminism = true,
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_7,
     "build-options-2.7",

@@ -1,0 +1,28 @@
+[
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": false,
+    "startTime": 0,
+    "status": "output rejected",
+    "stopTime": 0,
+    "success": false,
+    "timesBuilt": 0
+  },
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": true,
+    "startTime": 30,
+    "status": "not deterministic",
+    "stopTime": 50,
+    "success": false,
+    "timesBuilt": 3
+  },
+  {
+    "builtOutputs": {},
+    "startTime": 30,
+    "status": "built",
+    "stopTime": 50,
+    "success": true,
+    "timesBuilt": 0
+  }
+]
