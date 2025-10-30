@@ -273,6 +273,50 @@ struct StringSource : RestartableSource
 };
 
 /**
+ * Compresses a RestartableSource using the specified compression method.
+ *
+ * @note currently this buffers the entire compressed data stream in memory. In the future it may instead compress data
+ * on demand, lazily pulling from the original `RestartableSource`. In that case, the `size()` method would go away
+ * because we would not in fact know the compressed size in advance.
+ */
+struct CompressedSource : RestartableSource
+{
+private:
+    std::string compressedData;
+    std::string compressionMethod;
+    StringSource stringSource;
+
+public:
+    /**
+     * Compress a RestartableSource using the specified compression method.
+     *
+     * @param source The source data to compress
+     * @param compressionMethod The compression method to use (e.g., "xz", "br")
+     */
+    CompressedSource(RestartableSource & source, const std::string & compressionMethod);
+
+    size_t read(char * data, size_t len) override
+    {
+        return stringSource.read(data, len);
+    }
+
+    void restart() override
+    {
+        stringSource.restart();
+    }
+
+    uint64_t size() const
+    {
+        return compressedData.size();
+    }
+
+    std::string_view getCompressionMethod() const
+    {
+        return compressionMethod;
+    }
+};
+
+/**
  * Create a restartable Source from a factory function.
  *
  * @param factory Factory function that returns a fresh instance of the Source. Gets
