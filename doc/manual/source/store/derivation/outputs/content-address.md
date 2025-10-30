@@ -167,7 +167,7 @@ It is only in the potential for that check to fail that they are different.
 >
 > In a future world where floating content-addressing is also stable, we in principle no longer need separate [fixed](#fixed) content-addressing.
 > Instead, we could always use floating content-addressing, and separately assert the precise value content address of a given store object to be used as an input (of another derivation).
-> A stand-alone assertion object of this sort is not yet implemented, but its possible creation is tracked in [Issue #11955](https://github.com/NixOS/nix/issues/11955).
+> A stand-alone assertion object of this sort is not yet implemented, but its possible creation is tracked in [issue #11955](https://github.com/NixOS/nix/issues/11955).
 >
 > In the current version of Nix, fixed outputs which fail their hash check are still registered as valid store objects, just not registered as outputs of the derivation which produced them.
 > This is an optimization that means if the wrong output hash is specified in a derivation, and then the derivation is recreated with the right output hash, derivation does not need to be rebuilt --- avoiding downloading potentially large amounts of data twice.

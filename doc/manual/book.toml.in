@@ -7,6 +7,7 @@ additional-css = ["custom.css"]
 additional-js = ["redirects.js"]
 edit-url-template = "https://github.com/NixOS/nix/tree/master/doc/manual/{path}"
 git-repository-url = "https://github.com/NixOS/nix"
+mathjax-support = true
 
 # Handles replacing @docroot@ with a path to ./source relative to that markdown file,
 # {{#include handlebars}}, and the @generated@ syntax used within these. it mostly
