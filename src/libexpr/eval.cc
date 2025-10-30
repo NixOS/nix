@@ -2160,30 +2160,28 @@ void EvalState::forceValueDeep(Value & v)
 {
     std::set<const Value *> seen;
 
-    std::function<void(Value & v)> recurse;
-
-    recurse = [&](Value & v) {
+    [&, &state(*this)](this const auto & recurse, Value & v) {
         if (!seen.insert(&v).second)
             return;
 
-        forceValue(v, v.determinePos(noPos));
+        state.forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
-                    auto dts = debugRepl && i.value->isThunk() ? makeDebugTraceStacker(
-                                                                     *this,
-                                                                     *i.value->thunk().expr,
-                                                                     *i.value->thunk().env,
-                                                                     i.pos,
-                                                                     "while evaluating the attribute '%1%'",
-                                                                     symbols[i.name])
-                                                               : nullptr;
+                    auto dts = state.debugRepl && i.value->isThunk() ? makeDebugTraceStacker(
+                                                                           state,
+                                                                           *i.value->thunk().expr,
+                                                                           *i.value->thunk().env,
+                                                                           i.pos,
+                                                                           "while evaluating the attribute '%1%'",
+                                                                           state.symbols[i.name])
+                                                                     : nullptr;
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", symbols[i.name]);
+                    state.addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", state.symbols[i.name]);
                     throw;
                 }
         }
@@ -2192,9 +2190,7 @@ void EvalState::forceValueDeep(Value & v)
             for (auto v2 : v.listView())
                 recurse(*v2);
         }
-    };
-
-    recurse(v);
+    }(v);
 }
 
 NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCtx)

@@ -1391,8 +1391,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     }
 
     {
-        std::function<nlohmann::json(const DerivedPathMap<StringSet>::ChildNode &)> doInput;
-        doInput = [&](const auto & inputNode) {
+        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
             auto value = nlohmann::json::object();
             value["outputs"] = inputNode.value;
             {
@@ -1454,8 +1453,7 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
     }
 
     try {
-        std::function<DerivedPathMap<StringSet>::ChildNode(const nlohmann::json &)> doInput;
-        doInput = [&](const auto & _json) {
+        auto doInput = [&](this const auto & doInput, const auto & _json) -> DerivedPathMap<StringSet>::ChildNode {
             auto & json = getObject(_json);
             DerivedPathMap<StringSet>::ChildNode node;
             node.value = getStringSet(valueAt(json, "outputs"));

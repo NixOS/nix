@@ -267,11 +267,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
-            std::set<ref<Node>> visited;
+            std::set<ref<Node>> visited{lockedFlake.lockFile.root};
 
-            std::function<void(const Node & node, const std::string & prefix)> recurse;
-
-            recurse = [&](const Node & node, const std::string & prefix) {
+            [&](this const auto & recurse, const Node & node, const std::string & prefix) -> void {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
                     bool last = i + 1 == node.inputs.size();
 
@@ -298,10 +296,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                             printInputAttrPath(*follows));
                     }
                 }
-            };
-
-            visited.insert(lockedFlake.lockFile.root);
-            recurse(*lockedFlake.lockFile.root, "");
+            }(*lockedFlake.lockFile.root, "");
         }
     }
 };
@@ -884,8 +879,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::vector<std::filesystem::path> changedFiles;
         std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const std::filesystem::path & to) {
+        [&](this const auto & copyDir, const SourcePath & from, const std::filesystem::path & to) -> void {
             createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
@@ -935,9 +929,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
-        };
-
-        copyDir(templateDir, flakeDir);
+        }(templateDir, flakeDir);
 
         if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = {"-C", flakeDir, "add", "--intent-to-add", "--force", "--"};

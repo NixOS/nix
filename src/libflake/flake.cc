@@ -502,8 +502,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
-            std::function<void(const FlakeInput & input, const InputAttrPath & prefix)> addOverrides;
-            addOverrides = [&](const FlakeInput & input, const InputAttrPath & prefix) {
+            auto addOverrides =
+                [&](this const auto & addOverrides, const FlakeInput & input, const InputAttrPath & prefix) -> void {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
                     auto inputAttrPath(prefix);
                     inputAttrPath.push_back(idOverride);
