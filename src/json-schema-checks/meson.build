@@ -75,6 +75,56 @@ schemas = [
       'single_built_built.json',
     ],
   },
+  # Match overall
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'files' : [
+      'pure.json',
+      'impure.json',
+      'empty_pure.json',
+      'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'files' : [
+      'pure.json',
+      'impure.json',
+    ],
+  },
+  # Match exact variant
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'files' : [
+      'pure.json',
+      'empty_pure.json',
+    ],
+  },
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/impure',
+    'files' : [
+      'impure.json',
+      'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'files' : [
+      'pure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/narInfo',
+    'files' : [
+      'impure.json',
+    ],
+  },
 ]
 
 # Validate each example against the schema
