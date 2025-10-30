@@ -203,23 +203,23 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 
     // New format as this as nullable but mandatory field; handling
     // missing is for back-compat.
-    if (json.contains("ca"))
-        if (auto * rawCa = getNullable(valueAt(json, "ca")))
+    if (auto * rawCa0 = optionalValueAt(json, "ca"))
+        if (auto * rawCa = getNullable(*rawCa0))
             res.ca = ContentAddress::parse(getString(*rawCa));
 
-    if (json.contains("deriver"))
-        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
+    if (auto * rawDeriver0 = optionalValueAt(json, "deriver"))
+        if (auto * rawDeriver = getNullable(*rawDeriver0))
             res.deriver = store.parseStorePath(getString(*rawDeriver));
 
-    if (json.contains("registrationTime"))
-        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+    if (auto * rawRegistrationTime0 = optionalValueAt(json, "registrationTime"))
+        if (auto * rawRegistrationTime = getNullable(*rawRegistrationTime0))
             res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
-    if (json.contains("ultimate"))
-        res.ultimate = getBoolean(valueAt(json, "ultimate"));
+    if (auto * rawUltimate = optionalValueAt(json, "ultimate"))
+        res.ultimate = getBoolean(*rawUltimate);
 
-    if (json.contains("signatures"))
-        res.sigs = getStringSet(valueAt(json, "signatures"));
+    if (auto * rawSignatures = optionalValueAt(json, "signatures"))
+        res.sigs = getStringSet(*rawSignatures);
 
     return res;
 }
