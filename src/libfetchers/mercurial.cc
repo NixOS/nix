@@ -94,7 +94,7 @@ struct MercurialInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) const override
+    ParsedURL toURL(const Input & input, bool abbreviate) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         url.scheme = "hg+" + url.scheme;
@@ -222,9 +222,7 @@ struct MercurialInputScheme : InputScheme
 
         auto revInfoKey = [&](const Hash & rev) {
             if (rev.algo != HashAlgorithm::SHA1)
-                throw Error(
-                    "Hash '%s' is not supported by Mercurial. Only sha1 is supported.",
-                    rev.to_string(HashFormat::Base16, true));
+                throw Error("Hash '%s' is not supported by Mercurial. Only sha1 is supported.", rev.gitRev());
 
             return Cache::Key{"hgRev", {{"store", store->storeDir}, {"name", name}, {"rev", input.getRev()->gitRev()}}};
         };
@@ -331,7 +329,7 @@ struct MercurialInputScheme : InputScheme
         auto storePath = fetchToStore(store, input);
         auto accessor = store->requireStoreObjectAccessor(storePath);
 
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        accessor->setPathDisplay("«" + input.to_string(true) + "»");
 
         return {accessor, input};
     }
