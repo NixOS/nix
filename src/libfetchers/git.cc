@@ -49,38 +49,9 @@ Path getCachePath(std::string_view key, bool shallow)
 }
 
 // Returns the name of the HEAD branch.
-//
-// Returns the head branch name as reported by git ls-remote --symref, e.g., if
-// ls-remote returns the output below, "main" is returned based on the ref line.
-//
-//   ref: refs/heads/main       HEAD
-//   ...
 std::optional<std::string> readHead(const Path & path)
 {
-    auto [status, output] = runProgram(
-        RunOptions{
-            .program = "git",
-            // FIXME: use 'HEAD' to avoid returning all refs
-            .args = {"ls-remote", "--symref", path},
-            .isInteractive = true,
-        });
-    if (status != 0)
-        return std::nullopt;
-
-    std::string_view line = output;
-    line = line.substr(0, line.find("\n"));
-    if (const auto parseResult = git::parseLsRemoteLine(line); parseResult && parseResult->reference == "HEAD") {
-        switch (parseResult->kind) {
-        case git::LsRemoteRefLine::Kind::Symbolic:
-            debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
-            break;
-        case git::LsRemoteRefLine::Kind::Object:
-            debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
-            break;
-        }
-        return parseResult->target;
-    }
-    return std::nullopt;
+    return git::defaultRemoteBranch(path);
 }
 
 // Persist the HEAD ref from the remote repo in the local cached repo.
@@ -116,7 +87,7 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
     struct stat st;
     std::optional<std::string> cachedRef;
     if (stat(headRefFile.c_str(), &st) == 0) {
-        cachedRef = readHead(cacheDir);
+        cachedRef = readFile(headRefFile);
         if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
@@ -124,8 +95,9 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
     }
 
     auto ref = readHead(actualUrl);
-    if (ref)
+    if (ref) {
         return ref;
+    }
 
     if (cachedRef) {
         // If the cached git ref is expired in fetch() below, and the 'git fetch'
