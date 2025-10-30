@@ -141,18 +141,12 @@ void HttpBinaryCacheStore::upsertFile(
     req.method = HttpMethod::PUT;
     auto compressionMethod = getCompressionMethod(path);
 
-    std::string data;
-    std::optional<StringSource> stringSource{};
+    std::optional<CompressedSource> compressed;
 
     if (compressionMethod) {
-        StringSink sink{};
-        auto compressionSink = makeCompressionSink(*compressionMethod, sink);
-        source.drainInto(*compressionSink);
-        compressionSink->finish();
-        data = std::move(sink.s);
+        compressed = CompressedSource(source, *compressionMethod);
         req.headers.emplace_back("Content-Encoding", *compressionMethod);
-        stringSource = StringSource{data};
-        req.data = {*stringSource};
+        req.data = {compressed->size(), *compressed};
     } else {
         req.data = {sizeHint, source};
     }

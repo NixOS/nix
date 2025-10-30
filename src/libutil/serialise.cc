@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
@@ -250,6 +251,19 @@ void StringSource::skip(size_t len)
         throw EndOfFile("end of string reached");
     }
     pos += len;
+}
+
+CompressedSource::CompressedSource(RestartableSource & source, const std::string & compressionMethod)
+    : compressedData([&]() {
+        StringSink sink;
+        auto compressionSink = makeCompressionSink(compressionMethod, sink);
+        source.drainInto(*compressionSink);
+        compressionSink->finish();
+        return std::move(sink.s);
+    }())
+    , compressionMethod(compressionMethod)
+    , stringSource(compressedData)
+{
 }
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
