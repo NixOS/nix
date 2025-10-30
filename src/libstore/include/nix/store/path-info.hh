@@ -197,3 +197,4 @@ using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 } // namespace nix
 
 JSON_IMPL(nix::UnkeyedValidPathInfo)
+JSON_IMPL(nix::ValidPathInfo)

@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/store/worker-protocol-impl.hh"
@@ -632,7 +633,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_30,
     "client-handshake-info_1_30",
@@ -641,7 +642,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         {},
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_33,
     "client-handshake-info_1_33",
@@ -655,7 +656,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_35,
     "client-handshake-info_1_35",
