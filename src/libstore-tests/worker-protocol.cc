@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/store/worker-protocol-impl.hh"
@@ -649,7 +650,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_30,
     "client-handshake-info_1_30",
@@ -658,7 +659,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         {},
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_33,
     "client-handshake-info_1_33",
@@ -672,7 +673,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_35,
     "client-handshake-info_1_35",
@@ -690,7 +691,7 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 TEST_F(WorkerProtoTest, handshake_log)
 {
-    CharacterizationTest::writeTest("handshake-to-client", [&]() -> std::string {
+    CharacterizationTest::writeTest("handshake-to-client.bin", [&]() -> std::string {
         StringSink toClientLog;
 
         Pipe toClient, toServer;
@@ -751,7 +752,7 @@ struct NullBufferedSink : BufferedSink
 
 TEST_F(WorkerProtoTest, handshake_client_replay)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](std::string toClientLog) {
         NullBufferedSink nullSink;
 
         StringSource in{toClientLog};
@@ -764,7 +765,7 @@ TEST_F(WorkerProtoTest, handshake_client_replay)
 
 TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](std::string toClientLog) {
         for (size_t len = 0; len < toClientLog.size(); ++len) {
             NullBufferedSink nullSink;
             auto substring = toClientLog.substr(0, len);
@@ -782,7 +783,7 @@ TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
 
 TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](const std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](const std::string toClientLog) {
         for (size_t idx = 0; idx < toClientLog.size(); ++idx) {
             // corrupt a copy
             std::string toClientLogCorrupt = toClientLog;

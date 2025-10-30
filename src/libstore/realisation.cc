@@ -144,6 +144,16 @@ namespace nlohmann {
 
 using namespace nix;
 
+DrvOutput adl_serializer<DrvOutput>::from_json(const json & json)
+{
+    return DrvOutput::parse(getString(json));
+}
+
+void adl_serializer<DrvOutput>::to_json(json & json, const DrvOutput & drvOutput)
+{
+    json = drvOutput.to_string();
+}
+
 UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & json0)
 {
     auto json = getObject(json0);
@@ -182,14 +192,14 @@ Realisation adl_serializer<Realisation>::from_json(const json & json0)
 
     return Realisation{
         static_cast<UnkeyedRealisation>(json0),
-        DrvOutput::parse(valueAt(json, "id")),
+        valueAt(json, "id"),
     };
 }
 
 void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
 {
     json = static_cast<const UnkeyedRealisation &>(r);
-    json["id"] = r.id.to_string();
+    json["id"] = r.id;
 }
 
 } // namespace nlohmann

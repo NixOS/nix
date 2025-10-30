@@ -1,0 +1,47 @@
+[
+  {
+    "ca": null,
+    "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "narHash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+    },
+    "narSize": 34878,
+    "references": [
+      "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv"
+    ],
+    "registrationTime": null,
+    "signatures": [],
+    "ultimate": false,
+    "version": 2
+  },
+  {
+    "ca": {
+      "hash": {
+        "algorithm": "sha256",
+        "format": "base64",
+        "hash": "EMIJ+giQ/gLIWoxmPKjno3zHZrxbGymgzGGyZvZBIdM="
+      },
+      "method": "nar"
+    },
+    "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "narHash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+    },
+    "narSize": 34878,
+    "references": [
+      "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+      "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
+    ],
+    "registrationTime": null,
+    "signatures": [
+      "fake-sig-1",
+      "fake-sig-2"
+    ],
+    "ultimate": false,
+    "version": 2
+  }
+]

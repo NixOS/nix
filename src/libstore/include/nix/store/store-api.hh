@@ -1004,4 +1004,10 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 std::map<DrvOutput, StorePath>
 drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);
 
+template<>
+struct json_avoids_null<TrustedFlag> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::TrustedFlag)

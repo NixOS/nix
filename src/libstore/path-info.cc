@@ -251,4 +251,20 @@ void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedVal
     json = c.toJSON(nullptr, true);
 }
 
+ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)
+{
+    auto json = getObject(json0);
+
+    return ValidPathInfo{
+        valueAt(json, "path"),
+        adl_serializer<UnkeyedValidPathInfo>::from_json(json0),
+    };
+}
+
+void adl_serializer<ValidPathInfo>::to_json(json & json, const ValidPathInfo & v)
+{
+    adl_serializer<UnkeyedValidPathInfo>::to_json(json, v);
+    json["path"] = v.path;
+}
+
 } // namespace nlohmann
