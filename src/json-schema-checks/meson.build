@@ -134,7 +134,7 @@ schemas += [
   # Match overall
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
     'files' : [
       'pure.json',
       'impure.json',
@@ -144,7 +144,7 @@ schemas += [
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
     'files' : [
       'pure.json',
       'impure.json',
@@ -162,7 +162,7 @@ schemas += [
   # Match exact variant
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
     'files' : [
       'pure.json',
       'empty_pure.json',
@@ -170,7 +170,7 @@ schemas += [
   },
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/impure',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/impure',
     'files' : [
       'impure.json',
       'empty_impure.json',
@@ -178,14 +178,14 @@ schemas += [
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
     'files' : [
       'pure.json',
     ],
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/narInfo',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
     'files' : [
       'impure.json',
     ],

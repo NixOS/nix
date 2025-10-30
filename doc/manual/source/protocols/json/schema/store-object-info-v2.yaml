@@ -1,6 +1,6 @@
-"$schema": "http://json-schema.org/draft-07/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-object-info-v1.json"
-title: Store Object Info
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-object-info-v2.json"
+title: Store Object Info v2
 description: |
   Information about a [store object](@docroot@/store/store-object.md).
 
@@ -41,11 +41,27 @@ $defs:
       This is the minimal set of fields that describe what a store object contains.
     type: object
     required:
+      - version
       - narHash
       - narSize
       - references
       - ca
     properties:
+      version:
+        type: integer
+        const: 2
+        title: Format version (must be 2)
+        description: |
+          Must be `2`.
+          This is a guard that allows us to continue evolving this format.
+          Here is the rough version history:
+
+          - Version 0: `.narinfo` line-oriented format
+
+          - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from `.narinfo` format.
+
+          - Version 2: Use structured JSON type for `ca`
+
       path:
         type: string
         title: Store Path
@@ -76,7 +92,10 @@ $defs:
           type: string
 
       ca:
-        type: ["string", "null"]
+        oneOf:
+          - type: "null"
+            const: null
+          - "$ref": "./content-address-v1.yaml"
         title: Content Address
         description: |
           If the store object is [content-addressed](@docroot@/store/store-object/content-address.md),
@@ -91,6 +110,7 @@ $defs:
       In other words, the same store object in different stores could have different values for these impure fields.
     type: object
     required:
+      - version
       - narHash
       - narSize
       - references
@@ -101,6 +121,7 @@ $defs:
       - ultimate
       - signatures
     properties:
+      version: { $ref: "#/$defs/base/properties/version" }
       path: { $ref: "#/$defs/base/properties/path" }
       narHash: { $ref: "#/$defs/base/properties/narHash" }
       narSize: { $ref: "#/$defs/base/properties/narSize" }
@@ -164,6 +185,7 @@ $defs:
       This download information, being specific to how the store object happens to be stored and transferred, is also considered to be non-intrinsic / impure.
     type: object
     required:
+      - version
       - narHash
       - narSize
       - references
@@ -179,6 +201,7 @@ $defs:
       - downloadHash
       - downloadSize
     properties:
+      version: { $ref: "#/$defs/base/properties/version" }
       path: { $ref: "#/$defs/base/properties/path" }
       narHash: { $ref: "#/$defs/base/properties/narHash" }
       narSize: { $ref: "#/$defs/base/properties/narSize" }

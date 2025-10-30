@@ -14,7 +14,16 @@ nix-build fixed.nix -A bad --no-out-link && fail "should fail"
 # Building with the bad hash should produce the "good" output path as
 # a side-effect.
 [[ -e $path ]]
-nix path-info --json "$path" | grep fixed:md5:2qk15sxzzjlnpjk9brn7j8ppcd
+nix path-info --json "$path" | jq -e \
+    --arg hash "$(nix hash convert --to base64 "md5:8ddd8be4b179a529afa5f2ffae4b9858")" \
+    '.[].ca == {
+        method: "flat",
+        hash: {
+            algorithm: "md5",
+            format: "base64",
+            hash: $hash
+        },
+    }'
 
 echo 'testing good...'
 nix-build fixed.nix -A good --no-out-link

@@ -156,6 +156,8 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
 
     auto jsonObject = json::object();
 
+    jsonObject["version"] = 2;
+
     jsonObject["narHash"] = narHash.to_string(hashFormat, true);
     jsonObject["narSize"] = narSize;
 
@@ -165,7 +167,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    jsonObject["ca"] = ca ? (std::optional{renderContentAddress(*ca)}) : std::nullopt;
+    jsonObject["ca"] = ca;
 
     if (includeImpureInfo) {
         jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
@@ -189,6 +191,16 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
     };
 
     auto & json = getObject(_json);
+
+    // Check version (optional for backward compatibility)
+    nlohmann::json::number_unsigned_t version = 1;
+    if (json.contains("version")) {
+        version = getUnsigned(valueAt(json, "version"));
+        if (version != 1 && version != 2) {
+            throw Error("Unsupported path info JSON format version %d, expected 1 through 2", version);
+        }
+    }
+
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
@@ -205,7 +217,15 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
     // missing is for back-compat.
     if (auto * rawCa0 = optionalValueAt(json, "ca"))
         if (auto * rawCa = getNullable(*rawCa0))
-            res.ca = ContentAddress::parse(getString(*rawCa));
+            switch (version) {
+            case 1:
+                // old string format also used in SQLite DB and .narinfo
+                res.ca = ContentAddress::parse(getString(*rawCa));
+                break;
+            case 2 ... std::numeric_limits<decltype(version)>::max():
+                res.ca = *rawCa;
+                break;
+            }
 
     if (auto * rawDeriver0 = optionalValueAt(json, "deriver"))
         if (auto * rawDeriver = getNullable(*rawDeriver0))
