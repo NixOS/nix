@@ -207,6 +207,28 @@ INSTANTIATE_TEST_SUITE_P(
             .expectedUrl = "flake:nixpkgs/branch/2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
         },
         InputFromURLTestCase{
+            .url = "git://somewhere/repo?ref=branch",
+            .attrs =
+                {
+                    {"type", Attr("git")},
+                    {"ref", Attr("branch")},
+                    {"url", Attr("git://somewhere/repo")},
+                },
+            .description = "plain_git_with_ref",
+            .expectedUrl = "git://somewhere/repo?ref=branch",
+        },
+        InputFromURLTestCase{
+            .url = "git+https://somewhere.aaaaaaa/repo?ref=branch",
+            .attrs =
+                {
+                    {"type", Attr("git")},
+                    {"ref", Attr("branch")},
+                    {"url", Attr("https://somewhere.aaaaaaa/repo")},
+                },
+            .description = "git_https_with_ref",
+            .expectedUrl = "git+https://somewhere.aaaaaaa/repo?ref=branch",
+        },
+        InputFromURLTestCase{
             // Note that this is different from above because the "flake id" shorthand
             // doesn't allow this.
             .url = "flake:/nixpkgs///branch////",
