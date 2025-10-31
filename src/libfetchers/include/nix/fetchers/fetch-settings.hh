@@ -11,6 +11,12 @@
 
 #include <sys/types.h>
 
+namespace nix {
+
+struct GitRepo;
+
+}
+
 namespace nix::fetchers {
 
 struct Cache;
@@ -125,8 +131,12 @@ struct Settings : public Config
 
     ref<Cache> getCache() const;
 
+    ref<GitRepo> getTarballCache() const;
+
 private:
     mutable Sync<std::shared_ptr<Cache>> _cache;
+
+    mutable Sync<std::shared_ptr<GitRepo>> _tarballCache;
 };
 
 } // namespace nix::fetchers
