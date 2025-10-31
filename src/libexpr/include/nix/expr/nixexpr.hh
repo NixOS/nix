@@ -466,7 +466,7 @@ struct Formal
     Expr * def;
 };
 
-struct Formals
+struct FormalsBuilder
 {
     typedef std::vector<Formal> Formals_;
     /**
@@ -474,6 +474,23 @@ struct Formals
      */
     Formals_ formals;
     bool ellipsis;
+
+    bool has(Symbol arg) const
+    {
+        auto it = std::lower_bound(
+            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+};
+
+struct Formals
+{
+    std::span<Formal> formals;
+    bool ellipsis;
+
+    Formals(std::span<Formal> formals, bool ellipsis)
+        : formals(formals)
+        , ellipsis(ellipsis) {};
 
     bool has(Symbol arg) const
     {
@@ -498,30 +515,56 @@ struct ExprLambda : Expr
     PosIdx pos;
     Symbol name;
     Symbol arg;
-    Formals * formals;
+
+private:
+    bool hasFormals;
+    bool ellipsis;
+    uint16_t nFormals;
+    Formal * formalsStart;
+public:
+
+    std::optional<Formals> getFormals() const
+    {
+        if (hasFormals)
+            return Formals{{formalsStart, nFormals}, ellipsis};
+        else
+            return std::nullopt;
+    }
+
     Expr * body;
     DocComment docComment;
 
-    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
+    ExprLambda(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        Symbol arg,
+        const FormalsBuilder & formals,
+        Expr * body)
         : pos(pos)
         , arg(arg)
-        , formals(formals)
-        , body(body) {};
-
-    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
-        : pos(pos)
-        , formals(formals)
+        , hasFormals(true)
+        , ellipsis(formals.ellipsis)
+        , nFormals(formals.formals.size())
+        , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
     {
-    }
+        std::ranges::copy(formals.formals, formalsStart);
+    };
+
+    ExprLambda(PosIdx pos, Symbol arg, Expr * body)
+        : pos(pos)
+        , arg(arg)
+        , hasFormals(false)
+        , ellipsis(false)
+        , nFormals(0)
+        , formalsStart(nullptr)
+        , body(body) {};
+
+    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, FormalsBuilder formals, Expr * body)
+        : ExprLambda(alloc, pos, Symbol(), formals, body) {};
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
-
-    inline bool hasFormals() const
-    {
-        return formals != nullptr;
-    }
 
     PosIdx getPos() const override
     {

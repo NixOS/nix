@@ -154,7 +154,7 @@ void ExprList::show(const SymbolTable & symbols, std::ostream & str) const
 void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(";
-    if (hasFormals()) {
+    if (auto formals = getFormals()) {
         str << "{ ";
         bool first = true;
         // the natural Symbol ordering is by creation time, which can lead to the
@@ -171,7 +171,7 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
                 i.def->show(symbols, str);
             }
         }
-        if (formals->ellipsis) {
+        if (ellipsis) {
             if (!first)
                 str << ", ";
             str << "...";
@@ -452,14 +452,14 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv =
-        std::make_shared<StaticEnv>(nullptr, env, (hasFormals() ? formals->formals.size() : 0) + (!arg ? 0 : 1));
+        std::make_shared<StaticEnv>(nullptr, env, (getFormals() ? getFormals()->formals.size() : 0) + (!arg ? 0 : 1));
 
     Displacement displ = 0;
 
     if (arg)
         newEnv->vars.emplace_back(arg, displ++);
 
-    if (hasFormals()) {
+    if (auto formals = getFormals()) {
         for (auto & i : formals->formals)
             newEnv->vars.emplace_back(i.name, displ++);
 
