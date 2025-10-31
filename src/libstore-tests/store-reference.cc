@@ -186,4 +186,64 @@ static StoreReference sshIPv6AuthorityWithUserinfoAndParams{
 
 URI_TEST_READ(ssh_unbracketed_ipv6_3, sshIPv6AuthorityWithUserinfoAndParams)
 
+static const StoreReference sshIPv6AuthorityWithUserinfoAndParamsAndZoneId{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "userinfo@[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e%25eth0]",
+        },
+    .params =
+        {
+            {"a", "b"},
+            {"c", "d"},
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_4, sshIPv6AuthorityWithUserinfoAndParamsAndZoneId)
+URI_TEST_READ(ssh_unbracketed_ipv6_5, sshIPv6AuthorityWithUserinfoAndParamsAndZoneId)
+
+static const StoreReference sshIPv6AuthorityWithUserinfoAndParamsAndZoneIdTricky{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "userinfo@[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e%2525]",
+        },
+    .params =
+        {
+            {"a", "b"},
+            {"c", "d"},
+        },
+};
+
+// Non-standard syntax where the IPv6 literal appears without brackets. In
+// this case don't considering %25 to be a pct-encoded % and just take it as a
+// literal value. 25 is a perfectly legal ZoneId value in theory.
+URI_TEST_READ(ssh_unbracketed_ipv6_6, sshIPv6AuthorityWithUserinfoAndParamsAndZoneIdTricky)
+URI_TEST_READ(ssh_unbracketed_ipv6_7, sshIPv6AuthorityWithUserinfoAndParamsAndZoneId)
+
+static const StoreReference sshIPv6AuthorityWithParamsAndZoneId{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e%25eth0]",
+        },
+    .params =
+        {
+            {"a", "b"},
+            {"c", "d"},
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_8, sshIPv6AuthorityWithParamsAndZoneId)
+
+static const StoreReference sshIPv6AuthorityWithZoneId{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "ssh",
+            .authority = "[fea5:23e1:3916:fc24:cb52:2837:2ecb:ea8e%25eth0]",
+        },
+};
+
+URI_TEST_READ(ssh_unbracketed_ipv6_9, sshIPv6AuthorityWithZoneId)
+
 } // namespace nix
