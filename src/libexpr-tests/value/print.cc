@@ -111,7 +111,7 @@ TEST_F(ValuePrintingTests, vLambda)
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
 
-    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -500,7 +500,7 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
 
-    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);

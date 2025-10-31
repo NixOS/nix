@@ -179,7 +179,7 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { auto me = new ExprLambda(state->alloc, CUR_POS, state->symbols.create($1), $3);
+    { auto me = new ExprLambda(CUR_POS, state->symbols.create($1), $3);
       $$ = me;
       SET_DOC_POS(me, @1);
     }

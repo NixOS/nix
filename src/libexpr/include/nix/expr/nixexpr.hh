@@ -551,7 +551,7 @@ public:
         std::ranges::copy(formals.formals, formalsStart);
     };
 
-    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Symbol arg, Expr * body)
+    ExprLambda(PosIdx pos, Symbol arg, Expr * body)
         : pos(pos)
         , arg(arg)
         , hasFormals(false)
