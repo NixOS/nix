@@ -523,6 +523,7 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
     prevWith = 0;
     for (curEnv = env.get(), level = 1; curEnv; curEnv = curEnv->up.get(), level++)
         if (curEnv->isWith) {
+            assert(level <= std::numeric_limits<uint32_t>::max());
             prevWith = level;
             break;
         }
