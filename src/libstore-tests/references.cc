@@ -1,5 +1,6 @@
 #include "nix/store/references.hh"
 #include "nix/store/path-references.hh"
+#include "nix/util/bytes.hh"
 #include "nix/util/memory-source-accessor.hh"
 
 #include <gtest/gtest.h>
@@ -104,21 +105,21 @@ TEST(references, scanForReferencesDeep)
                 // file1.txt: contains hash1
                 "file1.txt",
                 File::Regular{
-                    .contents = "This file references " + hash1 + " in its content",
+                    .contents = to_owned(as_bytes("This file references " + hash1 + " in its content")),
                 },
             },
             {
                 // file2.txt: contains hash2 and hash3
                 "file2.txt",
                 File::Regular{
-                    .contents = "Multiple refs: " + hash2 + " and also " + hash3,
+                    .contents = to_owned(as_bytes("Multiple refs: " + hash2 + " and also " + hash3)),
                 },
             },
             {
                 // file3.txt: contains no references
                 "file3.txt",
                 File::Regular{
-                    .contents = "This file has no store path references at all",
+                    .contents = to_owned(as_bytes("This file has no store path references at all")),
                 },
             },
             {
@@ -130,7 +131,7 @@ TEST(references, scanForReferencesDeep)
                             // subdir/file4.txt: contains hash1 again
                             "file4.txt",
                             File::Regular{
-                                .contents = "Subdirectory file with " + hash1,
+                                .contents = to_owned(as_bytes("Subdirectory file with " + hash1)),
                             },
                         },
                     },
@@ -140,7 +141,7 @@ TEST(references, scanForReferencesDeep)
                 // link1: a symlink that contains a reference in its target
                 "link1",
                 File::Symlink{
-                    .target = hash2 + "-target",
+                    .target = to_owned(as_bytes(hash2 + "-target")),
                 },
             },
         },

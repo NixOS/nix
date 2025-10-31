@@ -21,6 +21,14 @@ schema_dir = meson.current_source_dir() / 'schema'
 # Get all example files
 schemas = [
   {
+    'stem' : 'file-system-object',
+    'schema' : schema_dir / 'file-system-object-v1.yaml',
+    'files' : [
+      'simple.json',
+      'complex.json',
+    ],
+  },
+  {
     'stem' : 'hash',
     'schema' : schema_dir / 'hash-v1.yaml',
     'files' : [
@@ -75,6 +83,15 @@ schemas = [
       'single_built_built.json',
     ],
   },
+  {
+    'stem' : 'build-trace-entry',
+    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'files' : [
+      'simple.json',
+      'with-dependent-realisations.json',
+      'with-signature.json',
+    ],
+  },
   # Match overall
   {
     'stem' : 'store-object-info',
@@ -92,6 +109,15 @@ schemas = [
     'files' : [
       'pure.json',
       'impure.json',
+    ],
+  },
+  {
+    'stem' : 'build-result',
+    'schema' : schema_dir / 'build-result-v1.yaml',
+    'files' : [
+      'success.json',
+      'output-rejected.json',
+      'not-deterministic.json',
     ],
   },
   # Match exact variant

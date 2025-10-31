@@ -39,9 +39,9 @@ properties:
       This is a guard that allows us to continue evolving this format.
       The choice of `3` is fairly arbitrary, but corresponds to this informal version:
 
-      - Version 0: A-Term format
+      - Version 0: ATerm format
 
-      - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from A-Term format.
+      - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from ATerm format.
 
       - Version 2: Separate `method` and `hashAlgo` fields in output specs
 
