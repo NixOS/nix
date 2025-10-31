@@ -468,7 +468,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
                 }
-                if (v.lambda().fun->hasFormals || !argHasName(v.lambda().fun->arg, "final"))
+                if (v.lambda().fun->getFormals() || !argHasName(v.lambda().fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.

@@ -3363,21 +3363,20 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->lambda().fun->hasFormals) {
+    if (const auto & formals = args[0]->lambda().fun->getFormals()) {
+        auto attrs = state.buildBindings(formals->formals.size());
+        for (auto & i : formals->formals)
+            attrs.insert(i.name, state.getBool(i.def), i.pos);
+        /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
+           (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
+           always holds:
+           assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
+           .*/
+        v.mkAttrs(attrs.alreadySorted());
+    } else {
         v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
-
-    const auto & formals = args[0]->lambda().fun->getFormals();
-    auto attrs = state.buildBindings(formals.size());
-    for (auto & i : formals)
-        attrs.insert(i.name, state.getBool(i.def), i.pos);
-    /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
-       (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
-       always holds:
-       assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
-       .*/
-    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_functionArgs({

@@ -281,12 +281,15 @@ static Flake readFlake(
     if (auto outputs = vInfo.attrs()->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, outputs->pos);
 
-        if (outputs->value->isLambda() && outputs->value->lambda().fun->hasFormals) {
-            for (auto & formal : outputs->value->lambda().fun->getFormals()) {
-                if (formal.name != state.s.self)
-                    flake.inputs.emplace(
-                        state.symbols[formal.name],
-                        FlakeInput{.ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))});
+        if (outputs->value->isLambda()) {
+            if (auto formals = outputs->value->lambda().fun->getFormals()) {
+                for (auto & formal : formals->formals) {
+                    if (formal.name != state.s.self)
+                        flake.inputs.emplace(
+                            state.symbols[formal.name],
+                            FlakeInput{
+                                .ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))});
+                }
             }
         }
 

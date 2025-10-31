@@ -131,7 +131,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <nix::Expr *> expr_pipe_from expr_pipe_into
 %type <std::vector<Expr *>> list
 %type <nix::ExprAttrs *> binds binds1
-%type <nix::Formals> formals formal_set
+%type <nix::FormalsBuilder> formals formal_set
 %type <nix::Formal> formal
 %type <std::vector<nix::AttrName>> attrpath
 %type <std::vector<std::pair<nix::AttrName, nix::PosIdx>>> attrs

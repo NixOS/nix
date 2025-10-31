@@ -771,7 +771,7 @@ TEST_F(PrimOpTest, derivation)
     ASSERT_EQ(v.type(), nFunction);
     ASSERT_TRUE(v.isLambda());
     ASSERT_NE(v.lambda().fun, nullptr);
-    ASSERT_TRUE(v.lambda().fun->hasFormals);
+    ASSERT_TRUE(v.lambda().fun->getFormals());
 }
 
 TEST_F(PrimOpTest, currentTime)

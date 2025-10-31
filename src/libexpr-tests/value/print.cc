@@ -110,9 +110,8 @@ TEST_F(ValuePrintingTests, vLambda)
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals{};
 
-    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), formals, &body);
+    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -500,9 +499,8 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals{};
 
-    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), formals, &body);
+    ExprLambda eLambda(state.mem.exprs.alloc, posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);

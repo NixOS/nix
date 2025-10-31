@@ -93,7 +93,7 @@ struct ParserState
     void addAttr(
         ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
-    void validateFormals(Formals & formals, PosIdx pos = noPos, Symbol arg = {});
+    void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
     PosIdx at(const ParserLocation & loc);
 };
@@ -213,7 +213,7 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
     }
 }
 
-inline void ParserState::validateFormals(Formals & formals, PosIdx pos, Symbol arg)
+inline void ParserState::validateFormals(FormalsBuilder & formals, PosIdx pos, Symbol arg)
 {
     std::sort(formals.formals.begin(), formals.formals.end(), [](const auto & a, const auto & b) {
         return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);

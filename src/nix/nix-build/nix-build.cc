@@ -415,11 +415,13 @@ static void main_nix_build(int argc, char ** argv)
                 return false;
             }
             bool add = false;
-            if (v.type() == nFunction && v.lambda().fun->hasFormals) {
-                for (auto & i : v.lambda().fun->getFormals()) {
-                    if (state->symbols[i.name] == "inNixShell") {
-                        add = true;
-                        break;
+            if (v.type() == nFunction) {
+                if (auto formals = v.lambda().fun->getFormals()) {
+                    for (auto & i : formals->formals) {
+                        if (state->symbols[i.name] == "inNixShell") {
+                            add = true;
+                            break;
+                        }
                     }
                 }
             }

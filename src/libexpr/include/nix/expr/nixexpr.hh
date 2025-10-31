@@ -466,7 +466,7 @@ struct Formal
     Expr * def;
 };
 
-struct Formals
+struct FormalsBuilder
 {
     typedef std::vector<Formal> Formals_;
     /**
@@ -483,26 +483,67 @@ struct Formals
     }
 };
 
+struct Formals
+{
+    std::span<Formal> formals;
+    bool ellipsis;
+
+    Formals(std::span<Formal> formals, bool ellipsis)
+        : formals(formals)
+        , ellipsis(ellipsis) {};
+
+    bool has(Symbol arg) const
+    {
+        auto it = std::lower_bound(
+            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+
+    std::vector<Formal> lexicographicOrder(const SymbolTable & symbols) const
+    {
+        std::vector<Formal> result(formals.begin(), formals.end());
+        std::sort(result.begin(), result.end(), [&](const Formal & a, const Formal & b) {
+            std::string_view sa = symbols[a.name], sb = symbols[b.name];
+            return sa < sb;
+        });
+        return result;
+    }
+};
+
 struct ExprLambda : Expr
 {
     PosIdx pos;
     Symbol name;
     Symbol arg;
 
-    bool ellipsis;
+private:
     bool hasFormals;
+    bool ellipsis;
     uint16_t nFormals;
     Formal * formalsStart;
+public:
+
+    std::optional<Formals> getFormals() const
+    {
+        if (hasFormals)
+            return Formals{{formalsStart, nFormals}, ellipsis};
+        else
+            return std::nullopt;
+    }
 
     Expr * body;
     DocComment docComment;
 
     ExprLambda(
-        std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Symbol arg, const Formals & formals, Expr * body)
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        Symbol arg,
+        const FormalsBuilder & formals,
+        Expr * body)
         : pos(pos)
         , arg(arg)
-        , ellipsis(formals.ellipsis)
         , hasFormals(true)
+        , ellipsis(formals.ellipsis)
         , nFormals(formals.formals.size())
         , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
@@ -514,42 +555,20 @@ struct ExprLambda : Expr
         : pos(pos)
         , arg(arg)
         , hasFormals(false)
+        , ellipsis(false)
+        , nFormals(0)
         , formalsStart(nullptr)
         , body(body) {};
 
-    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, Formals formals, Expr * body)
+    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, FormalsBuilder formals, Expr * body)
         : ExprLambda(alloc, pos, Symbol(), formals, body) {};
-
-    bool hasFormal(Symbol arg) const
-    {
-        auto formals = getFormals();
-        auto it = std::lower_bound(
-            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
-        return it != formals.end() && it->name == arg;
-    }
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
 
-    std::vector<Formal> getFormalsLexicographic(const SymbolTable & symbols) const
-    {
-        std::vector<Formal> result(getFormals().begin(), getFormals().end());
-        std::sort(result.begin(), result.end(), [&](const Formal & a, const Formal & b) {
-            std::string_view sa = symbols[a.name], sb = symbols[b.name];
-            return sa < sb;
-        });
-        return result;
-    }
-
     PosIdx getPos() const override
     {
         return pos;
-    }
-
-    std::span<Formal> getFormals() const
-    {
-        assert(hasFormals);
-        return {formalsStart, nFormals};
     }
 
     virtual void setDocComment(DocComment docComment) override;

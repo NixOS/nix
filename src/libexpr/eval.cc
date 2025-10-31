@@ -1496,15 +1496,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
             ExprLambda & lambda(*vCur.lambda().fun);
 
-            auto size = (!lambda.arg ? 0 : 1) + (lambda.hasFormals ? lambda.getFormals().size() : 0);
+            auto size = (!lambda.arg ? 0 : 1) + (lambda.getFormals() ? lambda.getFormals()->formals.size() : 0);
             Env & env2(mem.allocEnv(size));
             env2.up = vCur.lambda().env;
 
             Displacement displ = 0;
 
-            if (!lambda.hasFormals)
-                env2.values[displ++] = args[0];
-            else {
+            if (auto formals = lambda.getFormals()) {
                 try {
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
@@ -1520,7 +1518,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                    there is no matching actual argument but the formal
                    argument has a default, use the default. */
                 size_t attrsUsed = 0;
-                for (auto & i : lambda.getFormals()) {
+                for (auto & i : formals->formals) {
                     auto j = args[0]->attrs()->get(i.name);
                     if (!j) {
                         if (!i.def) {
@@ -1542,13 +1540,13 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
 
                 /* Check that each actual argument is listed as a formal
                    argument (unless the attribute match specifies a `...'). */
-                if (!lambda.ellipsis && attrsUsed != args[0]->attrs()->size()) {
+                if (!formals->ellipsis && attrsUsed != args[0]->attrs()->size()) {
                     /* Nope, so show the first unexpected argument to the
                        user. */
                     for (auto & i : *args[0]->attrs())
-                        if (!lambda.hasFormal(i.name)) {
+                        if (!formals->has(i.name)) {
                             StringSet formalNames;
-                            for (auto & formal : lambda.getFormals())
+                            for (auto & formal : formals->formals)
                                 formalNames.insert(std::string(symbols[formal.name]));
                             auto suggestions = Suggestions::bestMatches(formalNames, symbols[i.name]);
                             error<TypeError>(
@@ -1563,6 +1561,8 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                         }
                     unreachable();
                 }
+            } else {
+                env2.values[displ++] = args[0];
             }
 
             nrFunctionCalls++;
@@ -1747,14 +1747,15 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
         }
     }
 
-    if (!fun.isLambda() || !fun.lambda().fun->hasFormals) {
+    if (!fun.isLambda() || !fun.lambda().fun->getFormals()) {
         res = fun;
         return;
     }
+    auto formals = fun.lambda().fun->getFormals();
 
-    auto attrs = buildBindings(std::max(static_cast<uint32_t>(fun.lambda().fun->nFormals), args.size()));
+    auto attrs = buildBindings(std::max(static_cast<uint32_t>(formals->formals.size()), args.size()));
 
-    if (fun.lambda().fun->ellipsis) {
+    if (formals->ellipsis) {
         // If the formals have an ellipsis (eg the function accepts extra args) pass
         // all available automatic arguments (which includes arguments specified on
         // the command line via --arg/--argstr)
@@ -1762,7 +1763,7 @@ void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res
             attrs.insert(v);
     } else {
         // Otherwise, only pass the arguments that the function accepts
-        for (auto & i : fun.lambda().fun->getFormals()) {
+        for (auto & i : formals->formals) {
             auto j = args.get(i.name);
             if (j) {
                 attrs.insert(*j);
