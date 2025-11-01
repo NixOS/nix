@@ -794,10 +794,9 @@ in
       test_compression_disabled()
       test_nix_prefetch_url()
       test_versioned_urls()
-      # FIXME: enable when multipart fully lands
-      # test_multipart_upload_basic()
-      # test_multipart_threshold()
-      # test_multipart_with_log_compression()
+      test_multipart_upload_basic()
+      test_multipart_threshold()
+      test_multipart_with_log_compression()
 
       print("\n" + "="*80)
       print("✓ All S3 Binary Cache Store Tests Passed!")
