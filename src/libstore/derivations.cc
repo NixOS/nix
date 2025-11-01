@@ -489,6 +489,10 @@ Derivation parseDerivation(
     }
 
     expect(str, ')');
+
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return drv;
 }
 
@@ -615,6 +619,15 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 std::string Derivation::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
+    {
+        auto optionsFromEnv =
+            DerivationOptions::fromStructuredAttrs(env, structuredAttrs ? &*structuredAttrs : nullptr);
+
+        if (optionsFromEnv != options)
+            throw Error(
+                "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+    }
+
     std::string s;
     s.reserve(65536);
 
@@ -999,11 +1012,23 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
     }
     drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
+    drv.options =
+        DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
     return in;
 }
 
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv)
 {
+    {
+        auto optionsFromEnv =
+            DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
+
+        if (optionsFromEnv != drv.options)
+            throw Error(
+                "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+    }
+
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
         out << i.first;
@@ -1385,7 +1410,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 
     {
         auto & inputsList = res["inputSrcs"];
-        inputsList = nlohmann::json ::array();
+        inputsList = nlohmann::json::array();
         for (auto & input : d.inputSrcs)
             inputsList.emplace_back(input);
     }
@@ -1415,6 +1440,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     res["builder"] = d.builder;
     res["args"] = d.args;
     res["env"] = d.env;
+    res["options"] = d.options;
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
@@ -1487,6 +1513,12 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     if (auto structuredAttrs = get(json, "structuredAttrs"))
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+
+    if (auto options = get(json, "options"))
+        res.options = *options;
+    else
+        res.options =
+            DerivationOptions::fromStructuredAttrs(res.env, res.structuredAttrs ? &*res.structuredAttrs : nullptr);
 
     return res;
 }

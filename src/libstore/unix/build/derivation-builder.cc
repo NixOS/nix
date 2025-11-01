@@ -794,7 +794,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+    if (drv.options.getRequiredSystemFeatures(drv).count("recursive-nix"))
         startDaemon();
 
     /* Run the builder. */
@@ -856,7 +856,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
     /* This works like the above, except on a per-derivation level */
-    auto impurePaths = drvOptions.impureHostDeps;
+    auto impurePaths = drv.options.impureHostDeps;
 
     for (auto & i : impurePaths) {
         bool found = false;
@@ -878,7 +878,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 store.printStorePath(drvPath),
                 i);
 
-        /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
+        /* Allow files in drv.options.impureHostDeps to be missing; e.g.
            macOS 11+ has no /usr/lib/libSystem*.dylib */
         pathsInChroot[i] = {i, true};
     }
@@ -919,7 +919,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 
 void DerivationBuilderImpl::prepareSandbox()
 {
-    if (drvOptions.useUidRange(drv))
+    if (drv.options.useUidRange(drv))
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
@@ -1088,7 +1088,7 @@ void DerivationBuilderImpl::initEnv()
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
-        for (auto & i : drvOptions.impureEnvVars) {
+        for (auto & i : drv.options.impureEnvVars) {
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
@@ -1454,7 +1454,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             actualPath, buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt, inodesSeen);
 
         bool discardReferences = false;
-        if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
+        if (auto udr = get(drv.options.unsafeDiscardReferences, outputName)) {
             discardReferences = *udr;
         }
 
@@ -1839,7 +1839,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
+    checkOutputs(store, drvPath, drv.outputs, drv.options.outputChecks, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -1957,13 +1957,13 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
     /* Are we doing a sandboxed build? */
     {
         if (settings.sandboxMode == smEnabled) {
-            if (params.drvOptions.noChroot)
+            if (params.drv.options.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'",
                     store.printStorePath(params.drvPath));
 #ifdef __APPLE__
-            if (params.drvOptions.additionalSandboxProfile != "")
+            if (params.drv.options.additionalSandboxProfile != "")
                 throw Error(
                     "derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'",
@@ -1974,7 +1974,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
             useSandbox = false;
         else if (settings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
-            useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
+            useSandbox = params.drv.type().isSandboxed() && !params.drv.options.noChroot;
     }
 
     if (store.storeDir != store.config->realStoreDir.get()) {
@@ -1996,7 +1996,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 
 #endif
 
-    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drv.options.useUidRange(params.drv))
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__
