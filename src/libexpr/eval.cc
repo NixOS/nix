@@ -2021,7 +2021,7 @@ void EvalState::concatLists(
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     NixStringContext context;
-    std::vector<BackedStringView> s;
+    std::vector<BackedStringView> strings;
     size_t sSize = 0;
     NixInt n{0};
     NixFloat nf = 0;
@@ -2032,7 +2032,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     const auto str = [&] {
         std::string result;
         result.reserve(sSize);
-        for (const auto & part : s)
+        for (const auto & part : strings)
             result += *part;
         return result;
     };
@@ -2042,7 +2042,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
     const auto c_str = [&] {
         char * result = allocString(sSize + 1);
         char * tmp = result;
-        for (const auto & part : s) {
+        for (const auto & part : strings) {
             memcpy(tmp, part->data(), part->size());
             tmp += part->size();
         }
@@ -2097,15 +2097,15 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                     .withFrame(env, *this)
                     .debugThrow();
         } else {
-            if (s.empty())
-                s.reserve(es.size());
+            if (strings.empty())
+                strings.reserve(es.size());
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
             auto part = state.coerceToString(
                 i_pos, vTmp, context, "while evaluating a path segment", false, firstType == nString, !first);
             sSize += part->size();
-            s.emplace_back(std::move(part));
+            strings.emplace_back(std::move(part));
         }
 
         first = false;
