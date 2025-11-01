@@ -30,10 +30,10 @@ expectStderr 1 nix eval "$repo#y" | grepQuiet "at $repo/flake.nix:"
 
 git -C "$repo" commit -a -m foo
 
-expectStderr 1 nix eval "git+file://$repo?ref=master#y" | grepQuiet "at «git+file://$repo?ref=master&rev=.*»/flake.nix:"
+expectStderr 1 nix eval "git+file://$repo?ref=master#y" | grepQuiet "at «git+file://$repo?rev=.*»/flake.nix:"
 
 expectStderr 1 nix eval "$repo#z" | grepQuiet "error: Path 'foo' does not exist in Git repository \"$repo\"."
-expectStderr 1 nix eval "git+file://$repo?ref=master#z" | grepQuiet "error: '«git+file://$repo?ref=master&rev=.*»/foo' does not exist"
+expectStderr 1 nix eval "git+file://$repo?ref=master#z" | grepQuiet "error: '«git+file://$repo?rev=.*»/foo' does not exist"
 expectStderr 1 nix eval "$repo#a" | grepQuiet "error: Path 'foo' does not exist in Git repository \"$repo\"."
 
 echo 123 > "$repo/foo"

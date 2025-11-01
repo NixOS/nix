@@ -81,7 +81,7 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) const override
+    ParsedURL toURL(const Input & input, bool abbreviate) const override
     {
         ParsedURL url{
             .scheme = "flake",

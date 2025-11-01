@@ -134,11 +134,17 @@ std::optional<std::string> Input::getFingerprint(ref<Store> store) const
     return fingerprint;
 }
 
-ParsedURL Input::toURL() const
+ParsedURL Input::toURL(bool abbreviate) const
 {
     if (!scheme)
         throw Error("cannot show unsupported input '%s'", attrsToJSON(attrs));
-    return scheme->toURL(*this);
+
+    auto url = scheme->toURL(*this, abbreviate);
+
+    if (abbreviate)
+        url.query.erase("narHash");
+
+    return url;
 }
 
 std::string Input::toURLString(const StringMap & extraQuery) const
@@ -149,9 +155,9 @@ std::string Input::toURLString(const StringMap & extraQuery) const
     return url.to_string();
 }
 
-std::string Input::to_string() const
+std::string Input::to_string(bool abbreviate) const
 {
-    return toURL().to_string();
+    return toURL(abbreviate).to_string();
 }
 
 bool Input::isDirect() const
@@ -352,7 +358,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
                 settings->getCache()->upsert(cacheKey, *store, {}, storePath);
             }
 
-            accessor->setPathDisplay("«" + to_string() + "»");
+            accessor->setPathDisplay("«" + to_string(true) + "»");
 
             return {accessor, *this};
         } catch (Error & e) {
@@ -468,7 +474,7 @@ std::optional<time_t> Input::getLastModified() const
     return {};
 }
 
-ParsedURL InputScheme::toURL(const Input & input) const
+ParsedURL InputScheme::toURL(const Input & input, bool abbreviate) const
 {
     throw Error("don't know how to convert input '%s' to a URL", attrsToJSON(input.attrs));
 }

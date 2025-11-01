@@ -68,11 +68,11 @@ public:
      */
     static Input fromAttrs(const Settings & settings, Attrs && attrs);
 
-    ParsedURL toURL() const;
+    ParsedURL toURL(bool abbreviate = false) const;
 
     std::string toURLString(const StringMap & extraQuery = {}) const;
 
-    std::string to_string() const;
+    std::string to_string(bool abbreviate = false) const;
 
     Attrs toAttrs() const;
 
@@ -219,7 +219,7 @@ struct InputScheme
      */
     virtual StringSet allowedAttrs() const = 0;
 
-    virtual ParsedURL toURL(const Input & input) const;
+    virtual ParsedURL toURL(const Input & input, bool abbreviate = false) const;
 
     virtual Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) const;
 
