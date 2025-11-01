@@ -24,7 +24,7 @@ class SymbolValue : protected Value
 public:
     operator std::string_view() const noexcept
     {
-        return {c_str(), size_};
+        return string_view();
     }
 };
 

@@ -153,9 +153,9 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data)
+nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data)
 {
-    callback(str.c_str(), str.size(), user_data);
+    callback(str.data(), str.size(), user_data);
     return NIX_OK;
 }
 

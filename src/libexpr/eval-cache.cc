@@ -406,7 +406,7 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.c_str(), v.context()), string_t{v.c_str(), {}}};
+            cachedValue = {root->db->setString(getKey(), v.string_view(), v.context()), string_t{v.string_view(), {}}};
         else if (v.type() == nPath) {
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
@@ -541,7 +541,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
         root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
 
-    return v.type() == nString ? v.c_str() : v.path().to_string();
+    return v.type() == nString ? std::string(v.string_view()) : v.path().to_string();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -580,7 +580,7 @@ string_t AttrCursor::getStringWithContext()
     if (v.type() == nString) {
         NixStringContext context;
         copyContext(v, context);
-        return {v.c_str(), std::move(context)};
+        return {std::string{v.string_view()}, std::move(context)};
     } else if (v.type() == nPath)
         return {v.path().to_string(), {}};
     else
