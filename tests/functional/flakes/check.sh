@@ -192,3 +192,24 @@ EOF
 # shellcheck disable=SC2015
 checkRes=$(nix flake check "$flakeDir" 2>&1 && fail "nix flake check should have failed" || true)
 echo "$checkRes" | grepQuiet -E "builder( for .*)? failed with exit code 1"
+
+# Test that attribute paths are shown in error messages
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: with import ./config.nix; {
+    checks.${system}.failingCheck = mkDerivation {
+      name = "failing-check";
+      buildCommand = "echo 'This check fails'; exit 1";
+    };
+    checks.${system}.anotherFailingCheck = mkDerivation {
+      name = "another-failing-check";
+      buildCommand = "echo 'This also fails'; exit 1";
+    };
+  };
+}
+EOF
+
+# shellcheck disable=SC2015
+checkRes=$(nix flake check --keep-going "$flakeDir" 2>&1 && fail "nix flake check should have failed" || true)
+echo "$checkRes" | grepQuiet "checks.${system}.failingCheck"
+echo "$checkRes" | grepQuiet "checks.${system}.anotherFailingCheck"
