@@ -186,7 +186,7 @@ expr_function
   | formal_set ':' expr_function[body]
     {
       state->validateFormals($formal_set);
-      auto me = new ExprLambda(state->alloc, CUR_POS, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -194,7 +194,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = new ExprLambda(state->alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -202,7 +202,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = new ExprLambda(state->alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }

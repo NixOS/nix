@@ -13,6 +13,8 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
@@ -535,6 +537,7 @@ public:
     DocComment docComment;
 
     ExprLambda(
+        const PosTable & positions,
         std::pmr::polymorphic_allocator<char> & alloc,
         PosIdx pos,
         Symbol arg,
@@ -548,7 +551,15 @@ public:
         , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
     {
-        std::ranges::copy(formals.formals, formalsStart);
+        if (formals.formals.size() > nFormals) [[unlikely]] {
+            auto err = Error(
+                "too many formal arguments, implementation supports at most %1%",
+                std::numeric_limits<decltype(nFormals)>::max());
+            if (pos)
+                err.atPos(positions[pos]);
+            throw err;
+        }
+        std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
     };
 
     ExprLambda(PosIdx pos, Symbol arg, Expr * body)
@@ -560,8 +571,13 @@ public:
         , formalsStart(nullptr)
         , body(body) {};
 
-    ExprLambda(std::pmr::polymorphic_allocator<char> & alloc, PosIdx pos, FormalsBuilder formals, Expr * body)
-        : ExprLambda(alloc, pos, Symbol(), formals, body) {};
+    ExprLambda(
+        const PosTable & positions,
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        FormalsBuilder formals,
+        Expr * body)
+        : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;

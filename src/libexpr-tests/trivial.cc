@@ -1,4 +1,5 @@
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 namespace nix {
 // Testing of trivial expressions
@@ -160,7 +161,8 @@ TEST_F(TrivialExpressionTest, assertPassed)
     ASSERT_THAT(v, IsIntEq(123));
 }
 
-class AttrSetMergeTrvialExpressionTest : public TrivialExpressionTest, public testing::WithParamInterface<const char *>
+class AttrSetMergeTrvialExpressionTest : public TrivialExpressionTest,
+                                         public ::testing::WithParamInterface<const char *>
 {};
 
 TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
@@ -196,7 +198,7 @@ TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
 INSTANTIATE_TEST_SUITE_P(
     attrsetMergeLazy,
     AttrSetMergeTrvialExpressionTest,
-    testing::Values("{ a.b = 1; a.c = 2; }", "{ a = { b = 1; }; a = { c = 2; }; }"));
+    ::testing::Values("{ a.b = 1; a.c = 2; }", "{ a = { b = 1; }; a = { c = 2; }; }"));
 
 // The following macros ultimately define 48 tests (16 variations on three
 // templates). Each template tests an expression that can be written in 2^4
@@ -339,4 +341,18 @@ TEST_F(TrivialExpressionTest, orCantBeUsed)
 {
     ASSERT_THROW(eval("let or = 1; in or"), Error);
 }
+
+TEST_F(TrivialExpressionTest, tooManyFormals)
+{
+    std::string expr = "let f = { ";
+    for (uint32_t i = 0; i <= std::numeric_limits<uint16_t>::max(); ++i) {
+        expr += fmt("arg%d, ", i);
+    }
+    expr += " }: 0 in; f {}";
+    ASSERT_THAT(
+        [&]() { eval(expr); },
+        ::testing::ThrowsMessage<Error>(::nix::testing::HasSubstrIgnoreANSIMatcher(
+            "too many formal arguments, implementation supports at most 65535")));
+}
+
 } /* namespace nix */
