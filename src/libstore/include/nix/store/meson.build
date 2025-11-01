@@ -31,6 +31,8 @@ headers = [ config_pub_h ] + files(
   'common-ssh-store-config.hh',
   'content-address.hh',
   'daemon.hh',
+  'dependency-graph-impl.hh',
+  'dependency-graph.hh',
   'derivation-options.hh',
   'derivations.hh',
   'derived-path-map.hh',
