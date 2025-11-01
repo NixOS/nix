@@ -26,6 +26,8 @@
     - [Derivation Outputs and Types of Derivations](store/derivation/outputs/index.md)
       - [Content-addressing derivation outputs](store/derivation/outputs/content-address.md)
       - [Input-addressing derivation outputs](store/derivation/outputs/input-address.md)
+  - [Build Trace](store/build-trace.md)
+  - [Derivation Resolution](store/resolution.md)
   - [Building](store/building.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}
@@ -123,6 +125,8 @@
     - [Store Object Info](protocols/json/store-object-info.md)
     - [Derivation](protocols/json/derivation.md)
     - [Deriving Path](protocols/json/deriving-path.md)
+    - [Build Trace Entry](protocols/json/build-trace-entry.md)
+    - [Build Result](protocols/json/build-result.md)
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
   - [Store Path Specification](protocols/store-path.md)
   - [Nix Archive (NAR) Format](protocols/nix-archive.md)

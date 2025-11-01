@@ -15,6 +15,8 @@ schemas = [
   'store-object-info-v1',
   'derivation-v3',
   'deriving-path-v1',
+  'build-trace-entry-v1',
+  'build-result-v1',
 ]
 
 schema_files = files()
