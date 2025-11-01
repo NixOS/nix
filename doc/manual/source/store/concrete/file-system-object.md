@@ -1,5 +1,7 @@
 # File System Object
 
+Before we discuss the concrete Nix store's notion of a store object, we need to introduce the *file system object* data type it is built from.
+
 Nix uses a simplified model of the file system, which consists of file system objects.
 Every file system object is one of the following:
 
