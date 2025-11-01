@@ -15,7 +15,7 @@ namespace nix {
 struct PackageInfo
 {
 public:
-    typedef std::map<std::string, std::optional<StorePath>> Outputs;
+    typedef std::map<std::string, std::optional<StorePath>, std::less<>> Outputs;
 
 private:
     EvalState * state;
