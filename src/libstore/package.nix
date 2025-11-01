@@ -9,7 +9,6 @@
   nix-util,
   boost,
   curl,
-  aws-sdk-cpp,
   aws-crt-cpp,
   libseccomp,
   nlohmann_json,
