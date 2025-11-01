@@ -2366,12 +2366,15 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nPath) {
-        return !canonicalizePath && !copyToStore
-                   ? // FIXME: hack to preserve path literals that end in a
-                     // slash, as in /foo/${x}.
-                   v.pathStr()
-                   : copyToStore ? store->printStorePath(copyPathToStore(context, v.path()))
-                                 : std::string(v.path().path.abs());
+        if (!canonicalizePath && !copyToStore) {
+            // FIXME: hack to preserve path literals that end in a
+            // slash, as in /foo/${x}.
+            return v.pathStrView();
+        } else if (copyToStore) {
+            return store->printStorePath(copyPathToStore(context, v.path()));
+        } else {
+            return std::string{v.path().path.abs()};
+        }
     }
 
     if (v.type() == nAttrs) {
@@ -2624,7 +2627,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nString:
-        if (strcmp(v1.c_str(), v2.c_str()) != 0) {
+        if (v1.string_view() != v2.string_view()) {
             error<AssertionError>(
                 "string '%s' is not equal to string '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2641,7 +2644,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 ValuePrinter(*this, v2, errorPrintOptions))
                 .debugThrow();
         }
-        if (strcmp(v1.pathStr(), v2.pathStr()) != 0) {
+        if (v1.pathStrView() != v2.pathStrView()) {
             error<AssertionError>(
                 "path '%s' is not equal to path '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2807,12 +2810,12 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         return v1.boolean() == v2.boolean();
 
     case nString:
-        return strcmp(v1.c_str(), v2.c_str()) == 0;
+        return v1.string_view() == v2.string_view();
 
     case nPath:
         return
             // FIXME: compare accessors by their fingerprint.
-            v1.pathAccessor() == v2.pathAccessor() && strcmp(v1.pathStr(), v2.pathStr()) == 0;
+            v1.pathAccessor() == v2.pathAccessor() && v1.pathStrView() == v2.pathStrView();
 
     case nNull:
         return true;

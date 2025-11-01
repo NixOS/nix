@@ -168,7 +168,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         for (auto elem : outTI->listView()) {
             if (elem->type() != nString)
                 throw errMsg;
-            auto out = outputs.find(elem->c_str());
+            auto out = outputs.find(elem->string_view());
             if (out == outputs.end())
                 throw errMsg;
             result.insert(*out);
@@ -245,7 +245,7 @@ std::string PackageInfo::queryMetaString(const std::string & name)
     Value * v = queryMeta(name);
     if (!v || v->type() != nString)
         return "";
-    return v->c_str();
+    return std::string{v->string_view()};
 }
 
 NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
@@ -258,7 +258,7 @@ NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt::Inner>(v->c_str()))
+        if (auto n = string2Int<NixInt::Inner>(v->string_view()))
             return NixInt{*n};
     }
     return def;
@@ -274,7 +274,7 @@ NixFloat PackageInfo::queryMetaFloat(const std::string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        if (auto n = string2Float<NixFloat>(v->c_str()))
+        if (auto n = string2Float<NixFloat>(v->string_view()))
             return *n;
     }
     return def;
