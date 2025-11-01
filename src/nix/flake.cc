@@ -811,6 +811,8 @@ struct CmdFlakeCheck : FlakeCommand
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
+        logger->log(lvlInfo, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
+
         if (!omittedSystems.empty()) {
             // TODO: empty system is not visible; render all as nix strings?
             warn(
