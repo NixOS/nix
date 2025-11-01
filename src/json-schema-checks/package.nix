@@ -23,6 +23,7 @@ mkMesonDerivation (finalAttrs: {
     ../../src/libutil-tests/data/hash
     ../../src/libstore-tests/data/content-address
     ../../src/libstore-tests/data/store-path
+    ../../src/libstore-tests/data/realisation
     ../../src/libstore-tests/data/derivation
     ../../src/libstore-tests/data/derived-path
     ../../src/libstore-tests/data/path-info

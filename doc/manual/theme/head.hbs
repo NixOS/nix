@@ -1,0 +1,15 @@
+<script>
+MathJax = {
+  loader: {load: ['[tex]/bussproofs']},
+  tex: {
+    packages: {'[+]': ['bussproofs']},
+    // Doesn't seem to work in mathjax 3
+    //formatError: function(jax, error) {
+    //  console.log(`TeX error in "${jax.latex}": ${error.message}`);
+    //  return jax.formatError(error);
+    //}
+  }
+};
+</script>
+<!-- Load a newer versino of MathJax than mdbook does by default, and which in particular has working relative paths for the "bussproofs" extension. -->
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.0.1/es5/tex-mml-chtml.js"></script>
