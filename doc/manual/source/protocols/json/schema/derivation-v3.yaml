@@ -68,7 +68,7 @@ properties:
       > }
       > ```
     additionalProperties:
-      "$ref": "#/$defs/output"
+      "$ref": "#/$defs/output/overall"
 
   inputSrcs:
     type: array
@@ -154,28 +154,116 @@ properties:
 
 "$defs":
   output:
-    type: object
-    properties:
-      path:
-        $ref: "store-path-v1.yaml"
-        title: Output path
-        description: |
-          The output path, if known in advance.
+    overall:
+      title: Derivation Output
+      description: |
+        A single output of a derivation, with different variants for different output types.
+      oneOf:
+        - "$ref": "#/$defs/output/inputAddressed"
+        - "$ref": "#/$defs/output/caFixed"
+        - "$ref": "#/$defs/output/caFloating"
+        - "$ref": "#/$defs/output/deferred"
+        - "$ref": "#/$defs/output/impure"
 
-      method:
-        "$ref": "./content-address-v1.yaml#/$defs/method"
-        description: |
-          For an output which will be [content addressed](@docroot@/store/derivation/outputs/content-address.md), a string representing the [method](@docroot@/store/store-object/content-address.md) of content addressing that is chosen.
-          See the linked original definition for further details.
-      hashAlgo:
-        title: Hash algorithm
-        "$ref": "./hash-v1.yaml#/$defs/algorithm"
+    inputAddressed:
+      title: Input-Addressed Output
+      description: |
+        The traditional non-fixed-output derivation type.
+        The output path is determined from the derivation itself.
 
-      hash:
-        type: string
-        title: Expected hash value
-        description: |
-          For fixed-output derivations, the expected content hash in base-16.
+        See [Input-addressing derivation outputs](@docroot@/store/derivation/outputs/input-address.md) for more details.
+      type: object
+      required:
+        - path
+      properties:
+        path:
+          $ref: "store-path-v1.yaml"
+          title: Output path
+          description: |
+            The output path determined from the derivation itself.
+      additionalProperties: false
+
+    caFixed:
+      title: Fixed Content-Addressed Output
+      description: |
+        The output is content-addressed, and the content-address is fixed in advance.
+
+        See [Fixed-output content-addressing](@docroot@/store/derivation/outputs/content-address.md#fixed) for more details.
+      type: object
+      required:
+        - method
+        - hashAlgo
+        - hash
+      properties:
+        method:
+          "$ref": "./content-address-v1.yaml#/$defs/method"
+          description: |
+            Method of content addressing used for this output.
+        hashAlgo:
+          title: Hash algorithm
+          "$ref": "./hash-v1.yaml#/$defs/algorithm"
+        hash:
+          type: string
+          title: Expected hash value
+          description: |
+            The expected content hash in base-16.
+      additionalProperties: false
+
+    caFloating:
+      title: Floating Content-Addressed Output
+      description: |
+        Floating-output derivations, whose outputs are content
+        addressed, but not fixed, and so the output paths are dynamically calculated from
+        whatever the output ends up being.
+
+        See [Floating Content-Addressing](@docroot@/store/derivation/outputs/content-address.md#floating) for more details.
+      type: object
+      required:
+        - method
+        - hashAlgo
+      properties:
+        method:
+          "$ref": "./content-address-v1.yaml#/$defs/method"
+          description: |
+            Method of content addressing used for this output.
+        hashAlgo:
+          title: Hash algorithm
+          "$ref": "./hash-v1.yaml#/$defs/algorithm"
+          description: |
+            What hash algorithm to use for the given method of content-addressing.
+      additionalProperties: false
+
+    deferred:
+      title: Deferred Output
+      description: |
+        Input-addressed output which depends on a (CA) derivation whose outputs (and thus their content-address
+        are not yet known.
+      type: object
+      properties: {}
+      additionalProperties: false
+
+    impure:
+      title: Impure Output
+      description: |
+        Impure output which is just like a floating content-addressed output, but this derivation runs without sandboxing.
+        As such, we don't record it in the build trace, under the assumption that if we need it again, we should rebuild it, as it might produce something different.
+      required:
+        - impure
+        - method
+        - hashAlgo
+      properties:
+        impure:
+          const: true
+        method:
+          "$ref": "./content-address-v1.yaml#/$defs/method"
+          description: |
+            How the file system objects will be serialized for hashing.
+        hashAlgo:
+          title: Hash algorithm
+          "$ref": "./hash-v1.yaml#/$defs/algorithm"
+          description: |
+            How the serialization will be hashed.
+      additionalProperties: false
 
   outputName:
     type: string
