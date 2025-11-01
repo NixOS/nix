@@ -2021,34 +2021,13 @@ void EvalState::concatLists(
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
     NixStringContext context;
-    std::vector<BackedStringView> s;
+    std::vector<BackedStringView> strings;
     size_t sSize = 0;
     NixInt n{0};
     NixFloat nf = 0;
 
     bool first = !forceString;
     ValueType firstType = nString;
-
-    const auto str = [&] {
-        std::string result;
-        result.reserve(sSize);
-        for (const auto & part : s)
-            result += *part;
-        return result;
-    };
-    /* c_str() is not str().c_str() because we want to create a string
-       Value. allocating a GC'd string directly and moving it into a
-       Value lets us avoid an allocation and copy. */
-    const auto c_str = [&] {
-        char * result = allocString(sSize + 1);
-        char * tmp = result;
-        for (const auto & part : s) {
-            memcpy(tmp, part->data(), part->size());
-            tmp += part->size();
-        }
-        *tmp = 0;
-        return result;
-    };
 
     // List of returned strings. References to these Values must NOT be persisted.
     SmallTemporaryValueVector<conservativeStackReservation> values(es.size());
@@ -2097,33 +2076,46 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                     .withFrame(env, *this)
                     .debugThrow();
         } else {
-            if (s.empty())
-                s.reserve(es.size());
+            if (strings.empty())
+                strings.reserve(es.size());
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
             auto part = state.coerceToString(
                 i_pos, vTmp, context, "while evaluating a path segment", false, firstType == nString, !first);
             sSize += part->size();
-            s.emplace_back(std::move(part));
+            strings.emplace_back(std::move(part));
         }
 
         first = false;
     }
 
-    if (firstType == nInt)
+    if (firstType == nInt) {
         v.mkInt(n);
-    else if (firstType == nFloat)
+    } else if (firstType == nFloat) {
         v.mkFloat(nf);
-    else if (firstType == nPath) {
+    } else if (firstType == nPath) {
         if (!context.empty())
             state.error<EvalError>("a string that refers to a store path cannot be appended to a path")
                 .atPos(pos)
                 .withFrame(env, *this)
                 .debugThrow();
-        v.mkPath(state.rootPath(CanonPath(str())));
-    } else
-        v.mkStringMove(c_str(), context);
+        std::string result_str;
+        result_str.reserve(sSize);
+        for (const auto & part : strings) {
+            result_str += *part;
+        }
+        v.mkPath(state.rootPath(CanonPath(result_str)));
+    } else {
+        char * result_str = allocString(sSize + 1);
+        char * tmp = result_str;
+        for (const auto & part : strings) {
+            memcpy(tmp, part->data(), part->size());
+            tmp += part->size();
+        }
+        *tmp = 0;
+        v.mkStringMove(result_str, context);
+    }
 }
 
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
