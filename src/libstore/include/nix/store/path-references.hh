@@ -3,10 +3,12 @@
 
 #include "nix/store/references.hh"
 #include "nix/store/path.hh"
+#include "nix/store/dependency-graph.hh"
 #include "nix/util/source-accessor.hh"
 
 #include <functional>
 #include <vector>
+#include <map>
 
 namespace nix {
 
@@ -59,7 +61,7 @@ void scanForReferencesDeep(
     SourceAccessor & accessor,
     const CanonPath & rootPath,
     const StorePathSet & refs,
-    std::function<void(FileRefScanResult)> callback);
+    std::function<void(const FileRefScanResult &)> callback);
 
 /**
  * Scan a store path tree and return which references appear in which files.
@@ -77,5 +79,26 @@ void scanForReferencesDeep(
  */
 std::map<CanonPath, StorePathSet>
 scanForReferencesDeep(SourceAccessor & accessor, const CanonPath & rootPath, const StorePathSet & refs);
+
+/**
+ * Build a StorePath-level dependency graph from file scanning.
+ *
+ * This scans the given path for references and builds a graph where:
+ * - Nodes are StorePaths
+ * - Edges represent dependencies between StorePaths
+ * - Edge properties store the files that created each dependency
+ *
+ * This unified approach allows both cycle detection and why-depends to share
+ * the same graph-building logic while maintaining file-level information for
+ * detailed error messages embedded directly in the graph.
+ *
+ * @param accessor Source accessor to read the tree
+ * @param rootPath Root path to scan
+ * @param rootStorePath The StorePath that rootPath belongs to
+ * @param refs Set of store paths to search for
+ * @return StorePathGraphWithFiles where edge properties contain file lists
+ */
+DependencyGraph<StorePath, FileListEdgeProperty> buildStorePathGraphFromScan(
+    SourceAccessor & accessor, const CanonPath & rootPath, const StorePath & rootStorePath, const StorePathSet & refs);
 
 } // namespace nix

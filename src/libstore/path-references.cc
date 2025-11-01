@@ -1,4 +1,5 @@
 #include "nix/store/path-references.hh"
+#include "nix/store/dependency-graph.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/source-accessor.hh"
@@ -62,7 +63,7 @@ void scanForReferencesDeep(
     SourceAccessor & accessor,
     const CanonPath & rootPath,
     const StorePathSet & refs,
-    std::function<void(FileRefScanResult)> callback)
+    std::function<void(const FileRefScanResult &)> callback)
 {
     // Recursive tree walker
     auto walk = [&](this auto & self, const CanonPath & path) -> void {
@@ -137,11 +138,35 @@ scanForReferencesDeep(SourceAccessor & accessor, const CanonPath & rootPath, con
 {
     std::map<CanonPath, StorePathSet> results;
 
-    scanForReferencesDeep(accessor, rootPath, refs, [&](FileRefScanResult result) {
-        results[std::move(result.filePath)] = std::move(result.foundRefs);
+    scanForReferencesDeep(accessor, rootPath, refs, [&](const FileRefScanResult & result) {
+        results[result.filePath] = result.foundRefs;
     });
 
     return results;
+}
+
+DependencyGraph<StorePath, FileListEdgeProperty> buildStorePathGraphFromScan(
+    SourceAccessor & accessor, const CanonPath & rootPath, const StorePath & rootStorePath, const StorePathSet & refs)
+{
+    DependencyGraph<StorePath, FileListEdgeProperty> graph;
+
+    scanForReferencesDeep(accessor, rootPath, refs, [&](const FileRefScanResult & result) {
+        // All files in this scan belong to rootStorePath
+        for (const auto & foundRef : result.foundRefs) {
+            // Add StorePath -> StorePath edge with file metadata
+            FileListEdgeProperty edgeProp;
+            edgeProp.files.push_back(result.filePath);
+            graph.addEdge(rootStorePath, foundRef, std::move(edgeProp));
+
+            debug(
+                "buildStorePathGraphFromScan: %s (in %s) → %s",
+                rootStorePath.to_string(),
+                result.filePath.abs(),
+                foundRef.to_string());
+        }
+    });
+
+    return graph;
 }
 
 } // namespace nix

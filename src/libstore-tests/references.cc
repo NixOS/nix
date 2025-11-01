@@ -32,7 +32,7 @@ TEST_P(RewriteTest, IdentityRewriteIsIdentity)
     auto rewriter = RewritingSink(param.rewrites, rewritten);
     rewriter(param.originalString);
     rewriter.flush();
-    ASSERT_EQ(rewritten.s, param.finalString);
+    EXPECT_EQ(rewritten.s, param.finalString);
 }
 
 INSTANTIATE_TEST_CASE_P(
@@ -52,14 +52,14 @@ TEST(references, scan)
         RefScanSink scanner(StringSet{hash1});
         auto s = "foobar";
         scanner(s);
-        ASSERT_EQ(scanner.getResult(), StringSet{});
+        EXPECT_EQ(scanner.getResult(), StringSet{});
     }
 
     {
         RefScanSink scanner(StringSet{hash1});
         auto s = "foobar" + hash1 + "xyzzy";
         scanner(s);
-        ASSERT_EQ(scanner.getResult(), StringSet{hash1});
+        EXPECT_EQ(scanner.getResult(), StringSet{hash1});
     }
 
     {
@@ -69,7 +69,7 @@ TEST(references, scan)
         scanner(((std::string_view) s).substr(10, 5));
         scanner(((std::string_view) s).substr(15, 5));
         scanner(((std::string_view) s).substr(20));
-        ASSERT_EQ(scanner.getResult(), StringSet({hash1, hash2}));
+        EXPECT_EQ(scanner.getResult(), StringSet({hash1, hash2}));
     }
 
     {
@@ -77,7 +77,7 @@ TEST(references, scan)
         auto s = "foobar" + hash1 + "xyzzy" + hash2;
         for (auto & i : s)
             scanner(std::string(1, i));
-        ASSERT_EQ(scanner.getResult(), StringSet({hash1, hash2}));
+        EXPECT_EQ(scanner.getResult(), StringSet({hash1, hash2}));
     }
 }
 
@@ -161,7 +161,7 @@ TEST(references, scanForReferencesDeep)
         {
             CanonPath f1Path("/file1.txt");
             auto it = foundRefs.find(f1Path);
-            ASSERT_TRUE(it != foundRefs.end());
+            EXPECT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
             EXPECT_TRUE(it->second.count(path1));
         }
@@ -170,7 +170,7 @@ TEST(references, scanForReferencesDeep)
         {
             CanonPath f2Path("/file2.txt");
             auto it = foundRefs.find(f2Path);
-            ASSERT_TRUE(it != foundRefs.end());
+            EXPECT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 2);
             EXPECT_TRUE(it->second.count(path2));
             EXPECT_TRUE(it->second.count(path3));
@@ -186,7 +186,7 @@ TEST(references, scanForReferencesDeep)
         {
             CanonPath f4Path("/subdir/file4.txt");
             auto it = foundRefs.find(f4Path);
-            ASSERT_TRUE(it != foundRefs.end());
+            EXPECT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
             EXPECT_TRUE(it->second.count(path1));
         }
@@ -195,7 +195,7 @@ TEST(references, scanForReferencesDeep)
         {
             CanonPath linkPath("/link1");
             auto it = foundRefs.find(linkPath);
-            ASSERT_TRUE(it != foundRefs.end());
+            EXPECT_TRUE(it != foundRefs.end());
             EXPECT_EQ(it->second.size(), 1);
             EXPECT_TRUE(it->second.count(path2));
         }
