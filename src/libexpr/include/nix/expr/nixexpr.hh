@@ -3,6 +3,7 @@
 
 #include <map>
 #include <span>
+#include <memory>
 #include <vector>
 #include <memory_resource>
 #include <algorithm>
@@ -193,22 +194,18 @@ struct ExprString : Expr
      * This is only for strings already allocated in our polymorphic allocator,
      * or that live at least that long (e.g. c++ string literals)
      */
-    ExprString(const char * s)
+    ExprString(const StringData & s)
     {
         v.mkStringNoCopy(s);
     };
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
-        auto len = sv.length();
-        if (len == 0) {
-            v.mkStringNoCopy("");
+        if (sv.size() == 0) {
+            v.mkStringNoCopy(""_sds);
             return;
         }
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkStringNoCopy(s);
+        v.mkStringNoCopy(StringData::make(*alloc.resource(), sv));
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -223,11 +220,7 @@ struct ExprPath : Expr
     ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
         : accessor(accessor)
     {
-        auto len = sv.length();
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkPath(&*accessor, s);
+        v.mkPath(&*accessor, StringData::make(*alloc.resource(), sv));
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;

@@ -1228,7 +1228,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                         else {
                             if (v->type() == nString) {
                                 attrs2["type"] = "string";
-                                attrs2["value"] = v->c_str();
+                                attrs2["value"] = v->string_view();
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nInt) {
                                 attrs2["type"] = "int";
@@ -1249,7 +1249,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                     if (elem->type() != nString)
                                         continue;
                                     XMLAttrs attrs3;
-                                    attrs3["value"] = elem->c_str();
+                                    attrs3["value"] = elem->string_view();
                                     xml.writeEmptyElement("string", attrs3);
                                 }
                             } else if (v->type() == nAttrs) {
@@ -1260,7 +1260,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                         continue;
                                     XMLAttrs attrs3;
                                     attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = i.value->c_str();
+                                    attrs3["value"] = i.value->string_view();
                                     xml.writeEmptyElement("string", attrs3);
                                 }
                             }

@@ -33,7 +33,7 @@ json printValueAsJSON(
 
     case nString:
         copyContext(v, context);
-        out = v.c_str();
+        out = v.string_view();
         break;
 
     case nPath:

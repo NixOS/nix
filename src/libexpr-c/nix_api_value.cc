@@ -235,7 +235,7 @@ nix_get_string(nix_c_context * context, const nix_value * value, nix_get_string_
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nString);
-        call_nix_get_string_callback(v.c_str(), callback, user_data);
+        call_nix_get_string_callback(v.string_view(), callback, user_data);
     }
     NIXC_CATCH_ERRS
 }
@@ -254,7 +254,7 @@ const char * nix_get_path_string(nix_c_context * context, const nix_value * valu
         // We could use v.path().to_string().c_str(), but I'm concerned this
         // crashes. Looks like .path() allocates a CanonPath with a copy of the
         // string, then it gets the underlying data from that.
-        return v.pathStr();
+        return v.pathStr().view().data();
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -439,7 +439,7 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
             return nullptr;
         }
         const nix::Attr & a = (*v.attrs())[i];
-        *name = state->state.symbols[a.name].c_str();
+        *name = state->state.symbols[a.name].string_data().view().data();
         nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
         return as_nix_value_ptr(a.value);
@@ -460,7 +460,7 @@ nix_value * nix_get_attr_byidx_lazy(
             return nullptr;
         }
         const nix::Attr & a = (*v.attrs())[i];
-        *name = state->state.symbols[a.name].c_str();
+        *name = state->state.symbols[a.name].string_data().view().data();
         nix_gc_incref(nullptr, a.value);
         // Note: intentionally NOT calling forceValue() to keep the attribute lazy
         return as_nix_value_ptr(a.value);
@@ -480,7 +480,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value,
             return nullptr;
         }
         const nix::Attr & a = (*v.attrs())[i];
-        return state->state.symbols[a.name].c_str();
+        return state->state.symbols[a.name].string_data().view().data();
     }
     NIXC_CATCH_ERRS_NULL
 }

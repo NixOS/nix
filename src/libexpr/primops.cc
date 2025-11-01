@@ -487,34 +487,34 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Valu
     state.forceValue(*args[0], pos);
     switch (args[0]->type()) {
     case nInt:
-        v.mkStringNoCopy("int");
+        v.mkStringNoCopy("int"_sds);
         break;
     case nBool:
-        v.mkStringNoCopy("bool");
+        v.mkStringNoCopy("bool"_sds);
         break;
     case nString:
-        v.mkStringNoCopy("string");
+        v.mkStringNoCopy("string"_sds);
         break;
     case nPath:
-        v.mkStringNoCopy("path");
+        v.mkStringNoCopy("path"_sds);
         break;
     case nNull:
-        v.mkStringNoCopy("null");
+        v.mkStringNoCopy("null"_sds);
         break;
     case nAttrs:
-        v.mkStringNoCopy("set");
+        v.mkStringNoCopy("set"_sds);
         break;
     case nList:
-        v.mkStringNoCopy("list");
+        v.mkStringNoCopy("list"_sds);
         break;
     case nFunction:
-        v.mkStringNoCopy("lambda");
+        v.mkStringNoCopy("lambda"_sds);
         break;
     case nExternal:
         v.mkString(args[0]->external()->typeOf());
         break;
     case nFloat:
-        v.mkStringNoCopy("float");
+        v.mkStringNoCopy("float"_sds);
         break;
     case nThunk:
         unreachable();
@@ -691,12 +691,12 @@ struct CompareValues
             case nFloat:
                 return v1->fpoint() < v2->fpoint();
             case nString:
-                return strcmp(v1->c_str(), v2->c_str()) < 0;
+                return v1->string_view() < v2->string_view();
             case nPath:
                 // Note: we don't take the accessor into account
                 // since it's not obvious how to compare them in a
                 // reproducible way.
-                return strcmp(v1->pathStr(), v2->pathStr()) < 0;
+                return v1->pathStrView() < v2->pathStrView();
             case nList:
                 // Lexicographic comparison
                 for (size_t i = 0;; i++) {
@@ -2256,10 +2256,10 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
 
     static const Constants stringValues = []() {
         Constants res;
-        res.regular.mkStringNoCopy("regular");
-        res.directory.mkStringNoCopy("directory");
-        res.symlink.mkStringNoCopy("symlink");
-        res.unknown.mkStringNoCopy("unknown");
+        res.regular.mkStringNoCopy("regular"_sds);
+        res.directory.mkStringNoCopy("directory"_sds);
+        res.symlink.mkStringNoCopy("symlink"_sds);
+        res.unknown.mkStringNoCopy("unknown"_sds);
         return res;
     }();
 
@@ -2930,7 +2930,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
-    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
+    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
 }
@@ -4410,7 +4410,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
-            v.mkStringNoCopy("", args[2]->context());
+            v.mkStringNoCopy(""_sds, args[2]->context());
             return;
         }
     }
