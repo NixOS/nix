@@ -147,7 +147,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         co_await await(std::move(waitees));
     }
     if (nrFailed != 0) {
-        co_return doneFailure({BuildResult::Failure::DependencyFailed, "resolution failed"});
+        co_return doneFailure({BuildResult::Failure::DependencyFailed, "Build failed due to failed dependency"});
     }
 
     if (resolutionGoal->resolvedDrv) {
