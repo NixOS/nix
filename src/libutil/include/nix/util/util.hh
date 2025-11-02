@@ -99,6 +99,41 @@ N string2IntWithUnitPrefix(std::string_view s)
     throw UsageError("'%s' is not an integer", s);
 }
 
+#define SIZE_UNITS \
+    X(Base)        \
+    X(Kilo)        \
+    X(Mega)        \
+    X(Giga)        \
+    X(Tera)        \
+    X(Peta)        \
+    X(Exa)         \
+    X(Zetta)       \
+    X(Yotta)
+
+enum class SizeUnit {
+#define X(name) name,
+    SIZE_UNITS
+#undef X
+};
+
+constexpr std::array<SizeUnit, 9> sizeUnits{{
+#define X(name) SizeUnit::name,
+    SIZE_UNITS
+#undef X
+}};
+
+SizeUnit getSizeUnit(int64_t value);
+
+/**
+ * Returns the unit if all values would be rendered using the same unit
+ * otherwise returns `std::nullopt`.
+ */
+std::optional<SizeUnit> getCommonSizeUnit(std::initializer_list<int64_t> values);
+
+std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align = false);
+
+char getSizeUnitSuffix(SizeUnit unit);
+
 /**
  * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
  * GiB`. If `align` is set, the number will be right-justified by

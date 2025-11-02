@@ -132,17 +132,75 @@ std::optional<N> string2Float(const std::string_view s)
 template std::optional<double> string2Float<double>(const std::string_view s);
 template std::optional<float> string2Float<float>(const std::string_view s);
 
+static const int64_t conversionNumber = 1024;
+
+SizeUnit getSizeUnit(int64_t value)
+{
+    auto unit = sizeUnits.begin();
+    uint64_t absValue = std::abs(value);
+    while (absValue > conversionNumber && unit < sizeUnits.end()) {
+        unit++;
+        absValue /= conversionNumber;
+    }
+    return *unit;
+}
+
+std::optional<SizeUnit> getCommonSizeUnit(std::initializer_list<int64_t> values)
+{
+    assert(values.size() > 0);
+
+    auto it = values.begin();
+    SizeUnit unit = getSizeUnit(*it);
+    it++;
+
+    for (; it != values.end(); it++) {
+        if (unit != getSizeUnit(*it)) {
+            return std::nullopt;
+        }
+    }
+
+    return unit;
+}
+
+std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align)
+{
+    size_t unitIdx = std::find(sizeUnits.begin(), sizeUnits.end(), unit) - sizeUnits.begin();
+    // bytes should also displayed as KiB => 100 Bytes => 0.1 KiB
+    double result = (double) value / std::pow(conversionNumber, std::max((size_t) 1, unitIdx));
+    return fmt(align ? "%6.1f" : "%.1f", result);
+}
+
+char getSizeUnitSuffix(SizeUnit unit)
+{
+    switch (unit) {
+        // bytes should also displayed as KiB => 100 Bytes => 0.1 KiB
+    case SizeUnit::Base:
+        return 'K';
+    case SizeUnit::Kilo:
+        return 'K';
+    case SizeUnit::Mega:
+        return 'M';
+    case SizeUnit::Giga:
+        return 'G';
+    case SizeUnit::Tera:
+        return 'T';
+    case SizeUnit::Peta:
+        return 'P';
+    case SizeUnit::Exa:
+        return 'E';
+    case SizeUnit::Zetta:
+        return 'Z';
+    case SizeUnit::Yotta:
+        return 'Y';
+    }
+
+    assert(false);
+}
+
 std::string renderSize(int64_t value, bool align)
 {
-    static const std::array<char, 9> prefixes{{'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
-    size_t power = 0;
-    double abs_value = std::abs(value);
-    while (abs_value > 1024 && power < prefixes.size()) {
-        ++power;
-        abs_value /= 1024;
-    }
-    double res = (double) value / std::pow(1024.0, power);
-    return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
+    SizeUnit unit = getSizeUnit(value);
+    return fmt("%s %ciB", renderSizeWithoutUnit(value, unit, align), getSizeUnitSuffix(unit));
 }
 
 bool hasPrefix(std::string_view s, std::string_view prefix)
