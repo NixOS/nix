@@ -87,7 +87,7 @@ struct AuthorizationSettings : Config
         {"*"},
         "allowed-users",
         R"(
-          A list user names, separated by whitespace.
+          A list of user names, separated by whitespace.
           These users are allowed to connect to the Nix daemon.
 
           You can specify groups by prefixing names with `@`.

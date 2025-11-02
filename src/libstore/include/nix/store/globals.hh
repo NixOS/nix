@@ -199,7 +199,7 @@ public:
           -->
           For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
 
-          If set to `0`, nix will detect the number of CPU cores and pass this number via NIX_BUILD_CORES.
+          If set to `0`, nix will detect the number of CPU cores and pass this number via `NIX_BUILD_CORES`.
 
           > **Note**
           >
