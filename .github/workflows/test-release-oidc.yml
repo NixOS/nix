@@ -1,0 +1,35 @@
+name: Test Release OIDC
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  oidc-check:
+    runs-on: ubuntu-latest
+    environment: releases
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: "arn:aws:iam::080433136561:role/nix-release"
+          role-session-name: nix-release-oidc-test-${{ github.run_id }}
+          aws-region: eu-west-1
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Confirm access to release bucket
+        run: |
+          set -euo pipefail
+          KEY=$(aws s3api list-objects-v2 --bucket nix-releases --prefix nix/ --max-items 1 --query 'Contents[0].Key' --output text)
+          if [ "$KEY" = "None" ] || [ -z "$KEY" ]; then
+            echo "No objects found under nix/ prefix in nix-releases bucket" >&2
+            exit 1
+          fi
+          echo "Found object $KEY"
+          aws s3api head-object --bucket nix-releases --key "$KEY" --output json
