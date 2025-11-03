@@ -79,7 +79,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency(
       Create a copy of the given string where every
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element is turned into a
-      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      [constant](@docroot@/language/string-context.md#string-context-constant)
       string context element.
 
       This is the opposite of [`builtins.addDrvOutputDependencies`](#builtins-addDrvOutputDependencies).
@@ -145,7 +145,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
      .args = {"s"},
      .doc = R"(
       Create a copy of the given string where a single
-      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      [constant](@docroot@/language/string-context.md#string-context-constant)
       string context element is turned into a
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element.

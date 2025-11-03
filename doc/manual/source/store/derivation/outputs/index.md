@@ -43,7 +43,7 @@ In particular, the specification decides:
 
 - if the content is content-addressed, how is it content addressed
 
-- if the content is content-addressed, [what is its content address](./content-address.md#fixed-content-addressing) (and thus what is its [store path])
+- if the content is content-addressed, [what is its content address](./content-address.md#fixed) (and thus what is its [store path])
 
 ## Types of derivations
 

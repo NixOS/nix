@@ -14,7 +14,7 @@ The moving parts of channels are:
 - The official channels listed at <https://nixos.org/channels>
 - The user-specific list of [subscribed channels](#subscribed-channels)
 - The [downloaded channel contents](#channels)
-- The [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path), set with the [`-I` option](#opt-i) or the [`NIX_PATH` environment variable](#env-NIX_PATH)
+- The [Nix expression search path](@docroot@/command-ref/conf-file.md#conf-nix-path), set with the [`-I` option](#opt-I) or the [`NIX_PATH` environment variable](#env-NIX_PATH)
 
 > **Note**
 >

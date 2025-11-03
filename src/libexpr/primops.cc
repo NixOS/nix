@@ -825,10 +825,10 @@ static RegisterPrimOp primop_genericClosure(
 
       - [Int](@docroot@/language/types.md#type-int)
       - [Float](@docroot@/language/types.md#type-float)
-      - [Boolean](@docroot@/language/types.md#type-boolean)
+      - [Boolean](@docroot@/language/types.md#type-bool)
       - [String](@docroot@/language/types.md#type-string)
       - [Path](@docroot@/language/types.md#type-path)
-      - [List](@docroot@/language/types.md#list)
+      - [List](@docroot@/language/types.md#type-list)
 
       The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
       Items are compared by their `key` attribute.
@@ -2103,7 +2103,7 @@ static RegisterPrimOp primop_findFile(
       builtins.findFile builtins.nixPath "nixpkgs"
       ```
 
-      A search path is represented as a list of [attribute sets](./types.md#attribute-set) with two attributes:
+      A search path is represented as a list of [attribute sets](./types.md#type-attrs) with two attributes:
       - `prefix` is a relative path.
       - `path` denotes a file system location
 
@@ -2395,7 +2395,7 @@ static RegisterPrimOp primop_outputOf({
 
       returns an input placeholder for the output of the output of `myDrv`.
 
-      This primop corresponds to the `^` sigil for [deriving paths](@docroot@/glossary.md#gloss-deriving-paths), e.g. as part of installable syntax on the command line.
+      This primop corresponds to the `^` sigil for [deriving paths](@docroot@/glossary.md#gloss-deriving-path), e.g. as part of installable syntax on the command line.
     )",
     .fun = prim_outputOf,
     .experimentalFeature = Xp::DynamicDerivations,
@@ -4966,7 +4966,7 @@ static RegisterPrimOp primop_compareVersions({
       version *s1* is older than version *s2*, `0` if they are the same,
       and `1` if *s1* is newer than *s2*. The version comparison
       algorithm is the same as the one used by [`nix-env
-      -u`](../command-ref/nix-env.md#operation---upgrade).
+      -u`](../command-ref/nix-env/upgrade.md).
     )",
     .fun = prim_compareVersions,
 });
@@ -4995,7 +4995,7 @@ static RegisterPrimOp primop_splitVersion({
     .doc = R"(
       Split a string representing a version into its components, by the
       same version splitting logic underlying the version comparison in
-      [`nix-env -u`](../command-ref/nix-env.md#operation---upgrade).
+      [`nix-env -u`](../command-ref/nix-env/upgrade.md).
     )",
     .fun = prim_splitVersion,
 });
@@ -5045,9 +5045,9 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           Primitive value.
 
           It can be returned by
-          [comparison operators](@docroot@/language/operators.md#Comparison)
+          [comparison operators](@docroot@/language/operators.md#comparison)
           and used in
-          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#conditionals).
 
           The name `true` is not special, and can be shadowed:
 
@@ -5068,9 +5068,9 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           Primitive value.
 
           It can be returned by
-          [comparison operators](@docroot@/language/operators.md#Comparison)
+          [comparison operators](@docroot@/language/operators.md#comparison)
           and used in
-          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#conditionals).
 
           The name `false` is not special, and can be shadowed:
 

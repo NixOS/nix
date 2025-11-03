@@ -51,4 +51,4 @@ additionalProperties: false
     description: |
       The hash algorithm used to compute the hash value.
 
-      `blake3` is currently experimental and requires the [`blake-hashing`](@docroot@/development/experimental-features.md#xp-feature-blake-hashing) experimental feature.
+      `blake3` is currently experimental and requires the [`blake-hashing`](@docroot@/development/experimental-features.md#xp-feature-blake3-hashes) experimental feature.

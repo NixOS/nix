@@ -137,7 +137,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Booleans](@docroot@/language/types.md#type-boolean)
+   [Booleans](@docroot@/language/types.md#type-bool)
 
   </td>
  </tr>
@@ -245,7 +245,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   An [attribute set](@docroot@/language/types.md#attribute-set) with attributes named `x` and `y`
+   An [attribute set](@docroot@/language/types.md#type-attrs) with attributes named `x` and `y`
 
   </td>
  </tr>
@@ -285,7 +285,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Lists](@docroot@/language/types.md#list) with three elements.
+   [Lists](@docroot@/language/types.md#type-list) with three elements.
 
   </td>
  </tr>
@@ -369,7 +369,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Attribute selection](@docroot@/language/types.md#attribute-set) (evaluates to `1`)
+   [Attribute selection](@docroot@/language/types.md#type-attrs) (evaluates to `1`)
 
   </td>
  </tr>
@@ -381,7 +381,7 @@ This is an incomplete overview of language features, by example.
   </td>
   <td>
 
-   [Attribute selection](@docroot@/language/types.md#attribute-set) with default (evaluates to `3`)
+   [Attribute selection](@docroot@/language/types.md#type-attrs) with default (evaluates to `3`)
 
   </td>
  </tr>

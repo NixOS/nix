@@ -1,7 +1,7 @@
 # Content-Addressing Store Objects
 
 Just [like][fso-ca] [File System Objects][File System Object],
-[Store Objects][Store Object] can also be [content-addressed](@docroot@/glossary.md#gloss-content-addressed),
+[Store Objects][Store Object] can also be [content-addressed](@docroot@/glossary.md#gloss-content-address),
 unless they are [input-addressed](@docroot@/glossary.md#gloss-input-addressed-store-object).
 
 For store objects, the content address we produce will take the form of a [Store Path] rather than regular hash.
@@ -107,7 +107,7 @@ References (to other store objects and self-references alike) are supported so l
 >
 > This method is part of the [`git-hashing`][xp-feature-git-hashing] experimental feature.
 
-This uses the corresponding [Git](../file-system-object/content-address.md#serial-git) method of file system object content addressing.
+This uses the corresponding [Git](../file-system-object/content-address.md#git) method of file system object content addressing.
 
 References are not supported.
 
