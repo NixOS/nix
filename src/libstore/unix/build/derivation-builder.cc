@@ -1470,31 +1470,40 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
+    /* Build output graph and inverse map up front to avoid quadratic complexity. */
+    std::map<StorePath, StorePathSet> outputGraph;
+    std::map<StorePath, std::string> inverseOutputMap;
+    for (auto & name : outputsToSort) {
+        inverseOutputMap[scratchOutputs.at(name)] = name;
+    }
+
+    for (auto & name : outputsToSort) {
+        auto orifu = get(outputReferencesIfUnregistered, name);
+        if (!orifu)
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "no output reference for '%s' in build of '%s'",
+                name,
+                store.printStorePath(drvPath));
+
+        std::visit(
+            overloaded{
+                /* Since we'll use the already installed versions of these, we
+                   can treat them as leaves and ignore any references they have. */
+                [&](const AlreadyRegistered &) { outputGraph[scratchOutputs.at(name)] = StorePathSet{}; },
+                [&](const PerhapsNeedToRegister & refs) { outputGraph[scratchOutputs.at(name)] = refs.refs; }},
+            *orifu);
+    }
+
     auto topoSortResult = topoSort(outputsToSort, {[&](const std::string & name) {
-                                       auto orifu = get(outputReferencesIfUnregistered, name);
-                                       if (!orifu)
-                                           throw BuildError(
-                                               BuildResult::Failure::OutputRejected,
-                                               "no output reference for '%s' in build of '%s'",
-                                               name,
-                                               store.printStorePath(drvPath));
-                                       return std::visit(
-                                           overloaded{
-                                               /* Since we'll use the already installed versions of these, we
-                                                  can treat them as leaves and ignore any references they
-                                                  have. */
-                                               [&](const AlreadyRegistered &) { return StringSet{}; },
-                                               [&](const PerhapsNeedToRegister & refs) {
-                                                   StringSet referencedOutputs;
-                                                   /* FIXME build inverted map up front so no quadratic waste here */
-                                                   for (auto & r : refs.refs)
-                                                       for (auto & [o, p] : scratchOutputs)
-                                                           if (r == p)
-                                                               referencedOutputs.insert(o);
-                                                   return referencedOutputs;
-                                               },
-                                           },
-                                           *orifu);
+                                       StringSet referencedOutputs;
+                                       for (auto & path : outputGraph.at(scratchOutputs.at(name))) {
+                                           auto outputName = inverseOutputMap.find(path);
+                                           if (outputName != inverseOutputMap.end()) {
+                                               referencedOutputs.insert(outputName->second);
+                                           }
+                                       }
+                                       return referencedOutputs;
                                    }});
 
     auto sortedOutputNames = std::visit(
