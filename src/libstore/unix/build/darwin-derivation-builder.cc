@@ -3,10 +3,26 @@
 #  include <spawn.h>
 #  include <sys/sysctl.h>
 #  include <sandbox.h>
+#  include <sys/ipc.h>
+#  include <sys/shm.h>
 
 /* This definition is undocumented but depended upon by all major browsers. */
 extern "C" int
 sandbox_init_with_parameters(const char * profile, uint64_t flags, const char * const parameters[], char ** errorbuf);
+
+/* Darwin IPC cleanup structures and constants */
+#  define IPCS_MAGIC 0x00000001
+#  define IPCS_SHM_ITER 0x00000002
+#  define IPCS_SHM_SYSCTL "kern.sysv.ipcs.shm"
+
+struct IPCS_command
+{
+    uint32_t ipcs_magic;
+    uint32_t ipcs_op;
+    uint32_t ipcs_cursor;
+    uint32_t ipcs_datalen;
+    void * ipcs_data;
+};
 
 namespace nix {
 
@@ -203,6 +219,44 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         posix_spawn(
             NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+
+    void cleanupSysVIPCForUser(uid_t uid)
+    {
+        struct IPCS_command ic;
+        struct shmid_ds shm_ds;
+        size_t ic_size = sizeof(ic);
+
+        ic.ipcs_magic = IPCS_MAGIC;
+        ic.ipcs_op = IPCS_SHM_ITER;
+        ic.ipcs_cursor = 0;
+        ic.ipcs_data = &shm_ds;
+        ic.ipcs_datalen = sizeof(shm_ds);
+
+        while (true) {
+            memset(&shm_ds, 0, sizeof(shm_ds));
+
+            if (sysctlbyname(IPCS_SHM_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                break;
+            }
+
+            if (shm_ds.shm_perm.uid == uid) {
+                int shmid = shmget(shm_ds.shm_perm._key, 0, 0);
+                if (shmid != -1) {
+                    if (shmctl(shmid, IPC_RMID, NULL) == 0)
+                        debug("removed shared memory segment with shmid %d (key: 0x%x)", shmid, shm_ds.shm_perm._key);
+                }
+            }
+        }
+    }
+
+    void killSandbox(bool getStats) override
+    {
+        DerivationBuilderImpl::killSandbox(getStats);
+        if (buildUser) {
+            auto uid = buildUser->getUID();
+            cleanupSysVIPCForUser(uid);
+        }
     }
 };
 
