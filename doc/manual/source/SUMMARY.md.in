@@ -26,9 +26,12 @@
     - [Derivation Outputs and Types of Derivations](store/derivation/outputs/index.md)
       - [Content-addressing derivation outputs](store/derivation/outputs/content-address.md)
       - [Input-addressing derivation outputs](store/derivation/outputs/input-address.md)
+  - [Build Trace](store/build-trace.md)
+  - [Derivation Resolution](store/resolution.md)
   - [Building](store/building.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}
+  - [Appendix: Math notation](store/math-notation.md)
 - [Nix Language](language/index.md)
   - [Data Types](language/types.md)
     - [String context](language/string-context.md)
