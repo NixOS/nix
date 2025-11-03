@@ -29,7 +29,7 @@ types:
       - id: body
         type: str
         size: len_str
-        encoding: 'ascii'
+        encoding: 'ASCII'
       - id: padding
         size: (8 - (len_str % 8)) % 8
 
