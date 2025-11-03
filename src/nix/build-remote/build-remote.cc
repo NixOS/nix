@@ -37,9 +37,14 @@ std::string escapeUri(std::string uri)
 
 static std::string currentLoad;
 
-static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
+static AutoCloseFD openSlotLock(const std::string storeUri, uint64_t slot)
 {
-    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(m.storeUri.render()), slot), true);
+    return openLockFile(fmt("%s/%s-%d", currentLoad, escapeUri(storeUri), slot), true);
+}
+
+static AutoCloseFD openFeatureSlotLock(const std::string storeUri, const std::string feature, unsigned int slot)
+{
+    return openLockFile(fmt("%s/%s-%s-%d", currentLoad, escapeUri(storeUri), feature, slot), true);
 }
 
 static bool allSupportedLocally(Store & store, const StringSet & requiredFeatures)
@@ -48,6 +53,47 @@ static bool allSupportedLocally(Store & store, const StringSet & requiredFeature
         if (!store.config.systemFeatures.get().count(feature))
             return false;
     return true;
+}
+
+using FeatureSlotLocks = std::map<std::string, std::vector<AutoCloseFD>>;
+
+static bool tryReserveFeatures(
+    const Machine & m,
+    const FeatureCount requiredFeatures,
+    FeatureSlotLocks & featureSlotLocks
+) {
+    bool allSatisfied = true;
+    for (auto & f : requiredFeatures) {
+        if (!f.second) {
+            continue;
+        }
+        std::vector<AutoCloseFD> locks(f.second);
+        unsigned int numLocked = 0;
+        for (unsigned int s = 0;
+            numLocked < f.second && (
+                (m.supportedFeaturesCount.find(f.first) != m.supportedFeaturesCount.end() &&
+                s < m.supportedFeaturesCount.at(f.first)) ||
+                (m.mandatoryFeaturesCount.find(f.first) != m.mandatoryFeaturesCount.end() &&
+                s < m.mandatoryFeaturesCount.at(f.first))
+            ); ++s) {
+            auto lock = openFeatureSlotLock(m.storeUri.render(), f.first, s);
+            if (lockFile(lock.get(), ltWrite, false)) {
+                locks[numLocked] = std::move(lock);
+                ++numLocked;
+            }
+        }
+        if (numLocked < f.second) {
+            allSatisfied = false;
+            break;
+        }
+        auto & fslDest = featureSlotLocks[f.first];
+        fslDest.insert(fslDest.end(), std::make_move_iterator(locks.begin()),
+            std::make_move_iterator(locks.end()));
+    }
+    if (!allSatisfied) {
+        featureSlotLocks.clear();
+    }
+    return allSatisfied;
 }
 
 static int main_build_remote(int argc, char ** argv)
@@ -93,6 +139,7 @@ static int main_build_remote(int argc, char ** argv)
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
+        FeatureSlotLocks bestFeatureSlotLocks;
 
         auto machines = getMachines();
         debug("got %d remote builders", machines.size());
@@ -119,6 +166,12 @@ static int main_build_remote(int argc, char ** argv)
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<StringSet>(source);
+            auto requiredFeaturesCount = Machine::countFeatures(requiredFeatures);
+            bool needsResourceManagement = 0 < std::accumulate(
+                requiredFeaturesCount.begin(), requiredFeaturesCount.end(), 0,
+                [](auto total, auto feature) {
+                    return std::move(total) + feature.second;
+                });
 
             /* It would be possible to build locally after some builds clear out,
                so don't show the warning now: */
@@ -150,7 +203,7 @@ static int main_build_remote(int argc, char ** argv)
                         AutoCloseFD free;
                         uint64_t load = 0;
                         for (uint64_t slot = 0; slot < m.maxJobs; ++slot) {
-                            auto slotLock = openSlotLock(m, slot);
+                            auto slotLock = openSlotLock(m.storeUri.render(), slot);
                             if (lockFile(slotLock.get(), ltWrite, false)) {
                                 if (!free) {
                                     free = std::move(slotLock);
@@ -161,6 +214,13 @@ static int main_build_remote(int argc, char ** argv)
                         }
                         if (!free) {
                             continue;
+                        }
+                        FeatureSlotLocks featureSlotLocks;
+                        if (needsResourceManagement &&
+                            experimentalFeatureSettings.isEnabled(Xp::ResourceManagement)) {
+                            if (!tryReserveFeatures(m, requiredFeaturesCount, featureSlotLocks)) {
+                                continue;
+                            }
                         }
                         bool best = false;
                         if (!bestSlotLock) {
@@ -179,6 +239,7 @@ static int main_build_remote(int argc, char ** argv)
                         if (best) {
                             bestLoad = load;
                             bestSlotLock = std::move(free);
+                            bestFeatureSlotLocks = std::move(featureSlotLocks);
                             bestMachine = &m;
                         }
                     }
