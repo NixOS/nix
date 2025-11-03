@@ -41,3 +41,15 @@ The `str` function / parameterized rule is defined as follows:
 - `int(n)` = the 64-bit little endian representation of the number `n`
 
 - `pad(s)` = the byte sequence `s`, padded with 0s to a multiple of 8 byte
+
+## Kaitai Struct Specification
+
+The Nix Archive (NAR) format is also formally described using [Kaitai Struct](https://kaitai.io/), an Interface Description Language (IDL) for defining binary data structures.
+
+> Kaitai Struct provides a language-agnostic, machine-readable specification that can be compiled into parsers for various programming languages (e.g., C++, Python, Java, Rust).
+
+```yaml
+{{#include nar.ksy}}
+```
+
+The source of the spec can be found [here](https://github.com/nixos/nix/blob/master/src/nix-manual/source/protocols/nix-archive/nar.ksy). Contributions and improvements to the spec are welcomed.
