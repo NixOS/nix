@@ -4,6 +4,8 @@ on:
   pull_request:
   merge_group:
   push:
+    branches:
+      - master
   workflow_dispatch:
     inputs:
       dogfood:
@@ -11,6 +13,10 @@ on:
         required: false
         default: true
         type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions: read-all
 
@@ -27,6 +33,7 @@ jobs:
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        use_cache: false
     - run: nix flake show --all-systems --json
 
   pre-commit-checks:
@@ -39,7 +46,6 @@ jobs:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
           extra_nix_config: experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: ./ci/gha/tests/pre-commit-checks
 
   basic-checks:
@@ -90,7 +96,6 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -100,6 +105,12 @@ jobs:
         nix build --file ci/gha/tests/wrapper.nix componentTests -L \
           --arg withInstrumentation ${{ matrix.instrumented }} \
           --argstr stdenv "${{ matrix.stdenv }}"
+    - name: Run VM tests
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix vmTests -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}"
+      if: ${{ matrix.os == 'linux' }}
     - name: Run flake checks and prepare the installer tarball
       run: |
         ci/gha/tests/build-checks
@@ -135,9 +146,19 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
+            experimental-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
+            experimental-installer: false
+          - scenario: on ubuntu (experimental)
+            runs-on: ubuntu-24.04
+            os: linux
+            experimental-installer: true
+          - scenario: on macos (experimental)
+            runs-on: macos-14
+            os: darwin
+            experimental-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -149,11 +170,22 @@ jobs:
         path: out
     - name: Looking up the installer tarball URL
       id: installer-tarball-url
-      run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@v31
+      run: |
+        echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
+        TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
+        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
+    - uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31.5.1
+      if: ${{ !matrix.experimental-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
         install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
+    - uses: ./.github/actions/install-nix-action
+      if: ${{ matrix.experimental-installer }}
+      with:
+        dogfood: false
+        experimental-installer: true
+        tarball_url: ${{ steps.installer-tarball-url.outputs.tarball-path }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     - run: sudo apt install fish zsh
       if: matrix.os == 'linux'
     - run: brew install fish
@@ -185,7 +217,7 @@ jobs:
           echo "docker=${{ env._DOCKER_SECRETS != '' }}" >> $GITHUB_OUTPUT
 
   docker_push_image:
-    needs: [tests, vm_tests, check_secrets]
+    needs: [tests, check_secrets]
     permissions:
       contents: read
       packages: write
@@ -198,12 +230,13 @@ jobs:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: DeterminateSystems/magic-nix-cache-action@main
-    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
+        dogfood: false
+        extra_nix_config: |
+          experimental-features = flakes nix-command
+    - run: echo NIX_VERSION="$(nix eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
+    - run: nix build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
@@ -238,28 +271,8 @@ jobs:
         docker tag nix:$NIX_VERSION $IMAGE_ID:master
         docker push $IMAGE_ID:master
 
-  vm_tests:
-    needs: basic-checks
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/install-nix-action
-        with:
-          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
-          extra_nix_config:
-            experimental-features = nix-command flakes
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: |
-          nix build -L \
-            .#hydraJobs.tests.functional_user \
-            .#hydraJobs.tests.githubFlakes \
-            .#hydraJobs.tests.nix-docker \
-            .#hydraJobs.tests.tarballFlakes \
-            ;
-
   flake_regressions:
-    needs: vm_tests
+    needs: tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
@@ -280,7 +293,6 @@ jobs:
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
 
   profile_build:
@@ -301,7 +313,6 @@ jobs:
         extra_nix_config: |
           experimental-features = flakes nix-command ca-derivations impure-derivations
           max-jobs = 1
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: |
         nix build -L --file ./ci/gha/profile-build buildTimeReport --out-link build-time-report.md
         cat build-time-report.md >> $GITHUB_STEP_SUMMARY

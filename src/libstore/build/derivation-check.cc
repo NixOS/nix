@@ -18,7 +18,11 @@ void checkOutputs(
     for (auto & output : outputs)
         outputsByPath.emplace(store.printStorePath(output.second.path), output.second);
 
-    for (auto & [outputName, info] : outputs) {
+    for (auto & pair : outputs) {
+        // We can't use auto destructuring here because
+        // clang-tidy seems to complain about it.
+        const std::string & outputName = pair.first;
+        const auto & info = pair.second;
 
         auto * outputSpec = get(drvOutputs, outputName);
         assert(outputSpec);
@@ -33,7 +37,7 @@ void checkOutputs(
                 /* Throw an error after registering the path as
                    valid. */
                 throw BuildError(
-                    BuildResult::HashMismatch,
+                    BuildResult::Failure::HashMismatch,
                     "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
                     store.printStorePath(drvPath),
                     wanted.to_string(HashFormat::SRI, true),
@@ -42,7 +46,7 @@ void checkOutputs(
             if (!info.references.empty()) {
                 auto numViolations = info.references.size();
                 throw BuildError(
-                    BuildResult::HashMismatch,
+                    BuildResult::Failure::HashMismatch,
                     "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
                     store.printStorePath(drvPath),
                     numViolations,
@@ -84,7 +88,7 @@ void checkOutputs(
         auto applyChecks = [&](const DerivationOptions::OutputChecks & checks) {
             if (checks.maxSize && info.narSize > *checks.maxSize)
                 throw BuildError(
-                    BuildResult::OutputRejected,
+                    BuildResult::Failure::OutputRejected,
                     "path '%s' is too large at %d bytes; limit is %d bytes",
                     store.printStorePath(info.path),
                     info.narSize,
@@ -94,7 +98,7 @@ void checkOutputs(
                 uint64_t closureSize = getClosure(info.path).second;
                 if (closureSize > *checks.maxClosureSize)
                     throw BuildError(
-                        BuildResult::OutputRejected,
+                        BuildResult::Failure::OutputRejected,
                         "closure of path '%s' is too large at %d bytes; limit is %d bytes",
                         store.printStorePath(info.path),
                         closureSize,
@@ -115,7 +119,7 @@ void checkOutputs(
                         std::string outputsListing =
                             concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
                         throw BuildError(
-                            BuildResult::OutputRejected,
+                            BuildResult::Failure::OutputRejected,
                             "derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
                             " expected store path or output name (one of [%s])",
                             store.printStorePath(drvPath),
@@ -148,7 +152,7 @@ void checkOutputs(
                         badPathsStr += store.printStorePath(i);
                     }
                     throw BuildError(
-                        BuildResult::OutputRejected,
+                        BuildResult::Failure::OutputRejected,
                         "output '%s' is not allowed to refer to the following paths:%s",
                         store.printStorePath(info.path),
                         badPathsStr);

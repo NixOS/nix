@@ -15,7 +15,7 @@ programmatically:
 1. Embedding the evaluator
 2. Writing language plug-ins
 
-Embedding means you link the Nix C libraries in your program and use them from
+Embedding means you link the Nix C API libraries in your program and use them from
 there. Adding a plug-in means you make a library that gets loaded by the Nix
 language evaluator, specified through a configuration option.
 

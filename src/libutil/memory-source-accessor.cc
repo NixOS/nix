@@ -208,11 +208,16 @@ void MemorySink::createSymlink(const CanonPath & path, const std::string & targe
 
 ref<SourceAccessor> makeEmptySourceAccessor()
 {
-    static auto empty = make_ref<MemorySourceAccessor>().cast<SourceAccessor>();
-    /* Don't forget to clear the display prefix, as the default constructed
-       SourceAccessor has the «unknown» prefix. Since this accessor is supposed
-       to mimic an empty root directory the prefix needs to be empty. */
-    empty->setPathDisplay("");
+    static auto empty = []() {
+        auto empty = make_ref<MemorySourceAccessor>();
+        MemorySink sink{*empty};
+        sink.createDirectory(CanonPath::root);
+        /* Don't forget to clear the display prefix, as the default constructed
+           SourceAccessor has the «unknown» prefix. Since this accessor is supposed
+           to mimic an empty root directory the prefix needs to be empty. */
+        empty->setPathDisplay("");
+        return empty.cast<SourceAccessor>();
+    }();
     return empty;
 }
 

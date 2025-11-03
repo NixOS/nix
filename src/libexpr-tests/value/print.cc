@@ -10,7 +10,7 @@ using namespace testing;
 struct ValuePrintingTests : LibExprTest
 {
     template<class... A>
-    void test(Value v, std::string_view expected, A... args)
+    void test(Value & v, std::string_view expected, A... args)
     {
         std::stringstream out;
         v.print(state, out, args...);
@@ -110,9 +110,8 @@ TEST_F(ValuePrintingTests, vLambda)
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals{};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -500,9 +499,8 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
     auto posIdx = state.positions.add(origin, 0);
     auto body = ExprInt(0);
-    auto formals = Formals{};
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &formals, &body);
+    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -625,10 +623,11 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsElided)
     vThree.mkInt(3);
 
     builder.insert(state.symbols.create("three"), &vThree);
-    vAttrs.mkAttrs(builder.finish());
+    Value vAttrs2;
+    vAttrs2.mkAttrs(builder.finish());
 
     test(
-        vAttrs,
+        vAttrs2,
         "{ one = " ANSI_CYAN "1" ANSI_NORMAL "; " ANSI_FAINT "«2 attributes elided»" ANSI_NORMAL " }",
         PrintOptions{.ansiColors = true, .maxAttrs = 1});
 }

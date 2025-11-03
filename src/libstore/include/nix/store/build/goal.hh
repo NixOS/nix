@@ -456,6 +456,18 @@ public:
      */
     virtual void timedOut(Error && ex) = 0;
 
+    /**
+     * Used for comparisons. The order matters a bit for scheduling. We
+     * want:
+     *
+     * 1. Substitution
+     * 2. Derivation administrativia
+     * 3. Actual building
+     *
+     * Also, ensure that derivations get processed in order of their
+     * name, i.e. a derivation named "aardvark" always comes before
+     * "baboon".
+     */
     virtual std::string key() = 0;
 
     /**

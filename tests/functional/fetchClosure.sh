@@ -99,6 +99,14 @@ clearStore
 
 [ -e "$caPath" ]
 
+# Test import-from-derivation on the result of fetchClosure.
+[[ $(nix eval -v --expr "
+  import \"\${builtins.fetchClosure {
+    fromStore = \"file://$cacheDir\";
+    fromPath = $caPath;
+  }}/foo.nix\"
+") = 3 ]]
+
 # Check that URL query parameters aren't allowed.
 clearStore
 narCache=$TEST_ROOT/nar-cache

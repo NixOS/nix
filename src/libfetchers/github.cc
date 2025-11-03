@@ -399,7 +399,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto downloadResult = downloadFile(store, *input.settings, url, "source", headers);
-        auto json = nlohmann::json::parse(store->getFSAccessor(downloadResult.storePath)->readFile(CanonPath::root));
+        auto json = nlohmann::json::parse(
+            store->requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         return RefInfo{
             .rev = Hash::parseAny(std::string{json["sha"]}, HashAlgorithm::SHA1),
@@ -473,7 +474,8 @@ struct GitLabInputScheme : GitArchiveInputScheme
         Headers headers = makeHeadersWithAuthTokens(*input.settings, host, input);
 
         auto downloadResult = downloadFile(store, *input.settings, url, "source", headers);
-        auto json = nlohmann::json::parse(store->getFSAccessor(downloadResult.storePath)->readFile(CanonPath::root));
+        auto json = nlohmann::json::parse(
+            store->requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
             return RefInfo{.rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)};
@@ -548,13 +550,10 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto file = store->toRealPath(
-                downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers).storePath);
-            std::ifstream is(file);
-            std::string line;
-            getline(is, line);
+            auto downloadFileResult = downloadFile(store, *input.settings, fmt("%s/HEAD", base_url), "source", headers);
+            auto contents = store->requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
 
-            auto remoteLine = git::parseLsRemoteLine(line);
+            auto remoteLine = git::parseLsRemoteLine(getLine(contents).first);
             if (!remoteLine) {
                 throw BadURL("in '%d', couldn't resolve HEAD ref '%d'", input.to_string(), ref);
             }
@@ -564,9 +563,10 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto file = store->toRealPath(
-            downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers).storePath);
-        std::ifstream is(file);
+        auto downloadFileResult =
+            downloadFile(store, *input.settings, fmt("%s/info/refs", base_url), "source", headers);
+        auto contents = store->requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
+        std::istringstream is(contents);
 
         std::string line;
         std::optional<std::string> id;

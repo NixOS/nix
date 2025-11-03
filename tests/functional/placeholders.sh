@@ -4,6 +4,7 @@ source common.sh
 
 clearStoreIfPossible
 
+# shellcheck disable=SC2016
 nix-build --no-out-link -E '
   with import '"${config_nix}"';
 

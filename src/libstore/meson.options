@@ -33,3 +33,9 @@ option(
   value : '/nix/var/log/nix',
   description : 'path to store logs in for Nix',
 )
+
+option(
+  's3-aws-auth',
+  type : 'feature',
+  description : 'build support for AWS authentication with S3',
+)

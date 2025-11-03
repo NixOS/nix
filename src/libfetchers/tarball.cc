@@ -42,7 +42,7 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    FileTransferRequest request(ValidURL{url});
+    FileTransferRequest request(VerbatimURL{url});
     request.headers = headers;
     if (cached)
         request.expectedETag = getStrAttr(cached->value, "etag");
@@ -107,13 +107,13 @@ DownloadFileResult downloadFile(
 static DownloadTarballResult downloadTarball_(
     const Settings & settings, const std::string & urlS, const Headers & headers, const std::string & displayPrefix)
 {
-    ValidURL url = urlS;
+    ParsedURL url = parseURL(urlS);
 
     // Some friendly error messages for common mistakes.
     // Namely lets catch when the url is a local file path, but
     // it is not in fact a tarball.
-    if (url.scheme() == "file") {
-        std::filesystem::path localPath = renderUrlPathEnsureLegal(url.path());
+    if (url.scheme == "file") {
+        std::filesystem::path localPath = renderUrlPathEnsureLegal(url.path);
         if (!exists(localPath)) {
             throw Error("tarball '%s' does not exist.", localPath);
         }
@@ -164,7 +164,7 @@ static DownloadTarballResult downloadTarball_(
 
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
-    auto archive = !url.path().empty() && hasSuffix(toLower(url.path().back()), ".zip") ? ({
+    auto archive = !url.path.empty() && hasSuffix(toLower(url.path.back()), ".zip") ? ({
         /* In streaming mode, libarchive doesn't handle
            symlinks in zip files correctly (#10649). So write
            the entire file to disk so libarchive can access it
@@ -178,7 +178,7 @@ static DownloadTarballResult downloadTarball_(
         }
         TarArchive{path};
     })
-                                                                                        : TarArchive{*source};
+                                                                                    : TarArchive{*source};
     auto tarballCache = getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);

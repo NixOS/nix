@@ -64,7 +64,7 @@ boost = dependency(
     'url',
   ],
   include_type : 'system',
-  version : '>=1.82.0',
+  version : '>=1.87.0',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
@@ -118,7 +118,6 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = [ config_priv_h ] + files(
   'archive.cc',
@@ -157,7 +156,6 @@ sources = [ config_priv_h ] + files(
   'source-accessor.cc',
   'source-path.cc',
   'strings.cc',
-  'subdir-source-accessor.cc',
   'suggestions.cc',
   'tarfile.cc',
   'tee-logger.cc',

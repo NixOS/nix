@@ -27,6 +27,12 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         return accessor->readFile(subpath);
     }
 
+    Stat lstat(const CanonPath & path) override
+    {
+        auto [accessor, subpath] = resolve(path);
+        return accessor->lstat(subpath);
+    }
+
     std::optional<Stat> maybeLstat(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);
@@ -84,6 +90,14 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
             return *res;
         else
             return nullptr;
+    }
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override
+    {
+        if (fingerprint)
+            return {path, fingerprint};
+        auto [accessor, subpath] = resolve(path);
+        return accessor->getFingerprint(subpath);
     }
 };
 

@@ -1,0 +1,27 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/deriving-path-v1.json"
+title: Deriving Path
+description: |
+  This schema describes the JSON representation of Nix's [Deriving Path](@docroot@/store/derivation/index.md#deriving-path).
+oneOf:
+  - title: Constant
+    description: |
+      See [Constant](@docroot@/store/derivation/index.md#deriving-path-constant) deriving path.
+    $ref: "store-path-v1.yaml"
+  - title: Output
+    description: |
+      See [Output](@docroot@/store/derivation/index.md#deriving-path-output) deriving path.
+    type: object
+    properties:
+      drvPath:
+        "$ref": "#"
+        description: |
+          A deriving path to a [Derivation](@docroot@/store/derivation/index.md#store-derivation), whose output is being referred to.
+      output:
+        type: string
+        description: |
+          The name of an output produced by that derivation (e.g. "out", "doc", etc.).
+    required:
+      - drvPath
+      - output
+    additionalProperties: false

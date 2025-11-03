@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eux
 
@@ -21,12 +21,13 @@ cleanup() {
 
     for file in ~/.bash_profile ~/.bash_login ~/.profile ~/.zshenv ~/.zprofile ~/.zshrc ~/.zlogin; do
         if [ -e "$file" ]; then
+            # shellcheck disable=SC2002
             cat "$file" | grep -v nix-profile > "$file.next"
             mv "$file.next" "$file"
         fi
     done
 
-    for i in $(seq 1 $(sysctl -n hw.ncpu)); do
+    for i in $(seq 1 "$(sysctl -n hw.ncpu)"); do
         sudo /usr/bin/dscl . -delete "/Users/nixbld$i" || true
     done
     sudo /usr/bin/dscl . -delete "/Groups/nixbld" || true
@@ -65,11 +66,11 @@ verify
         echo nix-build ./release.nix -A binaryTarball.x86_64-darwin
     ) | bash -l
     set -e
-    cp ./result/nix-*.tar.bz2 $scratch/nix.tar.bz2
+    cp ./result/nix-*.tar.bz2 "$scratch"/nix.tar.bz2
 )
 
 (
-    cd $scratch
+    cd "$scratch"
     tar -xf ./nix.tar.bz2
 
     cd nix-*

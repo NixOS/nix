@@ -18,6 +18,21 @@ cat <<EOF >"$TEST_HOME/flake.nix"
         outputs = [ "out" "dev" ];
         meta.outputsToInstall = [ "out" ];
         buildCommand = "";
+        # ensure we're stripping these from the environment derivation
+        disallowedReferences = [ "out" ];
+        disallowedRequisites = [ "out" ];
+      };
+      packages.$system.hello-structured = (import ./config.nix).mkDerivation {
+        __structuredAttrs = true;
+        name = "hello";
+        outputs = [ "out" "dev" ];
+        meta.outputsToInstall = [ "out" ];
+        buildCommand = "";
+        # ensure we're stripping these from the environment derivation
+        outputChecks.out = {
+          disallowedReferences = [ "out" ];
+          disallowedRequisites = [ "out" ];
+        };
       };
     };
 }
@@ -141,5 +156,8 @@ EOF
 echo "\$SHELL"
 EOF
 )" -ef "$BASH_INTERACTIVE_EXECUTABLE" ]]
+
+# Test whether `nix develop` works with `__structuredAttrs`
+[[ -z "$(nix develop --no-write-lock-file .#hello-structured </dev/null)" ]]
 
 clearStore

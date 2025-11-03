@@ -10,6 +10,7 @@
 #include "nix/util/url.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/input-cache.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -198,8 +199,8 @@ static void fetchTree(
     if (state.settings.pureEval && !input.isLocked()) {
         if (input.getNarHash())
             warn(
-                "Input '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
-                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                "Input '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
+                "This is not reproducible and will break after garbage collection or when shared.",
                 input.to_string());
         else
             state
@@ -218,11 +219,11 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    auto cachedInput = state.inputCache->getAccessor(state.store, input, fetchers::UseRegistries::No);
 
-    state.allowPath(storePath);
+    auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -561,14 +562,22 @@ static void fetch(
                 .hash = *expectedHash,
                 .references = {}});
 
-        if (state.store->isValidPath(expectedPath)) {
+        // Try to get the path from the local store or substituters
+        try {
+            state.store->ensurePath(expectedPath);
+            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;
+        } catch (Error & e) {
+            debug(
+                "substitution of '%s' failed, will try to download: %s",
+                state.store->printStorePath(expectedPath),
+                e.what());
+            // Fall through to download
         }
     }
 
-    // TODO: fetching may fail, yet the path may be substitutable.
-    //       https://github.com/NixOS/nix/issues/4313
+    // Download the file/tarball if substitution failed or no hash was provided
     auto storePath = unpack ? fetchToStore(
                                   state.fetchSettings,
                                   *state.store,
@@ -579,7 +588,11 @@ static void fetch(
 
     if (expectedHash) {
         auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
-                           : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
+                           : hashPath(
+                                 {state.store->requireStoreObjectAccessor(storePath)},
+                                 FileSerialisationMethod::Flat,
+                                 HashAlgorithm::SHA256)
+                                 .hash;
         if (hash != *expectedHash) {
             state
                 .error<EvalError>(

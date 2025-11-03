@@ -66,23 +66,17 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
-#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                          \
-    TEST_P(FIXTURE, from_json)                                                    \
-    {                                                                             \
-        const auto & [name, expected] = GetParam();                               \
-        /* Don't use readJsonTest because we want to check experimental           \
-           features. */                                                           \
-        readTest(Path{"output-"} + name + ".json", [&](const auto & encoded_) {   \
-            json j = json::parse(encoded_);                                       \
-            DerivationOutput got = DerivationOutput::fromJSON(j, mockXpSettings); \
-            ASSERT_EQ(got, expected);                                             \
-        });                                                                       \
-    }                                                                             \
-                                                                                  \
-    TEST_P(FIXTURE, to_json)                                                      \
-    {                                                                             \
-        const auto & [name, value] = GetParam();                                  \
-        writeJsonTest("output-" + name, value);                                   \
+#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                \
+    TEST_P(FIXTURE, from_json)                                          \
+    {                                                                   \
+        const auto & [name, expected] = GetParam();                     \
+        readJsonTest(Path{"output-"} + name, expected, mockXpSettings); \
+    }                                                                   \
+                                                                        \
+    TEST_P(FIXTURE, to_json)                                            \
+    {                                                                   \
+        const auto & [name, value] = GetParam();                        \
+        writeJsonTest("output-" + name, value);                         \
     }
 
 struct DerivationOutputJsonTest : DerivationTest,
@@ -193,13 +187,7 @@ INSTANTIATE_TEST_SUITE_P(
     TEST_P(FIXTURE, from_json)                                                                     \
     {                                                                                              \
         const auto & drv = GetParam();                                                             \
-        /* Don't use readJsonTest because we want to check experimental                            \
-           features. */                                                                            \
-        readTest(drv.name + ".json", [&](const auto & encoded_) {                                  \
-            auto encoded = json::parse(encoded_);                                                  \
-            Derivation got = Derivation::fromJSON(encoded, mockXpSettings);                        \
-            ASSERT_EQ(got, drv);                                                                   \
-        });                                                                                        \
+        readJsonTest(drv.name, drv, mockXpSettings);                                               \
     }                                                                                              \
                                                                                                    \
     TEST_P(FIXTURE, to_json)                                                                       \
@@ -213,7 +201,8 @@ INSTANTIATE_TEST_SUITE_P(
         const auto & drv = GetParam();                                                             \
         readTest(drv.name + ".drv", [&](auto encoded) {                                            \
             auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);      \
-            ASSERT_EQ(got.toJSON(), drv.toJSON());                                                 \
+            using nlohmann::json;                                                                  \
+            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                             \
             ASSERT_EQ(got, drv);                                                                   \
         });                                                                                        \
     }                                                                                              \

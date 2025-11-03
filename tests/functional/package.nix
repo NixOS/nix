@@ -2,16 +2,7 @@
   lib,
   stdenv,
   mkMesonDerivation,
-
-  meson,
-  ninja,
-  pkg-config,
-
-  jq,
-  git,
-  mercurial,
-  util-linux,
-  unixtools,
+  buildPackages,
 
   nix-store,
   nix-expr,
@@ -46,16 +37,17 @@ mkMesonDerivation (
       ./.
     ];
 
-    # Hack for sake of the dev shell
+    # Hack for sake of the dev shell. Need to "manually splice" since
+    # this isn't a specially-recognized list of dependencies.
     passthru.externalNativeBuildInputs = [
-      meson
-      ninja
-      pkg-config
+      buildPackages.meson
+      buildPackages.ninja
+      buildPackages.pkg-config
 
-      jq
-      git
-      mercurial
-      unixtools.script
+      buildPackages.jq
+      buildPackages.git
+      buildPackages.mercurial
+      buildPackages.unixtools.script
     ]
     ++ lib.optionals stdenv.hostPlatform.isLinux [
       # For various sandboxing tests that needs a statically-linked shell,
@@ -64,11 +56,14 @@ mkMesonDerivation (
       # For Overlay FS tests need `mount`, `umount`, and `unshare`.
       # For `script` command (ensuring a TTY)
       # TODO use `unixtools` to be precise over which executables instead?
-      util-linux
+      buildPackages.util-linux
     ];
 
     nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
-      nix-cli
+      # Explicitly splice the hostHost variant to fix LLVM tests. The nix-cli
+      # has to be in PATH, but must come from the host context where it's built
+      # with libc++.
+      (nix-cli.__spliced.hostHost or nix-cli)
     ];
 
     buildInputs = [

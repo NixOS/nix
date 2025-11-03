@@ -179,9 +179,10 @@ std::pair<unsigned short, unsigned short> getWindowSize()
     return *windowSize.lock();
 }
 
+#ifndef _WIN32
 std::string getPtsName(int fd)
 {
-#ifdef __APPLE__
+#  ifdef __APPLE__
     static std::mutex ptsnameMutex;
     // macOS doesn't have ptsname_r, use mutex-protected ptsname
     std::lock_guard<std::mutex> lock(ptsnameMutex);
@@ -190,7 +191,7 @@ std::string getPtsName(int fd)
         throw SysError("getting pseudoterminal slave name");
     }
     return name;
-#else
+#  else
     // Use thread-safe ptsname_r on platforms that support it
     // PTY names are typically short:
     // - Linux: /dev/pts/N (where N is usually < 1000)
@@ -201,7 +202,8 @@ std::string getPtsName(int fd)
         throw SysError("getting pseudoterminal slave name");
     }
     return buf;
-#endif
+#  endif
 }
+#endif
 
 } // namespace nix

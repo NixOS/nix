@@ -1,1 +1,1 @@
-local://?root=/foo bar/baz
+local://?root=/foo%20bar/baz

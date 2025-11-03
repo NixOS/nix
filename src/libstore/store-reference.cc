@@ -121,7 +121,27 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
              * greedily assumed to be the part of the host address. */
             auto authorityString = schemeAndAuthority->authority;
             auto userinfo = splitPrefixTo(authorityString, '@');
-            auto maybeIpv6 = boost::urls::parse_ipv6_address(authorityString);
+            /* Back-compat shim for ZoneId specifiers. Technically this isn't
+             * standard, but the expectation is this works with the old syntax
+             * for ZoneID specifiers. For the full story behind the fiasco that
+             * is ZoneID in URLs look at [^].
+             * [^]: https://datatracker.ietf.org/doc/html/draft-schinazi-httpbis-link-local-uri-bcp-03
+             */
+
+            /* Fish out the internals from inside square brackets. It might be that the pct-sign is unencoded and that's
+             * why we failed to parse it previously. */
+            if (authorityString.starts_with('[') && authorityString.ends_with(']')) {
+                authorityString.remove_prefix(1);
+                authorityString.remove_suffix(1);
+            }
+
+            auto maybeBeforePct = splitPrefixTo(authorityString, '%');
+            bool hasZoneId = maybeBeforePct.has_value();
+            auto maybeZoneId = hasZoneId ? std::optional{authorityString} : std::nullopt;
+
+            std::string_view maybeIpv6S = maybeBeforePct.value_or(authorityString);
+            auto maybeIpv6 = boost::urls::parse_ipv6_address(maybeIpv6S);
+
             if (maybeIpv6) {
                 std::string fixedAuthority;
                 if (userinfo) {
@@ -129,7 +149,11 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                     fixedAuthority += '@';
                 }
                 fixedAuthority += '[';
-                fixedAuthority += authorityString;
+                fixedAuthority += maybeIpv6S;
+                if (maybeZoneId) {
+                    fixedAuthority += "%25"; // pct-encoded percent character
+                    fixedAuthority += *maybeZoneId;
+                }
                 fixedAuthority += ']';
                 return {
                     .variant =

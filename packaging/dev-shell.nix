@@ -70,6 +70,9 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
 
     # We use this shell with the local checkout, not unpackPhase.
     src = null;
+    # Workaround https://sourceware.org/pipermail/gdb-patches/2025-October/221398.html
+    # Remove when gdb fix is rolled out everywhere.
+    separateDebugInfo = false;
 
     env = {
       # For `make format`, to work without installing pre-commit
@@ -93,38 +96,45 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
 
     nativeBuildInputs =
-      attrs.nativeBuildInputs or [ ]
-      ++ pkgs.nixComponents2.nix-util.nativeBuildInputs
-      ++ pkgs.nixComponents2.nix-store.nativeBuildInputs
-      ++ pkgs.nixComponents2.nix-fetchers.nativeBuildInputs
-      ++ pkgs.nixComponents2.nix-expr.nativeBuildInputs
-      ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.nativeBuildInputs
-      ++ lib.optionals buildCanExecuteHost pkgs.nixComponents2.nix-manual.externalNativeBuildInputs
-      ++ pkgs.nixComponents2.nix-internal-api-docs.nativeBuildInputs
-      ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
-      ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
-      ++ lib.optional (
-        !buildCanExecuteHost
-        # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
-        && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
-        && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
-        && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages)
-      ) pkgs.buildPackages.mesonEmulatorHook
-      ++ [
-        pkgs.buildPackages.cmake
-        pkgs.buildPackages.gnused
-        pkgs.buildPackages.shellcheck
-        pkgs.buildPackages.changelog-d
-        modular.pre-commit.settings.package
-        (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
-        pkgs.buildPackages.nixfmt-rfc-style
-        pkgs.buildPackages.shellcheck
-        pkgs.buildPackages.gdb
-      ]
-      ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
-        lib.hiPrio pkgs.buildPackages.clang-tools
-      )
-      ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
+      let
+        inputs =
+          attrs.nativeBuildInputs or [ ]
+          ++ pkgs.nixComponents2.nix-util.nativeBuildInputs
+          ++ pkgs.nixComponents2.nix-store.nativeBuildInputs
+          ++ pkgs.nixComponents2.nix-fetchers.nativeBuildInputs
+          ++ pkgs.nixComponents2.nix-expr.nativeBuildInputs
+          ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.nativeBuildInputs
+          ++ lib.optionals buildCanExecuteHost pkgs.nixComponents2.nix-manual.externalNativeBuildInputs
+          ++ pkgs.nixComponents2.nix-internal-api-docs.nativeBuildInputs
+          ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
+          ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
+          ++ pkgs.nixComponents2.nix-json-schema-checks.externalNativeBuildInputs
+          ++ lib.optional (
+            !buildCanExecuteHost
+            # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
+            && !(stdenv.hostPlatform.isWindows && stdenv.buildPlatform.isDarwin)
+            && stdenv.hostPlatform.emulatorAvailable pkgs.buildPackages
+            && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages)
+          ) pkgs.buildPackages.mesonEmulatorHook
+          ++ [
+            pkgs.buildPackages.cmake
+            pkgs.buildPackages.gnused
+            pkgs.buildPackages.changelog-d
+            modular.pre-commit.settings.package
+            (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+            pkgs.buildPackages.nixfmt-rfc-style
+            pkgs.buildPackages.shellcheck
+            pkgs.buildPackages.include-what-you-use
+            pkgs.buildPackages.gdb
+          ]
+          ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
+            lib.hiPrio pkgs.buildPackages.clang-tools
+          )
+          ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
+      in
+      # FIXME: separateDebugInfo = false doesn't actually prevent -Wa,--compress-debug-sections
+      # from making its way into NIX_CFLAGS_COMPILE.
+      lib.filter (p: !lib.hasInfix "separate-debug-info" p) inputs;
 
     buildInputs = [
       pkgs.gbenchmark

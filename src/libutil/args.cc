@@ -318,6 +318,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         } catch (SystemError &) {
         }
     }
+
     for (auto pos = cmdline.begin(); pos != cmdline.end();) {
 
         auto arg = *pos;
@@ -354,6 +355,9 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
     processArgs(pendingArgs, true);
 
+    if (!completions)
+        checkArgs();
+
     initialFlagsProcessed();
 
     /* Now that we are done parsing, make sure that any experimental
@@ -384,7 +388,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
 
     auto & rootArgs = getRoot();
 
-    auto process = [&](const std::string & name, const Flag & flag) -> bool {
+    auto process = [&](const std::string & name, Flag & flag) -> bool {
         ++pos;
 
         if (auto & f = flag.experimentalFeature)
@@ -413,6 +417,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         }
         if (!anyCompleted)
             flag.handler.fun(std::move(args));
+        flag.timesUsed++;
         return true;
     };
 
@@ -502,6 +507,14 @@ bool Args::processArgs(const Strings & args, bool finish)
         throw UsageError("more arguments are required");
 
     return res;
+}
+
+void Args::checkArgs()
+{
+    for (auto & [name, flag] : longFlags) {
+        if (flag->required && flag->timesUsed == 0)
+            throw UsageError("required argument '--%s' is missing", name);
+    }
 }
 
 nlohmann::json Args::toJSON()
@@ -641,6 +654,13 @@ bool MultiCommand::processArgs(const Strings & args, bool finish)
         return command->second->processArgs(args, finish);
     else
         return Args::processArgs(args, finish);
+}
+
+void MultiCommand::checkArgs()
+{
+    Args::checkArgs();
+    if (command)
+        command->second->checkArgs();
 }
 
 nlohmann::json MultiCommand::toJSON()

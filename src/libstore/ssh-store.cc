@@ -143,7 +143,7 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        return LocalFSStore::narFromPath(path, sink);
+        return Store::narFromPath(path, sink);
     }
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath) override

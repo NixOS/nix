@@ -41,7 +41,9 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
-    Done done(ExitCode result, BuildResult::Status status, std::optional<std::string> errorMsg = {});
+    Done doneSuccess(BuildResult::Success::Status status);
+
+    Done doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg);
 
 public:
     PathSubstitutionGoal(
@@ -56,10 +58,6 @@ public:
         unreachable();
     };
 
-    /**
-     * We prepend "a$" to the key name to ensure substitution goals
-     * happen before derivation goals.
-     */
     std::string key() override
     {
         return "a$" + std::string(storePath.name()) + "$" + worker.store.printStorePath(storePath);

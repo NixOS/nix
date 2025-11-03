@@ -27,7 +27,8 @@ like the following to be accessible:
             "Sid": "AllowDirectReads",
             "Action": [
                 "s3:GetObject",
-                "s3:GetBucketLocation"
+                "s3:GetBucketLocation",
+                "s3:ListBucket"
             ],
             "Effect": "Allow",
             "Resource": [
@@ -51,7 +52,7 @@ Consult the documentation linked above for further details.
 
 ### Authenticated reads to your S3 binary cache
 
-Your bucket will need a bucket policy allowing the desired users to perform the `s3:GetObject` and `s3:GetBucketLocation` action on all objects in the bucket.
+Your bucket will need a bucket policy allowing the desired users to perform the `s3:GetObject`, `s3:GetBucketLocation`, and `s3:ListBucket` actions on all objects in the bucket.
 The [anonymous policy given above](#anonymous-reads-to-your-s3-compatible-binary-cache) can be updated to have a restricted `Principal` to support this.
 
 ### Authenticated writes to your S3-compatible binary cache

@@ -19,7 +19,7 @@
 
 This man page describes the command `nix-shell`, which is distinct from `nix
 shell`. For documentation on the latter, run `nix shell --help` or see `man
-nix3-shell`.
+nix3-env-shell`.
 
 # Description
 

@@ -9,7 +9,7 @@
   nix-util,
   boost,
   curl,
-  aws-sdk-cpp,
+  aws-crt-cpp,
   libseccomp,
   nlohmann_json,
   sqlite,
@@ -64,7 +64,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
-  ++ lib.optional withAWS aws-sdk-cpp;
+  ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
     nix-util
@@ -74,6 +74,7 @@ mkMesonLibrary (finalAttrs: {
   mesonFlags = [
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
+    (lib.mesonEnable "s3-aws-auth" withAWS)
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")

@@ -1374,7 +1374,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             pos,
             "while evaluating the `__structuredAttrs` "
             "attribute passed to builtins.derivationStrict"))
-        jsonObject = StructuredAttrs{.structuredAttrs = json::object()};
+        jsonObject = StructuredAttrs{};
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
@@ -1420,7 +1420,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                         .debugThrow();
                 }
             if (ingestionMethod == ContentAddressMethod::Raw::Text)
-                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                experimentalFeatureSettings.require(
+                    Xp::DynamicDerivations, fmt("text-hashed derivation '%s', outputHashMode = \"text\"", drvName));
             if (ingestionMethod == ContentAddressMethod::Raw::Git)
                 experimentalFeatureSettings.require(Xp::GitHashing);
         };
@@ -2412,7 +2413,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value ** args, Value
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(toView(out), context);
+    v.mkString(out.view(), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2520,7 +2521,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value ** args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(toView(out), context);
+    v.mkString(out.view(), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -3362,21 +3363,20 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->lambda().fun->hasFormals()) {
+    if (const auto & formals = args[0]->lambda().fun->getFormals()) {
+        auto attrs = state.buildBindings(formals->formals.size());
+        for (auto & i : formals->formals)
+            attrs.insert(i.name, state.getBool(i.def), i.pos);
+        /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
+           (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
+           always holds:
+           assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
+           .*/
+        v.mkAttrs(attrs.alreadySorted());
+    } else {
         v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
-
-    const auto & formals = args[0]->lambda().fun->formals->formals;
-    auto attrs = state.buildBindings(formals.size());
-    for (auto & i : formals)
-        attrs.insert(i.name, state.getBool(i.def), i.pos);
-    /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
-       (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
-       always holds:
-       assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
-       .*/
-    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_functionArgs({
@@ -4610,9 +4610,9 @@ struct RegexCache
     }
 };
 
-std::shared_ptr<RegexCache> makeRegexCache()
+ref<RegexCache> makeRegexCache()
 {
-    return std::make_shared<RegexCache>();
+    return make_ref<RegexCache>();
 }
 
 void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)

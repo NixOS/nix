@@ -997,7 +997,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             }},
             {[&](const StorePath & path, const StorePath & parent) {
                 return BuildError(
-                    BuildResult::OutputRejected,
+                    BuildResult::Failure::OutputRejected,
                     "cycle detected in the references of '%s' from '%s'",
                     printStorePath(path),
                     printStorePath(parent));
@@ -1036,7 +1036,7 @@ bool LocalStore::pathInfoIsUntrusted(const ValidPathInfo & info)
 
 bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
 {
-    return config->requireSigs && !realisation.checkSignatures(getPublicKeys());
+    return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
@@ -1048,15 +1048,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         /* In case we are not interested in reading the NAR: discard it. */
         bool narRead = false;
         Finally cleanup = [&]() {
-            if (!narRead) {
-                NullFileSystemObjectSink sink;
+            if (!narRead)
                 try {
-                    parseDump(sink, source);
+                    source.skip(info.narSize);
                 } catch (...) {
                     // TODO: should Interrupted be handled here?
                     ignoreExceptionInDestructor();
                 }
-            }
         };
 
         addTempRoot(info.path);
@@ -1383,7 +1381,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of '%s'", name);
+            printMsg(lvlTalkative, "checking contents of %s", name);
             PosixSourceAccessor accessor;
             std::string hash = hashPath(
                                    PosixSourceAccessor::createAtRoot(link.path()),
@@ -1391,10 +1389,10 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                                    HashAlgorithm::SHA256)
                                    .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError("link '%s' was modified! expected hash '%s', got '%s'", link.path(), name, hash);
+                printError("link %s was modified! expected hash %s, got '%s'", link.path(), name, hash);
                 if (repair) {
                     std::filesystem::remove(link.path());
-                    printInfo("removed link '%s'", link.path());
+                    printInfo("removed link %s", link.path());
                 } else {
                     errors = true;
                 }
@@ -1586,7 +1584,7 @@ void LocalStore::addSignatures(const StorePath & storePath, const StringSet & si
     });
 }
 
-std::optional<std::pair<int64_t, Realisation>>
+std::optional<std::pair<int64_t, UnkeyedRealisation>>
 LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & id)
 {
     auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.strHash())(id.outputName));
@@ -1598,14 +1596,13 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
 
     return {
         {realisationDbId,
-         Realisation{
-             .id = id,
+         UnkeyedRealisation{
              .outPath = outputPath,
              .signatures = signatures,
          }}};
 }
 
-std::optional<const Realisation> LocalStore::queryRealisation_(LocalStore::State & state, const DrvOutput & id)
+std::optional<const UnkeyedRealisation> LocalStore::queryRealisation_(LocalStore::State & state, const DrvOutput & id)
 {
     auto maybeCore = queryRealisationCore_(state, id);
     if (!maybeCore)
@@ -1631,13 +1628,13 @@ std::optional<const Realisation> LocalStore::queryRealisation_(LocalStore::State
 }
 
 void LocalStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
-        auto maybeRealisation =
-            retrySQLite<std::optional<const Realisation>>([&]() { return queryRealisation_(*_state->lock(), id); });
+        auto maybeRealisation = retrySQLite<std::optional<const UnkeyedRealisation>>(
+            [&]() { return queryRealisation_(*_state->lock(), id); });
         if (maybeRealisation)
-            callback(std::make_shared<const Realisation>(maybeRealisation.value()));
+            callback(std::make_shared<const UnkeyedRealisation>(maybeRealisation.value()));
         else
             callback(nullptr);
 

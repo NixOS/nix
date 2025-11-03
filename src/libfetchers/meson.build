@@ -32,7 +32,6 @@ libgit2 = dependency('libgit2', version : '>= 1.9')
 deps_private += libgit2
 
 subdir('nix-meson-build-support/common')
-subdir('nix-meson-build-support/asan-options')
 
 sources = files(
   'attrs.cc',

@@ -413,6 +413,10 @@
                 supportsCross = false;
               };
 
+              "nix-json-schema-checks" = {
+                supportsCross = false;
+              };
+
               "nix-perl-bindings" = {
                 supportsCross = false;
               };
@@ -464,6 +468,27 @@
                 ln -s ${image} $image
                 echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
               '';
+        }
+      );
+
+      apps = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
+        in
+        {
+          open-manual = {
+            type = "app";
+            program = "${pkgs.writeShellScript "open-nix-manual" ''
+              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
+              if ! ${opener} "$manual_path"; then
+                echo "Failed to open manual with ${opener}. Manual is located at:"
+                echo "$manual_path"
+              fi
+            ''}";
+            meta.description = "Open the Nix manual in your browser";
+          };
         }
       );
 

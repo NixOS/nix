@@ -107,8 +107,7 @@ void printClosureDiff(
             if (!removed.empty() || !added.empty())
                 items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
             if (showDelta)
-                items.push_back(
-                    fmt("%s%+.1f KiB" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, sizeDelta / 1024.0));
+                items.push_back(fmt("%s%s" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, renderSize(sizeDelta)));
             logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
         }
     }

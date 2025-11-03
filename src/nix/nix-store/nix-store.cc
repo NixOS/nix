@@ -603,7 +603,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
-                    {ref{store->getFSAccessor(info->path, false)}},
+                    {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 info->narHash = hash.hash;
@@ -985,6 +985,16 @@ static void opServe(Strings opFlags, Strings opArgs)
         case ServeProto::Command::DumpStorePath:
             store->narFromPath(store->parseStorePath(readString(in)), out);
             break;
+
+        case ServeProto::Command::ImportPaths: {
+            if (!writeAllowed)
+                throw Error("importing paths is not allowed");
+            // FIXME: should we skip sig checking?
+            importPaths(*store, in, NoCheckSigs);
+            // indicate success
+            out << 1;
+            break;
+        }
 
         case ServeProto::Command::BuildPaths: {
 

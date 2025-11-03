@@ -15,7 +15,6 @@ pymod = import('python')
 python = pymod.find_installation('python3')
 
 nix_env_for_docs = {
-  'ASAN_OPTIONS' : 'abort_on_error=1:print_summary=1:detect_leaks=0',
   'HOME' : '/dummy',
   'NIX_CONF_DIR' : '/dummy',
   'NIX_SSL_CERT_FILE' : '/dummy/no-ca-bundle.crt',
@@ -89,7 +88,7 @@ manual = custom_target(
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
         @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
         sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
-        @4@ -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
+        @4@ -r -L --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
         mv @2@/html @2@/manual
@@ -116,6 +115,7 @@ manual = custom_target(
     builtins_md,
     rl_next_generated,
     summary_rl_next,
+    json_schema_generated_files,
     nix_input,
   ],
   output : [

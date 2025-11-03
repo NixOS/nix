@@ -80,25 +80,45 @@ private:
 
 protected:
 
-    // The prefix under which realisation infos will be stored
-    const std::string realisationsPrefix = "realisations";
+    /**
+     * The prefix under which realisation infos will be stored
+     */
+    constexpr const static std::string realisationsPrefix = "realisations";
 
-    const std::string cacheInfoFile = "nix-cache-info";
+    constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
     BinaryCacheStore(Config &);
+
+    /**
+     * Compute the path to the given realisation
+     *
+     * It's `${realisationsPrefix}/${drvOutput}.doi`.
+     */
+    std::string makeRealisationPath(const DrvOutput & id);
 
 public:
 
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(
-        const std::string & path, std::shared_ptr<std::basic_iostream<char>> istream, const std::string & mimeType) = 0;
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
 
     void upsertFile(
         const std::string & path,
         // FIXME: use std::string_view
         std::string && data,
-        const std::string & mimeType);
+        const std::string & mimeType,
+        uint64_t sizeHint);
+
+    void upsertFile(
+        const std::string & path,
+        // FIXME: use std::string_view
+        std::string && data,
+        const std::string & mimeType)
+    {
+        auto size = data.size();
+        upsertFile(path, std::move(data), mimeType, size);
+    }
 
     /**
      * Dump the contents of the specified file to a sink.
@@ -175,7 +195,7 @@ public:
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

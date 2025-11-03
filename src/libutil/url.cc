@@ -4,6 +4,7 @@
 #include "nix/util/split.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/util/file-system.hh"
 
 #include <boost/url.hpp>
 
@@ -350,7 +351,7 @@ std::string ParsedURL::renderAuthorityAndPath() const
            must either be empty or begin with a slash ("/") character. */
         assert(path.empty() || path.front().empty());
         res += authority->to_string();
-    } else if (std::ranges::equal(std::views::take(path, 2), std::views::repeat("", 2))) {
+    } else if (std::ranges::equal(std::views::take(path, 3), std::views::repeat("", 3))) {
         /* If a URI does not contain an authority component, then the path cannot begin
            with two slash characters ("//") */
         unreachable();
@@ -434,10 +435,27 @@ bool isValidSchemeName(std::string_view s)
     return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);
 }
 
-std::ostream & operator<<(std::ostream & os, const ValidURL & url)
+std::ostream & operator<<(std::ostream & os, const VerbatimURL & url)
 {
     os << url.to_string();
     return os;
+}
+
+std::optional<std::string> VerbatimURL::lastPathSegment() const
+{
+    try {
+        auto parsedUrl = parsed();
+        auto segments = parsedUrl.pathSegments(/*skipEmpty=*/true);
+        if (std::ranges::empty(segments))
+            return std::nullopt;
+        return segments.back();
+    } catch (BadURL &) {
+        // Fall back to baseNameOf for unparsable URLs
+        auto name = baseNameOf(to_string());
+        if (name.empty())
+            return std::nullopt;
+        return std::string{name};
+    }
 }
 
 } // namespace nix

@@ -1,5 +1,9 @@
+#include <vector>
+
 #include "nix/flake/settings.hh"
 #include "nix/flake/flake-primops.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/eval.hh"
 
 namespace nix::flake {
 

@@ -254,10 +254,15 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.args = {store->printStorePath(getEnvShPath)};
 
     /* Remove derivation checks. */
-    drv.env.erase("allowedReferences");
-    drv.env.erase("allowedRequisites");
-    drv.env.erase("disallowedReferences");
-    drv.env.erase("disallowedRequisites");
+    if (drv.structuredAttrs) {
+        drv.structuredAttrs->structuredAttrs.erase("outputChecks");
+    } else {
+        drv.env.erase("allowedReferences");
+        drv.env.erase("allowedRequisites");
+        drv.env.erase("disallowedReferences");
+        drv.env.erase("disallowedRequisites");
+    }
+
     drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
@@ -299,11 +304,9 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
-        auto & outPath = *optPath;
-        assert(store->isValidPath(outPath));
-        auto outPathS = store->toRealPath(outPath);
-        if (lstat(outPathS).st_size)
-            return outPath;
+        auto accessor = evalStore->requireStoreObjectAccessor(*optPath);
+        if (auto st = accessor->maybeLstat(CanonPath::root); st && st->fileSize.value_or(0))
+            return *optPath;
     }
 
     throw Error("get-env.sh failed to produce an environment");
@@ -502,7 +505,9 @@ struct Common : InstallableCommand, MixProfile
 
         debug("reading environment file '%s'", strPath);
 
-        return {BuildEnvironment::parseJSON(readFile(store->toRealPath(shellOutPath))), strPath};
+        return {
+            BuildEnvironment::parseJSON(store->requireStoreObjectAccessor(shellOutPath)->readFile(CanonPath::root)),
+            strPath};
     }
 };
 

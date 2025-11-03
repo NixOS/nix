@@ -6,6 +6,7 @@ requireDaemonNewerThan "2.6.0pre20211215"
 
 clearStoreIfPossible
 
+# shellcheck disable=SC2016
 nix-build --no-out-link -E '
   with import '"${config_nix}"';
 

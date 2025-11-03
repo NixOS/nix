@@ -267,11 +267,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
-            std::set<ref<Node>> visited;
+            std::set<ref<Node>> visited{lockedFlake.lockFile.root};
 
-            std::function<void(const Node & node, const std::string & prefix)> recurse;
-
-            recurse = [&](const Node & node, const std::string & prefix) {
+            [&](this const auto & recurse, const Node & node, const std::string & prefix) -> void {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
                     bool last = i + 1 == node.inputs.size();
 
@@ -298,10 +296,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                             printInputAttrPath(*follows));
                     }
                 }
-            };
-
-            visited.insert(lockedFlake.lockFile.root);
-            recurse(*lockedFlake.lockFile.root, "");
+            }(*lockedFlake.lockFile.root, "");
         }
     }
 };
@@ -473,7 +468,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
                 }
-                if (v.lambda().fun->hasFormals() || !argHasName(v.lambda().fun->arg, "final"))
+                if (v.lambda().fun->getFormals() || !argHasName(v.lambda().fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -884,8 +879,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::vector<std::filesystem::path> changedFiles;
         std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const std::filesystem::path & to) {
+        [&](this const auto & copyDir, const SourcePath & from, const std::filesystem::path & to) -> void {
             createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
@@ -935,9 +929,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
-        };
-
-        copyDir(templateDir, flakeDir);
+        }(templateDir, flakeDir);
 
         if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = {"-C", flakeDir, "add", "--intent-to-add", "--force", "--"};
@@ -1032,11 +1024,9 @@ struct CmdFlakeClone : FlakeCommand
     }
 };
 
-struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
+struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 {
     std::string dstUri;
-
-    CheckSigsFlag checkSigs = CheckSigs;
 
     SubstituteFlag substitute = NoSubstitute;
 
@@ -1047,11 +1037,6 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun
             .description = "URI of the destination Nix store",
             .labels = {"store-uri"},
             .handler = {&dstUri},
-        });
-        addFlag({
-            .longName = "no-check-sigs",
-            .description = "Do not require that paths are signed by trusted keys.",
-            .handler = {&checkSigs, NoCheckSigs},
         });
     }
 
@@ -1155,7 +1140,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         evalSettings.enableImportFromDerivation.setDefault(false);
 
         auto state = getEvalState();
-        auto flake = std::make_shared<LockedFlake>(lockFlake());
+        auto flake = make_ref<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
         std::function<bool(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const Symbol & attr)>
@@ -1443,7 +1428,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             return j;
         };
 
-        auto cache = openEvalCache(*state, flake);
+        auto cache = openEvalCache(*state, ref<flake::LockedFlake>(flake));
 
         auto j = visit(*cache->getRoot(), {}, fmt(ANSI_BOLD "%s" ANSI_NORMAL, flake->flake.lockedRef), "");
         if (json)

@@ -5,6 +5,7 @@
 #include "nix/expr/symbol-table.hh"
 
 #include <boost/container/static_vector.hpp>
+#include <boost/iterator/function_output_iterator.hpp>
 
 #include <algorithm>
 #include <functional>
@@ -463,12 +464,48 @@ private:
         return bindings->baseLayer;
     }
 
+    /**
+     * If the bindings gets "layered" on top of another we need to recalculate
+     * the number of unique attributes in the chain.
+     *
+     * This is done by either iterating over the base "layer" and the newly added
+     * attributes and counting duplicates. If the base "layer" is big this approach
+     * is inefficient and we fall back to doing per-element binary search in the base
+     * "layer".
+     */
     void finishSizeIfNecessary()
     {
-        if (hasBaseLayer())
-            /* NOTE: Do not use std::ranges::distance, since Bindings is a sized
-               range, but we are calculating this size here. */
-            bindings->numAttrsInChain = std::distance(bindings->begin(), bindings->end());
+        if (!hasBaseLayer())
+            return;
+
+        auto & base = *bindings->baseLayer;
+        auto attrs = std::span(bindings->attrs, bindings->numAttrs);
+
+        Bindings::size_type duplicates = 0;
+
+        /* If the base bindings is smaller than the newly added attributes
+           iterate using std::set_intersection to run in O(|base| + |attrs|) =
+           O(|attrs|). Otherwise use an O(|attrs| * log(|base|)) per-attr binary
+           search to check for duplicates. Note that if we are in this code path then
+           |attrs| <= bindingsUpdateLayerRhsSizeThreshold, which 16 by default. We are
+           optimizing for the case when a small attribute set gets "layered" on top of
+           a much larger one. When attrsets are already small it's fine to do a linear
+           scan, but we should avoid expensive iterations over large "base" attrsets. */
+        if (attrs.size() > base.size()) {
+            std::set_intersection(
+                base.begin(),
+                base.end(),
+                attrs.begin(),
+                attrs.end(),
+                boost::make_function_output_iterator([&]([[maybe_unused]] auto && _) { ++duplicates; }));
+        } else {
+            for (const auto & attr : attrs) {
+                if (base.get(attr.name))
+                    ++duplicates;
+            }
+        }
+
+        bindings->numAttrsInChain = base.numAttrsInChain + attrs.size() - duplicates;
     }
 
 public:

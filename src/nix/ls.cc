@@ -115,10 +115,7 @@ struct CmdLsStore : StoreCommand, MixLs
     void run(ref<Store> store) override
     {
         auto [storePath, rest] = store->toStorePath(path);
-        auto accessor = store->getFSAccessor(storePath);
-        if (!accessor)
-            throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-        list(ref{std::move(accessor)}, CanonPath{rest});
+        list(store->requireStoreObjectAccessor(storePath), CanonPath{rest});
     }
 };
 
@@ -148,7 +145,13 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        list(makeNarAccessor(readFile(narPath)), CanonPath{path});
+        AutoCloseFD fd = open(narPath.c_str(), O_RDONLY);
+        if (!fd)
+            throw SysError("opening NAR file '%s'", narPath);
+        auto source = FdSource{fd.get()};
+        auto narAccessor = makeNarAccessor(source);
+        auto listing = listNar(narAccessor, CanonPath::root, true);
+        list(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };
 

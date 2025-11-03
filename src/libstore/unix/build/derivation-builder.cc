@@ -46,12 +46,18 @@
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
 
+#if NIX_WITH_AWS_AUTH
+#  include "nix/store/aws-creds.hh"
+#  include "nix/store/s3-url.hh"
+#  include "nix/util/url.hh"
+#endif
+
 namespace nix {
 
 struct NotDeterministic : BuildError
 {
     NotDeterministic(auto &&... args)
-        : BuildError(BuildResult::NotDeterministic, args...)
+        : BuildError(BuildResult::Failure::NotDeterministic, args...)
     {
     }
 };
@@ -290,6 +296,15 @@ protected:
      */
     virtual void startChild();
 
+#if NIX_WITH_AWS_AUTH
+    /**
+     * Pre-resolve AWS credentials for S3 URLs in builtin:fetchurl.
+     * This should be called before forking to ensure credentials are available in child.
+     * Returns the credentials if successfully resolved, or std::nullopt otherwise.
+     */
+    std::optional<AwsCredentials> preResolveAwsCredentials();
+#endif
+
 private:
 
     /**
@@ -340,9 +355,19 @@ protected:
     void writeBuilderFile(const std::string & name, std::string_view contents);
 
     /**
+     * Arguments passed to runChild().
+     */
+    struct RunChildArgs
+    {
+#if NIX_WITH_AWS_AUTH
+        std::optional<AwsCredentials> awsCredentials;
+#endif
+    };
+
+    /**
      * Run the builder's process.
      */
-    void runChild();
+    void runChild(RunChildArgs args);
 
     /**
      * Move the current process into the chroot, if any. Called early
@@ -519,7 +544,8 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
         cleanupBuild(false);
 
         throw BuilderFailureError{
-            !derivationType.isSandboxed() || diskFull ? BuildResult::TransientFailure : BuildResult::PermanentFailure,
+            !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
+                                                      : BuildResult::Failure::PermanentFailure,
             status,
             diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
         };
@@ -679,30 +705,6 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
        sandbox uids. This must be done before any chownToBuilder()
        calls. */
     prepareUser();
-
-    /* Right platform? */
-    if (!drvOptions.canBuildLocally(store, drv)) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
-                "\n"
-                "Required system: '%s' with features {%s}\n"
-                "Current system: '%s' with features {%s}",
-                Magenta(store.printStorePath(drvPath)),
-                Magenta(drv.platform),
-                concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(drv)),
-                Magenta(settings.thisSystem),
-                concatStringsSep<StringSet>(", ", store.Store::config.systemFeatures));
-
-        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware - we should
-        // tell them to run the command to install Darwin 2
-        if (drv.platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-            msg +=
-                fmt("\nNote: run `%s` to run programs for x86_64-darwin",
-                    Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
-
-        throw BuildError(BuildResult::InputRejected, msg);
-    }
 
     auto buildDir = store.config->getBuildDir();
 
@@ -943,11 +945,43 @@ void DerivationBuilderImpl::openSlave()
         throw SysError("cannot pipe standard error into log file");
 }
 
+#if NIX_WITH_AWS_AUTH
+std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
+{
+    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+        auto url = drv.env.find("url");
+        if (url != drv.env.end()) {
+            try {
+                auto parsedUrl = parseURL(url->second);
+                if (parsedUrl.scheme == "s3") {
+                    debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
+                    auto s3Url = ParsedS3URL::parse(parsedUrl);
+
+                    // Use the preResolveAwsCredentials from aws-creds
+                    auto credentials = getAwsCredentialsProvider()->getCredentials(s3Url);
+                    debug("Successfully pre-resolved AWS credentials in parent process");
+                    return credentials;
+                }
+            } catch (const std::exception & e) {
+                debug("Error pre-resolving S3 credentials: %s", e.what());
+            }
+        }
+    }
+    return std::nullopt;
+}
+#endif
+
 void DerivationBuilderImpl::startChild()
 {
-    pid = startProcess([&]() {
+    RunChildArgs args{
+#if NIX_WITH_AWS_AUTH
+        .awsCredentials = preResolveAwsCredentials(),
+#endif
+    };
+
+    pid = startProcess([this, args = std::move(args)]() {
         openSlave();
-        runChild();
+        runChild(std::move(args));
     });
 }
 
@@ -1204,7 +1238,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
     chownToBuilder(fd.get(), path);
 }
 
-void DerivationBuilderImpl::runChild()
+void DerivationBuilderImpl::runChild(RunChildArgs args)
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -1221,6 +1255,9 @@ void DerivationBuilderImpl::runChild()
         BuiltinBuilderContext ctx{
             .drv = drv,
             .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_AWS_AUTH
+            .awsCredentials = args.awsCredentials,
+#endif
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
@@ -1389,7 +1426,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optSt = maybeLstat(actualPath.c_str());
         if (!optSt)
             throw BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at '%s'",
                 store.printStorePath(drvPath),
                 outputName,
@@ -1404,7 +1441,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH)))
             || (buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "suspicious ownership or permission on '%s' for output '%s'; rejecting this build output",
                 actualPath,
                 outputName);
@@ -1442,7 +1479,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             auto orifu = get(outputReferencesIfUnregistered, name);
             if (!orifu)
                 throw BuildError(
-                    BuildResult::OutputRejected,
+                    BuildResult::Failure::OutputRejected,
                     "no output reference for '%s' in build of '%s'",
                     name,
                     store.printStorePath(drvPath));
@@ -1467,7 +1504,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         {[&](const std::string & path, const std::string & parent) {
             // TODO with more -vvvv also show the temporary paths for manual inspection.
             return BuildError(
-                BuildResult::OutputRejected,
+                BuildResult::Failure::OutputRejected,
                 "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
                 store.printStorePath(drvPath),
                 path,
@@ -1561,12 +1598,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto newInfoFromCA = [&](const DerivationOutput::CAFloating outputHash) -> ValidPathInfo {
             auto st = get(outputStats, outputName);
             if (!st)
-                throw BuildError(BuildResult::OutputRejected, "output path %1% without valid stats info", actualPath);
+                throw BuildError(
+                    BuildResult::Failure::OutputRejected, "output path %1% without valid stats info", actualPath);
             if (outputHash.method.getFileIngestionMethod() == FileIngestionMethod::Flat) {
                 /* The output path should be a regular file without execute permission. */
                 if (!S_ISREG(st->st_mode) || (st->st_mode & S_IXUSR) != 0)
                     throw BuildError(
-                        BuildResult::OutputRejected,
+                        BuildResult::Failure::OutputRejected,
                         "output path '%1%' should be a non-executable regular file "
                         "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         actualPath);
@@ -1704,7 +1742,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
                 replaceValidPath(store.toRealPath(finalDestPath), actualPath);
-                actualPath = store.toRealPath(finalDestPath);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
@@ -1718,7 +1755,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 auto destPath = store.toRealPath(finalDestPath);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
-                actualPath = destPath;
             }
         }
 
@@ -1771,7 +1807,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     debug("unreferenced input: '%1%'", store.printStorePath(i));
             }
 
-            store.optimisePath(actualPath, NoRepair); // FIXME: combine with scanForReferences()
+            if (!store.isValidPath(newInfo.path))
+                store.optimisePath(
+                    store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
@@ -1828,7 +1866,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, newInfo] : infos) {
         auto oldinfo = get(initialOutputs, outputName);
         assert(oldinfo);
-        auto thisRealisation = Realisation{.id = DrvOutput{oldinfo->outputHash, outputName}, .outPath = newInfo.path};
+        auto thisRealisation = Realisation{
+            {
+                .outPath = newInfo.path,
+            },
+            DrvOutput{oldinfo->outputHash, outputName},
+        };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
             store.signRealisation(thisRealisation);
             store.registerDrvOutput(thisRealisation);
@@ -1902,6 +1945,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 #include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
+#include "external-derivation-builder.cc"
 
 namespace nix {
 

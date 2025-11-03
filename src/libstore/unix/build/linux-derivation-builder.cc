@@ -276,6 +276,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void startChild() override
     {
+        RunChildArgs args{
+#  if NIX_WITH_AWS_AUTH
+            .awsCredentials = preResolveAwsCredentials(),
+#  endif
+        };
+
         /* Set up private namespaces for the build:
 
            - The PID namespace causes the build to start as PID 1.
@@ -343,7 +349,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (usingUserNamespace)
                     options.cloneFlags |= CLONE_NEWUSER;
 
-                pid_t child = startProcess([&]() { runChild(); }, options);
+                pid_t child = startProcess([this, args = std::move(args)]() { runChild(std::move(args)); }, options);
 
                 writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
                 _exit(0);

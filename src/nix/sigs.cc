@@ -3,6 +3,7 @@
 #include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/thread-pool.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <atomic>
 
@@ -28,6 +29,13 @@ struct CmdCopySigs : StorePathsCommand
         return "copy store path signatures from substituters";
     }
 
+    std::string doc() override
+    {
+        return
+#include "store-copy-sigs.md"
+            ;
+    }
+
     void run(ref<Store> store, StorePaths && storePaths) override
     {
         if (substituterUris.empty())
@@ -38,7 +46,7 @@ struct CmdCopySigs : StorePathsCommand
         for (auto & s : substituterUris)
             substituters.push_back(openStore(s));
 
-        ThreadPool pool;
+        ThreadPool pool{fileTransferSettings.httpConnections};
 
         std::atomic<size_t> added{0};
 
@@ -104,6 +112,7 @@ struct CmdSign : StorePathsCommand
             .labels = {"file"},
             .handler = {&secretKeyFile},
             .completer = completePath,
+            .required = true,
         });
     }
 
@@ -114,9 +123,6 @@ struct CmdSign : StorePathsCommand
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
-        if (secretKeyFile.empty())
-            throw UsageError("you must specify a secret key file using '-k'");
-
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
 
@@ -144,7 +150,7 @@ static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
 
 struct CmdKeyGenerateSecret : Command
 {
-    std::optional<std::string> keyName;
+    std::string keyName;
 
     CmdKeyGenerateSecret()
     {
@@ -153,6 +159,7 @@ struct CmdKeyGenerateSecret : Command
             .description = "Identifier of the key (e.g. `cache.example.org-1`).",
             .labels = {"name"},
             .handler = {&keyName},
+            .required = true,
         });
     }
 
@@ -170,11 +177,8 @@ struct CmdKeyGenerateSecret : Command
 
     void run() override
     {
-        if (!keyName)
-            throw UsageError("required argument '--key-name' is missing");
-
         logger->stop();
-        writeFull(getStandardOutput(), SecretKey::generate(*keyName).to_string());
+        writeFull(getStandardOutput(), SecretKey::generate(keyName).to_string());
     }
 };
 

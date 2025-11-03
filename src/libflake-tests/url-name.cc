@@ -1,5 +1,7 @@
-#include "nix/flake/url-name.hh"
 #include <gtest/gtest.h>
+
+#include "nix/flake/url-name.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 

@@ -21,16 +21,6 @@ let
   packages' = nixFlake.packages.${system};
   stdenv = (getStdenv pkgs);
 
-  enableSanitizersLayer = finalAttrs: prevAttrs: {
-    mesonFlags =
-      (prevAttrs.mesonFlags or [ ])
-      ++ [ (lib.mesonOption "b_sanitize" "address,undefined") ]
-      ++ (lib.optionals stdenv.cc.isClang [
-        # https://www.github.com/mesonbuild/meson/issues/764
-        (lib.mesonBool "b_lundef" false)
-      ]);
-  };
-
   collectCoverageLayer = finalAttrs: prevAttrs: {
     env =
       let
@@ -53,14 +43,15 @@ let
     '';
   };
 
-  componentOverrides =
-    (lib.optional withSanitizers enableSanitizersLayer)
-    ++ (lib.optional withCoverage collectCoverageLayer);
+  componentOverrides = (lib.optional withCoverage collectCoverageLayer);
 in
 
 rec {
   nixComponentsInstrumented = nixComponents.overrideScope (
     final: prev: {
+      withASan = withSanitizers;
+      withUBSan = withSanitizers;
+
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
@@ -70,6 +61,14 @@ rec {
       nix-perl-bindings = if withSanitizers then null else prev.nix-perl-bindings;
     }
   );
+
+  # Import NixOS tests using the instrumented components
+  nixosTests = import ../../../tests/nixos {
+    inherit lib pkgs;
+    nixComponents = nixComponentsInstrumented;
+    nixpkgs = nixFlake.inputs.nixpkgs;
+    inherit (nixFlake.inputs) nixpkgs-23-11;
+  };
 
   /**
     Top-level tests for the flake outputs, as they would be built by hydra.
@@ -117,6 +116,7 @@ rec {
     ) nixComponentsInstrumented)
     // lib.optionalAttrs (pkgs.stdenv.hostPlatform == pkgs.stdenv.buildPlatform) {
       "${componentTestsPrefix}nix-functional-tests" = nixComponentsInstrumented.nix-functional-tests;
+      "${componentTestsPrefix}nix-json-schema-checks" = nixComponentsInstrumented.nix-json-schema-checks;
     };
 
   codeCoverage =
@@ -221,4 +221,20 @@ rec {
     {
       inherit coverageProfileDrvs mergedProfdata coverageReports;
     };
+
+  vmTests = {
+    inherit (nixosTests) s3-binary-cache-store;
+  }
+  // lib.optionalAttrs (!withSanitizers && !withCoverage) {
+    # evalNixpkgs uses non-instrumented components from hydraJobs, so only run it
+    # when not testing with sanitizers to avoid rebuilding nix
+    inherit (hydraJobs.tests) evalNixpkgs;
+    # FIXME: CI times out when building vm tests instrumented
+    inherit (nixosTests)
+      functional_user
+      githubFlakes
+      nix-docker
+      tarballFlakes
+      ;
+  };
 }

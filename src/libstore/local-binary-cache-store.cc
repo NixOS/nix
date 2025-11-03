@@ -54,15 +54,12 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(
-        const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType) override
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
         auto path2 = config->binaryCacheDir + "/" + path;
         static std::atomic<int> counter{0};
         Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
         AutoDelete del(tmp, false);
-        StreamToSourceAdapter source(istream);
         writeFile(tmp, source);
         std::filesystem::rename(tmp, path2);
         del.cancel();

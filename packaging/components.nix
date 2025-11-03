@@ -204,6 +204,25 @@ let
       mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
     };
 
+  enableSanitizersLayer =
+    finalAttrs: prevAttrs:
+    let
+      sanitizers = lib.optional scope.withASan "address" ++ lib.optional scope.withUBSan "undefined";
+    in
+    {
+      mesonFlags =
+        (prevAttrs.mesonFlags or [ ])
+        ++ lib.optionals (lib.length sanitizers > 0) (
+          [
+            (lib.mesonOption "b_sanitize" (lib.concatStringsSep "," sanitizers))
+          ]
+          ++ (lib.optionals stdenv.cc.isClang [
+            # https://www.github.com/mesonbuild/meson/issues/764
+            (lib.mesonBool "b_lundef" false)
+          ])
+        );
+    };
+
   nixDefaultsLayer = finalAttrs: prevAttrs: {
     strictDeps = prevAttrs.strictDeps or true;
     enableParallelBuilding = true;
@@ -245,6 +264,16 @@ in
   inherit maintainers;
 
   inherit filesetToSource;
+
+  /**
+    Whether meson components are built with [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html).
+  */
+  withASan = false;
+
+  /**
+    Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
+  */
+  withUBSan = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
@@ -332,6 +361,7 @@ in
     setVersionLayer
     mesonLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
@@ -342,6 +372,7 @@ in
     mesonLayer
     mesonBuildLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
@@ -353,6 +384,7 @@ in
     mesonBuildLayer
     mesonLibraryLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
 
@@ -406,6 +438,11 @@ in
   */
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
 
+  /**
+    JSON schema validation checks
+  */
+  nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
+
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
   /**
@@ -458,7 +495,7 @@ in
 
       Example:
       ```
-      overrideScope (finalScope: prevScope: { aws-sdk-cpp = null; })
+      overrideScope (finalScope: prevScope: { aws-crt-cpp = null; })
       ```
     */
     overrideScope = f: (scope.overrideScope f).nix-everything;

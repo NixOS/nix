@@ -131,31 +131,3 @@ else
 fi
 
 rm -f "$TEST_ROOT/unicode-*"
-
-# Unpacking a NAR with a NUL character in a file name should fail.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < nul-character.nar | grepQuiet "NAR contains invalid file name 'f"
-
-# Likewise for a '.' filename.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dot.nar | grepQuiet "NAR contains invalid file name '.'"
-
-# Likewise for a '..' filename.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < dotdot.nar | grepQuiet "NAR contains invalid file name '..'"
-
-# Likewise for a filename containing a slash.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < slash.nar | grepQuiet "NAR contains invalid file name 'x/y'"
-
-# Likewise for an empty filename.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < empty.nar | grepQuiet "NAR contains invalid file name ''"
-
-# Test that the 'executable' field cannot come before the 'contents' field.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < executable-after-contents.nar | grepQuiet "expected tag ')', got 'executable'"
-
-# Test that the 'name' field cannot come before the 'node' field in a directory entry.
-rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < name-after-node.nar | grepQuiet "expected tag 'name'"

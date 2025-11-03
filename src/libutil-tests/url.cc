@@ -868,6 +868,12 @@ TEST_P(ParsedURLPathSegmentsTest, segmentsAreCorrect)
     EXPECT_EQ(encodeUrlPath(segments), testCase.path);
 }
 
+TEST_P(ParsedURLPathSegmentsTest, to_string)
+{
+    const auto & testCase = GetParam();
+    EXPECT_EQ(testCase.url, parseURL(testCase.url).to_string());
+}
+
 INSTANTIATE_TEST_SUITE_P(
     ParsedURL,
     ParsedURLPathSegmentsTest,
@@ -885,6 +891,13 @@ INSTANTIATE_TEST_SUITE_P(
             .path = "",
             .skipEmpty = false,
             .description = "empty_authority_empty_path",
+        },
+        ParsedURLPathSegmentsTestCase{
+            .url = "path:/",
+            .segments = {"", ""},
+            .path = "/",
+            .skipEmpty = false,
+            .description = "empty_authority_root_path",
         },
         ParsedURLPathSegmentsTestCase{
             .url = "scheme:///",

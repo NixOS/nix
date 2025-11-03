@@ -24,7 +24,8 @@ DownstreamPlaceholder DownstreamPlaceholder::unknownDerivation(
     OutputNameView outputName,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    xpSettings.require(Xp::DynamicDerivations);
+    xpSettings.require(
+        Xp::DynamicDerivations, [&] { return fmt("placeholder for unknown derivation output '%s'", outputName); });
     auto compressed = compressHash(placeholder.hash, 20);
     auto clearText =
         "nix-computed-output:" + compressed.to_string(HashFormat::Nix32, false) + ":" + std::string{outputName};

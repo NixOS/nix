@@ -299,7 +299,7 @@ void drvRequireExperiment(
 } // namespace nix
 
 JSON_IMPL(nix::SingleDerivedPath::Opaque)
-JSON_IMPL(nix::SingleDerivedPath::Built)
-JSON_IMPL(nix::SingleDerivedPath)
-JSON_IMPL(nix::DerivedPath::Built)
-JSON_IMPL(nix::DerivedPath)
+JSON_IMPL_WITH_XP_FEATURES(nix::SingleDerivedPath::Built)
+JSON_IMPL_WITH_XP_FEATURES(nix::SingleDerivedPath)
+JSON_IMPL_WITH_XP_FEATURES(nix::DerivedPath::Built)
+JSON_IMPL_WITH_XP_FEATURES(nix::DerivedPath)

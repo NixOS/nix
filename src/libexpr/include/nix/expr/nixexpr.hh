@@ -2,8 +2,10 @@
 ///@file
 
 #include <map>
+#include <span>
 #include <vector>
 #include <memory_resource>
+#include <algorithm>
 
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/value.hh"
@@ -11,6 +13,8 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
@@ -79,9 +83,11 @@ struct AttrName
         : expr(e) {};
 };
 
+static_assert(std::is_trivially_copy_constructible_v<AttrName>);
+
 typedef std::vector<AttrName> AttrPath;
 
-std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath);
+std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
@@ -212,14 +218,16 @@ struct ExprString : Expr
 struct ExprPath : Expr
 {
     ref<SourceAccessor> accessor;
-    std::string s;
     Value v;
 
-    ExprPath(ref<SourceAccessor> accessor, std::string s)
+    ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
         : accessor(accessor)
-        , s(std::move(s))
     {
-        v.mkPath(&*accessor, this->s.c_str());
+        auto len = sv.length();
+        char * s = alloc.allocate(len + 1);
+        sv.copy(s, len);
+        s[len] = '\0';
+        v.mkPath(&*accessor, s);
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -286,25 +294,43 @@ struct ExprInheritFrom : ExprVar
 struct ExprSelect : Expr
 {
     PosIdx pos;
+    uint32_t nAttrPath;
     Expr *e, *def;
-    AttrPath attrPath;
-    ExprSelect(const PosIdx & pos, Expr * e, AttrPath attrPath, Expr * def)
+    AttrName * attrPathStart;
+
+    ExprSelect(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        Expr * e,
+        std::span<const AttrName> attrPath,
+        Expr * def)
         : pos(pos)
+        , nAttrPath(attrPath.size())
         , e(e)
         , def(def)
-        , attrPath(std::move(attrPath)) {};
+        , attrPathStart(alloc.allocate_object<AttrName>(nAttrPath))
+    {
+        std::ranges::copy(attrPath, attrPathStart);
+    };
 
-    ExprSelect(const PosIdx & pos, Expr * e, Symbol name)
+    ExprSelect(std::pmr::polymorphic_allocator<char> & alloc, const PosIdx & pos, Expr * e, Symbol name)
         : pos(pos)
+        , nAttrPath(1)
         , e(e)
         , def(0)
+        , attrPathStart((alloc.allocate_object<AttrName>()))
     {
-        attrPath.push_back(AttrName(name));
+        *attrPathStart = AttrName(name);
     };
 
     PosIdx getPos() const override
     {
         return pos;
+    }
+
+    std::span<const AttrName> getAttrPath() const
+    {
+        return {attrPathStart, nAttrPath};
     }
 
     /**
@@ -324,10 +350,14 @@ struct ExprSelect : Expr
 struct ExprOpHasAttr : Expr
 {
     Expr * e;
-    AttrPath attrPath;
-    ExprOpHasAttr(Expr * e, AttrPath attrPath)
+    std::span<AttrName> attrPath;
+
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::vector<AttrName> attrPath)
         : e(e)
-        , attrPath(std::move(attrPath)) {};
+        , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
+    {
+        std::ranges::copy(attrPath, this->attrPath.begin());
+    };
 
     PosIdx getPos() const override
     {
@@ -414,8 +444,14 @@ struct ExprAttrs : Expr
 
 struct ExprList : Expr
 {
-    std::vector<Expr *> elems;
-    ExprList() {};
+    std::span<Expr *> elems;
+
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::vector<Expr *> exprs)
+        : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
+    {
+        std::ranges::copy(exprs, elems.begin());
+    };
+
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
 
@@ -432,7 +468,7 @@ struct Formal
     Expr * def;
 };
 
-struct Formals
+struct FormalsBuilder
 {
     typedef std::vector<Formal> Formals_;
     /**
@@ -440,6 +476,23 @@ struct Formals
      */
     Formals_ formals;
     bool ellipsis;
+
+    bool has(Symbol arg) const
+    {
+        auto it = std::lower_bound(
+            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+};
+
+struct Formals
+{
+    std::span<Formal> formals;
+    bool ellipsis;
+
+    Formals(std::span<Formal> formals, bool ellipsis)
+        : formals(formals)
+        , ellipsis(ellipsis) {};
 
     bool has(Symbol arg) const
     {
@@ -464,30 +517,70 @@ struct ExprLambda : Expr
     PosIdx pos;
     Symbol name;
     Symbol arg;
-    Formals * formals;
+
+private:
+    bool hasFormals;
+    bool ellipsis;
+    uint16_t nFormals;
+    Formal * formalsStart;
+public:
+
+    std::optional<Formals> getFormals() const
+    {
+        if (hasFormals)
+            return Formals{{formalsStart, nFormals}, ellipsis};
+        else
+            return std::nullopt;
+    }
+
     Expr * body;
     DocComment docComment;
 
-    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
+    ExprLambda(
+        const PosTable & positions,
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        Symbol arg,
+        const FormalsBuilder & formals,
+        Expr * body)
         : pos(pos)
         , arg(arg)
-        , formals(formals)
-        , body(body) {};
-
-    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
-        : pos(pos)
-        , formals(formals)
+        , hasFormals(true)
+        , ellipsis(formals.ellipsis)
+        , nFormals(formals.formals.size())
+        , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
     {
-    }
+        if (formals.formals.size() > nFormals) [[unlikely]] {
+            auto err = Error(
+                "too many formal arguments, implementation supports at most %1%",
+                std::numeric_limits<decltype(nFormals)>::max());
+            if (pos)
+                err.atPos(positions[pos]);
+            throw err;
+        }
+        std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
+    };
+
+    ExprLambda(PosIdx pos, Symbol arg, Expr * body)
+        : pos(pos)
+        , arg(arg)
+        , hasFormals(false)
+        , ellipsis(false)
+        , nFormals(0)
+        , formalsStart(nullptr)
+        , body(body) {};
+
+    ExprLambda(
+        const PosTable & positions,
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        FormalsBuilder formals,
+        Expr * body)
+        : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
-
-    inline bool hasFormals() const
-    {
-        return formals != nullptr;
-    }
 
     PosIdx getPos() const override
     {
@@ -667,11 +760,11 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> * es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
+    std::vector<std::pair<PosIdx, Expr *>> es;
+    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> && es)
         : pos(pos)
         , forceString(forceString)
-        , es(es) {};
+        , es(std::move(es)) {};
 
     PosIdx getPos() const override
     {
