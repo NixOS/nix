@@ -691,12 +691,12 @@ struct CompareValues
             case nFloat:
                 return v1->fpoint() < v2->fpoint();
             case nString:
-                return strcmp(v1->c_str(), v2->c_str()) < 0;
+                return v1->string_view() < v2->string_view();
             case nPath:
                 // Note: we don't take the accessor into account
                 // since it's not obvious how to compare them in a
                 // reproducible way.
-                return strcmp(v1->pathStr(), v2->pathStr()) < 0;
+                return v1->pathStrView() < v2->pathStrView();
             case nList:
                 // Lexicographic comparison
                 for (size_t i = 0;; i++) {
@@ -2930,7 +2930,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
-    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
+    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
 }

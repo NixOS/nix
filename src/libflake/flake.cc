@@ -97,7 +97,7 @@ static void parseFlakeInputAttr(EvalState & state, const Attr & attr, fetchers::
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (attr.value->type()) {
     case nString:
-        attrs.emplace(state.symbols[attr.name], attr.value->c_str());
+        attrs.emplace(state.symbols[attr.name], std::string(attr.value->string_view()));
         break;
     case nBool:
         attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
@@ -177,7 +177,7 @@ static FlakeInput parseFlakeInput(
                     parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
-                auto follows(parseInputAttrPath(attr.value->c_str()));
+                auto follows(parseInputAttrPath(attr.value->string_view()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
             } else
@@ -264,7 +264,7 @@ static Flake readFlake(
 
     if (auto description = vInfo.attrs()->get(state.s.description)) {
         expectType(state, nString, *description->value, description->pos);
-        flake.description = description->value->c_str();
+        flake.description = description->value->string_view();
     }
 
     auto sInputs = state.symbols.create("inputs");

@@ -1109,7 +1109,7 @@ public:
 
     std::string_view string_view() const noexcept
     {
-        return std::string_view(getStorage<StringWithContext>().c_str);
+        return std::string_view{getStorage<StringWithContext>().c_str};
     }
 
     const char * c_str() const noexcept
@@ -1175,6 +1175,11 @@ public:
     const char * pathStr() const noexcept
     {
         return getStorage<Path>().path;
+    }
+
+    std::string_view pathStrView() const noexcept
+    {
+        return std::string_view{getStorage<Path>().path};
     }
 
     SourceAccessor * pathAccessor() const noexcept
