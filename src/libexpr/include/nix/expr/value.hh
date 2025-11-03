@@ -220,7 +220,66 @@ struct ValueBase
     struct StringWithContext
     {
         const char * c_str;
-        const char ** context; // must be in sorted order
+
+        /**
+         * The type of the context itself.
+         *
+         * Currently, it is length-prefixed array of pointers to
+         * null-terminated strings. The strings are specially formatted
+         * to represent a flattening of the recursive sum type that is a
+         * context element.
+         *
+         * @See NixStringContext for an more easily understood type,
+         * that of the "builder" for this data structure.
+         */
+        struct Context
+        {
+            using value_type = const char *;
+            using size_type = std::size_t;
+            using iterator = const value_type *;
+
+            Context(size_type size)
+                : size_(size)
+            {
+            }
+
+        private:
+            /**
+             * Number of items in the array
+             */
+            size_type size_;
+
+            /**
+             * @pre must be in sorted order
+             */
+            value_type elems[];
+
+        public:
+            iterator begin() const
+            {
+                return elems;
+            }
+
+            iterator end() const
+            {
+                return elems + size();
+            }
+
+            size_type size() const
+            {
+                return size_;
+            }
+
+            /**
+             * @return null pointer when context.empty()
+             */
+            static Context * fromBuilder(const NixStringContext & context);
+        };
+
+        /**
+         * May be null for a string without context.
+         */
+        const Context * context;
     };
 
     struct Path
@@ -991,7 +1050,7 @@ public:
         setStorage(b);
     }
 
-    void mkStringNoCopy(const char * s, const char ** context = 0) noexcept
+    void mkStringNoCopy(const char * s, const Value::StringWithContext::Context * context = nullptr) noexcept
     {
         setStorage(StringWithContext{.c_str = s, .context = context});
     }
@@ -1117,7 +1176,7 @@ public:
         return getStorage<StringWithContext>().c_str;
     }
 
-    const char ** context() const noexcept
+    const Value::StringWithContext::Context * context() const noexcept
     {
         return getStorage<StringWithContext>().context;
     }

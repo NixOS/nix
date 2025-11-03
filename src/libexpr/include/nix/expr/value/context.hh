@@ -24,6 +24,14 @@ public:
     }
 };
 
+/**
+ * @todo This should be renamed to `StringContextBuilderElem`, since:
+ *
+ * 1. We use `*Builder` for off-heap temporary data structures
+ *
+ * 2. The `Nix*` is totally redundant. (And my mistake from a long time
+ * ago.)
+ */
 struct NixStringContextElem
 {
     /**
@@ -77,6 +85,11 @@ struct NixStringContextElem
     std::string to_string() const;
 };
 
+/**
+ * @todo This should be renamed to `StringContextBuilder`.
+ *
+ * @see NixStringContextElem for explanation why.
+ */
 typedef std::set<NixStringContextElem> NixStringContext;
 
 } // namespace nix
