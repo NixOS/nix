@@ -63,7 +63,7 @@ Expr * parseExprFromBuf(
     size_t length,
     Pos::Origin origin,
     const SourcePath & basePath,
-    std::pmr::polymorphic_allocator<char> & alloc,
+    Exprs & exprs,
     SymbolTable & symbols,
     const EvalSettings & settings,
     PosTable & positions,
@@ -186,7 +186,7 @@ expr_function
   | formal_set ':' expr_function[body]
     {
       state->validateFormals($formal_set);
-      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->exprs.alloc, CUR_POS, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -194,7 +194,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->exprs.alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -202,7 +202,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = new ExprLambda(state->positions, state->alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = new ExprLambda(state->positions, state->exprs.alloc, CUR_POS, arg, std::move($formal_set), $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -251,9 +251,9 @@ expr_op
   | expr_op OR expr_op { $$ = new ExprOpOr(state->at(@2), $1, $3); }
   | expr_op IMPL expr_op { $$ = new ExprOpImpl(state->at(@2), $1, $3); }
   | expr_op UPDATE expr_op { $$ = new ExprOpUpdate(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = new ExprOpHasAttr(state->alloc, $1, std::move($3)); }
+  | expr_op '?' attrpath { $$ = new ExprOpHasAttr(state->exprs.alloc, $1, std::move($3)); }
   | expr_op '+' expr_op
-    { $$ = new ExprConcatStrings(state->alloc, state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
+    { $$ = new ExprConcatStrings(state->exprs.alloc, state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
   | expr_op '-' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.sub), {$1, $3}); }
   | expr_op '*' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.mul), {$1, $3}); }
   | expr_op '/' expr_op { $$ = new ExprCall(state->at(@2), new ExprVar(state->s.div), {$1, $3}); }
@@ -272,9 +272,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = new ExprSelect(state->alloc, CUR_POS, $1, std::move($3), nullptr); }
+    { $$ = new ExprSelect(state->exprs.alloc, CUR_POS, $1, std::move($3), nullptr); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = new ExprSelect(state->alloc, CUR_POS, $1, std::move($3), $5); $5->warnIfCursedOr(state->symbols, state->positions); }
+    { $$ = new ExprSelect(state->exprs.alloc, CUR_POS, $1, std::move($3), $5); $5->warnIfCursedOr(state->symbols, state->positions); }
   | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
        allow stuff like ‘map or [...]’. This production is problematic (see
        https://github.com/NixOS/nix/issues/11118) and will be refactored in the
@@ -299,7 +299,7 @@ expr_simple
   | FLOAT_LIT { $$ = new ExprFloat($1); }
   | '"' string_parts '"' {
       std::visit(overloaded{
-          [&](std::string_view str) { $$ = new ExprString(state->alloc, str); },
+          [&](std::string_view str) { $$ = new ExprString(state->exprs.alloc, str); },
           [&](Expr * expr) { $$ = expr; }},
       $2);
   }
@@ -309,14 +309,14 @@ expr_simple
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2.insert($2.begin(), {state->at(@1), $1});
-      $$ = new ExprConcatStrings(state->alloc, CUR_POS, false, std::move($2));
+      $$ = new ExprConcatStrings(state->exprs.alloc, CUR_POS, false, std::move($2));
   }
   | SPATH {
       std::string_view path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
           new ExprVar(state->s.findFile),
           {new ExprVar(state->s.nixPath),
-           new ExprString(state->alloc, path)});
+           new ExprString(state->exprs.alloc, path)});
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
@@ -325,35 +325,35 @@ expr_simple
               .msg = HintFmt("URL literals are disabled"),
               .pos = state->positions[CUR_POS]
           });
-      $$ = new ExprString(state->alloc, $1);
+      $$ = new ExprString(state->exprs.alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(state->alloc, noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_POS; $$ = new ExprSelect(state->exprs.alloc, noPos, $3, state->s.body); }
   | REC '{' binds '}'
     { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
   | '{' binds1 '}'
     { $2->pos = CUR_POS; $$ = $2; }
   | '{' '}'
     { $$ = new ExprAttrs(CUR_POS); }
-  | '[' list ']' { $$ = new ExprList(state->alloc, std::move($2)); }
+  | '[' list ']' { $$ = new ExprList(state->exprs.alloc, std::move($2)); }
   ;
 
 string_parts
   : STR { $$ = $1; }
-  | string_parts_interpolated { $$ = new ExprConcatStrings(state->alloc, CUR_POS, true, std::move($1)); }
+  | string_parts_interpolated { $$ = new ExprConcatStrings(state->exprs.alloc, CUR_POS, true, std::move($1)); }
   | { $$ = std::string_view(); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = std::move($1); $$.emplace_back(state->at(@2), new ExprString(state->alloc, $2)); }
+  { $$ = std::move($1); $$.emplace_back(state->at(@2), new ExprString(state->exprs.alloc, $2)); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->at(@2), $3); }
   | DOLLAR_CURLY expr '}' { $$.emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$.emplace_back(state->at(@1), new ExprString(state->alloc, $1));
+      $$.emplace_back(state->at(@1), new ExprString(state->exprs.alloc, $1));
       $$.emplace_back(state->at(@2), $3);
     }
   ;
@@ -379,8 +379,8 @@ path_start
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
         literal.front() == '/'
-        ? new ExprPath(state->alloc, state->rootFS, path)
-        : new ExprPath(state->alloc, state->basePath.accessor, path);
+        ? new ExprPath(state->exprs.alloc, state->rootFS, path)
+        : new ExprPath(state->exprs.alloc, state->basePath.accessor, path);
   }
   | HPATH {
     if (state->settings.pureEval) {
@@ -390,7 +390,7 @@ path_start
         );
     }
     Path path(getHome() + std::string($1.p + 1, $1.l - 1));
-    $$ = new ExprPath(state->alloc, ref<SourceAccessor>(state->rootFS), path);
+    $$ = new ExprPath(state->exprs.alloc, ref<SourceAccessor>(state->rootFS), path);
   }
   ;
 
@@ -432,7 +432,7 @@ binds1
           $accum->attrs.emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  new ExprSelect(state->alloc, iPos, from, i.symbol),
+                  new ExprSelect(state->exprs.alloc, iPos, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
@@ -525,7 +525,7 @@ Expr * parseExprFromBuf(
     size_t length,
     Pos::Origin origin,
     const SourcePath & basePath,
-    std::pmr::polymorphic_allocator<char> & alloc,
+    Exprs & exprs,
     SymbolTable & symbols,
     const EvalSettings & settings,
     PosTable & positions,
@@ -540,7 +540,7 @@ Expr * parseExprFromBuf(
     };
     ParserState state {
         .lexerState = lexerState,
-        .alloc = alloc,
+        .exprs = exprs,
         .symbols = symbols,
         .positions = positions,
         .basePath = basePath,
