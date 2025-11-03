@@ -46,6 +46,20 @@ schemas = [
     ],
   },
   {
+    'stem' : 'deriving-path',
+    'schema' : schema_dir / 'deriving-path-v1.yaml',
+    'files' : [
+      'single_opaque.json',
+      'single_built.json',
+      'single_built_built.json',
+    ],
+  },
+]
+
+# Derivation and Derivation output
+schemas += [
+  # Match overall
+  {
     'stem' : 'derivation',
     'schema' : schema_dir / 'derivation-v3.yaml',
     'files' : [
@@ -55,7 +69,7 @@ schemas = [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/overall',
     'files' : [
       'output-caFixedFlat.json',
       'output-caFixedNAR.json',
@@ -66,15 +80,48 @@ schemas = [
       'output-inputAddressed.json',
     ],
   },
+  # Match exact variant
   {
-    'stem' : 'deriving-path',
-    'schema' : schema_dir / 'deriving-path-v1.yaml',
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/inputAddressed',
     'files' : [
-      'single_opaque.json',
-      'single_built.json',
-      'single_built_built.json',
+      'output-inputAddressed.json',
     ],
   },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/caFixed',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/caFloating',
+    'files' : [
+      'output-caFloating.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/deferred',
+    'files' : [
+      'output-deferred.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/impure',
+    'files' : [
+      'output-impure.json',
+    ],
+  },
+]
+
+# Store object info
+schemas += [
   # Match overall
   {
     'stem' : 'store-object-info',
