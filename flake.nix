@@ -327,6 +327,16 @@
           # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
           linkcheck = pkgs.testers.lycheeLinkCheck {
             site = self.packages.${system}.nix-manual + "/share/doc/nix/manual";
+            extraConfig = {
+              exclude = [
+                # Exclude auto-generated JSON schema documentation which has
+                # auto-generated fragment IDs that don't match the link references
+                ".*/protocols/json/.*\\.html"
+                # Exclude undocumented builtins
+                ".*/language/builtins\\.html#builtins-addErrorContext"
+                ".*/language/builtins\\.html#builtins-appendContext"
+              ];
+            };
           };
         }
         // (import ./ci/gha/tests {
