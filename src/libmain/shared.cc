@@ -65,19 +65,25 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
     }
 
     if (!missing.willSubstitute.empty()) {
+        const float downloadSizeMiB = missing.downloadSize / (1024.f * 1024.f);
+        const float narSizeMiB = missing.narSize / (1024.f * 1024.f);
+        /* N.B these log messages are a de-facto stable interface for NOM [^]. This
+         * needs to be replaced with an alternative way that presents a structured view into
+         * list of paths to be substituted and their sizes.
+         *
+         * [^]:
+         * https://github.com/maralorn/nix-output-monitor/blob/07169b3894ab7cb1ee01d766145ab03bf2dc7a69/lib/NOM/Parser.hs#L76-L86
+         */
         if (missing.willSubstitute.size() == 1) {
             printMsg(
-                lvl,
-                "this path will be fetched (%s download, %s unpacked):",
-                renderSize(missing.downloadSize),
-                renderSize(missing.narSize));
+                lvl, "this path will be fetched (%.2f MiB download, %.2f MiB unpacked):", downloadSizeMiB, narSizeMiB);
         } else {
             printMsg(
                 lvl,
-                "these %d paths will be fetched (%s download, %s unpacked):",
+                "these %d paths will be fetched (%.2f MiB download, %.2f MiB unpacked):",
                 missing.willSubstitute.size(),
-                renderSize(missing.downloadSize),
-                renderSize(missing.narSize));
+                downloadSizeMiB,
+                narSizeMiB);
         }
         std::vector<const StorePath *> willSubstituteSorted = {};
         std::for_each(missing.willSubstitute.begin(), missing.willSubstitute.end(), [&](const StorePath & p) {
