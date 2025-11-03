@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::ResourceManagement);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -321,6 +321,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         )",
         .trackingUrl = "",
     },
+    {
+        .tag = Xp::ResourceManagement,
+        .name = "resource-management",
+        .description = R"(
+            Enables support for resource management in remote build system features.
+        )",
+        .trackingUrl = "",
+    }
 }};
 
 static_assert(
