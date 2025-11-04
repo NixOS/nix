@@ -59,6 +59,17 @@ auto getInteger(const nlohmann::json & value) -> std::enable_if_t<std::is_signed
     throw Error("Out of range: JSON value '%s' cannot be casted to %d-bit integer", value.dump(), 8 * sizeof(T));
 }
 
+template<typename... Args>
+std::map<std::string, Args...> getMap(const nlohmann::json::object_t & jsonObject, auto && f)
+{
+    std::map<std::string, Args...> map;
+
+    for (const auto & [key, value] : jsonObject)
+        map.insert_or_assign(key, f(value));
+
+    return map;
+}
+
 const nlohmann::json::boolean_t & getBoolean(const nlohmann::json & value);
 Strings getStringList(const nlohmann::json & value);
 StringMap getStringMap(const nlohmann::json & value);

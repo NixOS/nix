@@ -1404,7 +1404,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 
     {
         auto & inputsList = res["inputSrcs"];
-        inputsList = nlohmann::json ::array();
+        inputsList = nlohmann::json::array();
         for (auto & input : d.inputSrcs)
             inputsList.emplace_back(input);
     }

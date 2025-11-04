@@ -10,13 +10,15 @@
 #include "nix/util/json-utils.hh"
 
 #include "nix/store/tests/libstore.hh"
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
 using namespace nlohmann;
 
-class DerivationAdvancedAttrsTest : public CharacterizationTest, public LibStoreTest
+class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>,
+                                    public JsonCharacterizationTest<DerivationOptions>,
+                                    public LibStoreTest
 {
 protected:
     std::filesystem::path unitTestData = getUnitTestData() / "derivation" / "ia";
@@ -453,5 +455,24 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         advancedAttributes_structuredAttrs_ca,
         {"rainbow", "uid-range", "ca-derivations"});
 };
+
+#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                                                             \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                                                  \
+    {                                                                                                      \
+        this->JsonCharacterizationTest<DerivationOptions>::readJsonTest(#VAR, advancedAttributes_##VAR2);  \
+    }                                                                                                      \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                                                    \
+    {                                                                                                      \
+        this->JsonCharacterizationTest<DerivationOptions>::writeJsonTest(#VAR, advancedAttributes_##VAR2); \
+    }
+
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, defaults, defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, all_set, ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, all_set, ca)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, structuredAttrs_defaults, structuredAttrs_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, structuredAttrs_all_set, structuredAttrs_ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, structuredAttrs_all_set, structuredAttrs_ca)
+
+#undef TEST_JSON_OPTIONS
 
 } // namespace nix
