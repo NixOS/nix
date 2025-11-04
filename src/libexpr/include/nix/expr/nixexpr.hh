@@ -637,8 +637,8 @@ struct ExprLet : Expr
 struct ExprWith : Expr
 {
     PosIdx pos;
+    uint32_t prevWith;
     Expr *attrs, *body;
-    size_t prevWith;
     ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body)
         : pos(pos)
