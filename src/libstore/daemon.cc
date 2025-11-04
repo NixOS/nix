@@ -896,7 +896,7 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->toRealPath(path), conn.to);
+        store->narFromPath(path, conn.to);
         break;
     }
 
