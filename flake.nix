@@ -320,30 +320,14 @@
 
       checks = forAllSystems (
         system:
-        let
-          pkgs = nixpkgsFor.${system}.native;
-        in
-        {
-          # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
-          linkcheck = pkgs.testers.lycheeLinkCheck {
-            site = self.packages.${system}.nix-manual + "/share/doc/nix/manual";
-            extraConfig = {
-              exclude = [
-                # Exclude auto-generated JSON schema documentation which has
-                # auto-generated fragment IDs that don't match the link references
-                ".*/protocols/json/.*\\.html"
-                # Exclude undocumented builtins
-                ".*/language/builtins\\.html#builtins-addErrorContext"
-                ".*/language/builtins\\.html#builtins-appendContext"
-              ];
-            };
-          };
-        }
-        // (import ./ci/gha/tests {
+        (import ./ci/gha/tests {
           inherit system;
           pkgs = nixpkgsFor.${system}.native;
           nixFlake = self;
         }).topLevel
+        // {
+          inherit (self.packages.${system}.nix-manual.tests) linkcheck;
+        }
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
         }
@@ -504,10 +488,10 @@
           open-manual = {
             type = "app";
             program = "${pkgs.writeShellScript "open-nix-manual" ''
-              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
-              if ! ${opener} "$manual_path"; then
+              path="${self.packages.${system}.nix-manual.site}/index.html"
+              if ! ${opener} "$path"; then
                 echo "Failed to open manual with ${opener}. Manual is located at:"
-                echo "$manual_path"
+                echo "$path"
               fi
             ''}";
             meta.description = "Open the Nix manual in your browser";

@@ -18,6 +18,9 @@
   # Configuration Options
 
   version,
+
+  # `tests` attribute
+  testers,
 }:
 
 let
@@ -86,6 +89,29 @@ mkMesonDerivation (finalAttrs: {
     mkdir -p ''$out/nix-support
     echo "doc manual ''$out/share/doc/nix/manual" >> ''$out/nix-support/hydra-build-products
   '';
+
+  /**
+    The root of the HTML manual.
+    E.g. "${nix-manual.site}/index.html" exists.
+  */
+  passthru.site = finalAttrs.finalPackage + "/share/doc/nix/manual";
+
+  passthru.tests = {
+    # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+    linkcheck = testers.lycheeLinkCheck {
+      inherit (finalAttrs.finalPackage) site;
+      extraConfig = {
+        exclude = [
+          # Exclude auto-generated JSON schema documentation which has
+          # auto-generated fragment IDs that don't match the link references
+          ".*/protocols/json/.*\\.html"
+          # Exclude undocumented builtins
+          ".*/language/builtins\\.html#builtins-addErrorContext"
+          ".*/language/builtins\\.html#builtins-appendContext"
+        ];
+      };
+    };
+  };
 
   meta = {
     platforms = lib.platforms.all;
