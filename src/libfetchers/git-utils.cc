@@ -10,6 +10,8 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/util.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/pool.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
@@ -33,12 +35,14 @@
 #include <git2/tag.h>
 #include <git2/tree.h>
 
+#include <boost/unordered/concurrent_flat_set.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <iostream>
 #include <queue>
 #include <regex>
 #include <span>
+#include <ranges>
 
 namespace std {
 
@@ -227,12 +231,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
     std::filesystem::path path;
+
+    bool bare;
+
     /**
      * libgit2 repository. Note that new objects are not written to disk,
      * because we are using a mempack backend. For writing to disk, see
      * `flush()`, which is also called by `GitFileSystemObjectSink::sync()`.
      */
     Repository repo;
+
     /**
      * In-memory object store for efficient batched writing to packfiles.
      * Owned by `repo`.
@@ -241,6 +249,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
+        , bare(bare)
     {
         initLibGit2();
 
@@ -317,32 +326,56 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         checkInterrupt();
     }
 
+    /**
+     * Return a connection pool for this repo. Useful for
+     * multithreaded access.
+     */
+    Pool<GitRepoImpl> getPool()
+    {
+        // TODO: as an optimization, it would be nice to include `this` in the pool.
+        return Pool<GitRepoImpl>(std::numeric_limits<size_t>::max(), [this]() -> ref<GitRepoImpl> {
+            return make_ref<GitRepoImpl>(path, false, bare);
+        });
+    }
+
     uint64_t getRevCount(const Hash & rev) override
     {
-        boost::unordered_flat_set<git_oid, std::hash<git_oid>> done;
-        std::queue<Commit> todo;
+        boost::concurrent_flat_set<git_oid, std::hash<git_oid>> done;
 
-        todo.push(peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT));
+        auto startCommit = peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
+        auto startOid = *git_commit_id(startCommit.get());
+        done.insert(startOid);
 
-        while (auto commit = pop(todo)) {
-            if (!done.insert(*git_commit_id(commit->get())).second)
-                continue;
+        auto repoPool(getPool());
 
-            for (size_t n = 0; n < git_commit_parentcount(commit->get()); ++n) {
-                git_commit * parent;
-                if (git_commit_parent(&parent, commit->get(), n)) {
+        ThreadPool pool;
+
+        auto process = [&done, &pool, &repoPool](this const auto & process, const git_oid & oid) -> void {
+            auto repo(repoPool.get());
+
+            auto _commit = lookupObject(*repo, oid, GIT_OBJECT_COMMIT);
+            auto commit = (const git_commit *) &*_commit;
+
+            for (auto n : std::views::iota(0U, git_commit_parentcount(commit))) {
+                auto parentOid = git_commit_parent_id(commit, n);
+                if (!parentOid) {
                     throw Error(
                         "Failed to retrieve the parent of Git commit '%s': %s. "
                         "This may be due to an incomplete repository history. "
                         "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
                         "or add set the shallow parameter to true in builtins.fetchGit, "
                         "or fetch the complete history for this branch.",
-                        *git_commit_id(commit->get()),
+                        *git_commit_id(commit),
                         git_error_last()->message);
                 }
-                todo.push(Commit(parent));
+                if (done.insert(*parentOid))
+                    pool.enqueue(std::bind(process, *parentOid));
             }
-        }
+        };
+
+        pool.enqueue(std::bind(process, startOid));
+
+        pool.process();
 
         return done.size();
     }
