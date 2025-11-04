@@ -7,6 +7,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/environment-variables.hh"
 #include <math.h>
 
 #ifdef __APPLE__
@@ -66,14 +67,16 @@ void setStackSize(size_t stackSize)
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
         savedStackSize = limit.rlim_cur;
         if (limit.rlim_max < static_cast<rlim_t>(stackSize)) {
-            logger->log(
-                lvlWarn,
-                HintFmt(
-                    "Stack size hard limit is %1%, which is less than the desired %2%. If possible, increase the hard limit, e.g. with 'ulimit -Hs %3%'.",
-                    limit.rlim_max,
-                    stackSize,
-                    stackSize / 1024)
-                    .str());
+            if (getEnv("_NIX_TEST_NO_ENVIRONMENT_WARNINGS") != "1") {
+                logger->log(
+                    lvlWarn,
+                    HintFmt(
+                        "Stack size hard limit is %1%, which is less than the desired %2%. If possible, increase the hard limit, e.g. with 'ulimit -Hs %3%'.",
+                        limit.rlim_max,
+                        stackSize,
+                        stackSize / 1024)
+                        .str());
+            }
         }
         auto requestedSize = std::min(static_cast<rlim_t>(stackSize), limit.rlim_max);
         limit.rlim_cur = requestedSize;
