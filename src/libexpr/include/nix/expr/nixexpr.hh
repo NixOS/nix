@@ -813,7 +813,7 @@ public:
     [[gnu::always_inline]]
     C * add(auto &&... args)
     {
-        return new C(std::forward<decltype(args)>(args)...);
+        return alloc.new_object<C>(std::forward<decltype(args)>(args)...);
     }
 
     // we define some calls to add explicitly so that the argument can be passed in as initializer lists
@@ -822,7 +822,7 @@ public:
     C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
         requires(std::same_as<C, ExprCall>)
     {
-        return new C(pos, fun, std::move(args));
+        return alloc.new_object<C>(pos, fun, std::move(args));
     }
 
     template<class C>
@@ -830,7 +830,7 @@ public:
     C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         requires(std::same_as<C, ExprCall>)
     {
-        return new C(pos, fun, std::move(args), std::move(cursedOrEndPos));
+        return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));
     }
 
     template<class C>
