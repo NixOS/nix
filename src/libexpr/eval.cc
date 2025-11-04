@@ -3216,8 +3216,8 @@ Expr * EvalState::parse(
         docComments = &it->second;
     }
 
-    auto result = parseExprFromBuf(
-        text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
+    auto result =
+        parseExprFromBuf(text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
 
     result->bindVars(*this, staticEnv);
 

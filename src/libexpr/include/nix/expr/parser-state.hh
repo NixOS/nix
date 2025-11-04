@@ -132,11 +132,11 @@ inline void ParserState::addAttr(
                     dupAttr(attrPath, pos, j->second.pos);
                 }
             } else {
-                nested = new ExprAttrs;
+                nested = exprs.add<ExprAttrs>();
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
             }
         } else {
-            nested = new ExprAttrs;
+            nested = exprs.add<ExprAttrs>();
             attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
         }
         attrs = nested;
@@ -240,7 +240,7 @@ inline Expr *
 ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty())
-        return new ExprString("");
+        return exprs.add<ExprString>("");
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -322,7 +322,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2.emplace_back(i->first, new ExprString(exprs.alloc, s2));
+            es2.emplace_back(i->first, exprs.add<ExprString>(exprs.alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {
@@ -332,7 +332,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
     if (es2.size() == 0) {
-        auto * const result = new ExprString("");
+        auto * const result = exprs.add<ExprString>("");
         return result;
     }
 
@@ -341,7 +341,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         auto * const result = (es2)[0].second;
         return result;
     }
-    return new ExprConcatStrings(exprs.alloc, pos, true, std::move(es2));
+    return exprs.add<ExprConcatStrings>(exprs.alloc, pos, true, std::move(es2));
 }
 
 inline PosIdx LexerState::at(const ParserLocation & loc)
