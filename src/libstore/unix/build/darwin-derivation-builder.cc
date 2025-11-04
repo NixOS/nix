@@ -227,6 +227,15 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
     }
 
+    /**
+     * Cleans up all System V IPC objects owned by the specified user.
+     *
+     * On Darwin, IPC objects (shared memory segments, message queues, and semaphore)
+     * can persist after the build user's processes are killed, since there are no IPC namespaces
+     * like on Linux. This can exhaust kernel IPC limits over time.
+     *
+     * Uses sysctl to enumerate and remove all IPC objects owned by the given UID.
+     */
     void cleanupSysVIPCForUser(uid_t uid)
     {
         struct IpcsCommand ic;
