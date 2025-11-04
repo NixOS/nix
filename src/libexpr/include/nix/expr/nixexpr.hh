@@ -760,11 +760,19 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> && es)
+    std::span<std::pair<PosIdx, Expr *>> es;
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        const std::vector<std::pair<PosIdx, Expr *>> & es)
         : pos(pos)
         , forceString(forceString)
-        , es(std::move(es)) {};
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
 
     PosIdx getPos() const override
     {

@@ -341,7 +341,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         auto * const result = (es2)[0].second;
         return result;
     }
-    return new ExprConcatStrings(pos, true, std::move(es2));
+    return new ExprConcatStrings(alloc, pos, true, std::move(es2));
 }
 
 inline PosIdx LexerState::at(const ParserLocation & loc)
