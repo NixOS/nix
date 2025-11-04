@@ -325,9 +325,6 @@
           pkgs = nixpkgsFor.${system}.native;
           nixFlake = self;
         }).topLevel
-        // {
-          inherit (self.packages.${system}.nix-manual.tests) linkcheck;
-        }
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
         }
