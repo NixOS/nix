@@ -246,7 +246,7 @@ void LocalOverlayStore::optimiseStore()
         if (lowerStore->isValidPath(path)) {
             uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deleteStorePath(Store::toRealPath(path), bytesFreed);
+            deleteStorePath(toRealPath(path), bytesFreed);
         }
         done++;
         act.progress(done, paths.size());

@@ -286,7 +286,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         PathSet lockFiles;
         /* FIXME: Should lock something like the drv itself so we don't build same
            CA drv concurrently */
-        if (dynamic_cast<LocalStore *>(&worker.store)) {
+        if (auto * localStore = dynamic_cast<LocalStore *>(&worker.store)) {
             /* If we aren't a local store, we might need to use the local store as
                a build remote, but that would cause a deadlock. */
             /* FIXME: Make it so we can use ourselves as a build remote even if we
@@ -296,9 +296,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                */
             for (auto & i : drv->outputsAndOptPaths(worker.store)) {
                 if (i.second.second)
-                    lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+                    lockFiles.insert(localStore->toRealPath(*i.second.second));
                 else
-                    lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+                    lockFiles.insert(localStore->toRealPath(drvPath) + "." + i.first);
             }
         }
 
@@ -331,12 +331,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         /* If any of the outputs already exist but are not valid, delete
            them. */
-        for (auto & [_, status] : initialOutputs) {
-            if (!status.known || status.known->isValid())
-                continue;
-            auto storePath = status.known->path;
-            debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-            deletePath(worker.store.Store::toRealPath(storePath));
+        if (auto * localStore = dynamic_cast<LocalFSStore *>(&worker.store)) {
+            for (auto & [_, status] : initialOutputs) {
+                if (!status.known || status.known->isValid())
+                    continue;
+                auto storePath = status.known->path;
+                debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
+                deletePath(localStore->toRealPath(storePath));
+            }
         }
 
         /* Don't do a remote build if the derivation has the attribute

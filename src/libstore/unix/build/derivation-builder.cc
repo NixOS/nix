@@ -1887,7 +1887,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
+            deletePath(store.toRealPath(i.second));
     }
 
     if (topTmpDir != "") {

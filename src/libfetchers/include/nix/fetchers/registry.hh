@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/types.hh"
+#include "nix/util/source-path.hh"
 #include "nix/fetchers/fetchers.hh"
 
 namespace nix {
@@ -39,7 +40,7 @@ struct Registry
     {
     }
 
-    static std::shared_ptr<Registry> read(const Settings & settings, const Path & path, RegistryType type);
+    static std::shared_ptr<Registry> read(const Settings & settings, const SourcePath & path, RegistryType type);
 
     void write(const Path & path);
 

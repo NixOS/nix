@@ -895,16 +895,6 @@ public:
      */
     virtual std::optional<TrustedFlag> isTrustedClient() = 0;
 
-    virtual Path toRealPath(const Path & storePath)
-    {
-        return storePath;
-    }
-
-    Path toRealPath(const StorePath & storePath)
-    {
-        return toRealPath(printStorePath(storePath));
-    }
-
     /**
      * Synchronises the options of the client with those of the daemon
      * (a no-op when there’s no daemon)

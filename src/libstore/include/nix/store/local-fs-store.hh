@@ -102,7 +102,12 @@ struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
         return config.realStoreDir;
     }
 
-    Path toRealPath(const Path & storePath) override
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
+    }
+
+    Path toRealPath(const Path & storePath)
     {
         assert(isInStore(storePath));
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
