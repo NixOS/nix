@@ -91,13 +91,6 @@ std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> 
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
-class Exprs
-{
-    std::pmr::monotonic_buffer_resource buffer;
-public:
-    std::pmr::polymorphic_allocator<char> alloc{&buffer};
-};
-
 /* Abstract syntax of Nix expressions. */
 
 struct Expr
@@ -809,6 +802,49 @@ struct ExprBlackHole : Expr
 };
 
 extern ExprBlackHole eBlackHole;
+
+class Exprs
+{
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(auto &&... args)
+    {
+        return new C(std::forward<decltype(args)>(args)...);
+    }
+
+    // we define some calls to add explicitly so that the argument can be passed in as initializer lists
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return new C(pos, fun, std::move(args));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return new C(pos, fun, std::move(args), std::move(cursedOrEndPos));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        const std::vector<std::pair<PosIdx, Expr *>> & es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+};
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
