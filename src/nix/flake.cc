@@ -793,8 +793,6 @@ struct CmdFlakeCheck : FlakeCommand
             // via substitution, as `nix flake check` only needs to verify buildability,
             // not actually produce the outputs.
             auto missing = store->queryMissing(drvPaths);
-            // Only occurs if `drvPaths` contains a `DerivedPath::Opaque`, which should never happen
-            assert(missing.unknown.empty());
 
             std::vector<DerivedPath> toBuild;
             for (auto & path : missing.willBuild) {
