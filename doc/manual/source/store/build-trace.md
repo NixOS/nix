@@ -40,13 +40,13 @@ Unlike with base build traces, incoherence with derived build traces is possible
 The key ingredient is that derivation resolution is only deterministic with respect to a fixed base build trace.
 Without fixing the base build trace, it inherits the subjectivity of base build traces themselves.
 
-Concretely, suppose there are three derivations \\(a\\), \\(b\\), and \((c\\).
-Let \\(a\\) be a resolved derivation, but let \\(b\\) and \((c\\) be unresolved and both take as an input an output of \\(a\\).
-Now suppose that derived entries are made for \\(b\\) and \((c\\) based on two different entries of \\(a\\).
+Concretely, suppose there are three derivations \\(a\\), \\(b\\), and \\(c\\).
+Let \\(a\\) be a resolved derivation, but let \\(b\\) and \\(c\\) be unresolved and both take as an input an output of \\(a\\).
+Now suppose that derived entries are made for \\(b\\) and \\(c\\) based on two different entries of \\(a\\).
 (This could happen if \\(a\\) is non-deterministic, \\(a\\) and \\(b\\) are built in one store, \\(a\\) and \\(c\\) are built in another store, and then a third store substitutes from both of the first two stores.)
 
-If trusting the derived build trace entries for \\(b\\) and \((c\\) requires that each's underlying entry for \\(a\\) be also trusted, the two different mappings for \\(a\\) will be caught.
-However, if \\(b\\) and \((c\\)'s entries can be combined in isolation, there will be nothing to catch the contradiction in their hidden assumptions about \\(a\\)'s output.
+If trusting the derived build trace entries for \\(b\\) and \\(c\\) requires that each's underlying entry for \\(a\\) be also trusted, the two different mappings for \\(a\\) will be caught.
+However, if \\(b\\) and \\(c\\)'s entries can be combined in isolation, there will be nothing to catch the contradiction in their hidden assumptions about \\(a\\)'s output.
 
 [derivation]: ./derivation/index.md
 [output]: ./derivation/outputs/index.md
