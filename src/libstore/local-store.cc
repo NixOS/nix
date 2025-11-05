@@ -1063,7 +1063,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
             PathLocks outputLock;
 
-            auto realPath = Store::toRealPath(info.path);
+            auto realPath = toRealPath(info.path);
 
             /* Lock the output path.  But don't lock if we're being called
             from a build hook (whose parent process already acquired a
@@ -1262,7 +1262,7 @@ StorePath LocalStore::addToStoreFromDump(
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        auto realPath = Store::toRealPath(dstPath);
+        auto realPath = toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
@@ -1413,7 +1413,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 auto hashSink = HashSink(info->narHash.algo);
 
-                dumpPath(Store::toRealPath(i), hashSink);
+                dumpPath(toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.hash) {
