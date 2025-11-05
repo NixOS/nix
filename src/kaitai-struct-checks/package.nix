@@ -1,4 +1,5 @@
 # Run with: nix build .#nix-kaitai-struct-checks
+# or: `nix develop .#nix-kaitai-struct-checks` to enter a dev shell
 {
   lib,
   mkMesonDerivation,
