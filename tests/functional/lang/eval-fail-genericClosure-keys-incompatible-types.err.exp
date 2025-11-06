@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-keys-incompatible-types.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [
+
+       … while comparing the `key` attributes of two genericClosure elements
+
+       error: cannot compare a string with an integer

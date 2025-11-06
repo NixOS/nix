@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-missing-startSet.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   operator = x: [ ];
+
+       … in the attrset passed as argument to builtins.genericClosure
+
+       error: attribute 'startSet' missing
