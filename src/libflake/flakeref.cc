@@ -80,7 +80,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     std::smatch match;
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
-    assert(succeeds);
+    if (!succeeds)
+        throw Error("invalid flakeref '%s'", url);
     auto path = match[1].str();
     auto query = decodeQuery(match[3]);
     auto fragment = percentDecode(match[5].str());
