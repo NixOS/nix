@@ -5,6 +5,8 @@ error:
              | ^
             2|   startSet = [
 
-       … while comparing the `key` attributes of two genericClosure elements
+       … while comparing element { key = { }; }
 
-       error: cannot compare a set with a set; values of that type are incomparable
+       … with element { key = { }; }
+
+       error: cannot compare a set with a set; values of that type are incomparable (values are { } and { })

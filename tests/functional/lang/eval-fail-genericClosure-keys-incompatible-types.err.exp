@@ -5,6 +5,8 @@ error:
              | ^
             2|   startSet = [
 
-       … while comparing the `key` attributes of two genericClosure elements
+       … while comparing element { key = "string"; }
 
-       error: cannot compare a string with an integer
+       … with element { key = 1; }
+
+       error: cannot compare a string with an integer; values are "string" and 1
