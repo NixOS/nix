@@ -636,7 +636,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     auto outj_ph = nix::hashPlaceholder("outj");
 
     std::string drvJson = R"({
-        "version": 3,
+        "version": 4,
         "name": "multi-output-test",
         "system": ")" + nix::settings.thisSystem.get()
                           + R"(",
@@ -668,8 +668,10 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
             "outa": ")" + outa_ph
                           + R"("
         },
-        "inputDrvs": {},
-        "inputSrcs": [],
+        "inputs": {
+          "drvs": {},
+          "srcs": []
+        },
         "outputs": {
             "outd": { "hashAlgo": "sha256", "method": "nar" },
             "outf": { "hashAlgo": "sha256", "method": "nar" },

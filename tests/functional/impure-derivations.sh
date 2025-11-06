@@ -30,7 +30,7 @@ path1_stuff=$(echo "$json" | jq -r .[].outputs.stuff)
 [[ $(< "$path1"/n) = 0 ]]
 [[ $(< "$path1_stuff"/bla) = 0 ]]
 
-[[ $(nix path-info --json "$path1" | jq .[].ca) =~ fixed:r:sha256: ]]
+nix path-info --json "$path1" | jq -e '.[].ca | .method == "nar" and .hash.algorithm == "sha256"'
 
 path2=$(nix build -L --no-link --json --file ./impure-derivations.nix impure | jq -r .[].outputs.out)
 [[ $(< "$path2"/n) = 1 ]]

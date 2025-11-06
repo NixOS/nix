@@ -70,7 +70,7 @@ schemas += [
   # Match overall
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml',
+    'schema' : schema_dir / 'derivation-v4.yaml',
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
@@ -78,7 +78,7 @@ schemas += [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/overall',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/overall',
     'files' : [
       'output-caFixedFlat.json',
       'output-caFixedNAR.json',
@@ -92,14 +92,14 @@ schemas += [
   # Match exact variant
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/inputAddressed',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/inputAddressed',
     'files' : [
       'output-inputAddressed.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/caFixed',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFixed',
     'files' : [
       'output-caFixedFlat.json',
       'output-caFixedNAR.json',
@@ -108,21 +108,21 @@ schemas += [
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/caFloating',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFloating',
     'files' : [
       'output-caFloating.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/deferred',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/deferred',
     'files' : [
       'output-deferred.json',
     ],
   },
   {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml#/$defs/output/impure',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/impure',
     'files' : [
       'output-impure.json',
     ],
@@ -134,7 +134,7 @@ schemas += [
   # Match overall
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
     'files' : [
       'pure.json',
       'impure.json',
@@ -144,7 +144,7 @@ schemas += [
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
     'files' : [
       'pure.json',
       'impure.json',
@@ -162,7 +162,7 @@ schemas += [
   # Match exact variant
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
     'files' : [
       'pure.json',
       'empty_pure.json',
@@ -170,7 +170,7 @@ schemas += [
   },
   {
     'stem' : 'store-object-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/impure',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/impure',
     'files' : [
       'impure.json',
       'empty_impure.json',
@@ -178,14 +178,14 @@ schemas += [
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/base',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
     'files' : [
       'pure.json',
     ],
   },
   {
     'stem' : 'nar-info',
-    'schema' : schema_dir / 'store-object-info-v1.yaml#/$defs/narInfo',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
     'files' : [
       'impure.json',
     ],
