@@ -168,8 +168,6 @@ struct GitInputScheme : InputScheme
             return {};
 
         auto url2(url);
-        if (hasPrefix(url2.scheme, "git+"))
-            url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
         Attrs attrs;
