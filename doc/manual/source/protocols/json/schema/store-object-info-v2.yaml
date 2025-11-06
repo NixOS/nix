@@ -71,7 +71,7 @@ $defs:
           Note: This field may not be present in all contexts, such as when the path is used as the key and the the store object info the value in map.
 
       narHash:
-        type: string
+        "$ref": "./hash-v1.yaml"
         title: NAR Hash
         description: |
           Hash of the [file system object](@docroot@/store/file-system-object.md) part of the store object when serialized as a [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive).
@@ -229,7 +229,7 @@ $defs:
           > This is an impure "`.narinfo`" field that may not be included in certain contexts.
 
       downloadHash:
-        type: string
+        "$ref": "./hash-v1.yaml"
         title: Download Hash
         description: |
           A digest for the compressed archive itself, as opposed to the data contained within.

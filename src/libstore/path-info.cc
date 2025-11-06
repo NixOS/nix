@@ -149,8 +149,7 @@ ValidPathInfo ValidPathInfo::makeFromCA(
     return res;
 }
 
-nlohmann::json
-UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
@@ -158,7 +157,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
 
     jsonObject["version"] = 2;
 
-    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narHash"] = narHash;
     jsonObject["narSize"] = narSize;
 
     {
@@ -198,7 +197,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
             throw Error("Unsupported path info JSON format version %d, only version 2 is currently supported", version);
     }
 
-    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narHash = valueAt(json, "narHash");
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {

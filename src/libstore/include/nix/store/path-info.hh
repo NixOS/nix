@@ -117,7 +117,7 @@ struct UnkeyedValidPathInfo
      * @param includeImpureInfo If true, variable elements such as the
      * registration time are included.
      */
-    virtual nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const;
+    virtual nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo) const;
     static UnkeyedValidPathInfo fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
 };
 

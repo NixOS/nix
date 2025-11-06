@@ -22,6 +22,14 @@ The store path info JSON format has been updated from version 1 to version 2:
   - New: `"ca": {"method": "nar", "hash": {"algorithm": "sha256", "format": "base64", "hash": "EMIJ+giQ..."}}`
   - Still `null` values for input-addressed store objects
 
+- **Structured hash fields**:
+
+  Hash values (`narHash` and `downloadHash`) are now structured JSON objects instead of strings:
+
+  - Old: `"narHash": "sha256:FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="`
+  - New: `"narHash": {"algorithm": "sha256", "format": "base64", "hash": "FePFYIlM..."}`
+  - Same structure applies to `downloadHash` in NAR info contexts
+
 Nix currently only produces, and doesn't consume this format.
 
 **Affected command**: `nix path-info --json`
