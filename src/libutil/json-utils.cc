@@ -91,14 +91,7 @@ Strings getStringList(const nlohmann::json & value)
 
 StringMap getStringMap(const nlohmann::json & value)
 {
-    auto & jsonObject = getObject(value);
-
-    StringMap stringMap;
-
-    for (const auto & [key, value] : jsonObject)
-        stringMap[getString(key)] = getString(value);
-
-    return stringMap;
+    return getMap<std::string, std::less<>>(getObject(value), getString);
 }
 
 StringSet getStringSet(const nlohmann::json & value)

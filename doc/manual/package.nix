@@ -37,6 +37,7 @@ mkMesonDerivation (finalAttrs: {
       (fileset.unions [
         ../../.version
         # For example JSON
+        ../../src/libutil-tests/data/memory-source-accessor
         ../../src/libutil-tests/data/hash
         ../../src/libstore-tests/data/content-address
         ../../src/libstore-tests/data/store-path
@@ -44,6 +45,7 @@ mkMesonDerivation (finalAttrs: {
         ../../src/libstore-tests/data/derived-path
         ../../src/libstore-tests/data/path-info
         ../../src/libstore-tests/data/nar-info
+        ../../src/libstore-tests/data/build-result
         # Too many different types of files to filter for now
         ../../doc/manual
         ./.

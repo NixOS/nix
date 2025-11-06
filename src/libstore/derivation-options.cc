@@ -176,13 +176,26 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                             return {};
                         };
 
-                        checks.allowedReferences = get_("allowedReferences");
-                        checks.allowedRequisites = get_("allowedRequisites");
-                        checks.disallowedReferences = get_("disallowedReferences").value_or(StringSet{});
-                        checks.disallowedRequisites = get_("disallowedRequisites").value_or(StringSet{});
-                        ;
-
-                        res.insert_or_assign(outputName, std::move(checks));
+                        res.insert_or_assign(
+                            outputName,
+                            OutputChecks{
+                                .maxSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto maxSize = get(output, "maxSize"))
+                                        return maxSize->get<uint64_t>();
+                                    else
+                                        return std::nullopt;
+                                }(),
+                                .maxClosureSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto maxClosureSize = get(output, "maxClosureSize"))
+                                        return maxClosureSize->get<uint64_t>();
+                                    else
+                                        return std::nullopt;
+                                }(),
+                                .allowedReferences = get_("allowedReferences"),
+                                .disallowedReferences = get_("disallowedReferences").value_or(StringSet{}),
+                                .allowedRequisites = get_("allowedRequisites"),
+                                .disallowedRequisites = get_("disallowedRequisites").value_or(StringSet{}),
+                            });
                     }
                 }
                 return res;
@@ -364,6 +377,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
 
         .unsafeDiscardReferences = valueAt(json, "unsafeDiscardReferences"),
         .passAsFile = getStringSet(valueAt(json, "passAsFile")),
+        .exportReferencesGraph = getMap<StringSet>(getObject(valueAt(json, "exportReferencesGraph")), getStringSet),
 
         .additionalSandboxProfile = getString(valueAt(json, "additionalSandboxProfile")),
         .noChroot = getBoolean(valueAt(json, "noChroot")),
@@ -396,6 +410,7 @@ void adl_serializer<DerivationOptions>::to_json(json & json, const DerivationOpt
 
     json["unsafeDiscardReferences"] = o.unsafeDiscardReferences;
     json["passAsFile"] = o.passAsFile;
+    json["exportReferencesGraph"] = o.exportReferencesGraph;
 
     json["additionalSandboxProfile"] = o.additionalSandboxProfile;
     json["noChroot"] = o.noChroot;
@@ -423,6 +438,8 @@ DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>:
 
     return {
         .ignoreSelfRefs = getBoolean(valueAt(json, "ignoreSelfRefs")),
+        .maxSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxSize"))),
+        .maxClosureSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxClosureSize"))),
         .allowedReferences = ptrToOwned<StringSet>(getNullable(valueAt(json, "allowedReferences"))),
         .disallowedReferences = getStringSet(valueAt(json, "disallowedReferences")),
         .allowedRequisites = ptrToOwned<StringSet>(getNullable(valueAt(json, "allowedRequisites"))),
@@ -433,6 +450,8 @@ DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>:
 void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, const DerivationOptions::OutputChecks & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
+    json["maxSize"] = c.maxSize;
+    json["maxClosureSize"] = c.maxClosureSize;
     json["allowedReferences"] = c.allowedReferences;
     json["disallowedReferences"] = c.disallowedReferences;
     json["allowedRequisites"] = c.allowedRequisites;
