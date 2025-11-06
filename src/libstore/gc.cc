@@ -5,7 +5,6 @@
 #include "nix/util/finally.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/util.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 
 #include "store-config-private.hh"
@@ -907,7 +906,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 #endif
             ;
 
-        printInfo("note: currently hard linking saves %s", renderSize(unsharedSize - actualSize - overhead));
+        printInfo(
+            "note: currently hard linking saves %.2f MiB",
+            ((unsharedSize - actualSize - overhead) / (1024.0 * 1024.0)));
     }
 
     /* While we're at it, vacuum the database. */
