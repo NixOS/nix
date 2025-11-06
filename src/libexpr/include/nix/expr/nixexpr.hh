@@ -289,7 +289,7 @@ struct ExprSelect : Expr
         std::pmr::polymorphic_allocator<char> & alloc,
         const PosIdx & pos,
         Expr * e,
-        std::span<const AttrName> attrPath,
+        const std::span<const AttrName> & attrPath,
         Expr * def)
         : pos(pos)
         , nAttrPath(attrPath.size())
@@ -339,7 +339,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::vector<AttrName> attrPath)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, const std::vector<AttrName> & attrPath)
         : e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
@@ -433,7 +433,7 @@ struct ExprList : Expr
 {
     std::span<Expr *> elems;
 
-    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::vector<Expr *> exprs)
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, const std::vector<Expr *> & exprs)
         : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
     {
         std::ranges::copy(exprs, elems.begin());
@@ -562,7 +562,7 @@ public:
         const PosTable & positions,
         std::pmr::polymorphic_allocator<char> & alloc,
         PosIdx pos,
-        FormalsBuilder formals,
+        const FormalsBuilder & formals,
         Expr * body)
         : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 

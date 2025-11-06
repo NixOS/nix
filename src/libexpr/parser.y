@@ -186,7 +186,7 @@ expr_function
   | formal_set ':' expr_function[body]
     {
       state->validateFormals($formal_set);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, std::move($formal_set), $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -194,7 +194,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -202,7 +202,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, std::move($formal_set), $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -251,7 +251,7 @@ expr_op
   | expr_op OR expr_op { $$ = state->exprs.add<ExprOpOr>(state->at(@2), $1, $3); }
   | expr_op IMPL expr_op { $$ = state->exprs.add<ExprOpImpl>(state->at(@2), $1, $3); }
   | expr_op UPDATE expr_op { $$ = state->exprs.add<ExprOpUpdate>(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = state->exprs.add<ExprOpHasAttr>(state->exprs.alloc, $1, std::move($3)); }
+  | expr_op '?' attrpath { $$ = state->exprs.add<ExprOpHasAttr>(state->exprs.alloc, $1, $3); }
   | expr_op '+' expr_op
     { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
   | expr_op '-' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.sub), {$1, $3}); }
@@ -272,9 +272,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, std::move($3), nullptr); }
+    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, nullptr); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, std::move($3), $5); $5->warnIfCursedOr(state->symbols, state->positions); }
+    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, $5); $5->warnIfCursedOr(state->symbols, state->positions); }
   | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
        allow stuff like ‘map or [...]’. This production is problematic (see
        https://github.com/NixOS/nix/issues/11118) and will be refactored in the
@@ -304,12 +304,12 @@ expr_simple
       $2);
   }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
-      $$ = state->stripIndentation(CUR_POS, std::move($2));
+      $$ = state->stripIndentation(CUR_POS, $2);
   }
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
       $2.insert($2.begin(), {state->at(@1), $1});
-      $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, false, std::move($2));
+      $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, false, $2);
   }
   | SPATH {
       std::string_view path($1.p + 1, $1.l - 2);
@@ -338,12 +338,12 @@ expr_simple
     { $2->pos = CUR_POS; $$ = $2; }
   | '{' '}'
     { $$ = state->exprs.add<ExprAttrs>(CUR_POS); }
-  | '[' list ']' { $$ = state->exprs.add<ExprList>(state->exprs.alloc, std::move($2)); }
+  | '[' list ']' { $$ = state->exprs.add<ExprList>(state->exprs.alloc, $2); }
   ;
 
 string_parts
   : STR { $$ = $1; }
-  | string_parts_interpolated { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, true, std::move($1)); }
+  | string_parts_interpolated { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, true, $1); }
   | { $$ = std::string_view(); }
   ;
 
