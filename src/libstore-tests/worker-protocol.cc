@@ -150,13 +150,30 @@ VERSIONED_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
             },
-            DrvOutput{
+            {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 .outputName = "baz",
             },
         },
+        Realisation{
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
+        },
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    realisation_with_deps,
+    "realisation-with-deps",
+    defaultVersion,
+    (std::tuple<Realisation>{
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
@@ -172,7 +189,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                         },
                     },
             },
-            DrvOutput{
+            {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 .outputName = "baz",
             },
