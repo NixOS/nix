@@ -269,7 +269,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::LocalOverlayStore,
         .name = "local-overlay-store",
         .description = R"(
-            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-overlay-store).
+            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#experimental-local-overlay-store).
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/50",
     },

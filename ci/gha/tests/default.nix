@@ -107,12 +107,29 @@ rec {
         };
   };
 
+  disable =
+    let
+      inherit (pkgs.stdenv) hostPlatform;
+    in
+    args@{
+      pkgName,
+      testName,
+      test,
+    }:
+    lib.any (b: b) [
+      # FIXME: Nix manual is impure and does not produce all settings on darwin
+      (hostPlatform.isDarwin && pkgName == "nix-manual" && testName == "linkcheck")
+    ];
+
   componentTests =
     (lib.concatMapAttrs (
       pkgName: pkg:
-      lib.concatMapAttrs (testName: test: {
-        "${componentTestsPrefix}${pkgName}-${testName}" = test;
-      }) (pkg.tests or { })
+      lib.concatMapAttrs (
+        testName: test:
+        lib.optionalAttrs (!disable { inherit pkgName testName test; }) {
+          "${componentTestsPrefix}${pkgName}-${testName}" = test;
+        }
+      ) (pkg.tests or { })
     ) nixComponentsInstrumented)
     // lib.optionalAttrs (pkgs.stdenv.hostPlatform == pkgs.stdenv.buildPlatform) {
       "${componentTestsPrefix}nix-functional-tests" = nixComponentsInstrumented.nix-functional-tests;

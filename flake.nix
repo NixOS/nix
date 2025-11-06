@@ -485,10 +485,10 @@
           open-manual = {
             type = "app";
             program = "${pkgs.writeShellScript "open-nix-manual" ''
-              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
-              if ! ${opener} "$manual_path"; then
+              path="${self.packages.${system}.nix-manual.site}/index.html"
+              if ! ${opener} "$path"; then
                 echo "Failed to open manual with ${opener}. Manual is located at:"
-                echo "$manual_path"
+                echo "$path"
               fi
             ''}";
             meta.description = "Open the Nix manual in your browser";

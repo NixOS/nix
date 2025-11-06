@@ -111,7 +111,7 @@ It creates an [attribute set] representing the string context, which can be insp
 
 [`builtins.hasContext`]: ./builtins.md#builtins-hasContext
 [`builtins.getContext`]: ./builtins.md#builtins-getContext
-[attribute set]: ./types.md#attribute-set
+[attribute set]: ./types.md#type-attrs
 
 ## Clearing string contexts
 
