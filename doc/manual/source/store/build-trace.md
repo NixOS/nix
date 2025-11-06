@@ -29,7 +29,7 @@ And even in that case, a different result doesn't mean the original entry was a 
 As such, the decision of whether to trust a counterparty's build trace is a fundamentally subject policy choice.
 Build trace entries are typically *signed* in order to enable arbitrary public-key-based trust polices.
 
-## Derived build traces
+## Derived build traces {#derived}
 
 Implementations that wish to memoize the above may also keep additional *derived* build trace entries that do map unresolved derivations.
 But if they do so, they *must* also keep the underlying base entries with resolved derivation keys around.
