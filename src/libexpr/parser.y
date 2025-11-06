@@ -126,26 +126,26 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 
 %define api.value.type variant
 
-%type <nix::Expr *> start expr expr_function expr_if expr_op
-%type <nix::Expr *> expr_select expr_simple expr_app
-%type <nix::Expr *> expr_pipe_from expr_pipe_into
+%type <Expr *> start expr expr_function expr_if expr_op
+%type <Expr *> expr_select expr_simple expr_app
+%type <Expr *> expr_pipe_from expr_pipe_into
 %type <std::vector<Expr *>> list
-%type <nix::ExprAttrs *> binds binds1
-%type <nix::FormalsBuilder> formals formal_set
-%type <nix::Formal> formal
-%type <std::vector<nix::AttrName>> attrpath
-%type <std::vector<std::pair<nix::AttrName, nix::PosIdx>>> attrs
-%type <std::vector<std::pair<nix::PosIdx, nix::Expr *>>> string_parts_interpolated
-%type <std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>>> ind_string_parts
-%type <nix::Expr *> path_start
-%type <std::variant<nix::Expr *, std::string_view>> string_parts string_attr
-%type <nix::StringToken> attr
-%token <nix::StringToken> ID
-%token <nix::StringToken> STR IND_STR
-%token <nix::NixInt> INT_LIT
-%token <nix::NixFloat> FLOAT_LIT
-%token <nix::StringToken> PATH HPATH SPATH PATH_END
-%token <nix::StringToken> URI
+%type <ExprAttrs *> binds binds1
+%type <FormalsBuilder> formals formal_set
+%type <Formal> formal
+%type <std::vector<AttrName>> attrpath
+%type <std::vector<std::pair<AttrName, PosIdx>>> attrs
+%type <std::vector<std::pair<PosIdx, Expr *>>> string_parts_interpolated
+%type <std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>> ind_string_parts
+%type <Expr *> path_start
+%type <std::variant<Expr *, std::string_view>> string_parts string_attr
+%type <StringToken> attr
+%token <StringToken> ID
+%token <StringToken> STR IND_STR
+%token <NixInt> INT_LIT
+%token <NixFloat> FLOAT_LIT
+%token <StringToken> PATH HPATH SPATH PATH_END
+%token <StringToken> URI
 %token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
 %token PIPE_FROM PIPE_INTO /* <| and |> */
 %token DOLLAR_CURLY /* == ${ */
@@ -425,7 +425,7 @@ binds1
       if (!$accum->inheritFromExprs)
           $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
       $accum->inheritFromExprs->push_back($expr);
-      auto from = new nix::ExprInheritFrom(state->at(@expr), $accum->inheritFromExprs->size() - 1);
+      auto from = state->exprs.add<ExprInheritFrom>(state->at(@expr), $accum->inheritFromExprs->size() - 1);
       for (auto & [i, iPos] : $attrs) {
           if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
               state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
