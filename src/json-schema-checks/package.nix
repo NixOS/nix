@@ -34,15 +34,11 @@ mkMesonDerivation (finalAttrs: {
 
   outputs = [ "out" ];
 
-  passthru.externalNativeBuildInputs = [
-    jsonschema
-  ];
-
   nativeBuildInputs = [
     meson
     ninja
-  ]
-  ++ finalAttrs.passthru.externalNativeBuildInputs;
+    jsonschema
+  ];
 
   doCheck = true;
 
