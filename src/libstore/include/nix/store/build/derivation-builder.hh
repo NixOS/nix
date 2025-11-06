@@ -62,7 +62,7 @@ struct DerivationBuilderParams
     /**
      * The derivation stored at drvPath.
      */
-    const Derivation & drv;
+    const BasicDerivation & drv;
 
     /**
      * The derivation options of `drv`.
