@@ -22,7 +22,7 @@ The store path info JSON format has been updated from version 1 to version 2:
   - New: `"ca": {"method": "nar", "hash": {"algorithm": "sha256", "format": "base64", "hash": "EMIJ+giQ..."}}`
   - Still `null` values for input-addressed store objects
 
-Version 1 format is still accepted when reading for backward compatibility.
+Nix currently only produces, and doesn't consume this format.
 
 **Affected command**: `nix path-info --json`
 
