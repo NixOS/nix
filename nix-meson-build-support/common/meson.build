@@ -42,6 +42,26 @@ if cxx.get_id() == 'clang'
   add_project_arguments('-fpch-instantiate-templates', language : 'cpp')
 endif
 
+# Detect if we're using libstdc++ (GCC's standard library)
+# libstdc++ uses Intel TBB as backend for C++17 parallel algorithms when <execution> is included.
+# boost::concurrent_flat_map includes <execution>, which would require linking against TBB.
+# Since we don't actually use parallel algorithms, disable the TBB backend to avoid the dependency.
+# TBB is a dependency of blake3 and leaking into our build environment.
+is_using_libstdcxx = cxx.compiles(
+  '''
+  #include <ciso646>
+  #ifndef __GLIBCXX__
+  #error "not libstdc++"
+  #endif
+  int main() { return 0; }
+''',
+  name : 'using libstdc++',
+)
+
+if is_using_libstdcxx
+  add_project_arguments('-D_GLIBCXX_USE_TBB_PAR_BACKEND=0', language : 'cpp')
+endif
+
 # Darwin ld doesn't like "X.Y.ZpreABCD+W"
 nix_soversion = meson.project_version().split('+')[0].split('pre')[0]
 
