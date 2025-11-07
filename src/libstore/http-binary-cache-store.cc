@@ -4,7 +4,6 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
-#include "nix/util/compression.hh"
 
 namespace nix {
 
@@ -139,13 +138,14 @@ void HttpBinaryCacheStore::upload(
     RestartableSource & source,
     uint64_t sizeHint,
     std::string_view mimeType,
-    std::optional<std::string_view> contentEncoding)
+    std::optional<Headers> headers)
 {
     auto req = makeRequest(path);
     req.method = HttpMethod::PUT;
 
-    if (contentEncoding) {
-        req.headers.emplace_back("Content-Encoding", *contentEncoding);
+    if (headers) {
+        req.headers.reserve(req.headers.size() + headers->size());
+        std::ranges::move(std::move(*headers), std::back_inserter(req.headers));
     }
 
     req.data = {sizeHint, source};
@@ -154,18 +154,14 @@ void HttpBinaryCacheStore::upload(
     getFileTransfer()->upload(req);
 }
 
-void HttpBinaryCacheStore::upload(std::string_view path, CompressedSource & source, std::string_view mimeType)
-{
-    upload(path, static_cast<RestartableSource &>(source), source.size(), mimeType, source.getCompressionMethod());
-}
-
 void HttpBinaryCacheStore::upsertFile(
     const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
             CompressedSource compressed(source, *compressionMethod);
-            upload(path, compressed, mimeType);
+            Headers headers = {{"Content-Encoding", *compressionMethod}};
+            upload(path, compressed, compressed.size(), mimeType, std::move(headers));
         } else {
             upload(path, source, sizeHint, mimeType, std::nullopt);
         }

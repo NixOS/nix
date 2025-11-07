@@ -50,7 +50,7 @@ private:
         RestartableSource & source,
         uint64_t sizeHint,
         std::string_view mimeType,
-        std::optional<std::string_view> contentEncoding);
+        std::optional<Headers> headers);
 
     /**
      * Uploads a file to S3 using multipart upload.
@@ -67,7 +67,7 @@ private:
         RestartableSource & source,
         uint64_t sizeHint,
         std::string_view mimeType,
-        std::optional<std::string_view> contentEncoding);
+        std::optional<Headers> headers);
 
     /**
      * A Sink that manages a complete S3 multipart upload lifecycle.
@@ -89,7 +89,7 @@ private:
             std::string_view path,
             uint64_t sizeHint,
             std::string_view mimeType,
-            std::optional<std::string_view> contentEncoding);
+            std::optional<Headers> headers);
 
         void operator()(std::string_view data) override;
         void finish();
@@ -102,8 +102,7 @@ private:
      * @see
      * https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateMultipartUpload.html#API_CreateMultipartUpload_RequestSyntax
      */
-    std::string createMultipartUpload(
-        std::string_view key, std::string_view mimeType, std::optional<std::string_view> contentEncoding);
+    std::string createMultipartUpload(std::string_view key, std::string_view mimeType, std::optional<Headers> headers);
 
     /**
      * Uploads a single part of a multipart upload
@@ -134,18 +133,19 @@ private:
 void S3BinaryCacheStore::upsertFile(
     const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
-    auto doUpload = [&](RestartableSource & src, uint64_t size, std::optional<std::string_view> encoding) {
+    auto doUpload = [&](RestartableSource & src, uint64_t size, std::optional<Headers> headers) {
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
-            uploadMultipart(path, src, size, mimeType, encoding);
+            uploadMultipart(path, src, size, mimeType, std::move(headers));
         } else {
-            upload(path, src, size, mimeType, encoding);
+            upload(path, src, size, mimeType, std::move(headers));
         }
     };
 
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
             CompressedSource compressed(source, *compressionMethod);
-            doUpload(compressed, compressed.size(), compressed.getCompressionMethod());
+            Headers headers = {{"Content-Encoding", *compressionMethod}};
+            doUpload(compressed, compressed.size(), std::move(headers));
         } else {
             doUpload(source, sizeHint, std::nullopt);
         }
@@ -161,7 +161,7 @@ void S3BinaryCacheStore::upload(
     RestartableSource & source,
     uint64_t sizeHint,
     std::string_view mimeType,
-    std::optional<std::string_view> contentEncoding)
+    std::optional<Headers> headers)
 {
     debug("using S3 regular upload for '%s' (%d bytes)", path, sizeHint);
     if (sizeHint > AWS_MAX_PART_SIZE)
@@ -170,7 +170,7 @@ void S3BinaryCacheStore::upload(
             renderSize(sizeHint),
             renderSize(AWS_MAX_PART_SIZE));
 
-    HttpBinaryCacheStore::upload(path, source, sizeHint, mimeType, contentEncoding);
+    HttpBinaryCacheStore::upload(path, source, sizeHint, mimeType, std::move(headers));
 }
 
 void S3BinaryCacheStore::uploadMultipart(
@@ -178,10 +178,10 @@ void S3BinaryCacheStore::uploadMultipart(
     RestartableSource & source,
     uint64_t sizeHint,
     std::string_view mimeType,
-    std::optional<std::string_view> contentEncoding)
+    std::optional<Headers> headers)
 {
     debug("using S3 multipart upload for '%s' (%d bytes)", path, sizeHint);
-    MultipartSink sink(*this, path, sizeHint, mimeType, contentEncoding);
+    MultipartSink sink(*this, path, sizeHint, mimeType, std::move(headers));
     source.drainInto(sink);
     sink.finish();
 }
@@ -191,7 +191,7 @@ S3BinaryCacheStore::MultipartSink::MultipartSink(
     std::string_view path,
     uint64_t sizeHint,
     std::string_view mimeType,
-    std::optional<std::string_view> contentEncoding)
+    std::optional<Headers> headers)
     : store(store)
     , path(path)
 {
@@ -227,7 +227,7 @@ S3BinaryCacheStore::MultipartSink::MultipartSink(
 
     buffer.reserve(chunkSize);
     partEtags.reserve(estimatedParts);
-    uploadId = store.createMultipartUpload(path, mimeType, contentEncoding);
+    uploadId = store.createMultipartUpload(path, mimeType, std::move(headers));
 }
 
 void S3BinaryCacheStore::MultipartSink::operator()(std::string_view data)
@@ -279,7 +279,7 @@ void S3BinaryCacheStore::MultipartSink::uploadChunk(std::string chunk)
 }
 
 std::string S3BinaryCacheStore::createMultipartUpload(
-    std::string_view key, std::string_view mimeType, std::optional<std::string_view> contentEncoding)
+    std::string_view key, std::string_view mimeType, std::optional<Headers> headers)
 {
     auto req = makeRequest(key);
 
@@ -296,8 +296,9 @@ std::string S3BinaryCacheStore::createMultipartUpload(
     req.data = {payload};
     req.mimeType = mimeType;
 
-    if (contentEncoding) {
-        req.headers.emplace_back("Content-Encoding", *contentEncoding);
+    if (headers) {
+        req.headers.reserve(req.headers.size() + headers->size());
+        std::move(headers->begin(), headers->end(), std::back_inserter(req.headers));
     }
 
     auto result = getFileTransfer()->enqueueFileTransfer(req).get();

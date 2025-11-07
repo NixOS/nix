@@ -103,18 +103,7 @@ protected:
         RestartableSource & source,
         uint64_t sizeHint,
         std::string_view mimeType,
-        std::optional<std::string_view> contentEncoding);
-
-    /**
-     * Uploads data to the binary cache (CompressedSource overload).
-     *
-     * This overload infers both the size and compression method from the CompressedSource.
-     *
-     * @param path The path in the binary cache to upload to
-     * @param source The compressed source (knows size and compression method)
-     * @param mimeType The MIME type of the content
-     */
-    void upload(std::string_view path, CompressedSource & source, std::string_view mimeType);
+        std::optional<Headers> headers);
 
     void getFile(const std::string & path, Sink & sink) override;
 
