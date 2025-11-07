@@ -14,6 +14,7 @@ schemas = [
   'store-path-v1',
   'store-object-info-v2',
   'derivation-v4',
+  'derivation-options-v1',
   'deriving-path-v1',
   'build-trace-entry-v1',
   'build-result-v1',
