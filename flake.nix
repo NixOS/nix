@@ -28,7 +28,6 @@
       nixpkgs-regression,
       ...
     }:
-
     let
       inherit (nixpkgs) lib;
 
@@ -202,7 +201,6 @@
               hostTarget = f hostTarget;
               targetTarget = f targetTarget;
             };
-
         in
         args@{
           pkgs,
@@ -285,8 +283,24 @@
           nixDependencies2 = packageSets.nixDependencies;
 
           nix = final.nixComponents2.nix-cli;
-        };
 
+          # We need to support pkgconfig until https://github.com/NixOS/nixpkgs/pull/452456
+          httplib = prev.httplib.overrideAttrs (oldAttrs: {
+            nativeBuildInputs = (oldAttrs.nativeBuildInputs or [ ]) ++ [ prev.copyPkgconfigItems ];
+            pkgconfigItems = [
+              (prev.makePkgconfigItem rec {
+                name = "httplib";
+                version = oldAttrs.version;
+                cflags = [ "-I${variables.includedir}" ];
+                variables = rec {
+                  prefix = placeholder "out";
+                  includedir = "''${prefix}/include";
+                };
+                inherit (oldAttrs.meta) description;
+              })
+            ];
+          });
+        };
     in
     {
       overlays.internal = overlayFor (p: p.stdenv);
@@ -584,7 +598,6 @@
             pkgs,
             getStdenv ? pkgs: pkgs.stdenv,
           }:
-
           let
             packageSets = packageSetsFor { inherit getStdenv pkgs; };
           in

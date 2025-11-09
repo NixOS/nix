@@ -12,6 +12,7 @@
 
   rapidcheck,
   gtest,
+  httplib,
   gbenchmark,
   runCommand,
 
@@ -47,6 +48,7 @@ mkMesonExecutable (finalAttrs: {
     sqlite
     rapidcheck
     gtest
+    httplib
   ]
   ++ lib.optionals withBenchmarks [
     gbenchmark

@@ -51,6 +51,9 @@ config_priv_h = configure_file(
 gtest = dependency('gmock')
 deps_private += gtest
 
+httplib = dependency('httplib')
+deps_private += httplib
+
 subdir('nix-meson-build-support/common')
 
 sources = files(
