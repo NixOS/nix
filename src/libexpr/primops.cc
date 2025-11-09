@@ -1939,8 +1939,13 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value ** args, Value
         NixStringContext context;
         auto path = state.coerceToString(
             pos, *args[0], context, "while evaluating the first argument passed to 'builtins.dirOf'", false, false);
-        auto dir = dirOf(*path);
-        v.mkString(dir, context);
+        auto pos = path->rfind('/');
+        if (pos == path->npos)
+            v.mkStringMove(".", context);
+        else if (pos == 0)
+            v.mkStringMove("/", context);
+        else
+            v.mkString(path->substr(0, pos), context);
     }
 }
 
