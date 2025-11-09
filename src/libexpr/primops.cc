@@ -2234,7 +2234,7 @@ static RegisterPrimOp primop_findFile(
       > - ```
       >   {
       >     prefix = "nixpkgs";
-      >     path = "https://nixos.org/channels/nixos-unstable/nixexprs.tar.xz";
+      >     path = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
       >   }
       >   ```
 
