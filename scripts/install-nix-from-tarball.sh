@@ -213,7 +213,7 @@ fi
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
     if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
-        "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
+        "$nix/bin/nix-channel" --add https://channels.nixos.org/nixpkgs-unstable
     fi
     if [ -z "$_NIX_INSTALLER_TEST" ]; then
         if ! "$nix/bin/nix-channel" --update nixpkgs; then
