@@ -136,17 +136,19 @@ struct AttrDb
         });
     }
 
-    AttrId setString(AttrKey key, std::string_view s, const char ** context = nullptr)
+    AttrId setString(AttrKey key, std::string_view s, const Value::StringWithContext::Context * context = nullptr)
     {
         return doSQLite([&]() {
             auto state(_state->lock());
 
             if (context) {
                 std::string ctx;
-                for (const char ** p = context; *p; ++p) {
-                    if (p != context)
+                bool first = true;
+                for (auto * elem : *context) {
+                    if (!first)
                         ctx.push_back(' ');
-                    ctx.append(*p);
+                    ctx.append(elem);
+                    first = false;
                 }
                 state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String) (s) (ctx)
                     .exec();

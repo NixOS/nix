@@ -36,6 +36,7 @@
 #include <sys/time.h>
 #include <fstream>
 #include <functional>
+#include <ranges>
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
@@ -821,28 +822,25 @@ void Value::mkString(std::string_view s)
     mkStringNoCopy(makeImmutableString(s));
 }
 
-static const char ** encodeContext(const NixStringContext & context)
+Value::StringWithContext::Context * Value::StringWithContext::Context::fromBuilder(const NixStringContext & context)
 {
-    if (!context.empty()) {
-        size_t n = 0;
-        auto ctx = (const char **) allocBytes((context.size() + 1) * sizeof(char *));
-        for (auto & i : context) {
-            ctx[n++] = makeImmutableString({i.to_string()});
-        }
-        ctx[n] = nullptr;
-        return ctx;
-    } else
+    if (context.empty())
         return nullptr;
+
+    auto ctx = new (allocBytes(sizeof(Context) + context.size() * sizeof(value_type))) Context(context.size());
+    std::ranges::transform(
+        context, ctx->elems, [](const NixStringContextElem & elt) { return makeImmutableString(elt.to_string()); });
+    return ctx;
 }
 
 void Value::mkString(std::string_view s, const NixStringContext & context)
 {
-    mkStringNoCopy(makeImmutableString(s), encodeContext(context));
+    mkStringNoCopy(makeImmutableString(s), Value::StringWithContext::Context::fromBuilder(context));
 }
 
 void Value::mkStringMove(const char * s, const NixStringContext & context)
 {
-    mkStringNoCopy(s, encodeContext(context));
+    mkStringNoCopy(s, Value::StringWithContext::Context::fromBuilder(context));
 }
 
 void Value::mkPath(const SourcePath & path)
@@ -2288,9 +2286,9 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
 
 void copyContext(const Value & v, NixStringContext & context, const ExperimentalFeatureSettings & xpSettings)
 {
-    if (v.context())
-        for (const char ** p = v.context(); *p; ++p)
-            context.insert(NixStringContextElem::parse(*p, xpSettings));
+    if (auto * ctx = v.context())
+        for (auto * elem : *ctx)
+            context.insert(NixStringContextElem::parse(elem, xpSettings));
 }
 
 std::string_view EvalState::forceString(
@@ -2310,7 +2308,9 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::s
     auto s = forceString(v, pos, errorCtx);
     if (v.context()) {
         error<EvalError>(
-            "the string '%1%' is not allowed to refer to a store path (such as '%2%')", v.string_view(), v.context()[0])
+            "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
+            v.string_view(),
+            *v.context()->begin())
             .withTrace(pos, errorCtx)
             .debugThrow();
     }
