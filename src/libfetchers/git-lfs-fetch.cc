@@ -7,10 +7,10 @@
 #include "nix/util/hash.hh"
 #include "nix/store/ssh.hh"
 
-#include <git2/attr.h>
-#include <git2/config.h>
-#include <git2/errors.h>
-#include <git2/remote.h>
+#include <git2-experimental/attr.h>
+#include <git2-experimental/config.h>
+#include <git2-experimental/errors.h>
+#include <git2-experimental/remote.h>
 
 #include <nlohmann/json.hpp>
 
