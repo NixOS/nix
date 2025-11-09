@@ -1113,6 +1113,7 @@ void EvalState::resetFileCache()
     importResolutionCache->clear();
     fileEvalCache->clear();
     inputCache->clear();
+    positions.clear();
 }
 
 void EvalState::eval(Expr * e, Value & v)
