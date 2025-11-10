@@ -104,6 +104,7 @@ MATCHER(IsAttrs, "")
 MATCHER_P(IsStringEq, s, fmt("The string is equal to \"%1%\"", s))
 {
     if (arg.type() != nString) {
+        *result_listener << "Expected a string got " << arg.type();
         return false;
     }
     return arg.string_view() == s;
