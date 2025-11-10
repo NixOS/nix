@@ -1381,13 +1381,15 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
+static unsigned constexpr expectedJsonVersionDerivation = 4;
+
 void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
     res = nlohmann::json::object();
 
     res["name"] = d.name;
 
-    res["version"] = 4;
+    res["version"] = expectedJsonVersionDerivation;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
@@ -1446,8 +1448,14 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     res.name = getString(valueAt(json, "name"));
 
-    if (valueAt(json, "version") != 4)
-        throw Error("Only derivation format version 4 is currently supported.");
+    {
+        auto version = getUnsigned(valueAt(json, "version"));
+        if (valueAt(json, "version") != expectedJsonVersionDerivation)
+            throw Error(
+                "Unsupported derivation JSON format version %d, only format version %d is currently supported.",
+                version,
+                expectedJsonVersionDerivation);
+    }
 
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
