@@ -136,11 +136,11 @@ static DownloadTarballResult downloadTarball_(
             .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
-            .accessor = getTarballCache()->getAccessor(treeHash, false, displayPrefix),
+            .accessor = settings.getTarballCache()->getAccessor(treeHash, false, displayPrefix),
         };
     };
 
-    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
+    if (cached && !settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
         cached.reset();
 
     if (cached && !cached->expired)
@@ -179,7 +179,7 @@ static DownloadTarballResult downloadTarball_(
         TarArchive{path};
     })
                                                                                     : TarArchive{*source};
-    auto tarballCache = getTarballCache();
+    auto tarballCache = settings.getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
     auto tree = parseSink->flush();
@@ -398,7 +398,9 @@ struct TarballInputScheme : CurlInputScheme
 
         input.attrs.insert_or_assign(
             "narHash",
-            getTarballCache()->treeHashToNarHash(*input.settings, result.treeHash).to_string(HashFormat::SRI, true));
+            input.settings->getTarballCache()
+                ->treeHashToNarHash(*input.settings, result.treeHash)
+                .to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
     }
