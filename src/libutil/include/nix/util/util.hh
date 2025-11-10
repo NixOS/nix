@@ -99,6 +99,42 @@ N string2IntWithUnitPrefix(std::string_view s)
     throw UsageError("'%s' is not an integer", s);
 }
 
+// Base also uses 'K', because it should also displayed as KiB => 100 Bytes => 0.1 KiB
+#define NIX_UTIL_SIZE_UNITS               \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Base, 'K')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Kilo, 'K')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Mega, 'M')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Giga, 'G')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Tera, 'T')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Peta, 'P')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Exa, 'E')   \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Zetta, 'Z') \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Yotta, 'Y')
+
+enum class SizeUnit {
+#define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) name,
+    NIX_UTIL_SIZE_UNITS
+#undef NIX_UTIL_DEFINE_SIZE_UNIT
+};
+
+constexpr inline auto sizeUnits = std::to_array<SizeUnit>({
+#define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) SizeUnit::name,
+    NIX_UTIL_SIZE_UNITS
+#undef NIX_UTIL_DEFINE_SIZE_UNIT
+});
+
+SizeUnit getSizeUnit(int64_t value);
+
+/**
+ * Returns the unit if all values would be rendered using the same unit
+ * otherwise returns `std::nullopt`.
+ */
+std::optional<SizeUnit> getCommonSizeUnit(std::initializer_list<int64_t> values);
+
+std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align = false);
+
+char getSizeUnitSuffix(SizeUnit unit);
+
 /**
  * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
  * GiB`. If `align` is set, the number will be right-justified by
