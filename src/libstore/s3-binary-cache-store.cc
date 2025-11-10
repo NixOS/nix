@@ -134,10 +134,14 @@ void S3BinaryCacheStore::upsertFile(
     const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
     auto doUpload = [&](RestartableSource & src, uint64_t size, std::optional<Headers> headers) {
+        Headers uploadHeaders = headers.value_or(Headers());
+        if (auto storageClass = s3Config->storageClass.get()) {
+            uploadHeaders.emplace_back("x-amz-storage-class", *storageClass);
+        }
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
-            uploadMultipart(path, src, size, mimeType, std::move(headers));
+            uploadMultipart(path, src, size, mimeType, std::move(uploadHeaders));
         } else {
-            upload(path, src, size, mimeType, std::move(headers));
+            upload(path, src, size, mimeType, std::move(uploadHeaders));
         }
     };
 

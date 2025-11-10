@@ -93,6 +93,26 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           Default is 100 MiB. Only takes effect when multipart-upload is enabled.
         )"};
 
+    const Setting<std::optional<std::string>> storageClass{
+        this,
+        std::nullopt,
+        "storage-class",
+        R"(
+          The S3 storage class to use for uploaded objects. When not set (default),
+          uses the bucket's default storage class. Valid values include:
+          - STANDARD (default, frequently accessed data)
+          - REDUCED_REDUNDANCY (less frequently accessed data)
+          - STANDARD_IA (infrequent access)
+          - ONEZONE_IA (infrequent access, single AZ)
+          - INTELLIGENT_TIERING (automatic cost optimization)
+          - GLACIER (archival with retrieval times in minutes to hours)
+          - DEEP_ARCHIVE (long-term archival with 12-hour retrieval)
+          - GLACIER_IR (instant retrieval archival)
+
+          See AWS S3 documentation for detailed storage class descriptions and pricing:
+          https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+        )"};
+
     /**
      * Set of settings that are part of the S3 URI itself.
      * These are needed for region specification and other S3-specific settings.
