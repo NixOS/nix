@@ -19,13 +19,13 @@ diff --unified --color=always \
         {
           "$foo": {
             "algorithm": "sha256",
-            "format": "base64",
-            "hash": "QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA="
+            "format": "base16",
+            "hash": "42fb4031b525feebe2f8b08e6e6a8e86f34e6a91dd036ada888e311b9cc8e690"
           },
           "$bar": {
             "algorithm": "sha256",
-            "format": "base64",
-            "hash": "9fhYGu9fqxcQC2Kc81qh2RMo1QcLBUBo8U+pPn+jthQ="
+            "format": "base16",
+            "hash": "f5f8581aef5fab17100b629cf35aa1d91328d5070b054068f14fa93e7fa3b614"
           },
           "$baz": null
         }
