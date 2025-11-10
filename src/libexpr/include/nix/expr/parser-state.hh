@@ -181,7 +181,7 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
         // See https://github.com/NixOS/nix/issues/9020.
         if (jAttrs && ae) {
             if (ae->inheritFromExprs && !jAttrs->inheritFromExprs)
-                jAttrs->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+                jAttrs->inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>();
             for (auto & ad : ae->attrs) {
                 if (ad.second.kind == ExprAttrs::AttrDef::Kind::InheritedFrom) {
                     auto & sel = dynamic_cast<ExprSelect &>(*ad.second.e);
