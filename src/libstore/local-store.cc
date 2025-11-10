@@ -989,19 +989,22 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSort(
-            paths,
-            {[&](const StorePath & path) {
-                auto i = infos.find(path);
-                return i == infos.end() ? StorePathSet() : i->second.references;
-            }},
-            {[&](const StorePath & path, const StorePath & parent) {
-                return BuildError(
-                    BuildResult::Failure::OutputRejected,
-                    "cycle detected in the references of '%s' from '%s'",
-                    printStorePath(path),
-                    printStorePath(parent));
-            }});
+        auto topoSortResult = topoSort(paths, {[&](const StorePath & path) {
+                                           auto i = infos.find(path);
+                                           return i == infos.end() ? StorePathSet() : i->second.references;
+                                       }});
+
+        std::visit(
+            overloaded{
+                [&](const Cycle<StorePath> & cycle) {
+                    throw BuildError(
+                        BuildResult::Failure::OutputRejected,
+                        "cycle detected in the references of '%s' from '%s'",
+                        printStorePath(cycle.path),
+                        printStorePath(cycle.parent));
+                },
+                [](auto &) { /* Success, continue */ }},
+            topoSortResult);
 
         txn.commit();
     });

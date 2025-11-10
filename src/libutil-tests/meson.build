@@ -74,6 +74,7 @@ sources = files(
   'strings.cc',
   'suggestions.cc',
   'terminal.cc',
+  'topo-sort.cc',
   'url.cc',
   'util.cc',
   'xml-writer.cc',

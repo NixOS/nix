@@ -311,22 +311,25 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    return topoSort(
-        paths,
-        {[&](const StorePath & path) {
-            try {
-                return queryPathInfo(path)->references;
-            } catch (InvalidPath &) {
-                return StorePathSet();
-            }
-        }},
-        {[&](const StorePath & path, const StorePath & parent) {
-            return BuildError(
-                BuildResult::Failure::OutputRejected,
-                "cycle detected in the references of '%s' from '%s'",
-                printStorePath(path),
-                printStorePath(parent));
-        }});
+    auto result = topoSort(paths, {[&](const StorePath & path) {
+                               try {
+                                   return queryPathInfo(path)->references;
+                               } catch (InvalidPath &) {
+                                   return StorePathSet();
+                               }
+                           }});
+
+    return std::visit(
+        overloaded{
+            [&](const Cycle<StorePath> & cycle) -> StorePaths {
+                throw BuildError(
+                    BuildResult::Failure::OutputRejected,
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(cycle.path),
+                    printStorePath(cycle.parent));
+            },
+            [](const auto & sorted) { return sorted; }},
+        result);
 }
 
 std::map<DrvOutput, StorePath>
