@@ -364,7 +364,7 @@ in
           """Test store operations on public bucket without credentials"""
           print("\n=== Testing Public Bucket Operations ===")
 
-          store_url = make_s3_url(bucket)
+          store_url = make_s3_url(bucket, public='true')
 
           # Verify store info works without credentials
           client.succeed(f"nix store info --store '{store_url}' >&2")
@@ -383,15 +383,139 @@ in
           verify_packages_in_store(client, [PKGS['A'], PKGS['B']], should_exist=False)
 
           # Test copy from public bucket without credentials
-          client.succeed(
+          output = client.succeed(
               f"nix copy --debug --no-check-sigs "
               f"--from '{store_url}' {PKGS['A']} {PKGS['B']} 2>&1"
           )
+
+          # Verify the public flag is working (should see the debug message)
+          if "S3 request without authentication (marked as public bucket)" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected to see public bucket debug message")
+
+          # Verify no credential provider was created
+          if "creating new AWS credential provider" in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Should NOT create credential provider for public bucket")
 
           # Verify packages were copied successfully
           verify_packages_in_store(client, [PKGS['A'], PKGS['B']])
 
           print("  ✓ nix copy from public bucket works without credentials")
+          print("  ✓ No credential lookup attempted (public=true flag working)")
+
+      @setup_s3(public=True)
+      def test_fetchurl_public_bucket(bucket):
+          """Test that fetchurl of public S3 URL does not trigger credential attempts"""
+          print("\n=== Testing fetchurl with Public S3 URL ===")
+
+          client.wait_for_unit("network-addresses-eth1.service")
+
+          # Upload a test file to the public bucket
+          test_content = "Public S3 test file content for fetchurl\n"
+          server.succeed(f"echo -n '{test_content}' > /tmp/public-test-file.txt")
+
+          # Calculate expected hash on server where file exists
+          file_hash = server.succeed(
+              "nix hash file --type sha256 --base32 /tmp/public-test-file.txt"
+          ).strip()
+
+          server.succeed(f"mc cp /tmp/public-test-file.txt minio/{bucket}/public-test.txt")
+
+          print("  ✓ Uploaded test file to public bucket")
+
+          # Test 1: builtins.fetchurl (immediate fetch in evaluator)
+          # ======================================================
+          s3_url = make_s3_url(bucket, path="/public-test.txt", public='true')
+
+          output = client.succeed(
+              f"nix eval --debug --impure --expr "
+              f"'builtins.fetchurl {{ name = \"public-s3-test\"; url = \"{s3_url}\"; }}' 2>&1"
+          )
+
+          # Verify the public flag is working (should see the debug message)
+          if "S3 request without authentication (marked as public bucket)" not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Expected to see public bucket debug message for fetchurl")
+
+          # Verify no credential provider was created
+          if "creating new AWS credential provider" in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("fetchurl should NOT create credential provider for public S3 URL")
+
+          # Verify no credential pre-resolution happened (that's for private buckets only)
+          if "Pre-resolving AWS credentials" in output:
+              print("Debug output:")
+              print(output)
+              raise Exception("Should not attempt credential pre-resolution for public buckets")
+
+          print("  ✓ builtins.fetchurl works with public S3 URL")
+          print("  ✓ No credential lookup attempted (public=true flag working)")
+          print("  ✓ No credential pre-resolution attempted")
+
+          # Test 2: import <nix/fetchurl.nix> (fixed-output derivation with fork)
+          # =====================================================================
+          print("\n  Testing import <nix/fetchurl.nix> with public S3 URL...")
+
+          # Build derivation with unique test ID (using hash calculated earlier)
+          test_id = random.randint(0, 10000)
+          test_url = make_s3_url(bucket, path="/public-test.txt", public='true', test_id=test_id)
+
+          fetchurl_expr = """
+              import <nix/fetchurl.nix> {{
+                  name = "public-s3-fork-test-{id}";
+                  url = "{url}";
+                  sha256 = "{hash}";
+              }}
+          """.format(id=test_id, url=test_url, hash=file_hash)
+
+          build_output = client.succeed(
+              f"nix build --debug --impure --no-link --expr '{fetchurl_expr}' 2>&1"
+          )
+
+          # Verify fork behavior - should create fresh FileTransfer
+          if "builtin:fetchurl creating fresh FileTransfer instance" not in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Expected to find FileTransfer creation in forked process")
+
+          print("    ✓ Forked process creates fresh FileTransfer")
+
+          # Verify public bucket handling in forked process
+          if "S3 request without authentication (marked as public bucket)" not in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Expected to see public bucket debug message in forked process")
+
+          print("    ✓ Public bucket flag respected in forked process")
+
+          # Verify no credential provider was created (neither in parent nor child)
+          if "creating new AWS credential provider" in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Should NOT create credential provider for public S3 URL in fixed-output derivation")
+
+          print("    ✓ No credential provider created in parent or child process")
+
+          # Verify no credential pre-resolution happened
+          # (public buckets should skip this entirely, unlike private buckets)
+          if "Pre-resolving AWS credentials" in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Should not attempt credential pre-resolution for public buckets")
+
+          if "Using pre-resolved AWS credentials from parent process" in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Should not have pre-resolved credentials to use for public buckets")
+
+          print("    ✓ No credential pre-resolution attempted (public bucket optimization)")
+          print("\n  ✓ import <nix/fetchurl.nix> works with public S3 URL")
+          print("  ✓ Fork + build path correctly skips all credential operations")
 
       @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
@@ -787,6 +911,7 @@ in
       test_fork_credential_preresolution()
       test_store_operations()
       test_public_bucket_operations()
+      test_fetchurl_public_bucket()
       test_url_format_variations()
       test_concurrent_fetches()
       test_compression_narinfo_gzip()

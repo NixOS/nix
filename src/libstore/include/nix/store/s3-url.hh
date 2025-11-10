@@ -32,6 +32,7 @@ struct ParsedS3URL
      * or an authority (so an IP address or a registered name).
      */
     std::variant<std::monostate, ParsedURL, ParsedURL::Authority> endpoint;
+    bool public_ = false;
 
     std::optional<std::string> getEncodedEndpoint() const
     {

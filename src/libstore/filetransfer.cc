@@ -885,6 +885,12 @@ void FileTransferRequest::setupForS3()
     // Update the request URI to use HTTPS (works without AWS SDK)
     uri = parsedS3.toHttpsUrl();
 
+    // Skip authentication for public buckets
+    if (parsedS3.public_) {
+        debug("S3 request without authentication (marked as public bucket)");
+        return;
+    }
+
 #if NIX_WITH_AWS_AUTH
     // Auth-specific code only compiled when AWS support is available
     awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";

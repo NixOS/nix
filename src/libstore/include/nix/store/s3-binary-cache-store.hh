@@ -93,11 +93,30 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           Default is 100 MiB. Only takes effect when multipart-upload is enabled.
         )"};
 
+    const Setting<bool> public_{
+        this,
+        false,
+        "public",
+        R"(
+          Whether to treat this S3 bucket as publicly accessible without authentication.
+          When set to `true`, Nix will skip all credential lookup attempts, including
+          checking EC2 instance metadata endpoints. This significantly improves performance
+          when accessing public S3 buckets from non-AWS infrastructure.
+
+          > **Note**
+          >
+          > This setting should only be used with genuinely public buckets. Using it
+          > with private buckets will result in access denied errors.
+        )"};
+
     /**
      * Set of settings that are part of the S3 URI itself.
      * These are needed for region specification and other S3-specific settings.
+     *
+     * @note The "public" parameter is a Nix-specific flag that controls authentication behavior,
+     * telling Nix to skip credential lookup for public buckets to avoid timeouts.
      */
-    const std::set<const AbstractSetting *> s3UriSettings = {&profile, &region, &scheme, &endpoint};
+    const std::set<const AbstractSetting *> s3UriSettings = {&profile, &region, &scheme, &endpoint, &public_};
 
     static const std::string name()
     {
