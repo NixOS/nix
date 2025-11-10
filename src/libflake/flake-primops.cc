@@ -19,7 +19,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/value.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/configuration.hh"

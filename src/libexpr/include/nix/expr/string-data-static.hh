@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/expr/value.hh"
+#include "nix/expr/string-data.hh"
 
 namespace nix {
 

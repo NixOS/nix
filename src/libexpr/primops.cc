@@ -5,7 +5,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/json-to-value.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"

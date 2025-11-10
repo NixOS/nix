@@ -5,7 +5,7 @@
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/value.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 namespace nix {
 

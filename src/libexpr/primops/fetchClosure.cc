@@ -1,5 +1,5 @@
 #include "nix/expr/primops.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
