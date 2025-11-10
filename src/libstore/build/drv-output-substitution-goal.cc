@@ -12,7 +12,7 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput & id, Worke
     : Goal(worker, init())
     , id(id)
 {
-    name = fmt("substitution of '%s'", id.to_string());
+    name = fmt("substitution of '%s'", id.render(worker.store));
     trace("created");
 }
 
@@ -86,31 +86,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         if (!outputInfo)
             continue;
 
-        bool failed = false;
-
         Goals waitees;
-
-        for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
-            if (depId != id) {
-                if (auto localOutputInfo = worker.store.queryRealisation(depId);
-                    localOutputInfo && localOutputInfo->outPath != depPath) {
-                    warn(
-                        "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
-                        "Local:  %s\n"
-                        "Remote: %s",
-                        sub->config.getHumanReadableURI(),
-                        depId.to_string(),
-                        worker.store.printStorePath(localOutputInfo->outPath),
-                        worker.store.printStorePath(depPath));
-                    failed = true;
-                    break;
-                }
-                waitees.insert(worker.makeDrvOutputSubstitutionGoal(depId));
-            }
-        }
-
-        if (failed)
-            continue;
 
         waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
@@ -131,7 +107,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
     /* None left.  Terminate this goal and let someone else deal
        with it. */
-    debug("derivation output '%s' is required, but there is no substituter that can provide it", id.to_string());
+    debug(
+        "derivation output '%s' is required, but there is no substituter that can provide it", id.render(worker.store));
 
     if (substituterFailed) {
         worker.failedSubstitutions++;
@@ -146,7 +123,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
 std::string DrvOutputSubstitutionGoal::key()
 {
-    return "a$" + std::string(id.to_string());
+    return "a$" + std::string(id.render(worker.store));
 }
 
 void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
