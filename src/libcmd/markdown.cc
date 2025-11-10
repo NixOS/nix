@@ -45,7 +45,7 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
 #  endif
     };
 
-    if (!isTTY())
+    if (!shouldANSI())
         opts.oflags |= LOWDOWN_TERM_NOANSI;
 
     auto doc = lowdown_doc_new(&opts);

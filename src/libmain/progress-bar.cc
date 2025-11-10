@@ -608,7 +608,7 @@ public:
 
 std::unique_ptr<Logger> makeProgressBar()
 {
-    return std::make_unique<ProgressBar>(isTTY());
+    return std::make_unique<ProgressBar>(shouldANSI());
 }
 
 } // namespace nix
