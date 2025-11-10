@@ -23,7 +23,8 @@
         "allowedReferences": null,
         "allowedRequisites": null,
         "disallowedReferences": [
-          "/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g"
+          "/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g",
+          "dev"
         ],
         "disallowedRequisites": [
           "/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"
@@ -46,7 +47,8 @@
           "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"
         ],
         "allowedRequisites": [
-          "/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z"
+          "/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z",
+          "bin"
         ],
         "disallowedReferences": [],
         "disallowedRequisites": [],

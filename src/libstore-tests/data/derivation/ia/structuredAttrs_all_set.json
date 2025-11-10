@@ -23,7 +23,8 @@
         "allowedReferences": null,
         "allowedRequisites": null,
         "disallowedReferences": [
-          "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"
+          "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
+          "dev"
         ],
         "disallowedRequisites": [
           "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"
@@ -46,7 +47,8 @@
           "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"
         ],
         "allowedRequisites": [
-          "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"
+          "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
+          "bin"
         ],
         "disallowedReferences": [],
         "disallowedRequisites": [],

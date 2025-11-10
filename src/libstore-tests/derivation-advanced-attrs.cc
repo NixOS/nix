@@ -127,6 +127,21 @@ TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attribute
 
 #undef TEST_ATERM_JSON
 
+/**
+ * Since these are both repeated and sensative opaque values, it makes
+ * sense to give them names in this file.
+ */
+static std::string pathFoo = "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo",
+                   pathFooDev = "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
+                   pathBar = "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
+                   pathBarDev = "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev",
+                   pathBarDrvIA = "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv",
+                   pathBarDrvCA = "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+                   placeholderFoo = "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9",
+                   placeholderFooDev = "/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z",
+                   placeholderBar = "/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g",
+                   placeholderBarDev = "/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8";
+
 using ExportReferencesMap = decltype(DerivationOptions::exportReferencesGraph);
 
 static const DerivationOptions advancedAttributes_defaults = {
@@ -216,16 +231,16 @@ DerivationOptions advancedAttributes_ia = {
     .outputChecks =
         DerivationOptions::OutputChecks{
             .ignoreSelfRefs = true,
-            .allowedReferences = StringSet{"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
-            .disallowedReferences = StringSet{"/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"},
-            .allowedRequisites = StringSet{"/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"},
-            .disallowedRequisites = StringSet{"/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"},
+            .allowedReferences = StringSet{pathFoo},
+            .disallowedReferences = StringSet{pathBar, "dev"},
+            .allowedRequisites = StringSet{pathFooDev, "bin"},
+            .disallowedRequisites = StringSet{pathBarDev},
         },
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph{
-        {"refs1", {"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"}},
-        {"refs2", {"/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"}},
+        {"refs1", {pathFoo}},
+        {"refs2", {pathBarDrvIA}},
     },
     .additionalSandboxProfile = "sandcastle",
     .noChroot = true,
@@ -246,16 +261,16 @@ DerivationOptions advancedAttributes_ca = {
     .outputChecks =
         DerivationOptions::OutputChecks{
             .ignoreSelfRefs = true,
-            .allowedReferences = StringSet{"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"},
-            .disallowedReferences = StringSet{"/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g"},
-            .allowedRequisites = StringSet{"/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z"},
-            .disallowedRequisites = StringSet{"/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"},
+            .allowedReferences = StringSet{placeholderFoo},
+            .disallowedReferences = StringSet{placeholderBar, "dev"},
+            .allowedRequisites = StringSet{placeholderFooDev, "bin"},
+            .disallowedRequisites = StringSet{placeholderBarDev},
         },
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph{
-        {"refs1", {"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"}},
-        {"refs2", {"/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}},
+        {"refs1", {placeholderFoo}},
+        {"refs2", {pathBarDrvCA}},
     },
     .additionalSandboxProfile = "sandcastle",
     .noChroot = true,
@@ -375,13 +390,13 @@ DerivationOptions advancedAttributes_structuredAttrs_ia = {
         std::map<std::string, DerivationOptions::OutputChecks>{
             {"out",
              DerivationOptions::OutputChecks{
-                 .allowedReferences = StringSet{"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
-                 .allowedRequisites = StringSet{"/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"},
+                 .allowedReferences = StringSet{pathFoo},
+                 .allowedRequisites = StringSet{pathFooDev, "bin"},
              }},
             {"bin",
              DerivationOptions::OutputChecks{
-                 .disallowedReferences = StringSet{"/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"},
-                 .disallowedRequisites = StringSet{"/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"},
+                 .disallowedReferences = StringSet{pathBar, "dev"},
+                 .disallowedRequisites = StringSet{pathBarDev},
              }},
             {"dev",
              DerivationOptions::OutputChecks{
@@ -393,8 +408,8 @@ DerivationOptions advancedAttributes_structuredAttrs_ia = {
     .passAsFile = {},
     .exportReferencesGraph =
         {
-            {"refs1", {"/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"}},
-            {"refs2", {"/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"}},
+            {"refs1", {pathFoo}},
+            {"refs2", {pathBarDrvIA}},
         },
     .additionalSandboxProfile = "sandcastle",
     .noChroot = true,
@@ -417,13 +432,13 @@ DerivationOptions advancedAttributes_structuredAttrs_ca = {
         std::map<std::string, DerivationOptions::OutputChecks>{
             {"out",
              DerivationOptions::OutputChecks{
-                 .allowedReferences = StringSet{"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"},
-                 .allowedRequisites = StringSet{"/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z"},
+                 .allowedReferences = StringSet{placeholderFoo},
+                 .allowedRequisites = StringSet{placeholderFooDev, "bin"},
              }},
             {"bin",
              DerivationOptions::OutputChecks{
-                 .disallowedReferences = StringSet{"/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g"},
-                 .disallowedRequisites = StringSet{"/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"},
+                 .disallowedReferences = StringSet{placeholderBar, "dev"},
+                 .disallowedRequisites = StringSet{placeholderBarDev},
              }},
             {"dev",
              DerivationOptions::OutputChecks{
@@ -435,8 +450,8 @@ DerivationOptions advancedAttributes_structuredAttrs_ca = {
     .passAsFile = {},
     .exportReferencesGraph =
         {
-            {"refs1", {"/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"}},
-            {"refs2", {"/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}},
+            {"refs1", {placeholderFoo}},
+            {"refs2", {pathBarDrvCA}},
         },
     .additionalSandboxProfile = "sandcastle",
     .noChroot = true,
