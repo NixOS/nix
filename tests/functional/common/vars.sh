@@ -49,6 +49,9 @@ if ! isTestOnNixOS; then
   fi
   export _NIX_IN_TEST=$TEST_ROOT/shared
   export _NIX_TEST_NO_LSOF=1
+  # Suppress warnings that depend on the test environment (e.g., ulimit warnings)
+  # to avoid non-deterministic test failures in golden tests
+  export _NIX_TEST_NO_ENVIRONMENT_WARNINGS=1
   export NIX_REMOTE=${NIX_REMOTE_-}
 
 fi # ! isTestOnNixOS
