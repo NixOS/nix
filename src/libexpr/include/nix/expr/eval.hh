@@ -108,7 +108,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    const StringData * doc = nullptr;
 
     /**
      * Add a trace item, while calling the `<name>` builtin.
@@ -156,7 +156,7 @@ struct Constant
     /**
      * Optional free-form documentation about the constant.
      */
-    const char * doc = nullptr;
+    const StringData * doc = nullptr;
 
     /**
      * Whether the constant is impure, and not available in pure mode.
@@ -836,11 +836,7 @@ public:
         std::optional<std::string> name;
         size_t arity;
         std::vector<std::string> args;
-        /**
-         * Unlike the other `doc` fields in this file, this one should never be
-         * `null`.
-         */
-        const char * doc;
+        const StringData & doc;
     };
 
     /**

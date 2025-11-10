@@ -2,6 +2,7 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/filetransfer.hh"
@@ -234,7 +235,7 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
-    .doc = R"(
+    .doc = &R"(
       Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
       - the resulting fixed-output [store path](@docroot@/store/store-path.md)
@@ -456,7 +457,7 @@ static RegisterPrimOp primop_fetchTree({
       >   ```nix
       >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
       >   ```
-    )",
+    )"_sds,
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
 });
@@ -616,7 +617,7 @@ static void prim_fetchurl(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_fetchurl({
     .name = "__fetchurl",
     .args = {"arg"},
-    .doc = R"(
+    .doc = &R"(
       Download the specified URL and return the path of the downloaded file.
       `arg` can be either a string denoting the URL, or an attribute set with the following attributes:
 
@@ -630,7 +631,7 @@ static RegisterPrimOp primop_fetchurl({
         characters that are invalid for the store.
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
-    )",
+    )"_sds,
     .fun = prim_fetchurl,
 });
 
@@ -642,7 +643,7 @@ static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_fetchTarball({
     .name = "fetchTarball",
     .args = {"args"},
-    .doc = R"(
+    .doc = &R"(
       Download the specified URL, unpack it and return the path of the
       unpacked tree. The file must be a tape archive (`.tar`) compressed
       with `gzip`, `bzip2` or `xz`. If the tarball consists of a
@@ -680,7 +681,7 @@ static RegisterPrimOp primop_fetchTarball({
       ```
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
-    )",
+    )"_sds,
     .fun = prim_fetchTarball,
 });
 
@@ -693,7 +694,7 @@ static void prim_fetchGit(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_fetchGit({
     .name = "fetchGit",
     .args = {"args"},
-    .doc = R"(
+    .doc = &R"(
       Fetch a path from git. *args* can be a URL, in which case the HEAD
       of the repo at that URL is fetched. Otherwise, it can be an
       attribute with the following attributes (all except `url` optional):
@@ -896,7 +897,7 @@ static RegisterPrimOp primop_fetchGit({
       given, `fetchGit` uses the current content of the checked-out
       files, even if they are not committed or added to Git's index. It
       only considers files added to the Git repository, as listed by `git ls-files`.
-    )",
+    )"_sds,
     .fun = prim_fetchGit,
 });
 

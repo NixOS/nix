@@ -1,4 +1,5 @@
 #include "nix/expr/primops.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/make-content-addressed.hh"
@@ -216,7 +217,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_fetchClosure({
     .name = "__fetchClosure",
     .args = {"args"},
-    .doc = R"(
+    .doc = &R"(
       Fetch a store path [closure](@docroot@/glossary.md#gloss-closure) from a binary cache, and return the store path as a string with context.
 
       This function can be invoked in three ways that we will discuss in order of preference.
@@ -284,7 +285,7 @@ static RegisterPrimOp primop_fetchClosure({
       `fetchClosure` is similar to [`builtins.storePath`](#builtins-storePath) in that it allows you to use a previously built store path in a Nix expression.
       However, `fetchClosure` is more reproducible because it specifies a binary cache from which the path can be fetched.
       Also, using content-addressed store paths does not require users to configure [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys) to ensure their authenticity.
-    )",
+    )"_sds,
     .fun = prim_fetchClosure,
     .experimentalFeature = Xp::FetchClosure,
 });

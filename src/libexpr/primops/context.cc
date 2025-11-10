@@ -1,5 +1,6 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
@@ -17,9 +18,9 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
 static RegisterPrimOp primop_unsafeDiscardStringContext({
     .name = "__unsafeDiscardStringContext",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
         Discard the [string context](@docroot@/language/string-context.md) from a value that can be coerced to a string.
-    )",
+    )"_sds,
     .fun = prim_unsafeDiscardStringContext,
 });
 
@@ -33,7 +34,7 @@ static void prim_hasContext(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_hasContext(
     {.name = "__hasContext",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Return `true` if string *s* has a non-empty context.
       The context can be obtained with
       [`getContext`](#builtins-getContext).
@@ -50,7 +51,7 @@ static RegisterPrimOp primop_hasContext(
       > then throw "package name cannot contain string context"
       > else { ${name} = meta; }
       > ```
-    )",
+    )"_sds,
      .fun = prim_hasContext});
 
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -75,7 +76,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
 static RegisterPrimOp primop_unsafeDiscardOutputDependency(
     {.name = "__unsafeDiscardOutputDependency",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Create a copy of the given string where every
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element is turned into a
@@ -91,7 +92,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency(
       Replacing a constant string context element with a "derivation deep" element is a safe operation that just enlargens the string context without forgetting anything.
 
       [`builtins.addDrvOutputDependencies`]: #builtins-addDrvOutputDependencies
-    )",
+    )"_sds,
      .fun = prim_unsafeDiscardOutputDependency});
 
 static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -143,7 +144,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
 static RegisterPrimOp primop_addDrvOutputDependencies(
     {.name = "__addDrvOutputDependencies",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Create a copy of the given string where a single
       [constant](@docroot@/language/string-context.md#string-context-constant)
       string context element is turned into a
@@ -156,7 +157,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
       The latter is supported so this function is idempotent.
 
       This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-unsafeDiscardOutputDependency).
-    )",
+    )"_sds,
      .fun = prim_addDrvOutputDependencies});
 
 /* Extract the context of a string as a structured Nix value.
@@ -230,7 +231,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_getContext(
     {.name = "__getContext",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Return the string context of *s*.
 
       The string context tracks references to derivations within a string.
@@ -248,7 +249,7 @@ static RegisterPrimOp primop_getContext(
       ```
       { "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = { outputs = [ "out" ]; }; }
       ```
-    )",
+    )"_sds,
      .fun = prim_getContext});
 
 /* Append the given context to a given string.

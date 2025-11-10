@@ -19,6 +19,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/value.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/configuration.hh"
@@ -62,7 +63,7 @@ PrimOp getFlake(const Settings & settings)
     return PrimOp{
         .name = "__getFlake",
         .args = {"args"},
-        .doc = R"(
+        .doc = &R"(
           Fetch a flake from a flake reference, and return its output attributes and some metadata. For example:
 
           ```nix
@@ -76,7 +77,7 @@ PrimOp getFlake(const Settings & settings)
           ```nix
           (builtins.getFlake "github:edolstra/dwarffs").rev
           ```
-        )",
+        )"_sds,
         .fun = prim_getFlake,
         .experimentalFeature = Xp::Flakes,
     };
@@ -104,7 +105,7 @@ static void prim_parseFlakeRef(EvalState & state, const PosIdx pos, Value ** arg
 nix::PrimOp parseFlakeRef({
     .name = "__parseFlakeRef",
     .args = {"flake-ref"},
-    .doc = R"(
+    .doc = &R"(
       Parse a flake reference, and return its exploded form.
 
       For example:
@@ -118,7 +119,7 @@ nix::PrimOp parseFlakeRef({
       ```nix
       { dir = "lib"; owner = "NixOS"; ref = "23.05"; repo = "nixpkgs"; type = "github"; }
       ```
-    )",
+    )"_sds,
     .fun = prim_parseFlakeRef,
     .experimentalFeature = Xp::Flakes,
 });
@@ -162,7 +163,7 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** 
 nix::PrimOp flakeRefToString({
     .name = "__flakeRefToString",
     .args = {"attrs"},
-    .doc = R"(
+    .doc = &R"(
       Convert a flake reference from attribute set format to URL format.
 
       For example:
@@ -178,7 +179,7 @@ nix::PrimOp flakeRefToString({
       ```nix
       "github:NixOS/nixpkgs/23.05?dir=lib"
       ```
-    )",
+    )"_sds,
     .fun = prim_flakeRefToString,
     .experimentalFeature = Xp::Flakes,
 });
