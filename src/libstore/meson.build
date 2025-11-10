@@ -267,6 +267,7 @@ sources = files(
   'build/derivation-trampoline-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
+  'build/find-cycles.cc',
   'build/goal.cc',
   'build/substitution-goal.cc',
   'build/worker.cc',

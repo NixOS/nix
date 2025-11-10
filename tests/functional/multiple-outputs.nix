@@ -83,6 +83,8 @@ rec {
     '';
   };
 
+  # Test for cycle detection with detailed error messages
+  # This creates multiple cycles: a→b→c→a and a→c→b→a
   cyclic =
     (mkDerivation {
       name = "cyclic-outputs";
@@ -92,10 +94,22 @@ rec {
         "c"
       ];
       builder = builtins.toFile "builder.sh" ''
-        mkdir $a $b $c
-        echo $a > $b/foo
-        echo $b > $c/bar
-        echo $c > $a/baz
+        mkdir -p $a/subdir $b/subdir $c/subdir
+
+        # First cycle: a → b → c → a
+        echo "$b/subdir/b-to-c" > $a/subdir/a-to-b
+        echo "$c/subdir/c-to-a" > $b/subdir/b-to-c
+        echo "$a/subdir/a-to-b" > $c/subdir/c-to-a
+
+        # Second cycle: a → c → b → a
+        echo "$c/subdir/c-to-b-2" > $a/subdir/a-to-c-2
+        echo "$b/subdir/b-to-a-2" > $c/subdir/c-to-b-2
+        echo "$a/subdir/a-to-c-2" > $b/subdir/b-to-a-2
+
+        # Non-cyclic reference (just for complexity)
+        echo "non-cyclic-data" > $a/data
+        echo "non-cyclic-data" > $b/data
+        echo "non-cyclic-data" > $c/data
       '';
     }).a;
 

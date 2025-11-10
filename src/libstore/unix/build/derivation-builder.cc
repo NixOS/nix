@@ -45,6 +45,7 @@
 
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
+#include "nix/store/build/find-cycles.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -1473,43 +1474,100 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto sortedOutputNames = topoSort(
-        outputsToSort,
-        {[&](const std::string & name) {
-            auto orifu = get(outputReferencesIfUnregistered, name);
-            if (!orifu)
-                throw BuildError(
-                    BuildResult::Failure::OutputRejected,
-                    "no output reference for '%s' in build of '%s'",
-                    name,
-                    store.printStorePath(drvPath));
-            return std::visit(
-                overloaded{
-                    /* Since we'll use the already installed versions of these, we
-                       can treat them as leaves and ignore any references they
-                       have. */
-                    [&](const AlreadyRegistered &) { return StringSet{}; },
-                    [&](const PerhapsNeedToRegister & refs) {
-                        StringSet referencedOutputs;
-                        /* FIXME build inverted map up front so no quadratic waste here */
-                        for (auto & r : refs.refs)
-                            for (auto & [o, p] : scratchOutputs)
-                                if (r == p)
-                                    referencedOutputs.insert(o);
-                        return referencedOutputs;
+    std::vector<std::string> sortedOutputNames;
+
+    try {
+        sortedOutputNames = topoSort(
+            outputsToSort,
+            {[&](const std::string & name) {
+                auto orifu = get(outputReferencesIfUnregistered, name);
+                if (!orifu)
+                    throw BuildError(
+                        BuildResult::Failure::OutputRejected,
+                        "no output reference for '%s' in build of '%s'",
+                        name,
+                        store.printStorePath(drvPath));
+                return std::visit(
+                    overloaded{
+                        /* Since we'll use the already installed versions of these, we
+                           can treat them as leaves and ignore any references they
+                           have. */
+                        [&](const AlreadyRegistered &) { return StringSet{}; },
+                        [&](const PerhapsNeedToRegister & refs) {
+                            StringSet referencedOutputs;
+                            /* FIXME build inverted map up front so no quadratic waste here */
+                            for (auto & r : refs.refs)
+                                for (auto & [o, p] : scratchOutputs)
+                                    if (r == p)
+                                        referencedOutputs.insert(o);
+                            return referencedOutputs;
+                        },
                     },
-                },
-                *orifu);
-        }},
-        {[&](const std::string & path, const std::string & parent) {
-            // TODO with more -vvvv also show the temporary paths for manual inspection.
-            return BuildError(
-                BuildResult::Failure::OutputRejected,
-                "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
-                store.printStorePath(drvPath),
-                path,
-                parent);
-        }});
+                    *orifu);
+            }},
+            {[&](const std::string & path, const std::string & parent) {
+                // TODO with more -vvvv also show the temporary paths for manual inspection.
+                return BuildError(
+                    BuildResult::Failure::OutputRejected,
+                    "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
+                    store.printStorePath(drvPath),
+                    path,
+                    parent);
+            }});
+    } catch (std::exception & e) {
+        debug("cycle detected during topoSort, analyzing for detailed error report");
+
+        // Scan all outputs for cycle edges with exact file paths
+        StoreCycleEdgeVec edges;
+        for (auto & [outputName, _] : drv.outputs) {
+            auto scratchOutput = get(scratchOutputs, outputName);
+            if (!scratchOutput)
+                continue;
+
+            auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
+            debug("scanning output '%s' at path '%s' for cycle edges", outputName, actualPath);
+
+            scanForCycleEdges(actualPath, referenceablePaths, edges);
+        }
+
+        if (edges.empty()) {
+            debug("no detailed cycle edges found, re-throwing original error");
+            throw;
+        }
+
+        debug("found %lu cycle edges, transforming to connected paths", edges.size());
+
+        // Transform individual edges into connected multi-edges (paths)
+        StoreCycleEdgeVec multiedges;
+        transformEdgesToMultiedges(edges, multiedges);
+
+        // Build detailed error message
+        std::string cycleDetails = fmt("Detailed cycle analysis found %d cycle path(s):", multiedges.size());
+
+        for (size_t i = 0; i < multiedges.size(); i++) {
+            auto & multiedge = multiedges[i];
+            cycleDetails += fmt("\n\nCycle %d:", i + 1);
+            for (auto & file : multiedge) {
+                cycleDetails += fmt("\n  → %s", file);
+            }
+        }
+
+        cycleDetails +=
+            fmt("\n\nThis means there are circular references between output files.\n"
+                "The build cannot proceed because the outputs reference each other.");
+
+        // Add hint with temp paths for debugging
+        if (settings.keepFailed || verbosity >= lvlDebug) {
+            cycleDetails +=
+                fmt("\n\nNote: Build outputs are kept for inspection.\n"
+                    "You can examine the files listed above to understand the cycle.");
+        }
+
+        // Throw new error with original message + cycle details
+        BuildError * buildErr = dynamic_cast<BuildError *>(&e);
+        std::string originalMsg = buildErr ? std::string(buildErr->msg()) : std::string(e.what());
+        throw BuildError(BuildResult::Failure::OutputRejected, "%s\n\n%s", originalMsg, cycleDetails);
+    }
 
     std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
 
@@ -1848,12 +1906,61 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     /* Register each output path as valid, and register the sets of
        paths referenced by each of them.  If there are cycles in the
        outputs, this will fail. */
-    {
+    try {
         ValidPathInfos infos2;
         for (auto & [outputName, newInfo] : infos) {
             infos2.insert_or_assign(newInfo.path, newInfo);
         }
         store.registerValidPaths(infos2);
+    } catch (BuildError & e) {
+        debug("cycle detected during registerValidPaths, analyzing for detailed error report");
+
+        // Scan all outputs for cycle edges with exact file paths
+        StoreCycleEdgeVec edges;
+        for (auto & [outputName, newInfo] : infos) {
+            auto actualPath = store.toRealPath(store.printStorePath(newInfo.path));
+            debug("scanning registered output '%s' at path '%s' for cycle edges", outputName, actualPath);
+
+            scanForCycleEdges(actualPath, referenceablePaths, edges);
+        }
+
+        if (edges.empty()) {
+            debug("no detailed cycle edges found, re-throwing original error");
+            throw;
+        }
+
+        debug("found %lu cycle edges, transforming to connected paths", edges.size());
+
+        // Transform individual edges into connected multi-edges (paths)
+        StoreCycleEdgeVec multiedges;
+        transformEdgesToMultiedges(edges, multiedges);
+
+        // Build detailed error message
+        std::string cycleDetails = fmt("Detailed cycle analysis found %d cycle path(s):", multiedges.size());
+
+        for (size_t i = 0; i < multiedges.size(); i++) {
+            auto & multiedge = multiedges[i];
+            cycleDetails += fmt("\n\nCycle %d:", i + 1);
+            for (auto & file : multiedge) {
+                cycleDetails += fmt("\n  → %s", file);
+            }
+        }
+
+        cycleDetails +=
+            fmt("\n\nThis means there are circular references between output files.\n"
+                "The build cannot proceed because the outputs reference each other.");
+
+        // Add hint with temp paths for debugging
+        if (settings.keepFailed || verbosity >= lvlDebug) {
+            cycleDetails +=
+                fmt("\n\nNote: Build outputs were kept for inspection.\n"
+                    "You can examine the files listed above to understand the cycle.");
+        }
+
+        // Throw new error with original message + cycle details
+        BuildError * buildErr = dynamic_cast<BuildError *>(&e);
+        std::string originalMsg = buildErr ? std::string(buildErr->msg()) : std::string(e.what());
+        throw BuildError(BuildResult::Failure::OutputRejected, "%s\n\n%s", originalMsg, cycleDetails);
     }
 
     /* If we made it this far, we are sure the output matches the
