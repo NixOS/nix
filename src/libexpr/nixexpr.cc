@@ -401,6 +401,15 @@ ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const Static
 
 void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
+    // Move storage into the Exprs arena
+    {
+        auto arena = es.mem.exprs.alloc.resource();
+        attrs = {std::move(attrs), arena};
+        dynamicAttrs = {std::move(dynamicAttrs), arena};
+        if (inheritFromExprs)
+            inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>(std::move(*inheritFromExprs), arena);
+    }
+
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
