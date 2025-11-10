@@ -65,7 +65,7 @@ struct PathInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) const override
+    ParsedURL toURL(const Input & input, bool abbreviate) const override
     {
         auto query = attrsToQuery(input.attrs);
         query.erase("path");

@@ -309,7 +309,7 @@ struct CurlInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) const override
+    ParsedURL toURL(const Input & input, bool abbreviate) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         // NAR hashes are preferred over file hashes since tar/zip
@@ -355,7 +355,7 @@ struct FileInputScheme : CurlInputScheme
 
         auto accessor = ref{store->getFSAccessor(file.storePath)};
 
-        accessor->setPathDisplay("«" + input.to_string() + "»");
+        accessor->setPathDisplay("«" + input.to_string(true) + "»");
 
         return {accessor, input};
     }
@@ -382,7 +382,7 @@ struct TarballInputScheme : CurlInputScheme
         auto input(_input);
 
         auto result =
-            downloadTarball_(*input.settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
+            downloadTarball_(*input.settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string(true) + "»");
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*input.settings, *result.immutableUrl);

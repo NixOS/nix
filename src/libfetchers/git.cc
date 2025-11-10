@@ -240,15 +240,17 @@ struct GitInputScheme : InputScheme
         return input;
     }
 
-    ParsedURL toURL(const Input & input) const override
+    ParsedURL toURL(const Input & input, bool abbreviate) const override
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme != "git")
             url.scheme = "git+" + url.scheme;
         if (auto rev = input.getRev())
             url.query.insert_or_assign("rev", rev->gitRev());
-        if (auto ref = input.getRef())
-            url.query.insert_or_assign("ref", *ref);
+        if (auto ref = input.getRef()) {
+            if (!abbreviate || (*ref != "master" && *ref != "main"))
+                url.query.insert_or_assign("ref", *ref);
+        }
         if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
         if (getLfsAttr(input))
@@ -746,7 +748,7 @@ struct GitInputScheme : InputScheme
 
         bool exportIgnore = getExportIgnoreAttr(input);
         bool smudgeLfs = getLfsAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»", smudgeLfs);
+        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string(true) + "»", smudgeLfs);
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
@@ -783,7 +785,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("allRefs", Explicit<bool>{true});
                 auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
-                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string(true) + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
 
@@ -833,7 +835,7 @@ struct GitInputScheme : InputScheme
 
                 auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
                 auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
-                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
+                submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string(true) + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
                    well. */
