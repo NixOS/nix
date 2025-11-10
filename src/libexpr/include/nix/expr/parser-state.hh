@@ -96,8 +96,7 @@ struct ParserState
         ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
     void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
-    Expr *
-    stripIndentation(const PosIdx pos, const std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> & es);
+    Expr * stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es);
     PosIdx at(const ParserLocation & loc);
 };
 
@@ -239,8 +238,8 @@ inline void ParserState::validateFormals(FormalsBuilder & formals, PosIdx pos, S
             {.msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]), .pos = positions[pos]});
 }
 
-inline Expr * ParserState::stripIndentation(
-    const PosIdx pos, const std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> & es)
+inline Expr *
+ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es)
 {
     if (es.empty())
         return exprs.add<ExprString>(""_sds);

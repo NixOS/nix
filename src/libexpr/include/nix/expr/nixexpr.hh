@@ -289,7 +289,7 @@ struct ExprSelect : Expr
         std::pmr::polymorphic_allocator<char> & alloc,
         const PosIdx & pos,
         Expr * e,
-        const std::span<const AttrName> & attrPath,
+        std::span<const AttrName> attrPath,
         Expr * def)
         : pos(pos)
         , nAttrPath(attrPath.size())
@@ -339,7 +339,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, const std::vector<AttrName> & attrPath)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::span<AttrName> attrPath)
         : e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
@@ -433,7 +433,7 @@ struct ExprList : Expr
 {
     std::span<Expr *> elems;
 
-    ExprList(std::pmr::polymorphic_allocator<char> & alloc, const std::vector<Expr *> & exprs)
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::span<Expr *> exprs)
         : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
     {
         std::ranges::copy(exprs, elems.begin());
@@ -753,7 +753,19 @@ struct ExprConcatStrings : Expr
         std::pmr::polymorphic_allocator<char> & alloc,
         const PosIdx & pos,
         bool forceString,
-        const std::vector<std::pair<PosIdx, Expr *>> & es)
+        std::span<std::pair<PosIdx, Expr *>> es)
+        : pos(pos)
+        , forceString(forceString)
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
         : pos(pos)
         , forceString(forceString)
         , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
@@ -833,7 +845,19 @@ public:
     add(std::pmr::polymorphic_allocator<char> & alloc,
         const PosIdx & pos,
         bool forceString,
-        const std::vector<std::pair<PosIdx, Expr *>> & es)
+        std::span<std::pair<PosIdx, Expr *>> es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
         requires(std::same_as<C, ExprConcatStrings>)
     {
         return alloc.new_object<C>(alloc, pos, forceString, es);
