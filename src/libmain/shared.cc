@@ -9,6 +9,7 @@
 #include "nix/main/loggers.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/terminal.hh"
 
 #include <algorithm>
 #include <iostream>
@@ -372,7 +373,7 @@ void printVersion(const std::string & programName)
 
 RunPager::RunPager()
 {
-    if (!isatty(STDOUT_FILENO))
+    if (!isOutputARealTerminal(StandardOutputStream::Stdout))
         return;
     char * pager = getenv("NIX_PAGER");
     if (!pager)

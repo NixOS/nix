@@ -3,6 +3,7 @@
 
 #include "nix/util/args.hh"
 #include "nix/util/repair-flag.hh"
+#include "nix/util/terminal.hh"
 
 namespace nix {
 
@@ -43,7 +44,7 @@ struct MixDryRun : virtual Args
  */
 struct MixPrintJSON : virtual Args
 {
-    bool outputPretty = isatty(STDOUT_FILENO);
+    bool outputPretty = shouldANSI(StandardOutputStream::Stdout);
 
     MixPrintJSON()
     {
