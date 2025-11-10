@@ -4,8 +4,8 @@
     "deriver": null,
     "narHash": {
       "algorithm": "sha256",
-      "format": "base64",
-      "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      "format": "base16",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "narSize": 34878,
     "references": [],
@@ -19,8 +19,8 @@
     "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
     "narHash": {
       "algorithm": "sha256",
-      "format": "base64",
-      "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      "format": "base16",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
     },
     "narSize": 34878,
     "references": [

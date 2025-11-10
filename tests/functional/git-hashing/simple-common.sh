@@ -49,12 +49,12 @@ try2 () {
 
     nix path-info --json "$path" | jq -e \
         --arg algo "$hashAlgo" \
-        --arg hash "$(nix hash convert --to base64 "$hashAlgo:$hashFromGit")" \
+        --arg hash "$hashFromGit" \
         '.[].ca == {
             method: "git",
             hash: {
                 algorithm: $algo,
-                format: "base64",
+                format: "base16",
                 hash: $hash
             },
         }'
