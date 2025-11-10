@@ -96,7 +96,7 @@ struct ParserState
         ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
     void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
-    Expr * stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
+    Expr * stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es);
     PosIdx at(const ParserLocation & loc);
 };
 
@@ -239,7 +239,7 @@ inline void ParserState::validateFormals(FormalsBuilder & formals, PosIdx pos, S
 }
 
 inline Expr *
-ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
+ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es)
 {
     if (es.empty())
         return exprs.add<ExprString>(""_sds);
@@ -343,7 +343,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
         auto * const result = (es2)[0].second;
         return result;
     }
-    return exprs.add<ExprConcatStrings>(exprs.alloc, pos, true, std::move(es2));
+    return exprs.add<ExprConcatStrings>(exprs.alloc, pos, true, es2);
 }
 
 inline PosIdx LexerState::at(const ParserLocation & loc)
