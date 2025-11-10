@@ -362,7 +362,7 @@ struct CmdFlakeCheck : FlakeCommand
                 throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreExceptionExceptInterrupt();
+                    logError(e.info());
                     hasErrors = true;
                 } else
                     throw;
@@ -418,7 +418,7 @@ struct CmdFlakeCheck : FlakeCommand
             return std::nullopt;
         };
 
-        std::vector<DerivedPath> drvPaths;
+        std::map<DerivedPath, std::vector<AttrPath>> attrPathsByDrv;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -616,7 +616,13 @@ struct CmdFlakeCheck : FlakeCommand
                                             .drvPath = makeConstantStorePathRef(*drvPath),
                                             .outputs = OutputsSpec::All{},
                                         };
-                                        drvPaths.push_back(std::move(path));
+
+                                        // Build and store the attribute path for error reporting
+                                        AttrPath attrPath;
+                                        attrPath.push_back(AttrName(state->symbols.create(name)));
+                                        attrPath.push_back(AttrName(attr.name));
+                                        attrPath.push_back(AttrName(attr2.name));
+                                        attrPathsByDrv[path].push_back(std::move(attrPath));
                                     }
                                 }
                             }
@@ -780,7 +786,9 @@ struct CmdFlakeCheck : FlakeCommand
             });
         }
 
-        if (build && !drvPaths.empty()) {
+        if (build && !attrPathsByDrv.empty()) {
+            auto keys = std::views::keys(attrPathsByDrv);
+            std::vector<DerivedPath> drvPaths(keys.begin(), keys.end());
             // TODO: This filtering of substitutable paths is a temporary workaround until
             // https://github.com/NixOS/nix/issues/5025 (union stores) is implemented.
             //
@@ -804,7 +812,28 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            store->buildPaths(toBuild);
+            auto results = store->buildPathsWithResults(toBuild);
+
+            // Report build failures with attribute paths
+            for (auto & result : results) {
+                if (auto * failure = result.tryGetFailure()) {
+                    auto it = attrPathsByDrv.find(result.path);
+                    if (it != attrPathsByDrv.end() && !it->second.empty()) {
+                        for (auto & attrPath : it->second) {
+                            auto attrPathStr = showAttrPath(state->symbols, attrPath);
+                            reportError(Error(
+                                "failed to build attribute '%s', build of '%s' failed: %s",
+                                attrPathStr,
+                                result.path.to_string(*store),
+                                failure->errorMsg));
+                        }
+                    } else {
+                        // Derivation has no attribute path (e.g., a build dependency)
+                        reportError(
+                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->errorMsg));
+                    }
+                }
+            }
         }
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
