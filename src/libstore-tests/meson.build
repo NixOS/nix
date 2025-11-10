@@ -57,6 +57,7 @@ sources = files(
   'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
+  'dependency-graph.cc',
   'derivation-advanced-attrs.cc',
   'derivation.cc',
   'derived-path.cc',
