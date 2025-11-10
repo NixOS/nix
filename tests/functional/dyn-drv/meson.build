@@ -5,9 +5,9 @@ configure_file(
 )
 
 suites += {
-  'name': 'dyn-drv',
-  'deps': [],
-  'tests': [
+  'name' : 'dyn-drv',
+  'deps' : [],
+  'tests' : [
     'text-hashed-output.sh',
     'recursive-mod-json.sh',
     'build-built-drv.sh',
@@ -17,5 +17,5 @@ suites += {
     'old-daemon-error-hack.sh',
     'dep-built-drv-2.sh',
   ],
-  'workdir': meson.current_source_dir(),
+  'workdir' : meson.current_source_dir(),
 }

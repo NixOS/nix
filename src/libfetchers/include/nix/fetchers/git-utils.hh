@@ -157,4 +157,14 @@ struct Setter
     }
 };
 
+/**
+ * Checks that the string can be a valid git reference, branch or tag name.
+ * Accepts shorthand references (one-level refnames are allowed), pseudorefs
+ * like `HEAD`.
+ *
+ * @note This is a coarse test to make sure that the refname is at least something
+ * that Git can make sense of.
+ */
+bool isLegalRefName(const std::string & refName);
+
 } // namespace nix

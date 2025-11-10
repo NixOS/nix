@@ -92,7 +92,7 @@ bool EvalSettings::isPseudoUrl(std::string_view s)
 std::string EvalSettings::resolvePseudoUrl(std::string_view url)
 {
     if (hasPrefix(url, "channel:"))
-        return "https://nixos.org/channels/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
+        return "https://channels.nixos.org/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
     else
         return std::string(url);
 }

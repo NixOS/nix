@@ -25,7 +25,7 @@ public:
         CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
             T got = ({
                 StringSource from{encoded};
-                CommonProto::Serialise<T>::read(*store, CommonProto::ReadConn{.from = from});
+                CommonProto::Serialise<T>::read(store, CommonProto::ReadConn{.from = from});
             });
 
             ASSERT_EQ(got, expected);
@@ -40,7 +40,7 @@ public:
     {
         CharacterizationTest::writeTest(testStem, [&]() -> std::string {
             StringSink to;
-            CommonProto::Serialise<T>::write(*store, CommonProto::WriteConn{.to = to}, decoded);
+            CommonProto::Serialise<T>::write(store, CommonProto::WriteConn{.to = to}, decoded);
             return to.s;
         });
     }
@@ -112,32 +112,49 @@ CHARACTERIZATION_TEST(
     "realisation",
     (std::tuple<Realisation, Realisation>{
         Realisation{
-            .id =
-                DrvOutput{
-                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                    .outputName = "baz",
-                },
-            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-            .signatures = {"asdf", "qwer"},
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
         },
         Realisation{
-            .id =
-                {
-                    .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-                    .outputName = "baz",
-                },
-            .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-            .signatures = {"asdf", "qwer"},
-            .dependentRealisations =
-                {
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
+        },
+    }))
+
+CHARACTERIZATION_TEST(
+    realisation_with_deps,
+    "realisation-with-deps",
+    (std::tuple<Realisation>{
+        Realisation{
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+                .dependentRealisations =
                     {
-                        DrvOutput{
-                            .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                            .outputName = "quux",
+                        {
+                            DrvOutput{
+                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
+                                .outputName = "quux",
+                            },
+                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                         },
-                        StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                     },
-                },
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
         },
     }))
 

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 function _complete_nix {
     local -a words
     local cword cur

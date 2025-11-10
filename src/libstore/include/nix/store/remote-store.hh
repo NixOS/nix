@@ -16,6 +16,7 @@ struct FdSink;
 struct FdSource;
 template<typename T>
 class Pool;
+class RemoteFSAccessor;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
@@ -101,7 +102,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
@@ -176,9 +177,17 @@ protected:
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 
+    virtual std::shared_ptr<SourceAccessor>
+    getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
+
     virtual void narFromPath(const StorePath & path, Sink & sink) override;
 
 private:
+
+    /**
+     * Same as the default implemenation of `RemoteStore::getFSAccessor`, but with a more preceise return type.
+     */
+    ref<RemoteFSAccessor> getRemoteFSAccessor(bool requireValidPath = true);
 
     std::atomic_bool failed{false};
 

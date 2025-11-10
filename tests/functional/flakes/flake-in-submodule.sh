@@ -62,8 +62,8 @@ flakeref=git+file://$rootRepo\?submodules=1\&dir=submodule
 # Check that dirtying a submodule makes the entire thing dirty.
 [[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) != null ]]
 echo '"foo"' > "$rootRepo"/submodule/sub.nix
-[[ $(nix eval --json "$flakeref#sub" ) = '"foo"' ]]
-[[ $(nix flake metadata --json "$flakeref" | jq -r .locked.rev) = null ]]
+[[ $(_NIX_TEST_BARF_ON_UNCACHEABLE='' nix eval --json "$flakeref#sub" ) = '"foo"' ]]
+[[ $(_NIX_TEST_BARF_ON_UNCACHEABLE='' nix flake metadata --json "$flakeref" | jq -r .locked.rev) = null ]]
 
 # Test that `nix flake metadata` parses `submodule` correctly.
 cat > "$rootRepo"/flake.nix <<EOF
@@ -75,7 +75,7 @@ EOF
 git -C "$rootRepo" add flake.nix
 git -C "$rootRepo" commit -m "Add flake.nix"
 
-storePath=$(nix flake prefetch --json "$rootRepo?submodules=1" | jq -r .storePath)
+storePath=$(_NIX_TEST_BARF_ON_UNCACHEABLE='' nix flake prefetch --json "$rootRepo?submodules=1" | jq -r .storePath)
 [[ -e "$storePath/submodule" ]]
 
 # Test the use of inputs.self.

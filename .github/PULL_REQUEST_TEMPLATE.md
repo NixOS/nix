@@ -15,6 +15,10 @@ so you understand the process and the expectations.
 - volunteering contributions effectively
 - how to get help and our review process.
 
+PR stuck in review? We have two Nix team meetings per week online that are open for everyone in a jitsi conference:
+
+- https://calendar.google.com/calendar/u/0/embed?src=b9o52fobqjak8oq8lfkhg3t0qg@group.calendar.google.com
+
 -->
 
 ## Motivation

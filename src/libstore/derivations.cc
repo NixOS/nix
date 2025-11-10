@@ -11,9 +11,12 @@
 #include "nix/util/json-utils.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
 namespace nix {
+
+using namespace std::literals::string_view_literals;
 
 std::optional<StorePath>
 DerivationOutput::path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
@@ -102,7 +105,7 @@ bool BasicDerivation::isBuiltin() const
     return builder.substr(0, 8) == "builtin:";
 }
 
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+static auto infoForDerivation(Store & store, const Derivation & drv)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs.map)
@@ -112,23 +115,44 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
        held during a garbage collection). */
     auto suffix = std::string(drv.name) + drvExtension;
     auto contents = drv.unparse(store, false);
-    return readOnly || settings.readOnlyMode ? store.makeFixedOutputPathFromCA(
-                                                   suffix,
-                                                   TextInfo{
-                                                       .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                       .references = std::move(references),
-                                                   })
-                                             : ({
-                                                   StringSource s{contents};
-                                                   store.addToStoreFromDump(
-                                                       s,
-                                                       suffix,
-                                                       FileSerialisationMethod::Flat,
-                                                       ContentAddressMethod::Raw::Text,
-                                                       HashAlgorithm::SHA256,
-                                                       references,
-                                                       repair);
-                                               });
+    auto hash = hashString(HashAlgorithm::SHA256, contents);
+    auto ca = TextInfo{.hash = hash, .references = references};
+    return std::tuple{
+        suffix,
+        contents,
+        references,
+        store.makeFixedOutputPathFromCA(suffix, ca),
+    };
+}
+
+StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+{
+    if (readOnly || settings.readOnlyMode) {
+        auto [_x, _y, _z, path] = infoForDerivation(store, drv);
+        return path;
+    } else
+        return store.writeDerivation(drv, repair);
+}
+
+StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
+{
+    auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
+
+    if (isValidPath(path) && !repair)
+        return path;
+
+    StringSource s{contents};
+    auto path2 = addToStoreFromDump(
+        s,
+        suffix,
+        FileSerialisationMethod::Flat,
+        ContentAddressMethod::Raw::Text,
+        HashAlgorithm::SHA256,
+        references,
+        repair);
+    assert(path2 == path);
+
+    return path;
 }
 
 namespace {
@@ -183,36 +207,60 @@ static void expect(StringViewStream & str, std::string_view s)
     str.remaining.remove_prefix(s.size());
 }
 
+static void expect(StringViewStream & str, char c)
+{
+    if (str.remaining.empty() || str.remaining[0] != c)
+        throw FormatError("expected string '%1%'", c);
+    str.remaining.remove_prefix(1);
+}
+
 /* Read a C-style string from stream `str'. */
 static BackedStringView parseString(StringViewStream & str)
 {
-    expect(str, "\"");
-    auto c = str.remaining.begin(), end = str.remaining.end();
-    bool escaped = false;
-    for (; c != end && *c != '"'; c++) {
-        if (*c == '\\') {
-            c++;
-            if (c == end)
-                throw FormatError("unterminated string in derivation");
-            escaped = true;
+    expect(str, '"');
+    size_t start = 0;
+    size_t end = str.remaining.size();
+    const auto data = str.remaining.data();
+    while (start < end) {
+        auto idx = str.remaining.find('"', start);
+        if (idx == std::string_view::npos) {
+            break;
         }
+        size_t pos = idx;
+        for (; pos > 0 && data[pos - 1] == '\\'; pos--)
+            ;
+        if ((idx - pos) % 2 == 0) { // even number of backslashes
+            end = idx;
+            break;
+        }
+        start = idx + 1;
     }
 
-    const auto contentLen = c - str.remaining.begin();
-    const auto content = str.remaining.substr(0, contentLen);
-    str.remaining.remove_prefix(contentLen + 1);
+    start = 0;
+    const auto content = str.remaining.substr(start, end);
+    str.remaining.remove_prefix(end + 1);
 
-    if (!escaped)
+    auto nextBackslash = content.find('\\', start);
+    if (nextBackslash == std::string_view::npos) {
         return content;
+    }
 
     std::string res;
-    res.reserve(content.size());
-    for (c = content.begin(), end = content.end(); c != end; c++)
-        if (*c == '\\') {
-            c++;
-            res += escapes[*c];
-        } else
-            res += *c;
+    res.reserve(end);
+    do {
+        if (nextBackslash == end - 1) {
+            throw FormatError("unterminated string in derivation");
+        }
+        if (nextBackslash > start) {
+            res.append(&data[start], nextBackslash - start);
+        }
+        res.push_back(escapes[data[nextBackslash + 1]]);
+        start = nextBackslash + 2;
+        nextBackslash = content.find('\\', start);
+    } while (nextBackslash != std::string_view::npos);
+    if (end > start) {
+        res.append(&data[start], end - start);
+    }
     return res;
 }
 
@@ -245,7 +293,7 @@ static bool endOfList(StringViewStream & str)
 static StringSet parseStrings(StringViewStream & str, bool arePaths)
 {
     StringSet res;
-    expect(str, "[");
+    expect(str, '[');
     while (!endOfList(str))
         res.insert((arePaths ? parsePath(str) : parseString(str)).toOwned());
     return res;
@@ -258,20 +306,20 @@ static DerivationOutput parseDerivationOutput(
     std::string_view hashS,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    if (hashAlgoStr != "") {
+    if (!hashAlgoStr.empty()) {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output");
         const auto hashAlgo = parseHashAlgo(hashAlgoStr);
-        if (hashS == "impure") {
+        if (hashS == "impure"sv) {
             xpSettings.require(Xp::ImpureDerivations);
-            if (pathS != "")
+            if (!pathS.empty())
                 throw FormatError("impure derivation output should not specify output path");
             return DerivationOutput::Impure{
                 .method = std::move(method),
                 .hashAlgo = std::move(hashAlgo),
             };
-        } else if (hashS != "") {
+        } else if (!hashS.empty()) {
             validatePath(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
             return DerivationOutput::CAFixed{
@@ -283,7 +331,7 @@ static DerivationOutput parseDerivationOutput(
             };
         } else {
             xpSettings.require(Xp::CaDerivations);
-            if (pathS != "")
+            if (!pathS.empty())
                 throw FormatError("content-addressing derivation output should not specify output path");
             return DerivationOutput::CAFloating{
                 .method = std::move(method),
@@ -291,7 +339,7 @@ static DerivationOutput parseDerivationOutput(
             };
         }
     } else {
-        if (pathS == "") {
+        if (pathS.empty()) {
             return DerivationOutput::Deferred{};
         }
         validatePath(pathS);
@@ -306,13 +354,13 @@ static DerivationOutput parseDerivationOutput(
     StringViewStream & str,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
-    expect(str, ",");
+    expect(str, ',');
     const auto pathS = parseString(str);
-    expect(str, ",");
+    expect(str, ',');
     const auto hashAlgo = parseString(str);
-    expect(str, ",");
+    expect(str, ',');
     const auto hash = parseString(str);
-    expect(str, ")");
+    expect(str, ')');
 
     return parseDerivationOutput(store, *pathS, *hashAlgo, *hash, xpSettings);
 }
@@ -353,17 +401,17 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, De
             parseNonDynamic();
             break;
         case '(':
-            expect(str, "(");
+            expect(str, '(');
             node.value = parseStrings(str, false);
-            expect(str, ",[");
+            expect(str, ",["sv);
             while (!endOfList(str)) {
-                expect(str, "(");
+                expect(str, '(');
                 auto outputName = parseString(str).toOwned();
-                expect(str, ",");
+                expect(str, ',');
                 node.childMap.insert_or_assign(outputName, parseDerivedPathMapNode(store, str, version));
-                expect(str, ")");
+                expect(str, ')');
             }
-            expect(str, ")");
+            expect(str, ')');
             break;
         default:
             throw FormatError("invalid inputDrvs entry in derivation");
@@ -386,24 +434,26 @@ Derivation parseDerivation(
     drv.name = name;
 
     StringViewStream str{s};
-    expect(str, "D");
+    expect(str, 'D');
     DerivationATermVersion version;
     switch (str.peek()) {
     case 'e':
-        expect(str, "erive(");
+        expect(str, "erive("sv);
         version = DerivationATermVersion::Traditional;
         break;
     case 'r': {
-        expect(str, "rvWithVersion(");
+        expect(str, "rvWithVersion("sv);
         auto versionS = parseString(str);
-        if (*versionS == "xp-dyn-drv") {
+        if (*versionS == "xp-dyn-drv"sv) {
             // Only version we have so far
             version = DerivationATermVersion::DynamicDerivations;
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, [&] {
+                return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
+            });
         } else {
             throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
         }
-        expect(str, ",");
+        expect(str, ',');
         break;
     }
     default:
@@ -411,49 +461,53 @@ Derivation parseDerivation(
     }
 
     /* Parse the list of outputs. */
-    expect(str, "[");
+    expect(str, '[');
     while (!endOfList(str)) {
-        expect(str, "(");
+        expect(str, '(');
         std::string id = parseString(str).toOwned();
         auto output = parseDerivationOutput(store, str, xpSettings);
         drv.outputs.emplace(std::move(id), std::move(output));
     }
 
     /* Parse the list of input derivations. */
-    expect(str, ",[");
+    expect(str, ",["sv);
     while (!endOfList(str)) {
-        expect(str, "(");
+        expect(str, '(');
         auto drvPath = parsePath(str);
-        expect(str, ",");
+        expect(str, ',');
         drv.inputDrvs.map.insert_or_assign(
             store.parseStorePath(*drvPath), parseDerivedPathMapNode(store, str, version));
-        expect(str, ")");
+        expect(str, ')');
     }
 
-    expect(str, ",");
+    expect(str, ',');
     drv.inputSrcs = store.parseStorePathSet(parseStrings(str, true));
-    expect(str, ",");
+    expect(str, ',');
     drv.platform = parseString(str).toOwned();
-    expect(str, ",");
+    expect(str, ',');
     drv.builder = parseString(str).toOwned();
 
     /* Parse the builder arguments. */
-    expect(str, ",[");
+    expect(str, ",["sv);
     while (!endOfList(str))
         drv.args.push_back(parseString(str).toOwned());
 
     /* Parse the environment variables. */
-    expect(str, ",[");
+    expect(str, ",["sv);
     while (!endOfList(str)) {
-        expect(str, "(");
+        expect(str, '(');
         auto name = parseString(str).toOwned();
-        expect(str, ",");
-        auto value = parseString(str).toOwned();
-        expect(str, ")");
-        drv.env.insert_or_assign(std::move(name), std::move(value));
+        expect(str, ',');
+        auto value = parseString(str);
+        if (name == StructuredAttrs::envVarName) {
+            drv.structuredAttrs = StructuredAttrs::parse(*std::move(value));
+        } else {
+            drv.env.insert_or_assign(std::move(name), std::move(value).toOwned());
+        }
+        expect(str, ')');
     }
 
-    expect(str, ")");
+    expect(str, ')');
     return drv;
 }
 
@@ -468,28 +522,33 @@ Derivation parseDerivation(
  */
 static void printString(std::string & res, std::string_view s)
 {
-    boost::container::small_vector<char, 64 * 1024> buffer;
-    buffer.reserve(s.size() * 2 + 2);
-    char * buf = buffer.data();
-    char * p = buf;
-    *p++ = '"';
-    for (auto c : s)
-        if (c == '\"' || c == '\\') {
-            *p++ = '\\';
-            *p++ = c;
-        } else if (c == '\n') {
-            *p++ = '\\';
-            *p++ = 'n';
-        } else if (c == '\r') {
-            *p++ = '\\';
-            *p++ = 'r';
-        } else if (c == '\t') {
-            *p++ = '\\';
-            *p++ = 't';
-        } else
-            *p++ = c;
-    *p++ = '"';
-    res.append(buf, p - buf);
+    res.reserve(res.size() + s.size() * 2 + 2);
+    res += '"';
+    static constexpr auto chunkSize = 1024;
+    std::array<char, 2 * chunkSize + 2> buffer;
+    while (!s.empty()) {
+        auto chunk = s.substr(0, /*n=*/chunkSize);
+        s.remove_prefix(chunk.size());
+        char * buf = buffer.data();
+        char * p = buf;
+        for (auto c : chunk)
+            if (c == '\"' || c == '\\') {
+                *p++ = '\\';
+                *p++ = c;
+            } else if (c == '\n') {
+                *p++ = '\\';
+                *p++ = 'n';
+            } else if (c == '\r') {
+                *p++ = '\\';
+                *p++ = 'r';
+            } else if (c == '\t') {
+                *p++ = '\\';
+                *p++ = 't';
+            } else
+                *p++ = c;
+        res.append(buf, p - buf);
+    }
+    res += '"';
 }
 
 static void printUnquotedString(std::string & res, std::string_view s)
@@ -536,9 +595,9 @@ static void unparseDerivedPathMapNode(
     if (node.childMap.empty()) {
         printUnquotedStrings(s, node.value.begin(), node.value.end());
     } else {
-        s += "(";
+        s += '(';
         printUnquotedStrings(s, node.value.begin(), node.value.end());
-        s += ",[";
+        s += ",["sv;
         bool first = true;
         for (auto & [outputName, childNode] : node.childMap) {
             if (first)
@@ -550,7 +609,7 @@ static void unparseDerivedPathMapNode(
             unparseDerivedPathMapNode(store, s, childNode);
             s += ')';
         }
-        s += "])";
+        s += "])"sv;
     }
 }
 
@@ -582,16 +641,16 @@ std::string Derivation::unparse(
        newer form only if we need it, which we do for
        `Xp::DynamicDerivations`. */
     if (hasDynamicDrvDep(*this)) {
-        s += "DrvWithVersion(";
+        s += "DrvWithVersion("sv;
         // Only version we have so far
-        printUnquotedString(s, "xp-dyn-drv");
-        s += ",";
+        printUnquotedString(s, "xp-dyn-drv"sv);
+        s += ',';
     } else {
-        s += "Derive(";
+        s += "Derive("sv;
     }
 
     bool first = true;
-    s += "[";
+    s += '[';
     for (auto & i : outputs) {
         if (first)
             first = false;
@@ -603,15 +662,15 @@ std::string Derivation::unparse(
             overloaded{
                 [&](const DerivationOutput::InputAddressed & doi) {
                     s += ',';
-                    printUnquotedString(s, maskOutputs ? "" : store.printStorePath(doi.path));
+                    printUnquotedString(s, maskOutputs ? ""sv : store.printStorePath(doi.path));
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::CAFixed & dof) {
                     s += ',';
-                    printUnquotedString(s, maskOutputs ? "" : store.printStorePath(dof.path(store, name, i.first)));
+                    printUnquotedString(s, maskOutputs ? ""sv : store.printStorePath(dof.path(store, name, i.first)));
                     s += ',';
                     printUnquotedString(s, dof.ca.printMethodAlgo());
                     s += ',';
@@ -619,34 +678,34 @@ std::string Derivation::unparse(
                 },
                 [&](const DerivationOutput::CAFloating & dof) {
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                     s += ',';
                     printUnquotedString(s, std::string{dof.method.renderPrefix()} + printHashAlgo(dof.hashAlgo));
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::Deferred &) {
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::Impure & doi) {
                     // FIXME
                     s += ',';
-                    printUnquotedString(s, "");
+                    printUnquotedString(s, {});
                     s += ',';
                     printUnquotedString(s, std::string{doi.method.renderPrefix()} + printHashAlgo(doi.hashAlgo));
                     s += ',';
-                    printUnquotedString(s, "impure");
+                    printUnquotedString(s, "impure"sv);
                 }},
             i.second.raw);
         s += ')';
     }
 
-    s += "],[";
+    s += "],["sv;
     first = true;
     if (actualInputs) {
         for (auto & [drvHashModulo, childMap] : *actualInputs) {
@@ -672,7 +731,7 @@ std::string Derivation::unparse(
         }
     }
 
-    s += "],";
+    s += "],"sv;
     auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
     printUnquotedStrings(s, paths.begin(), paths.end());
 
@@ -683,21 +742,33 @@ std::string Derivation::unparse(
     s += ',';
     printStrings(s, args.begin(), args.end());
 
-    s += ",[";
+    s += ",["sv;
     first = true;
-    for (auto & i : env) {
-        if (first)
-            first = false;
-        else
+
+    auto unparseEnv = [&](const StringPairs atermEnv) {
+        for (auto & i : atermEnv) {
+            if (first)
+                first = false;
+            else
+                s += ',';
+            s += '(';
+            printString(s, i.first);
             s += ',';
-        s += '(';
-        printString(s, i.first);
-        s += ',';
-        printString(s, maskOutputs && outputs.count(i.first) ? "" : i.second);
-        s += ')';
+            printString(s, maskOutputs && outputs.count(i.first) ? ""sv : i.second);
+            s += ')';
+        }
+    };
+
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (structuredAttrs) {
+        StringPairs scratch = env;
+        scratch.insert(structuredAttrs->unparse());
+        unparseEnv(scratch);
+    } else {
+        unparseEnv(env);
     }
 
-    s += "])";
+    s += "])"sv;
 
     return s;
 }
@@ -711,8 +782,8 @@ bool isDerivation(std::string_view fileName)
 std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 {
     std::string res{drvName};
-    if (outputName != "out") {
-        res += "-";
+    if (outputName != "out"sv) {
+        res += '-';
         res += outputName;
     }
     return res;
@@ -759,7 +830,7 @@ DerivationType BasicDerivation::type() const
         if (fixedCAOutputs.size() > 1)
             // FIXME: Experimental feature?
             throw Error("only one fixed output is allowed for now");
-        if (*fixedCAOutputs.begin() != "out")
+        if (*fixedCAOutputs.begin() != "out"sv)
             throw Error("single fixed output must be named \"out\"");
         return DerivationType::ContentAddressed{
             .sandboxed = false,
@@ -787,7 +858,7 @@ DerivationType BasicDerivation::type() const
     throw Error("can't mix derivation output types");
 }
 
-Sync<DrvHashes> drvHashes;
+DrvHashes drvHashes;
 
 /* pathDerivationModulo and hashDerivationModulo are mutually recursive
  */
@@ -797,16 +868,13 @@ Sync<DrvHashes> drvHashes;
  */
 static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPath)
 {
-    {
-        auto hashes = drvHashes.lock();
-        auto h = hashes->find(drvPath);
-        if (h != hashes->end()) {
-            return h->second;
-        }
+    std::optional<DrvHash> hash;
+    if (drvHashes.cvisit(drvPath, [&hash](const auto & kv) { hash.emplace(kv.second); })) {
+        return *hash;
     }
     auto h = hashDerivationModulo(store, store.readInvalidDerivation(drvPath), false);
     // Cache it
-    drvHashes.lock()->insert_or_assign(drvPath, h);
+    drvHashes.insert_or_assign(drvPath, h);
     return h;
 }
 
@@ -948,6 +1016,7 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
         auto value = readString(in);
         drv.env[key] = value;
     }
+    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     return in;
 }
@@ -983,9 +1052,21 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
     }
     CommonProto::write(store, CommonProto::WriteConn{.to = out}, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
-    out << drv.env.size();
-    for (auto & i : drv.env)
-        out << i.first << i.second;
+
+    auto writeEnv = [&](const StringPairs atermEnv) {
+        out << atermEnv.size();
+        for (auto & [k, v] : atermEnv)
+            out << k << v;
+    };
+
+    StructuredAttrs::checkKeyNotInUse(drv.env);
+    if (drv.structuredAttrs) {
+        StringPairs scratch = drv.env;
+        scratch.insert(drv.structuredAttrs->unparse());
+        writeEnv(scratch);
+    } else {
+        writeEnv(drv.env);
+    }
 }
 
 std::string hashPlaceholder(const OutputNameView outputName)
@@ -1017,6 +1098,13 @@ void BasicDerivation::applyRewrites(const StringMap & rewrites)
         newEnv.emplace(envName, envValue);
     }
     env = std::move(newEnv);
+
+    if (structuredAttrs) {
+        // TODO rewrite the JSON AST properly, rather than dump parse round trip.
+        auto [_, jsonS] = structuredAttrs->unparse();
+        jsonS = rewriteStrings(std::move(jsonS), rewrites);
+        structuredAttrs = StructuredAttrs::parse(jsonS);
+    }
 }
 
 static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
@@ -1192,19 +1280,26 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
-nlohmann::json
-DerivationOutput::toJSON(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
+} // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutput & o)
 {
-    nlohmann::json res = nlohmann::json::object();
+    res = nlohmann::json::object();
     std::visit(
         overloaded{
-            [&](const DerivationOutput::InputAddressed & doi) { res["path"] = store.printStorePath(doi.path); },
+            [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
             [&](const DerivationOutput::CAFixed & dof) {
-                res["path"] = store.printStorePath(dof.path(store, drvName, outputName));
-                res["method"] = std::string{dof.ca.method.render()};
-                res["hashAlgo"] = printHashAlgo(dof.ca.hash.algo);
-                res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
-                // FIXME print refs?
+                res = dof.ca;
+        // FIXME print refs?
+        /* it would be nice to output the path for user convenience, but
+           this would require us to know the store dir. */
+#if 0
+                res["path"] = dof.path(store, drvName, outputName);
+#endif
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 res["method"] = std::string{dof.method.render()};
@@ -1217,16 +1312,11 @@ DerivationOutput::toJSON(const StoreDirConfig & store, std::string_view drvName,
                 res["impure"] = true;
             },
         },
-        raw);
-    return res;
+        o.raw);
 }
 
-DerivationOutput DerivationOutput::fromJSON(
-    const StoreDirConfig & store,
-    std::string_view drvName,
-    OutputNameView outputName,
-    const nlohmann::json & _json,
-    const ExperimentalFeatureSettings & xpSettings)
+DerivationOutput
+adl_serializer<DerivationOutput>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     std::set<std::string_view> keys;
     auto & json = getObject(_json);
@@ -1237,7 +1327,7 @@ DerivationOutput DerivationOutput::fromJSON(
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         ContentAddressMethod method = ContentAddressMethod::parse(getString(valueAt(json, "method")));
         if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations);
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
 
         auto hashAlgo = parseHashAlgo(getString(valueAt(json, "hashAlgo")));
         return {std::move(method), std::move(hashAlgo)};
@@ -1245,21 +1335,22 @@ DerivationOutput DerivationOutput::fromJSON(
 
     if (keys == (std::set<std::string_view>{"path"})) {
         return DerivationOutput::InputAddressed{
-            .path = store.parseStorePath(getString(valueAt(json, "path"))),
+            .path = valueAt(json, "path"),
         };
     }
 
-    else if (keys == (std::set<std::string_view>{"path", "method", "hashAlgo", "hash"})) {
-        auto [method, hashAlgo] = methodAlgo();
+    else if (keys == (std::set<std::string_view>{"method", "hash"})) {
         auto dof = DerivationOutput::CAFixed{
-            .ca =
-                ContentAddress{
-                    .method = std::move(method),
-                    .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
-                },
+            .ca = static_cast<ContentAddress>(_json),
         };
-        if (dof.path(store, drvName, outputName) != store.parseStorePath(getString(valueAt(json, "path"))))
+        if (dof.ca.method == ContentAddressMethod::Raw::Text)
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
+        /* We no longer produce this (denormalized) field (for the
+           reasons described above), so we don't need to check it. */
+#if 0
+        if (dof.path(store, drvName, outputName) != static_cast<StorePath>(valueAt(json, "path")))
             throw Error("Path doesn't match derivation output");
+#endif
         return dof;
     }
 
@@ -1290,30 +1381,34 @@ DerivationOutput DerivationOutput::fromJSON(
     }
 }
 
-nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
+void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
-    nlohmann::json res = nlohmann::json::object();
+    res = nlohmann::json::object();
 
-    res["name"] = name;
+    res["name"] = d.name;
+
+    res["version"] = 4;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
-        for (auto & [outputName, output] : outputs) {
-            outputsObj[outputName] = output.toJSON(store, name, outputName);
+        for (auto & [outputName, output] : d.outputs) {
+            outputsObj[outputName] = output;
         }
     }
 
     {
-        auto & inputsList = res["inputSrcs"];
-        inputsList = nlohmann::json ::array();
-        for (auto & input : inputSrcs)
-            inputsList.emplace_back(store.printStorePath(input));
-    }
+        auto & inputsObj = res["inputs"];
+        inputsObj = nlohmann::json::object();
 
-    {
-        std::function<nlohmann::json(const DerivedPathMap<StringSet>::ChildNode &)> doInput;
-        doInput = [&](const auto & inputNode) {
+        {
+            auto & inputsList = inputsObj["srcs"];
+            inputsList = nlohmann::json::array();
+            for (auto & input : d.inputSrcs)
+                inputsList.emplace_back(input);
+        }
+
+        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
             auto value = nlohmann::json::object();
             value["outputs"] = inputNode.value;
             {
@@ -1324,30 +1419,24 @@ nlohmann::json Derivation::toJSON(const StoreDirConfig & store) const
             }
             return value;
         };
-        {
-            auto & inputDrvsObj = res["inputDrvs"];
-            inputDrvsObj = nlohmann::json::object();
-            for (auto & [inputDrv, inputNode] : inputDrvs.map) {
-                inputDrvsObj[store.printStorePath(inputDrv)] = doInput(inputNode);
-            }
+
+        auto & inputDrvsObj = inputsObj["drvs"];
+        inputDrvsObj = nlohmann::json::object();
+        for (auto & [inputDrv, inputNode] : d.inputDrvs.map) {
+            inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
         }
     }
 
-    res["system"] = platform;
-    res["builder"] = builder;
-    res["args"] = args;
-    res["env"] = env;
+    res["system"] = d.platform;
+    res["builder"] = d.builder;
+    res["args"] = d.args;
+    res["env"] = d.env;
 
-    if (auto it = env.find("__json"); it != env.end()) {
-        res["env"].erase("__json");
-        res["structuredAttrs"] = nlohmann::json::parse(it->second);
-    }
-
-    return res;
+    if (d.structuredAttrs)
+        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
 }
 
-Derivation Derivation::fromJSON(
-    const StoreDirConfig & store, const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
+Derivation adl_serializer<Derivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
     using nlohmann::detail::value_t;
 
@@ -1357,11 +1446,13 @@ Derivation Derivation::fromJSON(
 
     res.name = getString(valueAt(json, "name"));
 
+    if (valueAt(json, "version") != 4)
+        throw Error("Only derivation format version 4 is currently supported.");
+
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
         for (auto & [outputName, output] : outputs) {
-            res.outputs.insert_or_assign(
-                outputName, DerivationOutput::fromJSON(store, res.name, outputName, output, xpSettings));
+            res.outputs.insert_or_assign(outputName, adl_serializer<DerivationOutput>::from_json(output, xpSettings));
         }
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'outputs'");
@@ -1369,32 +1460,39 @@ Derivation Derivation::fromJSON(
     }
 
     try {
-        auto inputSrcs = getArray(valueAt(json, "inputSrcs"));
-        for (auto & input : inputSrcs)
-            res.inputSrcs.insert(store.parseStorePath(static_cast<const std::string &>(input)));
-    } catch (Error & e) {
-        e.addTrace({}, "while reading key 'inputSrcs'");
-        throw;
-    }
+        auto inputsObj = getObject(valueAt(json, "inputs"));
 
-    try {
-        std::function<DerivedPathMap<StringSet>::ChildNode(const nlohmann::json &)> doInput;
-        doInput = [&](const auto & _json) {
-            auto & json = getObject(_json);
-            DerivedPathMap<StringSet>::ChildNode node;
-            node.value = getStringSet(valueAt(json, "outputs"));
-            auto drvs = getObject(valueAt(json, "dynamicOutputs"));
-            for (auto & [outputId, childNode] : drvs) {
-                xpSettings.require(Xp::DynamicDerivations);
-                node.childMap[outputId] = doInput(childNode);
-            }
-            return node;
-        };
-        auto drvs = getObject(valueAt(json, "inputDrvs"));
-        for (auto & [inputDrvPath, inputOutputs] : drvs)
-            res.inputDrvs.map[store.parseStorePath(inputDrvPath)] = doInput(inputOutputs);
+        try {
+            auto inputSrcs = getArray(valueAt(inputsObj, "srcs"));
+            for (auto & input : inputSrcs)
+                res.inputSrcs.insert(input);
+        } catch (Error & e) {
+            e.addTrace({}, "while reading key 'srcs'");
+            throw;
+        }
+
+        try {
+            auto doInput = [&](this const auto & doInput, const auto & _json) -> DerivedPathMap<StringSet>::ChildNode {
+                auto & json = getObject(_json);
+                DerivedPathMap<StringSet>::ChildNode node;
+                node.value = getStringSet(valueAt(json, "outputs"));
+                auto drvs = getObject(valueAt(json, "dynamicOutputs"));
+                for (auto & [outputId, childNode] : drvs) {
+                    xpSettings.require(
+                        Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
+                    node.childMap[outputId] = doInput(childNode);
+                }
+                return node;
+            };
+            auto drvs = getObject(valueAt(inputsObj, "drvs"));
+            for (auto & [inputDrvPath, inputOutputs] : drvs)
+                res.inputDrvs.map[StorePath{inputDrvPath}] = doInput(inputOutputs);
+        } catch (Error & e) {
+            e.addTrace({}, "while reading key 'drvs'");
+            throw;
+        }
     } catch (Error & e) {
-        e.addTrace({}, "while reading key 'inputDrvs'");
+        e.addTrace({}, "while reading key 'inputs'");
         throw;
     }
 
@@ -1411,9 +1509,9 @@ Derivation Derivation::fromJSON(
     }
 
     if (auto structuredAttrs = get(json, "structuredAttrs"))
-        res.env.insert_or_assign("__json", structuredAttrs->dump());
+        res.structuredAttrs = StructuredAttrs{*structuredAttrs};
 
     return res;
 }
 
-} // namespace nix
+} // namespace nlohmann

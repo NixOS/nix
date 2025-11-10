@@ -1,6 +1,6 @@
 # Public headers directory
 
-include_dirs = [include_directories('../../..')]
+include_dirs = [ include_directories('../../..') ]
 
 headers = files(
   'derived-path.hh',
@@ -9,4 +9,5 @@ headers = files(
   'outputs-spec.hh',
   'path.hh',
   'protocol.hh',
+  'test-main.hh',
 )

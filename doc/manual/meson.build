@@ -1,4 +1,5 @@
-project('nix-manual',
+project(
+  'nix-manual',
   version : files('.version'),
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -8,44 +9,45 @@ nix = find_program('nix', native : true)
 
 mdbook = find_program('mdbook', native : true)
 bash = find_program('bash', native : true)
-rsync = find_program('rsync', required: true, native: true)
+rsync = find_program('rsync', required : true, native : true)
 
 pymod = import('python')
 python = pymod.find_installation('python3')
 
 nix_env_for_docs = {
-  'HOME': '/dummy',
-  'NIX_CONF_DIR': '/dummy',
-  'NIX_SSL_CERT_FILE': '/dummy/no-ca-bundle.crt',
-  'NIX_STATE_DIR': '/dummy',
-  'NIX_CONFIG': 'cores = 0',
+  'HOME' : '/dummy',
+  'NIX_CONF_DIR' : '/dummy',
+  'NIX_SSL_CERT_FILE' : '/dummy/no-ca-bundle.crt',
+  'NIX_STATE_DIR' : '/dummy',
+  'NIX_CONFIG' : 'cores = 0',
 }
 
-nix_for_docs = [nix, '--experimental-features', 'nix-command']
+nix_for_docs = [ nix, '--experimental-features', 'nix-command' ]
 nix_eval_for_docs_common = nix_for_docs + [
   'eval',
-  '-I', 'nix=' + meson.current_source_dir(),
+  '-I',
+  'nix=' + meson.current_source_dir(),
   '--store', 'dummy://',
   '--impure',
 ]
 nix_eval_for_docs = nix_eval_for_docs_common + '--raw'
 
 conf_file_json = custom_target(
-  command : nix_for_docs + ['config', 'show', '--json'],
+  command : nix_for_docs + [ 'config', 'show', '--json' ],
   capture : true,
   output : 'conf-file.json',
   env : nix_env_for_docs,
 )
 
 language_json = custom_target(
-  command: [nix, '__dump-language'],
+  command : [ nix, '__dump-language' ],
   output : 'language.json',
   capture : true,
   env : nix_env_for_docs,
 )
 
 nix3_cli_json = custom_target(
-  command : [nix, '__dump-cli'],
+  command : [ nix, '__dump-cli' ],
   capture : true,
   output : 'nix.json',
   env : nix_env_for_docs,
@@ -79,16 +81,19 @@ manual = custom_target(
   'manual',
   command : [
     bash,
-    '-euo', 'pipefail',
+    '-euo',
+    'pipefail',
     '-c',
     '''
         @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
         @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
         sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
-        @4@ -r --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
+        @4@ -r -L --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
         (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
         rm -rf @2@/manual
         mv @2@/html @2@/manual
+        # Remove Mathjax 2.7, because we will actually use MathJax 3.x
+        find @2@/manual | grep .html | xargs sed -i -e '/2.7.1.MathJax.js/d'
         find @2@/manual -iname meson.build -delete
     '''.format(
       python.full_path(),
@@ -112,6 +117,7 @@ manual = custom_target(
     builtins_md,
     rl_next_generated,
     summary_rl_next,
+    json_schema_generated_files,
     nix_input,
   ],
   output : [
@@ -120,8 +126,8 @@ manual = custom_target(
   ],
   depfile : 'manual.d',
   env : {
-    'RUST_LOG': 'info',
-    'MDBOOK_SUBSTITUTE_SEARCH': meson.current_build_dir() / 'source',
+    'RUST_LOG' : 'info',
+    'MDBOOK_SUBSTITUTE_SEARCH' : meson.current_build_dir() / 'source',
   },
 )
 manual_html = manual[0]
@@ -133,7 +139,8 @@ install_subdir(
 )
 
 nix_nested_manpages = [
-  [ 'nix-env',
+  [
+    'nix-env',
     [
       'delete-generations',
       'install',
@@ -148,7 +155,8 @@ nix_nested_manpages = [
       'upgrade',
     ],
   ],
-  [ 'nix-store',
+  [
+    'nix-store',
     [
       'add-fixed',
       'add',

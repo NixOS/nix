@@ -5,6 +5,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
 
@@ -12,15 +13,28 @@ MakeError(BadHash, Error);
 
 enum struct HashAlgorithm : char { MD5 = 42, SHA1, SHA256, SHA512, BLAKE3 };
 
-const int blake3HashSize = 32;
-const int md5HashSize = 16;
-const int sha1HashSize = 20;
-const int sha256HashSize = 32;
-const int sha512HashSize = 64;
+/**
+ * @return the size of a hash for the given algorithm
+ */
+constexpr inline size_t regularHashSize(HashAlgorithm type)
+{
+    switch (type) {
+    case HashAlgorithm::BLAKE3:
+        return 32;
+    case HashAlgorithm::MD5:
+        return 16;
+    case HashAlgorithm::SHA1:
+        return 20;
+    case HashAlgorithm::SHA256:
+        return 32;
+    case HashAlgorithm::SHA512:
+        return 64;
+    default:
+        assert(false);
+    }
+}
 
 extern const StringSet hashAlgorithms;
-
-extern const std::string nix32Chars;
 
 /**
  * @brief Enumeration representing the hash formats.
@@ -29,7 +43,7 @@ enum struct HashFormat : int {
     /// @brief Base 64 encoding.
     /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
     Base64,
-    /// @brief Nix-specific base-32 encoding. @see nix32Chars
+    /// @brief Nix-specific base-32 encoding. @see BaseNix32
     Nix32,
     /// @brief Lowercase hexadecimal encoding. @see base16Chars
     Base16,
@@ -42,6 +56,9 @@ extern const StringSet hashFormats;
 
 struct Hash
 {
+    /** Opaque handle type for the hash calculation state. */
+    union Ctx;
+
     constexpr static size_t maxHashSize = 64;
     size_t hashSize = 0;
     uint8_t hash[maxHashSize] = {};
@@ -74,14 +91,20 @@ struct Hash
      */
     static Hash parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo);
 
-    static Hash parseSRI(std::string_view original);
-
-private:
     /**
-     * The type must be provided, the string view must not include <type>
-     * prefix. `isSRI` helps disambigate the various base-* encodings.
+     * Like `parseNonSRIUnprefixed`, but the hash format has been
+     * explicitly given.
+     *
+     * @param explicitFormat cannot be SRI, but must be one of the
+     * "bases".
      */
-    Hash(std::string_view s, HashAlgorithm algo, bool isSRI);
+    static Hash parseExplicitFormatUnprefixed(
+        std::string_view s,
+        HashAlgorithm algo,
+        HashFormat explicitFormat,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+    static Hash parseSRI(std::string_view original);
 
 public:
     /**
@@ -93,30 +116,6 @@ public:
      * Compare how two hashes are ordered.
      */
     std::strong_ordering operator<=>(const Hash & h2) const noexcept;
-
-    /**
-     * Returns the length of a base-16 representation of this hash.
-     */
-    [[nodiscard]] size_t base16Len() const
-    {
-        return hashSize * 2;
-    }
-
-    /**
-     * Returns the length of a base-32 representation of this hash.
-     */
-    [[nodiscard]] size_t base32Len() const
-    {
-        return (hashSize * 8 - 1) / 5 + 1;
-    }
-
-    /**
-     * Returns the length of a base-64 representation of this hash.
-     */
-    [[nodiscard]] size_t base64Len() const
-    {
-        return ((4 * hashSize / 3) + 3) & ~3;
-    }
 
     /**
      * Return a string representation of the hash, in base-16, base-32
@@ -149,11 +148,6 @@ public:
 Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha);
 
 /**
- * Print a hash in base-16 if it's MD5, or base-32 otherwise.
- */
-std::string printHash16or32(const Hash & hash);
-
-/**
  * Compute the hash of the given string.
  */
 Hash hashString(
@@ -168,10 +162,12 @@ Hash hashFile(HashAlgorithm ha, const Path & path);
 
 /**
  * The final hash and the number of bytes digested.
- *
- * @todo Convert to proper struct
  */
-typedef std::pair<Hash, uint64_t> HashResult;
+struct HashResult
+{
+    Hash hash;
+    uint64_t numBytesDigested;
+};
 
 /**
  * Compress a hash to the specified number of bytes by cyclically
@@ -197,19 +193,19 @@ std::string_view printHashFormat(HashFormat hashFormat);
 /**
  * Parse a string representing a hash algorithm.
  */
-HashAlgorithm parseHashAlgo(std::string_view s);
+HashAlgorithm
+parseHashAlgo(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Will return nothing on parse error
  */
-std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s);
+std::optional<HashAlgorithm>
+parseHashAlgoOpt(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * And the reverse.
  */
 std::string_view printHashAlgo(HashAlgorithm ha);
-
-union Ctx;
 
 struct AbstractHashSink : virtual Sink
 {
@@ -220,7 +216,7 @@ class HashSink : public BufferedSink, public AbstractHashSink
 {
 private:
     HashAlgorithm ha;
-    Ctx * ctx;
+    Hash::Ctx * ctx;
     uint64_t bytes;
 
 public:
@@ -232,4 +228,29 @@ public:
     HashResult currentHash();
 };
 
+template<>
+struct json_avoids_null<Hash> : std::true_type
+{};
+
 } // namespace nix
+
+template<>
+struct std::hash<nix::Hash>
+{
+    std::size_t operator()(const nix::Hash & hash) const noexcept
+    {
+        assert(hash.hashSize > sizeof(size_t));
+        return *reinterpret_cast<const std::size_t *>(&hash.hash);
+    }
+};
+
+namespace nix {
+
+inline std::size_t hash_value(const Hash & hash)
+{
+    return std::hash<Hash>{}(hash);
+}
+
+} // namespace nix
+
+JSON_IMPL_WITH_XP_FEATURES(Hash)

@@ -4,12 +4,14 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
 #include "nix/util/signals.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -74,15 +76,26 @@ std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
 }
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
-    const StorePath & drvPath, const Derivation & drv, const OutputName & wantedOutput, BuildMode buildMode)
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    BuildMode buildMode,
+    bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode);
+    return initGoalIfNeeded(
+        derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode, storeDerivation);
 }
 
-std::shared_ptr<DerivationBuildingGoal>
-Worker::makeDerivationBuildingGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
+std::shared_ptr<DerivationResolutionGoal>
+Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
 {
-    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode);
+    return initGoalIfNeeded(derivationResolutionGoals[drvPath], drvPath, drv, *this, buildMode);
+}
+
+std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
+    const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation)
+{
+    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<PathSubstitutionGoal>
@@ -91,10 +104,9 @@ Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std:
     return initGoalIfNeeded(substitutionGoals[path], path, *this, repair, ca);
 }
 
-std::shared_ptr<DrvOutputSubstitutionGoal>
-Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id)
 {
-    return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this, repair, ca);
+    return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this);
 }
 
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
@@ -157,6 +169,8 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(drvGoal, derivationTrampolineGoals.map);
     else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
         nix::removeGoal(drvGoal, derivationGoals);
+    else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal))
+        nix::removeGoal(drvResolutionGoal, derivationResolutionGoals);
     else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
         nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
@@ -514,15 +528,9 @@ bool Worker::pathContentsGood(const StorePath & path)
         return i->second;
     printInfo("checking path '%s'...", store.printStorePath(path));
     auto info = store.queryPathInfo(path);
-    bool res;
-    if (!pathExists(store.printStorePath(path)))
-        res = false;
-    else {
-        auto current = hashPath(
-                           {store.getFSAccessor(), CanonPath(path.to_string())},
-                           FileIngestionMethod::NixArchive,
-                           info->narHash.algo)
-                           .first;
+    bool res = false;
+    if (auto accessor = store.getFSAccessor(path, /*requireValidPath=*/false)) {
+        auto current = hashPath({ref{accessor}}, FileIngestionMethod::NixArchive, info->narHash.algo).first;
         Hash nullHash(HashAlgorithm::SHA256);
         res = info->narHash == nullHash || info->narHash == current;
     }

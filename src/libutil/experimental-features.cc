@@ -1,5 +1,6 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/util.hh"
 
 #include <nlohmann/json.hpp>
@@ -268,7 +269,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .tag = Xp::LocalOverlayStore,
         .name = "local-overlay-store",
         .description = R"(
-            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#local-overlay-store).
+            Allow the use of [local overlay store](@docroot@/command-ref/new-cli/nix3-help-stores.md#experimental-local-overlay-store).
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/50",
     },
@@ -303,6 +304,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Add `|>` and `<|` operators to the Nix language.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/55",
+    },
+    {
+        .tag = Xp::ExternalBuilders,
+        .name = "external-builders",
+        .description = R"(
+            Enables support for external builders / sandbox providers.
+        )",
+        .trackingUrl = "",
     },
     {
         .tag = Xp::BLAKE3Hashes,
@@ -368,11 +377,13 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
     return res;
 }
 
-MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature)
+MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature, std::string reason)
     : Error(
-          "experimental Nix feature '%1%' is disabled; add '--extra-experimental-features %1%' to enable it",
-          showExperimentalFeature(feature))
+          "experimental Nix feature '%1%' is disabled%2%; add '--extra-experimental-features %1%' to enable it",
+          showExperimentalFeature(feature),
+          Uncolored(optionalBracket(" (", reason, ")")))
     , missingFeature(feature)
+    , reason{reason}
 {
 }
 

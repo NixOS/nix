@@ -3,7 +3,7 @@
 
 
 def transform_anchors_html:
-    . | gsub($empty_anchor_regex; "<a name=\"" + .anchor + "\"></a>")
+    . | gsub($empty_anchor_regex; "<a id=\"" + .anchor + "\"></a>")
       | gsub($anchor_regex; "<a href=\"#" + .anchor + "\" id=\"" + .anchor + "\">" + .text + "</a>");
 
 

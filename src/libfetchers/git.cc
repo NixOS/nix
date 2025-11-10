@@ -15,6 +15,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/mounted-source-accessor.hh"
 
 #include <regex>
 #include <string.h>
@@ -163,8 +164,7 @@ struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        if (url.scheme != "git" && url.scheme != "git+http" && url.scheme != "git+https" && url.scheme != "git+ssh"
-            && url.scheme != "git+file")
+        if (url.scheme != "git" && parseUrlScheme(url.scheme).application != "git")
             return {};
 
         auto url2(url);
@@ -228,16 +228,12 @@ struct GitInputScheme : InputScheme
 
         maybeGetBoolAttr(attrs, "verifyCommit");
 
-        if (auto ref = maybeGetStrAttr(attrs, "ref")) {
-            if (std::regex_search(*ref, badGitRefRegex))
-                throw BadURL("invalid Git branch/tag name '%s'", *ref);
-        }
+        if (auto ref = maybeGetStrAttr(attrs, "ref"); ref && !isLegalRefName(*ref))
+            throw BadURL("invalid Git branch/tag name '%s'", *ref);
 
         Input input{settings};
         input.attrs = attrs;
-        auto url = fixGitURL(getStrAttr(attrs, "url"));
-        parseURL(url);
-        input.attrs["url"] = url;
+        input.attrs["url"] = fixGitURL(getStrAttr(attrs, "url")).to_string();
         getShallowAttr(input);
         getSubmodulesAttr(input);
         getAllRefsAttr(input);
@@ -466,8 +462,8 @@ struct GitInputScheme : InputScheme
 
         // Why are we checking for bare repository?
         // well if it's a bare repository we want to force a git fetch rather than copying the folder
-        bool isBareRepository = url.scheme == "file" && pathExists(url.path) && !pathExists(url.path + "/.git");
-        //
+        auto isBareRepository = [](PathView path) { return pathExists(path) && !pathExists(path + "/.git"); };
+
         // FIXME: here we turn a possibly relative path into an absolute path.
         // This allows relative git flake inputs to be resolved against the
         // **current working directory** (as in POSIX), which tends to work out
@@ -476,8 +472,10 @@ struct GitInputScheme : InputScheme
         //
         // See: https://discourse.nixos.org/t/57783 and #9708
         //
-        if (url.scheme == "file" && !forceHttp && !isBareRepository) {
-            if (!isAbsolute(url.path)) {
+        if (url.scheme == "file" && !forceHttp && !isBareRepository(renderUrlPathEnsureLegal(url.path))) {
+            auto path = renderUrlPathEnsureLegal(url.path);
+
+            if (!isAbsolute(path)) {
                 warn(
                     "Fetching Git repository '%s', which uses a path relative to the current directory. "
                     "This is not supported and will stop working in a future release. "
@@ -487,16 +485,46 @@ struct GitInputScheme : InputScheme
 
             // If we don't check here for the path existence, then we can give libgit2 any directory
             // and it will initialize them as git directories.
-            if (!pathExists(url.path)) {
-                throw Error("The path '%s' does not exist.", url.path);
+            if (!pathExists(path)) {
+                throw Error("The path '%s' does not exist.", path);
             }
-            repoInfo.location = std::filesystem::absolute(url.path);
+            repoInfo.location = std::filesystem::absolute(path);
         } else {
             if (url.scheme == "file")
                 /* Query parameters are meaningless for file://, but
                    Git interprets them as part of the file name. So get
                    rid of them. */
                 url.query.clear();
+            /* Backward compatibility hack: In old versions of Nix, if you had
+               a flake input like
+
+                 inputs.foo.url = "git+https://foo/bar?dir=subdir";
+
+               it would result in a lock file entry like
+
+                 "original": {
+                   "dir": "subdir",
+                   "type": "git",
+                   "url": "https://foo/bar?dir=subdir"
+                 }
+
+               New versions of Nix remove `?dir=subdir` from the `url` field,
+               since the subdirectory is intended for `FlakeRef`, not the
+               fetcher (and specifically the remote server), that is, the
+               flakeref is parsed into
+
+                 "original": {
+                   "dir": "subdir",
+                   "type": "git",
+                   "url": "https://foo/bar"
+                 }
+
+               However, new versions of nix parsing old flake.lock files would pass the dir=
+               query parameter in the "url" attribute to git, which will then complain.
+
+               For this reason, we are filtering the `dir` query parameter from the URL
+               before passing it to git. */
+            url.query.erase("dir");
             repoInfo.location = url;
         }
 
@@ -707,13 +735,10 @@ struct GitInputScheme : InputScheme
 
         auto rev = *input.getRev();
 
-        Attrs infoAttrs({
-            {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(*input.settings, repoInfo, repoDir, rev)},
-        });
+        input.attrs.insert_or_assign("lastModified", getLastModified(*input.settings, repoInfo, repoDir, rev));
 
         if (!getShallowAttr(input))
-            infoAttrs.insert_or_assign("revCount", getRevCount(*input.settings, repoInfo, repoDir, rev));
+            input.attrs.insert_or_assign("revCount", getRevCount(*input.settings, repoInfo, repoDir, rev));
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
 
@@ -741,8 +766,16 @@ struct GitInputScheme : InputScheme
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
                 attrs.insert_or_assign("url", resolved);
-                if (submodule.branch != "")
-                    attrs.insert_or_assign("ref", submodule.branch);
+                if (submodule.branch != "") {
+                    // A special value of . is used to indicate that the name of the branch in the submodule
+                    // should be the same name as the current branch in the current repository.
+                    // https://git-scm.com/docs/gitmodules
+                    if (submodule.branch == ".") {
+                        attrs.insert_or_assign("ref", ref);
+                    } else {
+                        attrs.insert_or_assign("ref", submodule.branch);
+                    }
+                }
                 attrs.insert_or_assign("rev", submoduleRev.gitRev());
                 attrs.insert_or_assign("exportIgnore", Explicit<bool>{exportIgnore});
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
@@ -761,9 +794,6 @@ struct GitInputScheme : InputScheme
         }
 
         assert(!origRev || origRev == rev);
-        if (!getShallowAttr(input))
-            input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
         return {accessor, std::move(input)};
     }
@@ -886,8 +916,7 @@ struct GitInputScheme : InputScheme
             return makeFingerprint(*rev);
         else {
             auto repoInfo = getRepoInfo(input);
-            if (auto repoPath = repoInfo.getPath();
-                repoPath && repoInfo.workdirInfo.headRev && repoInfo.workdirInfo.submodules.empty()) {
+            if (auto repoPath = repoInfo.getPath(); repoPath && repoInfo.workdirInfo.submodules.empty()) {
                 /* Calculate a fingerprint that takes into account the
                    deleted and modified/added files. */
                 HashSink hashSink{HashAlgorithm::SHA512};
@@ -900,8 +929,8 @@ struct GitInputScheme : InputScheme
                     writeString("deleted:", hashSink);
                     writeString(file.abs(), hashSink);
                 }
-                return makeFingerprint(*repoInfo.workdirInfo.headRev)
-                       + ";d=" + hashSink.finish().first.to_string(HashFormat::Base16, false);
+                return makeFingerprint(repoInfo.workdirInfo.headRev.value_or(nullRev))
+                       + ";d=" + hashSink.finish().hash.to_string(HashFormat::Base16, false);
             }
             return std::nullopt;
         }

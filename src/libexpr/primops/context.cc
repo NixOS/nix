@@ -2,6 +2,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -78,7 +79,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency(
       Create a copy of the given string where every
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element is turned into a
-      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      [constant](@docroot@/language/string-context.md#string-context-constant)
       string context element.
 
       This is the opposite of [`builtins.addDrvOutputDependencies`](#builtins-addDrvOutputDependencies).
@@ -144,7 +145,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
      .args = {"s"},
      .doc = R"(
       Create a copy of the given string where a single
-      [constant](@docroot@/language/string-context.md#string-context-element-constant)
+      [constant](@docroot@/language/string-context.md#string-context-constant)
       string context element is turned into a
       [derivation deep](@docroot@/language/string-context.md#string-context-element-derivation-deep)
       string context element.
@@ -218,7 +219,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
             auto list = state.buildList(info.second.outputs.size());
             for (const auto & [i, output] : enumerate(info.second.outputs))
                 (list[i] = state.allocValue())->mkString(output);
-            infoAttrs.alloc(state.sOutputs).mkList(list);
+            infoAttrs.alloc(state.s.outputs).mkList(list);
         }
         attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);
     }
@@ -299,7 +300,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
             }
         }
 
-        if (auto attr = i.value->attrs()->get(state.sOutputs)) {
+        if (auto attr = i.value->attrs()->get(state.s.outputs)) {
             state.forceList(*attr->value, attr->pos, "while evaluating the `outputs` attribute of a string context");
             if (attr->value->listSize() && !isDerivation(name)) {
                 state

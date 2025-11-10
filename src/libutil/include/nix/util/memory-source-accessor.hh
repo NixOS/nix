@@ -1,3 +1,6 @@
+#pragma once
+///@file
+
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/variant-wrapper.hh"
@@ -55,7 +58,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
         Stat lstat() const;
     };
 
-    File root{File::Directory{}};
+    std::optional<File> root;
 
     bool operator==(const MemorySourceAccessor &) const noexcept = default;
 

@@ -3,10 +3,32 @@
 #  include <spawn.h>
 #  include <sys/sysctl.h>
 #  include <sandbox.h>
+#  include <sys/ipc.h>
+#  include <sys/shm.h>
+#  include <sys/msg.h>
+#  include <sys/sem.h>
 
 /* This definition is undocumented but depended upon by all major browsers. */
 extern "C" int
 sandbox_init_with_parameters(const char * profile, uint64_t flags, const char * const parameters[], char ** errorbuf);
+
+/* Darwin IPC structures and constants */
+#  define IPCS_MAGIC 0x00000001
+#  define IPCS_SHM_ITER 0x00000002
+#  define IPCS_SEM_ITER 0x00000020
+#  define IPCS_MSG_ITER 0x00000200
+#  define IPCS_SHM_SYSCTL "kern.sysv.ipcs.shm"
+#  define IPCS_MSG_SYSCTL "kern.sysv.ipcs.msg"
+#  define IPCS_SEM_SYSCTL "kern.sysv.ipcs.sem"
+
+struct IpcsCommand
+{
+    uint32_t ipcs_magic;
+    uint32_t ipcs_op;
+    uint32_t ipcs_cursor;
+    uint32_t ipcs_datalen;
+    void * ipcs_data;
+};
 
 namespace nix {
 
@@ -21,7 +43,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
     bool useSandbox;
 
     DarwinDerivationBuilder(
-        Store & store,
+        LocalStore & store,
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)
@@ -69,7 +91,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
             /* Add all our input paths to the chroot */
             for (auto & i : inputPaths) {
                 auto p = store.printStorePath(i);
-                pathsInChroot.insert_or_assign(p, p);
+                pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
             }
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be
@@ -203,6 +225,119 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         posix_spawn(
             NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+
+    /**
+     * Cleans up all System V IPC objects owned by the specified user.
+     *
+     * On Darwin, IPC objects (shared memory segments, message queues, and semaphore)
+     * can persist after the build user's processes are killed, since there are no IPC namespaces
+     * like on Linux. This can exhaust kernel IPC limits over time.
+     *
+     * Uses sysctl to enumerate and remove all IPC objects owned by the given UID.
+     */
+    void cleanupSysVIPCForUser(uid_t uid)
+    {
+        struct IpcsCommand ic;
+        size_t ic_size = sizeof(ic);
+        // IPC ids to cleanup
+        std::vector<int> shm_ids, msg_ids, sem_ids;
+
+        {
+            struct shmid_ds shm_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_SHM_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &shm_ds;
+            ic.ipcs_datalen = sizeof(shm_ds);
+
+            while (true) {
+                memset(&shm_ds, 0, sizeof(shm_ds));
+
+                if (sysctlbyname(IPCS_SHM_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (shm_ds.shm_perm.uid == uid) {
+                    int shmid = shmget(shm_ds.shm_perm._key, 0, 0);
+                    if (shmid != -1) {
+                        shm_ids.push_back(shmid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : shm_ids) {
+            if (shmctl(id, IPC_RMID, NULL) == 0)
+                debug("removed shared memory segment with shmid %d", id);
+        }
+
+        {
+            struct msqid_ds msg_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_MSG_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &msg_ds;
+            ic.ipcs_datalen = sizeof(msg_ds);
+
+            while (true) {
+                memset(&msg_ds, 0, sizeof(msg_ds));
+
+                if (sysctlbyname(IPCS_MSG_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (msg_ds.msg_perm.uid == uid) {
+                    int msgid = msgget(msg_ds.msg_perm._key, 0);
+                    if (msgid != -1) {
+                        msg_ids.push_back(msgid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : msg_ids) {
+            if (msgctl(id, IPC_RMID, NULL) == 0)
+                debug("removed message queue with msgid %d", id);
+        }
+
+        {
+            struct semid_ds sem_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_SEM_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &sem_ds;
+            ic.ipcs_datalen = sizeof(sem_ds);
+
+            while (true) {
+                memset(&sem_ds, 0, sizeof(sem_ds));
+
+                if (sysctlbyname(IPCS_SEM_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (sem_ds.sem_perm.uid == uid) {
+                    int semid = semget(sem_ds.sem_perm._key, 0, 0);
+                    if (semid != -1) {
+                        sem_ids.push_back(semid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : sem_ids) {
+            if (semctl(id, 0, IPC_RMID) == 0)
+                debug("removed semaphore with semid %d", id);
+        }
+    }
+
+    void killSandbox(bool getStats) override
+    {
+        DerivationBuilderImpl::killSandbox(getStats);
+        if (buildUser) {
+            auto uid = buildUser->getUID();
+            cleanupSysVIPCForUser(uid);
+        }
     }
 };
 

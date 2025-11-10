@@ -3,6 +3,7 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/types.hh"
+#include "nix/util/json-non-null.hh"
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -36,6 +37,7 @@ enum struct ExperimentalFeature {
     MountedSSHStore,
     VerifiedFetches,
     PipeOperators,
+    ExternalBuilders,
     BLAKE3Hashes,
 };
 
@@ -86,8 +88,17 @@ public:
      */
     ExperimentalFeature missingFeature;
 
-    MissingExperimentalFeature(ExperimentalFeature missingFeature);
+    std::string reason;
+
+    MissingExperimentalFeature(ExperimentalFeature missingFeature, std::string reason = "");
 };
+
+/**
+ * `ExperimentalFeature` is always rendered as a string.
+ */
+template<>
+struct json_avoids_null<ExperimentalFeature> : std::true_type
+{};
 
 /**
  * Semi-magic conversion to and from json.

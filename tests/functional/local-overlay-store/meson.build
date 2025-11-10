@@ -1,7 +1,7 @@
 suites += {
-  'name': 'local-overlay-store',
-  'deps': [],
-  'tests': [
+  'name' : 'local-overlay-store',
+  'deps' : [],
+  'tests' : [
     'check-post-init.sh',
     'redundant-add.sh',
     'build.sh',
@@ -14,5 +14,5 @@ suites += {
     'optimise.sh',
     'stale-file-handle.sh',
   ],
-  'workdir': meson.current_source_dir(),
+  'workdir' : meson.current_source_dir(),
 }

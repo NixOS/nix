@@ -22,7 +22,7 @@ GENERATE_CMP_EXT(
     me->sigs,
     me->ca);
 
-std::string ValidPathInfo::fingerprint(const Store & store) const
+std::string ValidPathInfo::fingerprint(const StoreDirConfig & store) const
 {
     if (narSize == 0)
         throw Error(
@@ -81,7 +81,7 @@ std::optional<ContentAddressWithReferences> ValidPathInfo::contentAddressWithRef
     }
 }
 
-bool ValidPathInfo::isContentAddressed(const Store & store) const
+bool ValidPathInfo::isContentAddressed(const StoreDirConfig & store) const
 {
     auto fullCaOpt = contentAddressWithReferences();
 
@@ -98,7 +98,7 @@ bool ValidPathInfo::isContentAddressed(const Store & store) const
     return res;
 }
 
-size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & publicKeys) const
+size_t ValidPathInfo::checkSignatures(const StoreDirConfig & store, const PublicKeys & publicKeys) const
 {
     if (isContentAddressed(store))
         return maxSigs;
@@ -110,7 +110,8 @@ size_t ValidPathInfo::checkSignatures(const Store & store, const PublicKeys & pu
     return good;
 }
 
-bool ValidPathInfo::checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const
+bool ValidPathInfo::checkSignature(
+    const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -123,32 +124,39 @@ Strings ValidPathInfo::shortRefs() const
     return refs;
 }
 
-ValidPathInfo::ValidPathInfo(
-    const Store & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
-    : UnkeyedValidPathInfo(narHash)
-    , path(store.makeFixedOutputPathFromCA(name, ca))
+ValidPathInfo ValidPathInfo::makeFromCA(
+    const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash)
 {
-    this->ca = ContentAddress{
+    ValidPathInfo res{
+        store.makeFixedOutputPathFromCA(name, ca),
+        narHash,
+    };
+    res.ca = ContentAddress{
         .method = ca.getMethod(),
         .hash = ca.getHash(),
     };
-    std::visit(
+    res.references = std::visit(
         overloaded{
-            [this](TextInfo && ti) { this->references = std::move(ti.references); },
-            [this](FixedOutputInfo && foi) {
-                this->references = std::move(foi.references.others);
+            [&](TextInfo && ti) { return std::move(ti.references); },
+            [&](FixedOutputInfo && foi) {
+                auto references = std::move(foi.references.others);
                 if (foi.references.self)
-                    this->references.insert(path);
+                    references.insert(res.path);
+                return references;
             },
         },
         std::move(ca).raw);
+    return res;
 }
 
-nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json
+UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
 {
     using nlohmann::json;
 
     auto jsonObject = json::object();
+
+    jsonObject["version"] = 2;
 
     jsonObject["narHash"] = narHash.to_string(hashFormat, true);
     jsonObject["narSize"] = narSize;
@@ -159,7 +167,7 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImp
             jsonRefs.emplace_back(store.printStorePath(ref));
     }
 
-    jsonObject["ca"] = ca ? (std::optional{renderContentAddress(*ca)}) : std::nullopt;
+    jsonObject["ca"] = ca;
 
     if (includeImpureInfo) {
         jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
@@ -176,13 +184,23 @@ nlohmann::json UnkeyedValidPathInfo::toJSON(const Store & store, bool includeImp
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const Store & store, const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store, const nlohmann::json & _json)
 {
     UnkeyedValidPathInfo res{
         Hash(Hash::dummy),
     };
 
     auto & json = getObject(_json);
+
+    // Check version (optional for backward compatibility)
+    nlohmann::json::number_unsigned_t version = 1;
+    if (json.contains("version")) {
+        version = getUnsigned(valueAt(json, "version"));
+        if (version != 1 && version != 2) {
+            throw Error("Unsupported path info JSON format version %d, expected 1 through 2", version);
+        }
+    }
+
     res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
@@ -197,23 +215,31 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const Store & store, const n
 
     // New format as this as nullable but mandatory field; handling
     // missing is for back-compat.
-    if (json.contains("ca"))
-        if (auto * rawCa = getNullable(valueAt(json, "ca")))
-            res.ca = ContentAddress::parse(getString(*rawCa));
+    if (auto * rawCa0 = optionalValueAt(json, "ca"))
+        if (auto * rawCa = getNullable(*rawCa0))
+            switch (version) {
+            case 1:
+                // old string format also used in SQLite DB and .narinfo
+                res.ca = ContentAddress::parse(getString(*rawCa));
+                break;
+            case 2 ... std::numeric_limits<decltype(version)>::max():
+                res.ca = *rawCa;
+                break;
+            }
 
-    if (json.contains("deriver"))
-        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
+    if (auto * rawDeriver0 = optionalValueAt(json, "deriver"))
+        if (auto * rawDeriver = getNullable(*rawDeriver0))
             res.deriver = store.parseStorePath(getString(*rawDeriver));
 
-    if (json.contains("registrationTime"))
-        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+    if (auto * rawRegistrationTime0 = optionalValueAt(json, "registrationTime"))
+        if (auto * rawRegistrationTime = getNullable(*rawRegistrationTime0))
             res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
-    if (json.contains("ultimate"))
-        res.ultimate = getBoolean(valueAt(json, "ultimate"));
+    if (auto * rawUltimate = optionalValueAt(json, "ultimate"))
+        res.ultimate = getBoolean(*rawUltimate);
 
-    if (json.contains("signatures"))
-        res.sigs = getStringSet(valueAt(json, "signatures"));
+    if (auto * rawSignatures = optionalValueAt(json, "signatures"))
+        res.sigs = getStringSet(*rawSignatures);
 
     return res;
 }

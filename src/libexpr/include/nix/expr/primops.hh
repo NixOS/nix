@@ -8,22 +8,6 @@
 
 namespace nix {
 
-/**
- * For functions where we do not expect deep recursion, we can use a sizable
- * part of the stack a free allocation space.
- *
- * Note: this is expected to be multiplied by sizeof(Value), or about 24 bytes.
- */
-constexpr size_t nonRecursiveStackReservation = 128;
-
-/**
- * Functions that maybe applied to self-similar inputs, such as concatMap on a
- * tree, should reserve a smaller part of the stack for allocation.
- *
- * Note: this is expected to be multiplied by sizeof(Value), or about 24 bytes.
- */
-constexpr size_t conservativeStackReservation = 16;
-
 struct RegisterPrimOp
 {
     typedef std::vector<PrimOp> PrimOps;

@@ -4,6 +4,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 // Need specialization involving `SymbolStr` just in this one module.
 #include "nix/util/strings-inline.hh"
 
@@ -69,10 +70,10 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        Path cacheDir = getCacheDir() + "/eval-cache-v5";
+        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v6";
         createDirs(cacheDir);
 
-        Path dbPath = cacheDir + "/" + fingerprint.to_string(HashFormat::Base16, false) + ".sqlite";
+        auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
 
         state->db = SQLite(dbPath);
         state->db.isCache();
@@ -135,17 +136,19 @@ struct AttrDb
         });
     }
 
-    AttrId setString(AttrKey key, std::string_view s, const char ** context = nullptr)
+    AttrId setString(AttrKey key, std::string_view s, const Value::StringWithContext::Context * context = nullptr)
     {
         return doSQLite([&]() {
             auto state(_state->lock());
 
             if (context) {
                 std::string ctx;
-                for (const char ** p = context; *p; ++p) {
-                    if (p != context)
+                bool first = true;
+                for (auto * elem : *context) {
+                    if (!first)
                         ctx.push_back(' ');
-                    ctx.append(*p);
+                    ctx.append(elem->view());
+                    first = false;
                 }
                 state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String) (s) (ctx)
                     .exec();
@@ -329,7 +332,7 @@ AttrCursor::AttrCursor(
 AttrKey AttrCursor::getKey()
 {
     if (!parent)
-        return {0, root->state.sEpsilon};
+        return {0, root->state.s.epsilon};
     if (!parent->first->cachedValue) {
         parent->first->cachedValue = root->db->getAttr(parent->first->getKey());
         assert(parent->first->cachedValue);
@@ -405,7 +408,7 @@ Value & AttrCursor::forceValue()
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.c_str(), v.context()), string_t{v.c_str(), {}}};
+            cachedValue = {root->db->setString(getKey(), v.string_view(), v.context()), string_t{v.string_view(), {}}};
         else if (v.type() == nPath) {
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
@@ -540,7 +543,7 @@ std::string AttrCursor::getString()
     if (v.type() != nString && v.type() != nPath)
         root->state.error<TypeError>("'%s' is not a string but %s", getAttrPathStr(), showType(v)).debugThrow();
 
-    return v.type() == nString ? v.c_str() : v.path().to_string();
+    return v.type() == nString ? std::string(v.string_view()) : v.path().to_string();
 }
 
 string_t AttrCursor::getStringWithContext()
@@ -579,7 +582,7 @@ string_t AttrCursor::getStringWithContext()
     if (v.type() == nString) {
         NixStringContext context;
         copyContext(v, context);
-        return {v.c_str(), std::move(context)};
+        return {std::string{v.string_view()}, std::move(context)};
     } else if (v.type() == nPath)
         return {v.path().to_string(), {}};
     else
@@ -701,7 +704,7 @@ bool AttrCursor::isDerivation()
 
 StorePath AttrCursor::forceDerivation()
 {
-    auto aDrvPath = getAttr(root->state.sDrvPath);
+    auto aDrvPath = getAttr(root->state.s.drvPath);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {

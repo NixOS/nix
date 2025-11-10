@@ -9,6 +9,8 @@
 
 #include "nix_api_util_config.h"
 
+extern "C" {
+
 nix_c_context * nix_c_context_create()
 {
     return new nix_c_context();
@@ -151,8 +153,22 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data)
+nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data)
 {
-    callback(str.c_str(), str.size(), user_data);
+    callback(str.data(), str.size(), user_data);
     return NIX_OK;
 }
+
+nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (level > NIX_LVL_VOMIT || level < NIX_LVL_ERROR)
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Invalid verbosity level");
+    try {
+        nix::verbosity = static_cast<nix::Verbosity>(level);
+    }
+    NIXC_CATCH_ERRS
+}
+
+} // extern "C"

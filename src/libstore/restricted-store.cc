@@ -2,6 +2,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/local-store.hh"
 
 namespace nix {
 
@@ -57,11 +58,6 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
         return next->config->realStoreDir;
     }
 
-    std::string getUri() override
-    {
-        return next->getUri();
-    }
-
     StorePathSet queryAllValidPaths() override;
 
     void queryPathInfoUncached(
@@ -111,7 +107,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
     void registerDrvOutput(const Realisation & info) override;
 
     void queryRealisationUncached(
-        const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
@@ -230,7 +226,7 @@ void RestrictedStore::narFromPath(const StorePath & path, Sink & sink)
 {
     if (!goal.isAllowed(path))
         throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-    LocalFSStore::narFromPath(path, sink);
+    Store::narFromPath(path, sink);
 }
 
 void RestrictedStore::ensurePath(const StorePath & path)
@@ -248,7 +244,7 @@ void RestrictedStore::registerDrvOutput(const Realisation & info)
 }
 
 void RestrictedStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 // XXX: This should probably be allowed if the realisation corresponds to
 // an allowed derivation
 {
@@ -261,8 +257,8 @@ void RestrictedStore::buildPaths(
     const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
     for (auto & result : buildPathsWithResults(paths, buildMode, evalStore))
-        if (!result.success())
-            result.rethrow();
+        if (auto * failureP = result.tryGetFailure())
+            failureP->rethrow();
 }
 
 std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
@@ -284,9 +280,11 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     auto results = next->buildPathsWithResults(paths, buildMode);
 
     for (auto & result : results) {
-        for (auto & [outputName, output] : result.builtOutputs) {
-            newPaths.insert(output.outPath);
-            newRealisations.insert(output);
+        if (auto * successP = result.tryGetSuccess()) {
+            for (auto & [outputName, output] : successP->builtOutputs) {
+                newPaths.insert(output.outPath);
+                newRealisations.insert(output);
+            }
         }
     }
 

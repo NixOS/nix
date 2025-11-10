@@ -1,10 +1,10 @@
-#include <regex>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
+#include "nix/store/path.hh"
+#include "nix/store/store-dir-config.hh"
 #include "nix/util/util.hh"
-#include "nix/util/regex-combinators.hh"
 #include "nix/store/outputs-spec.hh"
-#include "nix/store/path-regex.hh"
 #include "nix/util/strings-inline.hh"
 
 namespace nix {
@@ -19,31 +19,27 @@ bool OutputsSpec::contains(const std::string & outputName) const
         raw);
 }
 
-static std::string outputSpecRegexStr = regex::either(regex::group(R"(\*)"), regex::group(regex::list(nameRegexStr)));
-
 std::optional<OutputsSpec> OutputsSpec::parseOpt(std::string_view s)
 {
-    static std::regex regex(std::string{outputSpecRegexStr});
-
-    std::cmatch match;
-    if (!std::regex_match(s.cbegin(), s.cend(), match, regex))
+    try {
+        return parse(s);
+    } catch (BadStorePathName &) {
         return std::nullopt;
-
-    if (match[1].matched)
-        return {OutputsSpec::All{}};
-
-    if (match[2].matched)
-        return OutputsSpec::Names{tokenizeString<StringSet>({match[2].first, match[2].second}, ",")};
-
-    assert(false);
+    }
 }
 
 OutputsSpec OutputsSpec::parse(std::string_view s)
 {
-    std::optional spec = parseOpt(s);
-    if (!spec)
-        throw Error("invalid outputs specifier '%s'", s);
-    return std::move(*spec);
+    using namespace std::string_view_literals;
+
+    if (s == "*"sv)
+        return OutputsSpec::All{};
+
+    auto names = splitString<StringSet>(s, ",");
+    for (const auto & name : names)
+        checkName(name);
+
+    return OutputsSpec::Names{std::move(names)};
 }
 
 std::optional<std::pair<std::string_view, ExtendedOutputsSpec>> ExtendedOutputsSpec::parseOpt(std::string_view s)
@@ -150,7 +146,7 @@ OutputsSpec adl_serializer<OutputsSpec>::from_json(const json & json)
         return OutputsSpec::Names{std::move(names)};
 }
 
-void adl_serializer<OutputsSpec>::to_json(json & json, OutputsSpec t)
+void adl_serializer<OutputsSpec>::to_json(json & json, const OutputsSpec & t)
 {
     std::visit(
         overloaded{
@@ -169,7 +165,7 @@ ExtendedOutputsSpec adl_serializer<ExtendedOutputsSpec>::from_json(const json & 
     }
 }
 
-void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, ExtendedOutputsSpec t)
+void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, const ExtendedOutputsSpec & t)
 {
     std::visit(
         overloaded{

@@ -8,8 +8,10 @@
     "dev": "/02qcpld1y6xhs5gz9bchpxaw0xdhmsp5dv88lh25r2ss44kh8dxz",
     "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
   },
-  "inputDrvs": {},
-  "inputSrcs": [],
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
   "name": "advanced-attributes-structured-attrs-defaults",
   "outputs": {
     "dev": {
@@ -32,5 +34,6 @@
     ],
     "system": "my-system"
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

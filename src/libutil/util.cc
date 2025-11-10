@@ -132,15 +132,16 @@ std::optional<N> string2Float(const std::string_view s)
 template std::optional<double> string2Float<double>(const std::string_view s);
 template std::optional<float> string2Float<float>(const std::string_view s);
 
-std::string renderSize(uint64_t value, bool align)
+std::string renderSize(int64_t value, bool align)
 {
     static const std::array<char, 9> prefixes{{'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
     size_t power = 0;
-    double res = value;
-    while (res > 1024 && power < prefixes.size()) {
+    double abs_value = std::abs(value);
+    while (abs_value > 1024 && power < prefixes.size()) {
         ++power;
-        res /= 1024;
+        abs_value /= 1024;
     }
+    double res = (double) value / std::pow(1024.0, power);
     return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
 }
 
@@ -204,70 +205,6 @@ void ignoreExceptionExceptInterrupt(Verbosity lvl)
     }
 }
 
-constexpr char base64Chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-std::string base64Encode(std::string_view s)
-{
-    std::string res;
-    res.reserve((s.size() + 2) / 3 * 4);
-    int data = 0, nbits = 0;
-
-    for (char c : s) {
-        data = data << 8 | (unsigned char) c;
-        nbits += 8;
-        while (nbits >= 6) {
-            nbits -= 6;
-            res.push_back(base64Chars[data >> nbits & 0x3f]);
-        }
-    }
-
-    if (nbits)
-        res.push_back(base64Chars[data << (6 - nbits) & 0x3f]);
-    while (res.size() % 4)
-        res.push_back('=');
-
-    return res;
-}
-
-std::string base64Decode(std::string_view s)
-{
-    constexpr char npos = -1;
-    constexpr std::array<char, 256> base64DecodeChars = [&] {
-        std::array<char, 256> result{};
-        for (auto & c : result)
-            c = npos;
-        for (int i = 0; i < 64; i++)
-            result[base64Chars[i]] = i;
-        return result;
-    }();
-
-    std::string res;
-    // Some sequences are missing the padding consisting of up to two '='.
-    //                    vvv
-    res.reserve((s.size() + 2) / 4 * 3);
-    unsigned int d = 0, bits = 0;
-
-    for (char c : s) {
-        if (c == '=')
-            break;
-        if (c == '\n')
-            continue;
-
-        char digit = base64DecodeChars[(unsigned char) c];
-        if (digit == npos)
-            throw FormatError("invalid character in Base64 string: '%c'", c);
-
-        bits += 6;
-        d = d << 6 | digit;
-        if (bits >= 8) {
-            res.push_back(d >> (bits - 8) & 0xff);
-            bits -= 8;
-        }
-    }
-
-    return res;
-}
-
 std::string stripIndentation(std::string_view s)
 {
     size_t minIndent = 10000;
@@ -318,11 +255,6 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
             line = line.substr(0, line.size() - 1);
         return {line, s.substr(newline + 1)};
     }
-}
-
-std::string showBytes(uint64_t bytes)
-{
-    return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
 
 } // namespace nix

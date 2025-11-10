@@ -8,6 +8,7 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/store/names.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/store/globals.hh"
 #include "self-exe.hh"
 
 using namespace nix;
@@ -155,13 +156,13 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = FileTransferRequest((std::string &) settings.upgradeNixStorePathUrl);
+        auto req = FileTransferRequest(parseURL(settings.upgradeNixStorePathUrl.get()));
         auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(LookupPath{}, store, fetchSettings, evalSettings);
         auto v = state->allocValue();
         state->eval(state->parseExprFromString(res.data, state->rootPath(CanonPath("/no-such-path"))), *v);
-        Bindings & bindings(*state->allocBindings(0));
+        Bindings & bindings = Bindings::emptyBindings;
         auto v2 = findAlongAttrPath(*state, settings.thisSystem, bindings, *v).first;
 
         return store->parseStorePath(

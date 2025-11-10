@@ -1,0 +1,54 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/hash-v1.json"
+title: Hash
+description: |
+  A cryptographic hash value used throughout Nix for content addressing and integrity verification.
+
+  This schema describes the JSON representation of Nix's `Hash` type.
+type: object
+properties:
+  algorithm:
+    "$ref": "#/$defs/algorithm"
+  format:
+    type: string
+    enum:
+    - base64
+    - nix32
+    - base16
+    - sri
+    title: Hash format
+    description: |
+      The encoding format of the hash value.
+
+      - `base64` uses standard Base64 encoding [RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4)
+      - `nix32` is Nix-specific base-32 encoding
+      - `base16` is lowercase hexadecimal
+      - `sri` is the [Subresource Integrity format](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity).
+  hash:
+    type: string
+    title: Hash
+    description: |
+      The encoded hash value, itself.
+
+      It is specified in the format specified by the `format` field.
+      It must be the right length for the hash algorithm specified in the `algorithm` field, also.
+      The hash value does not include any algorithm prefix.
+required:
+- algorithm
+- format
+- hash
+additionalProperties: false
+"$defs":
+  algorithm:
+    type: string
+    enum:
+    - blake3
+    - md5
+    - sha1
+    - sha256
+    - sha512
+    title: Hash algorithm
+    description: |
+      The hash algorithm used to compute the hash value.
+
+      `blake3` is currently experimental and requires the [`blake-hashing`](@docroot@/development/experimental-features.md#xp-feature-blake3-hashes) experimental feature.

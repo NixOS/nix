@@ -97,6 +97,8 @@ struct Source
     void drainInto(Sink & sink);
 
     std::string drain();
+
+    virtual void skip(size_t len);
 };
 
 /**
@@ -177,6 +179,7 @@ struct FdSource : BufferedSource
     Descriptor fd;
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
+    bool isSeekable = true;
 
     FdSource()
         : fd(INVALID_DESCRIPTOR)
@@ -199,6 +202,8 @@ struct FdSource : BufferedSource
      * read.
      */
     bool hasData();
+
+    void skip(size_t len) override;
 
 protected:
     size_t readUnbuffered(char * data, size_t len) override;
@@ -226,9 +231,17 @@ struct StringSink : Sink
 };
 
 /**
+ * Source type that can be restarted.
+ */
+struct RestartableSource : Source
+{
+    virtual void restart() = 0;
+};
+
+/**
  * A source that reads data from a string.
  */
-struct StringSource : Source
+struct StringSource : RestartableSource
 {
     std::string_view s;
     size_t pos;
@@ -250,7 +263,67 @@ struct StringSource : Source
     }
 
     size_t read(char * data, size_t len) override;
+
+    void skip(size_t len) override;
+
+    void restart() override
+    {
+        pos = 0;
+    }
 };
+
+/**
+ * Compresses a RestartableSource using the specified compression method.
+ *
+ * @note currently this buffers the entire compressed data stream in memory. In the future it may instead compress data
+ * on demand, lazily pulling from the original `RestartableSource`. In that case, the `size()` method would go away
+ * because we would not in fact know the compressed size in advance.
+ */
+struct CompressedSource : RestartableSource
+{
+private:
+    std::string compressedData;
+    std::string compressionMethod;
+    StringSource stringSource;
+
+public:
+    /**
+     * Compress a RestartableSource using the specified compression method.
+     *
+     * @param source The source data to compress
+     * @param compressionMethod The compression method to use (e.g., "xz", "br")
+     */
+    CompressedSource(RestartableSource & source, const std::string & compressionMethod);
+
+    size_t read(char * data, size_t len) override
+    {
+        return stringSource.read(data, len);
+    }
+
+    void restart() override
+    {
+        stringSource.restart();
+    }
+
+    uint64_t size() const
+    {
+        return compressedData.size();
+    }
+
+    std::string_view getCompressionMethod() const
+    {
+        return compressionMethod;
+    }
+};
+
+/**
+ * Create a restartable Source from a factory function.
+ *
+ * @param factory Factory function that returns a fresh instance of the Source. Gets
+ * called for each source restart.
+ * @pre factory must return an equivalent source for each invocation.
+ */
+std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory);
 
 /**
  * A sink that writes all incoming data to two other sinks.

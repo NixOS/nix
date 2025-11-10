@@ -83,12 +83,22 @@ nlohmann::json SingleBuiltPath::Built::toJSON(const StoreDirConfig & store) cons
 
 nlohmann::json SingleBuiltPath::toJSON(const StoreDirConfig & store) const
 {
-    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
+    return std::visit(
+        overloaded{
+            [&](const SingleBuiltPath::Opaque & o) -> nlohmann::json { return store.printStorePath(o.path); },
+            [&](const SingleBuiltPath::Built & b) { return b.toJSON(store); },
+        },
+        raw());
 }
 
 nlohmann::json BuiltPath::toJSON(const StoreDirConfig & store) const
 {
-    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
+    return std::visit(
+        overloaded{
+            [&](const BuiltPath::Opaque & o) -> nlohmann::json { return store.printStorePath(o.path); },
+            [&](const BuiltPath::Built & b) { return b.toJSON(store); },
+        },
+        raw());
 }
 
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
@@ -107,10 +117,11 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
                                 "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
                                 store.printStorePath(p.drvPath->outPath()),
                                 outputName);
-                        auto thisRealisation = store.queryRealisation(DrvOutput{*drvOutput, outputName});
+                        DrvOutput key{*drvOutput, outputName};
+                        auto thisRealisation = store.queryRealisation(key);
                         assert(thisRealisation); // We’ve built it, so we must
                                                  // have the realisation
-                        res.insert(*thisRealisation);
+                        res.insert(Realisation{*thisRealisation, std::move(key)});
                     } else {
                         res.insert(outputPath);
                     }

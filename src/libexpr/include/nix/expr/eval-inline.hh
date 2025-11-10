@@ -6,9 +6,6 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 
-// For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
-#include "nix/expr/config.hh"
-
 namespace nix {
 
 /**
@@ -29,7 +26,7 @@ inline void * allocBytes(size_t n)
 }
 
 [[gnu::always_inline]]
-Value * EvalState::allocValue()
+Value * EvalMemory::allocValue()
 {
 #if NIX_USE_BOEHMGC
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
@@ -51,15 +48,15 @@ Value * EvalState::allocValue()
     void * p = allocBytes(sizeof(Value));
 #endif
 
-    nrValues++;
+    stats.nrValues++;
     return (Value *) p;
 }
 
 [[gnu::always_inline]]
-Env & EvalState::allocEnv(size_t size)
+Env & EvalMemory::allocEnv(size_t size)
 {
-    nrEnvs++;
-    nrValuesInEnvs += size;
+    stats.nrEnvs++;
+    stats.nrValuesInEnvs += size;
 
     Env * env;
 

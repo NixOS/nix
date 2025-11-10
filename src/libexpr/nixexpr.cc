@@ -11,7 +11,7 @@
 
 namespace nix {
 
-unsigned long Expr::nrExprs = 0;
+Counter Expr::nrExprs;
 
 ExprBlackHole eBlackHole;
 
@@ -40,12 +40,12 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    printLiteralString(str, s);
+    printLiteralString(str, v.string_view());
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    str << s;
+    str << v.pathStrView();
 }
 
 void ExprVar::show(const SymbolTable & symbols, std::ostream & str) const
@@ -57,7 +57,7 @@ void ExprSelect::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(";
     e->show(symbols, str);
-    str << ")." << showAttrPath(symbols, attrPath);
+    str << ")." << showAttrPath(symbols, getAttrPath());
     if (def) {
         str << " or (";
         def->show(symbols, str);
@@ -154,7 +154,7 @@ void ExprList::show(const SymbolTable & symbols, std::ostream & str) const
 void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(";
-    if (hasFormals()) {
+    if (auto formals = getFormals()) {
         str << "{ ";
         bool first = true;
         // the natural Symbol ordering is by creation time, which can lead to the
@@ -171,7 +171,7 @@ void ExprLambda::show(const SymbolTable & symbols, std::ostream & str) const
                 i.def->show(symbols, str);
             }
         }
-        if (formals->ellipsis) {
+        if (ellipsis) {
             if (!first)
                 str << ", ";
             str << "...";
@@ -246,7 +246,7 @@ void ExprConcatStrings::show(const SymbolTable & symbols, std::ostream & str) co
 {
     bool first = true;
     str << "(";
-    for (auto & i : *es) {
+    for (auto & i : es) {
         if (first)
             first = false;
         else
@@ -261,7 +261,7 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
     str << "__curPos";
 }
 
-std::string showAttrPath(const SymbolTable & symbols, const AttrPath & attrPath)
+std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath)
 {
     std::ostringstream out;
     bool first = true;
@@ -362,7 +362,7 @@ void ExprSelect::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
     e->bindVars(es, env);
     if (def)
         def->bindVars(es, env);
-    for (auto & i : attrPath)
+    for (auto & i : getAttrPath())
         if (!i.symbol)
             i.expr->bindVars(es, env);
 }
@@ -452,14 +452,14 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv =
-        std::make_shared<StaticEnv>(nullptr, env, (hasFormals() ? formals->formals.size() : 0) + (!arg ? 0 : 1));
+        std::make_shared<StaticEnv>(nullptr, env, (getFormals() ? getFormals()->formals.size() : 0) + (!arg ? 0 : 1));
 
     Displacement displ = 0;
 
     if (arg)
         newEnv->vars.emplace_back(arg, displ++);
 
-    if (hasFormals()) {
+    if (auto formals = getFormals()) {
         for (auto & i : formals->formals)
             newEnv->vars.emplace_back(i.name, displ++);
 
@@ -523,6 +523,7 @@ void ExprWith::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
     prevWith = 0;
     for (curEnv = env.get(), level = 1; curEnv; curEnv = curEnv->up.get(), level++)
         if (curEnv->isWith) {
+            assert(level <= std::numeric_limits<uint32_t>::max());
             prevWith = level;
             break;
         }
@@ -564,7 +565,7 @@ void ExprConcatStrings::bindVars(EvalState & es, const std::shared_ptr<const Sta
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
-    for (auto & i : *this->es)
+    for (auto & i : this->es)
         i.second->bindVars(es, env);
 }
 

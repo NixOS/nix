@@ -2,15 +2,16 @@
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/s3.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 
 #include "store-config-private.hh"
-#if NIX_WITH_S3_SUPPORT
-#  include <aws/core/client/ClientConfiguration.h>
+#include "nix/store/s3-url.hh"
+#include <optional>
+#if NIX_WITH_AWS_AUTH
+#  include "nix/store/aws-creds.hh"
 #endif
 
 #ifdef __linux__
@@ -100,7 +101,7 @@ struct curlFileTransfer : public FileTransfer
                   lvlTalkative,
                   actFileTransfer,
                   fmt("%sing '%s'", request.verb(), request.uri),
-                  {request.uri},
+                  {request.uri.to_string()},
                   request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
@@ -121,7 +122,7 @@ struct curlFileTransfer : public FileTransfer
                     this->result.data.append(data);
             })
         {
-            result.urls.push_back(request.uri);
+            result.urls.push_back(request.uri.to_string());
 
             requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
@@ -294,20 +295,17 @@ struct curlFileTransfer : public FileTransfer
             return 0;
         }
 
-        size_t readOffset = 0;
-
-        size_t readCallback(char * buffer, size_t size, size_t nitems)
-        {
-            if (readOffset == request.data->length())
-                return 0;
-            auto count = std::min(size * nitems, request.data->length() - readOffset);
-            assert(count);
-            memcpy(buffer, request.data->data() + readOffset, count);
-            readOffset += count;
-            return count;
+        size_t readCallback(char * buffer, size_t size, size_t nitems) noexcept
+        try {
+            auto data = request.data;
+            return data->source->read(buffer, nitems * size);
+        } catch (EndOfFile &) {
+            return 0;
+        } catch (...) {
+            return CURL_READFUNC_ABORT;
         }
 
-        static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp)
+        static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp) noexcept
         {
             return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
@@ -321,19 +319,24 @@ struct curlFileTransfer : public FileTransfer
         }
 #endif
 
-        size_t seekCallback(curl_off_t offset, int origin)
-        {
+        size_t seekCallback(curl_off_t offset, int origin) noexcept
+        try {
+            auto source = request.data->source;
             if (origin == SEEK_SET) {
-                readOffset = offset;
+                source->restart();
+                source->skip(offset);
             } else if (origin == SEEK_CUR) {
-                readOffset += offset;
+                source->skip(offset);
             } else if (origin == SEEK_END) {
-                readOffset = request.data->length() + offset;
+                NullSink sink{};
+                source->drainInto(sink);
             }
             return CURL_SEEKFUNC_OK;
+        } catch (...) {
+            return CURL_SEEKFUNC_FAIL;
         }
 
-        static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin)
+        static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
             return ((TransferItem *) clientp)->seekCallback(offset, origin);
         }
@@ -350,7 +353,7 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }
 
-            curl_easy_setopt(req, CURLOPT_URL, request.uri.c_str());
+            curl_easy_setopt(req, CURLOPT_URL, request.uri.to_string().c_str());
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
@@ -383,28 +386,30 @@ struct curlFileTransfer : public FileTransfer
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.head)
+            if (request.method == HttpMethod::HEAD)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
+            if (request.method == HttpMethod::DELETE)
+                curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
+
             if (request.data) {
-                if (request.post)
+                if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
-                else
+                    curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->sizeHint);
+                } else if (request.method == HttpMethod::PUT) {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->sizeHint);
+                } else {
+                    unreachable();
+                }
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
-                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
                 curl_easy_setopt(req, CURLOPT_SEEKFUNCTION, seekCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
-            if (request.verifyTLS) {
-                if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
-            } else {
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
-            }
+            if (settings.caFile != "")
+                curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
 
 #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
@@ -425,6 +430,24 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
+
+            // Set up username/password authentication if provided
+            if (request.usernameAuth) {
+                curl_easy_setopt(req, CURLOPT_USERNAME, request.usernameAuth->username.c_str());
+                if (request.usernameAuth->password) {
+                    curl_easy_setopt(req, CURLOPT_PASSWORD, request.usernameAuth->password->c_str());
+                }
+            }
+
+#if NIX_WITH_AWS_AUTH
+            // Set up AWS SigV4 signing if this is an S3 request
+            // Note: AWS SigV4 support guaranteed available (curl >= 7.75.0 checked at build time)
+            // The username/password (access key ID and secret key) are set via the general
+            // usernameAuth mechanism above.
+            if (request.awsSigV4Provider) {
+                curl_easy_setopt(req, CURLOPT_AWS_SIGV4, request.awsSigV4Provider->c_str());
+            }
+#endif
 
             result.data.clear();
             result.bodySize = 0;
@@ -577,7 +600,14 @@ struct curlFileTransfer : public FileTransfer
                     decompressionSink.reset();
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    fileTransfer.enqueueItem(shared_from_this());
+                    try {
+                        fileTransfer.enqueueItem(shared_from_this());
+                    } catch (const nix::Error & e) {
+                        // If enqueue fails (e.g., during shutdown), fail the transfer properly
+                        // instead of letting the exception propagate, which would leave done=false
+                        // and cause the destructor to attempt a second callback invocation
+                        fail(std::move(exc));
+                    }
                 } else
                     fail(std::move(exc));
             }
@@ -594,10 +624,24 @@ struct curlFileTransfer : public FileTransfer
             }
         };
 
-        bool quit = false;
         std::
             priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator>
                 incoming;
+    private:
+        bool quitting = false;
+    public:
+        void quit()
+        {
+            quitting = true;
+            /* We wil not be processing any more incoming requests */
+            while (!incoming.empty())
+                incoming.pop();
+        }
+
+        bool isQuitting()
+        {
+            return quitting;
+        }
     };
 
     Sync<State> state_;
@@ -649,7 +693,7 @@ struct curlFileTransfer : public FileTransfer
         /* Signal the worker thread to exit. */
         {
             auto state(state_.lock());
-            state->quit = true;
+            state->quit();
         }
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ", false);
@@ -750,7 +794,7 @@ struct curlFileTransfer : public FileTransfer
                         break;
                     }
                 }
-                quit = state->quit;
+                quit = state->isQuitting();
             }
 
             for (auto & item : incoming) {
@@ -767,29 +811,32 @@ struct curlFileTransfer : public FileTransfer
 
     void workerThreadEntry()
     {
+        // Unwinding or because someone called `quit`.
+        bool normalExit = true;
         try {
             workerThreadMain();
         } catch (nix::Interrupted & e) {
+            normalExit = false;
         } catch (std::exception & e) {
             printError("unexpected error in download thread: %s", e.what());
+            normalExit = false;
         }
 
-        {
+        if (!normalExit) {
             auto state(state_.lock());
-            while (!state->incoming.empty())
-                state->incoming.pop();
-            state->quit = true;
+            state->quit();
         }
     }
 
     void enqueueItem(std::shared_ptr<TransferItem> item)
     {
-        if (item->request.data && !hasPrefix(item->request.uri, "http://") && !hasPrefix(item->request.uri, "https://"))
-            throw nix::Error("uploading to '%s' is not supported", item->request.uri);
+        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
+            && item->request.uri.scheme() != "s3")
+            throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
 
         {
             auto state(state_.lock());
-            if (state->quit)
+            if (state->isQuitting())
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
         }
@@ -798,52 +845,13 @@ struct curlFileTransfer : public FileTransfer
 #endif
     }
 
-#if NIX_WITH_S3_SUPPORT
-    std::tuple<std::string, std::string, Store::Config::Params> parseS3Uri(std::string uri)
-    {
-        auto [path, params] = splitUriAndParams(uri);
-
-        auto slash = path.find('/', 5); // 5 is the length of "s3://" prefix
-        if (slash == std::string::npos)
-            throw nix::Error("bad S3 URI '%s'", path);
-
-        std::string bucketName(path, 5, slash - 5);
-        std::string key(path, slash + 1);
-
-        return {bucketName, key, params};
-    }
-#endif
-
     void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Ugly hack to support s3:// URIs. */
-        if (hasPrefix(request.uri, "s3://")) {
-            // FIXME: do this on a worker thread
-            try {
-#if NIX_WITH_S3_SUPPORT
-                auto [bucketName, key, params] = parseS3Uri(request.uri);
-
-                std::string profile = getOr(params, "profile", "");
-                std::string region = getOr(params, "region", Aws::Region::US_EAST_1);
-                std::string scheme = getOr(params, "scheme", "");
-                std::string endpoint = getOr(params, "endpoint", "");
-
-                S3Helper s3Helper(profile, region, scheme, endpoint);
-
-                // FIXME: implement ETag
-                auto s3Res = s3Helper.getObject(bucketName, key);
-                FileTransferResult res;
-                if (!s3Res.data)
-                    throw FileTransferError(NotFound, {}, "S3 object '%s' does not exist", request.uri);
-                res.data = std::move(*s3Res.data);
-                res.urls.push_back(request.uri);
-                callback(std::move(res));
-#else
-                throw nix::Error("cannot download '%s' because Nix is not built with S3 support", request.uri);
-#endif
-            } catch (...) {
-                callback.rethrow();
-            }
+        /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
+        if (request.uri.scheme() == "s3") {
+            auto modifiedRequest = request;
+            modifiedRequest.setupForS3();
+            enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
             return;
         }
 
@@ -860,7 +868,7 @@ ref<FileTransfer> getFileTransfer()
 {
     static ref<curlFileTransfer> fileTransfer = makeCurlFileTransfer();
 
-    if (fileTransfer->state_.lock()->quit)
+    if (fileTransfer->state_.lock()->isQuitting())
         fileTransfer = makeCurlFileTransfer();
 
     return fileTransfer;
@@ -869,6 +877,36 @@ ref<FileTransfer> getFileTransfer()
 ref<FileTransfer> makeFileTransfer()
 {
     return makeCurlFileTransfer();
+}
+
+void FileTransferRequest::setupForS3()
+{
+    auto parsedS3 = ParsedS3URL::parse(uri.parsed());
+    // Update the request URI to use HTTPS (works without AWS SDK)
+    uri = parsedS3.toHttpsUrl();
+
+#if NIX_WITH_AWS_AUTH
+    // Auth-specific code only compiled when AWS support is available
+    awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
+
+    // check if the request already has pre-resolved credentials
+    std::optional<std::string> sessionToken;
+    if (usernameAuth) {
+        debug("Using pre-resolved AWS credentials from parent process");
+        sessionToken = preResolvedAwsSessionToken;
+    } else if (auto creds = getAwsCredentialsProvider()->maybeGetCredentials(parsedS3)) {
+        usernameAuth = UsernameAuth{
+            .username = creds->accessKeyId,
+            .password = creds->secretAccessKey,
+        };
+        sessionToken = creds->sessionToken;
+    }
+    if (sessionToken)
+        headers.emplace_back("x-amz-security-token", *sessionToken);
+#else
+    // When built without AWS support, just try as public bucket
+    debug("S3 request without authentication (built without AWS support)");
+#endif
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
@@ -892,6 +930,11 @@ FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
     /* Note: this method is the same as download, but helps in readability */
+    return enqueueFileTransfer(request).get();
+}
+
+FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
+{
     return enqueueFileTransfer(request).get();
 }
 

@@ -195,18 +195,18 @@ TEST_F(PrimOpTest, unsafeGetAttrPos)
     auto v = eval(expr);
     ASSERT_THAT(v, IsAttrsOfSize(3));
 
-    auto file = v.attrs()->find(createSymbol("file"));
+    auto file = v.attrs()->get(createSymbol("file"));
     ASSERT_NE(file, nullptr);
     ASSERT_THAT(*file->value, IsString());
     auto s = baseNameOf(file->value->string_view());
     ASSERT_EQ(s, "foo.nix");
 
-    auto line = v.attrs()->find(createSymbol("line"));
+    auto line = v.attrs()->get(createSymbol("line"));
     ASSERT_NE(line, nullptr);
     state.forceValue(*line->value, noPos);
     ASSERT_THAT(*line->value, IsIntEq(4));
 
-    auto column = v.attrs()->find(createSymbol("column"));
+    auto column = v.attrs()->get(createSymbol("column"));
     ASSERT_NE(column, nullptr);
     state.forceValue(*column->value, noPos);
     ASSERT_THAT(*column->value, IsIntEq(3));
@@ -246,7 +246,7 @@ TEST_F(PrimOpTest, removeAttrsRetains)
 {
     auto v = eval("builtins.removeAttrs { x = 1; y = 2; } [\"x\"]");
     ASSERT_THAT(v, IsAttrsOfSize(1));
-    ASSERT_NE(v.attrs()->find(createSymbol("y")), nullptr);
+    ASSERT_NE(v.attrs()->get(createSymbol("y")), nullptr);
 }
 
 TEST_F(PrimOpTest, listToAttrsEmptyList)
@@ -266,7 +266,7 @@ TEST_F(PrimOpTest, listToAttrs)
 {
     auto v = eval("builtins.listToAttrs [ { name = \"key\"; value = 123; } ]");
     ASSERT_THAT(v, IsAttrsOfSize(1));
-    auto key = v.attrs()->find(createSymbol("key"));
+    auto key = v.attrs()->get(createSymbol("key"));
     ASSERT_NE(key, nullptr);
     ASSERT_THAT(*key->value, IsIntEq(123));
 }
@@ -275,7 +275,7 @@ TEST_F(PrimOpTest, intersectAttrs)
 {
     auto v = eval("builtins.intersectAttrs { a = 1; b = 2; } { b = 3; c = 4; }");
     ASSERT_THAT(v, IsAttrsOfSize(1));
-    auto b = v.attrs()->find(createSymbol("b"));
+    auto b = v.attrs()->get(createSymbol("b"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsIntEq(3));
 }
@@ -293,11 +293,11 @@ TEST_F(PrimOpTest, functionArgs)
     auto v = eval("builtins.functionArgs ({ x, y ? 123}: 1)");
     ASSERT_THAT(v, IsAttrsOfSize(2));
 
-    auto x = v.attrs()->find(createSymbol("x"));
+    auto x = v.attrs()->get(createSymbol("x"));
     ASSERT_NE(x, nullptr);
     ASSERT_THAT(*x->value, IsFalse());
 
-    auto y = v.attrs()->find(createSymbol("y"));
+    auto y = v.attrs()->get(createSymbol("y"));
     ASSERT_NE(y, nullptr);
     ASSERT_THAT(*y->value, IsTrue());
 }
@@ -307,13 +307,13 @@ TEST_F(PrimOpTest, mapAttrs)
     auto v = eval("builtins.mapAttrs (name: value: value * 10) { a = 1; b = 2; }");
     ASSERT_THAT(v, IsAttrsOfSize(2));
 
-    auto a = v.attrs()->find(createSymbol("a"));
+    auto a = v.attrs()->get(createSymbol("a"));
     ASSERT_NE(a, nullptr);
     ASSERT_THAT(*a->value, IsThunk());
     state.forceValue(*a->value, noPos);
     ASSERT_THAT(*a->value, IsIntEq(10));
 
-    auto b = v.attrs()->find(createSymbol("b"));
+    auto b = v.attrs()->get(createSymbol("b"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsThunk());
     state.forceValue(*b->value, noPos);
@@ -642,7 +642,7 @@ class ToStringPrimOpTest : public PrimOpTest,
 
 TEST_P(ToStringPrimOpTest, toString)
 {
-    const auto [input, output] = GetParam();
+    const auto & [input, output] = GetParam();
     auto v = eval(input);
     ASSERT_THAT(v, IsStringEq(output));
 }
@@ -771,7 +771,7 @@ TEST_F(PrimOpTest, derivation)
     ASSERT_EQ(v.type(), nFunction);
     ASSERT_TRUE(v.isLambda());
     ASSERT_NE(v.lambda().fun, nullptr);
-    ASSERT_TRUE(v.lambda().fun->hasFormals());
+    ASSERT_TRUE(v.lambda().fun->getFormals());
 }
 
 TEST_F(PrimOpTest, currentTime)
@@ -798,7 +798,7 @@ class CompareVersionsPrimOpTest : public PrimOpTest,
 
 TEST_P(CompareVersionsPrimOpTest, compareVersions)
 {
-    auto [expression, expectation] = GetParam();
+    const auto & [expression, expectation] = GetParam();
     auto v = eval(expression);
     ASSERT_THAT(v, IsIntEq(expectation));
 }
@@ -834,16 +834,16 @@ class ParseDrvNamePrimOpTest
 
 TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
 {
-    auto [input, expectedName, expectedVersion] = GetParam();
+    const auto & [input, expectedName, expectedVersion] = GetParam();
     const auto expr = fmt("builtins.parseDrvName \"%1%\"", input);
     auto v = eval(expr);
     ASSERT_THAT(v, IsAttrsOfSize(2));
 
-    auto name = v.attrs()->find(createSymbol("name"));
+    auto name = v.attrs()->get(createSymbol("name"));
     ASSERT_TRUE(name);
     ASSERT_THAT(*name->value, IsStringEq(expectedName));
 
-    auto version = v.attrs()->find(createSymbol("version"));
+    auto version = v.attrs()->get(createSymbol("version"));
     ASSERT_TRUE(version);
     ASSERT_THAT(*version->value, IsStringEq(expectedVersion));
 }

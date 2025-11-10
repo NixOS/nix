@@ -7,7 +7,7 @@
 #include "nix/util/archive.hh"
 #include "nix/store/builtins/buildenv.hh"
 #include "nix/flake/flakeref.hh"
-#include "../nix-env/user-env.hh"
+#include "nix-env/user-env.hh"
 #include "nix/store/profiles.hh"
 #include "nix/store/names.hh"
 #include "nix/util/url.hh"
@@ -105,7 +105,8 @@ std::string getNameFromElement(const ProfileElement & element)
 {
     std::optional<std::string> result = std::nullopt;
     if (element.source) {
-        result = getNameFromURL(parseURL(element.source->to_string()));
+        // Seems to be for Flake URLs
+        result = getNameFromURL(parseURL(element.source->to_string(), /*lenient=*/true));
     }
     return result.value_or(element.identifier());
 }
@@ -160,11 +161,15 @@ struct ProfileManifest
                         e["outputs"].get<ExtendedOutputsSpec>()};
                 }
 
-                std::string name =
-                    elems.is_object() ? elem.key()
-                    : element.source
-                        ? getNameFromURL(parseURL(element.source->to_string())).value_or(element.identifier())
-                        : element.identifier();
+                std::string name = [&] {
+                    if (elems.is_object())
+                        return elem.key();
+                    if (element.source) {
+                        if (auto optName = getNameFromURL(parseURL(element.source->to_string(), /*lenient=*/true)))
+                            return *optName;
+                    }
+                    return element.identifier();
+                }();
 
                 addElement(name, std::move(element));
             }
@@ -172,8 +177,8 @@ struct ProfileManifest
 
         else if (std::filesystem::exists(profile / "manifest.nix")) {
             // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStore(profile.string()));
-            state.allowPath(state.store->followLinksToStore((profile / "manifest.nix").string()));
+            state.allowPath(state.store->followLinksToStorePath(profile.string()));
+            state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
 
             auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
 
@@ -252,7 +257,7 @@ struct ProfileManifest
 
         auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
 
-        ValidPathInfo info{
+        auto info = ValidPathInfo::makeFromCA(
             *store,
             "profile",
             FixedOutputInfo{
@@ -265,8 +270,7 @@ struct ProfileManifest
                         .self = false,
                     },
             },
-            narHash,
-        };
+            narHash);
         info.narSize = sink.s.size();
 
         StringSource source(sink.s);

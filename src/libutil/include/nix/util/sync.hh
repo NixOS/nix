@@ -36,6 +36,8 @@ private:
 
 public:
 
+    using element_type = T;
+
     SyncBase() {}
 
     SyncBase(const T & data)

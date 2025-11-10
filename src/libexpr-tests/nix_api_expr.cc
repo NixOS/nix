@@ -1,7 +1,5 @@
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 
@@ -151,8 +149,8 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_value)
     assert_ctx_ok();
     auto r = nix_string_realise(ctx, state, value, false);
     ASSERT_EQ(nullptr, r);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("cannot coerce")));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("cannot coerce"));
 }
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
@@ -168,8 +166,8 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context_bad_build)
     assert_ctx_ok();
     auto r = nix_string_realise(ctx, state, value, false);
     ASSERT_EQ(nullptr, r);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("failed with exit code 1")));
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("failed with exit code 1"));
 }
 
 TEST_F(nix_api_expr_test, nix_expr_realise_context)
@@ -381,12 +379,11 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
     nix_value * result = nix_alloc_value(ctx, state);
     assert_ctx_ok();
     nix_value_call(ctx, state, primopValue, three, result);
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_THAT(
-        ctx->last_err,
-        testing::Optional(
-            testing::HasSubstr("Implementation error in custom function: return value was not initialized")));
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badNoReturn")));
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("Implementation error in custom function: return value was not initialized"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("badNoReturn"));
 }
 
 static void primop_bad_return_thunk(
@@ -419,12 +416,60 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
     assert_ctx_ok();
     NIX_VALUE_CALL(ctx, state, result, primopValue, toString, four);
 
-    ASSERT_EQ(ctx->last_err_code, NIX_ERR_NIX_ERROR);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
     ASSERT_THAT(
-        ctx->last_err,
-        testing::Optional(
-            testing::HasSubstr("Implementation error in custom function: return value must not be a thunk")));
-    ASSERT_THAT(ctx->last_err, testing::Optional(testing::HasSubstr("badReturnThunk")));
+        nix_err_msg(nullptr, ctx, nullptr),
+        testing::HasSubstr("Implementation error in custom function: return value must not be a thunk"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("badReturnThunk"));
+}
+
+static void primop_with_nix_err_key(
+    void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret)
+{
+    nix_set_err_msg(context, NIX_ERR_KEY, "Test error from primop");
+}
+
+TEST_F(nix_api_expr_test, nix_expr_primop_nix_err_key_conversion)
+{
+    // Test that NIX_ERR_KEY from a custom primop gets converted to a generic EvalError
+    //
+    // RATIONALE: NIX_ERR_KEY must not be propagated from custom primops because it would
+    // create semantic confusion. NIX_ERR_KEY indicates missing keys/indices in C API functions
+    // (like nix_get_attr_byname, nix_get_list_byidx). If custom primops could return NIX_ERR_KEY,
+    // an evaluation error would be indistinguishable from an actual missing attribute.
+    //
+    // For example, if nix_get_attr_byname returned NIX_ERR_KEY when the attribute is present
+    // but the value evaluation fails, callers expecting NIX_ERR_KEY to mean "missing attribute"
+    // would incorrectly handle evaluation failures as missing attributes. In places where
+    // missing attributes are tolerated (like optional attributes), this would cause the
+    // program to continue after swallowing the error, leading to silent failures.
+    PrimOp * primop = nix_alloc_primop(
+        ctx, primop_with_nix_err_key, 1, "testErrorPrimop", nullptr, "a test primop that sets NIX_ERR_KEY", nullptr);
+    assert_ctx_ok();
+    nix_value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    nix_value * arg = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_int(ctx, arg, 42);
+    assert_ctx_ok();
+
+    nix_value * result = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_value_call(ctx, state, primopValue, arg, result);
+
+    // Verify that NIX_ERR_KEY gets converted to NIX_ERR_NIX_ERROR (generic evaluation error)
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("Error from custom function"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("Test error from primop"));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("testErrorPrimop"));
+
+    // Clean up
+    nix_gc_decref(ctx, primopValue);
+    nix_gc_decref(ctx, arg);
+    nix_gc_decref(ctx, result);
 }
 
 TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
@@ -441,4 +486,31 @@ TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
     assert_ctx_ok();
     ASSERT_EQ(3, rInt);
 }
+
+TEST_F(nix_api_expr_test, nix_expr_attrset_update)
+{
+    nix_expr_eval_from_string(ctx, state, "{ a = 0; b = 2; } // { a = 1; b = 3; } // { a = 2; }", ".", value);
+    assert_ctx_ok();
+
+    ASSERT_EQ(nix_get_attrs_size(ctx, value), 2);
+    assert_ctx_ok();
+    std::array<std::pair<std::string_view, nix_value *>, 2> values;
+    for (unsigned int i = 0; i < 2; ++i) {
+        const char * name;
+        values[i].second = nix_get_attr_byidx(ctx, value, state, i, &name);
+        assert_ctx_ok();
+        values[i].first = name;
+    }
+    std::sort(values.begin(), values.end(), [](const auto & lhs, const auto & rhs) { return lhs.first < rhs.first; });
+
+    nix_value * a = values[0].second;
+    ASSERT_EQ("a", values[0].first);
+    ASSERT_EQ(nix_get_int(ctx, a), 2);
+    assert_ctx_ok();
+    nix_value * b = values[1].second;
+    ASSERT_EQ("b", values[1].first);
+    ASSERT_EQ(nix_get_int(ctx, b), 3);
+    assert_ctx_ok();
+}
+
 } // namespace nixC

@@ -3,8 +3,9 @@
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/fetchers/fetch-to-store.hh"
+#include "nix/util/url.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -63,6 +64,12 @@ Input Input::fromURL(const Settings & settings, const ParsedURL & url, bool requ
             fixupInput(*res);
             return std::move(*res);
         }
+    }
+
+    // Provide a helpful hint when user tries file+git instead of git+file
+    auto parsedScheme = parseUrlScheme(url.scheme);
+    if (parsedScheme.application == "file" && parsedScheme.transport == "git") {
+        throw Error("input '%s' is unsupported; did you mean 'git+file' instead of 'file+git'?", url);
     }
 
     throw Error("input '%s' is unsupported", url);
@@ -332,9 +339,18 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
 
-            auto accessor = makeStorePathAccessor(store, storePath);
+            auto accessor = store->requireStoreObjectAccessor(storePath);
 
             accessor->fingerprint = getFingerprint(store);
+
+            // Store a cache entry for the substituted tree so later fetches
+            // can reuse the existing nar instead of copying the unpacked
+            // input back into the store on every evaluation.
+            if (accessor->fingerprint) {
+                ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
+                auto cacheKey = makeFetchToStoreCacheKey(getName(), *accessor->fingerprint, method, "/");
+                settings->getCache()->upsert(cacheKey, *store, {}, storePath);
+            }
 
             accessor->setPathDisplay("«" + to_string() + "»");
 
@@ -346,8 +362,10 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(ref<Store> sto
 
     auto [accessor, result] = scheme->getAccessor(store, *this);
 
-    assert(!accessor->fingerprint);
-    accessor->fingerprint = result.getFingerprint(store);
+    if (!accessor->fingerprint)
+        accessor->fingerprint = result.getFingerprint(store);
+    else
+        result.cachedFingerprint = accessor->fingerprint;
 
     return {accessor, std::move(result)};
 }
@@ -501,15 +519,16 @@ using namespace nix;
 fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json)
 {
     fetchers::PublicKey res = {};
-    if (auto type = optionalValueAt(json, "type"))
+    auto & obj = getObject(json);
+    if (auto * type = optionalValueAt(obj, "type"))
         res.type = getString(*type);
 
-    res.key = getString(valueAt(json, "key"));
+    res.key = getString(valueAt(obj, "key"));
 
     return res;
 }
 
-void adl_serializer<fetchers::PublicKey>::to_json(json & json, fetchers::PublicKey p)
+void adl_serializer<fetchers::PublicKey>::to_json(json & json, const fetchers::PublicKey & p)
 {
     json["type"] = p.type;
     json["key"] = p.key;

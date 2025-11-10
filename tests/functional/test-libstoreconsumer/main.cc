@@ -27,8 +27,10 @@ int main(int argc, char ** argv)
         const auto results = store->buildPathsWithResults(paths, bmNormal, store);
 
         for (const auto & result : results) {
-            for (const auto & [outputName, realisation] : result.builtOutputs) {
-                std::cout << store->printStorePath(realisation.outPath) << "\n";
+            if (auto * successP = result.tryGetSuccess()) {
+                for (const auto & [outputName, realisation] : successP->builtOutputs) {
+                    std::cout << store->printStorePath(realisation.outPath) << "\n";
+                }
             }
         }
 

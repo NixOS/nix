@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-operator-not-function.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [ { key = 1; } ];
+
+       … while evaluating the 'operator' attribute passed as argument to builtins.genericClosure
+
+       error: expected a function but found a string: "not a function"

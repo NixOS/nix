@@ -8,20 +8,40 @@
 
 namespace nix {
 
-std::optional<StructuredAttrs> StructuredAttrs::tryParse(const StringPairs & env)
+StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
+{
+    try {
+        return StructuredAttrs{
+            .structuredAttrs = nlohmann::json::parse(encoded),
+        };
+    } catch (std::exception & e) {
+        throw Error("cannot process %s attribute: %s", envVarName, e.what());
+    }
+}
+
+std::optional<StructuredAttrs> StructuredAttrs::tryExtract(StringPairs & env)
 {
     /* Parse the __json attribute, if any. */
-    auto jsonAttr = env.find("__json");
+    auto jsonAttr = env.find(envVarName);
     if (jsonAttr != env.end()) {
-        try {
-            return StructuredAttrs{
-                .structuredAttrs = nlohmann::json::parse(jsonAttr->second),
-            };
-        } catch (std::exception & e) {
-            throw Error("cannot process __json attribute: %s", e.what());
-        }
-    }
-    return {};
+        auto encoded = std::move(jsonAttr->second);
+        env.erase(jsonAttr);
+        return parse(encoded);
+    } else
+        return {};
+}
+
+std::pair<std::string_view, std::string> StructuredAttrs::unparse() const
+{
+    // TODO don't copy the JSON object just to dump it.
+    return {envVarName, static_cast<nlohmann::json>(structuredAttrs).dump()};
+}
+
+void StructuredAttrs::checkKeyNotInUse(const StringPairs & env)
+{
+    if (env.count(envVarName))
+        throw Error(
+            "Cannot have an environment variable named '__json'. This key is reserved for encoding structured attrs");
 }
 
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
@@ -78,7 +98,7 @@ static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePa
     return jsonList;
 }
 
-nlohmann::json StructuredAttrs::prepareStructuredAttrs(
+nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     Store & store,
     const DerivationOptions & drvOptions,
     const StorePathSet & inputPaths,
@@ -94,17 +114,14 @@ nlohmann::json StructuredAttrs::prepareStructuredAttrs(
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, inputPaths] : drvOptions.exportReferencesGraph) {
-        StorePathSet storePaths;
-        for (auto & p : inputPaths)
-            storePaths.insert(store.toStorePath(p).first);
+    for (auto & [key, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
         json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, storePaths));
     }
 
     return json;
 }
 
-std::string StructuredAttrs::writeShell(const nlohmann::json & json)
+std::string StructuredAttrs::writeShell(const nlohmann::json::object_t & json)
 {
 
     auto handleSimpleType = [](const nlohmann::json & value) -> std::optional<std::string> {
@@ -128,7 +145,7 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     std::string jsonSh;
 
-    for (auto & [key, value] : json.items()) {
+    for (auto & [key, value] : json) {
 
         if (!std::regex_match(key, shVarName))
             continue;
@@ -175,4 +192,5 @@ std::string StructuredAttrs::writeShell(const nlohmann::json & json)
 
     return jsonSh;
 }
+
 } // namespace nix

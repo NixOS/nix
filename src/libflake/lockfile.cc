@@ -1,16 +1,49 @@
-#include <unordered_set>
-
-#include "nix/fetchers/fetch-settings.hh"
-#include "nix/flake/settings.hh"
-#include "nix/flake/lockfile.hh"
-#include "nix/store/store-api.hh"
-#include "nix/util/strings.hh"
-
+#include <boost/unordered/unordered_flat_set.hpp>
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <boost/unordered/unordered_flat_set_fwd.hpp>
+#include <nlohmann/detail/iterators/iter_impl.hpp>
+#include <nlohmann/detail/iterators/iteration_proxy.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <algorithm>
 #include <iomanip>
-
 #include <iterator>
-#include <nlohmann/json.hpp>
+#include <compare>
+#include <ctime>
+#include <format>
+#include <functional>
+#include <map>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <regex>
+#include <set>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/flake/lockfile.hh"
+#include "nix/util/strings.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/flake/flakeref.hh"
+#include "nix/store/path.hh"
+#include "nix/util/ansicolor.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/hash.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
+
+namespace nix {
+class Store;
+} // namespace nix
 
 namespace nix::flake {
 
@@ -44,8 +77,8 @@ LockedNode::LockedNode(const fetchers::Settings & fetchSettings, const nlohmann:
     if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative()) {
         if (lockedRef.input.getNarHash())
             warn(
-                "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
-                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
+                "This is not reproducible and will break after garbage collection or when shared.",
                 lockedRef.to_string());
         else
             throw Error(
@@ -114,11 +147,10 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
     if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    std::map<std::string, ref<Node>> nodeMap;
+    std::string rootKey = json["root"];
+    std::map<std::string, ref<Node>> nodeMap{{rootKey, root}};
 
-    std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
-
-    getInputs = [&](Node & node, const nlohmann::json & jsonNode) {
+    [&](this const auto & getInputs, Node & node, const nlohmann::json & jsonNode) {
         if (jsonNode.find("inputs") == jsonNode.end())
             return;
         for (auto & i : jsonNode["inputs"].items()) {
@@ -146,11 +178,7 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
                     throw Error("lock file contains cycle to root node");
             }
         }
-    };
-
-    std::string rootKey = json["root"];
-    nodeMap.insert_or_assign(rootKey, root);
-    getInputs(*root, json["nodes"][rootKey]);
+    }(*root, json["nodes"][rootKey]);
 
     // FIXME: check that there are no cycles in version >= 7. Cycles
     // between inputs are only possible using 'follows' indirections.
@@ -162,11 +190,9 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
 {
     nlohmann::json nodes;
     KeyMap nodeKeys;
-    std::unordered_set<std::string> keys;
+    boost::unordered_flat_set<std::string> keys;
 
-    std::function<std::string(const std::string & key, ref<const Node> node)> dumpNode;
-
-    dumpNode = [&](std::string key, ref<const Node> node) -> std::string {
+    auto dumpNode = [&](this auto & dumpNode, std::string key, ref<const Node> node) -> std::string {
         auto k = nodeKeys.find(node);
         if (k != nodeKeys.end())
             return k->second;
@@ -243,17 +269,13 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
 {
     std::set<ref<const Node>> nodes;
 
-    std::function<void(ref<const Node> node)> visit;
-
-    visit = [&](ref<const Node> node) {
+    [&](this const auto & visit, ref<const Node> node) {
         if (!nodes.insert(node).second)
             return;
         for (auto & i : node->inputs)
             if (auto child = std::get_if<0>(&i.second))
                 visit(*child);
-    };
-
-    visit(root);
+    }(root);
 
     /* Return whether the input is either locked, or, if
        `allow-dirty-locks` is enabled, it has a NAR hash. In the
@@ -299,9 +321,7 @@ std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
     std::set<ref<Node>> done;
     std::map<InputAttrPath, Node::Edge> res;
 
-    std::function<void(const InputAttrPath & prefix, ref<Node> node)> recurse;
-
-    recurse = [&](const InputAttrPath & prefix, ref<Node> node) {
+    [&](this const auto & recurse, const InputAttrPath & prefix, ref<Node> node) {
         if (!done.insert(node).second)
             return;
 
@@ -312,9 +332,7 @@ std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
             if (auto child = std::get_if<0>(&input))
                 recurse(inputAttrPath, *child);
         }
-    };
-
-    recurse({}, root);
+    }({}, root);
 
     return res;
 }

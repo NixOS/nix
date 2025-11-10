@@ -574,14 +574,15 @@ ProcessLineResult NixRepl::processLine(std::string line)
             for (auto & sub : subs) {
                 auto * logSubP = dynamic_cast<LogStore *>(&*sub);
                 if (!logSubP) {
-                    printInfo("Skipped '%s' which does not support retrieving build logs", sub->getUri());
+                    printInfo(
+                        "Skipped '%s' which does not support retrieving build logs", sub->config.getHumanReadableURI());
                     continue;
                 }
                 auto & logSub = *logSubP;
 
                 auto log = logSub.getBuildLog(drvPath);
                 if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.getUri());
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.config.getHumanReadableURI());
                     logger->writeToStdout(*log);
                     foundLog = true;
                     break;
@@ -668,7 +669,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = toView(ss);
+            auto markdown = ss.view();
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else
@@ -759,7 +760,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
 void NixRepl::initEnv()
 {
-    env = &state->allocEnv(envSize);
+    env = &state->mem.allocEnv(envSize);
     env->up = &state->baseEnv;
     displ = 0;
     staticEnv->vars.clear();
@@ -868,14 +869,8 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
-}
-
-void NixRepl::evalString(std::string s, Value & v)
-{
-    Expr * e;
     try {
-        e = parseString(s);
+        return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
     } catch (ParseError & e) {
         if (e.msg().find("unexpected end of file") != std::string::npos)
             // For parse errors on incomplete input, we continue waiting for the next line of
@@ -884,6 +879,11 @@ void NixRepl::evalString(std::string s, Value & v)
         else
             throw;
     }
+}
+
+void NixRepl::evalString(std::string s, Value & v)
+{
+    Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
@@ -915,6 +915,7 @@ ReplExitStatus AbstractNixRepl::runSimple(ref<EvalState> evalState, const ValMap
         return values;
     };
     LookupPath lookupPath = {};
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
     auto repl = std::make_unique<NixRepl>(
         lookupPath,
         openStore(),

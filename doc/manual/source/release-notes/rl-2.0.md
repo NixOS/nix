@@ -358,7 +358,7 @@ This release has the following new features:
     they are needed for evaluation.
 
   - You can now use `channel:` as a short-hand for
-    <https://nixos.org/channels//nixexprs.tar.xz>. For example,
+    <https://nixos.org/channels//nixexprs.tar.xz> [now <https://channels.nixos.org//nixexprs.tar.xz>]. For example,
     `nix-build channel:nixos-15.09 -A hello` will build the GNU Hello
     package from the `nixos-15.09` channel. In the future, this may
     use Git to fetch updates more efficiently.

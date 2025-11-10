@@ -1,10 +1,39 @@
+#include <assert.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <filesystem>
+#include <ostream>
+#include <string_view>
+#include <vector>
+#include <optional>
+#include <regex>
+#include <string>
+#include <tuple>
+#include <utility>
+
 #include "nix/flake/flakeref.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/registry.hh"
+#include "nix/store/outputs-spec.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
+class Store;
+struct SourceAccessor;
+
+namespace fetchers {
+struct Settings;
+} // namespace fetchers
 
 #if 0
 // 'dir' path elements cannot start with a '.'. We also reject
@@ -80,9 +109,10 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     std::smatch match;
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
-    assert(succeeds);
+    if (!succeeds)
+        throw Error("invalid flakeref '%s'", url);
     auto path = match[1].str();
-    auto query = decodeQuery(match[3]);
+    auto query = decodeQuery(match[3].str(), /*lenient=*/true);
     auto fragment = percentDecode(match[5].str());
 
     if (baseDir) {
@@ -142,8 +172,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 if (pathExists(flakeRoot + "/.git")) {
                     auto parsedURL = ParsedURL{
                         .scheme = "git+file",
-                        .authority = "",
-                        .path = flakeRoot,
+                        .authority = ParsedURL::Authority{},
+                        .path = splitString<std::vector<std::string>>(flakeRoot, "/"),
                         .query = query,
                         .fragment = fragment,
                     };
@@ -172,7 +202,13 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     return fromParsedURL(
         fetchSettings,
-        {.scheme = "path", .authority = "", .path = path, .query = query, .fragment = fragment},
+        {
+            .scheme = "path",
+            .authority = ParsedURL::Authority{},
+            .path = splitString<std::vector<std::string>>(path, "/"),
+            .query = query,
+            .fragment = fragment,
+        },
         isFlake);
 }
 
@@ -192,8 +228,8 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
     if (std::regex_match(url, match, flakeRegex)) {
         auto parsedURL = ParsedURL{
             .scheme = "flake",
-            .authority = "",
-            .path = match[1],
+            .authority = std::nullopt,
+            .path = splitString<std::vector<std::string>>(match[1].str(), "/"),
         };
 
         return std::make_pair(
@@ -210,9 +246,13 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     bool isFlake)
 {
     try {
-        auto parsed = parseURL(url);
-        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file") && !isAbsolute(parsed.path))
-            parsed.path = absPath(parsed.path, *baseDir);
+        auto parsed = parseURL(url, /*lenient=*/true);
+        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
+            /* Here we know that the path must not contain encoded '/' or NUL bytes. */
+            auto path = renderUrlPathEnsureLegal(parsed.path);
+            if (!isAbsolute(path))
+                parsed.path = splitString<std::vector<std::string>>(absPath(path, *baseDir), "/");
+        }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
         return std::nullopt;
@@ -289,7 +329,7 @@ FlakeRef FlakeRef::canonicalize() const
        filtering the `dir` query parameter from the URL. */
     if (auto url = fetchers::maybeGetStrAttr(flakeRef.input.attrs, "url")) {
         try {
-            auto parsed = parseURL(*url);
+            auto parsed = parseURL(*url, /*lenient=*/true);
             if (auto dir2 = get(parsed.query, "dir")) {
                 if (flakeRef.subdir != "" && flakeRef.subdir == *dir2)
                     parsed.query.erase("dir");

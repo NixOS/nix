@@ -104,8 +104,8 @@ in
 
           # Wait for the build to be ready
           # This is OK because it runs as root, so we can access everything
-          machine.wait_until_succeeds("stat /nix/var/nix/builds/nix-build-open-build-dir.drv-*/build/syncPoint")
-          dir = machine.succeed("ls -d /nix/var/nix/builds/nix-build-open-build-dir.drv-*").strip()
+          machine.wait_until_succeeds("stat /nix/var/nix/builds/nix-*/build/syncPoint")
+          dir = machine.succeed("ls -d /nix/var/nix/builds/nix-*").strip()
 
           # But Alice shouldn't be able to access the build directory
           machine.fail(f"su alice -c 'ls {dir}/build'")
@@ -125,8 +125,8 @@ in
                 args = [ (builtins.storePath "${create-hello-world}") ];
             }' >&2 &
           """.strip())
-          machine.wait_until_succeeds("stat /nix/var/nix/builds/nix-build-innocent.drv-*/build/syncPoint")
-          dir = machine.succeed("ls -d /nix/var/nix/builds/nix-build-innocent.drv-*").strip()
+          machine.wait_until_succeeds("stat /nix/var/nix/builds/nix-*/build/syncPoint")
+          dir = machine.succeed("ls -d /nix/var/nix/builds/nix-*").strip()
 
           # The build ran as `nixbld1` (which is the only build user on the
           # machine), but a process running as `nixbld1` outside the sandbox

@@ -62,6 +62,8 @@ let
         "nix-cmd"
         "nix-cli"
         "nix-functional-tests"
+        "nix-json-schema-checks"
+        "nix-kaitai-struct-checks"
       ]
       ++ lib.optionals enableBindings [
         "nix-perl-bindings"
@@ -73,7 +75,7 @@ let
       ]
     );
 in
-{
+rec {
   /**
     An internal check to make sure our package listing is complete.
   */
@@ -145,13 +147,25 @@ in
       )
   );
 
-  buildNoGc =
+  # Builds with sanitizers already have GC disabled, so this buildNoGc can just
+  # point to buildWithSanitizers in order to reduce the load on hydra.
+  buildNoGc = buildWithSanitizers;
+
+  buildWithSanitizers =
     let
       components = forAllSystems (
         system:
-        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        pkgs.nixComponents2.overrideScope (
           self: super: {
+            # Boost coroutines fail with ASAN on darwin.
+            withASan = !pkgs.stdenv.buildPlatform.isDarwin;
+            withUBSan = true;
             nix-expr = super.nix-expr.override { enableGC = false; };
+            # Unclear how to make Perl bindings work with a dynamically linked ASAN.
+            nix-perl-bindings = null;
           }
         )
       );
@@ -223,10 +237,17 @@ in
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
   # # Line coverage analysis.
-  # coverage = nixpkgsFor.x86_64-linux.native.nix.override {
-  #   pname = "nix-coverage";
-  #   withCoverageChecks = true;
-  # };
+  coverage =
+    (import ./../ci/gha/tests rec {
+      withCoverage = true;
+      pkgs = nixpkgsFor.x86_64-linux.nativeForStdenv.clangStdenv;
+      nixComponents = pkgs.nixComponents2;
+      nixFlake = null;
+      getStdenv = p: p.clangStdenv;
+    }).codeCoverage.coverageReports.overrideAttrs
+      {
+        name = "nix-coverage"; # For historical consistency
+      };
 
   # Nix's manual
   manual = nixpkgsFor.x86_64-linux.native.nixComponents2.nix-manual;
@@ -240,7 +261,9 @@ in
   # System tests.
   tests =
     import ../tests/nixos {
-      inherit lib nixpkgs nixpkgsFor;
+      inherit lib nixpkgs;
+      pkgs = nixpkgsFor.x86_64-linux.native;
+      nixComponents = nixpkgsFor.x86_64-linux.native.nixComponents2;
       inherit (self.inputs) nixpkgs-23-11;
     }
     // {

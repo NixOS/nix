@@ -5,13 +5,13 @@
 #include "nix/store/derivations.hh"
 
 #include "nix/store/tests/libstore.hh"
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
 using nlohmann::json;
 
-class DerivationTest : public CharacterizationTest, public LibStoreTest
+class DerivationTest : public virtual CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "derivation";
 
@@ -66,146 +66,172 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
-#define TEST_JSON(FIXTURE, NAME, VAL, DRV_NAME, OUTPUT_NAME)                                                           \
-    TEST_F(FIXTURE, DerivationOutput_##NAME##_from_json)                                                               \
-    {                                                                                                                  \
-        readTest("output-" #NAME ".json", [&](const auto & encoded_) {                                                 \
-            auto encoded = json::parse(encoded_);                                                                      \
-            DerivationOutput got = DerivationOutput::fromJSON(*store, DRV_NAME, OUTPUT_NAME, encoded, mockXpSettings); \
-            DerivationOutput expected{VAL};                                                                            \
-            ASSERT_EQ(got, expected);                                                                                  \
-        });                                                                                                            \
-    }                                                                                                                  \
-                                                                                                                       \
-    TEST_F(FIXTURE, DerivationOutput_##NAME##_to_json)                                                                 \
-    {                                                                                                                  \
-        writeTest(                                                                                                     \
-            "output-" #NAME ".json",                                                                                   \
-            [&]() -> json { return DerivationOutput{(VAL)}.toJSON(*store, (DRV_NAME), (OUTPUT_NAME)); },               \
-            [](const auto & file) { return json::parse(readFile(file)); },                                             \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });                  \
+#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                \
+    TEST_P(FIXTURE, from_json)                                          \
+    {                                                                   \
+        const auto & [name, expected] = GetParam();                     \
+        readJsonTest(Path{"output-"} + name, expected, mockXpSettings); \
+    }                                                                   \
+                                                                        \
+    TEST_P(FIXTURE, to_json)                                            \
+    {                                                                   \
+        const auto & [name, value] = GetParam();                        \
+        writeJsonTest("output-" + name, value);                         \
     }
 
-TEST_JSON(
-    DerivationTest,
-    inputAddressed,
-    (DerivationOutput::InputAddressed{
-        .path = store->parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"),
-    }),
-    "drv-name",
-    "output-name")
+struct DerivationOutputJsonTest : DerivationTest,
+                                  JsonCharacterizationTest<DerivationOutput>,
+                                  ::testing::WithParamInterface<std::pair<std::string_view, DerivationOutput>>
+{};
 
-TEST_JSON(
-    DerivationTest,
-    caFixedFlat,
-    (DerivationOutput::CAFixed{
-        .ca =
-            {
-                .method = ContentAddressMethod::Raw::Flat,
-                .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-            },
-    }),
-    "drv-name",
-    "output-name")
+MAKE_OUTPUT_JSON_TEST_P(DerivationOutputJsonTest)
 
-TEST_JSON(
-    DerivationTest,
-    caFixedNAR,
-    (DerivationOutput::CAFixed{
-        .ca =
-            {
+INSTANTIATE_TEST_SUITE_P(
+    DerivationOutputJSON,
+    DerivationOutputJsonTest,
+    ::testing::Values(
+        std::pair{
+            "inputAddressed",
+            DerivationOutput{DerivationOutput::InputAddressed{
+                .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"},
+            }},
+        },
+        std::pair{
+            "caFixedFlat",
+            DerivationOutput{DerivationOutput::CAFixed{
+                .ca =
+                    {
+                        .method = ContentAddressMethod::Raw::Flat,
+                        .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                    },
+            }},
+        },
+        std::pair{
+            "caFixedNAR",
+            DerivationOutput{DerivationOutput::CAFixed{
+                .ca =
+                    {
+                        .method = ContentAddressMethod::Raw::NixArchive,
+                        .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                    },
+            }},
+        },
+        std::pair{
+            "deferred",
+            DerivationOutput{DerivationOutput::Deferred{}},
+        }));
+
+struct DynDerivationOutputJsonTest : DynDerivationTest,
+                                     JsonCharacterizationTest<DerivationOutput>,
+                                     ::testing::WithParamInterface<std::pair<std::string_view, DerivationOutput>>
+{};
+
+MAKE_OUTPUT_JSON_TEST_P(DynDerivationOutputJsonTest);
+
+INSTANTIATE_TEST_SUITE_P(
+    DynDerivationOutputJSON,
+    DynDerivationOutputJsonTest,
+    ::testing::Values(
+        std::pair{
+            "caFixedText",
+            DerivationOutput{DerivationOutput::CAFixed{
+                .ca =
+                    {
+                        .method = ContentAddressMethod::Raw::Text,
+                        .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                    },
+            }},
+        }));
+
+struct CaDerivationOutputJsonTest : CaDerivationTest,
+                                    JsonCharacterizationTest<DerivationOutput>,
+                                    ::testing::WithParamInterface<std::pair<std::string_view, DerivationOutput>>
+{};
+
+MAKE_OUTPUT_JSON_TEST_P(CaDerivationOutputJsonTest);
+
+INSTANTIATE_TEST_SUITE_P(
+    CaDerivationOutputJSON,
+    CaDerivationOutputJsonTest,
+    ::testing::Values(
+        std::pair{
+            "caFloating",
+            DerivationOutput{DerivationOutput::CAFloating{
                 .method = ContentAddressMethod::Raw::NixArchive,
-                .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-            },
-    }),
-    "drv-name",
-    "output-name")
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        }));
 
-TEST_JSON(
-    DynDerivationTest,
-    caFixedText,
-    (DerivationOutput::CAFixed{
-        .ca =
-            {
-                .method = ContentAddressMethod::Raw::Text,
-                .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-            },
-    }),
-    "drv-name",
-    "output-name")
+struct ImpureDerivationOutputJsonTest : ImpureDerivationTest,
+                                        JsonCharacterizationTest<DerivationOutput>,
+                                        ::testing::WithParamInterface<std::pair<std::string_view, DerivationOutput>>
+{};
 
-TEST_JSON(
-    CaDerivationTest,
-    caFloating,
-    (DerivationOutput::CAFloating{
-        .method = ContentAddressMethod::Raw::NixArchive,
-        .hashAlgo = HashAlgorithm::SHA256,
-    }),
-    "drv-name",
-    "output-name")
+MAKE_OUTPUT_JSON_TEST_P(ImpureDerivationOutputJsonTest);
 
-TEST_JSON(DerivationTest, deferred, DerivationOutput::Deferred{}, "drv-name", "output-name")
+INSTANTIATE_TEST_SUITE_P(
+    ImpureDerivationOutputJSON,
+    ImpureDerivationOutputJsonTest,
+    ::testing::Values(
+        std::pair{
+            "impure",
+            DerivationOutput{DerivationOutput::Impure{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        }));
 
-TEST_JSON(
-    ImpureDerivationTest,
-    impure,
-    (DerivationOutput::Impure{
-        .method = ContentAddressMethod::Raw::NixArchive,
-        .hashAlgo = HashAlgorithm::SHA256,
-    }),
-    "drv-name",
-    "output-name")
+#undef MAKE_OUTPUT_JSON_TEST_P
 
-#undef TEST_JSON
-
-#define TEST_JSON(FIXTURE, NAME, VAL)                                                                 \
-    TEST_F(FIXTURE, Derivation_##NAME##_from_json)                                                    \
-    {                                                                                                 \
-        readTest(#NAME ".json", [&](const auto & encoded_) {                                          \
-            auto encoded = json::parse(encoded_);                                                     \
-            Derivation expected{VAL};                                                                 \
-            Derivation got = Derivation::fromJSON(*store, encoded, mockXpSettings);                   \
-            ASSERT_EQ(got, expected);                                                                 \
-        });                                                                                           \
-    }                                                                                                 \
-                                                                                                      \
-    TEST_F(FIXTURE, Derivation_##NAME##_to_json)                                                      \
-    {                                                                                                 \
-        writeTest(                                                                                    \
-            #NAME ".json",                                                                            \
-            [&]() -> json { return Derivation{VAL}.toJSON(*store); },                                 \
-            [](const auto & file) { return json::parse(readFile(file)); },                            \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+#define MAKE_TEST_P(FIXTURE)                                                                       \
+    TEST_P(FIXTURE, from_json)                                                                     \
+    {                                                                                              \
+        const auto & drv = GetParam();                                                             \
+        readJsonTest(drv.name, drv, mockXpSettings);                                               \
+    }                                                                                              \
+                                                                                                   \
+    TEST_P(FIXTURE, to_json)                                                                       \
+    {                                                                                              \
+        const auto & drv = GetParam();                                                             \
+        writeJsonTest(drv.name, drv);                                                              \
+    }                                                                                              \
+                                                                                                   \
+    TEST_P(FIXTURE, from_aterm)                                                                    \
+    {                                                                                              \
+        const auto & drv = GetParam();                                                             \
+        readTest(drv.name + ".drv", [&](auto encoded) {                                            \
+            auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);      \
+            using nlohmann::json;                                                                  \
+            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                             \
+            ASSERT_EQ(got, drv);                                                                   \
+        });                                                                                        \
+    }                                                                                              \
+                                                                                                   \
+    TEST_P(FIXTURE, to_aterm)                                                                      \
+    {                                                                                              \
+        const auto & drv = GetParam();                                                             \
+        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store, false); }); \
     }
 
-#define TEST_ATERM(FIXTURE, NAME, VAL, DRV_NAME)                                                \
-    TEST_F(FIXTURE, Derivation_##NAME##_from_aterm)                                             \
-    {                                                                                           \
-        readTest(#NAME ".drv", [&](auto encoded) {                                              \
-            Derivation expected{VAL};                                                           \
-            auto got = parseDerivation(*store, std::move(encoded), DRV_NAME, mockXpSettings);   \
-            ASSERT_EQ(got.toJSON(*store), expected.toJSON(*store));                             \
-            ASSERT_EQ(got, expected);                                                           \
-        });                                                                                     \
-    }                                                                                           \
-                                                                                                \
-    TEST_F(FIXTURE, Derivation_##NAME##_to_aterm)                                               \
-    {                                                                                           \
-        writeTest(#NAME ".drv", [&]() -> std::string { return (VAL).unparse(*store, false); }); \
-    }
+struct DerivationJsonAtermTest : DerivationTest,
+                                 JsonCharacterizationTest<Derivation>,
+                                 ::testing::WithParamInterface<Derivation>
+{};
 
-Derivation makeSimpleDrv(const Store & store)
+MAKE_TEST_P(DerivationJsonAtermTest);
+
+Derivation makeSimpleDrv()
 {
     Derivation drv;
     drv.name = "simple-derivation";
     drv.inputSrcs = {
-        store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+        StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
     };
     drv.inputDrvs = {
         .map =
             {
                 {
-                    store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                    StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
                     {
                         .value =
                             {
@@ -222,7 +248,7 @@ Derivation makeSimpleDrv(const Store & store)
         "bar",
         "baz",
     };
-    drv.env = {
+    drv.env = StringPairs{
         {
             "BIG_BAD",
             "WOLF",
@@ -231,22 +257,27 @@ Derivation makeSimpleDrv(const Store & store)
     return drv;
 }
 
-TEST_JSON(DerivationTest, simple, makeSimpleDrv(*store))
+INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values(makeSimpleDrv()));
 
-TEST_ATERM(DerivationTest, simple, makeSimpleDrv(*store), "simple-derivation")
+struct DynDerivationJsonAtermTest : DynDerivationTest,
+                                    JsonCharacterizationTest<Derivation>,
+                                    ::testing::WithParamInterface<Derivation>
+{};
 
-Derivation makeDynDepDerivation(const Store & store)
+MAKE_TEST_P(DynDerivationJsonAtermTest);
+
+Derivation makeDynDepDerivation()
 {
     Derivation drv;
     drv.name = "dyn-dep-derivation";
     drv.inputSrcs = {
-        store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
     };
     drv.inputDrvs = {
         .map =
             {
                 {
-                    store.parseStorePath("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
                     DerivedPathMap<StringSet>::ChildNode{
                         .value =
                             {
@@ -284,7 +315,7 @@ Derivation makeDynDepDerivation(const Store & store)
         "bar",
         "baz",
     };
-    drv.env = {
+    drv.env = StringPairs{
         {
             "BIG_BAD",
             "WOLF",
@@ -293,11 +324,8 @@ Derivation makeDynDepDerivation(const Store & store)
     return drv;
 }
 
-TEST_JSON(DynDerivationTest, dynDerivationDeps, makeDynDepDerivation(*store))
+INSTANTIATE_TEST_SUITE_P(DynDerivationJSONATerm, DynDerivationJsonAtermTest, ::testing::Values(makeDynDepDerivation()));
 
-TEST_ATERM(DynDerivationTest, dynDerivationDeps, makeDynDepDerivation(*store), "dyn-dep-derivation")
-
-#undef TEST_JSON
-#undef TEST_ATERM
+#undef MAKE_TEST_P
 
 } // namespace nix

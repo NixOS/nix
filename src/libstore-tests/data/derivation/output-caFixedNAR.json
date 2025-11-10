@@ -1,6 +1,8 @@
 {
-  "hash": "894517c9163c896ec31a2adbd33c0681fd5f45b2c0ef08a64c92a03fb97f390f",
-  "hashAlgo": "sha256",
-  "method": "nar",
-  "path": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-drv-name-output-name"
+  "hash": {
+    "algorithm": "sha256",
+    "format": "base64",
+    "hash": "iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="
+  },
+  "method": "nar"
 }

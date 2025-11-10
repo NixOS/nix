@@ -17,14 +17,14 @@ requireDaemonNewerThan "2.16.0pre20230524"
 
 # Initialize binary cache.
 nonCaPath=$(nix build --json --file ./dependencies.nix --no-link | jq -r .[].outputs.out)
-caPath=$(nix store make-content-addressed --json $nonCaPath | jq -r '.rewrites | map(.) | .[]')
-nix copy --to file://$cacheDir $nonCaPath
+caPath=$(nix store make-content-addressed --json "$nonCaPath" | jq -r '.rewrites | map(.) | .[]')
+nix copy --to file://"$cacheDir" "$nonCaPath"
 
 # Test basic fetchClosure rewriting from non-CA to CA.
 clearStore
 
-[ ! -e $nonCaPath ]
-[ ! -e $caPath ]
+[ ! -e "$nonCaPath" ]
+[ ! -e "$caPath" ]
 
 [[ $(nix eval -v --raw --expr "
   builtins.fetchClosure {
@@ -32,10 +32,10 @@ clearStore
     fromPath = $nonCaPath;
     toPath = $caPath;
   }
-") = $caPath ]]
+") = "$caPath" ]]
 
-[ ! -e $nonCaPath ]
-[ -e $caPath ]
+[ ! -e "$nonCaPath" ]
+[ -e "$caPath" ]
 
 clearStore
 
@@ -55,7 +55,7 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
     # TODO: Should the closure be rejected, despite single user mode?
     # [ ! -e $nonCaPath ]
 
-    [ ! -e $caPath ]
+    [ ! -e "$caPath" ]
 
     # We can use non-CA paths when we ask explicitly.
     [[ $(nix eval --raw --no-require-sigs --expr "
@@ -64,15 +64,15 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
         fromPath = $nonCaPath;
         inputAddressed = true;
       }
-    ") = $nonCaPath ]]
+    ") = "$nonCaPath" ]]
 
-    [ -e $nonCaPath ]
-    [ ! -e $caPath ]
+    [ -e "$nonCaPath" ]
+    [ ! -e "$caPath" ]
 
 
 fi
 
-[ ! -e $caPath ]
+[ ! -e "$caPath" ]
 
 # 'toPath' set to empty string should fail but print the expected path.
 expectStderr 1 nix eval -v --json --expr "
@@ -84,39 +84,49 @@ expectStderr 1 nix eval -v --json --expr "
 " | grep "error: rewriting.*$nonCaPath.*yielded.*$caPath"
 
 # If fromPath is CA, then toPath isn't needed.
-nix copy --to file://$cacheDir $caPath
+nix copy --to file://"$cacheDir" "$caPath"
 
 clearStore
 
-[ ! -e $caPath ]
+[ ! -e "$caPath" ]
 
 [[ $(nix eval -v --raw --expr "
   builtins.fetchClosure {
     fromStore = \"file://$cacheDir\";
     fromPath = $caPath;
   }
-") = $caPath ]]
+") = "$caPath" ]]
 
-[ -e $caPath ]
+[ -e "$caPath" ]
+
+# Test import-from-derivation on the result of fetchClosure.
+[[ $(nix eval -v --expr "
+  import \"\${builtins.fetchClosure {
+    fromStore = \"file://$cacheDir\";
+    fromPath = $caPath;
+  }}/foo.nix\"
+") = 3 ]]
 
 # Check that URL query parameters aren't allowed.
 clearStore
 narCache=$TEST_ROOT/nar-cache
-rm -rf $narCache
+rm -rf "$narCache"
 (! nix eval -v --raw --expr "
   builtins.fetchClosure {
     fromStore = \"file://$cacheDir?local-nar-cache=$narCache\";
     fromPath = $caPath;
   }
 ")
-(! [ -e $narCache ])
+# shellcheck disable=SC2235
+(! [ -e "$narCache" ])
 
 # If toPath is specified but wrong, we check it (only) when the path is missing.
 clearStore
 
-badPath=$(echo $caPath | sed -e 's!/store/................................-!/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-!')
+# shellcheck disable=SC2001
+badPath=$(echo "$caPath" | sed -e 's!/store/................................-!/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-!')
 
-[ ! -e $badPath ]
+[ ! -e "$badPath" ]
 
 expectStderr 1 nix eval -v --raw --expr "
   builtins.fetchClosure {
@@ -126,11 +136,11 @@ expectStderr 1 nix eval -v --raw --expr "
   }
 " | grep "error: rewriting.*$nonCaPath.*yielded.*$caPath.*while.*$badPath.*was expected"
 
-[ ! -e $badPath ]
+[ ! -e "$badPath" ]
 
 # We only check it when missing, as a performance optimization similar to what we do for fixed output derivations. So if it's already there, we don't check it.
 # It would be nice for this to fail, but checking it would be too(?) slow.
-[ -e $caPath ]
+[ -e "$caPath" ]
 
 [[ $(nix eval -v --raw --expr "
   builtins.fetchClosure {
@@ -138,7 +148,7 @@ expectStderr 1 nix eval -v --raw --expr "
     fromPath = $badPath;
     toPath = $caPath;
   }
-") = $caPath ]]
+") = "$caPath" ]]
 
 
 # However, if the output address is unexpected, we can report it

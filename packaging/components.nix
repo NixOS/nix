@@ -54,12 +54,12 @@ let
     preConfigure =
       prevAttrs.preConfigure or ""
       +
-        # Update the repo-global .version file.
-        # Symlink ./.version points there, but by default only workDir is writable.
-        ''
-          chmod u+w ./.version
-          echo ${finalAttrs.version} > ./.version
-        '';
+      # Update the repo-global .version file.
+      # Symlink ./.version points there, but by default only workDir is writable.
+      ''
+        chmod u+w ./.version
+        echo ${finalAttrs.version} > ./.version
+      '';
   };
 
   localSourceLayer =
@@ -148,7 +148,8 @@ let
     nativeBuildInputs = [
       meson
       ninja
-    ] ++ prevAttrs.nativeBuildInputs or [ ];
+    ]
+    ++ prevAttrs.nativeBuildInputs or [ ];
     mesonCheckFlags = prevAttrs.mesonCheckFlags or [ ] ++ [
       "--print-errorlogs"
     ];
@@ -163,6 +164,24 @@ let
   };
 
   mesonLibraryLayer = finalAttrs: prevAttrs: {
+    preConfigure =
+      let
+        interpositionFlags = [
+          "-fno-semantic-interposition"
+          "-Wl,-Bsymbolic-functions"
+        ];
+      in
+      # NOTE: By default GCC disables interprocedular optimizations (in particular inlining) for
+      # position-independent code and thus shared libraries.
+      # Since LD_PRELOAD tricks aren't worth losing out on optimizations, we disable it for good.
+      # This is not the case for Clang, where inlining is done by default even without -fno-semantic-interposition.
+      # https://reviews.llvm.org/D102453
+      # https://fedoraproject.org/wiki/Changes/PythonNoSemanticInterpositionSpeedup
+      prevAttrs.preConfigure or ""
+      + lib.optionalString stdenv.cc.isGNU ''
+        export CFLAGS="''${CFLAGS:-} ${toString interpositionFlags}"
+        export CXXFLAGS="''${CXXFLAGS:-} ${toString interpositionFlags}"
+      '';
     outputs = prevAttrs.outputs or [ "out" ] ++ [ "dev" ];
   };
 
@@ -183,6 +202,25 @@ let
     finalAttrs: prevAttrs:
     lib.optionalAttrs stdenv.hostPlatform.isBSD {
       mesonFlags = [ (lib.mesonBool "b_asneeded" false) ] ++ prevAttrs.mesonFlags or [ ];
+    };
+
+  enableSanitizersLayer =
+    finalAttrs: prevAttrs:
+    let
+      sanitizers = lib.optional scope.withASan "address" ++ lib.optional scope.withUBSan "undefined";
+    in
+    {
+      mesonFlags =
+        (prevAttrs.mesonFlags or [ ])
+        ++ lib.optionals (lib.length sanitizers > 0) (
+          [
+            (lib.mesonOption "b_sanitize" (lib.concatStringsSep "," sanitizers))
+          ]
+          ++ (lib.optionals stdenv.cc.isClang [
+            # https://www.github.com/mesonbuild/meson/issues/764
+            (lib.mesonBool "b_lundef" false)
+          ])
+        );
     };
 
   nixDefaultsLayer = finalAttrs: prevAttrs: {
@@ -226,6 +264,16 @@ in
   inherit maintainers;
 
   inherit filesetToSource;
+
+  /**
+    Whether meson components are built with [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html).
+  */
+  withASan = false;
+
+  /**
+    Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
+  */
+  withUBSan = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
@@ -313,6 +361,7 @@ in
     setVersionLayer
     mesonLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
@@ -323,6 +372,7 @@ in
     mesonLayer
     mesonBuildLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
@@ -334,6 +384,7 @@ in
     mesonBuildLayer
     mesonLibraryLayer
     fixupStaticLayer
+    enableSanitizersLayer
     scope.mesonComponentOverrides
   ];
 
@@ -365,18 +416,43 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
+  /**
+    The Nix command line interface. Note that this does not include its tests, whereas `nix-everything` does.
+  */
   nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
   };
 
+  /**
+    The manual as would be published on https://nix.dev/reference/nix-manual
+  */
   nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for C++ code
+  */
   nix-internal-api-docs = callPackage ../src/internal-api-docs/package.nix { version = fineVersion; };
+  /**
+    Doxygen pages for the public C API
+  */
   nix-external-api-docs = callPackage ../src/external-api-docs/package.nix { version = fineVersion; };
+
+  /**
+    JSON schema validation checks
+  */
+  nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
+
+  /**
+    Kaitai struct schema validation checks
+  */
+  nix-kaitai-struct-checks = callPackage ../src/kaitai-struct-checks/package.nix { };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
+  /**
+    Combined package that has the CLI, libraries, and (assuming non-cross, no overrides) it requires that all tests succeed.
+  */
   nix-everything = callPackage ../packaging/everything.nix { } // {
     # Note: no `passthru.overrideAllMesonComponents` etc
     #       This would propagate into `nix.overrideAttrs f`, but then discard
@@ -424,7 +500,7 @@ in
 
       Example:
       ```
-      overrideScope (finalScope: prevScope: { aws-sdk-cpp = null; })
+      overrideScope (finalScope: prevScope: { aws-crt-cpp = null; })
       ```
     */
     overrideScope = f: (scope.overrideScope f).nix-everything;

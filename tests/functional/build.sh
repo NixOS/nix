@@ -178,19 +178,23 @@ test "$(<<<"$out" grep -cE '^error:')" = 4
 
 out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -cE '^error:')" = 2
+# Precise number of errors depends on daemon version / goal refactorings
+(( "$(<<<"$out" grep -cE '^error:')" >= 2 ))
 
 if isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 1 dependency failed."
+    <<<"$out" grepQuiet -E "Build failed due to failed dependency"
 else
     <<<"$out" grepQuiet -E "error: 1 dependencies of derivation '.*-x4\\.drv' failed to build"
 fi
-<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
+# Either x2 or x3 could have failed, x4 depends on both symmetrically
+<<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x[23]\\.drv'"
 
 out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
-test "$(<<<"$out" grep -cE '^error:')" = 3
+# Precise number of errors depends on daemon version / goal refactorings
+(( "$(<<<"$out" grep -cE '^error:')" >= 3 ))
 if isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 2 dependencies failed."

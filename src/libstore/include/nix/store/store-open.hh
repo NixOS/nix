@@ -30,9 +30,12 @@ ref<Store> openStore(StoreReference && storeURI);
  * Opens the store at `uri`, where `uri` is in the format expected by
  * `StoreReference::parse`
  */
-ref<Store> openStore(
-    const std::string & uri = settings.storeUri.get(),
-    const StoreReference::Params & extraParams = StoreReference::Params());
+ref<Store> openStore(const std::string & uri, const StoreReference::Params & extraParams = StoreReference::Params());
+
+/**
+ * Short-hand which opens the default store, according to global settings
+ */
+ref<Store> openStore();
 
 /**
  * @return the default substituter stores, defined by the

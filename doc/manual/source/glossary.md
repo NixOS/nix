@@ -208,7 +208,7 @@
 
 - [impure derivation]{#gloss-impure-derivation}
 
-  [An experimental feature](#@docroot@/development/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
+  [An experimental feature](@docroot@/development/experimental-features.md#xp-feature-impure-derivations) that allows derivations to be explicitly marked as impure,
   so that they are always rebuilt, and their outputs not reused by subsequent calls to realise them.
 
 - [Nix database]{#gloss-nix-database}
@@ -279,7 +279,7 @@
 
   See [References](@docroot@/store/store-object.md#references) for details.
 
-- [referrer]{#gloss-reference}
+- [referrer]{#gloss-referrer}
 
   A reversed edge from one [store object] to another.
 
@@ -367,8 +367,8 @@
 
   Nix represents files as [file system objects][file system object], and how they belong together is encoded as [references][reference] between [store objects][store object] that contain these file system objects.
 
-  The [Nix language] allows denoting packages in terms of [attribute sets](@docroot@/language/types.md#attribute-set) containing:
-  - attributes that refer to the files of a package, typically in the form of [derivation outputs](#output),
+  The [Nix language] allows denoting packages in terms of [attribute sets](@docroot@/language/types.md#type-attrs) containing:
+  - attributes that refer to the files of a package, typically in the form of [derivation outputs](#gloss-output),
   - attributes with metadata, such as information about how the package is supposed to be used.
 
   The exact shape of these attribute sets is up to convention.
@@ -383,7 +383,7 @@
 
   [string]: ./language/types.md#type-string
   [path]: ./language/types.md#type-path
-  [attribute name]: ./language/types.md#attribute-set
+  [attribute name]: ./language/types.md#type-attrs
 
 - [base directory]{#gloss-base-directory}
 

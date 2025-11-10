@@ -5,6 +5,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/store/globals.hh"
 
 #include <optional>
 #include <string>
@@ -21,9 +22,9 @@ getStringAttr(const StringMap & env, const StructuredAttrs * parsed, const std::
         if (i == parsed->structuredAttrs.end())
             return {};
         else {
-            if (!i->is_string())
+            if (!i->second.is_string())
                 throw Error("attribute '%s' of must be a string", name);
-            return i->get<std::string>();
+            return i->second.get<std::string>();
         }
     } else {
         auto i = env.find(name);
@@ -41,9 +42,9 @@ static bool getBoolAttr(const StringMap & env, const StructuredAttrs * parsed, c
         if (i == parsed->structuredAttrs.end())
             return def;
         else {
-            if (!i->is_boolean())
+            if (!i->second.is_boolean())
                 throw Error("attribute '%s' must be a Boolean", name);
-            return i->get<bool>();
+            return i->second.get<bool>();
         }
     } else {
         auto i = env.find(name);
@@ -62,10 +63,11 @@ getStringsAttr(const StringMap & env, const StructuredAttrs * parsed, const std:
         if (i == parsed->structuredAttrs.end())
             return {};
         else {
-            if (!i->is_array())
+            if (!i->second.is_array())
                 throw Error("attribute '%s' must be a list of strings", name);
+            auto & a = getArray(i->second);
             Strings res;
-            for (auto j = i->begin(); j != i->end(); ++j) {
+            for (auto j = a.begin(); j != a.end(); ++j) {
                 if (!j->is_string())
                     throw Error("attribute '%s' must be a list of strings", name);
                 res.push_back(j->get<std::string>());
@@ -92,33 +94,52 @@ using OutputChecks = DerivationOptions::OutputChecks;
 
 using OutputChecksVariant = std::variant<OutputChecks, std::map<std::string, OutputChecks>>;
 
+DerivationOptions DerivationOptions::fromStructuredAttrs(
+    const StringMap & env, const std::optional<StructuredAttrs> & parsed, bool shouldWarn)
+{
+    return fromStructuredAttrs(env, parsed ? &*parsed : nullptr);
+}
+
+static void flatten(const nlohmann::json & value, StringSet & res)
+{
+    if (value.is_array())
+        for (auto & v : value)
+            flatten(v, res);
+    else if (value.is_string())
+        res.insert(value);
+    else
+        throw Error("'exportReferencesGraph' value is not an array or a string");
+}
+
 DerivationOptions
 DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn)
 {
     DerivationOptions defaults = {};
 
     if (shouldWarn && parsed) {
-        if (get(parsed->structuredAttrs, "allowedReferences")) {
+        auto & structuredAttrs = parsed->structuredAttrs;
+
+        if (get(structuredAttrs, "allowedReferences")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead");
         }
-        if (get(parsed->structuredAttrs, "allowedRequisites")) {
+        if (get(structuredAttrs, "allowedRequisites")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead");
         }
-        if (get(parsed->structuredAttrs, "disallowedRequisites")) {
+        if (get(structuredAttrs, "disallowedRequisites")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead");
         }
-        if (get(parsed->structuredAttrs, "disallowedReferences")) {
+        if (get(structuredAttrs, "disallowedReferences")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead");
         }
-        if (get(parsed->structuredAttrs, "maxSize")) {
+        if (get(structuredAttrs, "maxSize")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead");
         }
-        if (get(parsed->structuredAttrs, "maxClosureSize")) {
+        if (get(structuredAttrs, "maxClosureSize")) {
             warn(
                 "'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead");
         }
@@ -127,10 +148,14 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
     return {
         .outputChecks = [&]() -> OutputChecksVariant {
             if (parsed) {
+                auto & structuredAttrs = parsed->structuredAttrs;
+
                 std::map<std::string, OutputChecks> res;
-                if (auto outputChecks = get(parsed->structuredAttrs, "outputChecks")) {
-                    for (auto & [outputName, output] : getObject(*outputChecks)) {
+                if (auto * outputChecks = get(structuredAttrs, "outputChecks")) {
+                    for (auto & [outputName, output_] : getObject(*outputChecks)) {
                         OutputChecks checks;
+
+                        auto & output = getObject(output_);
 
                         if (auto maxSize = get(output, "maxSize"))
                             checks.maxSize = maxSize->get<uint64_t>();
@@ -138,7 +163,7 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                         if (auto maxClosureSize = get(output, "maxClosureSize"))
                             checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
-                        auto get_ = [&](const std::string & name) -> std::optional<StringSet> {
+                        auto get_ = [&output = output](const std::string & name) -> std::optional<StringSet> {
                             if (auto i = get(output, name)) {
                                 StringSet res;
                                 for (auto j = i->begin(); j != i->end(); ++j) {
@@ -151,13 +176,26 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                             return {};
                         };
 
-                        checks.allowedReferences = get_("allowedReferences");
-                        checks.allowedRequisites = get_("allowedRequisites");
-                        checks.disallowedReferences = get_("disallowedReferences").value_or(StringSet{});
-                        checks.disallowedRequisites = get_("disallowedRequisites").value_or(StringSet{});
-                        ;
-
-                        res.insert_or_assign(outputName, std::move(checks));
+                        res.insert_or_assign(
+                            outputName,
+                            OutputChecks{
+                                .maxSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto maxSize = get(output, "maxSize"))
+                                        return maxSize->get<uint64_t>();
+                                    else
+                                        return std::nullopt;
+                                }(),
+                                .maxClosureSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto maxClosureSize = get(output, "maxClosureSize"))
+                                        return maxClosureSize->get<uint64_t>();
+                                    else
+                                        return std::nullopt;
+                                }(),
+                                .allowedReferences = get_("allowedReferences"),
+                                .disallowedReferences = get_("disallowedReferences").value_or(StringSet{}),
+                                .allowedRequisites = get_("allowedRequisites"),
+                                .disallowedRequisites = get_("disallowedRequisites").value_or(StringSet{}),
+                            });
                     }
                 }
                 return res;
@@ -177,7 +215,9 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                 std::map<std::string, bool> res;
 
                 if (parsed) {
-                    if (auto udr = get(parsed->structuredAttrs, "unsafeDiscardReferences")) {
+                    auto & structuredAttrs = parsed->structuredAttrs;
+
+                    if (auto * udr = get(structuredAttrs, "unsafeDiscardReferences")) {
                         for (auto & [outputName, output] : getObject(*udr)) {
                             if (!output.is_boolean())
                                 throw Error("attribute 'unsafeDiscardReferences.\"%s\"' must be a Boolean", outputName);
@@ -208,16 +248,13 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
                 std::map<std::string, StringSet> ret;
 
                 if (parsed) {
-                    auto e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
+                    auto * e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
                     if (!e || !e->is_object())
                         return ret;
                     for (auto & [key, value] : getObject(*e)) {
-                        if (value.is_array())
-                            ret.insert_or_assign(key, value);
-                        else if (value.is_string())
-                            ret.insert_or_assign(key, StringSet{value});
-                        else
-                            throw Error("'exportReferencesGraph' value is not an array or a string");
+                        StringSet ss;
+                        flatten(value, ss);
+                        ret.insert_or_assign(key, std::move(ss));
                     }
                 } else {
                     auto s = getOr(env, "exportReferencesGraph", "");
@@ -247,6 +284,27 @@ DerivationOptions::fromStructuredAttrs(const StringMap & env, const StructuredAt
         .preferLocalBuild = getBoolAttr(env, parsed, "preferLocalBuild", defaults.preferLocalBuild),
         .allowSubstitutes = getBoolAttr(env, parsed, "allowSubstitutes", defaults.allowSubstitutes),
     };
+}
+
+std::map<std::string, StorePathSet>
+DerivationOptions::getParsedExportReferencesGraph(const StoreDirConfig & store) const
+{
+    std::map<std::string, StorePathSet> res;
+
+    for (auto & [fileName, ss] : exportReferencesGraph) {
+        StorePathSet storePaths;
+        for (auto & storePathS : ss) {
+            if (!store.isInStore(storePathS))
+                throw BuildError(
+                    BuildResult::Failure::InputRejected,
+                    "'exportReferencesGraph' contains a non-store path '%1%'",
+                    storePathS);
+            storePaths.insert(store.toStorePath(storePathS).first);
+        }
+        res.insert_or_assign(fileName, storePaths);
+    }
+
+    return res;
 }
 
 StringSet DerivationOptions::getRequiredSystemFeatures(const BasicDerivation & drv) const
@@ -297,8 +355,10 @@ namespace nlohmann {
 
 using namespace nix;
 
-DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json)
+DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json_)
 {
+    auto & json = getObject(json_);
+
     return {
         .outputChecks = [&]() -> OutputChecksVariant {
             auto outputChecks = getObject(valueAt(json, "outputChecks"));
@@ -317,6 +377,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
 
         .unsafeDiscardReferences = valueAt(json, "unsafeDiscardReferences"),
         .passAsFile = getStringSet(valueAt(json, "passAsFile")),
+        .exportReferencesGraph = getMap<StringSet>(getObject(valueAt(json, "exportReferencesGraph")), getStringSet),
 
         .additionalSandboxProfile = getString(valueAt(json, "additionalSandboxProfile")),
         .noChroot = getBoolean(valueAt(json, "noChroot")),
@@ -330,7 +391,7 @@ DerivationOptions adl_serializer<DerivationOptions>::from_json(const json & json
     };
 }
 
-void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o)
+void adl_serializer<DerivationOptions>::to_json(json & json, const DerivationOptions & o)
 {
     json["outputChecks"] = std::visit(
         overloaded{
@@ -349,6 +410,7 @@ void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o
 
     json["unsafeDiscardReferences"] = o.unsafeDiscardReferences;
     json["passAsFile"] = o.passAsFile;
+    json["exportReferencesGraph"] = o.exportReferencesGraph;
 
     json["additionalSandboxProfile"] = o.additionalSandboxProfile;
     json["noChroot"] = o.noChroot;
@@ -361,20 +423,35 @@ void adl_serializer<DerivationOptions>::to_json(json & json, DerivationOptions o
     json["allowSubstitutes"] = o.allowSubstitutes;
 }
 
-DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>::from_json(const json & json)
+template<typename T>
+static inline std::optional<T> ptrToOwned(const json * ptr)
 {
+    if (ptr)
+        return std::optional{*ptr};
+    else
+        return std::nullopt;
+}
+
+DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>::from_json(const json & json_)
+{
+    auto & json = getObject(json_);
+
     return {
         .ignoreSelfRefs = getBoolean(valueAt(json, "ignoreSelfRefs")),
-        .allowedReferences = nullableValueAt(json, "allowedReferences"),
+        .maxSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxSize"))),
+        .maxClosureSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxClosureSize"))),
+        .allowedReferences = ptrToOwned<StringSet>(getNullable(valueAt(json, "allowedReferences"))),
         .disallowedReferences = getStringSet(valueAt(json, "disallowedReferences")),
-        .allowedRequisites = nullableValueAt(json, "allowedRequisites"),
+        .allowedRequisites = ptrToOwned<StringSet>(getNullable(valueAt(json, "allowedRequisites"))),
         .disallowedRequisites = getStringSet(valueAt(json, "disallowedRequisites")),
     };
 }
 
-void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, DerivationOptions::OutputChecks c)
+void adl_serializer<DerivationOptions::OutputChecks>::to_json(json & json, const DerivationOptions::OutputChecks & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
+    json["maxSize"] = c.maxSize;
+    json["maxClosureSize"] = c.maxClosureSize;
     json["allowedReferences"] = c.allowedReferences;
     json["disallowedReferences"] = c.disallowedReferences;
     json["allowedRequisites"] = c.allowedRequisites;

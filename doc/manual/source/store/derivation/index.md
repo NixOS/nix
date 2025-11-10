@@ -9,7 +9,7 @@ This is where Nix distinguishes itself.
 
 ## Store Derivation {#store-derivation}
 
-A derivation is a specification for running an executable on precisely defined input to produce on more [store objects][store object].
+A derivation is a specification for running an executable on precisely defined input to produce one or more [store objects][store object].
 These store objects are known as the derivation's *outputs*.
 
 Derivations are *built*, in which case the process is spawned according to the spec, and when it exits, required to leave behind files which will (after post-processing) become the outputs of the derivation.
@@ -102,11 +102,11 @@ But rather than somehow scanning all the other fields for inputs, Nix requires t
 
 ### System {#system}
 
-The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+The system type on which the [`builder`](#builder) executable is meant to be run.
 
 A necessary condition for Nix to schedule a given derivation on some [Nix instance] is for the "system" of that derivation to match that instance's [`system` configuration option] or [`extra-platforms` configuration option].
 
-By putting the `system` in each derivation, Nix allows *heterogenous* build plans, where not all steps can be run on the same machine or same sort of machine.
+By putting the `system` in each derivation, Nix allows *heterogeneous* build plans, where not all steps can be run on the same machine or same sort of machine.
 Nix can schedule builds such that it automatically builds on other platforms by [forwarding build requests](@docroot@/advanced-topics/distributed-builds.md) to other Nix instances.
 
 [`system` configuration option]: @docroot@/command-ref/conf-file.md#conf-system
@@ -245,7 +245,7 @@ If those other derivations *also* abide by this common case (and likewise for tr
   >                                                           note the ".drv"
   > ```
 
-## Extending the model to be higher-order
+## Extending the model to be higher-order {#dynamic}
 
 **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 

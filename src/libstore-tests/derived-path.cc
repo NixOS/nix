@@ -3,13 +3,23 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
+#include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/derived-path.hh"
 #include "nix/store/tests/libstore.hh"
 
 namespace nix {
 
-class DerivedPathTest : public LibStoreTest
-{};
+class DerivedPathTest : public virtual CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "derived-path";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
 
 /**
  * Round trip (string <-> data structure) test for
@@ -106,5 +116,117 @@ RC_GTEST_FIXTURE_PROP(DerivedPathTest, prop_round_rip, (const DerivedPath & o))
 }
 
 #endif
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+struct SingleDerivedPathJsonTest : DerivedPathTest,
+                                   JsonCharacterizationTest<SingleDerivedPath>,
+                                   ::testing::WithParamInterface<SingleDerivedPath>
+{};
+
+struct DerivedPathJsonTest : DerivedPathTest,
+                             JsonCharacterizationTest<DerivedPath>,
+                             ::testing::WithParamInterface<DerivedPath>
+{};
+
+#define TEST_JSON(TYPE, NAME, VAL)           \
+    static const TYPE NAME = VAL;            \
+                                             \
+    TEST_F(TYPE##JsonTest, NAME##_from_json) \
+    {                                        \
+        readJsonTest(#NAME, NAME);           \
+    }                                        \
+                                             \
+    TEST_F(TYPE##JsonTest, NAME##_to_json)   \
+    {                                        \
+        writeJsonTest(#NAME, NAME);          \
+    }
+
+#define TEST_JSON_XP_DYN(TYPE, NAME, VAL)                                                              \
+    static const TYPE NAME = VAL;                                                                      \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_from_json_throws_without_xp)                                         \
+    {                                                                                                  \
+        std::optional<json> ret;                                                                       \
+        readTest(#NAME ".json", [&](const auto & encoded_) { ret = json::parse(encoded_); });          \
+        if (ret) {                                                                                     \
+            EXPECT_THROW(nlohmann::adl_serializer<TYPE>::from_json(*ret), MissingExperimentalFeature); \
+        }                                                                                              \
+    }                                                                                                  \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_from_json)                                                           \
+    {                                                                                                  \
+        ExperimentalFeatureSettings xpSettings;                                                        \
+        xpSettings.set("experimental-features", "dynamic-derivations");                                \
+        readJsonTest(#NAME, NAME, xpSettings);                                                         \
+    }                                                                                                  \
+                                                                                                       \
+    TEST_F(TYPE##JsonTest, NAME##_to_json)                                                             \
+    {                                                                                                  \
+        writeJsonTest(#NAME, NAME);                                                                    \
+    }
+
+TEST_JSON(
+    SingleDerivedPath, single_opaque, SingleDerivedPath::Opaque{StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}});
+
+TEST_JSON(
+    SingleDerivedPath,
+    single_built,
+    (SingleDerivedPath::Built{
+        .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
+            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),
+        .output = "bar",
+    }));
+
+TEST_JSON_XP_DYN(
+    SingleDerivedPath,
+    single_built_built,
+    (SingleDerivedPath::Built{
+        .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
+            .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
+                StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),
+            .output = "bar",
+        }),
+        .output = "baz",
+    }));
+
+TEST_JSON(DerivedPath, multi_opaque, DerivedPath::Opaque{StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}});
+
+TEST_JSON(
+    DerivedPath,
+    mutli_built,
+    (DerivedPath::Built{
+        .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
+            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),
+        .outputs = OutputsSpec::Names{"bar", "baz"},
+    }));
+
+TEST_JSON_XP_DYN(
+    DerivedPath,
+    multi_built_built,
+    (DerivedPath::Built{
+        .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
+            .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
+                StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),
+            .output = "bar",
+        }),
+        .outputs = OutputsSpec::Names{"baz", "quux"},
+    }));
+
+TEST_JSON_XP_DYN(
+    DerivedPath,
+    multi_built_built_wildcard,
+    (DerivedPath::Built{
+        .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
+            .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
+                StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),
+            .output = "bar",
+        }),
+        .outputs = OutputsSpec::All{},
+    }));
 
 } // namespace nix

@@ -1,5 +1,3 @@
-#include <unordered_set>
-
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
@@ -12,6 +10,8 @@
 #include "nix/util/closure.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/strings.hh"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
@@ -106,7 +106,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     struct State
     {
-        std::unordered_set<std::string> done;
+        boost::unordered_flat_set<std::string> done;
         MissingPaths res;
     };
 
@@ -126,13 +126,13 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     std::function<void(DerivedPath)> doPath;
 
-    std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> enqueueDerivedPaths;
-
-    enqueueDerivedPaths = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+    auto enqueueDerivedPaths = [&](this auto self,
+                                   ref<SingleDerivedPath> inputDrv,
+                                   const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
         if (!inputNode.value.empty())
             pool.enqueue(std::bind(doPath, DerivedPath::Built{inputDrv, inputNode.value}));
         for (const auto & [outputName, childNode] : inputNode.childMap)
-            enqueueDerivedPaths(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
+            self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
     };
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
@@ -224,13 +224,11 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         return;
 
                     auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-                    auto parsedDrv = StructuredAttrs::tryParse(drv->env);
                     DerivationOptions drvOptions;
                     try {
                         // FIXME: this is a lot of work just to get the value
                         // of `allowSubstitutes`.
-                        drvOptions =
-                            DerivationOptions::fromStructuredAttrs(drv->env, parsedDrv ? &*parsedDrv : nullptr);
+                        drvOptions = DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs);
                     } catch (Error & e) {
                         e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                         throw;
@@ -324,7 +322,10 @@ StorePaths Store::topoSortPaths(const StorePathSet & paths)
         }},
         {[&](const StorePath & path, const StorePath & parent) {
             return BuildError(
-                "cycle detected in the references of '%s' from '%s'", printStorePath(path), printStorePath(parent));
+                BuildResult::Failure::OutputRejected,
+                "cycle detected in the references of '%s' from '%s'",
+                printStorePath(path),
+                printStorePath(parent));
         }});
 }
 
@@ -349,9 +350,9 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
 
     std::set<Realisation> inputRealisations;
 
-    std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumRealisations;
-
-    accumRealisations = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+    auto accumRealisations = [&](this auto & self,
+                                 const StorePath & inputDrv,
+                                 const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
         if (!inputNode.value.empty()) {
             auto outputHashes = staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
             for (const auto & outputName : inputNode.value) {
@@ -359,18 +360,19 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
                 if (!outputHash)
                     throw Error(
                         "output '%s' of derivation '%s' isn't realised", outputName, store.printStorePath(inputDrv));
-                auto thisRealisation = store.queryRealisation(DrvOutput{*outputHash, outputName});
+                DrvOutput key{*outputHash, outputName};
+                auto thisRealisation = store.queryRealisation(key);
                 if (!thisRealisation)
                     throw Error(
                         "output '%s' of derivation '%s' isn’t built", outputName, store.printStorePath(inputDrv));
-                inputRealisations.insert(*thisRealisation);
+                inputRealisations.insert({*thisRealisation, std::move(key)});
             }
         }
         if (!inputNode.value.empty()) {
             auto d = makeConstantStorePathRef(inputDrv);
             for (const auto & [outputName, childNode] : inputNode.childMap) {
                 SingleDerivedPath next = SingleDerivedPath::Built{d, outputName};
-                accumRealisations(
+                self(
                     // TODO deep resolutions for dynamic derivations, issue #8947, would go here.
                     resolveDerivedPath(store, next, evalStore_),
                     childNode);

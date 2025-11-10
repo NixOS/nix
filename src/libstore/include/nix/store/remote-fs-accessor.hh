@@ -27,6 +27,11 @@ class RemoteFSAccessor : public SourceAccessor
 
 public:
 
+    /**
+     * @return nullptr if the store does not contain any object at that path.
+     */
+    std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
+
     RemoteFSAccessor(
         ref<Store> store, bool requireValidPath = true, const /* FIXME: use std::optional */ Path & cacheDir = "");
 

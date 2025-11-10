@@ -1,4 +1,5 @@
 #compdef nix
+# shellcheck disable=all
 
 function _nix() {
   local ifs_bk="$IFS"

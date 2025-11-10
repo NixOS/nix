@@ -33,7 +33,7 @@ json printValueAsJSON(
 
     case nString:
         copyContext(v, context);
-        out = v.c_str();
+        out = v.string_view();
         break;
 
     case nPath:
@@ -53,7 +53,7 @@ json printValueAsJSON(
             out = *maybeString;
             break;
         }
-        if (auto i = v.attrs()->get(state.sOutPath))
+        if (auto i = v.attrs()->get(state.s.outPath))
             return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
         else {
             out = json::object();

@@ -86,7 +86,7 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v6.sqlite")
+    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v7.sqlite")
     {
         auto state(_state.lock());
 
@@ -304,10 +304,15 @@ public:
                 if (queryRealisation.isNull(0))
                     return {oInvalid, 0};
 
-                auto realisation = std::make_shared<Realisation>(
-                    Realisation::fromJSON(nlohmann::json::parse(queryRealisation.getStr(0)), "Local disk cache"));
-
-                return {oValid, realisation};
+                try {
+                    return {
+                        oValid,
+                        std::make_shared<Realisation>(nlohmann::json::parse(queryRealisation.getStr(0))),
+                    };
+                } catch (Error & e) {
+                    e.addTrace({}, "while parsing the local disk cache");
+                    throw;
+                }
             });
     }
 
@@ -349,7 +354,8 @@ public:
 
             auto & cache(getCache(*state, uri));
 
-            state->insertRealisation.use()(cache.id)(realisation.id.to_string())(realisation.toJSON().dump())(time(0))
+            state->insertRealisation
+                .use()(cache.id)(realisation.id.to_string())(static_cast<nlohmann::json>(realisation).dump())(time(0))
                 .exec();
         });
     }

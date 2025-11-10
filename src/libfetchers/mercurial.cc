@@ -6,7 +6,6 @@
 #include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
-#include "nix/fetchers/store-path-accessor.hh"
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <sys/time.h>
@@ -120,7 +119,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return url.path;
+            return renderUrlPathEnsureLegal(url.path);
         return {};
     }
 
@@ -152,7 +151,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         bool isLocal = url.scheme == "file";
-        return {isLocal, isLocal ? url.path : url.to_string()};
+        return {isLocal, isLocal ? renderUrlPathEnsureLegal(url.path) : url.to_string()};
     }
 
     StorePath fetchToStore(ref<Store> store, Input & input) const
@@ -330,8 +329,7 @@ struct MercurialInputScheme : InputScheme
         Input input(_input);
 
         auto storePath = fetchToStore(store, input);
-
-        auto accessor = makeStorePathAccessor(store, storePath);
+        auto accessor = store->requireStoreObjectAccessor(storePath);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 

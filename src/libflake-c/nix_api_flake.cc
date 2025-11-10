@@ -10,6 +10,8 @@
 
 #include "nix/flake/flake.hh"
 
+extern "C" {
+
 nix_flake_settings * nix_flake_settings_new(nix_c_context * context)
 {
     nix_clear_err(context);
@@ -203,3 +205,5 @@ nix_value * nix_locked_flake_get_output_attrs(
     }
     NIXC_CATCH_ERRS_NULL
 }
+
+} // extern "C"

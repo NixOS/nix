@@ -8,6 +8,8 @@
 #include "nix_api_value.h"
 #include "nix/expr/search-path.hh"
 
+extern "C" {
+
 struct nix_eval_state_builder
 {
     nix::ref<nix::Store> store;
@@ -60,5 +62,7 @@ struct nix_realised_string
     std::string str;
     std::vector<StorePath> storePaths;
 };
+
+} // extern "C"
 
 #endif // NIX_API_EXPR_INTERNAL_H

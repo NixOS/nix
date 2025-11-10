@@ -2,15 +2,20 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/users.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/util.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/pool.hh"
 
 #include <git2/attr.h>
 #include <git2/blob.h>
+#include <git2/branch.h>
 #include <git2/commit.h>
 #include <git2/config.h>
 #include <git2/describe.h>
@@ -27,13 +32,17 @@
 #include <git2/submodule.h>
 #include <git2/sys/odb_backend.h>
 #include <git2/sys/mempack.h>
+#include <git2/tag.h>
 #include <git2/tree.h>
 
+#include <boost/unordered/concurrent_flat_set.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <iostream>
-#include <unordered_set>
 #include <queue>
 #include <regex>
 #include <span>
+#include <ranges>
 
 namespace std {
 
@@ -92,8 +101,11 @@ Hash toHash(const git_oid & oid)
 
 static void initLibGit2()
 {
-    if (git_libgit2_init() < 0)
-        throw Error("initialising libgit2: %s", git_error_last()->message);
+    static std::once_flag initialized;
+    std::call_once(initialized, []() {
+        if (git_libgit2_init() < 0)
+            throw Error("initialising libgit2: %s", git_error_last()->message);
+    });
 }
 
 git_oid hashToOID(const Hash & hash)
@@ -219,12 +231,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 {
     /** Location of the repository on disk. */
     std::filesystem::path path;
+
+    bool bare;
+
     /**
      * libgit2 repository. Note that new objects are not written to disk,
      * because we are using a mempack backend. For writing to disk, see
      * `flush()`, which is also called by `GitFileSystemObjectSink::sync()`.
      */
     Repository repo;
+
     /**
      * In-memory object store for efficient batched writing to packfiles.
      * Owned by `repo`.
@@ -233,6 +249,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
         : path(std::move(_path))
+        , bare(bare)
     {
         initLibGit2();
 
@@ -309,32 +326,56 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         checkInterrupt();
     }
 
+    /**
+     * Return a connection pool for this repo. Useful for
+     * multithreaded access.
+     */
+    Pool<GitRepoImpl> getPool()
+    {
+        // TODO: as an optimization, it would be nice to include `this` in the pool.
+        return Pool<GitRepoImpl>(std::numeric_limits<size_t>::max(), [this]() -> ref<GitRepoImpl> {
+            return make_ref<GitRepoImpl>(path, false, bare);
+        });
+    }
+
     uint64_t getRevCount(const Hash & rev) override
     {
-        std::unordered_set<git_oid> done;
-        std::queue<Commit> todo;
+        boost::concurrent_flat_set<git_oid, std::hash<git_oid>> done;
 
-        todo.push(peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT));
+        auto startCommit = peelObject<Commit>(lookupObject(*this, hashToOID(rev)).get(), GIT_OBJECT_COMMIT);
+        auto startOid = *git_commit_id(startCommit.get());
+        done.insert(startOid);
 
-        while (auto commit = pop(todo)) {
-            if (!done.insert(*git_commit_id(commit->get())).second)
-                continue;
+        auto repoPool(getPool());
 
-            for (size_t n = 0; n < git_commit_parentcount(commit->get()); ++n) {
-                git_commit * parent;
-                if (git_commit_parent(&parent, commit->get(), n)) {
+        ThreadPool pool;
+
+        auto process = [&done, &pool, &repoPool](this const auto & process, const git_oid & oid) -> void {
+            auto repo(repoPool.get());
+
+            auto _commit = lookupObject(*repo, oid, GIT_OBJECT_COMMIT);
+            auto commit = (const git_commit *) &*_commit;
+
+            for (auto n : std::views::iota(0U, git_commit_parentcount(commit))) {
+                auto parentOid = git_commit_parent_id(commit, n);
+                if (!parentOid) {
                     throw Error(
                         "Failed to retrieve the parent of Git commit '%s': %s. "
                         "This may be due to an incomplete repository history. "
                         "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
                         "or add set the shallow parameter to true in builtins.fetchGit, "
                         "or fetch the complete history for this branch.",
-                        *git_commit_id(commit->get()),
+                        *git_commit_id(commit),
                         git_error_last()->message);
                 }
-                todo.push(Commit(parent));
+                if (done.insert(*parentOid))
+                    pool.enqueue(std::bind(process, *parentOid));
             }
-        }
+        };
+
+        pool.enqueue(std::bind(process, startOid));
+
+        pool.process();
 
         return done.size();
     }
@@ -360,7 +401,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     Hash resolveRef(std::string ref) override
     {
         Object object;
-        if (git_revparse_single(Setter(object), *this, ref.c_str()))
+
+        // Using the rev-parse notation which libgit2 supports, make sure we peel
+        // the ref ultimately down to the underlying commit.
+        // This is to handle the case where it may be an annotated tag which itself has
+        // an object_id.
+        std::string peeledRef = ref + "^{commit}";
+        if (git_revparse_single(Setter(object), *this, peeledRef.c_str()))
             throw Error("resolving Git reference '%s': %s", ref, git_error_last()->message);
         auto oid = git_object_id(object.get());
         return toHash(*oid);
@@ -517,12 +564,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto act = (Activity *) payload;
         act->result(
             resFetchStatus,
-            fmt("%d/%d objects received, %d/%d deltas indexed, %.1f MiB",
+            fmt("%d/%d objects received, %d/%d deltas indexed, %s",
                 stats->received_objects,
                 stats->total_objects,
                 stats->indexed_deltas,
                 stats->total_deltas,
-                stats->received_bytes / (1024.0 * 1024.0)));
+                renderSize(stats->received_bytes)));
         return getInterrupted() ? -1 : 0;
     }
 
@@ -535,46 +582,47 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
-        Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--quiet", "--force"};
+        Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--progress", "--force"};
         if (shallow)
             append(gitArgs, {"--depth", "1"});
         append(gitArgs, {std::string("--"), url, refspec});
 
-        auto [status, output] = runProgram(
-            RunOptions{
-                .program = "git",
-                .lookupPath = true,
-                // FIXME: git stderr messes up our progress indicator, so
-                // we're using --quiet for now. Should process its stderr.
-                .args = gitArgs,
-                .input = {},
-                .mergeStderrToStdout = true,
-                .isInteractive = true});
+        auto status = runProgram(RunOptions{.program = "git", .args = gitArgs, .isInteractive = true}).first;
 
-        if (status > 0) {
-            throw Error("Failed to fetch git repository %s : %s", url, output);
-        }
+        if (status > 0)
+            throw Error("Failed to fetch git repository '%s'", url);
     }
 
     void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) override
     {
+        // Map of SSH key types to their internal OpenSSH representations
+        static const boost::unordered_flat_map<std::string_view, std::string_view> keyTypeMap = {
+            {"ssh-dsa", "ssh-dsa"},
+            {"ssh-ecdsa", "ssh-ecdsa"},
+            {"ssh-ecdsa-sk", "sk-ecdsa-sha2-nistp256@openssh.com"},
+            {"ssh-ed25519", "ssh-ed25519"},
+            {"ssh-ed25519-sk", "sk-ssh-ed25519@openssh.com"},
+            {"ssh-rsa", "ssh-rsa"}};
+
         // Create ad-hoc allowedSignersFile and populate it with publicKeys
         auto allowedSignersFile = createTempFile().second;
         std::string allowedSigners;
+
         for (const fetchers::PublicKey & k : publicKeys) {
-            if (k.type != "ssh-dsa" && k.type != "ssh-ecdsa" && k.type != "ssh-ecdsa-sk" && k.type != "ssh-ed25519"
-                && k.type != "ssh-ed25519-sk" && k.type != "ssh-rsa")
+            auto it = keyTypeMap.find(k.type);
+            if (it == keyTypeMap.end()) {
+                std::string supportedTypes;
+                for (const auto & [type, _] : keyTypeMap) {
+                    supportedTypes += fmt("  %s\n", type);
+                }
                 throw Error(
-                    "Unknown key type '%s'.\n"
-                    "Please use one of\n"
-                    "- ssh-dsa\n"
-                    "  ssh-ecdsa\n"
-                    "  ssh-ecdsa-sk\n"
-                    "  ssh-ed25519\n"
-                    "  ssh-ed25519-sk\n"
-                    "  ssh-rsa",
-                    k.type);
-            allowedSigners += "* " + k.type + " " + k.key + "\n";
+                    "Invalid SSH key type '%s' in publicKeys.\n"
+                    "Please use one of:\n%s",
+                    k.type,
+                    supportedTypes);
+            }
+
+            allowedSigners += fmt("* %s %s\n", it->second, k.key);
         }
         writeFile(allowedSignersFile, allowedSigners);
 
@@ -602,7 +650,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
             std::string keyDecoded;
             try {
-                keyDecoded = base64Decode(k.key);
+                keyDecoded = base64::decode(k.key);
             } catch (Error & e) {
                 e.addTrace({}, "while decoding public key '%s' used for git signature", k.key);
             }
@@ -795,7 +843,7 @@ struct GitSourceAccessor : SourceAccessor
         return toHash(*git_tree_entry_id(entry));
     }
 
-    std::unordered_map<CanonPath, TreeEntry> lookupCache;
+    boost::unordered_flat_map<CanonPath, TreeEntry> lookupCache;
 
     /* Recursively look up 'path' relative to the root. */
     git_tree_entry * lookup(State & state, const CanonPath & path)
@@ -1232,7 +1280,7 @@ GitRepoImpl::getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllow
                                            makeFSSourceAccessor(path),
                                            std::set<CanonPath>{wd.files},
                                            // Always allow access to the root, but not its children.
-                                           std::unordered_set<CanonPath>{CanonPath::root},
+                                           boost::unordered_flat_set<CanonPath>{CanonPath::root},
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (exportIgnore)
@@ -1299,6 +1347,35 @@ GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path &
     auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
     _cache.lock()->emplace(path, workdirInfo);
     return workdirInfo;
+}
+
+bool isLegalRefName(const std::string & refName)
+{
+    initLibGit2();
+
+    /* Check for cases that don't get rejected by libgit2.
+     * FIXME: libgit2 should reject this. */
+    if (refName == "@")
+        return false;
+
+    /* libgit2 doesn't barf on DEL symbol.
+     * FIXME: libgit2 should reject this. */
+    if (refName.find('\177') != refName.npos)
+        return false;
+
+    for (auto * func : {
+             git_reference_name_is_valid,
+             git_branch_name_is_valid,
+             git_tag_name_is_valid,
+         }) {
+        int valid = 0;
+        if (func(&valid, refName.c_str()))
+            throw Error("checking git reference '%s': %s", refName, git_error_last()->message);
+        if (valid)
+            return true;
+    }
+
+    return false;
 }
 
 } // namespace nix

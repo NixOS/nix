@@ -57,9 +57,7 @@ INPUT                  = \
   @src@/libutil/args \
   @src@/libutil-tests \
   @src@/libutil-test-support/tests \
-  @src@/nix \
-  @src@/nix-env \
-  @src@/nix-store
+  @src@/nix
 
 # If the MACRO_EXPANSION tag is set to YES, doxygen will expand all macro names
 # in the source code. If set to NO, only conditional compilation will be

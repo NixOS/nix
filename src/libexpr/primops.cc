@@ -5,6 +5,8 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/json-to-value.hh"
+#include "nix/expr/static-string-data.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
@@ -17,6 +19,8 @@
 #include "nix/util/sort.hh"
 
 #include <boost/container/small_vector.hpp>
+#include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -213,20 +217,20 @@ void derivationToValue(
     auto path2 = path.path.abs();
     Derivation drv = state.store->readDerivation(storePath);
     auto attrs = state.buildBindings(3 + drv.outputs.size());
-    attrs.alloc(state.sDrvPath)
+    attrs.alloc(state.s.drvPath)
         .mkString(
             path2,
             {
                 NixStringContextElem::DrvDeep{.drvPath = storePath},
             });
-    attrs.alloc(state.sName).mkString(drv.env["name"]);
+    attrs.alloc(state.s.name).mkString(drv.env["name"]);
 
     auto list = state.buildList(drv.outputs.size());
     for (const auto & [i, o] : enumerate(drv.outputs)) {
         mkOutputString(state, attrs, storePath, o);
         (list[i] = state.allocValue())->mkString(o.first);
     }
-    attrs.alloc(state.sOutputs).mkList(list);
+    attrs.alloc(state.s.outputs).mkList(list);
 
     auto w = state.allocValue();
     w->mkAttrs(attrs);
@@ -259,7 +263,7 @@ static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path,
 {
     state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
 
-    Env * env = &state.allocEnv(vScope->attrs()->size());
+    Env * env = &state.mem.allocEnv(vScope->attrs()->size());
     env->up = &state.baseEnv;
 
     auto staticEnv = std::make_shared<StaticEnv>(nullptr, state.staticBaseEnv, vScope->attrs()->size());
@@ -482,42 +486,40 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceValue(*args[0], pos);
-    std::string t;
     switch (args[0]->type()) {
     case nInt:
-        t = "int";
+        v.mkStringNoCopy("int"_sds);
         break;
     case nBool:
-        t = "bool";
+        v.mkStringNoCopy("bool"_sds);
         break;
     case nString:
-        t = "string";
+        v.mkStringNoCopy("string"_sds);
         break;
     case nPath:
-        t = "path";
+        v.mkStringNoCopy("path"_sds);
         break;
     case nNull:
-        t = "null";
+        v.mkStringNoCopy("null"_sds);
         break;
     case nAttrs:
-        t = "set";
+        v.mkStringNoCopy("set"_sds);
         break;
     case nList:
-        t = "list";
+        v.mkStringNoCopy("list"_sds);
         break;
     case nFunction:
-        t = "lambda";
+        v.mkStringNoCopy("lambda"_sds);
         break;
     case nExternal:
-        t = args[0]->external()->typeOf();
+        v.mkString(args[0]->external()->typeOf());
         break;
     case nFloat:
-        t = "float";
+        v.mkStringNoCopy("float"_sds);
         break;
     case nThunk:
         unreachable();
     }
-    v.mkString(t);
 }
 
 static RegisterPrimOp primop_typeOf({
@@ -680,7 +682,14 @@ struct CompareValues
             if (v1->type() == nInt && v2->type() == nFloat)
                 return v1->integer().value < v2->fpoint();
             if (v1->type() != v2->type())
-                state.error<EvalError>("cannot compare %s with %s", showType(*v1), showType(*v2)).debugThrow();
+                state
+                    .error<EvalError>(
+                        "cannot compare %s with %s; values are %s and %s",
+                        showType(*v1),
+                        showType(*v2),
+                        ValuePrinter(state, *v1, errorPrintOptions),
+                        ValuePrinter(state, *v2, errorPrintOptions))
+                    .debugThrow();
 // Allow selecting a subset of enum values
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
@@ -690,12 +699,12 @@ struct CompareValues
             case nFloat:
                 return v1->fpoint() < v2->fpoint();
             case nString:
-                return strcmp(v1->c_str(), v2->c_str()) < 0;
+                return v1->string_view() < v2->string_view();
             case nPath:
                 // Note: we don't take the accessor into account
                 // since it's not obvious how to compare them in a
                 // reproducible way.
-                return strcmp(v1->pathStr(), v2->pathStr()) < 0;
+                return v1->pathStrView() < v2->pathStrView();
             case nList:
                 // Lexicographic comparison
                 for (size_t i = 0;; i++) {
@@ -710,7 +719,11 @@ struct CompareValues
             default:
                 state
                     .error<EvalError>(
-                        "cannot compare %s with %s; values of that type are incomparable", showType(*v1), showType(*v2))
+                        "cannot compare %s with %s; values of that type are incomparable (values are %s and %s)",
+                        showType(*v1),
+                        showType(*v2),
+                        ValuePrinter(state, *v1, errorPrintOptions),
+                        ValuePrinter(state, *v2, errorPrintOptions))
                     .debugThrow();
 #pragma GCC diagnostic pop
             }
@@ -730,7 +743,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
 
     /* Get the start set. */
     auto startSet = state.getAttr(
-        state.sStartSet, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
+        state.s.startSet, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
 
     state.forceList(
         *startSet->value,
@@ -748,7 +761,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
 
     /* Get the operator. */
     auto op = state.getAttr(
-        state.sOperator, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
+        state.s.operator_, args[0]->attrs(), "in the attrset passed as argument to builtins.genericClosure");
     state.forceFunction(
         *op->value, noPos, "while evaluating the 'operator' attribute passed as argument to builtins.genericClosure");
 
@@ -756,42 +769,79 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
        `workSet', adding the result to `workSet', continuing until
        no new elements are found. */
     ValueList res;
-    // `doneKeys' doesn't need to be a GC root, because its values are
-    // reachable from res.
-    auto cmp = CompareValues(state, noPos, "while comparing the `key` attributes of two genericClosure elements");
-    std::set<Value *, decltype(cmp)> doneKeys(cmp);
+    // Track which element each key came from
+    auto cmp = CompareValues(state, noPos, "");
+    std::map<Value *, Value *, decltype(cmp)> keyToElem(cmp);
     while (!workSet.empty()) {
         Value * e = *(workSet.begin());
         workSet.pop_front();
 
-        state.forceAttrs(
-            *e,
-            noPos,
-            "while evaluating one of the elements generated by (or initially passed to) builtins.genericClosure");
+        try {
+            state.forceAttrs(*e, noPos, "");
+        } catch (Error & err) {
+            err.addTrace(nullptr, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
+            throw;
+        }
 
-        auto key = state.getAttr(
-            state.sKey,
-            e->attrs(),
-            "in one of the attrsets generated by (or initially passed to) builtins.genericClosure");
+        const Attr * key;
+        try {
+            key = state.getAttr(state.s.key, e->attrs(), "");
+        } catch (Error & err) {
+            err.addTrace(nullptr, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
+            throw;
+        }
         state.forceValue(*key->value, noPos);
 
-        if (!doneKeys.insert(key->value).second)
-            continue;
+        try {
+            auto [it, inserted] = keyToElem.insert({key->value, e});
+            if (!inserted)
+                continue;
+        } catch (Error & err) {
+            // Try to find which element we're comparing against
+            Value * otherElem = nullptr;
+            for (auto & [otherKey, elem] : keyToElem) {
+                try {
+                    cmp(key->value, otherKey);
+                } catch (Error &) {
+                    // Found the element we're comparing against
+                    otherElem = elem;
+                    break;
+                }
+            }
+            if (otherElem) {
+                // Traces are printed in reverse order; pre-swap them.
+                err.addTrace(nullptr, "with element %s", ValuePrinter(state, *otherElem, errorPrintOptions));
+                err.addTrace(nullptr, "while comparing element %s", ValuePrinter(state, *e, errorPrintOptions));
+            } else {
+                // Couldn't find the specific element, just show current
+                err.addTrace(nullptr, "while checking key of element %s", ValuePrinter(state, *e, errorPrintOptions));
+            }
+            throw;
+        }
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
         Value newElements;
-        state.callFunction(*op->value, {&e, 1}, newElements, noPos);
-        state.forceList(
-            newElements,
-            noPos,
-            "while evaluating the return value of the `operator` passed to builtins.genericClosure");
+        try {
+            state.callFunction(*op->value, {&e, 1}, newElements, noPos);
+            state.forceList(
+                newElements,
+                noPos,
+                "while evaluating the return value of the `operator` passed to builtins.genericClosure");
 
-        /* Add the values returned by the operator to the work set. */
-        for (auto elem : newElements.listView()) {
-            state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator`
-                                            // passed to builtins.genericClosure");
-            workSet.push_back(elem);
+            /* Add the values returned by the operator to the work set. */
+            for (auto elem : newElements.listView()) {
+                state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator`
+                                                // passed to builtins.genericClosure");
+                workSet.push_back(elem);
+            }
+        } catch (Error & err) {
+            err.addTrace(
+                nullptr,
+                "while calling %s on genericClosure element %s",
+                state.symbols[state.s.operator_],
+                ValuePrinter(state, *e, errorPrintOptions));
+            throw;
         }
     }
 
@@ -824,10 +874,10 @@ static RegisterPrimOp primop_genericClosure(
 
       - [Int](@docroot@/language/types.md#type-int)
       - [Float](@docroot@/language/types.md#type-float)
-      - [Boolean](@docroot@/language/types.md#type-boolean)
+      - [Boolean](@docroot@/language/types.md#type-bool)
       - [String](@docroot@/language/types.md#type-string)
       - [Path](@docroot@/language/types.md#type-path)
-      - [List](@docroot@/language/types.md#list)
+      - [List](@docroot@/language/types.md#type-list)
 
       The result is produced by calling the `operator` on each `item` that has not been called yet, including newly added items, until no new items are added.
       Items are compared by their `key` attribute.
@@ -1075,12 +1125,12 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value ** args, Val
 
     try {
         state.forceValue(*args[0], pos);
-        attrs.insert(state.sValue, args[0]);
-        attrs.insert(state.symbols.create("success"), &state.vTrue);
+        attrs.insert(state.s.value, args[0]);
+        attrs.insert(state.symbols.create("success"), &Value::vTrue);
     } catch (AssertionError & e) {
         // `value = false;` is unfortunate but removing it is a breaking change.
-        attrs.insert(state.sValue, &state.vFalse);
-        attrs.insert(state.symbols.create("success"), &state.vFalse);
+        attrs.insert(state.s.value, &Value::vFalse);
+        attrs.insert(state.symbols.create("success"), &Value::vFalse);
     }
 
     // restore the debugRepl pointer if we saved it earlier.
@@ -1291,7 +1341,8 @@ static void prim_derivationStrict(EvalState & state, const PosIdx pos, Value ** 
     auto attrs = args[0]->attrs();
 
     /* Figure out the name first (for stack backtraces). */
-    auto nameAttr = state.getAttr(state.sName, attrs, "in the attrset passed as argument to builtins.derivationStrict");
+    auto nameAttr =
+        state.getAttr(state.s.name, attrs, "in the attrset passed as argument to builtins.derivationStrict");
 
     std::string_view drvName;
     try {
@@ -1363,21 +1414,21 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
     /* Check whether attributes should be passed as a JSON file. */
     using nlohmann::json;
-    std::optional<json> jsonObject;
+    std::optional<StructuredAttrs> jsonObject;
     auto pos = v.determinePos(noPos);
-    auto attr = attrs->find(state.sStructuredAttrs);
-    if (attr != attrs->end()
+    auto attr = attrs->get(state.s.structuredAttrs);
+    if (attr
         && state.forceBool(
             *attr->value,
             pos,
             "while evaluating the `__structuredAttrs` "
             "attribute passed to builtins.derivationStrict"))
-        jsonObject = json::object();
+        jsonObject = StructuredAttrs{};
 
     /* Check whether null attributes should be ignored. */
     bool ignoreNulls = false;
-    attr = attrs->find(state.sIgnoreNulls);
-    if (attr != attrs->end())
+    attr = attrs->get(state.s.ignoreNulls);
+    if (attr)
         ignoreNulls = state.forceBool(
             *attr->value,
             pos,
@@ -1400,7 +1451,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     outputs.insert("out");
 
     for (auto & i : attrs->lexicographicOrder(state.symbols)) {
-        if (i->name == state.sIgnoreNulls)
+        if (i->name == state.s.ignoreNulls)
             continue;
         auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
@@ -1418,7 +1469,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                         .debugThrow();
                 }
             if (ingestionMethod == ContentAddressMethod::Raw::Text)
-                experimentalFeatureSettings.require(Xp::DynamicDerivations);
+                experimentalFeatureSettings.require(
+                    Xp::DynamicDerivations, fmt("text-hashed derivation '%s', outputHashMode = \"text\"", drvName));
             if (ingestionMethod == ContentAddressMethod::Raw::Git)
                 experimentalFeatureSettings.require(Xp::GitHashing);
         };
@@ -1452,19 +1504,22 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     continue;
             }
 
-            if (i->name == state.sContentAddressed && state.forceBool(*i->value, pos, context_below)) {
-                contentAddressed = true;
-                experimentalFeatureSettings.require(Xp::CaDerivations);
-            }
-
-            else if (i->name == state.sImpure && state.forceBool(*i->value, pos, context_below)) {
-                isImpure = true;
-                experimentalFeatureSettings.require(Xp::ImpureDerivations);
-            }
-
+            switch (i->name.getId()) {
+            case EvalState::s.contentAddressed.getId():
+                if (state.forceBool(*i->value, pos, context_below)) {
+                    contentAddressed = true;
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
+                }
+                break;
+            case EvalState::s.impure.getId():
+                if (state.forceBool(*i->value, pos, context_below)) {
+                    isImpure = true;
+                    experimentalFeatureSettings.require(Xp::ImpureDerivations);
+                }
+                break;
             /* The `args' attribute is special: it supplies the
                command-line arguments to the builder. */
-            else if (i->name == state.sArgs) {
+            case EvalState::s.args.getId():
                 state.forceList(*i->value, pos, context_below);
                 for (auto elem : i->value->listView()) {
                     auto s = state
@@ -1473,83 +1528,116 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                                  .toOwned();
                     drv.args.push_back(s);
                 }
-            }
-
+                break;
             /* All other attributes are passed to the builder through
                the environment. */
-            else {
+            default:
 
                 if (jsonObject) {
 
-                    if (i->name == state.sStructuredAttrs)
+                    if (i->name == state.s.structuredAttrs)
                         continue;
 
-                    jsonObject->emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
+                    jsonObject->structuredAttrs.emplace(key, printValueAsJSON(state, true, *i->value, pos, context));
 
-                    if (i->name == state.sBuilder)
+                    switch (i->name.getId()) {
+                    case EvalState::s.builder.getId():
                         drv.builder = state.forceString(*i->value, context, pos, context_below);
-                    else if (i->name == state.sSystem)
+                        break;
+                    case EvalState::s.system.getId():
                         drv.platform = state.forceStringNoCtx(*i->value, pos, context_below);
-                    else if (i->name == state.sOutputHash)
+                        break;
+                    case EvalState::s.outputHash.getId():
                         outputHash = state.forceStringNoCtx(*i->value, pos, context_below);
-                    else if (i->name == state.sOutputHashAlgo)
+                        break;
+                    case EvalState::s.outputHashAlgo.getId():
                         outputHashAlgo = parseHashAlgoOpt(state.forceStringNoCtx(*i->value, pos, context_below));
-                    else if (i->name == state.sOutputHashMode)
+                        break;
+                    case EvalState::s.outputHashMode.getId():
                         handleHashMode(state.forceStringNoCtx(*i->value, pos, context_below));
-                    else if (i->name == state.sOutputs) {
-                        /* Require ‘outputs’ to be a list of strings. */
+                        break;
+                    case EvalState::s.outputs.getId(): {
+                        /* Require 'outputs' to be a list of strings. */
                         state.forceList(*i->value, pos, context_below);
                         Strings ss;
                         for (auto elem : i->value->listView())
                             ss.emplace_back(state.forceStringNoCtx(*elem, pos, context_below));
                         handleOutputs(ss);
+                        break;
+                    }
+                    default:
+                        break;
                     }
 
-                    if (i->name == state.sAllowedReferences)
+                    switch (i->name.getId()) {
+                    case EvalState::s.allowedReferences.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead",
                             drvName);
-                    if (i->name == state.sAllowedRequisites)
+                        break;
+                    case EvalState::s.allowedRequisites.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead",
                             drvName);
-                    if (i->name == state.sDisallowedReferences)
+                        break;
+                    case EvalState::s.disallowedReferences.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead",
                             drvName);
-                    if (i->name == state.sDisallowedRequisites)
+                        break;
+                    case EvalState::s.disallowedRequisites.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead",
                             drvName);
-                    if (i->name == state.sMaxSize)
+                        break;
+                    case EvalState::s.maxSize.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead",
                             drvName);
-                    if (i->name == state.sMaxClosureSize)
+                        break;
+                    case EvalState::s.maxClosureSize.getId():
                         warn(
                             "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead",
                             drvName);
+                        break;
+                    default:
+                        break;
+                    }
 
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
-                    drv.env.emplace(key, s);
-                    if (i->name == state.sBuilder)
-                        drv.builder = std::move(s);
-                    else if (i->name == state.sSystem)
-                        drv.platform = std::move(s);
-                    else if (i->name == state.sOutputHash)
-                        outputHash = std::move(s);
-                    else if (i->name == state.sOutputHashAlgo)
-                        outputHashAlgo = parseHashAlgoOpt(s);
-                    else if (i->name == state.sOutputHashMode)
-                        handleHashMode(s);
-                    else if (i->name == state.sOutputs)
-                        handleOutputs(tokenizeString<Strings>(s));
-                    else if (i->name == state.sJson)
+                    if (i->name == state.s.json) {
                         warn(
                             "In derivation '%s': setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead.",
                             drvName);
+                        drv.structuredAttrs = StructuredAttrs::parse(s);
+                    } else {
+                        drv.env.emplace(key, s);
+                        switch (i->name.getId()) {
+                        case EvalState::s.builder.getId():
+                            drv.builder = std::move(s);
+                            break;
+                        case EvalState::s.system.getId():
+                            drv.platform = std::move(s);
+                            break;
+                        case EvalState::s.outputHash.getId():
+                            outputHash = std::move(s);
+                            break;
+                        case EvalState::s.outputHashAlgo.getId():
+                            outputHashAlgo = parseHashAlgoOpt(s);
+                            break;
+                        case EvalState::s.outputHashMode.getId():
+                            handleHashMode(s);
+                            break;
+                        case EvalState::s.outputs.getId():
+                            handleOutputs(tokenizeString<Strings>(s));
+                            break;
+                        default:
+                            break;
+                        }
+                    }
                 }
+                break;
             }
 
         } catch (Error & e) {
@@ -1560,8 +1648,10 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     }
 
     if (jsonObject) {
-        drv.env.emplace("__json", jsonObject->dump());
-        jsonObject.reset();
+        /* The only other way `drv.structuredAttrs` can be set is when
+           `jsonObject` is not set. */
+        assert(!drv.structuredAttrs);
+        drv.structuredAttrs = std::move(*jsonObject);
     }
 
     /* Everything in the context of the strings in the derivation
@@ -1712,11 +1802,11 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        read them later. */
     {
         auto h = hashDerivationModulo(*state.store, drv, false);
-        drvHashes.lock()->insert_or_assign(drvPath, h);
+        drvHashes.insert_or_assign(drvPath, std::move(h));
     }
 
     auto result = state.buildBindings(1 + drv.outputs.size());
-    result.alloc(state.sDrvPath)
+    result.alloc(state.s.drvPath)
         .mkString(
             drvPathS,
             {
@@ -1933,8 +2023,13 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value ** args, Value
         NixStringContext context;
         auto path = state.coerceToString(
             pos, *args[0], context, "while evaluating the first argument passed to 'builtins.dirOf'", false, false);
-        auto dir = dirOf(*path);
-        v.mkString(dir, context);
+        auto pos = path->rfind('/');
+        if (pos == path->npos)
+            v.mkStringMove("."_sds, context);
+        else if (pos == 0)
+            v.mkStringMove("/"_sds, context);
+        else
+            v.mkString(path->substr(0, pos), context);
     }
 }
 
@@ -2000,14 +2095,14 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.findFile");
 
         std::string prefix;
-        auto i = v2->attrs()->find(state.sPrefix);
-        if (i != v2->attrs()->end())
+        auto i = v2->attrs()->get(state.s.prefix);
+        if (i)
             prefix = state.forceStringNoCtx(
                 *i->value,
                 pos,
                 "while evaluating the `prefix` attribute of an element of the list passed to builtins.findFile");
 
-        i = state.getAttr(state.sPath, v2->attrs(), "in an element of the __nixPath");
+        i = state.getAttr(state.s.path, v2->attrs(), "in an element of the __nixPath");
 
         NixStringContext context;
         auto path =
@@ -2062,7 +2157,7 @@ static RegisterPrimOp primop_findFile(
       builtins.findFile builtins.nixPath "nixpkgs"
       ```
 
-      A search path is represented as a list of [attribute sets](./types.md#attribute-set) with two attributes:
+      A search path is represented as a list of [attribute sets](./types.md#type-attrs) with two attributes:
       - `prefix` is a relative path.
       - `path` denotes a file system location
 
@@ -2145,7 +2240,7 @@ static RegisterPrimOp primop_findFile(
       > - ```
       >   {
       >     prefix = "nixpkgs";
-      >     path = "https://nixos.org/channels/nixos-unstable/nixexprs.tar.xz";
+      >     path = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
       >   }
       >   ```
 
@@ -2203,19 +2298,45 @@ static RegisterPrimOp primop_hashFile({
     .fun = prim_hashFile,
 });
 
-static Value * fileTypeToString(EvalState & state, SourceAccessor::Type type)
+static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type type)
 {
-    return type == SourceAccessor::Type::tRegular     ? &state.vStringRegular
-           : type == SourceAccessor::Type::tDirectory ? &state.vStringDirectory
-           : type == SourceAccessor::Type::tSymlink   ? &state.vStringSymlink
-                                                      : &state.vStringUnknown;
+    struct Constants
+    {
+        Value regular;
+        Value directory;
+        Value symlink;
+        Value unknown;
+    };
+
+    static const Constants stringValues = []() {
+        Constants res;
+        res.regular.mkStringNoCopy("regular"_sds);
+        res.directory.mkStringNoCopy("directory"_sds);
+        res.symlink.mkStringNoCopy("symlink"_sds);
+        res.unknown.mkStringNoCopy("unknown"_sds);
+        return res;
+    }();
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    using enum SourceAccessor::Type;
+    switch (type) {
+    case tRegular:
+        return stringValues.regular;
+    case tDirectory:
+        return stringValues.directory;
+    case tSymlink:
+        return stringValues.symlink;
+    default:
+        return stringValues.unknown;
+    }
 }
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     auto path = realisePath(state, pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
-    v = *fileTypeToString(state, path.lstat().type);
+    v = fileTypeToString(state, path.lstat().type);
 }
 
 static RegisterPrimOp primop_readFileType({
@@ -2259,7 +2380,9 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Val
         } else {
             // This branch of the conditional is much more likely.
             // Here we just stringize the directory entry type.
-            attrs.insert(state.symbols.create(name), fileTypeToString(state, *type));
+            // N.B. const_cast here is ok, because these values will never be modified, since
+            // only thunks are mutable - other types do not change once constructed.
+            attrs.insert(state.symbols.create(name), const_cast<Value *>(&fileTypeToString(state, *type)));
         }
     }
 
@@ -2326,7 +2449,7 @@ static RegisterPrimOp primop_outputOf({
 
       returns an input placeholder for the output of the output of `myDrv`.
 
-      This primop corresponds to the `^` sigil for [deriving paths](@docroot@/glossary.md#gloss-deriving-paths), e.g. as part of installable syntax on the command line.
+      This primop corresponds to the `^` sigil for [deriving paths](@docroot@/glossary.md#gloss-deriving-path), e.g. as part of installable syntax on the command line.
     )",
     .fun = prim_outputOf,
     .experimentalFeature = Xp::DynamicDerivations,
@@ -2344,7 +2467,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value ** args, Value
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(toView(out), context);
+    v.mkString(out.view(), context);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2452,7 +2575,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value ** args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(toView(out), context);
+    v.mkString(out.view(), context);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -2634,7 +2757,7 @@ bool EvalState::callPathFilter(Value * filterFun, const SourcePath & path, PosId
     arg1.mkString(path.path.abs());
 
     // assert that type is not "unknown"
-    Value * args[]{&arg1, fileTypeToString(*this, st.type)};
+    Value * args[]{&arg1, const_cast<Value *>(&fileTypeToString(*this, st.type))};
     Value res;
     callFunction(*filterFun, args, res, pos);
 
@@ -2780,7 +2903,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value ** args, Value 
         if (n == "path")
             path.emplace(state.coerceToPath(
                 attr.pos, *attr.value, context, "while evaluating the 'path' attribute passed to 'builtins.path'"));
-        else if (attr.name == state.sName)
+        else if (attr.name == state.s.name)
             name = state.forceStringNoCtx(
                 *attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.path");
         else if (n == "filter")
@@ -2861,7 +2984,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
-    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return strcmp(v1->c_str(), v2->c_str()) < 0; });
+    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
 }
@@ -2940,8 +3063,8 @@ static void prim_unsafeGetAttrPos(EvalState & state, const PosIdx pos, Value ** 
     auto attr = state.forceStringNoCtx(
         *args[0], pos, "while evaluating the first argument passed to builtins.unsafeGetAttrPos");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.unsafeGetAttrPos");
-    auto i = args[1]->attrs()->find(state.symbols.create(attr));
-    if (i == args[1]->attrs()->end())
+    auto i = args[1]->attrs()->get(state.symbols.create(attr));
+    if (!i)
         v.mkNull();
     else
         state.mkPos(v, i->pos);
@@ -3008,7 +3131,7 @@ static void prim_hasAttr(EvalState & state, const PosIdx pos, Value ** args, Val
 {
     auto attr = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.hasAttr");
     state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.hasAttr");
-    v.mkBool(args[1]->attrs()->find(state.symbols.create(attr)) != args[1]->attrs()->end());
+    v.mkBool(args[1]->attrs()->get(state.symbols.create(attr)));
 }
 
 static RegisterPrimOp primop_hasAttr({
@@ -3093,13 +3216,13 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
     // Step 1. Sort the name-value attrsets in place using the memory we allocate for the result
     auto listView = args[0]->listView();
     size_t listSize = listView.size();
-    auto & bindings = *state.allocBindings(listSize);
+    auto & bindings = *state.mem.allocBindings(listSize);
     using ElemPtr = decltype(&bindings[0].value);
 
     for (const auto & [n, v2] : enumerate(listView)) {
         state.forceAttrs(*v2, pos, "while evaluating an element of the list passed to builtins.listToAttrs");
 
-        auto j = state.getAttr(state.sName, v2->attrs(), "in a {name=...; value=...;} pair");
+        auto j = state.getAttr(state.s.name, v2->attrs(), "in a {name=...; value=...;} pair");
 
         auto name = state.forceStringNoCtx(
             *j->value,
@@ -3126,7 +3249,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
         // Note that .value is actually a Value * *; see earlier comments
         Value * v2 = *std::bit_cast<ElemPtr>(attr.value);
 
-        auto j = state.getAttr(state.sValue, v2->attrs(), "in a {name=...; value=...;} pair");
+        auto j = state.getAttr(state.s.value, v2->attrs(), "in a {name=...; value=...;} pair");
         prev = attr.name;
         bindings.push_back({prev, j->value, j->pos});
     }
@@ -3218,14 +3341,14 @@ static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** ar
 
     if (left.size() < right.size()) {
         for (auto & l : left) {
-            auto r = right.find(l.name);
-            if (r != right.end())
+            auto r = right.get(l.name);
+            if (r)
                 attrs.insert(*r);
         }
     } else {
         for (auto & r : right) {
-            auto l = left.find(r.name);
-            if (l != left.end())
+            auto l = left.get(r.name);
+            if (l)
                 attrs.insert(r);
         }
     }
@@ -3288,27 +3411,26 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
 {
     state.forceValue(*args[0], pos);
     if (args[0]->isPrimOpApp() || args[0]->isPrimOp()) {
-        v.mkAttrs(&state.emptyBindings);
+        v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
     if (!args[0]->isLambda())
         state.error<TypeError>("'functionArgs' requires a function").atPos(pos).debugThrow();
 
-    if (!args[0]->lambda().fun->hasFormals()) {
-        v.mkAttrs(&state.emptyBindings);
+    if (const auto & formals = args[0]->lambda().fun->getFormals()) {
+        auto attrs = state.buildBindings(formals->formals.size());
+        for (auto & i : formals->formals)
+            attrs.insert(i.name, state.getBool(i.def), i.pos);
+        /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
+           (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
+           always holds:
+           assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
+           .*/
+        v.mkAttrs(attrs.alreadySorted());
+    } else {
+        v.mkAttrs(&Bindings::emptyBindings);
         return;
     }
-
-    const auto & formals = args[0]->lambda().fun->formals->formals;
-    auto attrs = state.buildBindings(formals.size());
-    for (auto & i : formals)
-        attrs.insert(i.name, state.getBool(i.def), i.pos);
-    /* Optimization: avoid sorting bindings. `formals` must already be sorted according to
-       (std::tie(a.name, a.pos) < std::tie(b.name, b.pos)) predicate, so the following assertion
-       always holds:
-       assert(std::is_sorted(attrs.alreadySorted()->begin(), attrs.alreadySorted()->end()));
-       .*/
-    v.mkAttrs(attrs.alreadySorted());
 }
 
 static RegisterPrimOp primop_functionArgs({
@@ -3942,13 +4064,13 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value ** args, V
     auto rlist = state.buildList(rsize);
     if (rsize)
         memcpy(rlist.elems, right.data(), sizeof(Value *) * rsize);
-    attrs.alloc(state.sRight).mkList(rlist);
+    attrs.alloc(state.s.right).mkList(rlist);
 
     auto wsize = wrong.size();
     auto wlist = state.buildList(wsize);
     if (wsize)
         memcpy(wlist.elems, wrong.data(), sizeof(Value *) * wsize);
-    attrs.alloc(state.sWrong).mkList(wlist);
+    attrs.alloc(state.s.wrong).mkList(wlist);
 
     v.mkAttrs(attrs);
 }
@@ -3989,7 +4111,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
         auto name = state.forceStringNoCtx(
             res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
         auto sym = state.symbols.create(name);
-        auto vector = attrs.try_emplace(sym, ValueVector()).first;
+        auto vector = attrs.try_emplace<ValueVector>(sym, {}).first;
         vector->second.push_back(vElem);
     }
 
@@ -4342,7 +4464,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     if (len == 0) {
         state.forceValue(*args[2], pos);
         if (args[2]->type() == nString) {
-            v.mkString("", args[2]->context());
+            v.mkStringNoCopy(""_sds, args[2]->context());
             return;
         }
     }
@@ -4524,33 +4646,27 @@ static RegisterPrimOp primop_convertHash({
 
 struct RegexCache
 {
-    struct State
-    {
-        std::unordered_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
-    };
-
-    Sync<State> state_;
+    boost::concurrent_flat_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
 
     std::regex get(std::string_view re)
     {
-        auto state(state_.lock());
-        auto it = state->cache.find(re);
-        if (it != state->cache.end())
-            return it->second;
+        std::regex regex;
         /* No std::regex constructor overload from std::string_view, but can be constructed
            from a pointer + size or an iterator range. */
-        return state->cache
-            .emplace(
-                std::piecewise_construct,
-                std::forward_as_tuple(re),
-                std::forward_as_tuple(/*s=*/re.data(), /*count=*/re.size(), std::regex::extended))
-            .first->second;
+        cache.try_emplace_and_cvisit(
+            re,
+            /*s=*/re.data(),
+            /*count=*/re.size(),
+            std::regex::extended,
+            [&regex](const auto & kv) { regex = kv.second; },
+            [&regex](const auto & kv) { regex = kv.second; });
+        return regex;
     }
 };
 
-std::shared_ptr<RegexCache> makeRegexCache()
+ref<RegexCache> makeRegexCache()
 {
-    return std::make_shared<RegexCache>();
+    return make_ref<RegexCache>();
 }
 
 void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -4575,7 +4691,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
         auto list = state.buildList(match.size() - 1);
         for (const auto & [i, v2] : enumerate(list))
             if (!match[i + 1].matched)
-                v2 = &state.vNull;
+                v2 = &Value::vNull;
             else
                 v2 = mkString(state, match[i + 1]);
         v.mkList(list);
@@ -4667,7 +4783,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             auto list2 = state.buildList(slen);
             for (const auto & [si, v2] : enumerate(list2)) {
                 if (!match[si + 1].matched)
-                    v2 = &state.vNull;
+                    v2 = &Value::vNull;
                 else
                     v2 = mkString(state, match[si + 1]);
             }
@@ -4788,7 +4904,7 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value ** ar
         from.emplace_back(state.forceString(
             *elem, pos, "while evaluating one of the strings to replace passed to builtins.replaceStrings"));
 
-    std::unordered_map<size_t, std::string_view> cache;
+    boost::unordered_flat_map<size_t, std::string_view> cache;
     auto to = args[1]->listView();
 
     NixStringContext context;
@@ -4867,7 +4983,7 @@ static void prim_parseDrvName(EvalState & state, const PosIdx pos, Value ** args
         state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.parseDrvName");
     DrvName parsed(name);
     auto attrs = state.buildBindings(2);
-    attrs.alloc(state.sName).mkString(parsed.name);
+    attrs.alloc(state.s.name).mkString(parsed.name);
     attrs.alloc("version").mkString(parsed.version);
     v.mkAttrs(attrs);
 }
@@ -4904,7 +5020,7 @@ static RegisterPrimOp primop_compareVersions({
       version *s1* is older than version *s2*, `0` if they are the same,
       and `1` if *s1* is newer than *s2*. The version comparison
       algorithm is the same as the one used by [`nix-env
-      -u`](../command-ref/nix-env.md#operation---upgrade).
+      -u`](../command-ref/nix-env/upgrade.md).
     )",
     .fun = prim_compareVersions,
 });
@@ -4933,7 +5049,7 @@ static RegisterPrimOp primop_splitVersion({
     .doc = R"(
       Split a string representing a version into its components, by the
       same version splitting logic underlying the version comparison in
-      [`nix-env -u`](../command-ref/nix-env.md#operation---upgrade).
+      [`nix-env -u`](../command-ref/nix-env/upgrade.md).
     )",
     .fun = prim_splitVersion,
 });
@@ -4983,9 +5099,9 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           Primitive value.
 
           It can be returned by
-          [comparison operators](@docroot@/language/operators.md#Comparison)
+          [comparison operators](@docroot@/language/operators.md#comparison)
           and used in
-          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#conditionals).
 
           The name `true` is not special, and can be shadowed:
 
@@ -5006,9 +5122,9 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           Primitive value.
 
           It can be returned by
-          [comparison operators](@docroot@/language/operators.md#Comparison)
+          [comparison operators](@docroot@/language/operators.md#comparison)
           and used in
-          [conditional expressions](@docroot@/language/syntax.md#Conditionals).
+          [conditional expressions](@docroot@/language/syntax.md#conditionals).
 
           The name `false` is not special, and can be shadowed:
 
@@ -5021,7 +5137,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
 
     addConstant(
         "null",
-        &vNull,
+        &Value::vNull,
         {
             .type = nNull,
             .doc = R"(

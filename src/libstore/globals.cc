@@ -86,13 +86,22 @@ Settings::Settings()
     }
 
 #if (defined(__linux__) || defined(__FreeBSD__)) && defined(SANDBOX_SHELL)
-    sandboxPaths = tokenizeString<StringSet>("/bin/sh=" SANDBOX_SHELL);
+    sandboxPaths = {{"/bin/sh", {.source = SANDBOX_SHELL}}};
 #endif
 
     /* chroot-like behavior from Apple's sandbox */
 #ifdef __APPLE__
-    sandboxPaths = tokenizeString<StringSet>(
-        "/System/Library/Frameworks /System/Library/PrivateFrameworks /bin/sh /bin/bash /private/tmp /private/var/tmp /usr/lib");
+    for (PathView p : {
+             "/System/Library/Frameworks",
+             "/System/Library/PrivateFrameworks",
+             "/bin/sh",
+             "/bin/bash",
+             "/private/tmp",
+             "/private/var/tmp",
+             "/usr/lib",
+         }) {
+        sandboxPaths.get().insert_or_assign(std::string{p}, ChrootPath{.source = std::string{p}});
+    }
     allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
 #endif
 }
@@ -141,7 +150,7 @@ std::vector<Path> getUserConfigFiles()
     return files;
 }
 
-unsigned int Settings::getDefaultCores() const
+unsigned int Settings::getDefaultCores()
 {
     const unsigned int concurrency = std::max(1U, std::thread::hardware_concurrency());
     const unsigned int maxCPU = getMaxCPU();
@@ -249,6 +258,15 @@ Path Settings::getDefaultSSLCertFile()
     return "";
 }
 
+const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
+{
+    if (auto it = std::ranges::find_if(
+            externalBuilders.get(), [&](const auto & handler) { return handler.systems.contains(drv.platform); });
+        it != externalBuilders.get().end())
+        return &*it;
+    return nullptr;
+}
+
 std::string nixVersion = PACKAGE_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
@@ -317,6 +335,47 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
     });
 }
 
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ChrootPath, source, optional)
+
+template<>
+PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const
+{
+    PathsInChroot pathsInChroot;
+    for (auto i : tokenizeString<StringSet>(str)) {
+        if (i.empty())
+            continue;
+        bool optional = false;
+        if (i[i.size() - 1] == '?') {
+            optional = true;
+            i.pop_back();
+        }
+        size_t p = i.find('=');
+        std::string inside, outside;
+        if (p == std::string::npos) {
+            inside = i;
+            outside = i;
+        } else {
+            inside = i.substr(0, p);
+            outside = i.substr(p + 1);
+        }
+        pathsInChroot[inside] = {.source = outside, .optional = optional};
+    }
+    return pathsInChroot;
+}
+
+template<>
+std::string BaseSetting<PathsInChroot>::to_string() const
+{
+    std::vector<std::string> accum;
+    for (auto & [name, cp] : value) {
+        std::string s = name == cp.source ? name : name + "=" + cp.source;
+        if (cp.optional)
+            s += "?";
+        accum.push_back(std::move(s));
+    }
+    return concatStringsSep(" ", accum);
+}
+
 unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 {
     if (str == "auto")
@@ -327,6 +386,30 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
         else
             throw UsageError("configuration setting '%s' should be 'auto' or an integer", name);
     }
+}
+
+template<>
+Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+{
+    try {
+        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+    } catch (std::exception & e) {
+        throw UsageError("parsing setting '%s': %s", name, e.what());
+    }
+}
+
+template<>
+std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+{
+    return nlohmann::json(value).dump();
+}
+
+template<>
+void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append)
+{
+    if (!append)
+        value.clear();
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 static void preloadNSS()

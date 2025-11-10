@@ -9,8 +9,7 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
 {
     std::string_view s = s0;
 
-    std::function<SingleDerivedPath()> parseRest;
-    parseRest = [&]() -> SingleDerivedPath {
+    auto parseRest = [&](this auto & parseRest) -> SingleDerivedPath {
         // Case on whether there is a '!'
         size_t index = s.find("!");
         if (index == std::string_view::npos) {

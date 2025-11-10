@@ -165,10 +165,14 @@ void WorkerProto::Serialise<KeyedBuildResult>::write(
 BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     BuildResult res;
-    res.status = static_cast<BuildResult::Status>(readInt(conn.from));
-    conn.from >> res.errorMsg;
+    BuildResult::Success success;
+    BuildResult::Failure failure;
+
+    auto rawStatus = readInt(conn.from);
+    conn.from >> failure.errorMsg;
+
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
-        conn.from >> res.timesBuilt >> res.isNonDeterministic >> res.startTime >> res.stopTime;
+        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
     }
     if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
@@ -177,28 +181,56 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
     if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
         auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
-            res.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
+
+    if (BuildResult::Success::statusIs(rawStatus)) {
+        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
+        res.inner = std::move(success);
+    } else {
+        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
+        res.inner = std::move(failure);
+    }
+
     return res;
 }
 
 void WorkerProto::Serialise<BuildResult>::write(
     const StoreDirConfig & store, WorkerProto::WriteConn conn, const BuildResult & res)
 {
-    conn.to << res.status << res.errorMsg;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
-        conn.to << res.timesBuilt << res.isNonDeterministic << res.startTime << res.stopTime;
-    }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
-        WorkerProto::write(store, conn, res.cpuUser);
-        WorkerProto::write(store, conn, res.cpuSystem);
-    }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-        DrvOutputs builtOutputs;
-        for (auto & [output, realisation] : res.builtOutputs)
-            builtOutputs.insert_or_assign(realisation.id, realisation);
-        WorkerProto::write(store, conn, builtOutputs);
-    }
+    /* The protocol predates the use of sum types (std::variant) to
+       separate the success or failure cases. As such, it transits some
+       success- or failure-only fields in both cases. This helper
+       function helps support this: in each case, we just pass the old
+       default value for the fields that don't exist in that case. */
+    auto common = [&](std::string_view errorMsg, bool isNonDeterministic, const auto & builtOutputs) {
+        conn.to << errorMsg;
+        if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
+            conn.to << res.timesBuilt << isNonDeterministic << res.startTime << res.stopTime;
+        }
+        if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+            WorkerProto::write(store, conn, res.cpuUser);
+            WorkerProto::write(store, conn, res.cpuSystem);
+        }
+        if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
+            DrvOutputs builtOutputsFullKey;
+            for (auto & [output, realisation] : builtOutputs)
+                builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
+            WorkerProto::write(store, conn, builtOutputsFullKey);
+        }
+    };
+    std::visit(
+        overloaded{
+            [&](const BuildResult::Failure & failure) {
+                conn.to << failure.status;
+                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+            },
+            [&](const BuildResult::Success & success) {
+                conn.to << success.status;
+                common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
+            },
+        },
+        res.inner);
 }
 
 ValidPathInfo WorkerProto::Serialise<ValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
@@ -219,11 +251,10 @@ void WorkerProto::Serialise<ValidPathInfo>::write(
 
 UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const StoreDirConfig & store, ReadConn conn)
 {
-    auto deriver = readString(conn.from);
+    auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(store, conn);
     auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
     UnkeyedValidPathInfo info(narHash);
-    if (deriver != "")
-        info.deriver = store.parseStorePath(deriver);
+    info.deriver = std::move(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
@@ -237,8 +268,8 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
 void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     const StoreDirConfig & store, WriteConn conn, const UnkeyedValidPathInfo & pathInfo)
 {
-    conn.to << (pathInfo.deriver ? store.printStorePath(*pathInfo.deriver) : "")
-            << pathInfo.narHash.to_string(HashFormat::Base16, false);
+    WorkerProto::write(store, conn, pathInfo.deriver);
+    conn.to << pathInfo.narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(store, conn, pathInfo.references);
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {

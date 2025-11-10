@@ -58,7 +58,10 @@ void BinaryCacheStore::init()
             if (name == "StoreDir") {
                 if (value != storeDir)
                     throw Error(
-                        "binary cache '%s' is for Nix stores with prefix '%s', not '%s'", getUri(), value, storeDir);
+                        "binary cache '%s' is for Nix stores with prefix '%s', not '%s'",
+                        config.getHumanReadableURI(),
+                        value,
+                        storeDir);
             } else if (name == "WantMassQuery") {
                 config.wantMassQuery.setDefault(value == "1");
             } else if (name == "Priority") {
@@ -73,9 +76,11 @@ std::optional<std::string> BinaryCacheStore::getNixCacheInfo()
     return getFile(cacheInfoFile);
 }
 
-void BinaryCacheStore::upsertFile(const std::string & path, std::string && data, const std::string & mimeType)
+void BinaryCacheStore::upsertFile(
+    const std::string & path, std::string && data, const std::string & mimeType, uint64_t sizeHint)
 {
-    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType);
+    auto source = restartableSourceFromFactory([data = std::move(data)]() { return make_unique<StringSource>(data); });
+    upsertFile(path, *source, mimeType, sizeHint);
 }
 
 void BinaryCacheStore::getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept
@@ -122,14 +127,14 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    {
-        auto state_(state.lock());
-        state_->pathInfoCache.upsert(
-            std::string(narInfo->path.to_string()), PathInfoCacheValue{.value = std::shared_ptr<NarInfo>(narInfo)});
-    }
+    pathInfoCache->lock()->upsert(
+        std::string(narInfo->path.to_string()), PathInfoCacheValue{.value = std::shared_ptr<NarInfo>(narInfo)});
 
     if (diskCache)
-        diskCache->upsertNarInfo(getUri(), std::string(narInfo->path.hashPart()), std::shared_ptr<NarInfo>(narInfo));
+        diskCache->upsertNarInfo(
+            config.getReference().render(/*FIXME withParams=*/false),
+            std::string(narInfo->path.hashPart()),
+            std::shared_ptr<NarInfo>(narInfo));
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
@@ -267,11 +272,19 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
+        auto source = restartableSourceFromFactory([fnTemp]() {
+            struct AutoCloseFDSource : AutoCloseFD, FdSource
+            {
+                AutoCloseFDSource(AutoCloseFD fd)
+                    : AutoCloseFD(std::move(fd))
+                    , FdSource(get())
+                {
+                }
+            };
+            return std::make_unique<AutoCloseFDSource>(toDescriptor(open(fnTemp.c_str(), O_RDONLY)));
+        });
         stats.narWrite++;
-        upsertFile(
-            narInfo->url,
-            std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
-            "application/x-nix-nar");
+        upsertFile(narInfo->url, *source, "application/x-nix-nar", narInfo->fileSize);
     } else
         stats.narWriteAverted++;
 
@@ -363,21 +376,20 @@ StorePath BinaryCacheStore::addToStoreFromDump(
                repair,
                CheckSigs,
                [&](HashResult nar) {
-                   ValidPathInfo info{
+                   auto info = ValidPathInfo::makeFromCA(
                        *this,
                        name,
                        ContentAddressWithReferences::fromParts(
                            hashMethod,
-                           caHash ? *caHash : nar.first,
+                           caHash ? *caHash : nar.hash,
                            {
                                .others = references,
                                // caller is not capable of creating a self-reference, because this is content-addressed
                                // without modulus
                                .self = false,
                            }),
-                       nar.first,
-                   };
-                   info.narSize = nar.second;
+                       nar.hash);
+                   info.narSize = nar.numBytesDigested;
                    return info;
                })
         ->path;
@@ -427,7 +439,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 void BinaryCacheStore::queryPathInfoUncached(
     const StorePath & storePath, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
-    auto uri = getUri();
+    auto uri = config.getReference().render(/*FIXME withParams=*/false);
     auto storePathS = printStorePath(storePath);
     auto act = std::make_shared<Activity>(
         *logger,
@@ -481,7 +493,7 @@ StorePath BinaryCacheStore::addToStore(
                repair,
                CheckSigs,
                [&](HashResult nar) {
-                   ValidPathInfo info{
+                   auto info = ValidPathInfo::makeFromCA(
                        *this,
                        name,
                        ContentAddressWithReferences::fromParts(
@@ -493,18 +505,22 @@ StorePath BinaryCacheStore::addToStore(
                                // without modulus
                                .self = false,
                            }),
-                       nar.first,
-                   };
-                   info.narSize = nar.second;
+                       nar.hash);
+                   info.narSize = nar.numBytesDigested;
                    return info;
                })
         ->path;
 }
 
-void BinaryCacheStore::queryRealisationUncached(
-    const DrvOutput & id, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
 {
-    auto outputInfoFilePath = realisationsPrefix + "/" + id.to_string() + ".doi";
+    return realisationsPrefix + "/" + id.to_string() + ".doi";
+}
+
+void BinaryCacheStore::queryRealisationUncached(
+    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
+{
+    auto outputInfoFilePath = makeRealisationPath(id);
 
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
@@ -514,8 +530,15 @@ void BinaryCacheStore::queryRealisationUncached(
             if (!data)
                 return (*callbackPtr)({});
 
-            auto realisation = Realisation::fromJSON(nlohmann::json::parse(*data), outputInfoFilePath);
-            return (*callbackPtr)(std::make_shared<const Realisation>(realisation));
+            std::shared_ptr<const UnkeyedRealisation> realisation;
+            try {
+                realisation = std::make_shared<const UnkeyedRealisation>(nlohmann::json::parse(*data));
+            } catch (Error & e) {
+                e.addTrace(
+                    {}, "while parsing file '%s' as a realisation for key '%s'", outputInfoFilePath, id.to_string());
+                throw;
+            }
+            return (*callbackPtr)(std::move(realisation));
         } catch (...) {
             callbackPtr->rethrow();
         }
@@ -527,14 +550,23 @@ void BinaryCacheStore::queryRealisationUncached(
 void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 {
     if (diskCache)
-        diskCache->upsertRealisation(getUri(), info);
-    auto filePath = realisationsPrefix + "/" + info.id.to_string() + ".doi";
-    upsertFile(filePath, info.toJSON().dump(), "application/json");
+        diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);
+    upsertFile(makeRealisationPath(info.id), static_cast<nlohmann::json>(info).dump(), "application/json");
+}
+
+ref<RemoteFSAccessor> BinaryCacheStore::getRemoteFSAccessor(bool requireValidPath)
+{
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
 }
 
 ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
+    return getRemoteFSAccessor(requireValidPath);
+}
+
+std::shared_ptr<SourceAccessor> BinaryCacheStore::getFSAccessor(const StorePath & storePath, bool requireValidPath)
+{
+    return getRemoteFSAccessor(requireValidPath)->accessObject(storePath);
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
@@ -555,7 +587,7 @@ std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & 
 {
     auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
 
-    debug("fetching build log from binary cache '%s/%s'", getUri(), logPath);
+    debug("fetching build log from binary cache '%s/%s'", config.getHumanReadableURI(), logPath);
 
     return getFile(logPath);
 }

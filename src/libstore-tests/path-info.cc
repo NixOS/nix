@@ -29,7 +29,7 @@ static UnkeyedValidPathInfo makeEmpty()
 
 static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
 {
-    ValidPathInfo info = ValidPathInfo{
+    auto info = ValidPathInfo::makeFromCA(
         store,
         "foo",
         FixedOutputInfo{
@@ -47,8 +47,7 @@ static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
                     .self = true,
                 },
         },
-        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-    };
+        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="));
     info.narSize = 34878;
     if (includeImpureInfo) {
         info.deriver = StorePath{

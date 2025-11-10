@@ -23,7 +23,7 @@ $ nix-shell
 To get a shell with one of the other [supported compilation environments](#compilation-environments):
 
 ```console
-$ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
+$ nix-shell --attr devShells.x86_64-linux.native-clangStdenv
 ```
 
 > **Note**
@@ -34,7 +34,7 @@ $ nix-shell --attr devShells.x86_64-linux.native-clangStdenvPackages
 To build Nix itself in this shell:
 
 ```console
-[nix-shell]$ mesonFlags+=" --prefix=$(pwd)/outputs/out"
+[nix-shell]$ out="$(pwd)/outputs/out" dev=$out debug=$out mesonFlags+=" --prefix=${out}"
 [nix-shell]$ dontAddPrefix=1 configurePhase
 [nix-shell]$ buildPhase
 ```
@@ -66,7 +66,7 @@ You can also build Nix for one of the [supported platforms](#platforms).
 This section assumes you are using Nix with the [`flakes`] and [`nix-command`] experimental features enabled.
 
 [`flakes`]: @docroot@/development/experimental-features.md#xp-feature-flakes
-[`nix-command`]: @docroot@/development/experimental-features.md#xp-nix-command
+[`nix-command`]: @docroot@/development/experimental-features.md#xp-feature-nix-command
 
 To build all dependencies and start a shell in which all environment variables are set up so that those dependencies can be found:
 
@@ -215,14 +215,18 @@ nix build .#nix-everything-x86_64-w64-mingw32
 
 For historic reasons and backward-compatibility, some CPU and OS identifiers are translated as follows:
 
-| `config.guess`             | Nix                 |
-|----------------------------|---------------------|
-| `amd64`                    | `x86_64`            |
-| `i*86`                     | `i686`              |
-| `arm6`                     | `arm6l`             |
-| `arm7`                     | `arm7l`             |
-| `linux-gnu*`               | `linux`             |
-| `linux-musl*`              | `linux`             |
+| `host_machine.cpu_family()` | `host_machine.endian()` | Nix                 |
+|-----------------------------|-------------------------|---------------------|
+| `x86`                       |                         | `i686`              |
+| `arm`                       |                         | `host_machine.cpu()`|
+| `ppc`                       | `little`                | `powerpcle`         |
+| `ppc64`                     | `little`                | `powerpc64le`       |
+| `ppc`                       | `big`                   | `powerpc`           |
+| `ppc64`                     | `big`                   | `powerpc64`         |
+| `mips`                      | `little`                | `mipsel`            |
+| `mips64`                    | `little`                | `mips64el`          |
+| `mips`                      | `big`                   | `mips`              |
+| `mips64`                    | `big`                   | `mips64`            |
 
 ## Compilation environments
 
@@ -252,7 +256,7 @@ You can use any of the other supported environments in place of `nix-cli-ccacheS
 ## Editor integration
 
 The `clangd` LSP server is installed by default on the `clang`-based `devShell`s.
-See [supported compilation environments](#compilation-environments) and instructions how to set up a shell [with flakes](#nix-with-flakes) or in [classic Nix](#classic-nix).
+See [supported compilation environments](#compilation-environments) and instructions how to set up a shell [with flakes](#building-nix-with-flakes) or in [classic Nix](#building-nix).
 
 To use the LSP with your editor, you will want a `compile_commands.json` file telling `clangd` how we are compiling the code.
 Meson's configure always produces this inside the build directory.

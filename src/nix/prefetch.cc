@@ -12,6 +12,9 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/url.hh"
+#include "nix/store/path.hh"
 
 #include "man-pages.hh"
 
@@ -55,7 +58,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
 std::tuple<StorePath, Hash> prefetchFile(
     ref<Store> store,
-    std::string_view url,
+    const VerbatimURL & url,
     std::optional<std::string> name,
     HashAlgorithm hashAlgo,
     std::optional<Hash> expectedHash,
@@ -67,9 +70,15 @@ std::tuple<StorePath, Hash> prefetchFile(
 
     /* Figure out a name in the Nix store. */
     if (!name) {
-        name = baseNameOf(url);
-        if (name->empty())
-            throw Error("cannot figure out file name for '%s'", url);
+        name = url.lastPathSegment();
+        if (!name || name->empty())
+            throw Error("cannot figure out file name for '%s'", url.to_string());
+    }
+    try {
+        checkName(*name);
+    } catch (BadStorePathName & e) {
+        e.addTrace({}, "file name '%s' was extracted from URL '%s'", *name, url.to_string());
+        throw;
     }
 
     std::optional<StorePath> storePath;
@@ -111,7 +120,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
         /* Optionally unpack the file. */
         if (unpack) {
-            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url));
+            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url.to_string()));
             auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
@@ -127,7 +136,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             }
         }
 
-        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url));
+        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url.to_string()));
 
         auto info = store->addToStoreSlow(
             *name, PosixSourceAccessor::createAtRoot(tmpFile), method, hashAlgo, {}, expectedHash);
@@ -247,7 +256,9 @@ static int main_nix_prefetch_url(int argc, char ** argv)
         if (!printPath)
             printInfo("path is '%s'", store->printStorePath(storePath));
 
-        logger->cout(printHash16or32(hash));
+        assert(static_cast<char>(hash.algo));
+        logger->cout(hash.to_string(hash.algo == HashAlgorithm::MD5 ? HashFormat::Base16 : HashFormat::Nix32, false));
+
         if (printPath)
             logger->cout(store->printStorePath(storePath));
 

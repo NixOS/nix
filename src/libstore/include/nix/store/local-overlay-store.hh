@@ -88,6 +88,8 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     ref<Store> openStore() const override;
 
+    StoreReference getReference() const override;
+
 protected:
     /**
      * @return The host OS path corresponding to the store path for the
@@ -115,11 +117,6 @@ struct LocalOverlayStore : virtual LocalStore
     ref<const Config> config;
 
     LocalOverlayStore(ref<const Config>);
-
-    std::string getUri() override
-    {
-        return "local-overlay://";
-    }
 
 private:
     /**
@@ -176,7 +173,7 @@ private:
      * Check lower store if upper DB does not have.
      */
     void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const Realisation>> callback) noexcept override;
+        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     /**
      * Call `remountIfNecessary` after collecting garbage normally.

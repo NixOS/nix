@@ -22,7 +22,7 @@ left untouched; this is not an error. It is also not an error if an
 element of *args* matches no installed derivations.
 
 For a description of how *args* is mapped to a set of store paths, see
-[`--install`](#operation---install). If *args* describes multiple
+[`--install`](./install.md). If *args* describes multiple
 store paths with the same symbolic name, only the one with the highest
 version is installed.
 

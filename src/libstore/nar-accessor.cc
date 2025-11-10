@@ -141,14 +141,10 @@ struct NarAccessor : public SourceAccessor
         parseDump(indexer, indexer);
     }
 
-    NarAccessor(const std::string & listing, GetNarBytes getNarBytes)
+    NarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes)
         : getNarBytes(getNarBytes)
     {
-        using json = nlohmann::json;
-
-        std::function<void(NarMember &, json &)> recurse;
-
-        recurse = [&](NarMember & member, json & v) {
+        [&](this const auto & recurse, NarMember & member, const nlohmann::json & v) -> void {
             std::string type = v["type"];
 
             if (type == "directory") {
@@ -167,10 +163,7 @@ struct NarAccessor : public SourceAccessor
                 member.target = v.value("target", "");
             } else
                 return;
-        };
-
-        json v = json::parse(listing);
-        recurse(root, v);
+        }(root, listing);
     }
 
     NarMember * find(const CanonPath & path)
@@ -251,9 +244,32 @@ ref<SourceAccessor> makeNarAccessor(Source & source)
     return make_ref<NarAccessor>(source);
 }
 
-ref<SourceAccessor> makeLazyNarAccessor(const std::string & listing, GetNarBytes getNarBytes)
+ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes)
 {
     return make_ref<NarAccessor>(listing, getNarBytes);
+}
+
+GetNarBytes seekableGetNarBytes(const Path & path)
+{
+    return [path](uint64_t offset, uint64_t length) {
+        AutoCloseFD fd = toDescriptor(open(
+            path.c_str(),
+            O_RDONLY
+#ifndef _WIN32
+                | O_CLOEXEC
+#endif
+            ));
+        if (!fd)
+            throw SysError("opening NAR cache file '%s'", path);
+
+        if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
+            throw SysError("seeking in '%s'", path);
+
+        std::string buf(length, 0);
+        readFull(fd.get(), buf.data(), length);
+
+        return buf;
+    };
 }
 
 using nlohmann::json;

@@ -6,7 +6,7 @@
 
 namespace nix {
 
-NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
+NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
     : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
 {
     unsigned line = 1;
@@ -102,7 +102,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     }
 }
 
-std::string NarInfo::to_string(const Store & store) const
+std::string NarInfo::to_string(const StoreDirConfig & store) const
 {
     std::string res;
     res += "StorePath: " + store.printStorePath(path) + "\n";
@@ -130,7 +130,7 @@ std::string NarInfo::to_string(const Store & store) const
     return res;
 }
 
-nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
 {
     using nlohmann::json;
 
@@ -150,7 +150,7 @@ nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, Hash
     return jsonObject;
 }
 
-NarInfo NarInfo::fromJSON(const Store & store, const StorePath & path, const nlohmann::json & json)
+NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, const nlohmann::json & json)
 {
     using nlohmann::detail::value_t;
 
@@ -159,17 +159,19 @@ NarInfo NarInfo::fromJSON(const Store & store, const StorePath & path, const nlo
         UnkeyedValidPathInfo::fromJSON(store, json),
     }};
 
+    auto & obj = getObject(json);
+
     if (json.contains("url"))
-        res.url = getString(valueAt(json, "url"));
+        res.url = getString(valueAt(obj, "url"));
 
     if (json.contains("compression"))
-        res.compression = getString(valueAt(json, "compression"));
+        res.compression = getString(valueAt(obj, "compression"));
 
     if (json.contains("downloadHash"))
-        res.fileHash = Hash::parseAny(getString(valueAt(json, "downloadHash")), std::nullopt);
+        res.fileHash = Hash::parseAny(getString(valueAt(obj, "downloadHash")), std::nullopt);
 
     if (json.contains("downloadSize"))
-        res.fileSize = getUnsigned(valueAt(json, "downloadSize"));
+        res.fileSize = getUnsigned(valueAt(obj, "downloadSize"));
 
     return res;
 }

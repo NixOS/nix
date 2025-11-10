@@ -1,0 +1,299 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v4.json"
+title: Derivation
+description: |
+  Experimental JSON representation of a Nix derivation (version 4).
+
+  This schema describes the JSON representation of Nix's `Derivation` type.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - name
+  - version
+  - outputs
+  - inputs
+  - system
+  - builder
+  - args
+  - env
+properties:
+  name:
+    type: string
+    title: Derivation name
+    description: |
+      The name of the derivation.
+      Used when calculating store paths for the derivation’s outputs.
+
+  version:
+    const: 4
+    title: Format version (must be 4)
+    description: |
+      Must be `4`.
+      This is a guard that allows us to continue evolving this format.
+      The choice of `3` is fairly arbitrary, but corresponds to this informal version:
+
+      - Version 0: ATerm format
+
+      - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from ATerm format.
+
+      - Version 2: Separate `method` and `hashAlgo` fields in output specs
+
+      - Version 3: Drop store dir from store paths, just include base name.
+
+      - Version 4: Two cleanups, batched together to lesson churn:
+
+        - Reorganize inputs into nested structure (`inputs.srcs` and `inputs.drvs`)
+
+        - Use canonical content address JSON format for floating content addressed derivation outputs.
+
+      Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
+
+  outputs:
+    type: object
+    title: Output specifications
+    description: |
+     Information about the output paths of the derivation.
+     This is a JSON object with one member per output, where the key is the output name and the value is a JSON object as described.
+
+      > **Example**
+      >
+      > ```json
+      > "outputs": {
+      >   "out": {
+      >     "method": "nar",
+      >     "hashAlgo": "sha256",
+      >     "hash": "6fc80dcc62179dbc12fc0b5881275898f93444833d21b89dfe5f7fbcbb1d0d62"
+      >   }
+      > }
+      > ```
+    additionalProperties:
+      "$ref": "#/$defs/output/overall"
+
+  inputs:
+    type: object
+    title: Derivation inputs
+    description: |
+      Input dependencies for the derivation, organized into source paths and derivation dependencies.
+    required:
+      - srcs
+      - drvs
+    properties:
+      srcs:
+        type: array
+        title: Input source paths
+        description: |
+          List of store paths on which this derivation depends.
+
+          > **Example**
+          >
+          > ```json
+          > "srcs": [
+          >   "47y241wqdhac3jm5l7nv0x4975mb1975-separate-debug-info.sh",
+          >   "56d0w71pjj9bdr363ym3wj1zkwyqq97j-fix-pop-var-context-error.patch"
+          > ]
+          > ```
+        items:
+          $ref: "store-path-v1.yaml"
+      drvs:
+        type: object
+        title: Input derivations
+        description: |
+          Mapping of derivation paths to lists of output names they provide.
+
+          > **Example**
+          >
+          > ```json
+          > "drvs": {
+          >   "6lkh5yi7nlb7l6dr8fljlli5zfd9hq58-curl-7.73.0.drv": ["dev"],
+          >   "fn3kgnfzl5dzym26j8g907gq3kbm8bfh-unzip-6.0.drv": ["out"]
+          > }
+          > ```
+          >
+          > specifies that this derivation depends on the `dev` output of `curl`, and the `out` output of `unzip`.
+        patternProperties:
+          "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
+            title: Store Path
+            description: |
+              A store path to a derivation, mapped to the outputs of that derivation.
+            oneOf:
+            - "$ref": "#/$defs/outputNames"
+            - "$ref": "#/$defs/dynamicOutputs"
+        additionalProperties: false
+    additionalProperties: false
+
+  system:
+    type: string
+    title: Build system type
+    description: |
+      The system type on which this derivation is to be built
+      (e.g. `x86_64-linux`).
+
+  builder:
+    type: string
+    title: Build program path
+    description: |
+      Absolute path of the program used to perform the build.
+      Typically this is the `bash` shell
+      (e.g. `/nix/store/r3j288vpmczbl500w6zz89gyfa4nr0b1-bash-4.4-p23/bin/bash`).
+
+  args:
+    type: array
+    title: Builder arguments
+    description: |
+      Command-line arguments passed to the `builder`.
+    items:
+      type: string
+
+  env:
+    type: object
+    title: Environment variables
+    description: |
+      Environment variables passed to the `builder`.
+    additionalProperties:
+      type: string
+
+  structuredAttrs:
+    title: Structured attributes
+    description: |
+      [Structured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
+      Structured attributes are JSON, and thus embedded as-is.
+    type: object
+    additionalProperties: true
+
+"$defs":
+  output:
+    overall:
+      title: Derivation Output
+      description: |
+        A single output of a derivation, with different variants for different output types.
+      oneOf:
+        - "$ref": "#/$defs/output/inputAddressed"
+        - "$ref": "#/$defs/output/caFixed"
+        - "$ref": "#/$defs/output/caFloating"
+        - "$ref": "#/$defs/output/deferred"
+        - "$ref": "#/$defs/output/impure"
+
+    inputAddressed:
+      title: Input-Addressed Output
+      description: |
+        The traditional non-fixed-output derivation type.
+        The output path is determined from the derivation itself.
+
+        See [Input-addressing derivation outputs](@docroot@/store/derivation/outputs/input-address.md) for more details.
+      type: object
+      required:
+        - path
+      properties:
+        path:
+          $ref: "store-path-v1.yaml"
+          title: Output path
+          description: |
+            The output path determined from the derivation itself.
+      additionalProperties: false
+
+    caFixed:
+      title: Fixed Content-Addressed Output
+      description: |
+        The output is content-addressed, and the content-address is fixed in advance.
+
+        See [Fixed-output content-addressing](@docroot@/store/derivation/outputs/content-address.md#fixed) for more details.
+      "$ref": "./content-address-v1.yaml"
+      required:
+        - method
+        - hash
+      properties:
+        method:
+          description: |
+            Method of content addressing used for this output.
+        hash:
+          title: Expected hash value
+          description: |
+            The expected content hash.
+      additionalProperties: false
+
+    caFloating:
+      title: Floating Content-Addressed Output
+      description: |
+        Floating-output derivations, whose outputs are content
+        addressed, but not fixed, and so the output paths are dynamically calculated from
+        whatever the output ends up being.
+
+        See [Floating Content-Addressing](@docroot@/store/derivation/outputs/content-address.md#floating) for more details.
+      type: object
+      required:
+        - method
+        - hashAlgo
+      properties:
+        method:
+          "$ref": "./content-address-v1.yaml#/$defs/method"
+          description: |
+            Method of content addressing used for this output.
+        hashAlgo:
+          title: Hash algorithm
+          "$ref": "./hash-v1.yaml#/$defs/algorithm"
+          description: |
+            What hash algorithm to use for the given method of content-addressing.
+      additionalProperties: false
+
+    deferred:
+      title: Deferred Output
+      description: |
+        Input-addressed output which depends on a (CA) derivation whose outputs (and thus their content-address
+        are not yet known.
+      type: object
+      properties: {}
+      additionalProperties: false
+
+    impure:
+      title: Impure Output
+      description: |
+        Impure output which is just like a floating content-addressed output, but this derivation runs without sandboxing.
+        As such, we don't record it in the build trace, under the assumption that if we need it again, we should rebuild it, as it might produce something different.
+      required:
+        - impure
+        - method
+        - hashAlgo
+      properties:
+        impure:
+          const: true
+        method:
+          "$ref": "./content-address-v1.yaml#/$defs/method"
+          description: |
+            How the file system objects will be serialized for hashing.
+        hashAlgo:
+          title: Hash algorithm
+          "$ref": "./hash-v1.yaml#/$defs/algorithm"
+          description: |
+            How the serialization will be hashed.
+      additionalProperties: false
+
+  outputName:
+    type: string
+    title: Output name
+    description: Name of the derivation output to depend on
+
+  outputNames:
+    type: array
+    title: Output Names
+    description: Set of names of derivation outputs to depend on
+    items:
+      "$ref": "#/$defs/outputName"
+
+  dynamicOutputs:
+    type: object
+    title: Dynamic Outputs
+    description: |
+      **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
+
+      This recursive data type allows for depending on outputs of outputs.
+    properties:
+      outputs:
+        "$ref": "#/$defs/outputNames"
+      dynamicOutputs:
+          "$ref": "#/$defs/dynamicOutputs"

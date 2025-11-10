@@ -10,11 +10,15 @@
 
 namespace nix {
 
+namespace {
+
 struct State
 {
     std::map<Path, int> priorities;
     unsigned long symlinks = 0;
 };
+
+} // namespace
 
 /* For each activated package, create symlinks */
 static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)

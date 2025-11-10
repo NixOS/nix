@@ -9,6 +9,18 @@ namespace nix {
 
 struct LocalFSStoreConfig : virtual StoreConfig
 {
+private:
+    static OptionalPathSetting makeRootDirSetting(LocalFSStoreConfig & self, std::optional<Path> defaultValue)
+    {
+        return {
+            &self,
+            std::move(defaultValue),
+            "root",
+            "Directory prefixed to all other paths.",
+        };
+    }
+
+public:
     using StoreConfig::StoreConfig;
 
     /**
@@ -20,17 +32,33 @@ struct LocalFSStoreConfig : virtual StoreConfig
      */
     LocalFSStoreConfig(PathView path, const Params & params);
 
-    OptionalPathSetting rootDir{this, std::nullopt, "root", "Directory prefixed to all other paths."};
+    OptionalPathSetting rootDir = makeRootDirSetting(*this, std::nullopt);
+
+private:
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultStateDir();
+
+    /**
+     * An indirection so that we don't need to refer to global settings
+     * in headers.
+     */
+    static Path getDefaultLogDir();
+
+public:
 
     PathSetting stateDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : settings.nixStateDir,
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
         "state",
         "Directory where Nix stores state."};
 
     PathSetting logDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : settings.nixLogDir,
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
         "log",
         "directory where Nix stores log files."};
 
@@ -50,8 +78,8 @@ struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
 
     LocalFSStore(const Config & params);
 
-    void narFromPath(const StorePath & path, Sink & sink) override;
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
 
     /**
      * Creates symlink from the `gcRoot` to the `storePath` and
@@ -74,7 +102,12 @@ struct LocalFSStore : virtual Store, virtual GcStore, virtual LogStore
         return config.realStoreDir;
     }
 
-    Path toRealPath(const Path & storePath) override
+    Path toRealPath(const StorePath & storePath)
+    {
+        return toRealPath(printStorePath(storePath));
+    }
+
+    Path toRealPath(const Path & storePath)
     {
         assert(isInStore(storePath));
         return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);

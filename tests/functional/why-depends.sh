@@ -4,9 +4,9 @@ source common.sh
 
 clearStoreIfPossible
 
-cp ./dependencies.nix ./dependencies.builder0.sh "${config_nix}" $TEST_HOME
+cp ./dependencies.nix ./dependencies.builder0.sh "${config_nix}" "$TEST_HOME"
 
-cd $TEST_HOME
+cd "$TEST_HOME"
 
 nix why-depends --derivation --file ./dependencies.nix input2_drv input1_drv
 nix why-depends --file ./dependencies.nix input2_drv input1_drv

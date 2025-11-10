@@ -85,7 +85,7 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (const auto & opt : _settings)
         if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
@@ -500,10 +500,10 @@ bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature)
     return std::find(f.begin(), f.end(), feature) != f.end();
 }
 
-void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature) const
+void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const
 {
     if (!isEnabled(feature))
-        throw MissingExperimentalFeature(feature);
+        throw MissingExperimentalFeature(feature, std::move(reason));
 }
 
 bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeature> & feature) const

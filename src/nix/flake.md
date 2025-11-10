@@ -187,7 +187,7 @@ Currently the `type` attribute can be one of the following:
   * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
   * `sub/dir` (if a flake named `sub` is in the registry)
 
-* <a name="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
+* <a id="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
   specifies the path of the flake. The URL form is
 
   ```
@@ -572,6 +572,27 @@ inputs.nixpkgs.follows = "dwarffs/nixpkgs";
 The value of the `follows` attribute is a `/`-separated sequence of
 input names denoting the path of inputs to be followed from the root
 flake.
+
+## Self-attributes
+
+Flakes can declare attributes about themselves that affect how they are fetched.
+These attributes are specified using the special `self` input and are retroactively
+applied to it:
+
+```nix
+{
+  inputs.self.submodules = true;
+  inputs.self.lfs = true;
+}
+```
+
+The following self-attributes are supported:
+
+* `submodules`: A Boolean denoting whether Git submodules should be fetched when this flake is used as an input. When set to `true`, Git submodules will be automatically fetched without requiring callers to specify `submodules=1` in the flake reference URL. Defaults to `false`.
+
+* `lfs`: A Boolean denoting whether Git LFS (Large File Storage) files should be fetched when this flake is used as an input. When set to `true`, Git LFS files will be automatically fetched. Defaults to `false`.
+
+These self-attributes eliminate the need for consumers of your flake to manually specify fetching options in their flake references.
 
 Overrides and `follows` can be combined, e.g.
 

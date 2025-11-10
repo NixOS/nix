@@ -15,6 +15,7 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/cmd/compatibility-settings.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 

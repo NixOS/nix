@@ -1,5 +1,6 @@
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/value-to-json.hh"
+#include "nix/expr/static-string-data.hh"
 
 namespace nix {
 // Testing the conversion to JSON
@@ -54,7 +55,7 @@ TEST_F(JSONValueTest, IntNegative)
 TEST_F(JSONValueTest, String)
 {
     Value v;
-    v.mkString("test");
+    v.mkStringNoCopy("test"_sds);
     ASSERT_EQ(getJSONValue(v), "\"test\"");
 }
 
@@ -62,7 +63,7 @@ TEST_F(JSONValueTest, StringQuotes)
 {
     Value v;
 
-    v.mkString("test\"");
+    v.mkStringNoCopy("test\""_sds);
     ASSERT_EQ(getJSONValue(v), "\"test\\\"\"");
 }
 

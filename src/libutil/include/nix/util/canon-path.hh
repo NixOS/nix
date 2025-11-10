@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/error.hh"
 #include <string>
 #include <optional>
 #include <cassert>
@@ -8,7 +9,11 @@
 #include <set>
 #include <vector>
 
+#include <boost/container_hash/hash.hpp>
+
 namespace nix {
+
+MakeError(BadCanonPath, Error);
 
 /**
  * A canonical representation of a path. It ensures the following:
@@ -20,6 +25,8 @@ namespace nix {
  * - A slash is never followed by a slash (i.e. no empty components).
  *
  * - There are no components equal to '.' or '..'.
+ *
+ * - It does not contain NUL bytes.
  *
  * `CanonPath` are "virtual" Nix paths for abstract file system objects;
  * they are always Unix-style paths, regardless of what OS Nix is
@@ -49,10 +56,7 @@ public:
      */
     CanonPath(std::string_view raw);
 
-    explicit CanonPath(const char * raw)
-        : CanonPath(std::string_view(raw))
-    {
-    }
+    explicit CanonPath(const char * raw);
 
     struct unchecked_t
     {};
@@ -67,7 +71,7 @@ public:
      */
     CanonPath(const std::vector<std::string> & elems);
 
-    static CanonPath root;
+    static const CanonPath root;
 
     /**
      * If `raw` starts with a slash, return
@@ -258,18 +262,26 @@ public:
      */
     std::string makeRelative(const CanonPath & path) const;
 
-    friend class std::hash<CanonPath>;
+    friend std::size_t hash_value(const CanonPath &);
 };
 
 std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
+
+inline std::size_t hash_value(const CanonPath & path)
+{
+    boost::hash<std::string_view> hasher;
+    return hasher(path.path);
+}
 
 } // namespace nix
 
 template<>
 struct std::hash<nix::CanonPath>
 {
-    std::size_t operator()(const nix::CanonPath & s) const noexcept
+    using is_avalanching = std::true_type;
+
+    std::size_t operator()(const nix::CanonPath & path) const noexcept
     {
-        return std::hash<std::string>{}(s.path);
+        return nix::hash_value(path);
     }
 };

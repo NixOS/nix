@@ -23,6 +23,16 @@ ref<Store> LocalOverlayStoreConfig::openStore() const
         ref{std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())});
 }
 
+StoreReference LocalOverlayStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+    };
+}
+
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
     return upperLayer + "/" + path.to_string();
@@ -67,7 +77,7 @@ void LocalOverlayStore::registerDrvOutput(const Realisation & info)
     // First do queryRealisation on lower layer to populate DB
     auto res = lowerStore->queryRealisation(info.id);
     if (res)
-        LocalStore::registerDrvOutput(*res);
+        LocalStore::registerDrvOutput({*res, info.id});
 
     LocalStore::registerDrvOutput(info);
 }
@@ -98,12 +108,12 @@ void LocalOverlayStore::queryPathInfoUncached(
 }
 
 void LocalOverlayStore::queryRealisationUncached(
-    const DrvOutput & drvOutput, Callback<std::shared_ptr<const Realisation>> callback) noexcept
+    const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     LocalStore::queryRealisationUncached(
-        drvOutput, {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+        drvOutput, {[this, drvOutput, callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
             try {
                 auto info = fut.get();
                 if (info)
@@ -113,7 +123,7 @@ void LocalOverlayStore::queryRealisationUncached(
             }
             // If we don't have it, check lower store
             lowerStore->queryRealisation(
-                drvOutput, {[callbackPtr](std::future<std::shared_ptr<const Realisation>> fut) {
+                drvOutput, {[callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
                     try {
                         (*callbackPtr)(fut.get());
                     } catch (...) {
@@ -236,7 +246,7 @@ void LocalOverlayStore::optimiseStore()
         if (lowerStore->isValidPath(path)) {
             uint64_t bytesFreed = 0;
             // Deduplicate store path
-            deleteStorePath(Store::toRealPath(path), bytesFreed);
+            deleteStorePath(toRealPath(path), bytesFreed);
         }
         done++;
         act.progress(done, paths.size());

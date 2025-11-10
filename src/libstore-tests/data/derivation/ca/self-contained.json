@@ -1,0 +1,26 @@
+{
+  "args": [
+    "-c",
+    "echo $name foo > $out"
+  ],
+  "builder": "/bin/sh",
+  "env": {
+    "builder": "/bin/sh",
+    "name": "myname",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+    "system": "x86_64-linux"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "myname",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

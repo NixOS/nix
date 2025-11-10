@@ -24,11 +24,18 @@ release:
 * In a checkout of the Nix repo, make sure you're on `master` and run
   `git pull`.
 
+* Compile a release notes to-do list by running
+
+  ```console
+  $ ./maintainers/release-notes-todo PREV_RELEASE HEAD
+  ```
+
 * Compile the release notes by running
 
   ```console
   $ export VERSION=X.YY
   $ git checkout -b release-notes
+  $ export GITHUB_TOKEN=...
   $ ./maintainers/release-notes
   ```
 
@@ -126,6 +133,8 @@ release:
 
   Commit and push this to the maintenance branch.
 
+* Create a backport label.
+
 * Bump the version of `master`:
 
   ```console
@@ -139,10 +148,6 @@ release:
   ```
 
   Make a pull request and auto-merge it.
-
-* Create a backport label.
-
-* Add the new backport label to `.mergify.yml`.
 
 * Post an [announcement on Discourse](https://discourse.nixos.org/c/announcements/8), including the contents of
   `rl-$VERSION.md`.

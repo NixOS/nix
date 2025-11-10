@@ -119,7 +119,7 @@ This will:
 
 3. Stop the program when the test fails, allowing the user to then issue arbitrary commands to GDB.
 
-### Characterisation testing { #characaterisation-testing-unit }
+### Characterisation testing { #characterisation-testing-unit }
 
 See [functional characterisation testing](#characterisation-testing-functional) for a broader discussion of characterisation testing.
 

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 proto=$1
 shift
 (( $# == 0 ))
@@ -7,7 +8,7 @@ TODO_NixOS
 clearStore
 clearCache
 
-mkdir -p $TEST_ROOT/stores
+mkdir -p "$TEST_ROOT"/stores
 
 # Create path to copy back and forth
 outPath=$(nix-build --no-out-link dependencies.nix)
@@ -37,17 +38,17 @@ if [[ "$proto" == "ssh-ng" ]]; then
     args+=(--no-check-sigs)
 fi
 
-[ ! -f ${remoteRoot}${outPath}/foobar ]
-nix copy "${args[@]}" --to "$remoteStore" $outPath
-[ -f ${remoteRoot}${outPath}/foobar ]
+[ ! -f "${remoteRoot}""${outPath}"/foobar ]
+nix copy "${args[@]}" --to "$remoteStore" "$outPath"
+[ -f "${remoteRoot}""${outPath}"/foobar ]
 
 # Copy back from store
 
 clearStore
 
-[ ! -f $outPath/foobar ]
-nix copy --no-check-sigs --from "$remoteStore" $outPath
-[ -f $outPath/foobar ]
+[ ! -f "$outPath"/foobar ]
+nix copy --no-check-sigs --from "$remoteStore" "$outPath"
+[ -f "$outPath"/foobar ]
 
 # Check --substitute-on-destination, avoid corrupted store
 

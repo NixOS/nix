@@ -1,5 +1,7 @@
-#include "nix/flake/url-name.hh"
 #include <gtest/gtest.h>
+
+#include "nix/flake/url-name.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -13,8 +15,9 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("path:~/repos/nixpkgs#packages.x86_64-linux.Hello")), "Hello");
     ASSERT_EQ(getNameFromURL(parseURL("path:.#nonStandardAttr.mylaptop")), "mylaptop");
     ASSERT_EQ(getNameFromURL(parseURL("path:./repos/myflake#nonStandardAttr.mylaptop")), "mylaptop");
-    ASSERT_EQ(getNameFromURL(parseURL("path:./nixpkgs#packages.x86_64-linux.complex^bin,man")), "complex");
-    ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#packages.x86_64-linux.default^*")), "myproj");
+    ASSERT_EQ(
+        getNameFromURL(parseURL("path:./nixpkgs#packages.x86_64-linux.complex^bin,man", /*lenient=*/true)), "complex");
+    ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#packages.x86_64-linux.default^*", /*lenient=*/true)), "myproj");
     ASSERT_EQ(getNameFromURL(parseURL("path:./myproj#defaultPackage.x86_64-linux")), "myproj");
 
     ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
@@ -80,6 +83,6 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("path:.")), std::nullopt);
     ASSERT_EQ(getNameFromURL(parseURL("file:.#")), std::nullopt);
     ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default")), std::nullopt);
-    ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default^*")), std::nullopt);
+    ASSERT_EQ(getNameFromURL(parseURL("path:.#packages.x86_64-linux.default^*", /*lenient=*/true)), std::nullopt);
 }
 } // namespace nix

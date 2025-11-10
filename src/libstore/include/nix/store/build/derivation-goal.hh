@@ -14,9 +14,6 @@ namespace nix {
 
 using std::map;
 
-/** Used internally */
-void runPostBuildHook(Store & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
-
 /**
  * A goal for realising a single output of a derivation. Various sorts of
  * fetching (which will be done by other goal types) is tried, and if none of
@@ -44,26 +41,15 @@ struct DerivationGoal : public Goal
     OutputName wantedOutput;
 
     /**
-     * The derivation stored at drvPath.
+     * @param storeDerivation See `DerivationBuildingGoal`. This is just passed along.
      */
-    std::unique_ptr<Derivation> drv;
-
-    /**
-     * The remainder is state held during the build.
-     */
-
-    std::map<std::string, InitialOutput> initialOutputs;
-
-    BuildMode buildMode;
-
-    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
-
     DerivationGoal(
         const StorePath & drvPath,
         const Derivation & drv,
         const OutputName & wantedOutput,
         Worker & worker,
-        BuildMode buildMode = bmNormal);
+        BuildMode buildMode,
+        bool storeDerivation);
     ~DerivationGoal() = default;
 
     void timedOut(Error && ex) override
@@ -73,41 +59,53 @@ struct DerivationGoal : public Goal
 
     std::string key() override;
 
-    /**
-     * The states.
-     */
-    Co haveDerivation();
-
-    /**
-     * Wrappers around the corresponding Store methods that first consult the
-     * derivation.  This is currently needed because when there is no drv file
-     * there also is no DB entry.
-     */
-    std::map<std::string, std::optional<StorePath>> queryPartialDerivationOutputMap();
-    OutputPathMap queryDerivationOutputMap();
-
-    /**
-     * Update 'initialOutputs' to determine the current status of the
-     * outputs of the derivation. Also returns a Boolean denoting
-     * whether all outputs are valid and non-corrupt, and a
-     * 'SingleDrvOutputs' structure containing the valid outputs.
-     */
-    std::pair<bool, SingleDrvOutputs> checkPathValidity();
-
-    /**
-     * Aborts if any output is not valid or corrupt, and otherwise
-     * returns a 'SingleDrvOutputs' structure containing all outputs.
-     */
-    SingleDrvOutputs assertPathValidity();
-
-    Co repairClosure();
-
-    Done done(BuildResult::Status status, SingleDrvOutputs builtOutputs = {}, std::optional<Error> ex = {});
-
     JobCategory jobCategory() const override
     {
         return JobCategory::Administration;
     };
+
+private:
+
+    /**
+     * The derivation stored at drvPath.
+     */
+    std::unique_ptr<Derivation> drv;
+
+    const Hash outputHash;
+
+    const BuildMode buildMode;
+
+    /**
+     * The remainder is state held during the build.
+     */
+
+    std::unique_ptr<MaintainCount<uint64_t>> mcExpectedBuilds;
+
+    /**
+     * The states.
+     */
+    Co haveDerivation(bool storeDerivation);
+
+    /**
+     * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
+     * floating content-addressing derivation. Otherwise, returns a pair
+     * of a `Realisation`, containing among other things the store path
+     * of the wanted output, and a `PathStatus` with the
+     * current status of that output.
+     */
+    std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity();
+
+    /**
+     * Aborts if any output is not valid or corrupt, and otherwise
+     * returns a 'Realisation' for the wanted output.
+     */
+    UnkeyedRealisation assertPathValidity();
+
+    Co repairClosure();
+
+    Done doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
+
+    Done doneFailure(BuildError ex);
 };
 
 } // namespace nix

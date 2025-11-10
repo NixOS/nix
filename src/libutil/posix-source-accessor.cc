@@ -3,7 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/sync.hh"
 
-#include <unordered_map>
+#include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
 
@@ -88,25 +88,21 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 
 std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    static SharedSync<std::unordered_map<Path, std::optional<struct stat>>> _cache;
+    using Cache = boost::concurrent_flat_map<Path, std::optional<struct stat>>;
+    static Cache cache;
 
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
 
-    {
-        auto cache(_cache.readLock());
-        auto i = cache->find(absPath);
-        if (i != cache->end())
-            return i->second;
-    }
+    if (auto res = getConcurrent(cache, absPath))
+        return *res;
 
     auto st = nix::maybeLstat(absPath.c_str());
 
-    auto cache(_cache.lock());
-    if (cache->size() >= 16384)
-        cache->clear();
-    cache->emplace(absPath, st);
+    if (cache.size() >= 16384)
+        cache.clear();
+    cache.emplace(std::move(absPath), st);
 
     return st;
 }
@@ -118,6 +114,8 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     auto st = cachedLstat(path);
     if (!st)
         return std::nullopt;
+    // This makes the accessor thread-unsafe, but we only seem to use the actual value in a single threaded context in
+    // `src/libfetchers/path.cc`.
     mtime = std::max(mtime, st->st_mtime);
     return Stat{
         .type = S_ISREG(st->st_mode)   ? tRegular

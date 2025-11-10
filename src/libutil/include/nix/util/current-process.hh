@@ -2,6 +2,7 @@
 ///@file
 
 #include <optional>
+#include <chrono>
 
 #ifndef _WIN32
 #  include <sys/resource.h>
@@ -10,6 +11,11 @@
 #include "nix/util/types.hh"
 
 namespace nix {
+
+/**
+ * Get the current process's user space CPU time.
+ */
+std::chrono::microseconds getCpuUserTime();
 
 /**
  * If cgroups are active, attempt to calculate the number of CPUs available.

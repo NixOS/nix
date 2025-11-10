@@ -1,9 +1,10 @@
 #pragma once
 ///@file
 
-#include "nix/util/configuration.hh"
-
 #include <sys/types.h>
+#include <string>
+
+#include "nix/util/configuration.hh"
 
 namespace nix {
 // Forward declarations

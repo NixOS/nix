@@ -1,4 +1,5 @@
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/git-utils.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/store/path.hh"
 
@@ -13,7 +14,8 @@ struct IndirectInputScheme : InputScheme
         if (url.scheme != "flake")
             return {};
 
-        auto path = tokenizeString<std::vector<std::string>>(url.path, "/");
+        /* This ignores empty path segments for back-compat. Older versions used a tokenizeString here. */
+        auto path = url.pathSegments(/*skipEmpty=*/true) | std::ranges::to<std::vector<std::string>>();
 
         std::optional<Hash> rev;
         std::optional<std::string> ref;
@@ -22,12 +24,12 @@ struct IndirectInputScheme : InputScheme
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
                 rev = Hash::parseAny(path[1], HashAlgorithm::SHA1);
-            else if (std::regex_match(path[1], refRegex))
+            else if (isLegalRefName(path[1]))
                 ref = path[1];
             else
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash or branch/tag name", url, path[1]);
         } else if (path.size() == 3) {
-            if (!std::regex_match(path[1], refRegex))
+            if (!isLegalRefName(path[1]))
                 throw BadURL("in flake URL '%s', '%s' is not a branch/tag name", url, path[1]);
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
@@ -81,16 +83,15 @@ struct IndirectInputScheme : InputScheme
 
     ParsedURL toURL(const Input & input) const override
     {
-        ParsedURL url;
-        url.scheme = "flake";
-        url.path = getStrAttr(input.attrs, "id");
+        ParsedURL url{
+            .scheme = "flake",
+            .path = {getStrAttr(input.attrs, "id")},
+        };
         if (auto ref = input.getRef()) {
-            url.path += '/';
-            url.path += *ref;
+            url.path.push_back(*ref);
         };
         if (auto rev = input.getRev()) {
-            url.path += '/';
-            url.path += rev->gitRev();
+            url.path.push_back(rev->gitRev());
         };
         return url;
     }

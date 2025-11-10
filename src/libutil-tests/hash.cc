@@ -1,22 +1,32 @@
 #include <regex>
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 
 #include "nix/util/hash.hh"
+#include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
 
-class BLAKE3HashTest : public virtual ::testing::Test
+class HashTest : public virtual CharacterizationTest
 {
+    std::filesystem::path unitTestData = getUnitTestData() / "hash";
+
 public:
 
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
+
+struct BLAKE3HashTest : virtual HashTest
+{
     /**
      * We set these in tests rather than the regular globals so we don't have
      * to worry about race conditions if the tests run concurrently.
      */
     ExperimentalFeatureSettings mockXpSettings;
-
-private:
 
     void SetUp() override
     {
@@ -138,6 +148,46 @@ TEST(hashString, testKnownSHA512Hashes2)
 }
 
 /* ----------------------------------------------------------------------------
+ * parsing hashes
+ * --------------------------------------------------------------------------*/
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_correct)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    auto s = "abc";
+
+    auto hash = hashString(HashAlgorithm::SHA256, s);
+    ASSERT_EQ(
+        hash,
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA256,
+            HashFormat::Base16));
+}
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_wrongAlgo)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    ASSERT_THROW(
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA1,
+            HashFormat::Base16),
+        BadHash);
+}
+
+TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_wrongBase)
+{
+    // values taken from: https://tools.ietf.org/html/rfc4634
+    ASSERT_THROW(
+        Hash::parseExplicitFormatUnprefixed(
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            HashAlgorithm::SHA256,
+            HashFormat::Nix32),
+        BadHash);
+}
+
+/* ----------------------------------------------------------------------------
  * parseHashFormat, parseHashFormatOpt, printHashFormat
  * --------------------------------------------------------------------------*/
 
@@ -153,4 +203,97 @@ TEST(hashFormat, testParseHashFormatOptException)
 {
     ASSERT_EQ(parseHashFormatOpt("sha0042"), std::nullopt);
 }
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+struct HashJsonTest : virtual HashTest,
+                      JsonCharacterizationTest<Hash>,
+                      ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
+{};
+
+struct HashJsonParseOnlyTest : virtual HashTest,
+                               JsonCharacterizationTest<Hash>,
+                               ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
+{};
+
+struct BLAKE3HashJsonTest : virtual HashTest,
+                            BLAKE3HashTest,
+                            JsonCharacterizationTest<Hash>,
+                            ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
+{};
+
+TEST_P(HashJsonTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(HashJsonTest, to_json)
+{
+    auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
+
+TEST_P(HashJsonParseOnlyTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(BLAKE3HashJsonTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected, mockXpSettings);
+}
+
+TEST_P(BLAKE3HashJsonTest, to_json)
+{
+    auto & [name, expected] = GetParam();
+    writeJsonTest(name, expected);
+}
+
+// Round-trip tests (from_json + to_json) for base64 format only
+// (to_json always outputs base64)
+INSTANTIATE_TEST_SUITE_P(
+    HashJSON,
+    HashJsonTest,
+    ::testing::Values(
+        std::pair{
+            "simple",
+            hashString(HashAlgorithm::SHA256, "asdf"),
+        },
+        std::pair{
+            "sha256-base64",
+            hashString(HashAlgorithm::SHA256, "asdf"),
+        }));
+
+// Parse-only tests for non-base64 formats
+// These verify C++ can deserialize other formats correctly
+INSTANTIATE_TEST_SUITE_P(
+    HashJSONParseOnly,
+    HashJsonParseOnlyTest,
+    ::testing::Values(
+        std::pair{
+            "sha256-base16",
+            hashString(HashAlgorithm::SHA256, "asdf"),
+        },
+        std::pair{
+            "sha256-nix32",
+            hashString(HashAlgorithm::SHA256, "asdf"),
+        }));
+
+INSTANTIATE_TEST_SUITE_P(BLAKE3HashJSONParseOnly, BLAKE3HashJsonTest, ([] {
+                             ExperimentalFeatureSettings mockXpSettings;
+                             mockXpSettings.set("experimental-features", "blake3-hashes");
+                             return ::testing::Values(
+                                 std::pair{
+                                     "blake3-base64",
+                                     hashString(HashAlgorithm::BLAKE3, "asdf", mockXpSettings),
+                                 });
+                         }()));
+
 } // namespace nix

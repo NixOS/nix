@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Purposely bypassing our usual common for this subgroup
 source ../common.sh
 
