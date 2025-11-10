@@ -1,5 +1,6 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/expr/static-string-data.hh"
 
 #include "expr-config-private.hh"
 
@@ -136,7 +137,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
                 normalizeDatetimeFormat(t);
 #endif
                 auto attrs = state.buildBindings(2);
-                attrs.alloc("_type").mkStringNoCopy("timestamp");
+                attrs.alloc("_type").mkStringNoCopy("timestamp"_sds);
                 std::ostringstream s;
                 s << t;
                 auto str = s.view();

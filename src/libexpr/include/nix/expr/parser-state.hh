@@ -4,6 +4,8 @@
 #include <limits>
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/static-string-data.hh"
 
 namespace nix {
 
@@ -240,7 +242,7 @@ inline Expr *
 ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
 {
     if (es.empty())
-        return exprs.add<ExprString>("");
+        return exprs.add<ExprString>(""_sds);
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -332,7 +334,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
     if (es2.size() == 0) {
-        auto * const result = exprs.add<ExprString>("");
+        auto * const result = exprs.add<ExprString>(""_sds);
         return result;
     }
 

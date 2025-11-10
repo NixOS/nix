@@ -147,7 +147,7 @@ struct AttrDb
                 for (auto * elem : *context) {
                     if (!first)
                         ctx.push_back(' ');
-                    ctx.append(elem);
+                    ctx.append(elem->view());
                     first = false;
                 }
                 state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String) (s) (ctx)
