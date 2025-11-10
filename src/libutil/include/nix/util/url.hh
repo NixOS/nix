@@ -330,10 +330,13 @@ struct ParsedUrlScheme
 
 ParsedUrlScheme parseUrlScheme(std::string_view scheme);
 
-/* Detects scp-style uris (e.g. git@github.com:NixOS/nix) and fixes
-   them by removing the `:` and assuming a scheme of `ssh://`. Also
-   changes absolute paths into file:// URLs. */
-ParsedURL fixGitURL(const std::string & url);
+/**
+ * Detects scp-style uris (e.g. `git@github.com:NixOS/nix`) and fixes
+ * them by removing the `:` and assuming a scheme of `ssh://`. Also
+ * drops `git+` from the scheme (e.g. `git+https://` to `https://`)
+ * and changes absolute paths into `file://` URLs.
+ */
+ParsedURL fixGitURL(std::string url);
 
 /**
  * Whether a string is valid as RFC 3986 scheme name.

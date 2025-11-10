@@ -35,10 +35,10 @@ INSTANTIATE_TEST_SUITE_P(
         // Already proper URL with git+ssh
         FixGitURLParam{
             .input = "git+ssh://user@domain:1234/path",
-            .expected = "git+ssh://user@domain:1234/path",
+            .expected = "ssh://user@domain:1234/path",
             .parsed =
                 ParsedURL{
-                    .scheme = "git+ssh",
+                    .scheme = "ssh",
                     .authority =
                         ParsedURL::Authority{
                             .host = "domain",
