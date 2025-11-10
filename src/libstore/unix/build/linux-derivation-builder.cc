@@ -709,8 +709,11 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         DerivationBuilderImpl::killSandbox(getStats);
     }
 
-    void addDependency(const StorePath & path) override
+    void addDependencyImpl(const StorePath & path) override
     {
+        if (isAllowed(path))
+            return;
+
         auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
 
         /* Bind-mount the path into the sandbox. This requires
