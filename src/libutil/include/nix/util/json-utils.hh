@@ -114,4 +114,13 @@ struct adl_serializer<std::optional<T>>
     }
 };
 
+template<typename T>
+static inline std::optional<T> ptrToOwned(const json * ptr)
+{
+    if (ptr)
+        return std::optional{*ptr};
+    else
+        return std::nullopt;
+}
+
 } // namespace nlohmann

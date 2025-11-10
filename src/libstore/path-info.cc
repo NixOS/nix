@@ -149,8 +149,7 @@ ValidPathInfo ValidPathInfo::makeFromCA(
     return res;
 }
 
-nlohmann::json
-UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
@@ -158,7 +157,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
 
     jsonObject["version"] = 2;
 
-    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["narHash"] = narHash;
     jsonObject["narSize"] = narSize;
 
     {
@@ -192,16 +191,13 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
 
     auto & json = getObject(_json);
 
-    // Check version (optional for backward compatibility)
-    nlohmann::json::number_unsigned_t version = 1;
-    if (json.contains("version")) {
-        version = getUnsigned(valueAt(json, "version"));
-        if (version != 1 && version != 2) {
-            throw Error("Unsupported path info JSON format version %d, expected 1 through 2", version);
-        }
+    {
+        auto version = getUnsigned(valueAt(json, "version"));
+        if (version != 2)
+            throw Error("Unsupported path info JSON format version %d, only version 2 is currently supported", version);
     }
 
-    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+    res.narHash = valueAt(json, "narHash");
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
@@ -213,19 +209,12 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store
         throw;
     }
 
-    // New format as this as nullable but mandatory field; handling
-    // missing is for back-compat.
-    if (auto * rawCa0 = optionalValueAt(json, "ca"))
-        if (auto * rawCa = getNullable(*rawCa0))
-            switch (version) {
-            case 1:
-                // old string format also used in SQLite DB and .narinfo
-                res.ca = ContentAddress::parse(getString(*rawCa));
-                break;
-            case 2 ... std::numeric_limits<decltype(version)>::max():
-                res.ca = *rawCa;
-                break;
-            }
+    try {
+        res.ca = ptrToOwned<ContentAddress>(getNullable(valueAt(json, "ca")));
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'ca'");
+        throw;
+    }
 
     if (auto * rawDeriver0 = optionalValueAt(json, "deriver"))
         if (auto * rawDeriver = getNullable(*rawDeriver0))

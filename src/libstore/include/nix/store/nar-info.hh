@@ -42,7 +42,7 @@ struct NarInfo : ValidPathInfo
 
     std::string to_string(const StoreDirConfig & store) const;
 
-    nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const override;
+    nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo) const override;
     static NarInfo fromJSON(const StoreDirConfig & store, const StorePath & path, const nlohmann::json & json);
 };
 

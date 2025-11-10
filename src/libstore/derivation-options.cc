@@ -423,15 +423,6 @@ void adl_serializer<DerivationOptions>::to_json(json & json, const DerivationOpt
     json["allowSubstitutes"] = o.allowSubstitutes;
 }
 
-template<typename T>
-static inline std::optional<T> ptrToOwned(const json * ptr)
-{
-    if (ptr)
-        return std::optional{*ptr};
-    else
-        return std::nullopt;
-}
-
 DerivationOptions::OutputChecks adl_serializer<DerivationOptions::OutputChecks>::from_json(const json & json_)
 {
     auto & json = getObject(json_);

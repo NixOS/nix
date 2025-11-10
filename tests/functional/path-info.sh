@@ -17,8 +17,16 @@ diff --unified --color=always \
         jq --sort-keys 'map_values(.narHash)') \
     <(jq --sort-keys <<-EOF
         {
-          "$foo": "sha256-QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA=",
-          "$bar": "sha256-9fhYGu9fqxcQC2Kc81qh2RMo1QcLBUBo8U+pPn+jthQ=",
+          "$foo": {
+            "algorithm": "sha256",
+            "format": "base64",
+            "hash": "QvtAMbUl/uvi+LCObmqOhvNOapHdA2raiI4xG5zI5pA="
+          },
+          "$bar": {
+            "algorithm": "sha256",
+            "format": "base64",
+            "hash": "9fhYGu9fqxcQC2Kc81qh2RMo1QcLBUBo8U+pPn+jthQ="
+          },
           "$baz": null
         }
 EOF

@@ -80,7 +80,7 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
     {                                                                                                 \
         writeTest(                                                                                    \
             #STEM,                                                                                    \
-            [&]() -> json { return OBJ.toJSON(*store, PURE, HashFormat::SRI); },                      \
+            [&]() -> json { return OBJ.toJSON(*store, PURE); },                                       \
             [](const auto & file) { return json::parse(readFile(file)); },                            \
             [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }

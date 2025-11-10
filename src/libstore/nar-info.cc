@@ -130,11 +130,11 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
     return res;
 }
 
-nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
-    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo, hashFormat);
+    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo);
 
     if (includeImpureInfo) {
         if (!url.empty())
@@ -142,7 +142,7 @@ nlohmann::json NarInfo::toJSON(const StoreDirConfig & store, bool includeImpureI
         if (!compression.empty())
             jsonObject["compression"] = compression;
         if (fileHash)
-            jsonObject["downloadHash"] = fileHash->to_string(hashFormat, true);
+            jsonObject["downloadHash"] = *fileHash;
         if (fileSize)
             jsonObject["downloadSize"] = fileSize;
     }
@@ -161,17 +161,17 @@ NarInfo NarInfo::fromJSON(const StoreDirConfig & store, const StorePath & path, 
 
     auto & obj = getObject(json);
 
-    if (json.contains("url"))
-        res.url = getString(valueAt(obj, "url"));
+    if (auto * url = get(obj, "url"))
+        res.url = getString(*url);
 
-    if (json.contains("compression"))
-        res.compression = getString(valueAt(obj, "compression"));
+    if (auto * compression = get(obj, "compression"))
+        res.compression = getString(*compression);
 
-    if (json.contains("downloadHash"))
-        res.fileHash = Hash::parseAny(getString(valueAt(obj, "downloadHash")), std::nullopt);
+    if (auto * downloadHash = get(obj, "downloadHash"))
+        res.fileHash = *downloadHash;
 
-    if (json.contains("downloadSize"))
-        res.fileSize = getUnsigned(valueAt(obj, "downloadSize"));
+    if (auto * downloadSize = get(obj, "downloadSize"))
+        res.fileSize = getUnsigned(*downloadSize);
 
     return res;
 }

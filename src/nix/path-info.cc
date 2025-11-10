@@ -51,7 +51,7 @@ static json pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool 
             // know the name yet until we've read the NAR info.
             printedStorePath = store.printStorePath(info->path);
 
-            jsonObject = info->toJSON(store, true, HashFormat::SRI);
+            jsonObject = info->toJSON(store, true);
 
             if (showClosureSize) {
                 StorePathSet closure;
