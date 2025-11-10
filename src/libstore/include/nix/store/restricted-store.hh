@@ -52,7 +52,21 @@ struct RestrictionContext
      * Add 'path' to the set of paths that may be referenced by the
      * outputs, and make it appear in the sandbox.
      */
-    virtual void addDependency(const StorePath & path) = 0;
+    void addDependency(const StorePath & path)
+    {
+        if (isAllowed(path))
+            return;
+        addDependencyInner(path);
+    }
+
+protected:
+
+    /**
+     * This is the underlying implementation to be defined. The caller
+     * will ensure that this is only called on newly added dependencies,
+     * and that idempotent calls are a no-op.
+     */
+    virtual void addDependencyInner(const StorePath & path) = 0;
 };
 
 /**

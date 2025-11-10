@@ -334,7 +334,7 @@ private:
 
 protected:
 
-    void addDependency(const StorePath & path) override;
+    void addDependencyInner(const StorePath & path) override;
 
     /**
      * Make a file owned by the builder.
@@ -1203,11 +1203,8 @@ void DerivationBuilderImpl::stopDaemon()
     daemonSocket.close();
 }
 
-void DerivationBuilderImpl::addDependency(const StorePath & path)
+void DerivationBuilderImpl::addDependencyInner(const StorePath & path)
 {
-    if (isAllowed(path))
-        return;
-
     addedPaths.insert(path);
 }
 
