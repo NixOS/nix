@@ -2340,7 +2340,7 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::s
         error<EvalError>(
             "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
             v.string_view(),
-            *v.context()->begin())
+            (*v.context()->begin())->view())
             .withTrace(pos, errorCtx)
             .debugThrow();
     }
