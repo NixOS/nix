@@ -69,7 +69,7 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
         }
     }
 
-    v.mkString(*s, context2);
+    v.mkString(*s, context2, state.mem);
 }
 
 static RegisterPrimOp primop_unsafeDiscardOutputDependency(
@@ -137,7 +137,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
             context.begin()->raw)}),
     };
 
-    v.mkString(*s, context2);
+    v.mkString(*s, context2, state.mem);
 }
 
 static RegisterPrimOp primop_addDrvOutputDependencies(
@@ -321,7 +321,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
         }
     }
 
-    v.mkString(orig, context);
+    v.mkString(orig, context, state.mem);
 }
 
 static RegisterPrimOp primop_appendContext({.name = "__appendContext", .arity = 2, .fun = prim_appendContext});
