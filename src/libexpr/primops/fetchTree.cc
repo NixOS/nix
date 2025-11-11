@@ -235,229 +235,127 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
-    .doc = R"(
-      Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
+    .doc = []() -> std::string {
+        std::string doc = stripIndentation(R"(
+          Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
-      - the resulting fixed-output [store path](@docroot@/store/store-path.md)
-      - the corresponding [NAR](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) hash
-      - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
+          - the resulting fixed-output [store path](@docroot@/store/store-path.md)
+          - the corresponding [NAR](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) hash
+          - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
 
-      *input* must be an attribute set with the following attributes:
+          *input* must be an attribute set with the following attributes:
 
-      - `type` (String, required)
+          - `type` (String, required)
 
-        One of the [supported source types](#source-types).
-        This determines other required and allowed input attributes.
+            One of the [supported source types](#source-types).
+            This determines other required and allowed input attributes.
 
-      - `narHash` (String, optional)
+          - `narHash` (String, optional)
 
-        The `narHash` parameter can be used to substitute the source of the tree.
-        It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
-        If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
+            The `narHash` parameter can be used to substitute the source of the tree.
+            It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
+            If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
 
-      A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
-      That is, `fetchTree` is idempotent.
+          A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
+          That is, `fetchTree` is idempotent.
 
-      Downloads are cached in `$XDG_CACHE_HOME/nix`.
-      The remote source is fetched from the network if both are true:
-      - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
+          Downloads are cached in `$XDG_CACHE_HOME/nix`.
+          The remote source is fetched from the network if both are true:
+          - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
 
-        > **Note**
-        >
-        > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
-
-      - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
-
-      ## Source types
-
-      The following source types and associated input attributes are supported.
-
-      <!-- TODO: It would be soooo much more predictable to work with (and
-      document) if `fetchTree` was a curried call with the first parameter for
-      `type` or an attribute like `builtins.fetchTree.git`! -->
-
-      - `"file"`
-
-        Place a plain file into the Nix store.
-        This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
-
-        - `url` (String, required)
-
-          Supported protocols:
-
-          - `https`
-
-            > **Example**
+            > **Note**
             >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "https://example.com/index.html";
-            > }
-            > ```
+            > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
 
-          - `http`
+          - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
 
-            Insecure HTTP transfer for legacy sources.
+          ## Source types
 
-            > **Warning**
-            >
-            > HTTP performs no encryption or authentication.
-            > Use a `narHash` known in advance to ensure the output has expected contents.
+          The following source types and associated input attributes are supported.
 
-          - `file`
+          <!-- TODO: It would be soooo much more predictable to work with (and
+          document) if `fetchTree` was a curried call with the first parameter for
+          `type` or an attribute like `builtins.fetchTree.git`! -->
+        )");
 
-            A file on the local file system.
+        auto indentString = [](std::string const & str, std::string const & indent) {
+            std::string result;
+            std::istringstream stream(str);
+            std::string line;
+            bool first = true;
+            while (std::getline(stream, line)) {
+                if (!first)
+                    result += "\n";
+                result += indent + line;
+                first = false;
+            }
+            return result;
+        };
 
-            > **Example**
-            >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "file:///home/eelco/nix/README.md";
-            > }
-            > ```
+        for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
+            doc += "\n- `" + quoteString(schemeName, '"') + "`\n\n";
+            doc += indentString(scheme->schemeDescription(), "  ");
+            if (!doc.empty() && doc.back() != '\n')
+                doc += "\n";
 
-      - `"git"`
+            for (const auto & [attrName, attribute] : scheme->allowedAttrs()) {
+                doc += "\n  - `" + attrName + "` (" + attribute.type + ", "
+                       + (attribute.required ? "required" : "optional") + ")\n\n";
+                doc += indentString(stripIndentation(attribute.doc), "    ");
+                if (!doc.empty() && doc.back() != '\n')
+                    doc += "\n";
+            }
+        }
 
-        Fetch a Git tree and copy it to the Nix store.
-        This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
+        doc += "\n" + stripIndentation(R"(
+          The following input types are still subject to change:
 
-        - `allRefs` (Bool, optional)
+          - `"path"`
+          - `"github"`
+          - `"gitlab"`
+          - `"sourcehut"`
+          - `"mercurial"`
 
-          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
-
-          Whether to fetch all references (eg. branches and tags) of the repository.
-          With this argument being true, it's possible to load a `rev` from *any* `ref`.
-          (Without setting this option, only `rev`s from the specified `ref` are supported).
-
-          Default: `false`
-
-        - `lastModified` (Integer, optional)
-
-          Unix timestamp of the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-        - `lfs` (Bool, optional)
-
-          Fetch any [Git LFS](https://git-lfs.com/) files.
-
-          Default: `false`
-
-        - `ref` (String, optional)
-
-          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
-
-          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
-
-          Default: `"HEAD"`
-
-        - `rev` (String, optional)
-
-          A Git revision; a commit hash.
-
-          Default: the tip of `ref`
-
-        - `revCount` (Integer, optional)
-
-          Number of revisions in the history of the Git repository before the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-        - `shallow` (Bool, optional)
-
-          Make a shallow clone when fetching the Git tree.
-          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
-
-          Default: `true`
-
-        - `submodules` (Bool, optional)
-
-          Also fetch submodules if available.
-
-          Default: `false`
-
-        - `url` (String, required)
-
-          The URL formats supported are the same as for Git itself.
+         *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
+         The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
 
           > **Example**
           >
+          > Fetch a GitHub repository using the attribute set representation:
+          >
           > ```nix
-          > fetchTree {
-          >   type = "git";
-          >   url = "git@github.com:NixOS/nixpkgs.git";
+          > builtins.fetchTree {
+          >   type = "github";
+          >   owner = "NixOS";
+          >   repo = "nixpkgs";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          > }
+          > ```
+          >
+          > This evaluates to the following attribute set:
+          >
+          > ```nix
+          > {
+          >   lastModified = 1686503798;
+          >   lastModifiedDate = "20230611171638";
+          >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+          >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          >   shortRev = "ae2e6b3";
           > }
           > ```
 
-          > **Note**
+          > **Example**
           >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+          > Fetch the same GitHub repository using the URL-like syntax:
+          >
+          >   ```nix
+          >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+          >   ```
+        )");
 
-      - `"tarball"`
-
-        Download a tar archive and extract it into the Nix store.
-        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
-
-        - `url` (String, required)
-
-           > **Example**
-           >
-           > ```nix
-           > fetchTree {
-           >   type = "tarball";
-           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
-           > }
-           > ```
-
-      The following input types are still subject to change:
-
-      - `"path"`
-      - `"github"`
-      - `"gitlab"`
-      - `"sourcehut"`
-      - `"mercurial"`
-
-     *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
-
-      > **Example**
-      >
-      > Fetch a GitHub repository using the attribute set representation:
-      >
-      > ```nix
-      > builtins.fetchTree {
-      >   type = "github";
-      >   owner = "NixOS";
-      >   repo = "nixpkgs";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      > }
-      > ```
-      >
-      > This evaluates to the following attribute set:
-      >
-      > ```nix
-      > {
-      >   lastModified = 1686503798;
-      >   lastModifiedDate = "20230611171638";
-      >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
-      >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      >   shortRev = "ae2e6b3";
-      > }
-      > ```
-
-      > **Example**
-      >
-      > Fetch the same GitHub repository using the URL-like syntax:
-      >
-      >   ```nix
-      >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
-      >   ```
-    )",
+        return doc;
+    }(),
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
 });
