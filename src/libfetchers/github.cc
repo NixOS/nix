@@ -110,17 +110,41 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    StringSet allowedAttrs() const override
+    std::map<std::string, AttributeInfo> allowedAttrs() const override
     {
         return {
-            "owner",
-            "repo",
-            "ref",
-            "rev",
-            "narHash",
-            "lastModified",
-            "host",
-            "treeHash",
+            {
+                "owner",
+                {},
+            },
+            {
+                "repo",
+                {},
+            },
+            {
+                "ref",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "lastModified",
+                {},
+            },
+            {
+                "host",
+                {},
+            },
+            {
+                "treeHash",
+                {},
+            },
         };
     }
 
@@ -361,6 +385,12 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return "github";
     }
 
+    std::string schemeDescription() const override
+    {
+        // TODO
+        return "";
+    }
+
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
     {
         // Github supports PAT/OAuth2 tokens and HTTP Basic
@@ -440,6 +470,12 @@ struct GitLabInputScheme : GitArchiveInputScheme
     std::string_view schemeName() const override
     {
         return "gitlab";
+    }
+
+    std::string schemeDescription() const override
+    {
+        // TODO
+        return "";
     }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
@@ -524,6 +560,12 @@ struct SourceHutInputScheme : GitArchiveInputScheme
     std::string_view schemeName() const override
     {
         return "sourcehut";
+    }
+
+    std::string schemeDescription() const override
+    {
+        // TODO
+        return "";
     }
 
     std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
