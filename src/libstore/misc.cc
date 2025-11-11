@@ -10,6 +10,7 @@
 #include "nix/util/closure.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/json-utils.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -482,3 +483,19 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+TrustedFlag adl_serializer<TrustedFlag>::from_json(const json & json)
+{
+    return getBoolean(json) ? TrustedFlag::Trusted : TrustedFlag::NotTrusted;
+}
+
+void adl_serializer<TrustedFlag>::to_json(json & json, const TrustedFlag & trustedFlag)
+{
+    json = static_cast<bool>(trustedFlag);
+}
+
+} // namespace nlohmann

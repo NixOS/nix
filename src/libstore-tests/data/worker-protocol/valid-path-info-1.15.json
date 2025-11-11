@@ -1,0 +1,37 @@
+[
+  {
+    "ca": null,
+    "deriver": null,
+    "narHash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+    },
+    "narSize": 34878,
+    "path": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+    "references": [],
+    "registrationTime": 23423,
+    "signatures": [],
+    "ultimate": false,
+    "version": 2
+  },
+  {
+    "ca": null,
+    "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "narHash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+    },
+    "narSize": 34878,
+    "path": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+    "references": [
+      "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+      "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo"
+    ],
+    "registrationTime": 23423,
+    "signatures": [],
+    "ultimate": false,
+    "version": 2
+  }
+]

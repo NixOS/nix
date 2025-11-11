@@ -178,3 +178,4 @@ struct KeyedBuildResult : BuildResult
 } // namespace nix
 
 JSON_IMPL(nix::BuildResult)
+JSON_IMPL(nix::KeyedBuildResult)

@@ -1,0 +1,13 @@
+[
+  {
+    "dependentRealisations": {
+      "sha256:6f869f9ea2823bda165e06076fd0de4366dead2c0e8d2dbbad277d4f15c373f5!quux": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"
+    },
+    "id": "sha256:15e3c560894cbb27085cf65b5a2ecb18488c999497f4531b6907a7581ce6d527!baz",
+    "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+    "signatures": [
+      "asdf",
+      "qwer"
+    ]
+  }
+]
