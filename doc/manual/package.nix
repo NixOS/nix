@@ -58,8 +58,8 @@ mkMesonDerivation (finalAttrs: {
     "man"
   ];
 
-  # Hack for sake of the dev shell
-  passthru.externalNativeBuildInputs = [
+  nativeBuildInputs = [
+    nix-cli
     meson
     ninja
     (lib.getBin lowdown-unsandboxed)
@@ -76,10 +76,6 @@ mkMesonDerivation (finalAttrs: {
     # yet to be rendered.
     # When released, these are rendered into a committed file to save a dependency.
     changelog-d
-  ];
-
-  nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
-    nix-cli
   ];
 
   preConfigure = ''
