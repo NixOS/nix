@@ -88,6 +88,7 @@ class PosIdx;
 struct Pos;
 class StorePath;
 class EvalState;
+class EvalMemory;
 class XMLWriter;
 class Printer;
 
@@ -161,7 +162,7 @@ class ListBuilder
     Value * inlineElems[2] = {nullptr, nullptr};
 public:
     Value ** elems;
-    ListBuilder(size_t size);
+    ListBuilder(EvalMemory & mem, size_t size);
 
     // NOTE: Can be noexcept because we are just copying integral values and
     // raw pointers.
@@ -364,7 +365,7 @@ struct ValueBase
             /**
              * @return null pointer when context.empty()
              */
-            static Context * fromBuilder(const NixStringContext & context);
+            static Context * fromBuilder(const NixStringContext & context, EvalMemory & mem);
         };
 
         /**
@@ -1148,9 +1149,9 @@ public:
 
     void mkString(std::string_view s);
 
-    void mkString(std::string_view s, const NixStringContext & context);
+    void mkString(std::string_view s, const NixStringContext & context, EvalMemory & mem);
 
-    void mkStringMove(const StringData & s, const NixStringContext & context);
+    void mkStringMove(const StringData & s, const NixStringContext & context, EvalMemory & mem);
 
     void mkPath(const SourcePath & path);
 

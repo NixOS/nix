@@ -335,6 +335,7 @@ public:
     EvalMemory & operator=(const EvalMemory &) = delete;
     EvalMemory & operator=(EvalMemory &&) = delete;
 
+    inline void * allocBytes(size_t n);
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
@@ -348,7 +349,7 @@ public:
     ListBuilder buildList(size_t size)
     {
         stats.nrListElems += size;
-        return ListBuilder(size);
+        return ListBuilder(*this, size);
     }
 
     const Statistics & getStats() const &

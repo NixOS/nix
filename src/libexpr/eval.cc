@@ -852,25 +852,26 @@ void Value::mkString(std::string_view s)
     mkStringNoCopy(StringData::make(s));
 }
 
-Value::StringWithContext::Context * Value::StringWithContext::Context::fromBuilder(const NixStringContext & context)
+Value::StringWithContext::Context *
+Value::StringWithContext::Context::fromBuilder(const NixStringContext & context, EvalMemory & mem)
 {
     if (context.empty())
         return nullptr;
 
-    auto ctx = new (allocBytes(sizeof(Context) + context.size() * sizeof(value_type))) Context(context.size());
+    auto ctx = new (mem.allocBytes(sizeof(Context) + context.size() * sizeof(value_type))) Context(context.size());
     std::ranges::transform(
         context, ctx->elems, [](const NixStringContextElem & elt) { return &StringData::make(elt.to_string()); });
     return ctx;
 }
 
-void Value::mkString(std::string_view s, const NixStringContext & context)
+void Value::mkString(std::string_view s, const NixStringContext & context, EvalMemory & mem)
 {
-    mkStringNoCopy(StringData::make(s), Value::StringWithContext::Context::fromBuilder(context));
+    mkStringNoCopy(StringData::make(s), Value::StringWithContext::Context::fromBuilder(context, mem));
 }
 
-void Value::mkStringMove(const StringData & s, const NixStringContext & context)
+void Value::mkStringMove(const StringData & s, const NixStringContext & context, EvalMemory & mem)
 {
-    mkStringNoCopy(s, Value::StringWithContext::Context::fromBuilder(context));
+    mkStringNoCopy(s, Value::StringWithContext::Context::fromBuilder(context, mem));
 }
 
 void Value::mkPath(const SourcePath & path)
@@ -911,9 +912,9 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     }
 }
 
-ListBuilder::ListBuilder(size_t size)
+ListBuilder::ListBuilder(EvalMemory & mem, size_t size)
     : size(size)
-    , elems(size <= 2 ? inlineElems : (Value **) allocBytes(size * sizeof(Value *)))
+    , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes(size * sizeof(Value *)))
 {
 }
 
@@ -953,7 +954,8 @@ void EvalState::mkStorePathString(const StorePath & p, Value & v)
         store->printStorePath(p),
         NixStringContext{
             NixStringContextElem::Opaque{.path = p},
-        });
+        },
+        mem);
 }
 
 std::string EvalState::mkOutputStringRaw(
@@ -975,7 +977,7 @@ void EvalState::mkOutputString(
     std::optional<StorePath> optStaticOutputPath,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    value.mkString(mkOutputStringRaw(b, optStaticOutputPath, xpSettings), NixStringContext{b});
+    value.mkString(mkOutputStringRaw(b, optStaticOutputPath, xpSettings), NixStringContext{b}, mem);
 }
 
 std::string EvalState::mkSingleDerivedPathStringRaw(const SingleDerivedPath & p)
@@ -1010,7 +1012,8 @@ void EvalState::mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v
         mkSingleDerivedPathStringRaw(p),
         NixStringContext{
             std::visit([](auto && v) -> NixStringContextElem { return v; }, p),
-        });
+        },
+        mem);
 }
 
 Value * Expr::maybeThunk(EvalState & state, Env & env)
@@ -2143,7 +2146,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             tmp += part->size();
         }
         *tmp = '\0';
-        v.mkStringMove(resultStr, context);
+        v.mkStringMove(resultStr, context, state.mem);
     }
 }
 

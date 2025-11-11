@@ -222,7 +222,8 @@ void derivationToValue(
             path2,
             {
                 NixStringContextElem::DrvDeep{.drvPath = storePath},
-            });
+            },
+            state.mem);
     attrs.alloc(state.s.name).mkString(drv.env["name"]);
 
     auto list = state.buildList(drv.outputs.size());
@@ -1811,7 +1812,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             drvPathS,
             {
                 NixStringContextElem::DrvDeep{.drvPath = drvPath},
-            });
+            },
+            state.mem);
     for (auto & i : drv.outputs)
         mkOutputString(state, result, drvPath, i);
 
@@ -1864,7 +1866,7 @@ static void prim_toPath(EvalState & state, const PosIdx pos, Value ** args, Valu
     NixStringContext context;
     auto path =
         state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to builtins.toPath");
-    v.mkString(path.path.abs(), context);
+    v.mkString(path.path.abs(), context, state.mem);
 }
 
 static RegisterPrimOp primop_toPath({
@@ -1907,7 +1909,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(NixStringContextElem::Opaque{.path = path2});
-    v.mkString(path.abs(), context);
+    v.mkString(path.abs(), context, state.mem);
 }
 
 static RegisterPrimOp primop_storePath({
@@ -1989,7 +1991,8 @@ static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value ** args, 
     v.mkString(
         legacyBaseNameOf(*state.coerceToString(
             pos, *args[0], context, "while evaluating the first argument passed to builtins.baseNameOf", false, false)),
-        context);
+        context,
+        state.mem);
 }
 
 static RegisterPrimOp primop_baseNameOf({
@@ -2025,11 +2028,11 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value ** args, Value
             pos, *args[0], context, "while evaluating the first argument passed to 'builtins.dirOf'", false, false);
         auto pos = path->rfind('/');
         if (pos == path->npos)
-            v.mkStringMove("."_sds, context);
+            v.mkStringMove("."_sds, context, state.mem);
         else if (pos == 0)
-            v.mkStringMove("/"_sds, context);
+            v.mkStringMove("/"_sds, context, state.mem);
         else
-            v.mkString(path->substr(0, pos), context);
+            v.mkString(path->substr(0, pos), context, state.mem);
     }
 }
 
@@ -2071,7 +2074,7 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Va
                 .path = std::move((StorePath &&) p),
             });
     }
-    v.mkString(s, context);
+    v.mkString(s, context, state.mem);
 }
 
 static RegisterPrimOp primop_readFile({
@@ -2467,7 +2470,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value ** args, Value
     std::ostringstream out;
     NixStringContext context;
     printValueAsXML(state, true, false, *args[0], out, context, pos);
-    v.mkString(out.view(), context);
+    v.mkString(out.view(), context, state.mem);
 }
 
 static RegisterPrimOp primop_toXML({
@@ -2575,7 +2578,7 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value ** args, Valu
     std::ostringstream out;
     NixStringContext context;
     printValueAsJSON(state, true, *args[0], pos, out, context);
-    v.mkString(out.view(), context);
+    v.mkString(out.view(), context, state.mem);
 }
 
 static RegisterPrimOp primop_toJSON({
@@ -4404,7 +4407,7 @@ static void prim_toString(EvalState & state, const PosIdx pos, Value ** args, Va
     NixStringContext context;
     auto s = state.coerceToString(
         pos, *args[0], context, "while evaluating the first argument passed to builtins.toString", true, false);
-    v.mkString(*s, context);
+    v.mkString(*s, context, state.mem);
 }
 
 static RegisterPrimOp primop_toString({
@@ -4477,7 +4480,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
     auto s = state.coerceToString(
         pos, *args[2], context, "while evaluating the third argument (the string) passed to builtins.substring");
 
-    v.mkString(NixUInt(start) >= s->size() ? "" : s->substr(start, _len), context);
+    v.mkString(NixUInt(start) >= s->size() ? "" : s->substr(start, _len), context, state.mem);
 }
 
 static RegisterPrimOp primop_substring({
@@ -4875,7 +4878,7 @@ static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value ** 
             "while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep");
     }
 
-    v.mkString(res, context);
+    v.mkString(res, context, state.mem);
 }
 
 static RegisterPrimOp primop_concatStringsSep({
@@ -4950,7 +4953,7 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value ** ar
         }
     }
 
-    v.mkString(res, context);
+    v.mkString(res, context, state.mem);
 }
 
 static RegisterPrimOp primop_replaceStrings({
