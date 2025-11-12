@@ -245,7 +245,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             printJSON(j);
         } else {
             logger->cout(ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s", flake.resolvedRef.to_string());
-            if (flake.lockedRef.input.isLocked())
+            if (flake.lockedRef.input.isLocked(fetchSettings))
                 logger->cout(ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s", flake.lockedRef.to_string());
             if (flake.description)
                 logger->cout(ANSI_BOLD "Description:" ANSI_NORMAL "   %s", *flake.description);
@@ -1049,7 +1049,7 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(store).input.clone(destDir);
+        getFlakeRef().resolve(fetchSettings, store).input.clone(fetchSettings, destDir);
     }
 };
 
@@ -1100,7 +1100,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
                     std::optional<StorePath> storePath;
                     if (!(*inputNode)->lockedRef.input.isRelative()) {
                         storePath = dryRun ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                                           : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                                           : (*inputNode)->lockedRef.input.fetchToStore(fetchSettings, store).first;
                         sources.insert(*storePath);
                     }
                     if (json) {
@@ -1496,8 +1496,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     void run(ref<Store> store) override
     {
         auto originalRef = getFlakeRef();
-        auto resolvedRef = originalRef.resolve(store);
-        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto resolvedRef = originalRef.resolve(fetchSettings, store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(getEvalState()->fetchSettings, store);
         auto storePath =
             fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;

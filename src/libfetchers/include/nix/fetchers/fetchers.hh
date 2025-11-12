@@ -36,13 +36,6 @@ struct Input
 {
     friend struct InputScheme;
 
-    const Settings * settings;
-
-    Input(const Settings & settings)
-        : settings{&settings}
-    {
-    }
-
     std::shared_ptr<InputScheme> scheme; // note: can be null
     Attrs attrs;
 
@@ -87,7 +80,7 @@ public:
      * attributes like a Git revision or NAR hash that uniquely
      * identify its contents.
      */
-    bool isLocked() const;
+    bool isLocked(const Settings & settings) const;
 
     /**
      * Only for relative path flakes, i.e. 'path:./foo', returns the
@@ -120,7 +113,7 @@ public:
      * Fetch the entire input into the Nix store, returning the
      * location in the Nix store and the locked input.
      */
-    std::pair<StorePath, Input> fetchToStore(ref<Store> store) const;
+    std::pair<StorePath, Input> fetchToStore(const Settings & settings, ref<Store> store) const;
 
     /**
      * Check the locking attributes in `result` against
@@ -140,17 +133,17 @@ public:
      * input without copying it to the store. Also return a possibly
      * unlocked input.
      */
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, Input> getAccessor(const Settings & settings, ref<Store> store) const;
 
 private:
 
-    std::pair<ref<SourceAccessor>, Input> getAccessorUnchecked(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, Input> getAccessorUnchecked(const Settings & settings, ref<Store> store) const;
 
 public:
 
     Input applyOverrides(std::optional<std::string> ref, std::optional<Hash> rev) const;
 
-    void clone(const Path & destDir) const;
+    void clone(const Settings & settings, const Path & destDir) const;
 
     std::optional<std::filesystem::path> getSourcePath() const;
 
@@ -223,7 +216,7 @@ struct InputScheme
 
     virtual Input applyOverrides(const Input & input, std::optional<std::string> ref, std::optional<Hash> rev) const;
 
-    virtual void clone(const Input & input, const Path & destDir) const;
+    virtual void clone(const Settings & settings, const Input & input, const Path & destDir) const;
 
     virtual std::optional<std::filesystem::path> getSourcePath(const Input & input) const;
 
@@ -233,7 +226,8 @@ struct InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const;
 
-    virtual std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const = 0;
+    virtual std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, ref<Store> store, const Input & input) const = 0;
 
     /**
      * Is this `InputScheme` part of an experimental feature?
@@ -250,7 +244,7 @@ struct InputScheme
         return std::nullopt;
     }
 
-    virtual bool isLocked(const Input & input) const
+    virtual bool isLocked(const Settings & settings, const Input & input) const
     {
         return false;
     }

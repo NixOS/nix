@@ -59,7 +59,7 @@ Path getUserRegistryPath();
 
 Registries getRegistries(const Settings & settings, ref<Store> store);
 
-void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs);
+void overrideRegistry(const Settings & settings, const Input & from, const Input & to, const Attrs & extraAttrs);
 
 enum class UseRegistries : int {
     No,
@@ -71,6 +71,7 @@ enum class UseRegistries : int {
  * Rewrite a flakeref using the registries. If `filter` is set, only
  * use the registries for which the filter function returns true.
  */
-std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & input, UseRegistries useRegistries);
+std::pair<Input, Attrs>
+lookupInRegistries(const Settings & settings, ref<Store> store, const Input & input, UseRegistries useRegistries);
 
 } // namespace nix::fetchers

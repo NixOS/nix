@@ -74,7 +74,7 @@ LockedNode::LockedNode(const fetchers::Settings & fetchSettings, const nlohmann:
     , parentInputAttrPath(
           json.find("parent") != json.end() ? (std::optional<InputAttrPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative()) {
+    if (!lockedRef.input.isLocked(fetchSettings) && !lockedRef.input.isRelative()) {
         if (lockedRef.input.getNarHash())
             warn(
                 "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
@@ -282,7 +282,7 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
        latter case, we can verify the input but we may not be able to
        fetch it from anywhere. */
     auto isConsideredLocked = [&](const fetchers::Input & input) {
-        return input.isLocked() || (fetchSettings.allowDirtyLocks && input.getNarHash());
+        return input.isLocked(fetchSettings) || (fetchSettings.allowDirtyLocks && input.getNarHash());
     };
 
     for (auto & i : nodes) {

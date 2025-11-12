@@ -82,7 +82,7 @@ struct FetchTreeParams
 static void fetchTree(
     EvalState & state, const PosIdx pos, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
 {
-    fetchers::Input input{state.fetchSettings};
+    fetchers::Input input{};
     NixStringContext context;
     std::optional<std::string> type;
     auto fetcher = params.isFetchGit ? "fetchGit" : "fetchTree";
@@ -194,9 +194,9 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchSettings, state.store, input, fetchers::UseRegistries::Limited).first;
 
-    if (state.settings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
             warn(
                 "Input '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
@@ -219,7 +219,8 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto cachedInput = state.inputCache->getAccessor(state.store, input, fetchers::UseRegistries::No);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, state.store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
