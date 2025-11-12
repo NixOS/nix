@@ -12,11 +12,7 @@ struct RegisterPrimOp
 {
     typedef std::vector<PrimOp> PrimOps;
 
-    static PrimOps & primOps()
-    {
-        static PrimOps primOps;
-        return primOps;
-    }
+    static PrimOps & primOps();
 
     /**
      * You can register a constant by passing an arity of 0. fun

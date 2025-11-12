@@ -20,11 +20,7 @@ struct RegisterBuiltinBuilder
 {
     typedef std::map<std::string, BuiltinBuilder> BuiltinBuilders;
 
-    static BuiltinBuilders & builtinBuilders()
-    {
-        static BuiltinBuilders builders;
-        return builders;
-    }
+    static BuiltinBuilders & builtinBuilders();
 
     RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && fun)
     {

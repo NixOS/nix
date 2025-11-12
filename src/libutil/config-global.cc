@@ -4,6 +4,12 @@
 
 namespace nix {
 
+GlobalConfig::ConfigRegistrations & GlobalConfig::configRegistrations()
+{
+    static GlobalConfig::ConfigRegistrations configRegistrations;
+    return configRegistrations;
+}
+
 bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
     for (auto & config : configRegistrations())
