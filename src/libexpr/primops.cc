@@ -40,6 +40,12 @@
 
 namespace nix {
 
+RegisterPrimOp::PrimOps & RegisterPrimOp::primOps()
+{
+    static RegisterPrimOp::PrimOps primOps;
+    return primOps;
+}
+
 /*************************************************************
  * Miscellaneous
  *************************************************************/
