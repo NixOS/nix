@@ -26,24 +26,12 @@ deps_public_maybe_subproject = [
   dependency('nix-expr'),
   dependency('nix-flake'),
   dependency('nix-main'),
+  dependency('cmark-cpp'),
 ]
 subdir('nix-meson-build-support/subprojects')
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
-
-lowdown = dependency(
-  'lowdown',
-  version : '>= 0.9.0',
-  required : get_option('markdown'),
-)
-deps_private += lowdown
-configdata.set('HAVE_LOWDOWN', lowdown.found().to_int())
-# The API changed slightly around terminal initialization.
-configdata.set(
-  'HAVE_LOWDOWN_1_4',
-  lowdown.version().version_compare('>= 1.4.0').to_int(),
-)
 
 readline_flavor = get_option('readline-flavor')
 if readline_flavor == 'editline'

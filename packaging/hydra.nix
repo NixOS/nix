@@ -174,24 +174,6 @@ rec {
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
-  # Toggles some settings for better coverage. Windows needs these
-  # library combinations, and Debian build Nix with GNU readline too.
-  buildReadlineNoMarkdown =
-    let
-      components = forAllSystems (
-        system:
-        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
-          self: super: {
-            nix-cmd = super.nix-cmd.override {
-              enableMarkdown = false;
-              readlineFlavor = "readline";
-            };
-          }
-        )
-      );
-    in
-    forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
-
   # Perl bindings for various platforms.
   perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-perl-bindings);
 

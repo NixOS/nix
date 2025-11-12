@@ -11,15 +11,11 @@
   nix-main,
   editline,
   readline,
-  lowdown,
   nlohmann_json,
 
   # Configuration Options
 
   version,
-
-  # Whether to enable Markdown rendering in the Nix binary.
-  enableMarkdown ? !stdenv.hostPlatform.isWindows,
 
   # Which interactive line editor library to use for Nix's repl.
   #
@@ -53,8 +49,7 @@ mkMesonLibrary (finalAttrs: {
 
   buildInputs = [
     ({ inherit editline readline; }.${readlineFlavor})
-  ]
-  ++ lib.optional enableMarkdown lowdown;
+  ];
 
   propagatedBuildInputs = [
     nix-util
@@ -67,7 +62,6 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   mesonFlags = [
-    (lib.mesonEnable "markdown" enableMarkdown)
     (lib.mesonOption "readline-flavor" readlineFlavor)
   ];
 
