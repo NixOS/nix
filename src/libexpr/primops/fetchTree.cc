@@ -8,6 +8,7 @@
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/util/url.hh"
+#include "nix/util/cmark-cpp.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/input-cache.hh"
@@ -236,7 +237,14 @@ static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
     .doc = []() -> std::string {
-        std::string doc = stripIndentation(R"(
+        using namespace cmark;
+
+        // Stores strings referenced by AST. Deallocate after rendering.
+        std::vector<std::string> textArena;
+
+        auto root = node_new(CMARK_NODE_DOCUMENT);
+
+        auto & before = textArena.emplace_back(stripIndentation(R"(
           Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
           - the resulting fixed-output [store path](@docroot@/store/store-path.md)
@@ -276,38 +284,45 @@ static RegisterPrimOp primop_fetchTree({
           <!-- TODO: It would be soooo much more predictable to work with (and
           document) if `fetchTree` was a curried call with the first parameter for
           `type` or an attribute like `builtins.fetchTree.git`! -->
-        )");
+        )"));
+        parse_document(*root, before, CMARK_OPT_DEFAULT);
 
-        auto indentString = [](std::string const & str, std::string const & indent) {
-            std::string result;
-            std::istringstream stream(str);
-            std::string line;
-            bool first = true;
-            while (std::getline(stream, line)) {
-                if (!first)
-                    result += "\n";
-                result += indent + line;
-                first = false;
-            }
-            return result;
-        };
+        auto & schemes = node_append_child(*root, node_new(CMARK_NODE_LIST));
 
         for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
-            doc += "\n- `" + quoteString(schemeName, '"') + "`\n\n";
-            doc += indentString(scheme->schemeDescription(), "  ");
-            if (!doc.empty() && doc.back() != '\n')
-                doc += "\n";
+            auto & s = node_append_child(schemes, node_new(CMARK_NODE_ITEM));
+            {
+                auto & name_p = node_append_child(s, node_new(CMARK_NODE_PARAGRAPH));
+                auto & name = node_append_child(name_p, node_new(CMARK_NODE_CODE));
+                auto & name_t = textArena.emplace_back(quoteString(schemeName, '"'));
+                node_set_literal(name, name_t.c_str());
+            }
+            parse_document(s, scheme->schemeDescription(), CMARK_OPT_DEFAULT);
 
+            auto & attrs = node_append_child(s, node_new(CMARK_NODE_LIST));
             for (const auto & [attrName, attribute] : scheme->allowedAttrs()) {
-                doc += "\n  - `" + attrName + "` (" + attribute.type + ", "
-                       + (attribute.required ? "required" : "optional") + ")\n\n";
-                doc += indentString(stripIndentation(attribute.doc), "    ");
-                if (!doc.empty() && doc.back() != '\n')
-                    doc += "\n";
+                auto & a = node_append_child(attrs, node_new(CMARK_NODE_ITEM));
+                {
+                    auto & name_info = node_append_child(a, node_new(CMARK_NODE_PARAGRAPH));
+                    {
+                        auto & name = node_append_child(name_info, node_new(CMARK_NODE_CODE));
+                        auto & name_t = textArena.emplace_back(attrName);
+                        node_set_literal(name, name_t.c_str());
+                    }
+                    auto & info = node_append_child(name_info, node_new(CMARK_NODE_TEXT));
+                    auto & header = textArena.emplace_back(
+                        std::string{} + " (" + attribute.type + ", " + (attribute.required ? "required" : "optional")
+                        + ")");
+                    node_set_literal(info, header.c_str());
+                }
+                {
+                    auto & doc = textArena.emplace_back(stripIndentation(attribute.doc));
+                    parse_document(a, doc, CMARK_OPT_DEFAULT);
+                }
             }
         }
 
-        doc += "\n" + stripIndentation(R"(
+        auto & after = textArena.emplace_back(stripIndentation(R"(
           The following input types are still subject to change:
 
           - `"path"`
@@ -352,9 +367,12 @@ static RegisterPrimOp primop_fetchTree({
           >   ```nix
           >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
           >   ```
-        )");
+        )"));
+        parse_document(*root, after, CMARK_OPT_DEFAULT);
 
-        return doc;
+        auto p = render_commonmark(*root, CMARK_OPT_DEFAULT, 0);
+        assert(p);
+        return {&*p};
     }(),
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,

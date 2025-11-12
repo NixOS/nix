@@ -110,6 +110,9 @@ deps_private += cpuid
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
+cmark = dependency('libcmark', required : true)
+deps_public += cmark
+
 cxx = meson.get_compiler('cpp')
 
 config_priv_h = configure_file(

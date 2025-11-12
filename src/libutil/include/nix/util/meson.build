@@ -17,6 +17,7 @@ headers = files(
   'checked-arithmetic.hh',
   'chunked-vector.hh',
   'closure.hh',
+  'cmark-cpp.hh',
   'comparator.hh',
   'compression.hh',
   'compute-levels.hh',

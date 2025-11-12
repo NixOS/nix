@@ -24,6 +24,7 @@ deps_public_maybe_subproject = [
   dependency('nix-util'),
   dependency('nix-store'),
   dependency('nix-fetchers'),
+  dependency('cmark-cpp'),
 ]
 subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/big-objs')

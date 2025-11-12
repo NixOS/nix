@@ -13,6 +13,7 @@ project(
 )
 
 # Internal Libraries
+subproject('libcmarkcpp')
 subproject('libutil')
 subproject('libstore')
 subproject('libfetchers')

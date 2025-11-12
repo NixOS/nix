@@ -5,6 +5,7 @@
 
   boost,
   brotli,
+  cmark,
   libarchive,
   libblake3,
   libcpuid,
@@ -57,6 +58,7 @@ mkMesonLibrary (finalAttrs: {
 
   propagatedBuildInputs = [
     boost
+    cmark
     libarchive
     nlohmann_json
   ];
