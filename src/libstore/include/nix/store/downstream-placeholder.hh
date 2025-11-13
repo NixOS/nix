@@ -37,7 +37,7 @@ using DrvRef = std::variant<OutputName, Input>;
  * We use them with `Derivation`: the `render()` method is called to
  * render an opaque string which can be used in the derivation, and the
  * resolving logic can substitute those strings for store paths when
- * resolving `Derivation.inputDrvs` to `BasicDerivation.inputSrcs`.
+ * resolving `Derivation.inputs.drvs` to `BasicDerivation.inputs.srcs`.
  */
 class DownstreamPlaceholder
 {

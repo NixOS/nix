@@ -61,7 +61,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                     make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
         };
 
-        for (const auto & [inputDrvPath, inputNode] : drv->inputDrvs.map) {
+        for (const auto & [inputDrvPath, inputNode] : drv->inputs.drvs.map) {
             /* Ensure that pure, non-fixed-output derivations don't
                depend on impure derivations. */
             if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
@@ -111,7 +111,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                         return ia.deferred;
                     },
                     [&](const DerivationType::ContentAddressed & ca) {
-                        return !fullDrv.inputDrvs.map.empty()
+                        return !fullDrv.inputs.drvs.map.empty()
                                && (ca.fixed
                                        /* Can optionally resolve if fixed, which is good
                                           for avoiding unnecessary rebuilds. */
@@ -123,11 +123,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                     [&](const DerivationType::Impure &) { return true; }},
                 drvType.raw)
             /* no inputs are outputs of dynamic derivations */
-            || std::ranges::any_of(fullDrv.inputDrvs.map.begin(), fullDrv.inputDrvs.map.end(), [](auto & pair) {
+            || std::ranges::any_of(fullDrv.inputs.drvs.map.begin(), fullDrv.inputs.drvs.map.end(), [](auto & pair) {
                    return !pair.second.childMap.empty();
                });
 
-        if (resolveDrv && !fullDrv.inputDrvs.map.empty()) {
+        if (resolveDrv && !fullDrv.inputs.drvs.map.empty()) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
 
             /* We are be able to resolve this derivation based on the
@@ -164,7 +164,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             }
             assert(attempt);
 
-            auto pathResolved = writeDerivation(worker.store, *attempt, NoRepair, /*readOnly =*/true);
+            auto pathResolved = writeDerivation(worker.store, attempt->unresolve(), NoRepair, /*readOnly =*/true);
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",

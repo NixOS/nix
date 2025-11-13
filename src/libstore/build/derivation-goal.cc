@@ -67,7 +67,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
             return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
+                worker.store, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
@@ -154,8 +154,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     if (resolutionGoal->resolvedDrv) {
         auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
 
-        auto resolvedDrvGoal =
-            worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode, /*storeDerivation=*/true);
+        auto resolvedDrvGoal = worker.makeDerivationGoal(
+            pathResolved, drvResolved.unresolve(), wantedOutput, buildMode, /*storeDerivation=*/true);
         {
             Goals waitees{resolvedDrvGoal};
             co_await await(std::move(waitees));
@@ -169,7 +169,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         if (auto * successP = resolvedResult.tryGetSuccess()) {
             auto & success = *successP;
             auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-            auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
+            auto resolvedHashes = staticOutputHashes(worker.store, drvResolved.unresolve());
 
             auto outputHash = get(outputHashes, wantedOutput);
             auto resolvedHash = get(resolvedHashes, wantedOutput);

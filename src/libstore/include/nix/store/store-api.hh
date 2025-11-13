@@ -36,8 +36,11 @@ struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
 
-struct BasicDerivation;
-struct Derivation;
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using BasicDerivation = DerivationT<StorePathSet>;
+using Derivation = DerivationT<FullInputs>;
 
 struct SourceAccessor;
 class NarInfoDiskCache;
@@ -999,7 +1002,7 @@ std::string showPaths(const PathSet & paths);
 std::optional<ValidPathInfo>
 decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven = std::nullopt);
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv);
+const ContentAddress * getDerivationCA(const Derivation & drv);
 
 std::map<DrvOutput, StorePath>
 drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);

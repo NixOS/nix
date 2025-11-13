@@ -7,7 +7,12 @@
 namespace nix {
 
 class Store;
-struct Derivation;
+
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using Derivation = DerivationT<FullInputs>;
+
 template<typename Input>
 struct DerivationOptions;
 

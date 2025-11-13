@@ -114,7 +114,9 @@ private:
      * Is the build hook willing to perform the build?
      */
     HookReply tryBuildHook(
-        const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions);
+        const std::map<std::string, InitialOutput> & initialOutputs,
+        const BasicDerivation & resolvedDrv,
+        const DerivationOptions<StorePath> & drvOptions);
 
     /**
      * Open a log file and a pipe to it.

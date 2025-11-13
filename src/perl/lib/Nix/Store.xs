@@ -382,12 +382,12 @@ StoreWrapper::derivationFromPath(char * drvPath)
             hv_stores(hash, "outputs", newRV((SV *) outputs));
 
             AV * inputDrvs = newAV();
-            for (auto & i : drv.inputDrvs.map)
+            for (auto & i : drv.inputs.drvs.map)
                 av_push(inputDrvs, newSVpv(THIS->store->printStorePath(i.first).c_str(), 0)); // !!! ignores i->second
             hv_stores(hash, "inputDrvs", newRV((SV *) inputDrvs));
 
             AV * inputSrcs = newAV();
-            for (auto & i : drv.inputSrcs)
+            for (auto & i : drv.inputs.srcs)
                 av_push(inputSrcs, newSVpv(THIS->store->printStorePath(i).c_str(), 0));
             hv_stores(hash, "inputSrcs", newRV((SV *) inputSrcs));
 

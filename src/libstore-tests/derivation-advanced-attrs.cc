@@ -43,7 +43,7 @@ public:
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+                *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
         });
     }
@@ -59,7 +59,7 @@ public:
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+                *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
             EXPECT_EQ(options, expected);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedSystemFeatures);
@@ -188,7 +188,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
@@ -234,7 +234,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
@@ -330,7 +330,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 
@@ -381,7 +381,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 

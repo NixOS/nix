@@ -14,8 +14,14 @@
 namespace nix {
 
 class Store;
+
 struct StoreDirConfig;
-struct BasicDerivation;
+
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using BasicDerivation = DerivationT<StorePathSet>;
+
 struct StructuredAttrs;
 
 template<typename V>
@@ -181,24 +187,28 @@ struct DerivationOptions
      * the future we'll flip things around so a `BasicDerivation` has
      * `DerivationOptions` instead.
      */
-    StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
+    template<typename Inputs>
+    StringSet getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    bool canBuildLocally(Store & localStore, const BasicDerivation & drv) const;
+    template<typename Inputs>
+    bool canBuildLocally(Store & localStore, const DerivationT<Inputs> & drv) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    bool willBuildLocally(Store & localStore, const BasicDerivation & drv) const;
+    template<typename Inputs>
+    bool willBuildLocally(Store & localStore, const DerivationT<Inputs> & drv) const;
 
     bool substitutesAllowed() const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    bool useUidRange(const BasicDerivation & drv) const;
+    template<typename Inputs>
+    bool useUidRange(const DerivationT<Inputs> & drv) const;
 };
 
 extern template struct DerivationOptions<StorePath>;

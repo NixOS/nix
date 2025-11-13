@@ -152,6 +152,23 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
+/**
+ * Inputs for full Derivation - both source and derivation inputs
+ */
+struct FullInputs
+{
+    /**
+     * inputs that are sources
+     */
+    StorePathSet srcs;
+    /**
+     * inputs that are sub-derivations
+     */
+    DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
+
+    bool operator==(const FullInputs &) const = default;
+};
+
 struct DerivationType
 {
     /**
@@ -263,16 +280,20 @@ struct DerivationType
     bool hasKnownOutputPaths() const;
 };
 
-struct BasicDerivation
+template<typename Inputs>
+struct DerivationT;
+
+using BasicDerivation = DerivationT<StorePathSet>;
+using Derivation = DerivationT<FullInputs>;
+
+template<typename Inputs>
+struct DerivationT
 {
     /**
      * keyed on symbolic IDs
      */
     DerivationOutputs outputs;
-    /**
-     * inputs that are sources
-     */
-    StorePathSet inputSrcs;
+    Inputs inputs;
     std::string platform;
     Path builder;
     Strings args;
@@ -284,12 +305,7 @@ struct BasicDerivation
 
     std::string name;
 
-    BasicDerivation() = default;
-    BasicDerivation(BasicDerivation &&) = default;
-    BasicDerivation(const BasicDerivation &) = default;
-    BasicDerivation & operator=(BasicDerivation &&) = default;
-    BasicDerivation & operator=(const BasicDerivation &) = default;
-    virtual ~BasicDerivation() {};
+    bool operator==(const DerivationT &) const = default;
 
     bool isBuiltin() const;
 
@@ -318,27 +334,14 @@ struct BasicDerivation
      */
     void applyRewrites(const StringMap & rewrites);
 
-    bool operator==(const BasicDerivation &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    // auto operator <=> (const BasicDerivation &) const = default;
-};
-
-class Store;
-
-struct Derivation : BasicDerivation
-{
     /**
-     * inputs that are sub-derivations
-     */
-    DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
-
-    /**
-     * Print a derivation.
+     * Print a derivation (only meaningful for full Derivation).
      */
     std::string unparse(
         const StoreDirConfig & store,
         bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -349,7 +352,8 @@ struct Derivation : BasicDerivation
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const;
+    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Like the above, but instead of querying the Nix database for
@@ -359,7 +363,16 @@ struct Derivation : BasicDerivation
     std::optional<BasicDerivation> tryResolve(
         Store & store,
         std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-            queryResolutionChain) const;
+            queryResolutionChain) const
+        requires std::is_same_v<Inputs, FullInputs>;
+
+    /**
+     * Convert a BasicDerivation to a full Derivation.
+     * The resulting Derivation has empty inputDrvs since BasicDerivation
+     * is already resolved.
+     */
+    Derivation unresolve() const
+        requires std::is_same_v<Inputs, StorePathSet>;
 
     /**
      * Check that the derivation is valid and does not present any
@@ -370,22 +383,6 @@ struct Derivation : BasicDerivation
      * allow.
      */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
-
-    Derivation() = default;
-
-    Derivation(const BasicDerivation & bd)
-        : BasicDerivation(bd)
-    {
-    }
-
-    Derivation(BasicDerivation && bd)
-        : BasicDerivation(std::move(bd))
-    {
-    }
-
-    bool operator==(const Derivation &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    // auto operator <=> (const Derivation &) const = default;
 };
 
 class Store;

@@ -656,9 +656,7 @@ static void performOp(
                paths. */
             assert(drvType.isCA());
 
-            Derivation drv2;
-            static_cast<BasicDerivation &>(drv2) = drv;
-            drvPath = writeDerivation(*store, Derivation{drv2});
+            drvPath = writeDerivation(*store, drv.unresolve());
         }
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
