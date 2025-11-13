@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/cmd/command.hh"
+#include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
@@ -13,6 +14,18 @@
 #include "nix/util/environment-variables.hh"
 
 namespace nix {
+
+RegisterCommand::Commands & RegisterCommand::commands()
+{
+    static RegisterCommand::Commands commands;
+    return commands;
+}
+
+RegisterLegacyCommand::Commands & RegisterLegacyCommand::commands()
+{
+    static RegisterLegacyCommand::Commands commands;
+    return commands;
+}
 
 nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
 {
