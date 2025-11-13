@@ -1774,28 +1774,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
         }
 
-        auto hashModulo = hashDerivationModulo(*state.store, Derivation(drv), true);
-        switch (hashModulo.kind) {
-        case DrvHash::Kind::Regular:
-            for (auto & i : outputs) {
-                auto h = get(hashModulo.hashes, i);
-                if (!h)
-                    state.error<AssertionError>("derivation produced no hash for output '%s'", i).atPos(v).debugThrow();
-                auto outPath = state.store->makeOutputPath(i, *h, drvName);
-                drv.env[i] = state.store->printStorePath(outPath);
-                drv.outputs.insert_or_assign(
-                    i,
-                    DerivationOutput::InputAddressed{
-                        .path = std::move(outPath),
-                    });
-            }
-            break;
-            ;
-        case DrvHash::Kind::Deferred:
-            for (auto & i : outputs) {
-                drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
-            }
-        }
+        drv.fillInOutputPaths(*state.store);
     }
 
     /* Write the resulting term into the Nix store directory. */

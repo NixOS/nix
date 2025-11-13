@@ -1210,6 +1210,136 @@ std::optional<BasicDerivation> Derivation::tryResolve(
     return resolved;
 }
 
+/**
+ * Process `InputAddressed`, `Deferred`, and `CAFixed` outputs.
+ *
+ * For `InputAddressed` outputs or `Deferred` outputs:
+ *
+ * - with `Regular` hash kind, validate `InputAddressed` outputs have
+ *   the correct path (throws if mismatch). For `Deferred` outputs:
+ *   - if `fillIn` is true, fill in the output path to make `InputAddressed`
+ *   - if `fillIn` is false, throw an error
+ *   Then validate or fill in the environment variable with the path.
+ *
+ * - with `Deferred` hash kind, validate that the output is either
+ *   `InputAddressed` (error) or `Deferred` (correct).
+ *
+ * For `CAFixed` outputs, validate or fill in the environment variable
+ * with the computed path.
+ *
+ * @tparam fillIn If true, fill in missing output paths and environment
+ * variables. If false, validate that all paths are correct (throws on
+ * mismatch).
+ */
+template<bool fillIn>
+static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
+{
+    std::optional<DrvHash> hashesModulo;
+
+    for (auto & [outputName, output] : drv.outputs) {
+        auto envHasRightPath = [&](const StorePath & actual) {
+            if constexpr (fillIn) {
+                auto j = drv.env.find(outputName);
+                /* Fill in mode: fill in missing or empty environment
+                   variables */
+                if (j == drv.env.end())
+                    drv.env.insert(j, {outputName, store.printStorePath(actual)});
+                else if (j->second == "")
+                    j->second = store.printStorePath(actual);
+                /* We know validation will succeed after fill-in, but
+                   just to be extra sure, validate unconditionally */
+            }
+            auto j = drv.env.find(outputName);
+            if (j == drv.env.end())
+                throw Error(
+                    "derivation has missing environment variable '%s', should be '%s' but is not present",
+                    outputName,
+                    store.printStorePath(actual));
+            if (j->second != store.printStorePath(actual))
+                throw Error(
+                    "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
+                    outputName,
+                    store.printStorePath(actual),
+                    j->second);
+        };
+        auto hash = [&]<typename Output>(const Output & outputVariant) {
+            if (!hashesModulo) {
+                // somewhat expensive so we do lazily
+                hashesModulo = hashDerivationModulo(store, drv, true);
+            }
+            switch (hashesModulo->kind) {
+            case DrvHash::Kind::Regular: {
+                auto h = get(hashesModulo->hashes, outputName);
+                if (!h)
+                    throw Error("derivation produced no hash for output '%s'", outputName);
+                auto outPath = store.makeOutputPath(outputName, *h, drvName);
+
+                if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
+                    if (outputVariant.path == outPath) {
+                        return; // Correct case
+                    }
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be '%s'",
+                        store.printStorePath(outputVariant.path),
+                        store.printStorePath(outPath));
+                } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
+                    if constexpr (fillIn)
+                        /* Fill in output path for Deferred
+                           outputs */
+                        output = DerivationOutput::InputAddressed{
+                            .path = outPath,
+                        };
+                    else
+                        /* Validation mode: deferred outputs
+                           should have been filled in */
+                        throw Error(
+                            "derivation has incorrect deferred output, should be '%s'", store.printStorePath(outPath));
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+                envHasRightPath(outPath);
+                break;
+            }
+            case DrvHash::Kind::Deferred:
+                if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be deferred",
+                        store.printStorePath(outputVariant.path));
+                } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
+                    /* Correct: Deferred output with Deferred
+                       hash kind. */
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+                break;
+            }
+        };
+        std::visit(
+            overloaded{
+                [&](const DerivationOutput::InputAddressed & o) { hash(o); },
+                [&](const DerivationOutput::Deferred & o) { hash(o); },
+                [&](const DerivationOutput::CAFixed & dof) { envHasRightPath(dof.path(store, drvName, outputName)); },
+                [&](const auto &) {
+                    // Nothing to do for other output types
+                },
+            },
+            output.raw);
+    }
+
+    /* Don't need the answer, but do this anyways to assert is proper
+       combination. The code above is more general and naturally allows
+       combinations that are currently prohibited. */
+    drv.type();
+}
+
 void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 {
     assert(drvPath.isDerivation());
@@ -1217,65 +1347,41 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
     drvName = drvName.substr(0, drvName.size() - drvExtension.size());
 
     if (drvName != name) {
-        throw Error("Derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
+        throw Error("derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
     }
 
-    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName) {
-        auto j = env.find(varName);
-        if (j == env.end() || store.parseStorePath(j->second) != actual)
-            throw Error(
-                "derivation '%s' has incorrect environment variable '%s', should be '%s'",
-                store.printStorePath(drvPath),
-                varName,
-                store.printStorePath(actual));
-    };
-
-    // Don't need the answer, but do this anyways to assert is proper
-    // combination. The code below is more general and naturally allows
-    // combinations that are currently prohibited.
-    type();
-
-    std::optional<DrvHash> hashesModulo;
-    for (auto & i : outputs) {
-        std::visit(
-            overloaded{
-                [&](const DerivationOutput::InputAddressed & doia) {
-                    if (!hashesModulo) {
-                        // somewhat expensive so we do lazily
-                        hashesModulo = hashDerivationModulo(store, *this, true);
-                    }
-                    auto currentOutputHash = get(hashesModulo->hashes, i.first);
-                    if (!currentOutputHash)
-                        throw Error(
-                            "derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
-                            store.printStorePath(drvPath),
-                            store.printStorePath(doia.path),
-                            i.first);
-                    StorePath recomputed = store.makeOutputPath(i.first, *currentOutputHash, drvName);
-                    if (doia.path != recomputed)
-                        throw Error(
-                            "derivation '%s' has incorrect output '%s', should be '%s'",
-                            store.printStorePath(drvPath),
-                            store.printStorePath(doia.path),
-                            store.printStorePath(recomputed));
-                    envHasRightPath(doia.path, i.first);
-                },
-                [&](const DerivationOutput::CAFixed & dof) {
-                    auto path = dof.path(store, drvName, i.first);
-                    envHasRightPath(path, i.first);
-                },
-                [&](const DerivationOutput::CAFloating &) {
-                    /* Nothing to check */
-                },
-                [&](const DerivationOutput::Deferred &) {
-                    /* Nothing to check */
-                },
-                [&](const DerivationOutput::Impure &) {
-                    /* Nothing to check */
-                },
-            },
-            i.second.raw);
+    try {
+        checkInvariants(store);
+    } catch (Error & e) {
+        e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
+        throw;
     }
+}
+
+void Derivation::checkInvariants(Store & store) const
+{
+    processDerivationOutputPaths<false>(store, *this, name);
+}
+
+void Derivation::fillInOutputPaths(Store & store)
+{
+    processDerivationOutputPaths<true>(store, *this, name);
+}
+
+Derivation Derivation::parseJsonAndValidate(Store & store, const nlohmann::json & json)
+{
+    auto drv = static_cast<Derivation>(json);
+
+    drv.fillInOutputPaths(store);
+
+    try {
+        drv.checkInvariants(store);
+    } catch (Error & e) {
+        e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
+        throw;
+    }
+
+    return drv;
 }
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
