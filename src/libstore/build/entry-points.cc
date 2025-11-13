@@ -107,7 +107,7 @@ std::vector<KeyedBuildResult> Worker::buildPathsWithResults(const std::vector<De
 
 BuildResult Worker::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
-    auto goal = makeDerivationTrampolineGoal(drvPath, OutputsSpec::All{}, drv, buildMode);
+    auto goal = makeDerivationTrampolineGoal(drvPath, OutputsSpec::All{}, drv.unresolve(), buildMode);
 
     try {
         run(Goals{goal});

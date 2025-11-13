@@ -188,10 +188,10 @@ MAKE_TEST_P(DerivationJsonAtermTest);
 INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values([]() {
                              Derivation drv;
                              drv.name = "simple-derivation";
-                             drv.inputSrcs = {
+                             drv.inputs.srcs = {
                                  StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
                              };
-                             drv.inputDrvs = {
+                             drv.inputs.drvs = {
                                  .map =
                                      {
                                          {
@@ -232,10 +232,10 @@ Derivation makeDynDepDerivation()
 {
     Derivation drv;
     drv.name = "dyn-dep-derivation";
-    drv.inputSrcs = {
+    drv.inputs.srcs = {
         StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
     };
-    drv.inputDrvs = {
+    drv.inputs.drvs = {
         .map =
             {
                 {

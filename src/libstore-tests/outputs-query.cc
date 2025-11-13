@@ -72,8 +72,8 @@ TEST_F(OutputsQueryTest, fibonacciChainQueryCount)
     // d_i depends on d_{i-1} and d_{i-2}
     for (size_t i = 2; i <= N; ++i) {
         Derivation drv = makeLeafDrv("d" + std::to_string(i));
-        drv.inputDrvs.map[drvPaths[i - 1]].value.insert("out");
-        drv.inputDrvs.map[drvPaths[i - 2]].value.insert("out");
+        drv.inputs.drvs.map[drvPaths[i - 1]].value.insert("out");
+        drv.inputs.drvs.map[drvPaths[i - 2]].value.insert("out");
         drvPaths.push_back(store->writeDerivation(drv));
     }
 

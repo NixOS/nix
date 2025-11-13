@@ -109,11 +109,10 @@ Worker::makeDerivationResolutionGoal(const StorePath & drvPath, ref<const Deriva
     return initGoalIfNeeded(derivationResolutionGoals[drvPath], drvPath, drv, *this, buildMode);
 }
 
-std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
-    const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation)
+std::shared_ptr<DerivationBuildingGoal>
+Worker::makeDerivationBuildingGoal(const StorePath & drvPath, ref<const BasicDerivation> drv, BuildMode buildMode)
 {
-    return initGoalIfNeeded(
-        derivationBuildingGoals[drvPath], drvPath, std::move(drv), *this, buildMode, storeDerivation);
+    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, std::move(drv), *this, buildMode);
 }
 
 std::shared_ptr<PathSubstitutionGoal>

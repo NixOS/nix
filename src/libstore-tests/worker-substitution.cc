@@ -329,7 +329,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
         },
     };
     // Add the dependency derivation as an input
-    rootDrv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    rootDrv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     // Write the root derivation to the destination store
     auto rootDrvPath = dummyStore->writeDerivation(rootDrv);
@@ -345,7 +345,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(resolvedRootDrv);
 
     // Write the resolved derivation to the substituter
-    auto resolvedRootDrvPath = substituter->writeDerivation(Derivation{*resolvedRootDrv});
+    auto resolvedRootDrvPath = substituter->writeDerivation(resolvedRootDrv->unresolve());
 
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);

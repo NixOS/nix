@@ -174,7 +174,7 @@ TEST_F(TryResolveTest, withInputs)
             drv.platform = "x86_64-linux";
             drv.builder = "/bin/bash";
             drv.outputs = multiOutputs;
-            drv.inputDrvs = {
+            drv.inputs.drvs = {
                 .map = {
                     {dep1DrvPath, {.value = {"out", "dev"}}},
                     {dep2DrvPath, {.value = {"out"}}},
@@ -219,7 +219,7 @@ TEST_F(TryResolveTest, withInputs)
             expected.platform = "x86_64-linux";
             expected.builder = "/bin/bash";
             expected.outputs = multiOutputs;
-            expected.inputSrcs = {dep1OutPath, dep1DevPath, dep2OutPath};
+            expected.inputs = {dep1OutPath, dep1DevPath, dep2OutPath};
             expected.env = {
                 {"DEP1_OUT", "prefix-" + store->printStorePath(dep1OutPath) + "-suffix"},
                 {"DEP1_DEV", store->printStorePath(dep1DevPath)},
@@ -243,7 +243,7 @@ TEST_F(TryResolveTest, resolutionFailure)
     drv.platform = "x86_64-linux";
     drv.builder = "/bin/bash";
     drv.outputs = {{"out", caFloatingOutput()}};
-    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     BuildTrace buildTrace;
 
@@ -273,7 +273,7 @@ void TryResolveTest::exportRefGraphSubpathTest(
 
     nix::checkpointJson(*this, std::string{stem} + "-before", drv);
 
-    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputDrvs, drv.env, parsed, true);
+    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputs.drvs, drv.env, parsed, true);
 
     nix::checkpointJson(*this, std::string{stem} + "-before-options", options);
 
@@ -333,7 +333,7 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath)
     drv.platform = "x86_64-linux";
     drv.builder = "/bin/bash";
     drv.outputs = {{"out", caFloatingOutput()}};
-    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
     drv.env = {
         {"exportReferencesGraph", "refs " + placeholder + "/foo"},
     };
@@ -351,7 +351,7 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
     drv.platform = "x86_64-linux";
     drv.builder = "/bin/bash";
     drv.outputs = {{"out", caFloatingOutput()}};
-    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
     drv.structuredAttrs = StructuredAttrs{{
         {"exportReferencesGraph", nlohmann::json::object({{"refs", nlohmann::json::array({placeholder + "/foo"})}})},
     }};

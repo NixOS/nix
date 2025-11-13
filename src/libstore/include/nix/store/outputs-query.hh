@@ -19,7 +19,7 @@ using QueryRealisationFun = std::function<std::shared_ptr<const UnkeyedRealisati
 void queryPartialDerivationOutputMapCA(
     Store & store,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
+    const Derivation & drv,
     std::map<std::string, std::optional<StorePath>> & outputs,
     QueryRealisationFun queryRealisation = {});
 
