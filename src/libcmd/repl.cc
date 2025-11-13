@@ -656,7 +656,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                             + "\n\n";
             }
 
-            markdown += stripIndentation(doc->doc);
+            markdown += stripIndentation(doc->doc.view());
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {

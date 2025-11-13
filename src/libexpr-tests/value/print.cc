@@ -1,5 +1,5 @@
 #include "nix/expr/tests/libexpr.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 #include "nix/expr/value.hh"
 #include "nix/expr/print.hh"

@@ -9,7 +9,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/profiles.hh"
 #include "nix/expr/print-ambiguous.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 #include <limits>
 #include <sstream>

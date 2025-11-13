@@ -1,6 +1,6 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 #include "expr-config-private.hh"
 
@@ -170,10 +170,10 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
     }
 }
 
-static RegisterPrimOp primop_fromTOML(
-    {.name = "fromTOML",
-     .args = {"e"},
-     .doc = R"(
+static RegisterPrimOp primop_fromTOML({
+    .name = "fromTOML",
+    .args = {"e"},
+    .doc = &R"(
       Convert a TOML string to a Nix value. For example,
 
       ```nix
@@ -186,7 +186,8 @@ static RegisterPrimOp primop_fromTOML(
       ```
 
       returns the value `{ s = "a"; table = { y = 2; }; x = 1; }`.
-    )",
-     .fun = prim_fromTOML});
+    )"_sds,
+    .fun = prim_fromTOML,
+});
 
 } // namespace nix

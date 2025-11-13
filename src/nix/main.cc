@@ -440,7 +440,7 @@ void mainWrapped(int argc, char ** argv)
             if (!primOp->doc)
                 continue;
             b["args"] = primOp->args;
-            b["doc"] = trim(stripIndentation(primOp->doc));
+            b["doc"] = trim(stripIndentation(primOp->doc->view()));
             if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
             builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
@@ -449,7 +449,7 @@ void mainWrapped(int argc, char ** argv)
             auto b = nlohmann::json::object();
             if (!info.doc)
                 continue;
-            b["doc"] = trim(stripIndentation(info.doc));
+            b["doc"] = trim(stripIndentation(info.doc->view()));
             b["type"] = showType(info.type, false);
             if (info.impureOnly)
                 b["impure-only"] = true;

@@ -1,6 +1,6 @@
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/value-to-json.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 namespace nix {
 // Testing the conversion to JSON

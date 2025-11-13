@@ -12,7 +12,7 @@
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
 #include "nix/util/pos-table.hh"
