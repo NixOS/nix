@@ -368,8 +368,45 @@ struct Derivation : BasicDerivation
      * This is mainly a matter of checking the outputs, where our C++
      * representation supports all sorts of combinations we do not yet
      * allow.
+     *
+     * This overload does not validate the derivation name or add path
+     * context to errors. Use this when you don't have a `StorePath` or
+     * when you want to handle error context yourself.
+     *
+     * @param store The store to use for validation
+     */
+    void checkInvariants(Store & store) const;
+
+    /**
+     * This overload does everything the base `checkInvariants` does,
+     * but also validates that the derivation name matches the path, and
+     * improves any error messages that occur using the derivation path.
+     *
+     * @param store The store to use for validation
+     * @param drvPath The path to this derivation
      */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
+
+    /**
+     * Fill in output paths as needed.
+     *
+     * For input-addressed derivations (ready or deferred), it computes
+     * the derivation hash modulo and based on the result:
+     *
+     * - If `Regular`: converts `Deferred` outputs to `InputAddressed`, and
+     *   ensures all `InputAddressed` (exist or just et) have he right
+     *   computed paths. Also updates the environment variables with
+     *   output paths.
+     *
+     * - If `Deferred`: converts `InputAddressed` to `Deferred`.
+     *
+     * Also for fixed-output content-addressed derivations, likewise
+     * updates output paths in env vars.
+     *
+     * @param store The store to use for path computation
+     * @param drvName The derivation name (without .drv extension)
+     */
+    void fillInOutputPaths(Store & store);
 
     Derivation() = default;
 
@@ -382,6 +419,29 @@ struct Derivation : BasicDerivation
         : BasicDerivation(std::move(bd))
     {
     }
+
+    /**
+     * Parse a derivation from JSON, and also perform various
+     * conveniences such as:
+     *
+     * 1. Filling in output paths in as needed/required.
+     *
+     * 2. Checking invariants in general.
+     *
+     * In the future it might also do things like:
+     *
+     * - assist with the migration from older JSON formats.
+     *
+     * - (a somewhat exmaple of the above) initialize
+     *   `DerivationOptions` from their traditional encoding inside the
+     *   `env` and `structuredAttrs`.
+     *
+     * @param store The store to use for path computation and validation
+     * @param json The JSON representation of the derivation
+     * @return A validated derivation with output paths filled in
+     * @throws Error if parsing fails, output paths can't be computed, or validation fails
+     */
+    static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json);
 
     bool operator==(const Derivation &) const = default;
     // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
