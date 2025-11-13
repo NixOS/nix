@@ -13,27 +13,27 @@
 #include "nix/util/thread-pool.hh"
 #include "nix/util/pool.hh"
 
-#include <git2/attr.h>
-#include <git2/blob.h>
-#include <git2/branch.h>
-#include <git2/commit.h>
-#include <git2/config.h>
-#include <git2/describe.h>
-#include <git2/errors.h>
-#include <git2/global.h>
-#include <git2/indexer.h>
-#include <git2/object.h>
-#include <git2/odb.h>
-#include <git2/refs.h>
-#include <git2/remote.h>
-#include <git2/repository.h>
-#include <git2/revparse.h>
-#include <git2/status.h>
-#include <git2/submodule.h>
-#include <git2/sys/odb_backend.h>
-#include <git2/sys/mempack.h>
-#include <git2/tag.h>
-#include <git2/tree.h>
+#include <git2-experimental/attr.h>
+#include <git2-experimental/blob.h>
+#include <git2-experimental/branch.h>
+#include <git2-experimental/commit.h>
+#include <git2-experimental/config.h>
+#include <git2-experimental/describe.h>
+#include <git2-experimental/errors.h>
+#include <git2-experimental/global.h>
+#include <git2-experimental/indexer.h>
+#include <git2-experimental/object.h>
+#include <git2-experimental/odb.h>
+#include <git2-experimental/refs.h>
+#include <git2-experimental/remote.h>
+#include <git2-experimental/repository.h>
+#include <git2-experimental/revparse.h>
+#include <git2-experimental/status.h>
+#include <git2-experimental/submodule.h>
+#include <git2-experimental/sys/odb_backend.h>
+#include <git2-experimental/sys/mempack.h>
+#include <git2-experimental/tag.h>
+#include <git2-experimental/tree.h>
 
 #include <boost/unordered/concurrent_flat_set.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -91,10 +91,21 @@ typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
 
 Hash toHash(const git_oid & oid)
 {
-#ifdef GIT_EXPERIMENTAL_SHA256
-    assert(oid.type == GIT_OID_SHA1);
-#endif
-    Hash hash(HashAlgorithm::SHA1);
+    HashAlgorithm algo;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (oid.type) {
+    case GIT_OID_SHA1:
+        algo = HashAlgorithm::SHA1;
+        break;
+    case GIT_OID_SHA256:
+        algo = HashAlgorithm::SHA256;
+        break;
+    default:
+        unreachable();
+    }
+#pragma GCC diagnostic pop
+    Hash hash(algo);
     memcpy(hash.hash, oid.id, hash.hashSize);
     return hash;
 }
@@ -111,7 +122,21 @@ static void initLibGit2()
 git_oid hashToOID(const Hash & hash)
 {
     git_oid oid;
-    if (git_oid_fromstr(&oid, hash.gitRev().c_str()))
+    git_oid_t t;
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (hash.algo) {
+    case HashAlgorithm::SHA1:
+        t = GIT_OID_SHA1;
+        break;
+    case HashAlgorithm::SHA256:
+        t = GIT_OID_SHA256;
+        break;
+    default:
+        throw Error("unsupported hash algorithm for Git: %s", printHashAlgo(hash.algo));
+    }
+#pragma GCC diagnostic pop
+    if (git_oid_fromstr(&oid, hash.gitRev().c_str(), t))
         throw Error("cannot convert '%s' to a Git OID", hash.gitRev());
     return oid;
 }
@@ -304,7 +329,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //                     (synchronously on the git_packbuilder_write_buf thread)
         Indexer indexer;
         git_indexer_progress stats;
-        if (git_indexer_new(Setter(indexer), pack_dir_path.c_str(), 0, nullptr, nullptr))
+        git_indexer_options indexer_opts = GIT_INDEXER_OPTIONS_INIT;
+        if (git_indexer_new(Setter(indexer), pack_dir_path.c_str(), &indexer_opts))
             throw Error("creating git packfile indexer: %s", git_error_last()->message);
 
         // TODO: provide index callback for checkInterrupt() termination
@@ -1381,6 +1407,23 @@ bool isLegalRefName(const std::string & refName)
     }
 
     return false;
+}
+
+Hash parseGitHash(std::string_view hashStr)
+{
+    HashAlgorithm algo;
+    switch (hashStr.size()) {
+    case 40:
+        algo = HashAlgorithm::SHA1;
+        break;
+    case 64:
+        algo = HashAlgorithm::SHA256;
+        break;
+    default:
+        throw Error(
+            "invalid git hash '%s': expected 40 (SHA1) or 64 (SHA256) hex characters, got %d", hashStr, hashStr.size());
+    }
+    return Hash::parseNonSRIUnprefixed(hashStr, algo);
 }
 
 } // namespace nix

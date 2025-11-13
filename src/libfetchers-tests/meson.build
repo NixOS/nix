@@ -33,7 +33,7 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
-libgit2 = dependency('libgit2')
+libgit2 = dependency('libgit2-experimental')
 deps_private += libgit2
 
 subdir('nix-meson-build-support/common')
