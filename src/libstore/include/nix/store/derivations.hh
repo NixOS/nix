@@ -152,6 +152,23 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
 
+/**
+ * Inputs for full Derivation - both source and derivation inputs
+ */
+struct FullInputs
+{
+    /**
+     * inputs that are sources
+     */
+    StorePathSet srcs;
+    /**
+     * inputs that are sub-derivations
+     */
+    DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
+
+    bool operator==(const FullInputs &) const = default;
+};
+
 struct DerivationType
 {
     /**
@@ -263,16 +280,20 @@ struct DerivationType
     bool hasKnownOutputPaths() const;
 };
 
-struct BasicDerivation
+template<typename Inputs>
+struct DerivationT;
+
+using BasicDerivation = DerivationT<StorePathSet>;
+using Derivation = DerivationT<FullInputs>;
+
+template<typename Inputs>
+struct DerivationT
 {
     /**
      * keyed on symbolic IDs
      */
     DerivationOutputs outputs;
-    /**
-     * inputs that are sources
-     */
-    StorePathSet inputSrcs;
+    Inputs inputs;
     std::string platform;
     /**
      * Probably should be an absolute path in the path format that `platform` uses
@@ -287,12 +308,7 @@ struct BasicDerivation
 
     std::string name;
 
-    BasicDerivation() = default;
-    BasicDerivation(BasicDerivation &&) = default;
-    BasicDerivation(const BasicDerivation &) = default;
-    BasicDerivation & operator=(BasicDerivation &&) = default;
-    BasicDerivation & operator=(const BasicDerivation &) = default;
-    virtual ~BasicDerivation();
+    bool operator==(const DerivationT &) const = default;
 
     bool isBuiltin() const;
 
@@ -321,27 +337,14 @@ struct BasicDerivation
      */
     void applyRewrites(const StringMap & rewrites);
 
-    bool operator==(const BasicDerivation &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    // auto operator <=> (const BasicDerivation &) const = default;
-};
-
-class Store;
-
-struct Derivation : BasicDerivation
-{
     /**
-     * inputs that are sub-derivations
-     */
-    DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
-
-    /**
-     * Print a derivation.
+     * Print a derivation (only meaningful for full Derivation).
      */
     std::string unparse(
         const StoreDirConfig & store,
         bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Determine whether this derivation should be resolved before building.
@@ -354,7 +357,8 @@ struct Derivation : BasicDerivation
      * - Impure derivations always need resolution
      * - Any input derivations have outputs from dynamic derivations
      */
-    bool shouldResolve() const;
+    bool shouldResolve() const
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -365,7 +369,8 @@ struct Derivation : BasicDerivation
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const;
+    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Like the above, but instead of querying the Nix database for
@@ -375,7 +380,34 @@ struct Derivation : BasicDerivation
     std::optional<BasicDerivation> tryResolve(
         Store & store,
         fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-            queryResolutionChain) const;
+            queryResolutionChain) const
+        requires std::is_same_v<Inputs, FullInputs>;
+
+    /**
+     * Convert a BasicDerivation to a full Derivation.
+     * The resulting Derivation has empty inputDrvs since BasicDerivation
+     * is already resolved.
+     */
+    Derivation unresolve() const
+        requires std::is_same_v<Inputs, StorePathSet>;
+
+    /**
+     * Return a derivation identical to this one, but with the inputs transformed by `f`.
+     */
+    template<typename F>
+    DerivationT<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
+    {
+        return {
+            .outputs = outputs,
+            .inputs = f(inputs),
+            .platform = platform,
+            .builder = builder,
+            .args = args,
+            .env = env,
+            .structuredAttrs = structuredAttrs,
+            .name = name,
+        };
+    }
 
     /**
      * Check that the derivation is valid and does not present any
@@ -424,24 +456,8 @@ struct Derivation : BasicDerivation
      * @param store The store to use for path computation
      * @param drvName The derivation name (without .drv extension)
      */
-    void fillInOutputPaths(Store & store);
-
-    Derivation() = default;
-    Derivation(Derivation &&) = default;
-    Derivation(const Derivation &) = default;
-    Derivation & operator=(Derivation &&) = default;
-    Derivation & operator=(const Derivation &) = default;
-    ~Derivation() override;
-
-    Derivation(const BasicDerivation & bd)
-        : BasicDerivation(bd)
-    {
-    }
-
-    Derivation(BasicDerivation && bd)
-        : BasicDerivation(std::move(bd))
-    {
-    }
+    void fillInOutputPaths(Store & store)
+        requires std::is_same_v<Inputs, FullInputs>;
 
     /**
      * Parse a derivation from JSON, and also perform various
@@ -464,14 +480,34 @@ struct Derivation : BasicDerivation
      * @return A validated derivation with output paths filled in
      * @throws Error if parsing fails, output paths can't be computed, or validation fails
      */
-    static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json);
-
-    bool operator==(const Derivation &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
-    // auto operator <=> (const Derivation &) const = default;
+    static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json)
+        requires std::is_same_v<Inputs, FullInputs>;
 };
 
 class Store;
+
+template<>
+std::string DerivationT<FullInputs>::unparse(
+    const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const;
+template<>
+bool DerivationT<FullInputs>::shouldResolve() const;
+template<>
+std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(Store & store, Store * evalStore) const;
+template<>
+std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(
+    Store & store,
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+        queryResolutionChain) const;
+template<>
+void DerivationT<FullInputs>::fillInOutputPaths(Store & store);
+template<>
+Derivation DerivationT<FullInputs>::parseJsonAndValidate(Store & store, const nlohmann::json & json);
+template<>
+Derivation DerivationT<StorePathSet>::unresolve() const;
+template<>
+void DerivationT<StorePathSet>::checkInvariants(Store & store) const;
+template<>
+void DerivationT<FullInputs>::checkInvariants(Store & store) const;
 
 /**
  * Compute the store path that would be used for a derivation without writing it.
@@ -625,5 +661,9 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 } // namespace nix
 
 JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
-JSON_IMPL_WITH_XP_FEATURES(nix::BasicDerivation)
-JSON_IMPL_WITH_XP_FEATURES(nix::Derivation)
+
+namespace nlohmann {
+using namespace nix;
+template<typename Inputs>
+JSON_IMPL_WITH_XP_FEATURES_INNER(DerivationT<Inputs>);
+} // namespace nlohmann

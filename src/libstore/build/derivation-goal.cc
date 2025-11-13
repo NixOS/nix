@@ -52,7 +52,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
             return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
+                worker.store, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
@@ -164,7 +164,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         auto resolvedDrvGoal = worker.makeDerivationGoal(
             pathResolved,
-            make_ref<const Derivation>(drvResolved),
+            make_ref<const Derivation>(drvResolved.unresolve()),
             wantedOutput,
             buildMode,
             /*storeDerivation=*/true);
@@ -230,7 +230,54 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
     /* Give up on substitution for the output we want, actually build this derivation */
 
-    auto g = worker.makeDerivationBuildingGoal(drvPath, drv, buildMode, storeDerivation);
+    /* Project down to the `BasicDerivation` the builder consumes,
+       adding the outputs of the input derivations to the input
+       sources. */
+    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const FullInputs & inputs) {
+        auto srcs = inputs.srcs;
+        for (auto & [depDrvPath, depNode] : inputs.drvs.map) {
+            for (auto & outputName : depNode.value) {
+                /* Don't need to worry about `inputGoals`, because
+                   impure derivations are always resolved above. Can
+                   just use DB. This case only happens in the (older)
+                   input addressed and fixed output derivation cases. */
+                auto outMap = [&] {
+                    for (auto * drvStore : {&worker.evalStore, &worker.store})
+                        if (drvStore->isValidPath(depDrvPath))
+                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
+                    assert(false);
+                }();
+                auto outMapPath = outMap.find(outputName);
+                if (outMapPath == outMap.end()) {
+                    throw Error(
+                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                        worker.store.printStorePath(drvPath),
+                        outputName,
+                        worker.store.printStorePath(depDrvPath));
+                }
+                srcs.insert(outMapPath->second);
+            }
+        }
+        return srcs;
+    }));
+
+    if (storeDerivation) {
+        assert(drv->inputs.drvs.map.empty());
+        /* `writeDerivation` checks the derivation's references are valid,
+           so the eval store's sources must be copied over first. */
+        if (&worker.evalStore != &worker.store) {
+            RealisedPath::Set inputSrcs;
+            for (auto & i : resolvedDrv->inputs)
+                if (worker.evalStore.isValidPath(i))
+                    inputSrcs.insert(i);
+            copyClosure(worker.evalStore, worker.store, inputSrcs);
+        }
+        /* Store the resolved derivation, as part of the record of
+           what we're actually building */
+        worker.store.writeDerivation(resolvedDrv->unresolve());
+    }
+
+    auto g = worker.makeDerivationBuildingGoal(drvPath, resolvedDrv, buildMode);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
     g->preserveFailure = true;

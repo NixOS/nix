@@ -358,7 +358,8 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 }
 
 template<typename Input>
-StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivation & drv) const
+template<typename Inputs>
+StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const
 {
     // FIXME: cache this?
     StringSet res;
@@ -376,10 +377,19 @@ bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerS
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::useUidRange(const BasicDerivation & drv) const
+template<typename Inputs>
+bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs> & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
+
+// Explicit instantiations for member function templates
+template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const BasicDerivation &) const;
+template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const Derivation &) const;
+template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(const Derivation &) const;
+
+template bool DerivationOptions<StorePath>::useUidRange(const BasicDerivation &) const;
+template bool DerivationOptions<SingleDerivedPath>::useUidRange(const Derivation &) const;
 
 std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,

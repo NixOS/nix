@@ -82,7 +82,7 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
 BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     Worker worker(*this, *this);
-    auto goal = worker.makeDerivationTrampolineGoal(drvPath, OutputsSpec::All{}, drv, buildMode);
+    auto goal = worker.makeDerivationTrampolineGoal(drvPath, OutputsSpec::All{}, drv.unresolve(), buildMode);
 
     try {
         worker.run(Goals{goal});

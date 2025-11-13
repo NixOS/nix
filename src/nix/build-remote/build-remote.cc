@@ -327,18 +327,26 @@ static int main_build_remote(int argc, char ** argv)
         // This condition mirrors that: that code enforces the "rules" outlined there;
         // we do the best we can given those "rules".
         if (trustedOrLegacy || drv.type().isCA()) {
-            // Hijack the inputs paths of the derivation to include all
-            // the paths that come from the `inputDrvs` set. We don’t do
-            // that for the derivations whose `inputDrvs` is empty
-            // because:
-            //
-            // 1. It’s not needed
-            //
-            // 2. Changing the `inputSrcs` set changes the associated
-            //    output ids, which break CA derivations
-            if (!drv.inputDrvs.map.empty())
-                drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
+            BasicDerivation resolvedDrv{
+                .outputs = drv.outputs,
+                // Hijack the inputs paths of the derivation to include
+                // all the paths that come from the `inputDrvs` set. We
+                // don’t do that for the derivations whose `inputDrvs`
+                // is empty because:
+                //
+                // 1. It’s not needed
+                //
+                // 2. Changing the `inputSrcs` set changes the
+                //    associated output ids, which break CA derivations
+                .inputs = drv.inputs.drvs.map.empty() ? drv.inputs.srcs : store->parseStorePathSet(inputs),
+                .platform = drv.platform,
+                .builder = drv.builder,
+                .args = drv.args,
+                .env = drv.env,
+                .structuredAttrs = drv.structuredAttrs,
+                .name = drv.name,
+            };
+            optResult = sshStore->buildDerivation(*drvPath, resolvedDrv);
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {
