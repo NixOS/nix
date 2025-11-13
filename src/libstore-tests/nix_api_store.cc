@@ -92,6 +92,63 @@ TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
     nix_store_path_free(path);
 }
 
+TEST_F(nix_api_store_test, nix_store_path_hash)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    ASSERT_NE(path, nullptr);
+
+    nix_store_path_hash_path hash = nix_store_path_hash(path);
+
+    // Verify it's 20 bytes
+    static_assert(sizeof(hash.bytes) == 20);
+
+    // The hash should be non-zero
+    bool allZero = true;
+    for (int i = 0; i < 20; i++) {
+        if (hash.bytes[i] != 0) {
+            allZero = false;
+            break;
+        }
+    }
+    ASSERT_FALSE(allZero);
+
+    nix_store_path_free(path);
+}
+
+TEST_F(nix_api_store_test, nix_store_create_from_parts_roundtrip)
+{
+    // Parse a path
+    StorePath * original = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    EXPECT_NE(original, nullptr);
+
+    // Get its hash
+    nix_store_path_hash_path hash = nix_store_path_hash(original);
+
+    // Get its name
+    std::string name;
+    nix_store_path_name(original, OBSERVE_STRING(name));
+
+    // Reconstruct from parts
+    StorePath * reconstructed = nix_store_create_from_parts(ctx, &hash, name.c_str(), name.size());
+    assert_ctx_ok();
+    ASSERT_NE(reconstructed, nullptr);
+
+    // Should be equal
+    EXPECT_EQ(original->path, reconstructed->path);
+
+    nix_store_path_free(original);
+    nix_store_path_free(reconstructed);
+}
+
+TEST_F(nix_api_store_test, nix_store_create_from_parts_invalid_name)
+{
+    nix_store_path_hash_path hash = {};
+    // Invalid name with spaces
+    StorePath * path = nix_store_create_from_parts(ctx, &hash, "invalid name", 12);
+    ASSERT_EQ(path, nullptr);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+}
+
 TEST_F(nix_api_store_test, get_version)
 {
     std::string str;

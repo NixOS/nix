@@ -10,6 +10,10 @@
 #include "nix/store/local-fs-store.hh"
 
 #include "nix/store/globals.hh"
+#include "nix/util/base-nix-32.hh"
+
+#include <cstring>
+#include <span>
 
 extern "C" {
 
@@ -218,6 +222,44 @@ StorePath * nix_store_path_clone(const StorePath * p)
     return new StorePath{p->path};
 }
 
+nix_store_path_hash_path nix_store_path_hash(const StorePath * store_path)
+{
+    auto hashPart = store_path->path.hashPart();
+    // Decode from Nix32 (base32) encoding to raw bytes
+    auto decoded = nix::BaseNix32::decode(hashPart);
+
+    nix_store_path_hash_path result;
+    assert(decoded.size() == 20);
+    std::memcpy(result.bytes, decoded.data(), 20);
+    return result;
+}
+
+StorePath * nix_store_create_from_parts(
+    nix_c_context * context, const nix_store_path_hash_path * hash, const char * name, size_t name_len)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        // Encode the 20 raw bytes to Nix32 (base32) format
+        auto hashStr =
+            nix::BaseNix32::encode(std::span<const std::byte>(reinterpret_cast<const std::byte *>(hash->bytes), 20));
+
+        // Construct the store path basename: <hash>-<name>
+        std::string baseName;
+        baseName += hashStr;
+        baseName += "-";
+        baseName += std::string_view{name, name_len};
+
+        return new StorePath{nix::StorePath(std::move(baseName))};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_derivation * nix_derivation_clone(const nix_derivation * d)
+{
+    return new nix_derivation{d->drv};
+}
+
 nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
 {
     if (context)
@@ -226,6 +268,20 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
         return new nix_derivation{nix::Derivation::parseJsonAndValidate(*store->ptr, nlohmann::json::parse(json))};
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_derivation_to_json(
+    nix_c_context * context, const nix_derivation * drv, nix_get_string_callback callback, void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto result = static_cast<nlohmann::json>(drv->drv).dump();
+        if (callback) {
+            callback(result.data(), result.size(), userdata);
+        }
+    }
+    NIXC_CATCH_ERRS
 }
 
 StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation)
@@ -248,6 +304,75 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
         nix::RealisedPath::Set paths;
         paths.insert(path->path);
         nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_drv_from_path(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void (*callback)(void * userdata, const nix_derivation * drv),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::Derivation drv = store->ptr->derivationFromPath(path->path);
+        if (callback) {
+            const nix_derivation tmp{drv};
+            callback(userdata, &tmp);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_query_path_info(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    void * userdata,
+    nix_get_string_callback callback)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(store_path->path);
+        if (callback) {
+            auto result = info->toJSON(&*store->ptr, true).dump();
+            callback(result.data(), result.size(), userdata);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        std::span<const StorePath * const> paths_span(store_paths, num_store_paths);
+
+        std::vector<nix::DerivedPath> derived_paths;
+        for (const StorePath * store_path : paths_span) {
+            derived_paths.push_back(nix::SingleDerivedPath::Opaque{store_path->path});
+        }
+
+        auto results = store->ptr->buildPathsWithResults(derived_paths);
+        for (auto & result : results) {
+            if (callback) {
+                callback(
+                    userdata,
+                    result.path.to_string(store->ptr->config).c_str(),
+                    static_cast<nlohmann::json>(result).dump().c_str());
+            }
+        }
     }
     NIXC_CATCH_ERRS
 }
