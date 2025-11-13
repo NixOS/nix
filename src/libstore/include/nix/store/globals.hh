@@ -207,6 +207,24 @@ public:
         )",
         {"build-cores"}};
 
+    Setting<bool> useJobserver{
+        this,
+        false,
+        "use-jobserver",
+        R"(
+          Enable the GNU Make jobserver protocol for coordinated parallelism across builds. This uses a token-based system to limit total parallelism.
+
+          When enabled, Nix creates a FIFO with a limited number of tokens. Build tools that support the jobserver protocol can coordinate parallelism through this shared resource.
+        )"};
+
+    Setting<unsigned int> jobserverTokens{
+        this,
+        0,
+        "jobserver-tokens",
+        R"(
+          Number of jobserver tokens to create. If set to 0 (default), uses the value of 'cores' or the number of available CPU cores.
+        )"};
+
     /**
      * Read-only mode.  Don't copy stuff to the store, don't change
      * the database.
@@ -1446,6 +1464,9 @@ public:
 
 // FIXME: don't use a global variable.
 extern Settings settings;
+
+// Global jobserver FIFO path (set by daemon, used by derivation-builder)
+extern std::string jobserverFifoPath;
 
 /**
  * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the
