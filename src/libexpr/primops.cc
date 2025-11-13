@@ -4014,6 +4014,8 @@ static RegisterPrimOp primop_sort({
 
         1. Transitivity
 
+        If a is less than b; b is less than c. Then it follows that a is less than c
+
         ```nix
         comparator a b && comparator b c -> comparator a c
         ```
@@ -4025,6 +4027,9 @@ static RegisterPrimOp primop_sort({
         ```
 
         1. Transitivity of equivalence
+
+        If a is NOT less than b; b is NOT less then a; a and b are equal according to the comparator.
+        If b is equal to c then it follows that a is equal to c
 
         ```nix
         let equiv = a: b: (!comparator a b && !comparator b a); in
