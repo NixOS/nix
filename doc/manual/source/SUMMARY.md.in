@@ -29,6 +29,7 @@
   - [Build Trace](store/build-trace.md)
   - [Derivation Resolution](store/resolution.md)
   - [Building](store/building.md)
+  - [Secrets](store/secrets.md)
   - [Store Types](store/types/index.md)
 {{#include ./store/types/SUMMARY.md}}
   - [Appendix: Math notation](store/math-notation.md)
