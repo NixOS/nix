@@ -69,6 +69,7 @@ in
     { nodes }:
     # python
     ''
+      import functools
       import json
       import random
       import re
@@ -159,7 +160,8 @@ in
               versioned: If True, enable versioning on the bucket before populating
           """
           def decorator(test_func):
-              def wrapper():
+              @functools.wraps(test_func)
+              def wrapper(*args, **kwargs):
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
                   try:
@@ -171,7 +173,7 @@ in
                           store_url = make_s3_url(bucket)
                           for pkg in populate_bucket:
                               server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
-                      test_func(bucket)
+                      test_func(bucket, *args, **kwargs)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
                       # Clean up client store - only delete if path exists
@@ -179,6 +181,38 @@ in
                           client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
               return wrapper
           return decorator
+
+      def parametrize_url_schemes(test_func):
+          """Decorator that runs a test with both s3:// and https:// URL schemes
+
+          The decorated test receives a 'url_maker' callable that generates
+          the appropriate store URL for a given bucket. Each URL scheme gets
+          a fresh bucket (when combined with setup_s3).
+
+          Usage:
+              @parametrize_url_schemes
+              @setup_s3(populate_bucket=[PKGS['A']], public=True)
+              def test_something(bucket, url_maker):
+                  store_url = url_maker(bucket)
+                  # test code uses store_url
+          """
+          @functools.wraps(test_func)
+          def wrapper():
+              url_schemes = [
+                  ("s3://", lambda b: make_s3_url(b)),
+                  ("https://", lambda b: f"http://server:9000/{b}")
+              ]
+
+              for scheme_name, url_maker in url_schemes:
+                  print(f"\n  → Testing with {scheme_name} URLs")
+                  try:
+                      test_func(url_maker)
+                  except Exception as e:
+                      print(f"    ✗ Failed with {scheme_name} URLs")
+                      raise Exception(f"Test failed for {scheme_name} URLs: {e}") from e
+                  print(f"    ✓ All checks passed with {scheme_name} URLs")
+
+          return wrapper
 
       # ============================================================================
       # Test Functions
@@ -359,16 +393,17 @@ in
           print("  ✓ nix copy works")
           print("  ✓ Credentials cached on client")
 
+      @parametrize_url_schemes
       @setup_s3(populate_bucket=[PKGS['A'], PKGS['B']], public=True)
-      def test_public_bucket_operations(bucket):
-          """Test store operations on public bucket without credentials"""
+      def test_public_bucket_operations(bucket, url_maker):
+          """Test store operations on public bucket using both s3:// and https:// URLs"""
           print("\n=== Testing Public Bucket Operations ===")
 
-          store_url = make_s3_url(bucket)
+          store_url = url_maker(bucket)
 
           # Verify store info works without credentials
           client.succeed(f"nix store info --store '{store_url}' >&2")
-          print("  ✓ nix store info works without credentials")
+          print("  ✓ nix store info works")
 
           # Get and validate store info JSON
           info_json = client.succeed(f"nix store info --json --store '{store_url}'")
@@ -383,15 +418,123 @@ in
           verify_packages_in_store(client, [PKGS['A'], PKGS['B']], should_exist=False)
 
           # Test copy from public bucket without credentials
-          client.succeed(
+          output = client.succeed(
               f"nix copy --debug --no-check-sigs "
               f"--from '{store_url}' {PKGS['A']} {PKGS['B']} 2>&1"
           )
 
+          # For HTTPS URLs, verify no credential provider was created
+          # For s3:// URLs, credential provider might be created but works due to fallback
+          if store_url.startswith("http://") or store_url.startswith("https://"):
+              if "creating new AWS credential provider" in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception("HTTPS URLs should NOT create AWS credential provider")
+              print("  ✓ No credential provider created (HTTPS URL)")
+          else:
+              print("  ✓ S3 URL works with public bucket")
+
           # Verify packages were copied successfully
           verify_packages_in_store(client, [PKGS['A'], PKGS['B']])
+          print("  ✓ Packages successfully copied from public bucket")
 
-          print("  ✓ nix copy from public bucket works without credentials")
+      @parametrize_url_schemes
+      @setup_s3(public=True)
+      def test_fetchurl_public_bucket(bucket, url_maker):
+          """Test fetchurl with public S3 URLs using both s3:// and https:// schemes"""
+          print("\n=== Testing fetchurl with Public S3 URLs ===")
+
+          client.wait_for_unit("network-addresses-eth1.service")
+
+          # Upload a test file to the public bucket
+          test_content = "Public S3 test file content\n"
+          server.succeed(f"echo -n '{test_content}' > /tmp/public-test-file.txt")
+
+          # Calculate expected hash
+          file_hash = server.succeed(
+              "nix hash file --type sha256 --base32 /tmp/public-test-file.txt"
+          ).strip()
+
+          server.succeed(f"mc cp /tmp/public-test-file.txt minio/{bucket}/public-test.txt")
+          print("  ✓ Uploaded test file to public bucket")
+
+          # Build file URL based on bucket URL
+          bucket_url = url_maker(bucket)
+          if bucket_url.startswith("http://") or bucket_url.startswith("https://"):
+              file_url = f"{bucket_url}/public-test.txt"
+          else:
+              # s3:// URL
+              file_url = make_s3_url(bucket, path="/public-test.txt")
+
+          # Test 1: builtins.fetchurl
+          # ============================
+          output = client.succeed(
+              f"nix eval --debug --impure --expr "
+              f"'builtins.fetchurl {{ name = \"public-test\"; url = \"{file_url}\"; }}' 2>&1"
+          )
+
+          # For HTTPS URLs, verify no AWS credential handling
+          if file_url.startswith("http://") or file_url.startswith("https://"):
+              if "creating new AWS credential provider" in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception("HTTPS URLs should not trigger AWS credential providers")
+
+              if "Pre-resolving AWS credentials" in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception("HTTPS URLs should not trigger credential pre-resolution")
+
+              print("  ✓ No AWS credential handling for HTTPS URL")
+          else:
+              print("  ✓ S3 URL works with public bucket")
+
+          print("  ✓ builtins.fetchurl successful")
+
+          # Test 2: import <nix/fetchurl.nix> (fixed-output derivation)
+          # ===========================================================
+          print("\n  Testing import <nix/fetchurl.nix>...")
+
+          test_id = random.randint(0, 10000)
+          test_url = f"{file_url}?test_id={test_id}"
+
+          fetchurl_expr = """
+              import <nix/fetchurl.nix> {{
+                  name = "public-fork-test-{id}";
+                  url = "{url}";
+                  sha256 = "{hash}";
+              }}
+          """.format(id=test_id, url=test_url, hash=file_hash)
+
+          build_output = client.succeed(
+              f"nix build --debug --impure --no-link --expr '{fetchurl_expr}' 2>&1"
+          )
+
+          # Verify fork behavior
+          if "builtin:fetchurl creating fresh FileTransfer instance" not in build_output:
+              print("Debug output:")
+              print(build_output)
+              raise Exception("Expected FileTransfer creation in forked process")
+
+          print("    ✓ Forked process creates fresh FileTransfer")
+
+          # For HTTPS URLs, verify no AWS credential handling in fork
+          if file_url.startswith("http://") or file_url.startswith("https://"):
+              if "creating new AWS credential provider" in build_output:
+                  print("Debug output:")
+                  print(build_output)
+                  raise Exception("HTTPS URLs should not create AWS credential providers in fork")
+
+              if "Pre-resolving AWS credentials" in build_output or "Using pre-resolved AWS credentials" in build_output:
+                  print("Debug output:")
+                  print(build_output)
+                  raise Exception("HTTPS URLs should not trigger credential pre-resolution")
+
+              print("    ✓ No AWS credential handling in forked process")
+          else:
+              print("    ✓ S3 URL works in forked process")
+
+          print("  ✓ import <nix/fetchurl.nix> successful")
 
       @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
@@ -787,6 +930,7 @@ in
       test_fork_credential_preresolution()
       test_store_operations()
       test_public_bucket_operations()
+      test_fetchurl_public_bucket()
       test_url_format_variations()
       test_concurrent_fetches()
       test_compression_narinfo_gzip()
