@@ -1747,18 +1747,18 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputSrcs.insert(j);
+                        drv.inputs.srcs.insert(j);
                         if (j.isDerivation()) {
-                            drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            drv.inputs.drvs.map[j].value = state.store->readDerivation(j).outputNames();
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.drvs.ensureSlot(*b.drvPath).value.insert(b.output);
                 },
                 [&](const NixStringContextElem::Opaque & o) {
                     state.ensureLazyPathCopied(o.path);
-                    drv.inputSrcs.insert(o.path);
+                    drv.inputs.srcs.insert(o.path);
                 },
             },
             c.raw);

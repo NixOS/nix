@@ -52,7 +52,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
             return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
+                worker.store, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
@@ -160,7 +160,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         auto resolvedDrvGoal = worker.makeDerivationGoal(
             pathResolved,
-            make_ref<const Derivation>(drvResolved),
+            make_ref<const Derivation>(drvResolved.unresolve()),
             wantedOutput,
             buildMode,
             /*storeDerivation=*/true);

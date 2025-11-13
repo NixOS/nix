@@ -88,6 +88,7 @@ private:
         PathLocks outputLocks);
     Co buildLocally(
         LocalBuildCapability localBuildCap,
+        BasicDerivation resolvedDrv,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
@@ -96,7 +97,7 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
+    HookReply tryBuildHook(const BasicDerivation & resolvedDrv, const DerivationOptions<StorePath> & drvOptions);
 
     Done doneFailureLogTooLong(BuildLog & buildLog);
 

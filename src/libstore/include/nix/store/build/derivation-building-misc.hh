@@ -9,7 +9,11 @@
 namespace nix {
 
 class Store;
-struct Derivation;
+
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using Derivation = DerivationT<FullInputs>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,

@@ -155,13 +155,13 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
        are (resolved) derivation outputs in a resolved derivation. */
     if (&worker.evalStore != &worker.store) {
         RealisedPath::Set inputSrcs;
-        for (auto & i : drv->inputSrcs)
+        for (auto & i : drv->inputs.srcs)
             if (worker.evalStore.isValidPath(i))
                 inputSrcs.insert(i);
         copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
-    for (auto & i : drv->inputSrcs) {
+    for (auto & i : drv->inputs.srcs) {
         if (worker.store.isValidPath(i))
             continue;
         if (!worker.settings.useSubstitutes)
@@ -193,7 +193,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     /* Determine the full set of input paths. */
 
     if (storeDerivation) {
-        assert(drv->inputDrvs.map.empty());
+        assert(drv->inputs.drvs.map.empty());
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
         worker.store.writeDerivation(*drv);
@@ -204,7 +204,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     {
         /* If we get this far, we know no dynamic drvs inputs */
 
-        for (auto & [depDrvPath, depNode] : drv->inputDrvs.map) {
+        for (auto & [depDrvPath, depNode] : drv->inputs.drvs.map) {
             for (auto & outputName : depNode.value) {
                 /* Don't need to worry about `inputGoals`, because
                    impure derivations are always resolved above. Can
@@ -232,7 +232,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     }
 
     /* Second, the input sources. */
-    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
+    worker.store.computeFSClosure(drv->inputs.srcs, inputPaths);
 
     debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
               return "'" + worker.store.printStorePath(p) + "'";
@@ -336,36 +336,26 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
+    /* Project down to the `BasicDerivation` the builder consumes. */
+    BasicDerivation resolvedDrv{
+        .outputs = drv->outputs,
+        .inputs = drv->inputs.srcs,
+        .platform = drv->platform,
+        .builder = drv->builder,
+        .args = drv->args,
+        .env = drv->env,
+        .structuredAttrs = drv->structuredAttrs,
+        .name = drv->name,
+    };
+
     auto drvOptions = [&] {
-        DerivationOptions<SingleDerivedPath> temp;
         try {
-            temp =
-                derivationOptionsFromStructuredAttrs(worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
+            return derivationOptionsFromStructuredAttrs(
+                worker.store, resolvedDrv.env, get(resolvedDrv.structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
         }
-
-        auto res = tryResolve(
-            temp,
-            [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
-                try {
-                    return resolveDerivedPath(
-                        worker.store, SingleDerivedPath::Built{drvPath, outputName}, &worker.evalStore);
-                } catch (Error &) {
-                    return std::nullopt;
-                }
-            });
-
-        /* The derivation must have all of its inputs gotten this point,
-           so the resolution will surely succeed.
-
-           (Actually, we shouldn't even enter this goal until we have a
-           resolved derivation, or derivation with only input addressed
-           transitive inputs, so this should be a no-opt anyways.)
-         */
-        assert(res);
-        return *res;
     }();
 
     std::map<std::string, InitialOutput> initialOutputs;
@@ -521,7 +511,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (tryBuildHook(resolvedDrv, drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -532,8 +522,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 // We should do it ourselves.
                 co_return Return{};
             case rpPostpone:
-                /* Not now; wait until at least one child finishes or
-                   the wake-up timeout expires. */
                 break;
             }
         }
@@ -554,7 +542,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (tryBuildHook(resolvedDrv, drvOptions)) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
                        EOF from the hook. */
@@ -590,7 +578,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 
             valid = true;
             co_return buildLocally(
-                *cap, std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                *cap,
+                resolvedDrv,
+                std::move(inputPaths),
+                std::move(initialOutputs),
+                std::move(drvOptions),
+                std::move(outputLocks));
         }
 
         co_return Return{};
@@ -860,6 +853,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 
 Goal::Co DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
+    BasicDerivation resolvedDrv,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -975,7 +969,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             DerivationBuilderParams params{
                 .drvPath = drvPath,
                 .buildResult = buildResult,
-                .drv = *drv,
+                .drv = resolvedDrv,
                 .drvOptions = drvOptions,
                 .inputPaths = inputPaths,
                 .initialOutputs = initialOutputs,
@@ -1187,7 +1181,8 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const BasicDerivation & resolvedDrv, const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1205,7 +1200,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         /* Send the request to the hook. */
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
                           << drv->platform << worker.store.printStorePath(drvPath)
-                          << drvOptions.getRequiredSystemFeatures(*drv);
+                          << drvOptions.getRequiredSystemFeatures(resolvedDrv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating

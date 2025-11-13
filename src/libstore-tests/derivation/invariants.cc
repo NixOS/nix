@@ -216,7 +216,7 @@ TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
         {"out", ""},
     };
     // Add the real input derivation dependency
-    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     // Serialize before state
     checkpointJson("depends-on-drv-pre", drv);
@@ -252,7 +252,7 @@ TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeffered)
         {"out", ""},
     };
     // Add the real input derivation dependency
-    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     // Serialize before state
     checkpointJson("bad-depends-on-drv-pre", drv);
