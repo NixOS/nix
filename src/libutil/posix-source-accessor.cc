@@ -7,8 +7,9 @@
 
 namespace nix {
 
-PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot)
+PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
     : root(std::move(argRoot))
+    , trackLastModified(trackLastModified)
 {
     assert(root.empty() || root.is_absolute());
     displayPrefix = root.string();
@@ -19,11 +20,11 @@ PosixSourceAccessor::PosixSourceAccessor()
 {
 }
 
-SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path)
+SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path, bool trackLastModified)
 {
     std::filesystem::path path2 = absPath(path);
     return {
-        make_ref<PosixSourceAccessor>(path2.root_path()),
+        make_ref<PosixSourceAccessor>(path2.root_path(), trackLastModified),
         CanonPath{path2.relative_path().string()},
     };
 }
@@ -114,9 +115,12 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     auto st = cachedLstat(path);
     if (!st)
         return std::nullopt;
-    // This makes the accessor thread-unsafe, but we only seem to use the actual value in a single threaded context in
-    // `src/libfetchers/path.cc`.
-    mtime = std::max(mtime, st->st_mtime);
+
+    /* The contract is that trackLastModified implies that the caller uses the accessor
+       from a single thread. Thus this is not a CAS loop. */
+    if (trackLastModified)
+        mtime = std::max(mtime, st->st_mtime);
+
     return Stat{
         .type = S_ISREG(st->st_mode)   ? tRegular
                 : S_ISDIR(st->st_mode) ? tDirectory
