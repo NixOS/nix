@@ -372,7 +372,8 @@ static Flake getFlake(
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
-    auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, state.store, originalRef.input, useRegistries);
 
     auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
@@ -388,7 +389,8 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, fetchers::UseRegistries::No);
+        auto cachedInput2 = state.inputCache->getAccessor(
+            state.fetchSettings, state.store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -704,7 +706,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                            this input. */
                         debug("creating new input '%s'", inputAttrPathS);
 
-                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked() && !input.ref->input.isRelative())
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked(state.fetchSettings)
+                            && !input.ref->input.isRelative())
                             throw Error("cannot update unlocked flake input '%s' in pure mode", inputAttrPathS);
 
                         /* Note: in case of an --override-input, we use
@@ -753,7 +756,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto cachedInput = state.inputCache->getAccessor(
-                                        state.store, input.ref->input, useRegistriesInputs);
+                                        state.fetchSettings, state.store, input.ref->input, useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 

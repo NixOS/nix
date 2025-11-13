@@ -131,9 +131,9 @@ std::shared_ptr<Registry> getFlagRegistry(const Settings & settings)
     return flagRegistry;
 }
 
-void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
+void overrideRegistry(const Settings & settings, const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    getFlagRegistry(*from.settings)->add(from, to, extraAttrs);
+    getFlagRegistry(settings)->add(from, to, extraAttrs);
 }
 
 static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, ref<Store> store)
@@ -172,7 +172,8 @@ Registries getRegistries(const Settings & settings, ref<Store> store)
     return registries;
 }
 
-std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & _input, UseRegistries useRegistries)
+std::pair<Input, Attrs>
+lookupInRegistries(const Settings & settings, ref<Store> store, const Input & _input, UseRegistries useRegistries)
 {
     Attrs extraAttrs;
     int n = 0;
@@ -187,7 +188,7 @@ restart:
     if (n > 100)
         throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
-    for (auto & registry : getRegistries(*input.settings, store)) {
+    for (auto & registry : getRegistries(settings, store)) {
         if (useRegistries == UseRegistries::Limited
             && !(registry->type == fetchers::Registry::Flag || registry->type == fetchers::Registry::Global))
             continue;

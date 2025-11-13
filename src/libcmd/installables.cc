@@ -185,6 +185,7 @@ MixFlakeOptions::MixFlakeOptions()
                     }
 
                     overrideRegistry(
+                        fetchSettings,
                         fetchers::Input::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", inputName}}),
                         input3->lockedRef.input,
                         extraAttrs);
