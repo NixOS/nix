@@ -109,7 +109,7 @@ public:
     /**
      * Build result.
      */
-    BuildResult buildResult;
+    BuildResult buildResult = {.inner = BuildResult::Failure{.status = BuildResult::Failure::Cancelled}};
 
     /**
      * Suspend our goal and wait until we get `work`-ed again.
