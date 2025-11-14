@@ -103,9 +103,9 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto path2 = PosixSourceAccessor::createAtRoot(path);
+    auto path2 = PosixSourceAccessor::createAtRoot(path, /*trackLastModified=*/true);
     path2.dumpPath(sink, filter);
-    return path2.accessor.dynamic_pointer_cast<PosixSourceAccessor>()->mtime;
+    return path2.accessor->getLastModified().value();
 }
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
