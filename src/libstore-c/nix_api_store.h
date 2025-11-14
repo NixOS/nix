@@ -259,11 +259,11 @@ nix_err nix_store_get_fs_closure(
  * @param[in] callback The callback to call
  * @param[in] userdata The userdata to pass to the callback
  */
-nix_err nix_store_drv_from_path(
+nix_err nix_store_drv_from_store_path(
     nix_c_context * context,
     Store * store,
     const StorePath * path,
-    void (*callback)(void * userdata, const nix_derivation * drv),
+    nix_err (*callback)(nix_c_context * return_ctx, void * userdata, const nix_derivation * drv),
     void * userdata);
 
 /**
@@ -300,7 +300,7 @@ nix_err nix_store_build_paths(
     Store * store,
     const StorePath ** store_paths,
     unsigned int num_store_paths,
-    void (*callback)(void * userdata, const char * path, const char * result),
+    nix_err (*callback)(nix_c_context * ctx, void * userdata, const char * path, const char * result),
     void * userdata);
 
 // cffi end

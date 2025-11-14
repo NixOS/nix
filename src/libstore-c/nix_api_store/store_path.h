@@ -65,7 +65,7 @@ typedef struct nix_store_path_hash_path
  * @param[in] store_path the path to get the hash from
  * @return the decoded hash as 20 raw bytes
  */
-nix_store_path_hash_path nix_store_path_hash(const StorePath * store_path);
+nix_err nix_store_path_hash(const StorePath *store_path, nix_store_path_hash_part * hash_part_out);
 
 /**
  * @brief Create a StorePath from its constituent parts (hash and name)
