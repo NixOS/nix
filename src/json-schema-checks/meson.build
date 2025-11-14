@@ -63,6 +63,19 @@ schemas = [
       'with-signature.json',
     ],
   },
+  # Derivation options
+  {
+    'stem' : 'derivation-options',
+    'schema' : schema_dir / 'derivation-options-v1.yaml',
+    'files' : [
+      'ia' / 'defaults.json',
+      'ia' / 'all_set.json',
+      'ia' / 'structuredAttrs_defaults.json',
+      'ia' / 'structuredAttrs_all_set.json',
+      'ca' / 'all_set.json',
+      'ca' / 'structuredAttrs_all_set.json',
+    ],
+  },
 ]
 
 # Derivation and Derivation output

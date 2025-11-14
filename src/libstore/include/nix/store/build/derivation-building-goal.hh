@@ -52,8 +52,6 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
-    std::unique_ptr<DerivationOptions> drvOptions;
-
     /**
      * The remainder is state held during the build.
      */
@@ -115,7 +113,8 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const std::map<std::string, InitialOutput> & initialOutputs);
+    HookReply tryBuildHook(
+        const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions);
 
     /**
      * Open a log file and a pipe to it.
