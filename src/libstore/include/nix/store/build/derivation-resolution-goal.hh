@@ -41,7 +41,7 @@ struct DerivationResolutionGoal : public Goal
      * If the derivation needed to be resolved, this is resulting
      * resolved derivations and its path.
      */
-    std::unique_ptr<std::pair<StorePath, BasicDerivation>> resolvedDrv;
+    std::unique_ptr<std::tuple<StorePath, BasicDerivation, DerivationOptions<StorePath>>> resolvedDrv;
 
     void timedOut(Error && ex) override {}
 

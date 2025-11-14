@@ -43,6 +43,8 @@ static Derivation makeSimpleDrv()
 TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
     auto drv = makeSimpleDrv();
+    drv.options =
+        derivationOptionsFromStructuredAttrs(StoreDirConfig{"/nix/store"}, drv.inputDrvs, drv.env, drv.structuredAttrs);
 
     auto path1 = writeDerivation(*store, drv, NoRepair);
     config->readOnly = true;

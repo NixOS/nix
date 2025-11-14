@@ -18,7 +18,10 @@ std::string & DesugaredEnv::atFileEnvPair(std::string_view name, std::string fil
 }
 
 DesugaredEnv DesugaredEnv::create(
-    Store & store, const Derivation & drv, const DerivationOptions & drvOptions, const StorePathSet & inputPaths)
+    Store & store,
+    const Derivation & drv,
+    const DerivationOptions<StorePath> & drvOptions,
+    const StorePathSet & inputPaths)
 {
     DesugaredEnv res;
 
@@ -46,7 +49,7 @@ DesugaredEnv DesugaredEnv::create(
         }
 
         /* Handle exportReferencesGraph(), if set. */
-        for (auto & [fileName, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
+        for (auto & [fileName, storePaths] : drvOptions.exportReferencesGraph) {
             /* Write closure info to <fileName>. */
             res.extraFiles.insert_or_assign(
                 fileName, store.makeValidityRegistration(store.exportReferences(storePaths, inputPaths), false, false));

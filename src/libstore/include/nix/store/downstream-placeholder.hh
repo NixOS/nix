@@ -2,10 +2,22 @@
 ///@file
 
 #include "nix/util/hash.hh"
+#include "nix/util/json-impls.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
 
 namespace nix {
+
+/**
+ * A reference is either to a to-be-registered output (by name),
+ * or to an already-registered store object (by `Input`).
+ *
+ * `Ref<SingleDerivedPath` is a representation of something that can be
+ * turned into a placeholder. (Regular own-output placeholder in the
+ * first case, `DownstreamPlaceholder` in the second case.)
+ */
+template<typename Input>
+using DrvRef = std::variant<OutputName, Input>;
 
 /**
  * Downstream Placeholders are opaque and almost certainly unique values
@@ -92,3 +104,17 @@ public:
 };
 
 } // namespace nix
+
+namespace nlohmann {
+
+template<typename Item>
+struct adl_serializer<nix::DrvRef<Item>>
+{
+    static nix::DrvRef<Item> from_json(const json & json);
+    static void to_json(json & json, const nix::DrvRef<Item> & t);
+};
+
+extern template struct adl_serializer<nix::DrvRef<nix::StorePath>>;
+extern template struct adl_serializer<nix::DrvRef<nix::SingleDerivedPath>>;
+
+} // namespace nlohmann
