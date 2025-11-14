@@ -330,6 +330,7 @@ EvalState::EvalState(
         for (auto & i : settings.nixPath.get()) {
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
         }
+        // TODO: only set if nothing else is
         if (!settings.restrictEval) {
             for (auto & i : EvalSettings::getDefaultNixPath()) {
                 lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
