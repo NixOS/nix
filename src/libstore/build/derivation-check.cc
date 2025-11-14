@@ -11,7 +11,7 @@ void checkOutputs(
     Store & store,
     const StorePath & drvPath,
     const decltype(Derivation::outputs) & drvOutputs,
-    const decltype(DerivationOptions::outputChecks) & outputChecks,
+    const decltype(DerivationOptions<StorePath>::outputChecks) & outputChecks,
     const std::map<std::string, ValidPathInfo> & outputs)
 {
     std::map<Path, const ValidPathInfo &> outputsByPath;
@@ -85,7 +85,7 @@ void checkOutputs(
             return std::make_pair(std::move(pathsDone), closureSize);
         };
 
-        auto applyChecks = [&](const DerivationOptions::OutputChecks & checks) {
+        auto applyChecks = [&](const DerivationOptions<StorePath>::OutputChecks & checks) {
             if (checks.maxSize && info.narSize > *checks.maxSize)
                 throw BuildError(
                     BuildResult::Failure::OutputRejected,
@@ -105,28 +105,33 @@ void checkOutputs(
                         *checks.maxClosureSize);
             }
 
-            auto checkRefs = [&](const StringSet & value, bool allowed, bool recursive) {
+            auto checkRefs = [&](const std::set<DrvRef<StorePath>> & value, bool allowed, bool recursive) {
                 /* Parse a list of reference specifiers.  Each element must
                    either be a store path, or the symbolic name of the output
                    of the derivation (such as `out'). */
                 StorePathSet spec;
                 for (auto & i : value) {
-                    if (store.isStorePath(i))
-                        spec.insert(store.parseStorePath(i));
-                    else if (auto output = get(outputs, i))
-                        spec.insert(output->path);
-                    else {
-                        std::string outputsListing =
-                            concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
-                        throw BuildError(
-                            BuildResult::Failure::OutputRejected,
-                            "derivation '%s' output check for '%s' contains an illegal reference specifier '%s',"
-                            " expected store path or output name (one of [%s])",
-                            store.printStorePath(drvPath),
-                            outputName,
-                            i,
-                            outputsListing);
-                    }
+                    std::visit(
+                        overloaded{
+                            [&](const StorePath & path) { spec.insert(path); },
+                            [&](const OutputName & refOutputName) {
+                                if (auto output = get(outputs, refOutputName))
+                                    spec.insert(output->path);
+                                else {
+                                    std::string outputsListing =
+                                        concatMapStringsSep(", ", outputs, [](auto & o) { return o.first; });
+                                    throw BuildError(
+                                        BuildResult::Failure::OutputRejected,
+                                        "derivation '%s' output check for '%s' contains output name '%s',"
+                                        " but this is not a valid output of this derivation."
+                                        " (Valid outputs are [%s].)",
+                                        store.printStorePath(drvPath),
+                                        outputName,
+                                        refOutputName,
+                                        outputsListing);
+                                }
+                            }},
+                        i);
                 }
 
                 auto used = recursive ? getClosure(info.path).first : info.references;
@@ -180,8 +185,8 @@ void checkOutputs(
 
         std::visit(
             overloaded{
-                [&](const DerivationOptions::OutputChecks & checks) { applyChecks(checks); },
-                [&](const std::map<std::string, DerivationOptions::OutputChecks> & checksPerOutput) {
+                [&](const DerivationOptions<StorePath>::OutputChecks & checks) { applyChecks(checks); },
+                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks> & checksPerOutput) {
                     if (auto outputChecks = get(checksPerOutput, outputName))
 
                         applyChecks(*outputChecks);
