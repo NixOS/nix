@@ -408,7 +408,7 @@ void mainWrapped(int argc, char ** argv)
     settings.verboseBuild = false;
 
     // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
-    if (nix::isTTY()) {
+    if (nix::isOutputARealTerminal(StandardOutputStream::Stderr)) {
         verbosity = lvlNotice;
     } else {
         verbosity = lvlInfo;
