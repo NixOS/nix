@@ -108,22 +108,7 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     if (trackLastModified)
         mtime = std::max(mtime, st->st_mtime);
 
-    return Stat{
-        .type = S_ISREG(st->st_mode)   ? tRegular
-                : S_ISDIR(st->st_mode) ? tDirectory
-                : S_ISLNK(st->st_mode) ? tSymlink
-                : S_ISCHR(st->st_mode) ? tChar
-                : S_ISBLK(st->st_mode) ? tBlock
-                :
-#ifdef S_ISSOCK
-                S_ISSOCK(st->st_mode) ? tSocket
-                :
-#endif
-                S_ISFIFO(st->st_mode) ? tFifo
-                                      : tUnknown,
-        .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
-        .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
-    };
+    return makeStat(*st);
 }
 
 SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & path)
@@ -198,6 +183,26 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
             throw SymlinkNotAllowed(path, "path '%s' is a symlink", showPath(path));
         path.pop();
     }
+}
+
+PosixSourceAccessor::Stat PosixSourceAccessor::makeStat(const struct ::stat st)
+{
+    return Stat{
+        .type = S_ISREG(st.st_mode)   ? tRegular
+                : S_ISDIR(st.st_mode) ? tDirectory
+                : S_ISLNK(st.st_mode) ? tSymlink
+                : S_ISCHR(st.st_mode) ? tChar
+                : S_ISBLK(st.st_mode) ? tBlock
+                :
+#ifdef S_ISSOCK
+                S_ISSOCK(st.st_mode) ? tSocket
+                :
+#endif
+                S_ISFIFO(st.st_mode) ? tFifo
+                                     : tUnknown,
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
+    };
 }
 
 ref<SourceAccessor> getFSSourceAccessor()

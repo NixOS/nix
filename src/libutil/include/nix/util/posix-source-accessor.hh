@@ -82,6 +82,8 @@ public:
 
     void invalidateCache(const CanonPath & path) override;
 
+    static Stat makeStat(const struct ::stat st);
+
 private:
 
     /**
