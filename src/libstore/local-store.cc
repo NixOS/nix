@@ -1385,7 +1385,6 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of %s", name);
-            PosixSourceAccessor accessor;
             std::string hash = hashPath(
                                    PosixSourceAccessor::createAtRoot(link.path()),
                                    FileIngestionMethod::NixArchive,
