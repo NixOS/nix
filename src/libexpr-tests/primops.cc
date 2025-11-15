@@ -662,7 +662,13 @@ INSTANTIATE_TEST_SUITE_P(
         CASE(R"({ v = "bar"; __toString = self: self.v; })", "bar"),
         CASE(R"({ v = "bar"; __toString = self: self.v; outPath = "foo"; })", "bar"),
         CASE(R"({ outPath = "foo"; })", "foo"),
-        CASE(R"(./test)", "/test")));
+        CASE(
+            R"(./test)",
+// canonPath("//./test", false) on cygwin returns //./test
+#ifdef __CYGWIN__
+            "//."
+#endif
+            "/test")));
 #undef CASE
 
 TEST_F(PrimOpTest, substring)
