@@ -4,6 +4,8 @@
 #include <limits>
 
 #include "nix/expr/eval.hh"
+#include "nix/expr/value.hh"
+#include "nix/expr/static-string-data.hh"
 
 namespace nix {
 
@@ -78,7 +80,7 @@ struct LexerState
 struct ParserState
 {
     const LexerState & lexerState;
-    std::pmr::polymorphic_allocator<char> & alloc;
+    Exprs & exprs;
     SymbolTable & symbols;
     PosTable & positions;
     Expr * result;
@@ -93,8 +95,8 @@ struct ParserState
     void addAttr(
         ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
     void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
-    Formals * validateFormals(Formals * formals, PosIdx pos = noPos, Symbol arg = {});
-    Expr * stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es);
+    void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
+    Expr * stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es);
     PosIdx at(const ParserLocation & loc);
 };
 
@@ -132,11 +134,11 @@ inline void ParserState::addAttr(
                     dupAttr(attrPath, pos, j->second.pos);
                 }
             } else {
-                nested = new ExprAttrs;
+                nested = exprs.add<ExprAttrs>();
                 attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
             }
         } else {
-            nested = new ExprAttrs;
+            nested = exprs.add<ExprAttrs>();
             attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
         }
         attrs = nested;
@@ -213,17 +215,17 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
     }
 }
 
-inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Symbol arg)
+inline void ParserState::validateFormals(FormalsBuilder & formals, PosIdx pos, Symbol arg)
 {
-    std::sort(formals->formals.begin(), formals->formals.end(), [](const auto & a, const auto & b) {
+    std::sort(formals.formals.begin(), formals.formals.end(), [](const auto & a, const auto & b) {
         return std::tie(a.name, a.pos) < std::tie(b.name, b.pos);
     });
 
     std::optional<std::pair<Symbol, PosIdx>> duplicate;
-    for (size_t i = 0; i + 1 < formals->formals.size(); i++) {
-        if (formals->formals[i].name != formals->formals[i + 1].name)
+    for (size_t i = 0; i + 1 < formals.formals.size(); i++) {
+        if (formals.formals[i].name != formals.formals[i + 1].name)
             continue;
-        std::pair thisDup{formals->formals[i].name, formals->formals[i + 1].pos};
+        std::pair thisDup{formals.formals[i].name, formals.formals[i + 1].pos};
         duplicate = std::min(thisDup, duplicate.value_or(thisDup));
     }
     if (duplicate)
@@ -231,18 +233,16 @@ inline Formals * ParserState::validateFormals(Formals * formals, PosIdx pos, Sym
             {.msg = HintFmt("duplicate formal function argument '%1%'", symbols[duplicate->first]),
              .pos = positions[duplicate->second]});
 
-    if (arg && formals->has(arg))
+    if (arg && formals.has(arg))
         throw ParseError(
             {.msg = HintFmt("duplicate formal function argument '%1%'", symbols[arg]), .pos = positions[pos]});
-
-    return formals;
 }
 
 inline Expr *
-ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>> && es)
+ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es)
 {
     if (es.empty())
-        return new ExprString("");
+        return exprs.add<ExprString>(""_sds);
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -282,7 +282,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     }
 
     /* Strip spaces from each line. */
-    auto * es2 = new std::vector<std::pair<PosIdx, Expr *>>;
+    std::vector<std::pair<PosIdx, Expr *>> es2{};
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -290,7 +290,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
     const auto trimExpr = [&](Expr * e) {
         atStartOfLine = false;
         curDropped = 0;
-        es2->emplace_back(i->first, e);
+        es2.emplace_back(i->first, e);
     };
     const auto trimString = [&](const StringToken & t) {
         std::string s2;
@@ -324,7 +324,7 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2->emplace_back(i->first, new ExprString(alloc, s2));
+            es2.emplace_back(i->first, exprs.add<ExprString>(exprs.alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {
@@ -333,19 +333,17 @@ ParserState::stripIndentation(const PosIdx pos, std::vector<std::pair<PosIdx, st
 
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
-    if (es2->size() == 0) {
-        auto * const result = new ExprString("");
-        delete es2;
+    if (es2.size() == 0) {
+        auto * const result = exprs.add<ExprString>(""_sds);
         return result;
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    if (es2->size() == 1 && dynamic_cast<ExprString *>((*es2)[0].second)) {
-        auto * const result = (*es2)[0].second;
-        delete es2;
+    if (es2.size() == 1 && dynamic_cast<ExprString *>((es2)[0].second)) {
+        auto * const result = (es2)[0].second;
         return result;
     }
-    return new ExprConcatStrings(pos, true, es2);
+    return exprs.add<ExprConcatStrings>(exprs.alloc, pos, true, es2);
 }
 
 inline PosIdx LexerState::at(const ParserLocation & loc)

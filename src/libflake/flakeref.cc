@@ -64,9 +64,10 @@ std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-FlakeRef FlakeRef::resolve(ref<Store> store, fetchers::UseRegistries useRegistries) const
+FlakeRef FlakeRef::resolve(
+    const fetchers::Settings & fetchSettings, ref<Store> store, fetchers::UseRegistries useRegistries) const
 {
-    auto [input2, extraAttrs] = lookupInRegistries(store, input, useRegistries);
+    auto [input2, extraAttrs] = lookupInRegistries(fetchSettings, store, input, useRegistries);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
@@ -109,7 +110,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     std::smatch match;
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
-    assert(succeeds);
+    if (!succeeds)
+        throw Error("invalid flakeref '%s'", url);
     auto path = match[1].str();
     auto query = decodeQuery(match[3].str(), /*lenient=*/true);
     auto fragment = percentDecode(match[5].str());
@@ -286,9 +288,10 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Settings & fetchSettings, const fet
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
-std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
+std::pair<ref<SourceAccessor>, FlakeRef>
+FlakeRef::lazyFetch(const fetchers::Settings & fetchSettings, ref<Store> store) const
 {
-    auto [accessor, lockedInput] = input.getAccessor(store);
+    auto [accessor, lockedInput] = input.getAccessor(fetchSettings, store);
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};
 }
 

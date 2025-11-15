@@ -42,6 +42,7 @@ sources = files(
   'access-tokens.cc',
   'git-utils.cc',
   'git.cc',
+  'input.cc',
   'nix_api_fetchers.cc',
   'public-key.cc',
 )

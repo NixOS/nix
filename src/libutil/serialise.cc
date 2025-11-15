@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
@@ -240,6 +241,29 @@ size_t StringSource::read(char * data, size_t len)
     size_t n = s.copy(data, len, pos);
     pos += n;
     return n;
+}
+
+void StringSource::skip(size_t len)
+{
+    const size_t remain = s.size() - pos;
+    if (len > remain) {
+        pos = s.size();
+        throw EndOfFile("end of string reached");
+    }
+    pos += len;
+}
+
+CompressedSource::CompressedSource(RestartableSource & source, const std::string & compressionMethod)
+    : compressedData([&]() {
+        StringSink sink;
+        auto compressionSink = makeCompressionSink(compressionMethod, sink);
+        source.drainInto(*compressionSink);
+        compressionSink->finish();
+        return std::move(sink.s);
+    }())
+    , compressionMethod(compressionMethod)
+    , stringSource(compressedData)
+{
 }
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
@@ -501,6 +525,43 @@ size_t ChainSource::read(char * data, size_t len)
             return this->read(data, len);
         }
     }
+}
+
+std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory)
+{
+    struct RestartableSourceImpl : RestartableSource
+    {
+        RestartableSourceImpl(decltype(factory) factory_)
+            : factory_(std::move(factory_))
+            , impl(this->factory_())
+        {
+        }
+
+        decltype(factory) factory_;
+        std::unique_ptr<Source> impl = factory_();
+
+        size_t read(char * data, size_t len) override
+        {
+            return impl->read(data, len);
+        }
+
+        bool good() override
+        {
+            return impl->good();
+        }
+
+        void skip(size_t len) override
+        {
+            return impl->skip(len);
+        }
+
+        void restart() override
+        {
+            impl = factory_();
+        }
+    };
+
+    return std::make_unique<RestartableSourceImpl>(std::move(factory));
 }
 
 } // namespace nix

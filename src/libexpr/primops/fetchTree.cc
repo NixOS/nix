@@ -82,7 +82,7 @@ struct FetchTreeParams
 static void fetchTree(
     EvalState & state, const PosIdx pos, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
 {
-    fetchers::Input input{state.fetchSettings};
+    fetchers::Input input{};
     NixStringContext context;
     std::optional<std::string> type;
     auto fetcher = params.isFetchGit ? "fetchGit" : "fetchTree";
@@ -194,9 +194,9 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchSettings, state.store, input, fetchers::UseRegistries::Limited).first;
 
-    if (state.settings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
             warn(
                 "Input '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
@@ -219,7 +219,8 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto cachedInput = state.inputCache->getAccessor(state.store, input, fetchers::UseRegistries::No);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, state.store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
@@ -317,76 +318,10 @@ static RegisterPrimOp primop_fetchTree({
             > }
             > ```
 
-      - `"tarball"`
-
-        Download a tar archive and extract it into the Nix store.
-        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
-
-        - `url` (String, required)
-
-           > **Example**
-           >
-           > ```nix
-           > fetchTree {
-           >   type = "tarball";
-           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
-           > }
-           > ```
-
       - `"git"`
 
         Fetch a Git tree and copy it to the Nix store.
         This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
-
-        - `url` (String, required)
-
-          The URL formats supported are the same as for Git itself.
-
-          > **Example**
-          >
-          > ```nix
-          > fetchTree {
-          >   type = "git";
-          >   url = "git@github.com:NixOS/nixpkgs.git";
-          > }
-          > ```
-
-          > **Note**
-          >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
-
-        - `ref` (String, optional)
-
-          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
-
-          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
-
-          Default: `"HEAD"`
-
-        - `rev` (String, optional)
-
-          A Git revision; a commit hash.
-
-          Default: the tip of `ref`
-
-        - `shallow` (Bool, optional)
-
-          Make a shallow clone when fetching the Git tree.
-          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
-
-          Default: `true`
-
-        - `submodules` (Bool, optional)
-
-          Also fetch submodules if available.
-
-          Default: `false`
-
-        - `lfs` (Bool, optional)
-
-          Fetch any [Git LFS](https://git-lfs.com/) files.
-
-          Default: `false`
 
         - `allRefs` (Bool, optional)
 
@@ -405,12 +340,78 @@ static RegisterPrimOp primop_fetchTree({
           If set, pass through the value to the output attribute set.
           Otherwise, generated from the fetched Git tree.
 
+        - `lfs` (Bool, optional)
+
+          Fetch any [Git LFS](https://git-lfs.com/) files.
+
+          Default: `false`
+
+        - `ref` (String, optional)
+
+          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
+
+          Default: `"HEAD"`
+
+        - `rev` (String, optional)
+
+          A Git revision; a commit hash.
+
+          Default: the tip of `ref`
+
         - `revCount` (Integer, optional)
 
           Number of revisions in the history of the Git repository before the fetched commit.
 
           If set, pass through the value to the output attribute set.
           Otherwise, generated from the fetched Git tree.
+
+        - `shallow` (Bool, optional)
+
+          Make a shallow clone when fetching the Git tree.
+          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
+
+          Default: `true`
+
+        - `submodules` (Bool, optional)
+
+          Also fetch submodules if available.
+
+          Default: `false`
+
+        - `url` (String, required)
+
+          The URL formats supported are the same as for Git itself.
+
+          > **Example**
+          >
+          > ```nix
+          > fetchTree {
+          >   type = "git";
+          >   url = "git@github.com:NixOS/nixpkgs.git";
+          > }
+          > ```
+
+          > **Note**
+          >
+          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+
+      - `"tarball"`
+
+        Download a tar archive and extract it into the Nix store.
+        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+
+        - `url` (String, required)
+
+           > **Example**
+           >
+           > ```nix
+           > fetchTree {
+           >   type = "tarball";
+           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
+           > }
+           > ```
 
       The following input types are still subject to change:
 

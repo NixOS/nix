@@ -117,11 +117,11 @@ struct UnkeyedValidPathInfo
      * @param includeImpureInfo If true, variable elements such as the
      * registration time are included.
      */
-    virtual nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const;
-    static UnkeyedValidPathInfo fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
+    virtual nlohmann::json toJSON(const StoreDirConfig * store, bool includeImpureInfo) const;
+    static UnkeyedValidPathInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
 };
 
-struct ValidPathInfo : UnkeyedValidPathInfo
+struct ValidPathInfo : virtual UnkeyedValidPathInfo
 {
     StorePath path;
 
@@ -174,10 +174,14 @@ struct ValidPathInfo : UnkeyedValidPathInfo
 
     ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info)
         : UnkeyedValidPathInfo(info)
-        , path(std::move(path)) {};
+        , path(std::move(path))
+    {
+    }
+
     ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info)
-        : UnkeyedValidPathInfo(info)
-        , path(path) {};
+        : ValidPathInfo(StorePath{path}, std::move(info))
+    {
+    }
 
     static ValidPathInfo
     makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
@@ -191,3 +195,6 @@ static_assert(std::is_move_constructible_v<ValidPathInfo>);
 using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 } // namespace nix
+
+JSON_IMPL(nix::UnkeyedValidPathInfo)
+JSON_IMPL(nix::ValidPathInfo)

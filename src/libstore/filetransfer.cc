@@ -295,20 +295,17 @@ struct curlFileTransfer : public FileTransfer
             return 0;
         }
 
-        size_t readOffset = 0;
-
-        size_t readCallback(char * buffer, size_t size, size_t nitems)
-        {
-            if (readOffset == request.data->length())
-                return 0;
-            auto count = std::min(size * nitems, request.data->length() - readOffset);
-            assert(count);
-            memcpy(buffer, request.data->data() + readOffset, count);
-            readOffset += count;
-            return count;
+        size_t readCallback(char * buffer, size_t size, size_t nitems) noexcept
+        try {
+            auto data = request.data;
+            return data->source->read(buffer, nitems * size);
+        } catch (EndOfFile &) {
+            return 0;
+        } catch (...) {
+            return CURL_READFUNC_ABORT;
         }
 
-        static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp)
+        static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp) noexcept
         {
             return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
@@ -322,19 +319,24 @@ struct curlFileTransfer : public FileTransfer
         }
 #endif
 
-        size_t seekCallback(curl_off_t offset, int origin)
-        {
+        size_t seekCallback(curl_off_t offset, int origin) noexcept
+        try {
+            auto source = request.data->source;
             if (origin == SEEK_SET) {
-                readOffset = offset;
+                source->restart();
+                source->skip(offset);
             } else if (origin == SEEK_CUR) {
-                readOffset += offset;
+                source->skip(offset);
             } else if (origin == SEEK_END) {
-                readOffset = request.data->length() + offset;
+                NullSink sink{};
+                source->drainInto(sink);
             }
             return CURL_SEEKFUNC_OK;
+        } catch (...) {
+            return CURL_SEEKFUNC_FAIL;
         }
 
-        static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin)
+        static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
             return ((TransferItem *) clientp)->seekCallback(offset, origin);
         }
@@ -384,28 +386,30 @@ struct curlFileTransfer : public FileTransfer
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.head)
+            if (request.method == HttpMethod::HEAD)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
+            if (request.method == HttpMethod::DELETE)
+                curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
+
             if (request.data) {
-                if (request.post)
+                if (request.method == HttpMethod::POST) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
-                else
+                    curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->sizeHint);
+                } else if (request.method == HttpMethod::PUT) {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
+                    curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->sizeHint);
+                } else {
+                    unreachable();
+                }
                 curl_easy_setopt(req, CURLOPT_READFUNCTION, readCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_READDATA, this);
-                curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->length());
                 curl_easy_setopt(req, CURLOPT_SEEKFUNCTION, seekCallbackWrapper);
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
-            if (request.verifyTLS) {
-                if (settings.caFile != "")
-                    curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
-            } else {
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYPEER, 0);
-                curl_easy_setopt(req, CURLOPT_SSL_VERIFYHOST, 0);
-            }
+            if (settings.caFile != "")
+                curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
 
 #if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
@@ -596,7 +600,14 @@ struct curlFileTransfer : public FileTransfer
                     decompressionSink.reset();
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    fileTransfer.enqueueItem(shared_from_this());
+                    try {
+                        fileTransfer.enqueueItem(shared_from_this());
+                    } catch (const nix::Error & e) {
+                        // If enqueue fails (e.g., during shutdown), fail the transfer properly
+                        // instead of letting the exception propagate, which would leave done=false
+                        // and cause the destructor to attempt a second callback invocation
+                        fail(std::move(exc));
+                    }
                 } else
                     fail(std::move(exc));
             }
@@ -622,7 +633,7 @@ struct curlFileTransfer : public FileTransfer
         void quit()
         {
             quitting = true;
-            /* We wil not be processing any more incomming requests */
+            /* We wil not be processing any more incoming requests */
             while (!incoming.empty())
                 incoming.pop();
         }
@@ -919,6 +930,11 @@ FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
     /* Note: this method is the same as download, but helps in readability */
+    return enqueueFileTransfer(request).get();
+}
+
+FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
+{
     return enqueueFileTransfer(request).get();
 }
 

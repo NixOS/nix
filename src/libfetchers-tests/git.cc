@@ -196,7 +196,7 @@ TEST_F(GitTest, submodulePeriodSupport)
             {"ref", "main"},
         });
 
-    auto [accessor, i] = input.getAccessor(store);
+    auto [accessor, i] = input.getAccessor(settings, store);
 
     ASSERT_EQ(accessor->readFile(CanonPath("deps/sub/lib.txt")), "hello from submodule\n");
 }

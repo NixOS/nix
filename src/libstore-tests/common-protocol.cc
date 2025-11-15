@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/build-result.hh"
@@ -22,7 +23,7 @@ public:
     template<typename T>
     void readProtoTest(PathView testStem, const T & expected)
     {
-        CharacterizationTest::readTest(testStem, [&](const auto & encoded) {
+        CharacterizationTest::readTest(std::string{testStem + ".bin"}, [&](const auto & encoded) {
             T got = ({
                 StringSource from{encoded};
                 CommonProto::Serialise<T>::read(store, CommonProto::ReadConn{.from = from});
@@ -38,7 +39,7 @@ public:
     template<typename T>
     void writeProtoTest(PathView testStem, const T & decoded)
     {
-        CharacterizationTest::writeTest(testStem, [&]() -> std::string {
+        CharacterizationTest::writeTest(std::string{testStem + ".bin"}, [&]() -> std::string {
             StringSink to;
             CommonProto::Serialise<T>::write(store, CommonProto::WriteConn{.to = to}, decoded);
             return to.s;
@@ -54,6 +55,14 @@ public:
     TEST_F(CommonProtoTest, NAME##_write)        \
     {                                            \
         writeProtoTest(STEM, VALUE);             \
+    }                                            \
+    TEST_F(CommonProtoTest, NAME##_json_read)    \
+    {                                            \
+        readJsonTest(STEM, VALUE);               \
+    }                                            \
+    TEST_F(CommonProtoTest, NAME##_json_write)   \
+    {                                            \
+        writeJsonTest(STEM, VALUE);              \
     }
 
 CHARACTERIZATION_TEST(
@@ -114,13 +123,28 @@ CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
             },
-            DrvOutput{
+            {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 .outputName = "baz",
             },
         },
+        Realisation{
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures = {"asdf", "qwer"},
+            },
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
+        },
+    }))
+
+CHARACTERIZATION_TEST(
+    realisation_with_deps,
+    "realisation-with-deps",
+    (std::tuple<Realisation>{
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},

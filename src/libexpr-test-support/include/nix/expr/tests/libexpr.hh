@@ -104,9 +104,10 @@ MATCHER(IsAttrs, "")
 MATCHER_P(IsStringEq, s, fmt("The string is equal to \"%1%\"", s))
 {
     if (arg.type() != nString) {
+        *result_listener << "Expected a string got " << arg.type();
         return false;
     }
-    return std::string_view(arg.c_str()) == s;
+    return arg.string_view() == s;
 }
 
 MATCHER_P(IsIntEq, v, fmt("The string is equal to \"%1%\"", v))

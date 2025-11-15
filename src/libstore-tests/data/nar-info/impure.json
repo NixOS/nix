@@ -1,10 +1,25 @@
 {
-  "ca": "fixed:r:sha256:1lr187v6dck1rjh2j6svpikcfz53wyl3qrlcbb405zlh13x0khhh",
+  "ca": {
+    "hash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "EMIJ+giQ/gLIWoxmPKjno3zHZrxbGymgzGGyZvZBIdM="
+    },
+    "method": "nar"
+  },
   "compression": "xz",
   "deriver": "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
-  "downloadHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "downloadHash": {
+    "algorithm": "sha256",
+    "format": "base64",
+    "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+  },
   "downloadSize": 4029176,
-  "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "narHash": {
+    "algorithm": "sha256",
+    "format": "base64",
+    "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+  },
   "narSize": 34878,
   "references": [
     "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
@@ -16,5 +31,6 @@
     "qwer"
   ],
   "ultimate": true,
-  "url": "nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz"
+  "url": "nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz",
+  "version": 2
 }

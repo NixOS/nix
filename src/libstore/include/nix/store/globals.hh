@@ -77,7 +77,7 @@ public:
 
     Settings();
 
-    unsigned int getDefaultCores() const;
+    static unsigned int getDefaultCores();
 
     Path nixPrefix;
 
@@ -189,7 +189,7 @@ public:
         0,
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/store/building.md#builder-execution) of a derivation.
           The `builder` executable can use this variable to control its own maximum amount of parallelism.
 
           <!--
@@ -199,7 +199,7 @@ public:
           -->
           For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
 
-          If set to `0`, nix will detect the number of CPU cores and pass this number via NIX_BUILD_CORES.
+          If set to `0`, nix will detect the number of CPU cores and pass this number via `NIX_BUILD_CORES`.
 
           > **Note**
           >
@@ -427,7 +427,7 @@ public:
         R"(
           If set to `true`, Nix instructs [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
 
-          It means that remote build hosts fetches as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          It means that remote build hosts fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
           This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
@@ -503,7 +503,7 @@ public:
           by the Nix account, its group should be the group specified here,
           and its mode should be `1775`.
 
-          If the build users group is empty, builds areperformed under
+          If the build users group is empty, builds are performed under
           the uid of the Nix process (that is, the uid of the caller if
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used
@@ -847,8 +847,8 @@ public:
           4.  The path to the build's scratch directory. This directory
               exists only if the build was run with `--keep-failed`.
 
-          The stderr and stdout output from the diff hook isn't
-          displayed to the user. Instead, it print to the nix-daemon's log.
+          The stderr and stdout output from the diff hook isn't displayed
+          to the user. Instead, it prints to the nix-daemon's log.
 
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.

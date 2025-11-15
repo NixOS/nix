@@ -51,7 +51,7 @@ static json pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool 
             // know the name yet until we've read the NAR info.
             printedStorePath = store.printStorePath(info->path);
 
-            jsonObject = info->toJSON(store, true, HashFormat::SRI);
+            jsonObject = info->toJSON(&store, true);
 
             if (showClosureSize) {
                 StorePathSet closure;
@@ -141,7 +141,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
     void printSize(std::ostream & str, uint64_t value)
     {
         if (humanReadable)
-            str << fmt("\t%s", renderSize(value, true));
+            str << fmt("\t%s", renderSize((int64_t) value, true));
         else
             str << fmt("\t%11d", value);
     }

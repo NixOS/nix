@@ -66,10 +66,16 @@ derivation' {
   outputChecks = {
     out = {
       allowedReferences = [ foo ];
-      allowedRequisites = [ foo.dev ];
+      allowedRequisites = [
+        foo.dev
+        "bin"
+      ];
     };
     bin = {
-      disallowedReferences = [ bar ];
+      disallowedReferences = [
+        bar
+        "dev"
+      ];
       disallowedRequisites = [ bar.dev ];
     };
     dev = {

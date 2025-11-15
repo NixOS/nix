@@ -101,13 +101,24 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(
-        const std::string & path, std::shared_ptr<std::basic_iostream<char>> istream, const std::string & mimeType) = 0;
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
 
     void upsertFile(
         const std::string & path,
         // FIXME: use std::string_view
         std::string && data,
-        const std::string & mimeType);
+        const std::string & mimeType,
+        uint64_t sizeHint);
+
+    void upsertFile(
+        const std::string & path,
+        // FIXME: use std::string_view
+        std::string && data,
+        const std::string & mimeType)
+    {
+        auto size = data.size();
+        upsertFile(path, std::move(data), mimeType, size);
+    }
 
     /**
      * Dump the contents of the specified file to a sink.

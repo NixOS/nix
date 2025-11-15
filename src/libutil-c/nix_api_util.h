@@ -155,6 +155,8 @@ typedef struct nix_c_context nix_c_context;
 /**
  * @brief Called to get the value of a string owned by Nix.
  *
+ * The `start` data is borrowed and the function must not assume that the buffer persists after it returns.
+ *
  * @param[in] start the string to copy.
  * @param[in] n the string length.
  * @param[in] user_data optional, arbitrary data, passed to the nix_get_string_callback when it's called.

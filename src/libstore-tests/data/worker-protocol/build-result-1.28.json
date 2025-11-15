@@ -1,0 +1,41 @@
+[
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": false,
+    "startTime": 0,
+    "status": "OutputRejected",
+    "stopTime": 0,
+    "success": false,
+    "timesBuilt": 0
+  },
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": false,
+    "startTime": 0,
+    "status": "NotDeterministic",
+    "stopTime": 0,
+    "success": false,
+    "timesBuilt": 0
+  },
+  {
+    "builtOutputs": {
+      "bar": {
+        "dependentRealisations": {},
+        "id": "sha256:6f869f9ea2823bda165e06076fd0de4366dead2c0e8d2dbbad277d4f15c373f5!bar",
+        "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+        "signatures": []
+      },
+      "foo": {
+        "dependentRealisations": {},
+        "id": "sha256:6f869f9ea2823bda165e06076fd0de4366dead2c0e8d2dbbad277d4f15c373f5!foo",
+        "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+        "signatures": []
+      }
+    },
+    "startTime": 0,
+    "status": "Built",
+    "stopTime": 0,
+    "success": true,
+    "timesBuilt": 0
+  }
+]

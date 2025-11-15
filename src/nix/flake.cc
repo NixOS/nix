@@ -245,7 +245,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             printJSON(j);
         } else {
             logger->cout(ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s", flake.resolvedRef.to_string());
-            if (flake.lockedRef.input.isLocked())
+            if (flake.lockedRef.input.isLocked(fetchSettings))
                 logger->cout(ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s", flake.lockedRef.to_string());
             if (flake.description)
                 logger->cout(ANSI_BOLD "Description:" ANSI_NORMAL "   %s", *flake.description);
@@ -267,11 +267,9 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             if (!lockedFlake.lockFile.root->inputs.empty())
                 logger->cout(ANSI_BOLD "Inputs:" ANSI_NORMAL);
 
-            std::set<ref<Node>> visited;
+            std::set<ref<Node>> visited{lockedFlake.lockFile.root};
 
-            std::function<void(const Node & node, const std::string & prefix)> recurse;
-
-            recurse = [&](const Node & node, const std::string & prefix) {
+            [&](this const auto & recurse, const Node & node, const std::string & prefix) -> void {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
                     bool last = i + 1 == node.inputs.size();
 
@@ -298,10 +296,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                             printInputAttrPath(*follows));
                     }
                 }
-            };
-
-            visited.insert(lockedFlake.lockFile.root);
-            recurse(*lockedFlake.lockFile.root, "");
+            }(*lockedFlake.lockFile.root, "");
         }
     }
 };
@@ -367,7 +362,7 @@ struct CmdFlakeCheck : FlakeCommand
                 throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreExceptionExceptInterrupt();
+                    logError(e.info());
                     hasErrors = true;
                 } else
                     throw;
@@ -423,7 +418,7 @@ struct CmdFlakeCheck : FlakeCommand
             return std::nullopt;
         };
 
-        std::vector<DerivedPath> drvPaths;
+        std::map<DerivedPath, std::vector<AttrPath>> attrPathsByDrv;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -473,7 +468,7 @@ struct CmdFlakeCheck : FlakeCommand
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
                 }
-                if (v.lambda().fun->hasFormals() || !argHasName(v.lambda().fun->arg, "final"))
+                if (v.lambda().fun->getFormals() || !argHasName(v.lambda().fun->arg, "final"))
                     throw Error("overlay does not take an argument named 'final'");
                 // FIXME: if we have a 'nixpkgs' input, use it to
                 // evaluate the overlay.
@@ -621,7 +616,13 @@ struct CmdFlakeCheck : FlakeCommand
                                             .drvPath = makeConstantStorePathRef(*drvPath),
                                             .outputs = OutputsSpec::All{},
                                         };
-                                        drvPaths.push_back(std::move(path));
+
+                                        // Build and store the attribute path for error reporting
+                                        AttrPath attrPath;
+                                        attrPath.push_back(AttrName(state->symbols.create(name)));
+                                        attrPath.push_back(AttrName(attr.name));
+                                        attrPath.push_back(AttrName(attr2.name));
+                                        attrPathsByDrv[path].push_back(std::move(attrPath));
                                     }
                                 }
                             }
@@ -785,7 +786,9 @@ struct CmdFlakeCheck : FlakeCommand
             });
         }
 
-        if (build && !drvPaths.empty()) {
+        if (build && !attrPathsByDrv.empty()) {
+            auto keys = std::views::keys(attrPathsByDrv);
+            std::vector<DerivedPath> drvPaths(keys.begin(), keys.end());
             // TODO: This filtering of substitutable paths is a temporary workaround until
             // https://github.com/NixOS/nix/issues/5025 (union stores) is implemented.
             //
@@ -798,8 +801,6 @@ struct CmdFlakeCheck : FlakeCommand
             // via substitution, as `nix flake check` only needs to verify buildability,
             // not actually produce the outputs.
             auto missing = store->queryMissing(drvPaths);
-            // Only occurs if `drvPaths` contains a `DerivedPath::Opaque`, which should never happen
-            assert(missing.unknown.empty());
 
             std::vector<DerivedPath> toBuild;
             for (auto & path : missing.willBuild) {
@@ -811,10 +812,33 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            store->buildPaths(toBuild);
+            auto results = store->buildPathsWithResults(toBuild);
+
+            // Report build failures with attribute paths
+            for (auto & result : results) {
+                if (auto * failure = result.tryGetFailure()) {
+                    auto it = attrPathsByDrv.find(result.path);
+                    if (it != attrPathsByDrv.end() && !it->second.empty()) {
+                        for (auto & attrPath : it->second) {
+                            auto attrPathStr = showAttrPath(state->symbols, attrPath);
+                            reportError(Error(
+                                "failed to build attribute '%s', build of '%s' failed: %s",
+                                attrPathStr,
+                                result.path.to_string(*store),
+                                failure->errorMsg));
+                        }
+                    } else {
+                        // Derivation has no attribute path (e.g., a build dependency)
+                        reportError(
+                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->errorMsg));
+                    }
+                }
+            }
         }
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
+
+        logger->log(lvlInfo, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
 
         if (!omittedSystems.empty()) {
             // TODO: empty system is not visible; render all as nix strings?
@@ -884,8 +908,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         std::vector<std::filesystem::path> changedFiles;
         std::vector<std::filesystem::path> conflictedFiles;
 
-        std::function<void(const SourcePath & from, const std::filesystem::path & to)> copyDir;
-        copyDir = [&](const SourcePath & from, const std::filesystem::path & to) {
+        [&](this const auto & copyDir, const SourcePath & from, const std::filesystem::path & to) -> void {
             createDirs(to);
 
             for (auto & [name, entry] : from.readDirectory()) {
@@ -935,9 +958,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 changedFiles.push_back(to2);
                 notice("wrote: %s", to2);
             }
-        };
-
-        copyDir(templateDir, flakeDir);
+        }(templateDir, flakeDir);
 
         if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
             Strings args = {"-C", flakeDir, "add", "--intent-to-add", "--force", "--"};
@@ -1028,7 +1049,7 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(store).input.clone(destDir);
+        getFlakeRef().resolve(fetchSettings, store).input.clone(fetchSettings, destDir);
     }
 };
 
@@ -1079,7 +1100,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
                     std::optional<StorePath> storePath;
                     if (!(*inputNode)->lockedRef.input.isRelative()) {
                         storePath = dryRun ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                                           : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                                           : (*inputNode)->lockedRef.input.fetchToStore(fetchSettings, store).first;
                         sources.insert(*storePath);
                     }
                     if (json) {
@@ -1477,8 +1498,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     void run(ref<Store> store) override
     {
         auto originalRef = getFlakeRef();
-        auto resolvedRef = originalRef.resolve(store);
-        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto resolvedRef = originalRef.resolve(fetchSettings, store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(getEvalState()->fetchSettings, store);
         auto storePath =
             fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;

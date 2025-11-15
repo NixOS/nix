@@ -896,7 +896,7 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->toRealPath(path), conn.to);
+        store->narFromPath(path, conn.to);
         break;
     }
 
@@ -1031,7 +1031,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
     auto [protoVersion, features] =
         WorkerProto::BasicServerConnection::handshake(to, from, PROTOCOL_VERSION, WorkerProto::allFeatures);
 
-    if (protoVersion < 256 + 18)
+    if (protoVersion < MINIMUM_PROTOCOL_VERSION)
         throw Error("the Nix client version is too old");
 
     WorkerProto::BasicServerConnection conn;

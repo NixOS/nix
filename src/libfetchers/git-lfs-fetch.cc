@@ -209,7 +209,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     auto url = api.endpoint + "/objects/batch";
     const auto & authHeader = api.authHeader;
     FileTransferRequest request(parseURL(url));
-    request.post = true;
+    request.method = HttpMethod::POST;
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
@@ -219,7 +219,9 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
-    request.data = data.dump();
+    auto payload = data.dump();
+    StringSource source{payload};
+    request.data = {source};
 
     FileTransferResult result = getFileTransfer()->upload(request);
     auto responseString = result.data;

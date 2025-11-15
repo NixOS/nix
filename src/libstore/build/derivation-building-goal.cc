@@ -239,7 +239,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 : buildMode == bmCheck ? "checking outputs of '%s'"
                                        : "building '%s'",
                 worker.store.printStorePath(drvPath));
-        fmt("building '%s'", worker.store.printStorePath(drvPath));
 #ifndef _WIN32 // TODO enable build hook on Windows
         if (hook)
             msg += fmt(" on '%s'", hook->machineName);
@@ -287,7 +286,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         PathSet lockFiles;
         /* FIXME: Should lock something like the drv itself so we don't build same
            CA drv concurrently */
-        if (dynamic_cast<LocalStore *>(&worker.store)) {
+        if (auto * localStore = dynamic_cast<LocalStore *>(&worker.store)) {
             /* If we aren't a local store, we might need to use the local store as
                a build remote, but that would cause a deadlock. */
             /* FIXME: Make it so we can use ourselves as a build remote even if we
@@ -297,9 +296,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                */
             for (auto & i : drv->outputsAndOptPaths(worker.store)) {
                 if (i.second.second)
-                    lockFiles.insert(worker.store.Store::toRealPath(*i.second.second));
+                    lockFiles.insert(localStore->toRealPath(*i.second.second));
                 else
-                    lockFiles.insert(worker.store.Store::toRealPath(drvPath) + "." + i.first);
+                    lockFiles.insert(localStore->toRealPath(drvPath) + "." + i.first);
             }
         }
 
@@ -332,12 +331,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         /* If any of the outputs already exist but are not valid, delete
            them. */
-        for (auto & [_, status] : initialOutputs) {
-            if (!status.known || status.known->isValid())
-                continue;
-            auto storePath = status.known->path;
-            debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
-            deletePath(worker.store.Store::toRealPath(storePath));
+        if (auto * localStore = dynamic_cast<LocalFSStore *>(&worker.store)) {
+            for (auto & [_, status] : initialOutputs) {
+                if (!status.known || status.known->isValid())
+                    continue;
+                auto storePath = status.known->path;
+                debug("removing invalid path '%s'", worker.store.printStorePath(status.known->path));
+                deletePath(localStore->toRealPath(storePath));
+            }
         }
 
         /* Don't do a remote build if the derivation has the attribute
@@ -678,7 +679,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     {
         builder.reset();
         StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs) {
+        /* In the check case we install no store objects, and so
+           `builtOutputs` is empty. However, per issue #14287, there is
+           an expectation that the post-build hook is still executed.
+           (This is useful for e.g. logging successful deterministic rebuilds.)
+
+           In order to make that work, in the check case just load the
+           (preexisting) infos from scratch, rather than relying on what
+           `DerivationBuilder` returned to us. */
+        for (auto & [_, output] : buildMode == bmCheck ? checkPathValidity(initialOutputs).second : builtOutputs) {
             // for sake of `bmRepair`
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);

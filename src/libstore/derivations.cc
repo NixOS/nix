@@ -105,7 +105,7 @@ bool BasicDerivation::isBuiltin() const
     return builder.substr(0, 8) == "builtin:";
 }
 
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+static auto infoForDerivation(Store & store, const Derivation & drv)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs.map)
@@ -117,13 +117,32 @@ StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repa
     auto contents = drv.unparse(store, false);
     auto hash = hashString(HashAlgorithm::SHA256, contents);
     auto ca = TextInfo{.hash = hash, .references = references};
-    auto path = store.makeFixedOutputPathFromCA(suffix, ca);
+    return std::tuple{
+        suffix,
+        contents,
+        references,
+        store.makeFixedOutputPathFromCA(suffix, ca),
+    };
+}
 
-    if (readOnly || settings.readOnlyMode || (store.isValidPath(path) && !repair))
+StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+{
+    if (readOnly || settings.readOnlyMode) {
+        auto [_x, _y, _z, path] = infoForDerivation(store, drv);
+        return path;
+    } else
+        return store.writeDerivation(drv, repair);
+}
+
+StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
+{
+    auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
+
+    if (isValidPath(path) && !repair)
         return path;
 
     StringSource s{contents};
-    auto path2 = store.addToStoreFromDump(
+    auto path2 = addToStoreFromDump(
         s,
         suffix,
         FileSerialisationMethod::Flat,
@@ -1274,15 +1293,13 @@ void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutpu
         overloaded{
             [&](const DerivationOutput::InputAddressed & doi) { res["path"] = doi.path; },
             [&](const DerivationOutput::CAFixed & dof) {
-    /* it would be nice to output the path for user convenience, but
-       this would require us to know the store dir. */
+                res = dof.ca;
+        // FIXME print refs?
+        /* it would be nice to output the path for user convenience, but
+           this would require us to know the store dir. */
 #if 0
                 res["path"] = dof.path(store, drvName, outputName);
 #endif
-                res["method"] = std::string{dof.ca.method.render()};
-                res["hashAlgo"] = printHashAlgo(dof.ca.hash.algo);
-                res["hash"] = dof.ca.hash.to_string(HashFormat::Base16, false);
-                // FIXME print refs?
             },
             [&](const DerivationOutput::CAFloating & dof) {
                 res["method"] = std::string{dof.method.render()};
@@ -1322,15 +1339,12 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
         };
     }
 
-    else if (keys == (std::set<std::string_view>{"method", "hashAlgo", "hash"})) {
-        auto [method, hashAlgo] = methodAlgo();
+    else if (keys == (std::set<std::string_view>{"method", "hash"})) {
         auto dof = DerivationOutput::CAFixed{
-            .ca =
-                ContentAddress{
-                    .method = std::move(method),
-                    .hash = Hash::parseNonSRIUnprefixed(getString(valueAt(json, "hash")), hashAlgo),
-                },
+            .ca = static_cast<ContentAddress>(_json),
         };
+        if (dof.ca.method == ContentAddressMethod::Raw::Text)
+            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
         /* We no longer produce this (denormalized) field (for the
            reasons described above), so we don't need to check it. */
 #if 0
@@ -1367,13 +1381,15 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
+static unsigned constexpr expectedJsonVersionDerivation = 4;
+
 void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
     res = nlohmann::json::object();
 
     res["name"] = d.name;
 
-    res["version"] = 3;
+    res["version"] = expectedJsonVersionDerivation;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
@@ -1384,15 +1400,17 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     }
 
     {
-        auto & inputsList = res["inputSrcs"];
-        inputsList = nlohmann::json ::array();
-        for (auto & input : d.inputSrcs)
-            inputsList.emplace_back(input);
-    }
+        auto & inputsObj = res["inputs"];
+        inputsObj = nlohmann::json::object();
 
-    {
-        std::function<nlohmann::json(const DerivedPathMap<StringSet>::ChildNode &)> doInput;
-        doInput = [&](const auto & inputNode) {
+        {
+            auto & inputsList = inputsObj["srcs"];
+            inputsList = nlohmann::json::array();
+            for (auto & input : d.inputSrcs)
+                inputsList.emplace_back(input);
+        }
+
+        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
             auto value = nlohmann::json::object();
             value["outputs"] = inputNode.value;
             {
@@ -1403,12 +1421,11 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
             }
             return value;
         };
-        {
-            auto & inputDrvsObj = res["inputDrvs"];
-            inputDrvsObj = nlohmann::json::object();
-            for (auto & [inputDrv, inputNode] : d.inputDrvs.map) {
-                inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
-            }
+
+        auto & inputDrvsObj = inputsObj["drvs"];
+        inputDrvsObj = nlohmann::json::object();
+        for (auto & [inputDrv, inputNode] : d.inputDrvs.map) {
+            inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
         }
     }
 
@@ -1431,8 +1448,14 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     res.name = getString(valueAt(json, "name"));
 
-    if (valueAt(json, "version") != 3)
-        throw Error("Only derivation format version 3 is currently supported.");
+    {
+        auto version = getUnsigned(valueAt(json, "version"));
+        if (valueAt(json, "version") != expectedJsonVersionDerivation)
+            throw Error(
+                "Unsupported derivation JSON format version %d, only format version %d is currently supported.",
+                version,
+                expectedJsonVersionDerivation);
+    }
 
     try {
         auto outputs = getObject(valueAt(json, "outputs"));
@@ -1445,33 +1468,39 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
     }
 
     try {
-        auto inputSrcs = getArray(valueAt(json, "inputSrcs"));
-        for (auto & input : inputSrcs)
-            res.inputSrcs.insert(input);
-    } catch (Error & e) {
-        e.addTrace({}, "while reading key 'inputSrcs'");
-        throw;
-    }
+        auto inputsObj = getObject(valueAt(json, "inputs"));
 
-    try {
-        std::function<DerivedPathMap<StringSet>::ChildNode(const nlohmann::json &)> doInput;
-        doInput = [&](const auto & _json) {
-            auto & json = getObject(_json);
-            DerivedPathMap<StringSet>::ChildNode node;
-            node.value = getStringSet(valueAt(json, "outputs"));
-            auto drvs = getObject(valueAt(json, "dynamicOutputs"));
-            for (auto & [outputId, childNode] : drvs) {
-                xpSettings.require(
-                    Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
-                node.childMap[outputId] = doInput(childNode);
-            }
-            return node;
-        };
-        auto drvs = getObject(valueAt(json, "inputDrvs"));
-        for (auto & [inputDrvPath, inputOutputs] : drvs)
-            res.inputDrvs.map[StorePath{inputDrvPath}] = doInput(inputOutputs);
+        try {
+            auto inputSrcs = getArray(valueAt(inputsObj, "srcs"));
+            for (auto & input : inputSrcs)
+                res.inputSrcs.insert(input);
+        } catch (Error & e) {
+            e.addTrace({}, "while reading key 'srcs'");
+            throw;
+        }
+
+        try {
+            auto doInput = [&](this const auto & doInput, const auto & _json) -> DerivedPathMap<StringSet>::ChildNode {
+                auto & json = getObject(_json);
+                DerivedPathMap<StringSet>::ChildNode node;
+                node.value = getStringSet(valueAt(json, "outputs"));
+                auto drvs = getObject(valueAt(json, "dynamicOutputs"));
+                for (auto & [outputId, childNode] : drvs) {
+                    xpSettings.require(
+                        Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
+                    node.childMap[outputId] = doInput(childNode);
+                }
+                return node;
+            };
+            auto drvs = getObject(valueAt(inputsObj, "drvs"));
+            for (auto & [inputDrvPath, inputOutputs] : drvs)
+                res.inputDrvs.map[StorePath{inputDrvPath}] = doInput(inputOutputs);
+        } catch (Error & e) {
+            e.addTrace({}, "while reading key 'drvs'");
+            throw;
+        }
     } catch (Error & e) {
-        e.addTrace({}, "while reading key 'inputDrvs'");
+        e.addTrace({}, "while reading key 'inputs'");
         throw;
     }
 

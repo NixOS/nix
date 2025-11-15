@@ -147,7 +147,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         co_await await(std::move(waitees));
     }
     if (nrFailed != 0) {
-        co_return doneFailure({BuildResult::Failure::DependencyFailed, "resolution failed"});
+        co_return doneFailure({BuildResult::Failure::DependencyFailed, "Build failed due to failed dependency"});
     }
 
     if (resolutionGoal->resolvedDrv) {
@@ -278,7 +278,23 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 }
             }
 
-            assert(success.builtOutputs.count(wantedOutput) > 0);
+            /* If the wanted output is not in builtOutputs (e.g., because it
+               was already valid and therefore not re-registered), we need to
+               add it ourselves to ensure we return the correct information. */
+            if (success.builtOutputs.count(wantedOutput) == 0) {
+                debug(
+                    "BUG! wanted output '%s' not in builtOutputs, working around by adding it manually", wantedOutput);
+                success.builtOutputs = {{
+                    wantedOutput,
+                    {
+                        assertPathValidity(),
+                        {
+                            .drvHash = outputHash,
+                            .outputName = wantedOutput,
+                        },
+                    },
+                }};
+            }
         }
     }
 

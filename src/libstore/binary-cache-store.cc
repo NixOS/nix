@@ -76,9 +76,11 @@ std::optional<std::string> BinaryCacheStore::getNixCacheInfo()
     return getFile(cacheInfoFile);
 }
 
-void BinaryCacheStore::upsertFile(const std::string & path, std::string && data, const std::string & mimeType)
+void BinaryCacheStore::upsertFile(
+    const std::string & path, std::string && data, const std::string & mimeType, uint64_t sizeHint)
 {
-    upsertFile(path, std::make_shared<std::stringstream>(std::move(data)), mimeType);
+    auto source = restartableSourceFromFactory([data = std::move(data)]() { return make_unique<StringSource>(data); });
+    upsertFile(path, *source, mimeType, sizeHint);
 }
 
 void BinaryCacheStore::getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept
@@ -270,11 +272,19 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
+        auto source = restartableSourceFromFactory([fnTemp]() {
+            struct AutoCloseFDSource : AutoCloseFD, FdSource
+            {
+                AutoCloseFDSource(AutoCloseFD fd)
+                    : AutoCloseFD(std::move(fd))
+                    , FdSource(get())
+                {
+                }
+            };
+            return std::make_unique<AutoCloseFDSource>(toDescriptor(open(fnTemp.c_str(), O_RDONLY)));
+        });
         stats.narWrite++;
-        upsertFile(
-            narInfo->url,
-            std::make_shared<std::fstream>(fnTemp, std::ios_base::in | std::ios_base::binary),
-            "application/x-nix-nar");
+        upsertFile(narInfo->url, *source, "application/x-nix-nar", narInfo->fileSize);
     } else
         stats.narWriteAverted++;
 

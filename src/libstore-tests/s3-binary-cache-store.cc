@@ -122,4 +122,22 @@ TEST(S3BinaryCacheStore, parameterFiltering)
     EXPECT_EQ(ref.params["priority"], "10");
 }
 
+/**
+ * Test storage class configuration
+ */
+TEST(S3BinaryCacheStore, storageClassDefault)
+{
+    S3BinaryCacheStoreConfig config{"s3", "test-bucket", {}};
+    EXPECT_EQ(config.storageClass.get(), std::nullopt);
+}
+
+TEST(S3BinaryCacheStore, storageClassConfiguration)
+{
+    StringMap params;
+    params["storage-class"] = "GLACIER";
+
+    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
+    EXPECT_EQ(config.storageClass.get(), std::optional<std::string>("GLACIER"));
+}
+
 } // namespace nix

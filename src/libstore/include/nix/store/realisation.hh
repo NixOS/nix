@@ -182,5 +182,6 @@ public:
 
 } // namespace nix
 
+JSON_IMPL(nix::DrvOutput)
 JSON_IMPL(nix::UnkeyedRealisation)
 JSON_IMPL(nix::Realisation)

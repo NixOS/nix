@@ -235,7 +235,7 @@ nix_get_string(nix_c_context * context, const nix_value * value, nix_get_string_
     try {
         auto & v = check_value_in(value);
         assert(v.type() == nix::nString);
-        call_nix_get_string_callback(v.c_str(), callback, user_data);
+        call_nix_get_string_callback(v.string_view(), callback, user_data);
     }
     NIXC_CATCH_ERRS
 }

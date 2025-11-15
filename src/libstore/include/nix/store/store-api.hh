@@ -609,7 +609,7 @@ public:
     /**
      * Write a NAR dump of a store path.
      */
-    virtual void narFromPath(const StorePath & path, Sink & sink) = 0;
+    virtual void narFromPath(const StorePath & path, Sink & sink);
 
     /**
      * For each path, if it's a derivation, build it.  Building a
@@ -779,14 +779,19 @@ public:
     Derivation derivationFromPath(const StorePath & drvPath);
 
     /**
+     * Write a derivation to the Nix store, and return its path.
+     */
+    virtual StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair);
+
+    /**
      * Read a derivation (which must already be valid).
      */
-    Derivation readDerivation(const StorePath & drvPath);
+    virtual Derivation readDerivation(const StorePath & drvPath);
 
     /**
      * Read a derivation from a potentially invalid path.
      */
-    Derivation readInvalidDerivation(const StorePath & drvPath);
+    virtual Derivation readInvalidDerivation(const StorePath & drvPath);
 
     /**
      * @param [out] out Place in here the set of all store paths in the
@@ -889,16 +894,6 @@ public:
      * store setting. That is about whether *we* trust the store.
      */
     virtual std::optional<TrustedFlag> isTrustedClient() = 0;
-
-    virtual Path toRealPath(const Path & storePath)
-    {
-        return storePath;
-    }
-
-    Path toRealPath(const StorePath & storePath)
-    {
-        return toRealPath(printStorePath(storePath));
-    }
 
     /**
      * Synchronises the options of the client with those of the daemon
@@ -1009,4 +1004,10 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 std::map<DrvOutput, StorePath>
 drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);
 
+template<>
+struct json_avoids_null<TrustedFlag> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::TrustedFlag)

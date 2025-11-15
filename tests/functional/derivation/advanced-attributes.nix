@@ -58,8 +58,14 @@ derivation' {
   impureEnvVars = [ "UNICORN" ];
   __darwinAllowLocalNetworking = true;
   allowedReferences = [ foo ];
-  allowedRequisites = [ foo.dev ];
-  disallowedReferences = [ bar ];
+  allowedRequisites = [
+    foo.dev
+    "bin"
+  ];
+  disallowedReferences = [
+    bar
+    "dev"
+  ];
   disallowedRequisites = [ bar.dev ];
   requiredSystemFeatures = [
     "rainbow"

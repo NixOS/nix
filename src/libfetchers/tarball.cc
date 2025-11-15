@@ -136,11 +136,11 @@ static DownloadTarballResult downloadTarball_(
             .treeHash = treeHash,
             .lastModified = (time_t) getIntAttr(infoAttrs, "lastModified"),
             .immutableUrl = maybeGetStrAttr(infoAttrs, "immutableUrl"),
-            .accessor = getTarballCache()->getAccessor(treeHash, false, displayPrefix),
+            .accessor = settings.getTarballCache()->getAccessor(treeHash, false, displayPrefix),
         };
     };
 
-    if (cached && !getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
+    if (cached && !settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
         cached.reset();
 
     if (cached && !cached->expired)
@@ -179,7 +179,7 @@ static DownloadTarballResult downloadTarball_(
         TarArchive{path};
     })
                                                                                     : TarArchive{*source};
-    auto tarballCache = getTarballCache();
+    auto tarballCache = settings.getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
     auto tree = parseSink->flush();
@@ -224,7 +224,7 @@ ref<SourceAccessor> downloadTarball(ref<Store> store, const Settings & settings,
 
     auto input = Input::fromAttrs(settings, std::move(attrs));
 
-    return input.getAccessor(store).first;
+    return input.getAccessor(settings, store).first;
 }
 
 // An input scheme corresponding to a curl-downloadable resource.
@@ -252,7 +252,7 @@ struct CurlInputScheme : InputScheme
         if (!isValidURL(_url, requireTree))
             return std::nullopt;
 
-        Input input{settings};
+        Input input{};
 
         auto url = _url;
 
@@ -302,7 +302,7 @@ struct CurlInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
     {
-        Input input{settings};
+        Input input{};
         input.attrs = attrs;
 
         // input.locked = (bool) maybeGetStrAttr(input.attrs, "hash");
@@ -319,7 +319,7 @@ struct CurlInputScheme : InputScheme
         return url;
     }
 
-    bool isLocked(const Input & input) const override
+    bool isLocked(const Settings & settings, const Input & input) const override
     {
         return (bool) input.getNarHash();
     }
@@ -340,7 +340,8 @@ struct FileInputScheme : CurlInputScheme
                                                : (!requireTree && !hasTarballExtension(url)));
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 
@@ -348,7 +349,7 @@ struct FileInputScheme : CurlInputScheme
            the Nix store directly, since there is little deduplication
            benefit in using the Git cache for single big files like
            tarballs. */
-        auto file = downloadFile(store, *input.settings, getStrAttr(input.attrs, "url"), input.getName());
+        auto file = downloadFile(store, settings, getStrAttr(input.attrs, "url"), input.getName());
 
         auto narHash = store->queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
@@ -377,15 +378,15 @@ struct TarballInputScheme : CurlInputScheme
                                                : (requireTree || hasTarballExtension(url)));
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
     {
         auto input(_input);
 
-        auto result =
-            downloadTarball_(*input.settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
+        auto result = downloadTarball_(settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
-            auto immutableInput = Input::fromURL(*input.settings, *result.immutableUrl);
+            auto immutableInput = Input::fromURL(settings, *result.immutableUrl);
             // FIXME: would be nice to support arbitrary flakerefs
             // here, e.g. git flakes.
             if (immutableInput.getType() != "tarball")
@@ -398,7 +399,7 @@ struct TarballInputScheme : CurlInputScheme
 
         input.attrs.insert_or_assign(
             "narHash",
-            getTarballCache()->treeHashToNarHash(*input.settings, result.treeHash).to_string(HashFormat::SRI, true));
+            settings.getTarballCache()->treeHashToNarHash(settings, result.treeHash).to_string(HashFormat::SRI, true));
 
         return {result.accessor, input};
     }

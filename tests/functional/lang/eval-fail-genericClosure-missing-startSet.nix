@@ -1,0 +1,3 @@
+builtins.genericClosure {
+  operator = x: [ ];
+}

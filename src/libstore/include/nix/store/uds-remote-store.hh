@@ -68,7 +68,7 @@ struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        LocalFSStore::narFromPath(path, sink);
+        Store::narFromPath(path, sink);
     }
 
     /**

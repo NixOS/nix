@@ -8,6 +8,7 @@
 #include <iostream>
 #include <set>
 #include <vector>
+#include <ranges>
 
 #include <boost/container_hash/hash.hpp>
 
@@ -122,10 +123,47 @@ public:
         return &cs[1];
     }
 
-    struct Iterator
+    class Iterator
     {
+        /**
+         * Helper class with overloaded operator-> for "drill-down" behavior.
+         * This was a "temporary" string_view doesn't have to be stored anywhere.
+         */
+        class PointerProxy
+        {
+            std::string_view segment;
+
+        public:
+            PointerProxy(std::string_view segment_)
+                : segment(segment_)
+            {
+            }
+
+            const std::string_view * operator->() const
+            {
+                return &segment;
+            }
+        };
+
+    public:
+        using value_type = std::string_view;
+        using reference_type = const std::string_view;
+        using pointer_type = PointerProxy;
+        using difference_type = std::ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+
         std::string_view remaining;
         size_t slash;
+
+        /**
+         * Dummy default constructor required for forward iterators. Doesn't return
+         * a usable iterator.
+         */
+        Iterator()
+            : remaining()
+            , slash(0)
+        {
+        }
 
         Iterator(std::string_view remaining)
             : remaining(remaining)
@@ -133,22 +171,22 @@ public:
         {
         }
 
-        bool operator!=(const Iterator & x) const
-        {
-            return remaining.data() != x.remaining.data();
-        }
-
         bool operator==(const Iterator & x) const
         {
-            return !(*this != x);
+            return remaining.data() == x.remaining.data();
         }
 
-        const std::string_view operator*() const
+        reference_type operator*() const
         {
             return remaining.substr(0, slash);
         }
 
-        void operator++()
+        pointer_type operator->() const
+        {
+            return PointerProxy(**this);
+        }
+
+        Iterator & operator++()
         {
             if (slash == remaining.npos)
                 remaining = remaining.substr(remaining.size());
@@ -156,8 +194,18 @@ public:
                 remaining = remaining.substr(slash + 1);
                 slash = remaining.find('/');
             }
+            return *this;
+        }
+
+        Iterator operator++(int)
+        {
+            auto tmp = *this;
+            ++*this;
+            return tmp;
         }
     };
+
+    static_assert(std::forward_iterator<Iterator>);
 
     Iterator begin() const
     {
@@ -264,6 +312,8 @@ public:
 
     friend std::size_t hash_value(const CanonPath &);
 };
+
+static_assert(std::ranges::forward_range<CanonPath>);
 
 std::ostream & operator<<(std::ostream & stream, const CanonPath & path);
 

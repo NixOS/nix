@@ -12,7 +12,7 @@ namespace nix {
  * Note: Various places expect the allocated memory to be zeroed.
  */
 [[gnu::always_inline]]
-inline void * allocBytes(size_t n)
+inline void * EvalMemory::allocBytes(size_t n)
 {
     void * p;
 #if NIX_USE_BOEHMGC

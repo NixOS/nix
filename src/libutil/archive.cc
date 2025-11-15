@@ -47,12 +47,12 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
         writePadding(*size, sink);
     };
 
-    std::function<void(const CanonPath & path)> dump;
+    sink << narVersionMagic1;
 
-    dump = [&](const CanonPath & path) {
+    [&, &this_(*this)](this const auto & dump, const CanonPath & path) -> void {
         checkInterrupt();
 
-        auto st = lstat(path);
+        auto st = this_.lstat(path);
 
         sink << "(";
 
@@ -69,7 +69,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
             StringMap unhacked;
-            for (auto & i : readDirectory(path))
+            for (auto & i : this_.readDirectory(path))
                 if (archiveSettings.useCaseHack) {
                     std::string name(i.first);
                     size_t pos = i.first.find(caseHackSuffix);
@@ -92,23 +92,20 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
         }
 
         else if (st.type == tSymlink)
-            sink << "type" << "symlink" << "target" << readLink(path);
+            sink << "type" << "symlink" << "target" << this_.readLink(path);
 
         else
             throw Error("file '%s' has an unsupported type", path);
 
         sink << ")";
-    };
-
-    sink << narVersionMagic1;
-    dump(path);
+    }(path);
 }
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto path2 = PosixSourceAccessor::createAtRoot(path);
+    auto path2 = PosixSourceAccessor::createAtRoot(path, /*trackLastModified=*/true);
     path2.dumpPath(sink, filter);
-    return path2.accessor.dynamic_pointer_cast<PosixSourceAccessor>()->mtime;
+    return path2.accessor->getLastModified().value();
 }
 
 void dumpPath(const Path & path, Sink & sink, PathFilter & filter)

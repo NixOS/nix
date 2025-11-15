@@ -164,13 +164,10 @@ struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        auto parsedScheme = parseUrlScheme(url.scheme);
-        if (parsedScheme.application != "git")
+        if (url.scheme != "git" && parseUrlScheme(url.scheme).application != "git")
             return {};
 
         auto url2(url);
-        if (hasPrefix(url2.scheme, "git+"))
-            url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
         Attrs attrs;
@@ -232,7 +229,7 @@ struct GitInputScheme : InputScheme
         if (auto ref = maybeGetStrAttr(attrs, "ref"); ref && !isLegalRefName(*ref))
             throw BadURL("invalid Git branch/tag name '%s'", *ref);
 
-        Input input{settings};
+        Input input{};
         input.attrs = attrs;
         input.attrs["url"] = fixGitURL(getStrAttr(attrs, "url")).to_string();
         getShallowAttr(input);
@@ -281,7 +278,7 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void clone(const Input & input, const Path & destDir) const override
+    void clone(const Settings & settings, const Input & input, const Path & destDir) const override
     {
         auto repoInfo = getRepoInfo(input);
 
@@ -626,7 +623,7 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromCommit(ref<Store> store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromCommit(const Settings & settings, ref<Store> store, RepoInfo & repoInfo, Input && input) const
     {
         assert(!repoInfo.workdirInfo.isDirty);
 
@@ -736,13 +733,10 @@ struct GitInputScheme : InputScheme
 
         auto rev = *input.getRev();
 
-        Attrs infoAttrs({
-            {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(*input.settings, repoInfo, repoDir, rev)},
-        });
+        input.attrs.insert_or_assign("lastModified", getLastModified(settings, repoInfo, repoDir, rev));
 
         if (!getShallowAttr(input))
-            infoAttrs.insert_or_assign("revCount", getRevCount(*input.settings, repoInfo, repoDir, rev));
+            input.attrs.insert_or_assign("revCount", getRevCount(settings, repoInfo, repoDir, rev));
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
 
@@ -785,8 +779,8 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
                 attrs.insert_or_assign("lfs", Explicit<bool>{smudgeLfs});
                 attrs.insert_or_assign("allRefs", Explicit<bool>{true});
-                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
+                auto submoduleInput = fetchers::Input::fromAttrs(settings, std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
@@ -798,15 +792,12 @@ struct GitInputScheme : InputScheme
         }
 
         assert(!origRev || origRev == rev);
-        if (!getShallowAttr(input))
-            input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
         return {accessor, std::move(input)};
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromWorkdir(ref<Store> store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromWorkdir(const Settings & settings, ref<Store> store, RepoInfo & repoInfo, Input && input) const
     {
         auto repoPath = repoInfo.getPath().value();
 
@@ -838,8 +829,8 @@ struct GitInputScheme : InputScheme
                 // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
                 // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
-                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
+                auto submoduleInput = fetchers::Input::fromAttrs(settings, std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
@@ -866,12 +857,12 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign("rev", rev.gitRev());
             if (!getShallowAttr(input)) {
                 input.attrs.insert_or_assign(
-                    "revCount", rev == nullRev ? 0 : getRevCount(*input.settings, repoInfo, repoPath, rev));
+                    "revCount", rev == nullRev ? 0 : getRevCount(settings, repoInfo, repoPath, rev));
             }
 
             verifyCommit(input, repo);
         } else {
-            repoInfo.warnDirty(*input.settings);
+            repoInfo.warnDirty(settings);
 
             if (repoInfo.workdirInfo.headRev) {
                 input.attrs.insert_or_assign("dirtyRev", repoInfo.workdirInfo.headRev->gitRev() + "-dirty");
@@ -883,14 +874,14 @@ struct GitInputScheme : InputScheme
 
         input.attrs.insert_or_assign(
             "lastModified",
-            repoInfo.workdirInfo.headRev
-                ? getLastModified(*input.settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
-                : 0);
+            repoInfo.workdirInfo.headRev ? getLastModified(settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
+                                         : 0);
 
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
     {
         Input input(_input);
 
@@ -906,8 +897,8 @@ struct GitInputScheme : InputScheme
         }
 
         auto [accessor, final] = input.getRef() || input.getRev() || !repoInfo.getPath()
-                                     ? getAccessorFromCommit(store, repoInfo, std::move(input))
-                                     : getAccessorFromWorkdir(store, repoInfo, std::move(input));
+                                     ? getAccessorFromCommit(settings, store, repoInfo, std::move(input))
+                                     : getAccessorFromWorkdir(settings, store, repoInfo, std::move(input));
 
         return {accessor, std::move(final)};
     }
@@ -943,7 +934,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
-    bool isLocked(const Input & input) const override
+    bool isLocked(const Settings & settings, const Input & input) const override
     {
         auto rev = input.getRev();
         return rev && rev != nullRev;

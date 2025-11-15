@@ -409,21 +409,23 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
-ParsedURL fixGitURL(const std::string & url)
+ParsedURL fixGitURL(std::string url)
 {
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
-    if (hasPrefix(url, "file:"))
-        return parseURL(url);
-    if (url.find("://") == std::string::npos) {
+        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
         return ParsedURL{
             .scheme = "file",
             .authority = ParsedURL::Authority{},
             .path = splitString<std::vector<std::string>>(url, "/"),
         };
-    }
-    return parseURL(url);
+    auto parsed = parseURL(url);
+    // Drop the superfluous "git+" from the scheme.
+    auto scheme = parseUrlScheme(parsed.scheme);
+    if (scheme.application == "git")
+        parsed.scheme = scheme.transport;
+    return parsed;
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1

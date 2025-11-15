@@ -226,7 +226,7 @@ void RestrictedStore::narFromPath(const StorePath & path, Sink & sink)
 {
     if (!goal.isAllowed(path))
         throw InvalidPath("cannot dump unknown path '%s' in recursive Nix", printStorePath(path));
-    LocalFSStore::narFromPath(path, sink);
+    Store::narFromPath(path, sink);
 }
 
 void RestrictedStore::ensurePath(const StorePath & path)

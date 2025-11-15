@@ -9,6 +9,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/profiles.hh"
 #include "nix/expr/print-ambiguous.hh"
+#include "nix/expr/static-string-data.hh"
 
 #include <limits>
 #include <sstream>
@@ -56,7 +57,7 @@ bool createUserEnv(
 
         auto attrs = state.buildBindings(7 + outputs.size());
 
-        attrs.alloc(state.s.type).mkStringNoCopy("derivation");
+        attrs.alloc(state.s.type).mkStringNoCopy("derivation"_sds);
         attrs.alloc(state.s.name).mkString(i.queryName());
         auto system = i.querySystem();
         if (!system.empty())

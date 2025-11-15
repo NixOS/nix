@@ -102,7 +102,7 @@ But rather than somehow scanning all the other fields for inputs, Nix requires t
 
 ### System {#system}
 
-The system type on which the [`builder`](#attr-builder) executable is meant to be run.
+The system type on which the [`builder`](#builder) executable is meant to be run.
 
 A necessary condition for Nix to schedule a given derivation on some [Nix instance] is for the "system" of that derivation to match that instance's [`system` configuration option] or [`extra-platforms` configuration option].
 
@@ -245,7 +245,7 @@ If those other derivations *also* abide by this common case (and likewise for tr
   >                                                           note the ".drv"
   > ```
 
-## Extending the model to be higher-order
+## Extending the model to be higher-order {#dynamic}
 
 **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 

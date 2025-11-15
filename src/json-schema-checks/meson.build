@@ -31,27 +31,165 @@ schemas = [
     ],
   },
   {
+    'stem' : 'content-address',
+    'schema' : schema_dir / 'content-address-v1.yaml',
+    'files' : [
+      'text.json',
+      'nar.json',
+    ],
+  },
+  {
+    'stem' : 'store-path',
+    'schema' : schema_dir / 'store-path-v1.yaml',
+    'files' : [
+      'simple.json',
+    ],
+  },
+  {
+    'stem' : 'deriving-path',
+    'schema' : schema_dir / 'deriving-path-v1.yaml',
+    'files' : [
+      'single_opaque.json',
+      'single_built.json',
+      'single_built_built.json',
+    ],
+  },
+  {
+    'stem' : 'build-trace-entry',
+    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'files' : [
+      'simple.json',
+      'with-dependent-realisations.json',
+      'with-signature.json',
+    ],
+  },
+]
+
+# Derivation and Derivation output
+schemas += [
+  # Match overall
+  {
     'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml',
+    'schema' : schema_dir / 'derivation-v4.yaml',
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
     ],
   },
-  # # Not sure how to make subschema work
-  # {
-  #   'stem': 'derivation',
-  #   'schema': schema_dir / 'derivation-v3.yaml#output',
-  #   'files' : [
-  #     'output-caFixedFlat.json',
-  #     'output-caFixedNAR.json',
-  #     'output-caFixedText.json',
-  #     'output-caFloating.json',
-  #     'output-deferred.json',
-  #     'output-impure.json',
-  #     'output-inputAddressed.json',
-  #   ],
-  # },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/overall',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+      'output-caFloating.json',
+      'output-deferred.json',
+      'output-impure.json',
+      'output-inputAddressed.json',
+    ],
+  },
+  # Match exact variant
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/inputAddressed',
+    'files' : [
+      'output-inputAddressed.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFixed',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFloating',
+    'files' : [
+      'output-caFloating.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/deferred',
+    'files' : [
+      'output-deferred.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/impure',
+    'files' : [
+      'output-impure.json',
+    ],
+  },
+]
+
+# Store object info
+schemas += [
+  # Match overall
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
+    'files' : [
+      'pure.json',
+      'impure.json',
+      'empty_pure.json',
+      'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
+    'files' : [
+      'pure.json',
+      'impure.json',
+    ],
+  },
+  {
+    'stem' : 'build-result',
+    'schema' : schema_dir / 'build-result-v1.yaml',
+    'files' : [
+      'success.json',
+      'output-rejected.json',
+      'not-deterministic.json',
+    ],
+  },
+  # Match exact variant
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
+    'files' : [
+      'pure.json',
+      'empty_pure.json',
+    ],
+  },
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/impure',
+    'files' : [
+      'impure.json',
+      'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
+    'files' : [
+      'pure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
+    'files' : [
+      'impure.json',
+    ],
+  },
 ]
 
 # Validate each example against the schema
@@ -64,8 +202,6 @@ foreach schema : schemas
       stem + '-schema-valid',
       jv,
       args : [
-        '--map',
-        './hash-v1.yaml=' + schema_dir / 'hash-v1.yaml',
         'http://json-schema.org/draft-04/schema',
         schema_file,
       ],

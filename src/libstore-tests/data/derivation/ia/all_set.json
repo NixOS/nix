@@ -1,0 +1,48 @@
+{
+  "additionalSandboxProfile": "sandcastle",
+  "allowLocalNetworking": true,
+  "allowSubstitutes": false,
+  "exportReferencesGraph": {
+    "refs1": [
+      "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"
+    ],
+    "refs2": [
+      "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
+  },
+  "impureEnvVars": [
+    "UNICORN"
+  ],
+  "impureHostDeps": [
+    "/usr/bin/ditto"
+  ],
+  "noChroot": true,
+  "outputChecks": {
+    "forAllOutputs": {
+      "allowedReferences": [
+        "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"
+      ],
+      "allowedRequisites": [
+        "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
+        "bin"
+      ],
+      "disallowedReferences": [
+        "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
+        "dev"
+      ],
+      "disallowedRequisites": [
+        "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"
+      ],
+      "ignoreSelfRefs": true,
+      "maxClosureSize": null,
+      "maxSize": null
+    }
+  },
+  "passAsFile": [],
+  "preferLocalBuild": true,
+  "requiredSystemFeatures": [
+    "rainbow",
+    "uid-range"
+  ],
+  "unsafeDiscardReferences": {}
+}

@@ -10,6 +10,7 @@
 #include "nix/util/closure.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/json-utils.hh"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -126,13 +127,13 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     std::function<void(DerivedPath)> doPath;
 
-    std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> enqueueDerivedPaths;
-
-    enqueueDerivedPaths = [&](ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+    auto enqueueDerivedPaths = [&](this auto self,
+                                   ref<SingleDerivedPath> inputDrv,
+                                   const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
         if (!inputNode.value.empty())
             pool.enqueue(std::bind(doPath, DerivedPath::Built{inputDrv, inputNode.value}));
         for (const auto & [outputName, childNode] : inputNode.childMap)
-            enqueueDerivedPaths(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
+            self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
     };
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
@@ -311,22 +312,25 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
 {
-    return topoSort(
-        paths,
-        {[&](const StorePath & path) {
-            try {
-                return queryPathInfo(path)->references;
-            } catch (InvalidPath &) {
-                return StorePathSet();
-            }
-        }},
-        {[&](const StorePath & path, const StorePath & parent) {
-            return BuildError(
-                BuildResult::Failure::OutputRejected,
-                "cycle detected in the references of '%s' from '%s'",
-                printStorePath(path),
-                printStorePath(parent));
-        }});
+    auto result = topoSort(paths, {[&](const StorePath & path) {
+                               try {
+                                   return queryPathInfo(path)->references;
+                               } catch (InvalidPath &) {
+                                   return StorePathSet();
+                               }
+                           }});
+
+    return std::visit(
+        overloaded{
+            [&](const Cycle<StorePath> & cycle) -> StorePaths {
+                throw BuildError(
+                    BuildResult::Failure::OutputRejected,
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(cycle.path),
+                    printStorePath(cycle.parent));
+            },
+            [](const auto & sorted) { return sorted; }},
+        result);
 }
 
 std::map<DrvOutput, StorePath>
@@ -350,9 +354,9 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
 
     std::set<Realisation> inputRealisations;
 
-    std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumRealisations;
-
-    accumRealisations = [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+    auto accumRealisations = [&](this auto & self,
+                                 const StorePath & inputDrv,
+                                 const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
         if (!inputNode.value.empty()) {
             auto outputHashes = staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
             for (const auto & outputName : inputNode.value) {
@@ -372,7 +376,7 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
             auto d = makeConstantStorePathRef(inputDrv);
             for (const auto & [outputName, childNode] : inputNode.childMap) {
                 SingleDerivedPath next = SingleDerivedPath::Built{d, outputName};
-                accumRealisations(
+                self(
                     // TODO deep resolutions for dynamic derivations, issue #8947, would go here.
                     resolveDerivedPath(store, next, evalStore_),
                     childNode);
@@ -479,3 +483,19 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+TrustedFlag adl_serializer<TrustedFlag>::from_json(const json & json)
+{
+    return getBoolean(json) ? TrustedFlag::Trusted : TrustedFlag::NotTrusted;
+}
+
+void adl_serializer<TrustedFlag>::to_json(json & json, const TrustedFlag & trustedFlag)
+{
+    json = static_cast<bool>(trustedFlag);
+}
+
+} // namespace nlohmann

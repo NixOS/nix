@@ -1,5 +1,6 @@
-#include <unordered_set>
 #include <queue>
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "nix/cmd/command.hh"
 #include "nix/expr/eval.hh"

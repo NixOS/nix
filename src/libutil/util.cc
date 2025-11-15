@@ -132,16 +132,62 @@ std::optional<N> string2Float(const std::string_view s)
 template std::optional<double> string2Float<double>(const std::string_view s);
 template std::optional<float> string2Float<float>(const std::string_view s);
 
-std::string renderSize(uint64_t value, bool align)
+static const int64_t conversionNumber = 1024;
+
+SizeUnit getSizeUnit(int64_t value)
 {
-    static const std::array<char, 9> prefixes{{'K', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'}};
-    size_t power = 0;
-    double res = value;
-    while (res > 1024 && power < prefixes.size()) {
-        ++power;
-        res /= 1024;
+    auto unit = sizeUnits.begin();
+    uint64_t absValue = std::abs(value);
+    while (absValue > conversionNumber && unit < sizeUnits.end()) {
+        unit++;
+        absValue /= conversionNumber;
     }
-    return fmt(align ? "%6.1f %ciB" : "%.1f %ciB", power == 0 ? res / 1024 : res, prefixes.at(power));
+    return *unit;
+}
+
+std::optional<SizeUnit> getCommonSizeUnit(std::initializer_list<int64_t> values)
+{
+    assert(values.size() > 0);
+
+    auto it = values.begin();
+    SizeUnit unit = getSizeUnit(*it);
+    it++;
+
+    for (; it != values.end(); it++) {
+        if (unit != getSizeUnit(*it)) {
+            return std::nullopt;
+        }
+    }
+
+    return unit;
+}
+
+std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align)
+{
+    // bytes should also displayed as KiB => 100 Bytes => 0.1 KiB
+    auto power = std::max<std::underlying_type_t<SizeUnit>>(1, std::to_underlying(unit));
+    double denominator = std::pow(conversionNumber, power);
+    double result = (double) value / denominator;
+    return fmt(align ? "%6.1f" : "%.1f", result);
+}
+
+char getSizeUnitSuffix(SizeUnit unit)
+{
+    switch (unit) {
+#define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) \
+    case SizeUnit::name:                        \
+        return suffix;
+        NIX_UTIL_SIZE_UNITS
+#undef NIX_UTIL_DEFINE_SIZE_UNIT
+    }
+
+    assert(false);
+}
+
+std::string renderSize(int64_t value, bool align)
+{
+    SizeUnit unit = getSizeUnit(value);
+    return fmt("%s %ciB", renderSizeWithoutUnit(value, unit, align), getSizeUnitSuffix(unit));
 }
 
 bool hasPrefix(std::string_view s, std::string_view prefix)
@@ -254,11 +300,6 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
             line = line.substr(0, line.size() - 1);
         return {line, s.substr(newline + 1)};
     }
-}
-
-std::string showBytes(uint64_t bytes)
-{
-    return fmt("%.2f MiB", bytes / (1024.0 * 1024.0));
 }
 
 } // namespace nix

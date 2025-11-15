@@ -1,10 +1,15 @@
 {
   "ca": null,
   "deriver": null,
-  "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "narHash": {
+    "algorithm": "sha256",
+    "format": "base64",
+    "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+  },
   "narSize": 0,
   "references": [],
   "registrationTime": null,
   "signatures": [],
-  "ultimate": false
+  "ultimate": false,
+  "version": 2
 }

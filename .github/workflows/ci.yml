@@ -14,6 +14,10 @@ on:
         default: true
         type: boolean
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions: read-all
 
 jobs:
@@ -29,6 +33,7 @@ jobs:
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        use_cache: false
     - run: nix flake show --all-systems --json
 
   pre-commit-checks:
@@ -41,7 +46,6 @@ jobs:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
           extra_nix_config: experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: ./ci/gha/tests/pre-commit-checks
 
   basic-checks:
@@ -92,7 +96,6 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -122,13 +125,13 @@ jobs:
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: coverage-reports
         path: coverage-reports/
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: installer-${{matrix.os}}
         path: out/*
@@ -161,7 +164,7 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - name: Download installer tarball
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: installer-${{matrix.os}}
         path: out
@@ -171,7 +174,7 @@ jobs:
         echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
         TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
         echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@v31
+    - uses: cachix/install-nix-action@7ec16f2c061ab07b235a7245e06ed46fe9a1cab6 # v31.8.3
       if: ${{ !matrix.experimental-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
@@ -227,12 +230,13 @@ jobs:
     - uses: actions/checkout@v5
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: DeterminateSystems/magic-nix-cache-action@main
-    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
+        dogfood: false
+        extra_nix_config: |
+          experimental-features = flakes nix-command
+    - run: echo NIX_VERSION="$(nix eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
+    - run: nix build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
@@ -289,7 +293,6 @@ jobs:
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
 
   profile_build:
@@ -310,7 +313,6 @@ jobs:
         extra_nix_config: |
           experimental-features = flakes nix-command ca-derivations impure-derivations
           max-jobs = 1
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: |
         nix build -L --file ./ci/gha/profile-build buildTimeReport --out-link build-time-report.md
         cat build-time-report.md >> $GITHUB_STEP_SUMMARY

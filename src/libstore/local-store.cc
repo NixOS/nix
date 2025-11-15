@@ -989,19 +989,22 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        topoSort(
-            paths,
-            {[&](const StorePath & path) {
-                auto i = infos.find(path);
-                return i == infos.end() ? StorePathSet() : i->second.references;
-            }},
-            {[&](const StorePath & path, const StorePath & parent) {
-                return BuildError(
-                    BuildResult::Failure::OutputRejected,
-                    "cycle detected in the references of '%s' from '%s'",
-                    printStorePath(path),
-                    printStorePath(parent));
-            }});
+        auto topoSortResult = topoSort(paths, {[&](const StorePath & path) {
+                                           auto i = infos.find(path);
+                                           return i == infos.end() ? StorePathSet() : i->second.references;
+                                       }});
+
+        std::visit(
+            overloaded{
+                [&](const Cycle<StorePath> & cycle) {
+                    throw BuildError(
+                        BuildResult::Failure::OutputRejected,
+                        "cycle detected in the references of '%s' from '%s'",
+                        printStorePath(cycle.path),
+                        printStorePath(cycle.parent));
+                },
+                [](auto &) { /* Success, continue */ }},
+            topoSortResult);
 
         txn.commit();
     });
@@ -1048,15 +1051,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         /* In case we are not interested in reading the NAR: discard it. */
         bool narRead = false;
         Finally cleanup = [&]() {
-            if (!narRead) {
-                NullFileSystemObjectSink sink;
+            if (!narRead)
                 try {
-                    parseDump(sink, source);
+                    source.skip(info.narSize);
                 } catch (...) {
                     // TODO: should Interrupted be handled here?
                     ignoreExceptionInDestructor();
                 }
-            }
         };
 
         addTempRoot(info.path);
@@ -1065,7 +1066,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
             PathLocks outputLock;
 
-            auto realPath = Store::toRealPath(info.path);
+            auto realPath = toRealPath(info.path);
 
             /* Lock the output path.  But don't lock if we're being called
             from a build hook (whose parent process already acquired a
@@ -1264,7 +1265,7 @@ StorePath LocalStore::addToStoreFromDump(
         /* The first check above is an optimisation to prevent
            unnecessary lock acquisition. */
 
-        auto realPath = Store::toRealPath(dstPath);
+        auto realPath = toRealPath(dstPath);
 
         PathLocks outputLock({realPath});
 
@@ -1384,7 +1385,6 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of %s", name);
-            PosixSourceAccessor accessor;
             std::string hash = hashPath(
                                    PosixSourceAccessor::createAtRoot(link.path()),
                                    FileIngestionMethod::NixArchive,
@@ -1415,7 +1415,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 auto hashSink = HashSink(info->narHash.algo);
 
-                dumpPath(Store::toRealPath(i), hashSink);
+                dumpPath(toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.hash) {

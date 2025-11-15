@@ -166,7 +166,7 @@ printf 4.0 > "$flake1Dir"/version
 printf Utrecht > "$flake1Dir"/who
 nix profile add "$flake1Dir"
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello Utrecht" ]]
-[[ $(nix path-info --json "$(realpath "$TEST_HOME"/.nix-profile/bin/hello)" | jq -r .[].ca) =~ fixed:r:sha256: ]]
+nix path-info --json "$(realpath "$TEST_HOME"/.nix-profile/bin/hello)" | jq -e '.[].ca | .method == "nar" and .hash.algorithm == "sha256"'
 
 # Override the outputs.
 nix profile remove simple flake1

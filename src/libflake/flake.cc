@@ -97,7 +97,7 @@ static void parseFlakeInputAttr(EvalState & state, const Attr & attr, fetchers::
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (attr.value->type()) {
     case nString:
-        attrs.emplace(state.symbols[attr.name], attr.value->c_str());
+        attrs.emplace(state.symbols[attr.name], std::string(attr.value->string_view()));
         break;
     case nBool:
         attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
@@ -177,7 +177,7 @@ static FlakeInput parseFlakeInput(
                     parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
-                auto follows(parseInputAttrPath(attr.value->c_str()));
+                auto follows(parseInputAttrPath(attr.value->string_view()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
             } else
@@ -264,7 +264,7 @@ static Flake readFlake(
 
     if (auto description = vInfo.attrs()->get(state.s.description)) {
         expectType(state, nString, *description->value, description->pos);
-        flake.description = description->value->c_str();
+        flake.description = description->value->string_view();
     }
 
     auto sInputs = state.symbols.create("inputs");
@@ -281,12 +281,15 @@ static Flake readFlake(
     if (auto outputs = vInfo.attrs()->get(sOutputs)) {
         expectType(state, nFunction, *outputs->value, outputs->pos);
 
-        if (outputs->value->isLambda() && outputs->value->lambda().fun->hasFormals()) {
-            for (auto & formal : outputs->value->lambda().fun->formals->formals) {
-                if (formal.name != state.s.self)
-                    flake.inputs.emplace(
-                        state.symbols[formal.name],
-                        FlakeInput{.ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))});
+        if (outputs->value->isLambda()) {
+            if (auto formals = outputs->value->lambda().fun->getFormals()) {
+                for (auto & formal : formals->formals) {
+                    if (formal.name != state.s.self)
+                        flake.inputs.emplace(
+                            state.symbols[formal.name],
+                            FlakeInput{
+                                .ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))});
+                }
             }
         }
 
@@ -369,7 +372,8 @@ static Flake getFlake(
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
-    auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, state.store, originalRef.input, useRegistries);
 
     auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
@@ -385,7 +389,8 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, fetchers::UseRegistries::No);
+        auto cachedInput2 = state.inputCache->getAccessor(
+            state.fetchSettings, state.store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -502,8 +507,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
             /* Get the overrides (i.e. attributes of the form
                'inputs.nixops.inputs.nixpkgs.url = ...'). */
-            std::function<void(const FlakeInput & input, const InputAttrPath & prefix)> addOverrides;
-            addOverrides = [&](const FlakeInput & input, const InputAttrPath & prefix) {
+            auto addOverrides =
+                [&](this const auto & addOverrides, const FlakeInput & input, const InputAttrPath & prefix) -> void {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
                     auto inputAttrPath(prefix);
                     inputAttrPath.push_back(idOverride);
@@ -701,7 +706,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                            this input. */
                         debug("creating new input '%s'", inputAttrPathS);
 
-                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked() && !input.ref->input.isRelative())
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked(state.fetchSettings)
+                            && !input.ref->input.isRelative())
                             throw Error("cannot update unlocked flake input '%s' in pure mode", inputAttrPathS);
 
                         /* Note: in case of an --override-input, we use
@@ -750,7 +756,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto cachedInput = state.inputCache->getAccessor(
-                                        state.store, input.ref->input, useRegistriesInputs);
+                                        state.fetchSettings, state.store, input.ref->input, useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 

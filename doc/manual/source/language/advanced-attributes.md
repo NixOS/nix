@@ -333,7 +333,7 @@ Here is more information on the `output*` attributes, and what values they may b
 
     `outputHashAlgo` can only be `null` when `outputHash` follows the SRI format, because in that case the choice of hash algorithm is determined by `outputHash`.
 
-  - [`outputHash`]{#adv-attr-outputHashAlgo}; [`outputHash`]{#adv-attr-outputHashMode}
+  - [`outputHash`]{#adv-attr-outputHash}
 
     This will specify the output hash of the single output of a [fixed-output derivation].
 

@@ -27,3 +27,17 @@ option(
   value : false,
   description : 'Build benchmarks (requires gbenchmark)',
 )
+
+option(
+  'kaitai-struct-checks',
+  type : 'boolean',
+  value : true,
+  description : 'Check the Kaitai Struct specifications (requires Kaitai Struct)',
+)
+
+option(
+  'json-schema-checks',
+  type : 'boolean',
+  value : true,
+  description : 'Check JSON schema validity of schemas and examples (requires jv)',
+)

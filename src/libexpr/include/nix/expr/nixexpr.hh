@@ -3,6 +3,7 @@
 
 #include <map>
 #include <span>
+#include <memory>
 #include <vector>
 #include <memory_resource>
 #include <algorithm>
@@ -11,8 +12,11 @@
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/error.hh"
 
 namespace nix {
 
@@ -88,13 +92,6 @@ typedef std::vector<AttrName> AttrPath;
 std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
-
-class Exprs
-{
-    std::pmr::monotonic_buffer_resource buffer;
-public:
-    std::pmr::polymorphic_allocator<char> alloc{&buffer};
-};
 
 /* Abstract syntax of Nix expressions. */
 
@@ -191,22 +188,18 @@ struct ExprString : Expr
      * This is only for strings already allocated in our polymorphic allocator,
      * or that live at least that long (e.g. c++ string literals)
      */
-    ExprString(const char * s)
+    ExprString(const StringData & s)
     {
         v.mkStringNoCopy(s);
     };
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
-        auto len = sv.length();
-        if (len == 0) {
-            v.mkStringNoCopy("");
+        if (sv.size() == 0) {
+            v.mkStringNoCopy(""_sds);
             return;
         }
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkStringNoCopy(s);
+        v.mkStringNoCopy(StringData::make(*alloc.resource(), sv));
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -221,11 +214,7 @@ struct ExprPath : Expr
     ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
         : accessor(accessor)
     {
-        auto len = sv.length();
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkPath(&*accessor, s);
+        v.mkPath(&*accessor, StringData::make(*alloc.resource(), sv));
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -350,7 +339,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::vector<AttrName> attrPath)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::span<AttrName> attrPath)
         : e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
@@ -442,8 +431,14 @@ struct ExprAttrs : Expr
 
 struct ExprList : Expr
 {
-    std::vector<Expr *> elems;
-    ExprList() {};
+    std::span<Expr *> elems;
+
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::span<Expr *> exprs)
+        : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
+    {
+        std::ranges::copy(exprs, elems.begin());
+    };
+
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
 
@@ -460,7 +455,7 @@ struct Formal
     Expr * def;
 };
 
-struct Formals
+struct FormalsBuilder
 {
     typedef std::vector<Formal> Formals_;
     /**
@@ -468,6 +463,23 @@ struct Formals
      */
     Formals_ formals;
     bool ellipsis;
+
+    bool has(Symbol arg) const
+    {
+        auto it = std::lower_bound(
+            formals.begin(), formals.end(), arg, [](const Formal & f, const Symbol & sym) { return f.name < sym; });
+        return it != formals.end() && it->name == arg;
+    }
+};
+
+struct Formals
+{
+    std::span<Formal> formals;
+    bool ellipsis;
+
+    Formals(std::span<Formal> formals, bool ellipsis)
+        : formals(formals)
+        , ellipsis(ellipsis) {};
 
     bool has(Symbol arg) const
     {
@@ -492,30 +504,70 @@ struct ExprLambda : Expr
     PosIdx pos;
     Symbol name;
     Symbol arg;
-    Formals * formals;
+
+private:
+    bool hasFormals;
+    bool ellipsis;
+    uint16_t nFormals;
+    Formal * formalsStart;
+public:
+
+    std::optional<Formals> getFormals() const
+    {
+        if (hasFormals)
+            return Formals{{formalsStart, nFormals}, ellipsis};
+        else
+            return std::nullopt;
+    }
+
     Expr * body;
     DocComment docComment;
 
-    ExprLambda(PosIdx pos, Symbol arg, Formals * formals, Expr * body)
+    ExprLambda(
+        const PosTable & positions,
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        Symbol arg,
+        const FormalsBuilder & formals,
+        Expr * body)
         : pos(pos)
         , arg(arg)
-        , formals(formals)
-        , body(body) {};
-
-    ExprLambda(PosIdx pos, Formals * formals, Expr * body)
-        : pos(pos)
-        , formals(formals)
+        , hasFormals(true)
+        , ellipsis(formals.ellipsis)
+        , nFormals(formals.formals.size())
+        , formalsStart(alloc.allocate_object<Formal>(nFormals))
         , body(body)
     {
-    }
+        if (formals.formals.size() > nFormals) [[unlikely]] {
+            auto err = Error(
+                "too many formal arguments, implementation supports at most %1%",
+                std::numeric_limits<decltype(nFormals)>::max());
+            if (pos)
+                err.atPos(positions[pos]);
+            throw err;
+        }
+        std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
+    };
+
+    ExprLambda(PosIdx pos, Symbol arg, Expr * body)
+        : pos(pos)
+        , arg(arg)
+        , hasFormals(false)
+        , ellipsis(false)
+        , nFormals(0)
+        , formalsStart(nullptr)
+        , body(body) {};
+
+    ExprLambda(
+        const PosTable & positions,
+        std::pmr::polymorphic_allocator<char> & alloc,
+        PosIdx pos,
+        const FormalsBuilder & formals,
+        Expr * body)
+        : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
-
-    inline bool hasFormals() const
-    {
-        return formals != nullptr;
-    }
 
     PosIdx getPos() const override
     {
@@ -572,8 +624,8 @@ struct ExprLet : Expr
 struct ExprWith : Expr
 {
     PosIdx pos;
+    uint32_t prevWith;
     Expr *attrs, *body;
-    size_t prevWith;
     ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body)
         : pos(pos)
@@ -695,11 +747,31 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> * es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> * es)
+    std::span<std::pair<PosIdx, Expr *>> es;
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::span<std::pair<PosIdx, Expr *>> es)
         : pos(pos)
         , forceString(forceString)
-        , es(es) {};
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
+        : pos(pos)
+        , forceString(forceString)
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
 
     PosIdx getPos() const override
     {
@@ -736,6 +808,61 @@ struct ExprBlackHole : Expr
 };
 
 extern ExprBlackHole eBlackHole;
+
+class Exprs
+{
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(auto &&... args)
+    {
+        return alloc.new_object<C>(std::forward<decltype(args)>(args)...);
+    }
+
+    // we define some calls to add explicitly so that the argument can be passed in as initializer lists
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return alloc.new_object<C>(pos, fun, std::move(args));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::span<std::pair<PosIdx, Expr *>> es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+};
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at

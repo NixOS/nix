@@ -300,6 +300,13 @@ ValidPathInfo Store::addToStoreSlow(
     return info;
 }
 
+void Store::narFromPath(const StorePath & path, Sink & sink)
+{
+    auto accessor = requireStoreObjectAccessor(path);
+    SourcePath sourcePath{accessor};
+    dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
+}
+
 StringSet Store::Config::getDefaultSystemFeatures()
 {
     auto res = settings.systemFeatures.get();
@@ -1163,7 +1170,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
         if (resolvedDrv)
-            return writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            return ::nix::writeDerivation(*this, *resolvedDrv, NoRepair, true);
     }
 
     return path;

@@ -74,7 +74,7 @@ LockedNode::LockedNode(const fetchers::Settings & fetchSettings, const nlohmann:
     , parentInputAttrPath(
           json.find("parent") != json.end() ? (std::optional<InputAttrPath>) json["parent"] : std::nullopt)
 {
-    if (!lockedRef.input.isLocked() && !lockedRef.input.isRelative()) {
+    if (!lockedRef.input.isLocked(fetchSettings) && !lockedRef.input.isRelative()) {
         if (lockedRef.input.getNarHash())
             warn(
                 "Lock file entry '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
@@ -147,11 +147,10 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
     if (version < 5 || version > 7)
         throw Error("lock file '%s' has unsupported version %d", path, version);
 
-    std::map<std::string, ref<Node>> nodeMap;
+    std::string rootKey = json["root"];
+    std::map<std::string, ref<Node>> nodeMap{{rootKey, root}};
 
-    std::function<void(Node & node, const nlohmann::json & jsonNode)> getInputs;
-
-    getInputs = [&](Node & node, const nlohmann::json & jsonNode) {
+    [&](this const auto & getInputs, Node & node, const nlohmann::json & jsonNode) {
         if (jsonNode.find("inputs") == jsonNode.end())
             return;
         for (auto & i : jsonNode["inputs"].items()) {
@@ -179,11 +178,7 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
                     throw Error("lock file contains cycle to root node");
             }
         }
-    };
-
-    std::string rootKey = json["root"];
-    nodeMap.insert_or_assign(rootKey, root);
-    getInputs(*root, json["nodes"][rootKey]);
+    }(*root, json["nodes"][rootKey]);
 
     // FIXME: check that there are no cycles in version >= 7. Cycles
     // between inputs are only possible using 'follows' indirections.
@@ -197,9 +192,7 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
     KeyMap nodeKeys;
     boost::unordered_flat_set<std::string> keys;
 
-    std::function<std::string(const std::string & key, ref<const Node> node)> dumpNode;
-
-    dumpNode = [&](std::string key, ref<const Node> node) -> std::string {
+    auto dumpNode = [&](this auto & dumpNode, std::string key, ref<const Node> node) -> std::string {
         auto k = nodeKeys.find(node);
         if (k != nodeKeys.end())
             return k->second;
@@ -276,24 +269,20 @@ std::optional<FlakeRef> LockFile::isUnlocked(const fetchers::Settings & fetchSet
 {
     std::set<ref<const Node>> nodes;
 
-    std::function<void(ref<const Node> node)> visit;
-
-    visit = [&](ref<const Node> node) {
+    [&](this const auto & visit, ref<const Node> node) {
         if (!nodes.insert(node).second)
             return;
         for (auto & i : node->inputs)
             if (auto child = std::get_if<0>(&i.second))
                 visit(*child);
-    };
-
-    visit(root);
+    }(root);
 
     /* Return whether the input is either locked, or, if
        `allow-dirty-locks` is enabled, it has a NAR hash. In the
        latter case, we can verify the input but we may not be able to
        fetch it from anywhere. */
     auto isConsideredLocked = [&](const fetchers::Input & input) {
-        return input.isLocked() || (fetchSettings.allowDirtyLocks && input.getNarHash());
+        return input.isLocked(fetchSettings) || (fetchSettings.allowDirtyLocks && input.getNarHash());
     };
 
     for (auto & i : nodes) {
@@ -332,9 +321,7 @@ std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
     std::set<ref<Node>> done;
     std::map<InputAttrPath, Node::Edge> res;
 
-    std::function<void(const InputAttrPath & prefix, ref<Node> node)> recurse;
-
-    recurse = [&](const InputAttrPath & prefix, ref<Node> node) {
+    [&](this const auto & recurse, const InputAttrPath & prefix, ref<Node> node) {
         if (!done.insert(node).second)
             return;
 
@@ -345,9 +332,7 @@ std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
             if (auto child = std::get_if<0>(&input))
                 recurse(inputAttrPath, *child);
         }
-    };
-
-    recurse({}, root);
+    }({}, root);
 
     return res;
 }
