@@ -36,7 +36,7 @@ nix_err nix_context_error(nix_c_context * context)
         const char * demangled = abi::__cxa_demangle(typeid(e).name(), 0, 0, &status);
         if (demangled) {
             context->name = demangled;
-            free((void*)demangled);
+            free((void *) demangled);
         } else {
             context->name = typeid(e).name();
         }
