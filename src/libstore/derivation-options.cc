@@ -6,6 +6,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/machines.hh"
 
 #include <optional>
 #include <string>
@@ -327,9 +328,16 @@ bool DerivationOptions::canBuildLocally(Store & localStore, const BasicDerivatio
     if (settings.maxBuildJobs.get() == 0 && !drv.isBuiltin())
         return false;
 
-    for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.config.systemFeatures.get().count(feature))
-            return false;
+    auto features = getRequiredSystemFeatures(drv);
+    if (experimentalFeatureSettings.isEnabled(Xp::ResourceManagement)) {
+        auto featureCount = Machine::countFeatures(features);
+        for (auto & feature : featureCount)
+            if (!localStore.config.systemFeatures.get().count(feature.first))
+                return false;
+    } else
+        for (auto & feature : features)
+            if (!localStore.config.systemFeatures.get().count(feature))
+                return false;
 
     return true;
 }
