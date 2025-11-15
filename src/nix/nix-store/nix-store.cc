@@ -1118,128 +1118,117 @@ static void opVersion(Strings opFlags, Strings opArgs)
    list. */
 static int main_nix_store(int argc, char ** argv)
 {
-    {
-        Strings opFlags, opArgs;
-        Operation op = 0;
-        bool readFromStdIn = false;
-        std::string opName;
-        bool showHelp = false;
+    // CMD registry: maps command strings : {operation, canonical_name}
+    struct CommandInfo {
+        Operation op;
+        const char* name;
+    };
 
-        parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
-            Operation oldOp = op;
+    static const std::unordered_map<std::string_view, CommandInfo> commands = {
+        {"--help", {nullptr, nullptr}},
+        {"--version", {opVersion, nullptr}},
+        {"--realise", {opRealise, "-realise"}},
+        {"--realize", {opRealise, "-realise"}},
+        {"-r", {opRealise, "-realise"}},
+        {"--add", {opAdd, "-add"}},
+        {"-A", {opAdd, "-add"}},
+        {"--add-fixed", {opAddFixed, "add-fixed"}},
+        {"--print-fixed-path", {opPrintFixedPath, nullptr}},
+        {"--delete", {opDelete, "delete"}},
+        {"--query", {opQuery, "-query"}},
+        {"-q", {opQuery, "-query"}},
+        {"--print-env", {opPrintEnv, "print-env"}},
+        {"--read-log", {opReadLog, "-read-log"}},
+        {"-l", {opReadLog, "-read-log"}},
+        {"--dump-db", {opDumpDB, "dump-db"}},
+        {"--load-db", {opLoadDB, "load-db"}},
+        {"--register-validity", {opRegisterValidity, nullptr}},
+        {"--check-validity", {opCheckValidity, nullptr}},
+        {"--gc", {opGC, "gc"}},
+        {"--dump", {opDump, "dump"}},
+        {"--restore", {opRestore, "restore"}},
+        {"--export", {opExport, "export"}},
+        {"--import", {opImport, "import"}},
+        {"--init", {opInit, nullptr}},
+        {"--verify", {opVerify, "verify"}},
+        {"--verify-path", {opVerifyPath, "verify-path"}},
+        {"--repair-path", {opRepairPath, "repair-path"}},
+        {"--optimise", {opOptimise, "-optimise"}},
+        {"--optimize", {opOptimise, "-optimise"}},
+        {"--serve", {opServe, "serve"}},
+        {"--generate-binary-cache-key", {opGenerateBinaryCacheKey, "generate-binary-cache-key"}},
+    };
 
-            if (*arg == "--help")
+    // flags that require an argument
+    static const std::unordered_set<std::string_view> flagsWithArgs = {
+        "--max-freed", "--max-links", "--max-atime"
+    };
+
+    Strings opFlags, opArgs;
+    Operation op = nullptr;
+    bool readFromStdIn = false;
+    std::string opName;
+    bool showHelp = false;
+
+    parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
+        auto it = commands.find(*arg);
+        if (it != commands.end()) {
+            if (*arg == "--help") {
                 showHelp = true;
-            else if (*arg == "--version")
-                op = opVersion;
-            else if (*arg == "--realise" || *arg == "--realize" || *arg == "-r") {
-                op = opRealise;
-                opName = "-realise";
-            } else if (*arg == "--add" || *arg == "-A") {
-                op = opAdd;
-                opName = "-add";
-            } else if (*arg == "--add-fixed") {
-                op = opAddFixed;
-                opName = arg->substr(1);
-            } else if (*arg == "--print-fixed-path")
-                op = opPrintFixedPath;
-            else if (*arg == "--delete") {
-                op = opDelete;
-                opName = arg->substr(1);
-            } else if (*arg == "--query" || *arg == "-q") {
-                op = opQuery;
-                opName = "-query";
-            } else if (*arg == "--print-env") {
-                op = opPrintEnv;
-                opName = arg->substr(1);
-            } else if (*arg == "--read-log" || *arg == "-l") {
-                op = opReadLog;
-                opName = "-read-log";
-            } else if (*arg == "--dump-db") {
-                op = opDumpDB;
-                opName = arg->substr(1);
-            } else if (*arg == "--load-db") {
-                op = opLoadDB;
-                opName = arg->substr(1);
-            } else if (*arg == "--register-validity")
-                op = opRegisterValidity;
-            else if (*arg == "--check-validity")
-                op = opCheckValidity;
-            else if (*arg == "--gc") {
-                op = opGC;
-                opName = arg->substr(1);
-            } else if (*arg == "--dump") {
-                op = opDump;
-                opName = arg->substr(1);
-            } else if (*arg == "--restore") {
-                op = opRestore;
-                opName = arg->substr(1);
-            } else if (*arg == "--export") {
-                op = opExport;
-                opName = arg->substr(1);
-            } else if (*arg == "--import") {
-                op = opImport;
-                opName = arg->substr(1);
-            } else if (*arg == "--init")
-                op = opInit;
-            else if (*arg == "--verify") {
-                op = opVerify;
-                opName = arg->substr(1);
-            } else if (*arg == "--verify-path") {
-                op = opVerifyPath;
-                opName = arg->substr(1);
-            } else if (*arg == "--repair-path") {
-                op = opRepairPath;
-                opName = arg->substr(1);
-            } else if (*arg == "--optimise" || *arg == "--optimize") {
-                op = opOptimise;
-                opName = "-optimise";
-            } else if (*arg == "--serve") {
-                op = opServe;
-                opName = arg->substr(1);
-            } else if (*arg == "--generate-binary-cache-key") {
-                op = opGenerateBinaryCacheKey;
-                opName = arg->substr(1);
-            } else if (*arg == "--add-root")
-                gcRoot = absPath(getArg(*arg, arg, end));
-            else if (*arg == "--stdin" && !isatty(STDIN_FILENO))
-                readFromStdIn = true;
-            else if (*arg == "--indirect")
-                ;
-            else if (*arg == "--no-output")
-                noOutput = true;
-            else if (*arg != "" && arg->at(0) == '-') {
-                opFlags.push_back(*arg);
-                if (*arg == "--max-freed" || *arg == "--max-links" || *arg == "--max-atime") /* !!! hack */
-                    opFlags.push_back(getArg(*arg, arg, end));
-            } else
-                opArgs.push_back(*arg);
-
-            if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
-                std::string word;
-                while (std::cin >> word) {
-                    opArgs.emplace_back(std::move(word));
-                };
+                return true;
             }
 
-            if (oldOp && oldOp != op)
+            if (op && op != it->second.op)
                 throw UsageError("only one operation may be specified");
 
+            op = it->second.op;
+            if (it->second.name)
+                opName = it->second.name;
+
             return true;
-        });
+        }
 
-        if (showHelp)
-            showManPage("nix-store" + opName);
-        if (!op)
-            throw UsageError("no operation specified");
+        // special flags
+        if (*arg == "--add-root") {
+            gcRoot = absPath(getArg(*arg, arg, end));
+        } else if (*arg == "--stdin" && !isatty(STDIN_FILENO)) {
+            readFromStdIn = true;
+        } else if (*arg == "--indirect") {
+            // no-op, compatibility
+        } else if (*arg == "--no-output") {
+            noOutput = true;
+        } else if (!arg->empty() && (*arg)[0] == '-') {
+            // Generic
+            opFlags.push_back(*arg);
+            if (flagsWithArgs.count(*arg))
+                opFlags.push_back(getArg(*arg, arg, end));
+        } else {
+            // Positional argument
+            opArgs.push_back(*arg);
+        }
 
-        if (op != opDump && op != opRestore) /* !!! hack */
-            store = openStore();
+        return true;
+    });
 
-        op(std::move(opFlags), std::move(opArgs));
-
-        return 0;
+    // get additional arguments from stdin if requested
+    if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
+        std::string word;
+        while (std::cin >> word) {
+            opArgs.emplace_back(std::move(word));
+        }
     }
+
+    if (showHelp)
+        showManPage("nix-store" + opName);
+    if (!op)
+        throw UsageError("no operation specified");
+
+    if (op != opDump && op != opRestore)
+        store = openStore();
+
+    op(std::move(opFlags), std::move(opArgs));
+
+    return 0;
 }
 
 static RegisterLegacyCommand r_nix_store("nix-store", main_nix_store);
