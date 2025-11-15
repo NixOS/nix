@@ -137,6 +137,8 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
 
 void nix_eval_state_builder_free(nix_eval_state_builder * builder)
 {
+    if (builder)
+        builder->~nix_eval_state_builder();
     operator delete(builder, static_cast<std::align_val_t>(alignof(nix_eval_state_builder)));
 }
 
@@ -203,6 +205,8 @@ EvalState * nix_state_create(nix_c_context * context, const char ** lookupPath_c
 
 void nix_state_free(EvalState * state)
 {
+    if (state)
+        state->~EvalState();
     operator delete(state, static_cast<std::align_val_t>(alignof(EvalState)));
 }
 
