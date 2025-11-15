@@ -808,7 +808,8 @@ public:
         StorePathSet & out,
         bool flipDirection = false,
         bool includeOutputs = false,
-        bool includeDerivers = false);
+        bool includeDerivers = false,
+        std::function<bool(const StorePath & path)> pathCallback = nullptr);
 
     void computeFSClosure(
         const StorePath & path,
