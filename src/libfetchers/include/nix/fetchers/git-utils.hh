@@ -88,8 +88,12 @@ struct GitRepo
 
     virtual bool hasObject(const Hash & oid) = 0;
 
-    virtual ref<SourceAccessor>
-    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false) = 0;
+    virtual ref<SourceAccessor> getAccessor(
+        const Hash & rev,
+        bool exportIgnore,
+        std::string displayPrefix,
+        bool smudgeLfs = false,
+        bool applyFilters = false) = 0;
 
     virtual ref<SourceAccessor>
     getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
