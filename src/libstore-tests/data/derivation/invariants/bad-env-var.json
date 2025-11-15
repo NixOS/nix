@@ -1,0 +1,18 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "Wrong env var value throws error",
+    "out": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "bad-env-var",
+  "outputs": {
+    "out": {}
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

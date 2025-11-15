@@ -1,0 +1,17 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "Fill in deferred with missing env var"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "filled-in-deferred-no-env-var",
+  "outputs": {
+    "out": {}
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

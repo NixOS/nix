@@ -31,16 +31,14 @@ static inline bool testAccept()
 /**
  * Mixin class for writing characterization tests
  */
-class CharacterizationTest : public virtual ::testing::Test
+struct CharacterizationTest : virtual ::testing::Test
 {
-protected:
     /**
      * While the "golden master" for this characterization test is
      * located. It should not be shared with any other test.
      */
     virtual std::filesystem::path goldenMaster(PathView testStem) const = 0;
 
-public:
     /**
      * Golden test for reading
      *

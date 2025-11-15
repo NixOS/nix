@@ -35,6 +35,8 @@ include_dirs = [ include_directories('.') ]
 
 headers = files(
   'nix_api_store.h',
+  'nix_api_store/derivation.h',
+  'nix_api_store/store_path.h',
 )
 
 # TODO don't install this once tests don't use it and/or move the header into `libstore`, non-`c`
