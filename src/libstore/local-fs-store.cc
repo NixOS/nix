@@ -1,5 +1,6 @@
 #include "nix/util/archive.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/posix-source-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
@@ -109,7 +110,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
         if (!pathExists(absPath))
             return nullptr;
     }
-    return std::make_shared<PosixSourceAccessor>(std::move(absPath));
+    return makeFSSourceAccessor(std::move(absPath));
 }
 
 const std::string LocalFSStore::drvsLogDir = "drvs";

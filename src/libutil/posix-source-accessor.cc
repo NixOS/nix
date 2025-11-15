@@ -1,4 +1,5 @@
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/directory-source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/sync.hh"
@@ -213,6 +214,30 @@ ref<SourceAccessor> getFSSourceAccessor()
 
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
 {
+    AutoCloseFD fd = toDescriptor(
+        ::open(
+            root.c_str(),
+            O_RDONLY |
+#ifndef _WIN32
+                O_NOFOLLOW | O_CLOEXEC
+#endif
+            ));
+
+    if (!fd) {
+        if (errno == ELOOP)
+            /* Use a plain old PosixSourceAccessor for symlinks. Should probably just
+               read the link here into a MemorySourceAccessor. */
+            return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
+        throw SysError("opening file %s", PathFmt(root));
+    }
+
+    struct ::stat st;
+    if (::fstat(fd.get(), &st))
+        throw SysError("getting status of %s", PathFmt(root));
+
+    if (S_ISDIR(st.st_mode))
+        return makeDirectorySourceAccessor(std::move(fd), std::move(root), trackLastModified);
+
     return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
 } // namespace nix
