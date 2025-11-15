@@ -207,7 +207,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                contain the reference. */
             std::map<std::string, Strings> hits;
 
-            auto accessor = store->getFSAccessor(node.path);
+            auto accessor = store->requireStoreObjectAccessor(node.path);
 
             auto visitPath = [&](this auto && recur, const CanonPath & p) -> void {
                 auto st = accessor->maybeLstat(p);

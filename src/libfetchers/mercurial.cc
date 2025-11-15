@@ -329,9 +329,7 @@ struct MercurialInputScheme : InputScheme
         Input input(_input);
 
         auto storePath = fetchToStore(store, input);
-
-        // We just added it, it should be there.
-        auto accessor = ref{store->getFSAccessor(storePath)};
+        auto accessor = store->requireStoreObjectAccessor(storePath);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
