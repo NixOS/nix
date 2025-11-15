@@ -140,4 +140,70 @@ TEST(S3BinaryCacheStore, storageClassConfiguration)
     EXPECT_EQ(config.storageClass.get(), std::optional<std::string>("GLACIER"));
 }
 
+#if NIX_WITH_AWS_AUTH
+/**
+ * Test that transfer acceleration parameter is properly preserved
+ */
+TEST(S3BinaryCacheStore, transferAccelerationParameter)
+{
+    StringMap params;
+    params["use-transfer-acceleration"] = "true";
+
+    S3BinaryCacheStoreConfig config("s3", "my-cache", params);
+
+    // Transfer acceleration param should be in cacheUri.query
+    EXPECT_EQ(
+        config.cacheUri,
+        (ParsedURL{
+            .scheme = "s3",
+            .authority = ParsedURL::Authority{.host = "my-cache"},
+            .query = (StringMap) {{"use-transfer-acceleration", "true"}},
+        }));
+
+    // And the config setting should be set
+    EXPECT_EQ(config.use_transfer_acceleration.get(), true);
+}
+
+/**
+ * Test that transfer acceleration works with other S3 parameters
+ */
+TEST(S3BinaryCacheStore, transferAccelerationWithOtherParams)
+{
+    StringMap params;
+    params["region"] = "ap-northeast-1";
+    params["use-transfer-acceleration"] = "true";
+    params["profile"] = "production";
+
+    S3BinaryCacheStoreConfig config("s3", "tokyo-cache", params);
+
+    EXPECT_EQ(
+        config.cacheUri,
+        (ParsedURL{
+            .scheme = "s3",
+            .authority = ParsedURL::Authority{.host = "tokyo-cache"},
+            .query =
+                (StringMap) {
+                    {"region", "ap-northeast-1"},
+                    {"use-transfer-acceleration", "true"},
+                    {"profile", "production"},
+                },
+        }));
+
+    EXPECT_EQ(config.region.get(), "ap-northeast-1");
+    EXPECT_EQ(config.use_transfer_acceleration.get(), true);
+    EXPECT_EQ(config.profile.get(), "production");
+}
+
+/**
+ * Test default value for transfer acceleration
+ */
+TEST(S3BinaryCacheStore, transferAccelerationDefaultValue)
+{
+    S3BinaryCacheStoreConfig config("s3", "test-bucket", {});
+
+    // Default should be false
+    EXPECT_EQ(config.use_transfer_acceleration.get(), false);
+}
+#endif
+
 } // namespace nix
