@@ -1210,6 +1210,100 @@ std::optional<BasicDerivation> Derivation::tryResolve(
     return resolved;
 }
 
+/**
+ * Process `InputAddressed`, `Deferred`, and `CAFixed` outputs.
+ *
+ * For `InputAddressed` outputs or `Deferred` outputs:
+ *
+ * - with `Regular` hash kind, validate `InputAddressed` outputs have the
+ *   correct path (throws if mismatch), invoke `deferredCallback` for
+ *   `Deferred` outputs with the computed output path, then invoke
+ *   `envCallback` with the path.
+ *
+ * - with `Deferred` hash kind, validate that the output is either
+ *   `InputAddressed` (error) or `Deferred` (correct).
+ *
+ * For `CAFixed` outputs, invoke `envCallback` with the computed path.
+ */
+static void processForOutputPaths(
+    Store & store, auto && drv, std::string_view drvName, auto && deferredCallback, auto && envCallback)
+{
+    std::optional<DrvHash> hashesModulo;
+
+    for (auto & [outputName, output] : drv.outputs) {
+        auto envHasRightPath = [&](const StorePath & actual) {
+            envCallback(outputName, drv.env.find(outputName), actual);
+        };
+        auto hash = [&] {
+            if (!hashesModulo) {
+                // somewhat expensive so we do lazily
+                hashesModulo = hashDerivationModulo(store, drv, true);
+            }
+            switch (hashesModulo->kind) {
+            case DrvHash::Kind::Regular: {
+                auto h = get(hashesModulo->hashes, outputName);
+                if (!h)
+                    throw Error("derivation produced no hash for output '%s'", outputName);
+                auto outPath = store.makeOutputPath(outputName, *h, drvName);
+                std::visit(
+                    overloaded{
+                        [&](const DerivationOutput::InputAddressed & doia) {
+                            if (doia.path == outPath) {
+                                return; // Correct case
+                            }
+                            // Error case, an explicilty wrong path is always an error.
+                            throw Error(
+                                "derivation has incorrect output '%s', should be '%s'",
+                                store.printStorePath(doia.path),
+                                store.printStorePath(outPath));
+                        },
+                        [&](const DerivationOutput::Deferred &) {
+                            // The callback will either fill in the right path or throw an error
+                            deferredCallback(outputName, output, outPath);
+                        },
+                        [&](const auto &) {
+                            // should never happen, based on where `hash` is called.
+                            unreachable();
+                        },
+                    },
+                    output.raw);
+                envHasRightPath(outPath);
+                break;
+            }
+            case DrvHash::Kind::Deferred:
+                std::visit(
+                    overloaded{
+                        [&](const DerivationOutput::InputAddressed & doia) {
+                            // Error case, an explicilty wrong path is always an error.
+                            throw Error(
+                                "derivation has incorrect output '%s', should be deferred",
+                                store.printStorePath(doia.path));
+                        },
+                        [&](const DerivationOutput::Deferred &) {
+                            // Correct: Deferred output with Deferred hash kind
+                        },
+                        [&](const auto &) {
+                            // should never happen, based on where `hash` is called.
+                            unreachable();
+                        },
+                    },
+                    output.raw);
+                break;
+            }
+        };
+        std::visit(
+            overloaded{
+                [&](const DerivationOutput::InputAddressed &) { hash(); },
+                [&](const DerivationOutput::Deferred &) { hash(); },
+                [&](const DerivationOutput::CAFixed & dof) { envHasRightPath(dof.path(store, drvName, outputName)); },
+                [&](const auto &) {
+                    // Nothing to do for other output types
+                },
+            },
+            output.raw);
+    }
+}
+
 void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
 {
     assert(drvPath.isDerivation());
@@ -1217,65 +1311,96 @@ void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
     drvName = drvName.substr(0, drvName.size() - drvExtension.size());
 
     if (drvName != name) {
-        throw Error("Derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
+        throw Error("derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
     }
 
-    auto envHasRightPath = [&](const StorePath & actual, const std::string & varName) {
-        auto j = env.find(varName);
-        if (j == env.end() || store.parseStorePath(j->second) != actual)
-            throw Error(
-                "derivation '%s' has incorrect environment variable '%s', should be '%s'",
-                store.printStorePath(drvPath),
-                varName,
-                store.printStorePath(actual));
-    };
+    try {
+        checkInvariants(store);
+    } catch (Error & e) {
+        e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
+        throw;
+    }
+}
 
+void Derivation::checkInvariants(Store & store) const
+{
     // Don't need the answer, but do this anyways to assert is proper
     // combination. The code below is more general and naturally allows
     // combinations that are currently prohibited.
     type();
 
-    std::optional<DrvHash> hashesModulo;
-    for (auto & i : outputs) {
-        std::visit(
-            overloaded{
-                [&](const DerivationOutput::InputAddressed & doia) {
-                    if (!hashesModulo) {
-                        // somewhat expensive so we do lazily
-                        hashesModulo = hashDerivationModulo(store, *this, true);
-                    }
-                    auto currentOutputHash = get(hashesModulo->hashes, i.first);
-                    if (!currentOutputHash)
-                        throw Error(
-                            "derivation '%s' has unexpected output '%s' (local-store / hashesModulo) named '%s'",
-                            store.printStorePath(drvPath),
-                            store.printStorePath(doia.path),
-                            i.first);
-                    StorePath recomputed = store.makeOutputPath(i.first, *currentOutputHash, drvName);
-                    if (doia.path != recomputed)
-                        throw Error(
-                            "derivation '%s' has incorrect output '%s', should be '%s'",
-                            store.printStorePath(drvPath),
-                            store.printStorePath(doia.path),
-                            store.printStorePath(recomputed));
-                    envHasRightPath(doia.path, i.first);
-                },
-                [&](const DerivationOutput::CAFixed & dof) {
-                    auto path = dof.path(store, drvName, i.first);
-                    envHasRightPath(path, i.first);
-                },
-                [&](const DerivationOutput::CAFloating &) {
-                    /* Nothing to check */
-                },
-                [&](const DerivationOutput::Deferred &) {
-                    /* Nothing to check */
-                },
-                [&](const DerivationOutput::Impure &) {
-                    /* Nothing to check */
-                },
-            },
-            i.second.raw);
+    processForOutputPaths(
+        store,
+        *this,
+        name,
+        [&](const std::string & outputName, const DerivationOutput & output, const StorePath & outPath) {
+            throw Error("derivation has incorrect deferred output, should be '%s'", store.printStorePath(outPath));
+        },
+        [&](const std::string & outputName, decltype(env)::const_iterator j, const StorePath & actual) {
+            if (j == env.end())
+                throw Error(
+                    "derivation has missing environment variable '%s', should be '%s' but is not present",
+                    outputName,
+                    store.printStorePath(actual));
+            if (j->second != store.printStorePath(actual))
+                throw Error(
+                    "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
+                    outputName,
+                    store.printStorePath(actual),
+                    j->second);
+        });
+}
+
+void Derivation::fillInOutputPaths(Store & store)
+{
+    processForOutputPaths(
+        store,
+        *this,
+        name,
+        [&](const std::string & outputName, DerivationOutput & output, StorePath outPath) {
+            // Fill in output path for Deferred outputs
+            output = DerivationOutput::InputAddressed{
+                .path = std::move(outPath),
+            };
+        },
+        [&](const std::string & outputName, decltype(env)::iterator j, const StorePath & actual) {
+            if (j == env.end()) {
+                // fill it in
+                env.insert(j, {outputName, store.printStorePath(actual)});
+                return;
+            }
+            auto & value = j->second;
+            if (value == "") {
+                // fill it in
+                j->second = store.printStorePath(actual);
+                return;
+            }
+            if (j->second == store.printStorePath(actual)) {
+                // do nothing, already filled in
+                return;
+            }
+            throw Error(
+                "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
+                outputName,
+                store.printStorePath(actual),
+                value);
+        });
+}
+
+Derivation Derivation::parseJsonAndValidate(Store & store, const nlohmann::json & json)
+{
+    auto drv = static_cast<Derivation>(json);
+
+    drv.fillInOutputPaths(store);
+
+    try {
+        drv.checkInvariants(store);
+    } catch (Error & e) {
+        e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
+        throw;
     }
+
+    return drv;
 }
 
 const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
