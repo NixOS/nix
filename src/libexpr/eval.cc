@@ -517,15 +517,16 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     if (primOp.arity == 0) {
         primOp.arity = 1;
         auto vPrimOp = allocValue();
-        vPrimOp->mkPrimOp(new PrimOp(primOp));
+        vPrimOp->mkPrimOp(new PrimOp(std::move(primOp)));
         Value v;
         v.mkApp(vPrimOp, vPrimOp);
+        auto & primOp1 = *vPrimOp->primOp();
         return addConstant(
-            primOp.name,
+            primOp1.name,
             v,
             {
                 .type = nThunk, // FIXME
-                .doc = primOp.doc,
+                .doc = primOp1.doc ? primOp1.doc->c_str() : nullptr,
             });
     }
 
@@ -565,13 +566,14 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 {
     if (v.isPrimOp()) {
         auto v2 = &v;
-        if (auto * doc = v2->primOp()->doc)
+        auto & primOp = *v2->primOp();
+        if (primOp.doc)
             return Doc{
                 .pos = {},
-                .name = v2->primOp()->name,
-                .arity = v2->primOp()->arity,
-                .args = v2->primOp()->args,
-                .doc = doc,
+                .name = primOp.name,
+                .arity = primOp.arity,
+                .args = primOp.args,
+                .doc = primOp.doc->c_str(),
             };
     }
     if (v.isLambda()) {

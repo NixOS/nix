@@ -108,7 +108,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    std::optional<std::string> doc;
 
     /**
      * Add a trace item, while calling the `<name>` builtin.

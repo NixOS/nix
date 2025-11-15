@@ -26,18 +26,9 @@ void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
         throw Error("Input scheme with name %s already registered", schemeName);
 }
 
-nlohmann::json dumpRegisterInputSchemeInfo()
+const InputSchemeMap & getAllInputSchemes()
 {
-    using nlohmann::json;
-
-    auto res = json::object();
-
-    for (auto & [name, scheme] : inputSchemes()) {
-        auto & r = res[name] = json::object();
-        r["allowedAttrs"] = scheme->allowedAttrs();
-    }
-
-    return res;
+    return inputSchemes();
 }
 
 Input Input::fromURL(const Settings & settings, const std::string & url, bool requireTree)
