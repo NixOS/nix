@@ -14,7 +14,7 @@
 
 namespace nixC {
 
-TEST_F(nix_api_store_test, nix_eval_state_lookup_path)
+TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 {
     auto tmpDir = nix::createTempDir();
     auto delTmpDir = std::make_unique<nix::AutoDelete>(tmpDir, true);
