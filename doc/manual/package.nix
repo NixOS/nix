@@ -37,6 +37,7 @@ mkMesonDerivation (finalAttrs: {
       (fileset.unions [
         ../../.version
         # For example JSON
+        ../../src/libutil-tests/data/memory-source-accessor
         ../../src/libutil-tests/data/hash
         ../../src/libstore-tests/data/content-address
         ../../src/libstore-tests/data/store-path
