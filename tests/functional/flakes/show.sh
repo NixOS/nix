@@ -56,7 +56,7 @@ cat >flake.nix <<EOF
     packages.$system = { };
     packages.someOtherSystem = { };
 
-    formatter = { };
+    formatter.x86_64-linux = null;
     nixosConfigurations = { };
     nixosModules = { };
   };
@@ -66,7 +66,7 @@ nix flake show --json --all-systems > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-assert show_output == { };
+assert show_output == { formatter = { x86_64-linux = null; }; };
 true
 '
 

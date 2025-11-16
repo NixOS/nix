@@ -162,6 +162,8 @@ public:
 
     bool isDerivation();
 
+    bool isNull();
+
     Value & forceValue();
 
     /**

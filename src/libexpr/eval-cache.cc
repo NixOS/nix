@@ -1,3 +1,4 @@
+#include "nix/expr/value.hh"
 #include "nix/util/users.hh"
 #include "nix/expr/eval-cache.hh"
 #include "nix/store/sqlite.hh"
@@ -694,6 +695,14 @@ std::vector<Symbol> AttrCursor::getAttrs()
         cachedValue = {root->db->setAttrs(getKey(), attrs), attrs};
 
     return attrs;
+}
+
+bool AttrCursor::isNull()
+{
+    // <<< TODO: caching? >>>
+    auto & v = forceValue();
+
+    return v.type() == nNull;
 }
 
 bool AttrCursor::isDerivation()
