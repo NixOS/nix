@@ -189,7 +189,6 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto registry = getRegistry();
         auto ref = parseFlakeRef(fetchSettings, url);
         auto lockedRef = parseFlakeRef(fetchSettings, locked);
-        registry->remove(ref.input);
         auto resolvedInput = lockedRef.resolve(fetchSettings, store).input;
         auto resolved = resolvedInput.getAccessor(fetchSettings, store).second;
         if (!resolved.isLocked(fetchSettings))
@@ -197,6 +196,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "")
             extraAttrs["dir"] = ref.subdir;
+        registry->remove(ref.input);
         registry->add(ref.input, resolved, extraAttrs);
         registry->write(getRegistryPath());
     }
