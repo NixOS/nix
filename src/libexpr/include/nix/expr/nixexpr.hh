@@ -395,9 +395,9 @@ struct ExprAttrs : Expr
         }
     };
 
-    typedef std::map<Symbol, AttrDef> AttrDefs;
+    typedef std::pmr::map<Symbol, AttrDef> AttrDefs;
     AttrDefs attrs;
-    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
+    std::unique_ptr<std::pmr::vector<Expr *>> inheritFromExprs;
 
     struct DynamicAttrDef
     {
@@ -409,7 +409,7 @@ struct ExprAttrs : Expr
             , pos(pos) {};
     };
 
-    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
+    typedef std::pmr::vector<DynamicAttrDef> DynamicAttrDefs;
     DynamicAttrDefs dynamicAttrs;
     ExprAttrs(const PosIdx & pos)
         : recursive(false)
