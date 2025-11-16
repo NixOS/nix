@@ -107,3 +107,26 @@ in
 assert show_output.packages.${builtins.currentSystem}.default == { };
 true
 '
+
+
+# Test that nix keeps going even when packages.$SYSTEM contains not derivations
+cat >flake.nix <<EOF
+{
+  outputs = inputs: {
+    packages.$system = {
+      drv1 = import ./simple.nix;
+      not-a-derivation = 42;
+      drv2 = import ./simple.nix;
+    };
+  };
+}
+EOF
+nix flake show --json --all-systems > show-output.json
+# shellcheck disable=SC2016
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output.packages.${builtins.currentSystem}.not-a-derivation == {};
+true
+'
+
