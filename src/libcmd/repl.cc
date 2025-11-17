@@ -739,7 +739,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
     auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
     if (evalSettings.pureEval && !flakeRef.input.isLocked(fetchSettings))
-        throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
+        throw Error("cannot use ':load-flake' on unlocked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
