@@ -517,6 +517,16 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     conn.processStderr();
 }
 
+void RemoteStore::submitOutput(const SingleDerivedPath & path, const OutputName & output)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::SubmitOutput;
+    WorkerProto::Serialise<SingleDerivedPath>::write(*this, *conn, path);
+    conn->to << output;
+    conn.processStderr();
+    readInt(conn->from);
+}
+
 void RemoteStore::queryRealisationUncached(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {

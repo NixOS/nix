@@ -6,6 +6,7 @@
 #include <string>
 
 #include "nix/store/store-api.hh"
+#include "nix/store/submit-store.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
@@ -46,7 +47,7 @@ public:
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore
+struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore, public virtual SubmitStore
 {
 private:
     void anchor() override;
@@ -112,6 +113,8 @@ public:
     addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     void registerDrvOutput(const Realisation & info) override;
+
+    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
 
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;

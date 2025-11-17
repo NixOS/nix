@@ -120,6 +120,12 @@ struct WorkerProto
     static const Version minimum;
 
     /**
+     * Static version for the `builder-rpc-v0` feature.
+     * Should never change, as any modification would be derivation-visible.
+     */
+    static const Version builderRpcV0;
+
+    /**
      * Feature for transmitting `UnkeyedRealisation` and `DrvOutput`
      * using drvPath (store path) instead of the old hash-based JSON format.
      */
@@ -256,6 +262,7 @@ enum struct WorkerProto::Op : uint64_t {
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    SubmitOutput = 1000, // Only used within derivations with feature
 };
 
 struct WorkerProto::ClientHandshakeInfo
@@ -324,6 +331,8 @@ inline std::ostream & operator<<(std::ostream & s, WorkerProto::Op op)
 
 template<>
 DECLARE_WORKER_SERIALISER(DerivedPath);
+template<>
+DECLARE_WORKER_SERIALISER(SingleDerivedPath);
 template<>
 DECLARE_WORKER_SERIALISER(BuildResult);
 template<>
