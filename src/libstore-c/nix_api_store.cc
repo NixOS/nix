@@ -338,4 +338,54 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
     NIXC_CATCH_ERRS_NULL
 }
 
+nix_err nix_store_query_path_info(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    void * userdata,
+    nix_get_string_callback callback)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(store_path->path);
+        if (callback) {
+            auto result = info->toJSON(&*store->ptr, true).dump();
+            callback(result.data(), result.size(), userdata);
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        std::span<const StorePath * const> paths_span(store_paths, num_store_paths);
+
+        std::vector<nix::DerivedPath> derived_paths;
+        for (const StorePath * store_path : paths_span) {
+            derived_paths.push_back(nix::SingleDerivedPath::Opaque{store_path->path});
+        }
+
+        auto results = store->ptr->buildPathsWithResults(derived_paths);
+        for (auto & result : results) {
+            if (callback) {
+                callback(
+                    userdata,
+                    result.path.to_string(store->ptr->config).c_str(),
+                    static_cast<nlohmann::json>(result).dump().c_str());
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
 } // extern "C"

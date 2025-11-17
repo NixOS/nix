@@ -259,6 +259,46 @@ nix_err nix_store_get_fs_closure(
  */
 nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * store, const StorePath * path);
 
+/**
+ * @brief Queries for the nix store path info JSON.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] path A store path
+ * @param[in] userdata The data to pass to the callback
+ * @param[in] callback Called for when the path info is resolved
+ */
+nix_err nix_store_query_path_info(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    void * userdata,
+    nix_get_string_callback callback);
+
+/**
+ * @brief Builds the paths, if they are a derivation then they get built.
+ *
+ * @note Path and result for the callback only exist for the lifetime of
+ * the call. Result is a string containing the build result in JSON.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] store_paths Pointer to list of nix store paths
+ * @param[in] num_store_paths Number of nix store paths
+ * @param[in] callback The callback to trigger for each build result. Called with:
+ *   - userdata: user-provided data
+ *   - path: the path that was built (string, only valid for duration of callback)
+ *   - result: JSON string of the build result (only valid for duration of callback)
+ * @param[in] userdata User data to pass to the callback
+ */
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata);
+
 // cffi end
 #ifdef __cplusplus
 }
