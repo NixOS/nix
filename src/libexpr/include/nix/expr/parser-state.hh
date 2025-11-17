@@ -126,8 +126,8 @@ inline void ParserState::addAttr(
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
         ExprAttrs * nested;
         if (i->symbol) {
-            ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(i->symbol);
-            if (j != attrs->attrs.end()) {
+            ExprAttrs::AttrDefs::iterator j = attrs->attrs->find(i->symbol);
+            if (j != attrs->attrs->end()) {
                 nested = dynamic_cast<ExprAttrs *>(j->second.e);
                 if (!nested) {
                     attrPath.erase(i + 1, attrPath.end());
@@ -135,11 +135,11 @@ inline void ParserState::addAttr(
                 }
             } else {
                 nested = exprs.add<ExprAttrs>();
-                attrs->attrs[i->symbol] = ExprAttrs::AttrDef(nested, pos);
+                (*attrs->attrs)[i->symbol] = ExprAttrs::AttrDef(nested, pos);
             }
         } else {
             nested = exprs.add<ExprAttrs>();
-            attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
+            attrs->dynamicAttrs->push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
         }
         attrs = nested;
     }
@@ -148,7 +148,7 @@ inline void ParserState::addAttr(
     if (i->symbol) {
         addAttr(attrs, attrPath, i->symbol, ExprAttrs::AttrDef(e, pos));
     } else {
-        attrs->dynamicAttrs.push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
+        attrs->dynamicAttrs->push_back(ExprAttrs::DynamicAttrDef(i->expr, e, pos));
     }
 
     auto it = lexerState.positionToDocComment.find(pos);
@@ -165,8 +165,8 @@ inline void ParserState::addAttr(
 inline void
 ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def)
 {
-    ExprAttrs::AttrDefs::iterator j = attrs->attrs.find(symbol);
-    if (j != attrs->attrs.end()) {
+    ExprAttrs::AttrDefs::iterator j = attrs->attrs->find(symbol);
+    if (j != attrs->attrs->end()) {
         // This attr path is already defined. However, if both
         // e and the expr pointed by the attr path are two attribute sets,
         // we want to merge them.
@@ -182,7 +182,7 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
         if (jAttrs && ae) {
             if (ae->inheritFromExprs && !jAttrs->inheritFromExprs)
                 jAttrs->inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>();
-            for (auto & ad : ae->attrs) {
+            for (auto & ad : *ae->attrs) {
                 if (ad.second.kind == ExprAttrs::AttrDef::Kind::InheritedFrom) {
                     auto & sel = dynamic_cast<ExprSelect &>(*ad.second.e);
                     auto & from = dynamic_cast<ExprInheritFrom &>(*sel.e);
@@ -192,12 +192,12 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
                 addAttr(jAttrs, attrPath, ad.first, std::move(ad.second));
                 attrPath.pop_back();
             }
-            ae->attrs.clear();
-            jAttrs->dynamicAttrs.insert(
-                jAttrs->dynamicAttrs.end(),
-                std::make_move_iterator(ae->dynamicAttrs.begin()),
-                std::make_move_iterator(ae->dynamicAttrs.end()));
-            ae->dynamicAttrs.clear();
+            ae->attrs->clear();
+            jAttrs->dynamicAttrs->insert(
+                jAttrs->dynamicAttrs->end(),
+                std::make_move_iterator(ae->dynamicAttrs->begin()),
+                std::make_move_iterator(ae->dynamicAttrs->end()));
+            ae->dynamicAttrs->clear();
             if (ae->inheritFromExprs) {
                 jAttrs->inheritFromExprs->insert(
                     jAttrs->inheritFromExprs->end(),
@@ -210,7 +210,7 @@ ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symb
         }
     } else {
         // This attr path is not defined. Let's create it.
-        attrs->attrs.emplace(symbol, def);
+        attrs->attrs->emplace(symbol, def);
         def.e->setName(symbol);
     }
 }
