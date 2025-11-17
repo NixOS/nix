@@ -174,7 +174,7 @@ jobs:
         echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
         TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
         echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@7ec16f2c061ab07b235a7245e06ed46fe9a1cab6 # v31.8.3
+    - uses: cachix/install-nix-action@0b0e072294b088b73964f1d72dfdac0951439dbd # v31.8.4
       if: ${{ !matrix.experimental-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
