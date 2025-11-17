@@ -229,13 +229,6 @@ constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
 
 /**
- * Remove common leading whitespace from the lines in the string
- * 's'. For example, if every line is indented by at least 3 spaces,
- * then we remove 3 spaces from the start of every line.
- */
-std::string stripIndentation(std::string_view s);
-
-/**
  * Get the prefix of 's' up to and excluding the next line break (LF
  * optionally preceded by CR), and the remainder following the line
  * break.

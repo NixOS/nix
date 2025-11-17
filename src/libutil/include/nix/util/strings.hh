@@ -133,6 +133,13 @@ std::string optionalBracket(std::string_view prefix, const std::optional<T> & co
 }
 
 /**
+ * Remove common leading whitespace from the lines in the string
+ * 's'. For example, if every line is indented by at least 3 spaces,
+ * then we remove 3 spaces from the start of every line.
+ */
+std::string stripIndentation(std::string_view s);
+
+/**
  * Hash implementation that can be used for zero-copy heterogenous lookup from
  * P1690R1[1] in unordered containers.
  *

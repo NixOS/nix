@@ -114,4 +114,69 @@ std::string dropEmptyInitThenConcatStringsSep(const std::string_view sep, const 
     return s;
 }
 
+/**
+ * Consteval helper for the "constexpr 2-step" pattern.
+ * Converts a std::string to a std::array<char, N> for stable compile-time storage.
+ *
+ * Usage:
+ *   static constexpr auto str = stripIndentationConsteval(...);
+ *   static constexpr auto arr = toArray<str.size()>(str);
+ *   static constexpr std::string_view view{arr.data(), arr.size()};
+ */
+template<size_t N>
+consteval std::string_view toArray(const std::string & s)
+{
+    static std::array<char, N> arr{};
+    for (size_t i = 0; i < N; ++i) {
+        arr[i] = s[i];
+    }
+    return {arr.data(), N};
+}
+
+constexpr std::string stripIndentationImpl(std::string_view s)
+{
+    size_t minIndent = 10000;
+    size_t curIndent = 0;
+    bool atStartOfLine = true;
+
+    for (auto & c : s) {
+        if (atStartOfLine && c == ' ')
+            curIndent++;
+        else if (c == '\n') {
+            if (atStartOfLine)
+                minIndent = std::max(minIndent, curIndent);
+            curIndent = 0;
+            atStartOfLine = true;
+        } else {
+            if (atStartOfLine) {
+                minIndent = std::min(minIndent, curIndent);
+                atStartOfLine = false;
+            }
+        }
+    }
+
+    std::string res;
+
+    size_t pos = 0;
+    while (pos < s.size()) {
+        auto eol = s.find('\n', pos);
+        if (eol == s.npos)
+            eol = s.size();
+        if (eol - pos > minIndent)
+            res.append(s.substr(pos + minIndent, eol - pos - minIndent));
+        res.push_back('\n');
+        pos = eol + 1;
+    }
+
+    return res;
+}
+
+template<std::string_view s>
+consteval std::string_view stripIndentationConsteval()
+{
+    constexpr auto stripped = stripIndentationImpl(s);
+    constexpr size_t n = stripped.size();
+    return toArray<n>(stripped);
+}
+
 } // namespace nix

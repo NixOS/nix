@@ -152,4 +152,8 @@ std::string optionalBracket(std::string_view prefix, std::string_view content, s
     return result;
 }
 
+std::string stripIndentation(std::string_view s) {
+    return stripIndentationImpl(s);
+}
+
 } // namespace nix
