@@ -396,8 +396,13 @@ StringSet Store::Config::getDefaultSystemFeatures()
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         res.insert("ca-derivations");
 
-    if (experimentalFeatureSettings.isEnabled(Xp::RecursiveNix))
+    if (experimentalFeatureSettings.isEnabled(Xp::RecursiveNix)) {
         res.insert("recursive-nix");
+    }
+
+    if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations)) {
+        res.insert(std::string{drvFeatureBuilderRpcV0});
+    }
 
     return res;
 }

@@ -14,6 +14,12 @@ public:
     inline static std::string operationName = "Submit outputs for a currently running derivation";
 
     /**
+     * Submit an output for the current derivation.
+     * Only makes sense when running within a recursive-nix derivation
+     */
+    virtual void submitOutput(const SingleDerivedPath & path, const OutputName & output) = 0;
+
+    /**
      * Add to store, scanning references.
      * Only within a recursive-nix derivation, as there would otherwise be no known
      * set of valid store paths

@@ -16,6 +16,11 @@
 
 namespace nix {
 
+/**
+ * String to include in requiredSystemFeatures to enable builder-rpc-v0
+ */
+static constexpr std::string_view drvFeatureBuilderRpcV0 = "builder-rpc-v0";
+
 struct StoreDirConfig;
 
 /* Abstract syntax of derivations. */

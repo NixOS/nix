@@ -25,9 +25,7 @@ const WorkerProto::Version WorkerProto::latest = {
         },
     .features =
         {
-            std::string{
-                WorkerProto::featureRealisationWithPath,
-            },
+            std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
         },
 };
@@ -37,6 +35,21 @@ const WorkerProto::Version WorkerProto::minimum = {
         {
             .major = 1,
             .minor = 18,
+        },
+};
+
+const WorkerProto::Version WorkerProto::builderRpcV0 = {
+    .number =
+        {
+            .major = 1,
+            .minor = 38,
+        },
+    .features =
+        {
+            std::string{WorkerProto::featureRealisationWithPath},
+            std::string{WorkerProto::featureDisableSetOptions},
+            std::string{WorkerProto::featureAddToStoreScanning},
+            std::string{WorkerProto::featureSubmitOutput},
         },
 };
 
@@ -225,6 +238,45 @@ void WorkerProto::Serialise<DerivedPath>::write(
             },
             sOrDrvPath);
     }
+}
+
+SingleDerivedPath
+WorkerProto::Serialise<SingleDerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto tag = readNum<uint8_t>(conn.from);
+    switch (tag) {
+    case 0:
+        return SingleDerivedPath::Opaque{
+            .path = WorkerProto::Serialise<StorePath>::read(store, conn),
+        };
+    case 1: {
+        auto drvPath = make_ref<SingleDerivedPath>(WorkerProto::Serialise<SingleDerivedPath>::read(store, conn));
+        return SingleDerivedPath::Built{
+            .drvPath = std::move(drvPath),
+            .output = readString(conn.from),
+        };
+    }
+    default:
+        throw Error("Invalid tag %d for single derived path", tag);
+    }
+}
+
+void WorkerProto::Serialise<SingleDerivedPath>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const SingleDerivedPath & req)
+{
+    std::visit(
+        overloaded{
+            [&](const SingleDerivedPath::Opaque & o) {
+                conn.to << uint8_t{0};
+                WorkerProto::write(store, conn, o.path);
+            },
+            [&](const SingleDerivedPath::Built & b) {
+                conn.to << uint8_t{1};
+                WorkerProto::write(store, conn, *b.drvPath);
+                conn.to << b.output;
+            },
+        },
+        req.raw());
 }
 
 KeyedBuildResult

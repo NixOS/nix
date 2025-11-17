@@ -375,7 +375,8 @@ static void daemonLoop(
                         // Handle the connection.
                         auto store = storeConfig->openStore();
                         store->init();
-                        processConnection(store, FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
+                        processConnection(
+                            store, FdSource(remote.get()), FdSink(remote.get()), trusted, RecursiveFlag::NotRecursive);
 
                         exit(0);
                     },
@@ -437,7 +438,8 @@ static void forwardStdioConnection(RemoteStore & store)
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    processConnection(store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, daemon::NotRecursive);
+    processConnection(
+        store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, daemon::RecursiveFlag::NotRecursive);
 }
 
 /**
