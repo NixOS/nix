@@ -1,5 +1,5 @@
 #include "nix/expr/value.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 
 #include "nix/store/tests/libstore.hh"
 #include <gtest/gtest.h>

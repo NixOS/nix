@@ -5,7 +5,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/expr/json-to-value.hh"
-#include "nix/expr/static-string-data.hh"
+#include "nix/expr/string-data-static.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
@@ -326,7 +326,7 @@ static RegisterPrimOp primop_import(
     {.name = "import",
      .args = {"path"},
      // TODO turn "normal path values" into link below
-     .doc = R"(
+     .doc = &R"(
       Load, parse, and return the Nix expression in the file *path*.
 
       > **Note**
@@ -392,7 +392,7 @@ static RegisterPrimOp primop_import(
       >  ```
       >
       >  The function argument doesn’t have to be called `x` in `foo.nix`; any name would work.
-    )",
+    )"_sds,
      .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
          import(state, pos, *args[0], nullptr, v);
      }});
@@ -532,11 +532,11 @@ static void prim_typeOf(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_typeOf({
     .name = "__typeOf",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return a string representing the type of the value *e*, namely
       `"int"`, `"bool"`, `"string"`, `"path"`, `"null"`, `"set"`,
       `"list"`, `"lambda"` or `"float"`.
-    )",
+    )"_sds,
     .fun = prim_typeOf,
 });
 
@@ -550,11 +550,11 @@ static void prim_isNull(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_isNull({
     .name = "isNull",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to `null`, and `false` otherwise.
 
       This is equivalent to `e == null`.
-    )",
+    )"_sds,
     .fun = prim_isNull,
 });
 
@@ -568,9 +568,9 @@ static void prim_isFunction(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_isFunction({
     .name = "__isFunction",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a function, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isFunction,
 });
 
@@ -584,9 +584,9 @@ static void prim_isInt(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_isInt({
     .name = "__isInt",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to an integer, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isInt,
 });
 
@@ -600,9 +600,9 @@ static void prim_isFloat(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_isFloat({
     .name = "__isFloat",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a float, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isFloat,
 });
 
@@ -616,9 +616,9 @@ static void prim_isString(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_isString({
     .name = "__isString",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a string, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isString,
 });
 
@@ -632,9 +632,9 @@ static void prim_isBool(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_isBool({
     .name = "__isBool",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a bool, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isBool,
 });
 
@@ -648,9 +648,9 @@ static void prim_isPath(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_isPath({
     .name = "__isPath",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a path, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isPath,
 });
 
@@ -864,7 +864,7 @@ static RegisterPrimOp primop_genericClosure(
         .name = "__genericClosure",
         .args = {"attrset"},
         .arity = 1,
-        .doc = R"(
+        .doc = &R"(
       `builtins.genericClosure` iteratively computes the transitive closure over an arbitrary relation defined by a function.
 
       It takes *attrset* with two attributes named `startSet` and `operator`, and returns a list of attribute sets:
@@ -913,17 +913,17 @@ static RegisterPrimOp primop_genericClosure(
       > ```nix
       > [ { key = 5; } { key = 16; } { key = 8; } { key = 4; } { key = 2; } { key = 1; } ]
       > ```
-      )",
+      )"_sds,
         .fun = prim_genericClosure,
     });
 
 static RegisterPrimOp primop_break(
     {.name = "break",
      .args = {"v"},
-     .doc = R"(
+     .doc = &R"(
       In debug mode (enabled using `--debugger`), pause Nix expression evaluation and enter the REPL.
       Otherwise, return the argument `v`.
-    )",
+    )"_sds,
      .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
          if (state.canDebug()) {
              auto error = Error(
@@ -943,9 +943,9 @@ static RegisterPrimOp primop_break(
 static RegisterPrimOp primop_abort(
     {.name = "abort",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Abort Nix expression evaluation and print the error message *s*.
-    )",
+    )"_sds,
      .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
          NixStringContext context;
          auto s =
@@ -959,13 +959,13 @@ static RegisterPrimOp primop_abort(
 static RegisterPrimOp primop_throw(
     {.name = "throw",
      .args = {"s"},
-     .doc = R"(
+     .doc = &R"(
       Throw an error message *s*. This usually aborts Nix expression
       evaluation, but in `nix-env -qa` and other commands that try to
       evaluate a set of derivations to get information about those
       derivations, a derivation that throws an error is silently skipped
       (which is not the case for `abort`).
-    )",
+    )"_sds,
      .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
          NixStringContext context;
          auto s =
@@ -1045,7 +1045,7 @@ static void prim_ceil(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_ceil({
     .name = "__ceil",
     .args = {"number"},
-    .doc = R"(
+    .doc = &R"(
         Rounds and converts *number* to the next higher NixInt value if possible, i.e. `ceil *number* >= *number*` and
         `ceil *number* - *number* < 1`.
 
@@ -1055,7 +1055,7 @@ static RegisterPrimOp primop_ceil({
 
         If the datatype of *number* is neither a NixInt (signed 64-bit integer) nor a NixFloat
         (IEEE-754 double-precision floating-point number), an evaluation error is thrown.
-    )",
+    )"_sds,
     .fun = prim_ceil,
 });
 
@@ -1100,7 +1100,7 @@ static void prim_floor(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_floor({
     .name = "__floor",
     .args = {"number"},
-    .doc = R"(
+    .doc = &R"(
         Rounds and converts *number* to the next lower NixInt value if possible, i.e. `floor *number* <= *number*` and
         `*number* - floor *number* < 1`.
 
@@ -1110,7 +1110,7 @@ static RegisterPrimOp primop_floor({
 
         If the datatype of *number* is neither a NixInt (signed 64-bit integer) nor a NixFloat
         (IEEE-754 double-precision floating-point number), an evaluation error will be thrown.
-    )",
+    )"_sds,
     .fun = prim_floor,
 });
 
@@ -1150,7 +1150,7 @@ static void prim_tryEval(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_tryEval({
     .name = "__tryEval",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Try to shallowly evaluate *e*. Return a set containing the
       attributes `success` (`true` if *e* evaluated successfully,
       `false` if an error was thrown) and `value`, equalling *e* if
@@ -1167,7 +1167,7 @@ static RegisterPrimOp primop_tryEval({
 
       `tryEval` intentionally does not return the error message, because that risks bringing non-determinism into the evaluation result, and it would become very difficult to improve error reporting without breaking existing expressions.
       Instead, use [`builtins.addErrorContext`](@docroot@/language/builtins.md#builtins-addErrorContext) to add context to the error message, and use a Nix unit testing tool for testing.
-    )",
+    )"_sds,
     .fun = prim_tryEval,
 });
 
@@ -1182,7 +1182,7 @@ static void prim_getEnv(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_getEnv({
     .name = "__getEnv",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
       `getEnv` returns the value of the environment variable *s*, or an
       empty string if the variable doesn’t exist. This function should be
       used with care, as it can introduce all sorts of nasty environment
@@ -1192,7 +1192,7 @@ static RegisterPrimOp primop_getEnv({
       `~/.nixpkgs/config.nix`, which contains user-local settings for Nix
       Packages. (That is, it does a `getEnv "HOME"` to locate the user’s
       home directory.)
-    )",
+    )"_sds,
     .fun = prim_getEnv,
 });
 
@@ -1207,10 +1207,10 @@ static void prim_seq(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_seq({
     .name = "__seq",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Evaluate *e1*, then evaluate and return *e2*. This ensures that a
       computation is strict in the value of *e1*.
-    )",
+    )"_sds,
     .fun = prim_seq,
 });
 
@@ -1226,11 +1226,11 @@ static void prim_deepSeq(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_deepSeq({
     .name = "__deepSeq",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       This is like `seq e1 e2`, except that *e1* is evaluated *deeply*:
       if it’s a list or set, its elements or attributes are also
       evaluated recursively.
-    )",
+    )"_sds,
     .fun = prim_deepSeq,
 });
 
@@ -1253,7 +1253,7 @@ static void prim_trace(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_trace({
     .name = "__trace",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Evaluate *e1* and print its abstract syntax representation on
       standard error. Then return *e2*. This function is useful for
       debugging.
@@ -1263,7 +1263,7 @@ static RegisterPrimOp primop_trace({
       option is set to `true` and the `--debugger` flag is given, the
       interactive debugger is started when `trace` is called (like
       [`break`](@docroot@/language/builtins.md#builtins-break)).
-    )",
+    )"_sds,
     .fun = prim_trace,
 });
 
@@ -1299,7 +1299,7 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_warn({
     .name = "__warn",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Evaluate *e1*, which must be a string, and print it on standard error as a warning.
       Then return *e2*.
       This function is useful for non-critical situations where attention is advisable.
@@ -1315,7 +1315,7 @@ static RegisterPrimOp primop_warn({
       [`abort-on-warn`](@docroot@/command-ref/conf-file.md#conf-abort-on-warn)
       option is set, the evaluation is aborted after the warning is printed.
       This is useful to reveal the stack trace of the warning, when the context is non-interactive and a debugger can not be launched.
-    )",
+    )"_sds,
     .fun = prim_warn,
 });
 
@@ -1849,7 +1849,7 @@ static void prim_placeholder(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_placeholder({
     .name = "placeholder",
     .args = {"output"},
-    .doc = R"(
+    .doc = &R"(
       Return an
       [output placeholder string](@docroot@/store/derivation/index.md#output-placeholder)
       for the specified *output* that will be substituted by the corresponding
@@ -1857,7 +1857,7 @@ static RegisterPrimOp primop_placeholder({
       at build time.
 
       Typical outputs would be `"out"`, `"bin"` or `"dev"`.
-    )",
+    )"_sds,
     .fun = prim_placeholder,
 });
 
@@ -1878,10 +1878,10 @@ static void prim_toPath(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_toPath({
     .name = "__toPath",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
       **DEPRECATED.** Use `/. + "/path"` to convert a string into an absolute
       path. For relative paths, use `./. + "/path"`.
-    )",
+    )"_sds,
     .fun = prim_toPath,
 });
 
@@ -1921,7 +1921,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_storePath({
     .name = "__storePath",
     .args = {"path"},
-    .doc = R"(
+    .doc = &R"(
       This function allows you to define a dependency on an already
       existing store path. For example, the derivation attribute `src
       = builtins.storePath /nix/store/f1d18v1y…-source` causes the
@@ -1934,7 +1934,7 @@ static RegisterPrimOp primop_storePath({
       Not available in [pure evaluation mode](@docroot@/command-ref/conf-file.md#conf-pure-eval).
 
       See also [`builtins.fetchClosure`](#builtins-fetchClosure).
-    )",
+    )"_sds,
     .fun = prim_storePath,
 });
 
@@ -1962,10 +1962,10 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_pathExists({
     .name = "__pathExists",
     .args = {"path"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if the path *path* exists at evaluation time, and
       `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_pathExists,
 });
 
@@ -2004,7 +2004,7 @@ static void prim_baseNameOf(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_baseNameOf({
     .name = "baseNameOf",
     .args = {"x"},
-    .doc = R"(
+    .doc = &R"(
       Return the *base name* of either a [path value](@docroot@/language/types.md#type-path) *x* or a string *x*, depending on which type is passed, and according to the following rules.
 
       For a path value, the *base name* is considered to be the part of the path after the last directory separator, including any file extensions.
@@ -2015,7 +2015,7 @@ static RegisterPrimOp primop_baseNameOf({
       After this, the *base name* is returned as previously described, assuming `/` as the directory separator. (Note that evaluation must be platform independent.)
 
       This is somewhat similar to the [GNU `basename`](https://www.gnu.org/software/coreutils/manual/html_node/basename-invocation.html) command, but GNU `basename` strips any number of trailing slashes.
-    )",
+    )"_sds,
     .fun = prim_baseNameOf,
 });
 
@@ -2045,11 +2045,11 @@ static void prim_dirOf(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_dirOf({
     .name = "dirOf",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
       Return the directory part of the string *s*, that is, everything
       before the final slash in the string. This is similar to the GNU
       `dirname` command.
-    )",
+    )"_sds,
     .fun = prim_dirOf,
 });
 
@@ -2086,9 +2086,9 @@ static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_readFile({
     .name = "__readFile",
     .args = {"path"},
-    .doc = R"(
+    .doc = &R"(
       Return the contents of the file *path* as a string.
-    )",
+    )"_sds,
     .fun = prim_readFile,
 });
 
@@ -2151,7 +2151,7 @@ static RegisterPrimOp primop_findFile(
     PrimOp{
         .name = "__findFile",
         .args = {"search-path", "lookup-path"},
-        .doc = R"(
+        .doc = &R"(
       Find *lookup-path* in *search-path*.
 
       [Lookup path](@docroot@/language/constructs/lookup-path.md) expressions are [desugared](https://en.wikipedia.org/wiki/Syntactic_sugar) using this and [`builtins.nixPath`](#builtins-nixPath):
@@ -2278,7 +2278,7 @@ static RegisterPrimOp primop_findFile(
       > ```
       >
       > makes `<nixpkgs>` refer to a particular branch of the `NixOS/nixpkgs` repository on GitHub.
-    )",
+    )"_sds,
         .fun = prim_findFile,
     });
 
@@ -2299,11 +2299,11 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_hashFile({
     .name = "__hashFile",
     .args = {"type", "p"},
-    .doc = R"(
+    .doc = &R"(
       Return a base-16 representation of the cryptographic hash of the
       file at path *p*. The hash algorithm specified by *type* must be one
       of `"md5"`, `"sha1"`, `"sha256"` or `"sha512"`.
-    )",
+    )"_sds,
     .fun = prim_hashFile,
 });
 
@@ -2351,10 +2351,10 @@ static void prim_readFileType(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_readFileType({
     .name = "__readFileType",
     .args = {"p"},
-    .doc = R"(
+    .doc = &R"(
       Determine the directory entry type of a filesystem node, being
       one of `"directory"`, `"regular"`, `"symlink"`, or `"unknown"`.
-    )",
+    )"_sds,
     .fun = prim_readFileType,
 });
 
@@ -2401,7 +2401,7 @@ static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_readDir({
     .name = "__readDir",
     .args = {"path"},
-    .doc = R"(
+    .doc = &R"(
       Return the contents of the directory *path* as a set mapping
       directory entries to the corresponding file type. For instance, if
       directory `A` contains a regular file `B` and another directory
@@ -2413,7 +2413,7 @@ static RegisterPrimOp primop_readDir({
 
       The possible values for the file type are `"regular"`,
       `"directory"`, `"symlink"` and `"unknown"`.
-    )",
+    )"_sds,
     .fun = prim_readDir,
 });
 
@@ -2437,7 +2437,7 @@ static void prim_outputOf(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_outputOf({
     .name = "__outputOf",
     .args = {"derivation-reference", "output-name"},
-    .doc = R"(
+    .doc = &R"(
       Return the output path of a derivation, literally or using an
       [input placeholder string](@docroot@/store/derivation/index.md#input-placeholder)
       if needed.
@@ -2459,7 +2459,7 @@ static RegisterPrimOp primop_outputOf({
       returns an input placeholder for the output of the output of `myDrv`.
 
       This primop corresponds to the `^` sigil for [deriving paths](@docroot@/glossary.md#gloss-deriving-path), e.g. as part of installable syntax on the command line.
-    )",
+    )"_sds,
     .fun = prim_outputOf,
     .experimentalFeature = Xp::DynamicDerivations,
 });
@@ -2482,7 +2482,7 @@ static void prim_toXML(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_toXML({
     .name = "__toXML",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return a string containing an XML representation of *e*. The main
       application for `toXML` is to communicate information with the
       builder in a more structured format than plain environment
@@ -2572,7 +2572,7 @@ static RegisterPrimOp primop_toXML({
       the stylesheet “inline” in the Nix expression. The path of the
       stylesheet is spliced into the builder using the syntax `xsltproc
       ${stylesheet}`.
-    )",
+    )"_sds,
     .fun = prim_toXML,
 });
 
@@ -2590,14 +2590,14 @@ static void prim_toJSON(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_toJSON({
     .name = "__toJSON",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return a string containing a JSON representation of *e*. Strings,
       integers, floats, booleans, nulls and lists are mapped to their JSON
       equivalents. Sets (except derivations) are represented as objects.
       Derivations are translated to a JSON string containing the
       derivation’s output path. Paths are copied to the store and
       represented as a JSON string of the resulting store path.
-    )",
+    )"_sds,
     .fun = prim_toJSON,
 });
 
@@ -2616,7 +2616,7 @@ static void prim_fromJSON(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_fromJSON({
     .name = "__fromJSON",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Convert a JSON string to a Nix value. For example,
 
       ```nix
@@ -2624,7 +2624,7 @@ static RegisterPrimOp primop_fromJSON({
       ```
 
       returns the value `{ x = [ 1 2 3 ]; y = null; }`.
-    )",
+    )"_sds,
     .fun = prim_fromJSON,
 });
 
@@ -2682,7 +2682,7 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_toFile({
     .name = "__toFile",
     .args = {"name", "s"},
-    .doc = R"(
+    .doc = &R"(
       Store the string *s* in a file in the Nix store and return its
       path.  The file has suffix *name*. This file can be used as an
       input to derivations. One application is to write builders
@@ -2752,7 +2752,7 @@ static RegisterPrimOp primop_toFile({
       It is also not possible to reference the result of a derivation. If
       you are using Nixpkgs, the `writeTextFile` function is able to do
       that.
-    )",
+    )"_sds,
     .fun = prim_toFile,
 });
 
@@ -2844,7 +2844,7 @@ static void prim_filterSource(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_filterSource({
     .name = "__filterSource",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       > **Warning**
       >
       > `filterSource` should not be used to filter store paths. Since
@@ -2892,7 +2892,7 @@ static RegisterPrimOp primop_filterSource({
       cannot be copied to the Nix store, so if the predicate returns
       `true` for them, the copy fails). If you exclude a directory,
       the entire corresponding subtree of *e2* is excluded.
-    )",
+    )"_sds,
     .fun = prim_filterSource,
 });
 
@@ -2946,7 +2946,7 @@ static void prim_path(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_path({
     .name = "__path",
     .args = {"args"},
-    .doc = R"(
+    .doc = &R"(
       An enrichment of the built-in path type, based on the attributes
       present in *args*. All are optional except `path`:
 
@@ -2974,7 +2974,7 @@ static RegisterPrimOp primop_path({
           path. Evaluation fails if the hash is incorrect, and
           providing a hash allows `builtins.path` to be used even when the
           `pure-eval` nix config option is on.
-    )",
+    )"_sds,
     .fun = prim_path,
 });
 
@@ -3001,11 +3001,11 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_attrNames({
     .name = "__attrNames",
     .args = {"set"},
-    .doc = R"(
+    .doc = &R"(
       Return the names of the attributes in the set *set* in an
       alphabetically sorted list. For instance, `builtins.attrNames { y
       = 1; x = "foo"; }` evaluates to `[ "x" "y" ]`.
-    )",
+    )"_sds,
     .fun = prim_attrNames,
 });
 
@@ -3034,10 +3034,10 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_attrValues({
     .name = "__attrValues",
     .args = {"set"},
-    .doc = R"(
+    .doc = &R"(
       Return the values of the attributes in the set *set* in the order
       corresponding to the sorted attribute names.
-    )",
+    )"_sds,
     .fun = prim_attrValues,
 });
 
@@ -3057,12 +3057,12 @@ void prim_getAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 static RegisterPrimOp primop_getAttr({
     .name = "__getAttr",
     .args = {"s", "set"},
-    .doc = R"(
+    .doc = &R"(
       `getAttr` returns the attribute named *s* from *set*. Evaluation
       aborts if the attribute doesn’t exist. This is a dynamic version of
       the `.` operator, since *s* is an expression rather than an
       identifier.
-    )",
+    )"_sds,
     .fun = prim_getAttr,
 });
 
@@ -3084,11 +3084,11 @@ static RegisterPrimOp primop_unsafeGetAttrPos(
         .name = "__unsafeGetAttrPos",
         .args = {"s", "set"},
         .arity = 2,
-        .doc = R"(
+        .doc = &R"(
       `unsafeGetAttrPos` returns the position of the attribute named *s*
       from *set*. This is used by Nixpkgs to provide location information
       in error messages.
-    )",
+    )"_sds,
         .fun = prim_unsafeGetAttrPos,
     });
 
@@ -3146,11 +3146,11 @@ static void prim_hasAttr(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_hasAttr({
     .name = "__hasAttr",
     .args = {"s", "set"},
-    .doc = R"(
+    .doc = &R"(
       `hasAttr` returns `true` if *set* has an attribute named *s*, and
       `false` otherwise. This is a dynamic version of the `?` operator,
       since *s* is an expression rather than an identifier.
-    )",
+    )"_sds,
     .fun = prim_hasAttr,
 });
 
@@ -3164,9 +3164,9 @@ static void prim_isAttrs(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_isAttrs({
     .name = "__isAttrs",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a set, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isAttrs,
 });
 
@@ -3200,7 +3200,7 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_removeAttrs({
     .name = "removeAttrs",
     .args = {"set", "list"},
-    .doc = R"(
+    .doc = &R"(
       Remove the attributes listed in *list* from *set*. The attributes
       don’t have to exist in *set*. For instance,
 
@@ -3209,7 +3209,7 @@ static RegisterPrimOp primop_removeAttrs({
       ```
 
       evaluates to `{ y = 2; }`.
-    )",
+    )"_sds,
     .fun = prim_removeAttrs,
 });
 
@@ -3272,7 +3272,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_listToAttrs({
     .name = "__listToAttrs",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Construct a set from a list specifying the names and values of each
       attribute. Each element of the list should be a set consisting of a
       string-valued attribute `name` specifying the name of the attribute,
@@ -3296,7 +3296,7 @@ static RegisterPrimOp primop_listToAttrs({
       ```nix
       { foo = 123; bar = 456; }
       ```
-    )",
+    )"_sds,
     .fun = prim_listToAttrs,
 });
 
@@ -3368,12 +3368,12 @@ static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** ar
 static RegisterPrimOp primop_intersectAttrs({
     .name = "__intersectAttrs",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return a set consisting of the attributes in the set *e2* which have the
       same name as some attribute in *e1*.
 
       Performs in O(*n* log *m*) where *n* is the size of the smaller set and *m* the larger set's size.
-    )",
+    )"_sds,
     .fun = prim_intersectAttrs,
 });
 
@@ -3402,7 +3402,7 @@ static void prim_catAttrs(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_catAttrs({
     .name = "__catAttrs",
     .args = {"attr", "list"},
-    .doc = R"(
+    .doc = &R"(
       Collect each attribute named *attr* from a list of attribute
       sets.  Attrsets that don't contain the named attribute are
       ignored. For example,
@@ -3412,7 +3412,7 @@ static RegisterPrimOp primop_catAttrs({
       ```
 
       evaluates to `[1 2]`.
-    )",
+    )"_sds,
     .fun = prim_catAttrs,
 });
 
@@ -3445,7 +3445,7 @@ static void prim_functionArgs(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_functionArgs({
     .name = "__functionArgs",
     .args = {"f"},
-    .doc = R"(
+    .doc = &R"(
       Return a set containing the names of the formal arguments expected
       by the function *f*. The value of each attribute is a Boolean
       denoting whether the corresponding argument has a default value. For
@@ -3455,7 +3455,7 @@ static RegisterPrimOp primop_functionArgs({
       "Formal argument" here refers to the attributes pattern-matched by
       the function. Plain lambdas are not included, e.g. `functionArgs (x:
       ...) = { }`.
-    )",
+    )"_sds,
     .fun = prim_functionArgs,
 });
 
@@ -3479,7 +3479,7 @@ static void prim_mapAttrs(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_mapAttrs({
     .name = "__mapAttrs",
     .args = {"f", "attrset"},
-    .doc = R"(
+    .doc = &R"(
       Apply function *f* to every element of *attrset*. For example,
 
       ```nix
@@ -3487,7 +3487,7 @@ static RegisterPrimOp primop_mapAttrs({
       ```
 
       evaluates to `{ a = 10; b = 20; }`.
-    )",
+    )"_sds,
     .fun = prim_mapAttrs,
 });
 
@@ -3549,7 +3549,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_zipAttrsWith({
     .name = "__zipAttrsWith",
     .args = {"f", "list"},
-    .doc = R"(
+    .doc = &R"(
       Transpose a list of attribute sets into an attribute set of lists,
       then apply `mapAttrs`.
 
@@ -3574,7 +3574,7 @@ static RegisterPrimOp primop_zipAttrsWith({
         b = { name = "b"; values = [ "z" ]; };
       }
       ```
-    )",
+    )"_sds,
     .fun = prim_zipAttrsWith,
 });
 
@@ -3592,9 +3592,9 @@ static void prim_isList(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_isList({
     .name = "__isList",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if *e* evaluates to a list, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_isList,
 });
 
@@ -3615,10 +3615,10 @@ static void prim_elemAt(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_elemAt({
     .name = "__elemAt",
     .args = {"xs", "n"},
-    .doc = R"(
+    .doc = &R"(
       Return element *n* from the list *xs*. Elements are counted starting
       from 0. A fatal error occurs if the index is out of bounds.
-    )",
+    )"_sds,
     .fun = prim_elemAt,
 });
 
@@ -3635,11 +3635,11 @@ static void prim_head(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_head({
     .name = "__head",
     .args = {"list"},
-    .doc = R"(
+    .doc = &R"(
       Return the first element of a list; abort evaluation if the argument
       isn’t a list or is an empty list. You can test whether a list is
       empty by comparing it with `[]`.
-    )",
+    )"_sds,
     .fun = prim_head,
 });
 
@@ -3661,7 +3661,7 @@ static void prim_tail(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_tail({
     .name = "__tail",
     .args = {"list"},
-    .doc = R"(
+    .doc = &R"(
       Return the list without its first item; abort evaluation if
       the argument isn’t a list or is an empty list.
 
@@ -3670,7 +3670,7 @@ static RegisterPrimOp primop_tail({
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.
-    )",
+    )"_sds,
     .fun = prim_tail,
 });
 
@@ -3695,7 +3695,7 @@ static void prim_map(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_map({
     .name = "map",
     .args = {"f", "list"},
-    .doc = R"(
+    .doc = &R"(
       Apply the function *f* to each element in the list *list*. For
       example,
 
@@ -3704,7 +3704,7 @@ static RegisterPrimOp primop_map({
       ```
 
       evaluates to `[ "foobar" "foobla" "fooabc" ]`.
-    )",
+    )"_sds,
     .fun = prim_map,
 });
 
@@ -3750,10 +3750,10 @@ static void prim_filter(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_filter({
     .name = "__filter",
     .args = {"f", "list"},
-    .doc = R"(
+    .doc = &R"(
       Return a list consisting of the elements of *list* for which the
       function *f* returns `true`.
-    )",
+    )"_sds,
     .fun = prim_filter,
 });
 
@@ -3773,10 +3773,10 @@ static void prim_elem(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_elem({
     .name = "__elem",
     .args = {"x", "xs"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if a value equal to *x* occurs in the list *xs*, and
       `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_elem,
 });
 
@@ -3796,9 +3796,9 @@ static void prim_concatLists(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_concatLists({
     .name = "__concatLists",
     .args = {"lists"},
-    .doc = R"(
+    .doc = &R"(
       Concatenate a list of lists into a single list.
-    )",
+    )"_sds,
     .fun = prim_concatLists,
 });
 
@@ -3812,9 +3812,9 @@ static void prim_length(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_length({
     .name = "__length",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return the length of the list *e*.
-    )",
+    )"_sds,
     .fun = prim_length,
 });
 
@@ -3844,7 +3844,7 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_foldlStrict({
     .name = "__foldl'",
     .args = {"op", "nul", "list"},
-    .doc = R"(
+    .doc = &R"(
       Reduce a list by applying a binary operator, from left to right,
       e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
       ...`.
@@ -3857,7 +3857,7 @@ static RegisterPrimOp primop_foldlStrict({
       argument is the current element being processed. The return value
       of each application of `op` is evaluated immediately, even for
       intermediate values.
-    )",
+    )"_sds,
     .fun = prim_foldlStrict,
 });
 
@@ -3892,10 +3892,10 @@ static void prim_any(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_any({
     .name = "__any",
     .args = {"pred", "list"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if the function *pred* returns `true` for at least one
       element of *list*, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_any,
 });
 
@@ -3907,10 +3907,10 @@ static void prim_all(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_all({
     .name = "__all",
     .args = {"pred", "list"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if the function *pred* returns `true` for all elements
       of *list*, and `false` otherwise.
-    )",
+    )"_sds,
     .fun = prim_all,
 });
 
@@ -3939,7 +3939,7 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_genList({
     .name = "__genList",
     .args = {"generator", "length"},
-    .doc = R"(
+    .doc = &R"(
       Generate list of size *length*, with each element *i* equal to the
       value returned by *generator* `i`. For example,
 
@@ -3948,7 +3948,7 @@ static RegisterPrimOp primop_genList({
       ```
 
       returns the list `[ 0 1 4 9 16 ]`.
-    )",
+    )"_sds,
     .fun = prim_genList,
 });
 
@@ -4002,7 +4002,7 @@ static void prim_sort(EvalState & state, const PosIdx pos, Value ** args, Value 
 static RegisterPrimOp primop_sort({
     .name = "__sort",
     .args = {"comparator", "list"},
-    .doc = R"(
+    .doc = &R"(
       Return *list* in sorted order. It repeatedly calls the function
       *comparator* with two elements. The comparator should return `true`
       if the first element is less than the second, and `false` otherwise.
@@ -4042,7 +4042,7 @@ static RegisterPrimOp primop_sort({
 
       If the *comparator* violates any of these properties, then `builtins.sort`
       reorders elements in an unspecified manner.
-    )",
+    )"_sds,
     .fun = prim_sort,
 });
 
@@ -4087,7 +4087,7 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_partition({
     .name = "__partition",
     .args = {"pred", "list"},
-    .doc = R"(
+    .doc = &R"(
       Given a predicate function *pred*, this function returns an
       attrset containing a list named `right`, containing the elements
       in *list* for which *pred* returned `true`, and a list named
@@ -4103,7 +4103,7 @@ static RegisterPrimOp primop_partition({
       ```nix
       { right = [ 23 42 ]; wrong = [ 1 9 3 ]; }
       ```
-    )",
+    )"_sds,
     .fun = prim_partition,
 });
 
@@ -4139,7 +4139,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_groupBy({
     .name = "__groupBy",
     .args = {"f", "list"},
-    .doc = R"(
+    .doc = &R"(
       Groups elements of *list* together by the string returned from the
       function *f* called on each element. It returns an attribute set
       where each attribute value contains the elements of *list* that are
@@ -4156,7 +4156,7 @@ static RegisterPrimOp primop_groupBy({
       ```nix
       { b = [ "bar" "baz" ]; f = [ "foo" ]; }
       ```
-    )",
+    )"_sds,
     .fun = prim_groupBy,
 });
 
@@ -4195,10 +4195,10 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_concatMap({
     .name = "__concatMap",
     .args = {"f", "list"},
-    .doc = R"(
+    .doc = &R"(
       This function is equivalent to `builtins.concatLists (map f list)`
       but is more efficient.
-    )",
+    )"_sds,
     .fun = prim_concatMap,
 });
 
@@ -4230,9 +4230,9 @@ static void prim_add(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_add({
     .name = "__add",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the sum of the numbers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_add,
 });
 
@@ -4261,9 +4261,9 @@ static void prim_sub(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_sub({
     .name = "__sub",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the difference between the numbers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_sub,
 });
 
@@ -4292,9 +4292,9 @@ static void prim_mul(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_mul({
     .name = "__mul",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the product of the numbers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_mul,
 });
 
@@ -4325,9 +4325,9 @@ static void prim_div(EvalState & state, const PosIdx pos, Value ** args, Value &
 static RegisterPrimOp primop_div({
     .name = "__div",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the quotient of the numbers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_div,
 });
 
@@ -4341,9 +4341,9 @@ static void prim_bitAnd(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_bitAnd({
     .name = "__bitAnd",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the bitwise AND of the integers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_bitAnd,
 });
 
@@ -4358,9 +4358,9 @@ static void prim_bitOr(EvalState & state, const PosIdx pos, Value ** args, Value
 static RegisterPrimOp primop_bitOr({
     .name = "__bitOr",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the bitwise OR of the integers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_bitOr,
 });
 
@@ -4375,9 +4375,9 @@ static void prim_bitXor(EvalState & state, const PosIdx pos, Value ** args, Valu
 static RegisterPrimOp primop_bitXor({
     .name = "__bitXor",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return the bitwise XOR of the integers *e1* and *e2*.
-    )",
+    )"_sds,
     .fun = prim_bitXor,
 });
 
@@ -4393,11 +4393,11 @@ static void prim_lessThan(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_lessThan({
     .name = "__lessThan",
     .args = {"e1", "e2"},
-    .doc = R"(
+    .doc = &R"(
       Return `true` if the value *e1* is less than the value *e2*, and `false` otherwise.
       Evaluation aborts if either *e1* or *e2* does not evaluate to a number, string or path.
       Furthermore, it aborts if *e2* does not match *e1*'s type according to the aforementioned classification of number, string or path.
-    )",
+    )"_sds,
     .fun = prim_lessThan,
 });
 
@@ -4419,7 +4419,7 @@ static void prim_toString(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_toString({
     .name = "toString",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Convert the expression *e* to a string. *e* can be:
 
         - A string (in which case the string is returned unmodified).
@@ -4436,7 +4436,7 @@ static RegisterPrimOp primop_toString({
         - A Boolean (`false` yields `""`, `true` yields `"1"`).
 
         - `null`, which yields the empty string.
-    )",
+    )"_sds,
     .fun = prim_toString,
 });
 
@@ -4492,7 +4492,7 @@ static void prim_substring(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_substring({
     .name = "__substring",
     .args = {"start", "len", "s"},
-    .doc = R"(
+    .doc = &R"(
       Return the substring of *s* from byte position *start*
       (zero-based) up to but not including *start + len*. If *start* is
       greater than the length of the string, an empty string is returned.
@@ -4506,7 +4506,7 @@ static RegisterPrimOp primop_substring({
       ```
 
       evaluates to `"nix"`.
-    )",
+    )"_sds,
     .fun = prim_substring,
 });
 
@@ -4521,10 +4521,10 @@ static void prim_stringLength(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_stringLength({
     .name = "__stringLength",
     .args = {"e"},
-    .doc = R"(
+    .doc = &R"(
       Return the number of bytes of the string *e*. If *e* is not a string,
       evaluation is aborted.
-    )",
+    )"_sds,
     .fun = prim_stringLength,
 });
 
@@ -4547,11 +4547,11 @@ static void prim_hashString(EvalState & state, const PosIdx pos, Value ** args, 
 static RegisterPrimOp primop_hashString({
     .name = "__hashString",
     .args = {"type", "s"},
-    .doc = R"(
+    .doc = &R"(
       Return a base-16 representation of the cryptographic hash of string
       *s*. The hash algorithm specified by *type* must be one of `"md5"`,
       `"sha1"`, `"sha256"` or `"sha512"`.
-    )",
+    )"_sds,
     .fun = prim_hashString,
 });
 
@@ -4580,7 +4580,7 @@ static void prim_convertHash(EvalState & state, const PosIdx pos, Value ** args,
 static RegisterPrimOp primop_convertHash({
     .name = "__convertHash",
     .args = {"args"},
-    .doc = R"(
+    .doc = &R"(
       Return the specified representation of a hash string, based on the attributes presented in *args*:
 
       - `hash`
@@ -4649,7 +4649,7 @@ static RegisterPrimOp primop_convertHash({
       > ```
       >
       >     "sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU="
-    )",
+    )"_sds,
     .fun = prim_convertHash,
 });
 
@@ -4717,7 +4717,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 static RegisterPrimOp primop_match({
     .name = "__match",
     .args = {"regex", "str"},
-    .doc = R"s(
+    .doc = &R"s(
       Returns a list if the [extended POSIX regular
       expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
       *regex* matches *str* precisely, otherwise returns `null`. Each item
@@ -4746,7 +4746,7 @@ static RegisterPrimOp primop_match({
       ```
 
       Evaluates to `[ "FOO" ]`.
-    )s",
+    )s"_sds,
     .fun = prim_match,
 });
 
@@ -4820,7 +4820,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 static RegisterPrimOp primop_split({
     .name = "__split",
     .args = {"regex", "str"},
-    .doc = R"s(
+    .doc = &R"s(
       Returns a list composed of non matched strings interleaved with the
       lists of the [extended POSIX regular
       expression](http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap09.html#tag_09_04)
@@ -4850,7 +4850,7 @@ static RegisterPrimOp primop_split({
       ```
 
       Evaluates to `[ " " [ "FOO" ] " " ]`.
-    )s",
+    )s"_sds,
     .fun = prim_split,
 });
 
@@ -4890,11 +4890,11 @@ static void prim_concatStringsSep(EvalState & state, const PosIdx pos, Value ** 
 static RegisterPrimOp primop_concatStringsSep({
     .name = "__concatStringsSep",
     .args = {"separator", "list"},
-    .doc = R"(
+    .doc = &R"(
       Concatenate a list of strings with a separator between each
       element, e.g. `concatStringsSep "/" ["usr" "local" "bin"] ==
       "usr/local/bin"`.
-    )",
+    )"_sds,
     .fun = prim_concatStringsSep,
 });
 
@@ -4965,7 +4965,7 @@ static void prim_replaceStrings(EvalState & state, const PosIdx pos, Value ** ar
 static RegisterPrimOp primop_replaceStrings({
     .name = "__replaceStrings",
     .args = {"from", "to", "s"},
-    .doc = R"(
+    .doc = &R"(
       Given string *s*, replace every occurrence of the strings in *from*
       with the corresponding string in *to*.
 
@@ -4978,7 +4978,7 @@ static RegisterPrimOp primop_replaceStrings({
       ```
 
       evaluates to `"fabir"`.
-    )",
+    )"_sds,
     .fun = prim_replaceStrings,
 });
 
@@ -5000,14 +5000,14 @@ static void prim_parseDrvName(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_parseDrvName({
     .name = "__parseDrvName",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
       Split the string *s* into a package name and version. The package
       name is everything up to but not including the first dash not followed
       by a letter, and the version is everything following that dash. The
       result is returned in a set `{ name, version }`. Thus,
       `builtins.parseDrvName "nix-0.12pre12876"` returns `{ name =
       "nix"; version = "0.12pre12876"; }`.
-    )",
+    )"_sds,
     .fun = prim_parseDrvName,
 });
 
@@ -5024,13 +5024,13 @@ static void prim_compareVersions(EvalState & state, const PosIdx pos, Value ** a
 static RegisterPrimOp primop_compareVersions({
     .name = "__compareVersions",
     .args = {"s1", "s2"},
-    .doc = R"(
+    .doc = &R"(
       Compare two strings representing versions and return `-1` if
       version *s1* is older than version *s2*, `0` if they are the same,
       and `1` if *s1* is newer than *s2*. The version comparison
       algorithm is the same as the one used by [`nix-env
       -u`](../command-ref/nix-env/upgrade.md).
-    )",
+    )"_sds,
     .fun = prim_compareVersions,
 });
 
@@ -5055,11 +5055,11 @@ static void prim_splitVersion(EvalState & state, const PosIdx pos, Value ** args
 static RegisterPrimOp primop_splitVersion({
     .name = "__splitVersion",
     .args = {"s"},
-    .doc = R"(
+    .doc = &R"(
       Split a string representing a version into its components, by the
       same version splitting logic underlying the version comparison in
       [`nix-env -u`](../command-ref/nix-env/upgrade.md).
-    )",
+    )"_sds,
     .fun = prim_splitVersion,
 });
 
@@ -5086,7 +5086,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nAttrs,
-            .doc = R"(
+            .doc = &R"(
           Contains all the built-in functions and values.
 
           Since built-in functions were added over time, [testing for attributes](./operators.md#has-attribute) in `builtins` can be used for graceful fallback on older Nix installations:
@@ -5095,7 +5095,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           # if hasContext is not available, we assume `s` has a context
           if builtins ? hasContext then builtins.hasContext s else true
           ```
-        )",
+        )"_sds,
         });
 
     v.mkBool(true);
@@ -5104,7 +5104,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nBool,
-            .doc = R"(
+            .doc = &R"(
           Primitive value.
 
           It can be returned by
@@ -5118,7 +5118,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           nix-repl> let true = 1; in true
           1
           ```
-        )",
+        )"_sds,
         });
 
     v.mkBool(false);
@@ -5127,7 +5127,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nBool,
-            .doc = R"(
+            .doc = &R"(
           Primitive value.
 
           It can be returned by
@@ -5141,7 +5141,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           nix-repl> let false = 1; in false
           1
           ```
-        )",
+        )"_sds,
         });
 
     addConstant(
@@ -5149,7 +5149,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         &Value::vNull,
         {
             .type = nNull,
-            .doc = R"(
+            .doc = &R"(
           Primitive value.
 
           The name `null` is not special, and can be shadowed:
@@ -5158,7 +5158,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           nix-repl> let null = 1; in null
           1
           ```
-        )",
+        )"_sds,
         });
 
     if (!settings.pureEval) {
@@ -5169,7 +5169,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nInt,
-            .doc = R"(
+            .doc = &R"(
           Return the [Unix time](https://en.wikipedia.org/wiki/Unix_time) at first evaluation.
           Repeated references to that name re-use the initially obtained value.
 
@@ -5187,7 +5187,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           ```
 
           The [store path](@docroot@/store/store-path.md) of a derivation depending on `currentTime` differs for each evaluation, unless both evaluate `builtins.currentTime` in the same second.
-        )",
+        )"_sds,
             .impureOnly = true,
         });
 
@@ -5198,7 +5198,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nString,
-            .doc = R"(
+            .doc = &R"(
           The value of the
           [`eval-system`](@docroot@/command-ref/conf-file.md#conf-eval-system)
           or else
@@ -5220,7 +5220,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           $ nix-instantiate --system "mips64-linux" --eval --expr 'builtins.currentSystem'
           "mips64-linux"
           ```
-        )",
+        )"_sds,
             .impureOnly = true,
         });
 
@@ -5230,7 +5230,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nString,
-            .doc = R"(
+            .doc = &R"(
           The version of Nix.
 
           For example, where the command line returns the current Nix version,
@@ -5246,7 +5246,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           nix-repl> builtins.nixVersion
           "2.16.0"
           ```
-        )",
+        )"_sds,
         });
 
     v.mkString(store->storeDir);
@@ -5255,7 +5255,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nString,
-            .doc = R"(
+            .doc = &R"(
           Logical file system location of the [Nix store](@docroot@/glossary.md#gloss-store) currently in use.
 
           This value is determined by the `store` parameter in [Store URLs](@docroot@/store/types/index.md#store-url-format):
@@ -5264,7 +5264,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           $ nix-instantiate --store 'dummy://?store=/blah' --eval --expr builtins.storeDir
           "/blah"
           ```
-        )",
+        )"_sds,
         });
 
     /* Language version.  This should be increased every time a new
@@ -5277,9 +5277,9 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nInt,
-            .doc = R"(
+            .doc = &R"(
           The current version of the Nix language.
-        )",
+        )"_sds,
         });
 
 #ifndef _WIN32 // TODO implement on Windows
@@ -5302,11 +5302,11 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         .name = "__traceVerbose",
         .args = {"e1", "e2"},
         .arity = 2,
-        .doc = R"(
+        .doc = &R"(
           Evaluate *e1* and print its abstract syntax representation on standard
           error if `--trace-verbose` is enabled. Then return *e2*. This function
           is useful for debugging.
-        )",
+        )"_sds,
         .fun = settings.traceVerbose ? prim_trace : prim_second,
     });
 
@@ -5324,7 +5324,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         v,
         {
             .type = nList,
-            .doc = R"(
+            .doc = &R"(
           A list of search path entries used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
           Its value is primarily determined by the [`nix-path` configuration setting](@docroot@/command-ref/conf-file.md#conf-nix-path), which are
           - Overridden by the [`NIX_PATH`](@docroot@/command-ref/env-common.md#env-NIX_PATH) environment variable or the `--nix-path` option
@@ -5349,7 +5349,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
           ```nix
           builtins.findFile builtins.nixPath "nixpkgs"
           ```
-        )",
+        )"_sds,
         });
 
     for (auto & primOp : RegisterPrimOp::primOps())

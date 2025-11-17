@@ -51,36 +51,6 @@ using json = nlohmann::json;
 
 namespace nix {
 
-/**
- * Just for doc strings. Not for regular string values.
- */
-static char * allocString(size_t size)
-{
-    char * t;
-    t = (char *) GC_MALLOC_ATOMIC(size);
-    if (!t)
-        throw std::bad_alloc();
-    return t;
-}
-
-// When there's no need to write to the string, we can optimize away empty
-// string allocations.
-// This function handles makeImmutableString(std::string_view()) by returning
-// the empty string.
-/**
- * Just for doc strings. Not for regular string values.
- */
-static const char * makeImmutableString(std::string_view s)
-{
-    const size_t size = s.size();
-    if (size == 0)
-        return "";
-    auto t = allocString(size + 1);
-    memcpy(t, s.data(), size);
-    t[size] = '\0';
-    return t;
-}
-
 StringData & StringData::alloc(size_t size)
 {
     void * t = GC_MALLOC_ATOMIC(sizeof(StringData) + size + 1);
@@ -571,7 +541,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .name = v2->primOp()->name,
                 .arity = v2->primOp()->arity,
                 .args = v2->primOp()->args,
-                .doc = doc,
+                .doc = *doc,
             };
     }
     if (v.isLambda()) {
@@ -613,9 +583,8 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .name = name,
             .arity = 0, // FIXME: figure out how deep by syntax only? It's not semantically useful though...
             .args = {},
-            /* N.B. Can't use StringData here, because that would lead to an interior pointer.
-               NOTE: memory leak when compiled without GC. */
-            .doc = makeImmutableString(s.view()),
+            /* NOTE: memory leak when compiled without GC. */
+            .doc = StringData::make(s.view()),
         };
     }
     if (isFunctor(v)) {
