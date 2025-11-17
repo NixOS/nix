@@ -68,7 +68,7 @@ struct CmdRegistryList : StoreCommand
     {
         using namespace fetchers;
 
-        auto registries = getRegistries(fetchSettings, store);
+        auto registries = getRegistries(fetchSettings, *store);
 
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
@@ -189,8 +189,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto registry = getRegistry();
         auto ref = parseFlakeRef(fetchSettings, url);
         auto lockedRef = parseFlakeRef(fetchSettings, locked);
-        auto resolvedInput = lockedRef.resolve(fetchSettings, store).input;
-        auto resolved = resolvedInput.getAccessor(fetchSettings, store).second;
+        auto resolvedInput = lockedRef.resolve(fetchSettings, *store).input;
+        auto resolved = resolvedInput.getAccessor(fetchSettings, *store).second;
         if (!resolved.isLocked(fetchSettings))
             warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;

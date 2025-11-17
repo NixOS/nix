@@ -121,7 +121,7 @@ static void update(const StringSet & channelNames)
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
             // definition from a consistent location if the redirect changes mid-download.
-            auto result = fetchers::downloadFile(store, fetchSettings, url, std::string(baseNameOf(url)));
+            auto result = fetchers::downloadFile(*store, fetchSettings, url, std::string(baseNameOf(url)));
             url = result.effectiveUrl;
 
             bool unpacked = false;
@@ -139,10 +139,10 @@ static void update(const StringSet & channelNames)
             if (!unpacked) {
                 // Download the channel tarball.
                 try {
-                    result = fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz");
+                    result = fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz");
                 } catch (FileTransferError & e) {
                     result =
-                        fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2");
+                        fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2");
                 }
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression

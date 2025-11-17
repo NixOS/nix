@@ -194,7 +194,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.fetchSettings, state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchSettings, *state.store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
@@ -220,7 +220,7 @@ static void fetchTree(
     }
 
     auto cachedInput =
-        state.inputCache->getAccessor(state.fetchSettings, state.store, input, fetchers::UseRegistries::No);
+        state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
@@ -582,10 +582,10 @@ static void fetch(
     auto storePath = unpack ? fetchToStore(
                                   state.fetchSettings,
                                   *state.store,
-                                  fetchers::downloadTarball(state.store, state.fetchSettings, *url),
+                                  fetchers::downloadTarball(*state.store, state.fetchSettings, *url),
                                   FetchMode::Copy,
                                   name)
-                            : fetchers::downloadFile(state.store, state.fetchSettings, *url, name).storePath;
+                            : fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
 
     if (expectedHash) {
         auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash

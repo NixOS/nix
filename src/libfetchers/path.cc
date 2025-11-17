@@ -117,7 +117,7 @@ struct PathInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         Input input(_input);
         auto path = getStrAttr(input.attrs, "path");
@@ -125,31 +125,31 @@ struct PathInputScheme : InputScheme
         auto absPath = getAbsPath(input);
 
         // FIXME: check whether access to 'path' is allowed.
-        auto storePath = store->maybeParseStorePath(absPath.string());
+        auto storePath = store.maybeParseStorePath(absPath.string());
 
         if (storePath)
-            store->addTempRoot(*storePath);
+            store.addTempRoot(*storePath);
 
         time_t mtime = 0;
-        if (!storePath || storePath->name() != "source" || !store->isValidPath(*storePath)) {
+        if (!storePath || storePath->name() != "source" || !store.isValidPath(*storePath)) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
             // FIXME: try to substitute storePath.
             auto src = sinkToSource(
                 [&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter); });
-            storePath = store->addToStoreFromDump(*src, "source");
+            storePath = store.addToStoreFromDump(*src, "source");
         }
 
-        auto accessor = store->requireStoreObjectAccessor(*storePath);
+        auto accessor = store.requireStoreObjectAccessor(*storePath);
 
         // To prevent `fetchToStore()` copying the path again to Nix
         // store, pre-create an entry in the fetcher cache.
-        auto info = store->queryPathInfo(*storePath);
+        auto info = store.queryPathInfo(*storePath);
         accessor->fingerprint =
-            fmt("path:%s", store->queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
+            fmt("path:%s", store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
         settings.getCache()->upsert(
             makeFetchToStoreCacheKey(
                 input.getName(), *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
-            *store,
+            store,
             {},
             *storePath);
 

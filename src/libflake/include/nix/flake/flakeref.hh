@@ -73,13 +73,12 @@ struct FlakeRef
 
     FlakeRef resolve(
         const fetchers::Settings & fetchSettings,
-        ref<Store> store,
+        Store & store,
         fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
 
     static FlakeRef fromAttrs(const fetchers::Settings & fetchSettings, const fetchers::Attrs & attrs);
 
-    std::pair<ref<SourceAccessor>, FlakeRef>
-    lazyFetch(const fetchers::Settings & fetchSettings, ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(const fetchers::Settings & fetchSettings, Store & store) const;
 
     /**
      * Canonicalize a flakeref for the purpose of comparing "old" and

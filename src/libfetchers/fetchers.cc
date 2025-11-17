@@ -120,7 +120,7 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
     return std::move(*res);
 }
 
-std::optional<std::string> Input::getFingerprint(ref<Store> store) const
+std::optional<std::string> Input::getFingerprint(Store & store) const
 {
     if (!scheme)
         return std::nullopt;
@@ -199,7 +199,7 @@ bool Input::contains(const Input & other) const
 }
 
 // FIXME: remove
-std::pair<StorePath, Input> Input::fetchToStore(const Settings & settings, ref<Store> store) const
+std::pair<StorePath, Input> Input::fetchToStore(const Settings & settings, Store & store) const
 {
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
@@ -209,9 +209,9 @@ std::pair<StorePath, Input> Input::fetchToStore(const Settings & settings, ref<S
             auto [accessor, result] = getAccessorUnchecked(settings, store);
 
             auto storePath =
-                nix::fetchToStore(settings, *store, SourcePath(accessor), FetchMode::Copy, result.getName());
+                nix::fetchToStore(settings, store, SourcePath(accessor), FetchMode::Copy, result.getName());
 
-            auto narHash = store->queryPathInfo(storePath)->narHash;
+            auto narHash = store.queryPathInfo(storePath)->narHash;
             result.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
             result.attrs.insert_or_assign("__final", Explicit<bool>(true));
@@ -298,7 +298,7 @@ void Input::checkLocks(Input specified, Input & result)
     }
 }
 
-std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settings, ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settings, Store & store) const
 {
     try {
         auto [accessor, result] = getAccessorUnchecked(settings, store);
@@ -314,7 +314,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settin
     }
 }
 
-std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings & settings, ref<Store> store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings & settings, Store & store) const
 {
     // FIXME: cache the accessor
 
@@ -334,13 +334,13 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
     */
     if (isFinal() && getNarHash()) {
         try {
-            auto storePath = computeStorePath(*store);
+            auto storePath = computeStorePath(store);
 
-            store->ensurePath(storePath);
+            store.ensurePath(storePath);
 
-            debug("using substituted/cached input '%s' in '%s'", to_string(), store->printStorePath(storePath));
+            debug("using substituted/cached input '%s' in '%s'", to_string(), store.printStorePath(storePath));
 
-            auto accessor = store->requireStoreObjectAccessor(storePath);
+            auto accessor = store.requireStoreObjectAccessor(storePath);
 
             accessor->fingerprint = getFingerprint(store);
 
@@ -350,7 +350,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
             if (accessor->fingerprint) {
                 ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
                 auto cacheKey = makeFetchToStoreCacheKey(getName(), *accessor->fingerprint, method, "/");
-                settings.getCache()->upsert(cacheKey, *store, {}, storePath);
+                settings.getCache()->upsert(cacheKey, store, {}, storePath);
             }
 
             accessor->setPathDisplay("«" + to_string() + "»");
@@ -378,7 +378,7 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
     return scheme->applyOverrides(*this, ref, rev);
 }
 
-void Input::clone(const Settings & settings, ref<Store> store, const std::filesystem::path & destDir) const
+void Input::clone(const Settings & settings, Store & store, const std::filesystem::path & destDir) const
 {
     assert(scheme);
     scheme->clone(settings, store, *this, destDir);
@@ -495,7 +495,7 @@ void InputScheme::putFile(
 }
 
 void InputScheme::clone(
-    const Settings & settings, ref<Store> store, const Input & input, const std::filesystem::path & destDir) const
+    const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir) const
 {
     if (std::filesystem::exists(destDir))
         throw Error("cannot clone into existing path %s", destDir);

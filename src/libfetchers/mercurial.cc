@@ -154,7 +154,7 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? renderUrlPathEnsureLegal(url.path) : url.to_string()};
     }
 
-    StorePath fetchToStore(const Settings & settings, ref<Store> store, Input & input) const
+    StorePath fetchToStore(const Settings & settings, Store & store, Input & input) const
     {
         auto origRev = input.getRev();
 
@@ -205,7 +205,7 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(
+                auto storePath = store.addToStore(
                     input.getName(),
                     {getFSSourceAccessor(), CanonPath(actualPath)},
                     ContentAddressMethod::Raw::NixArchive,
@@ -226,7 +226,7 @@ struct MercurialInputScheme : InputScheme
                     "Hash '%s' is not supported by Mercurial. Only sha1 is supported.",
                     rev.to_string(HashFormat::Base16, true));
 
-            return Cache::Key{"hgRev", {{"store", store->storeDir}, {"name", name}, {"rev", input.getRev()->gitRev()}}};
+            return Cache::Key{"hgRev", {{"store", store.storeDir}, {"name", name}, {"rev", input.getRev()->gitRev()}}};
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath {
@@ -246,7 +246,7 @@ struct MercurialInputScheme : InputScheme
 
         /* If we have a rev, check if we have a cached store path. */
         if (auto rev = input.getRev()) {
-            if (auto res = settings.getCache()->lookupStorePath(revInfoKey(*rev), *store))
+            if (auto res = settings.getCache()->lookupStorePath(revInfoKey(*rev), store))
                 return makeResult(res->value, res->storePath);
         }
 
@@ -300,7 +300,7 @@ struct MercurialInputScheme : InputScheme
 
         /* Now that we have the rev, check the cache again for a
            cached store path. */
-        if (auto res = settings.getCache()->lookupStorePath(revInfoKey(rev), *store))
+        if (auto res = settings.getCache()->lookupStorePath(revInfoKey(rev), store))
             return makeResult(res->value, res->storePath);
 
         Path tmpDir = createTempDir();
@@ -310,7 +310,7 @@ struct MercurialInputScheme : InputScheme
 
         deletePath(tmpDir + "/.hg_archival.txt");
 
-        auto storePath = store->addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
+        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
 
         Attrs infoAttrs({
             {"revCount", (uint64_t) revCount},
@@ -319,18 +319,18 @@ struct MercurialInputScheme : InputScheme
         if (!origRev)
             settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
 
-        settings.getCache()->upsert(revInfoKey(rev), *store, infoAttrs, storePath);
+        settings.getCache()->upsert(revInfoKey(rev), store, infoAttrs, storePath);
 
         return makeResult(infoAttrs, std::move(storePath));
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         Input input(_input);
 
         auto storePath = fetchToStore(settings, store, input);
-        auto accessor = store->requireStoreObjectAccessor(storePath);
+        auto accessor = store.requireStoreObjectAccessor(storePath);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -342,7 +342,7 @@ struct MercurialInputScheme : InputScheme
         return (bool) input.getRev();
     }
 
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
     {
         if (auto rev = input.getRev())
             return rev->gitRev();

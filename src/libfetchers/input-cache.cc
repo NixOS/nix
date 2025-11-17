@@ -6,7 +6,7 @@
 namespace nix::fetchers {
 
 InputCache::CachedResult InputCache::getAccessor(
-    const Settings & settings, ref<Store> store, const Input & originalInput, UseRegistries useRegistries)
+    const Settings & settings, Store & store, const Input & originalInput, UseRegistries useRegistries)
 {
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
