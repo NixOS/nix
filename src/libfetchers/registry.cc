@@ -136,7 +136,7 @@ void overrideRegistry(const Settings & settings, const Input & from, const Input
     getFlagRegistry(settings)->add(from, to, extraAttrs);
 }
 
-static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, ref<Store> store)
+static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
 {
     static auto reg = [&]() {
         auto path = settings.flakeRegistry.get();
@@ -149,9 +149,9 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, re
             [&] -> SourcePath {
                 if (!isAbsolute(path)) {
                     auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
-                    if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                    if (auto store2 = dynamic_cast<LocalFSStore *>(&store))
                         store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
-                    return {store->requireStoreObjectAccessor(storePath)};
+                    return {store.requireStoreObjectAccessor(storePath)};
                 } else {
                     return SourcePath{getFSSourceAccessor(), CanonPath{path}}.resolveSymlinks();
                 }
@@ -162,7 +162,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, re
     return reg;
 }
 
-Registries getRegistries(const Settings & settings, ref<Store> store)
+Registries getRegistries(const Settings & settings, Store & store)
 {
     Registries registries;
     registries.push_back(getFlagRegistry(settings));
@@ -173,7 +173,7 @@ Registries getRegistries(const Settings & settings, ref<Store> store)
 }
 
 std::pair<Input, Attrs>
-lookupInRegistries(const Settings & settings, ref<Store> store, const Input & _input, UseRegistries useRegistries)
+lookupInRegistries(const Settings & settings, Store & store, const Input & _input, UseRegistries useRegistries)
 {
     Attrs extraAttrs;
     int n = 0;

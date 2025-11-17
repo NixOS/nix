@@ -64,8 +64,8 @@ std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-FlakeRef FlakeRef::resolve(
-    const fetchers::Settings & fetchSettings, ref<Store> store, fetchers::UseRegistries useRegistries) const
+FlakeRef
+FlakeRef::resolve(const fetchers::Settings & fetchSettings, Store & store, fetchers::UseRegistries useRegistries) const
 {
     auto [input2, extraAttrs] = lookupInRegistries(fetchSettings, store, input, useRegistries);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
@@ -289,7 +289,7 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Settings & fetchSettings, const fet
 }
 
 std::pair<ref<SourceAccessor>, FlakeRef>
-FlakeRef::lazyFetch(const fetchers::Settings & fetchSettings, ref<Store> store) const
+FlakeRef::lazyFetch(const fetchers::Settings & fetchSettings, Store & store) const
 {
     auto [accessor, lockedInput] = input.getAccessor(fetchSettings, store);
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};

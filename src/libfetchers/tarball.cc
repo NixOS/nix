@@ -13,7 +13,7 @@
 namespace nix::fetchers {
 
 DownloadFileResult downloadFile(
-    ref<Store> store,
+    Store & store,
     const Settings & settings,
     const std::string & url,
     const std::string & name,
@@ -28,7 +28,7 @@ DownloadFileResult downloadFile(
             {"name", name},
         }}};
 
-    auto cached = settings.getCache()->lookupStorePath(key, *store);
+    auto cached = settings.getCache()->lookupStorePath(key, store);
 
     auto useCached = [&]() -> DownloadFileResult {
         return {
@@ -74,7 +74,7 @@ DownloadFileResult downloadFile(
         dumpString(res.data, sink);
         auto hash = hashString(HashAlgorithm::SHA256, res.data);
         auto info = ValidPathInfo::makeFromCA(
-            *store,
+            store,
             name,
             FixedOutputInfo{
                 .method = FileIngestionMethod::Flat,
@@ -84,7 +84,7 @@ DownloadFileResult downloadFile(
             hashString(HashAlgorithm::SHA256, sink.s));
         info.narSize = sink.s.size();
         auto source = StringSource{sink.s};
-        store->addToStore(info, source, NoRepair, NoCheckSigs);
+        store.addToStore(info, source, NoRepair, NoCheckSigs);
         storePath = std::move(info.path);
     }
 
@@ -93,7 +93,7 @@ DownloadFileResult downloadFile(
         key.second.insert_or_assign("url", url);
         assert(!res.urls.empty());
         infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        settings.getCache()->upsert(key, *store, infoAttrs, *storePath);
+        settings.getCache()->upsert(key, store, infoAttrs, *storePath);
     }
 
     return {
@@ -214,7 +214,7 @@ static DownloadTarballResult downloadTarball_(
     return attrsToResult(infoAttrs);
 }
 
-ref<SourceAccessor> downloadTarball(ref<Store> store, const Settings & settings, const std::string & url)
+ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, const std::string & url)
 {
     /* Go through Input::getAccessor() to ensure that the resulting
        accessor has a fingerprint. */
@@ -414,7 +414,7 @@ struct FileInputScheme : CurlInputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         auto input(_input);
 
@@ -424,10 +424,10 @@ struct FileInputScheme : CurlInputScheme
            tarballs. */
         auto file = downloadFile(store, settings, getStrAttr(input.attrs, "url"), input.getName());
 
-        auto narHash = store->queryPathInfo(file.storePath)->narHash;
+        auto narHash = store.queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
-        auto accessor = ref{store->getFSAccessor(file.storePath)};
+        auto accessor = ref{store.getFSAccessor(file.storePath)};
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
@@ -480,7 +480,7 @@ struct TarballInputScheme : CurlInputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, ref<Store> store, const Input & _input) const override
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         auto input(_input);
 
@@ -505,7 +505,7 @@ struct TarballInputScheme : CurlInputScheme
         return {result.accessor, input};
     }
 
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
     {
         if (auto narHash = input.getNarHash())
             return narHash->to_string(HashFormat::SRI, true);

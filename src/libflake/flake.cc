@@ -373,7 +373,7 @@ static Flake getFlake(
 {
     // Fetch a lazy tree first.
     auto cachedInput =
-        state.inputCache->getAccessor(state.fetchSettings, state.store, originalRef.input, useRegistries);
+        state.inputCache->getAccessor(state.fetchSettings, *state.store, originalRef.input, useRegistries);
 
     auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
@@ -390,7 +390,7 @@ static Flake getFlake(
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
         auto cachedInput2 = state.inputCache->getAccessor(
-            state.fetchSettings, state.store, newLockedRef.input, fetchers::UseRegistries::No);
+            state.fetchSettings, *state.store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -756,7 +756,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto cachedInput = state.inputCache->getAccessor(
-                                        state.fetchSettings, state.store, input.ref->input, useRegistriesInputs);
+                                        state.fetchSettings, *state.store, input.ref->input, useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
@@ -975,7 +975,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     state.callFunction(*vCallFlake, args, vRes, noPos);
 }
 
-std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store, const fetchers::Settings & fetchSettings) const
+std::optional<Fingerprint> LockedFlake::getFingerprint(Store & store, const fetchers::Settings & fetchSettings) const
 {
     if (lockFile.isUnlocked(fetchSettings))
         return std::nullopt;
@@ -1005,7 +1005,7 @@ Flake::~Flake() {}
 ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake)
 {
     auto fingerprint = state.settings.useEvalCache && state.settings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
+                           ? lockedFlake->getFingerprint(*state.store, state.fetchSettings)
                            : std::nullopt;
     auto rootLoader = [&state, lockedFlake]() {
         /* For testing whether the evaluation cache is
