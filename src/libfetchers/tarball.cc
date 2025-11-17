@@ -278,7 +278,7 @@ struct CurlInputScheme : InputScheme
            HTTP request. Now that we've processed the Nix-specific
            attributes above, remove them so we don't also send them as
            part of the HTTP request. */
-        for (auto & param : allowedAttrs())
+        for (auto & [param, _] : allowedAttrs())
             url.query.erase(param);
 
         input.attrs.insert_or_assign("type", std::string{schemeName()});
@@ -286,18 +286,83 @@ struct CurlInputScheme : InputScheme
         return input;
     }
 
-    StringSet allowedAttrs() const override
+    static const std::map<std::string, AttributeInfo> & allowedAttrsImpl()
     {
-        return {
-            "type",
-            "url",
-            "narHash",
-            "name",
-            "unpack",
-            "rev",
-            "revCount",
-            "lastModified",
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "url",
+                {
+                    .type = "String",
+                    .required = true,
+                    .doc = R"(
+                      Supported protocols:
+
+                      - `https`
+
+                        > **Example**
+                        >
+                        > ```nix
+                        > fetchTree {
+                        >   type = "file";
+                        >   url = "https://example.com/index.html";
+                        > }
+                        > ```
+
+                      - `http`
+
+                        Insecure HTTP transfer for legacy sources.
+
+                        > **Warning**
+                        >
+                        > HTTP performs no encryption or authentication.
+                        > Use a `narHash` known in advance to ensure the output has expected contents.
+
+                      - `file`
+
+                        A file on the local file system.
+
+                        > **Example**
+                        >
+                        > ```nix
+                        > fetchTree {
+                        >   type = "file";
+                        >   url = "file:///home/eelco/nix/README.md";
+                        > }
+                        > ```
+                    )",
+                },
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "name",
+                {},
+            },
+            {
+                "unpack",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "revCount",
+                {},
+            },
+            {
+                "lastModified",
+                {},
+            },
         };
+        return attrs;
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        return allowedAttrsImpl();
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
@@ -330,6 +395,14 @@ struct FileInputScheme : CurlInputScheme
     std::string_view schemeName() const override
     {
         return "file";
+    }
+
+    std::string schemeDescription() const override
+    {
+        return stripIndentation(R"(
+          Place a plain file into the Nix store.
+          This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
+        )");
     }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override
@@ -367,6 +440,34 @@ struct TarballInputScheme : CurlInputScheme
     std::string_view schemeName() const override
     {
         return "tarball";
+    }
+
+    std::string schemeDescription() const override
+    {
+        return stripIndentation(R"(
+          Download a tar archive and extract it into the Nix store.
+          This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        )");
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = [] {
+            auto attrs = CurlInputScheme::allowedAttrsImpl();
+            // Override the "url" attribute to add tarball-specific example
+            attrs["url"].doc = R"(
+              > **Example**
+              >
+              > ```nix
+              > fetchTree {
+              >   type = "tarball";
+              >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
+              > }
+              > ```
+            )";
+            return attrs;
+        }();
+        return attrs;
     }
 
     bool isValidURL(const ParsedURL & url, bool requireTree) const override

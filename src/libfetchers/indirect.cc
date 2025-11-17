@@ -60,14 +60,33 @@ struct IndirectInputScheme : InputScheme
         return "indirect";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
     {
-        return {
-            "id",
-            "ref",
-            "rev",
-            "narHash",
+        // TODO
+        return "";
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "id",
+                {},
+            },
+            {
+                "ref",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
         };
+        return attrs;
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override

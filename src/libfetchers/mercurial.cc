@@ -68,16 +68,41 @@ struct MercurialInputScheme : InputScheme
         return "hg";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
     {
-        return {
-            "url",
-            "ref",
-            "rev",
-            "revCount",
-            "narHash",
-            "name",
+        // TODO
+        return "";
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "url",
+                {},
+            },
+            {
+                "ref",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "revCount",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "name",
+                {},
+            },
         };
+        return attrs;
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override

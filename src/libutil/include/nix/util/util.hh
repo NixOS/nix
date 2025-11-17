@@ -34,14 +34,27 @@ auto concatStrings(Parts &&... parts)
 }
 
 /**
+ * Add quotes around a string.
+ */
+inline std::string quoteString(std::string_view s, char quote = '\'')
+{
+    std::string result;
+    result.reserve(s.size() + 2);
+    result += quote;
+    result += s;
+    result += quote;
+    return result;
+}
+
+/**
  * Add quotes around a collection of strings.
  */
 template<class C>
-Strings quoteStrings(const C & c)
+Strings quoteStrings(const C & c, char quote = '\'')
 {
     Strings res;
     for (auto & s : c)
-        res.push_back("'" + s + "'");
+        res.push_back(quoteString(s, quote));
     return res;
 }
 
