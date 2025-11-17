@@ -86,3 +86,15 @@ method AddDerivation(derivation: Derivation) -> (path: string)
 # in "build system space", and punts it back to userspace, where
 # arbitrary strategies can be employed.
 method SubmitOutput(name: string, path: string) -> ()
+
+# File Descriptor not sent when required
+error NoFileDescriptor ()
+
+# Could not deserialize output NAR
+error InvalidNar ()
+
+# Attempted to submit path not in store (or restricted)
+error InvalidPath ()
+
+# Attempted to submit output a second time
+error DuplicateOutput ()
