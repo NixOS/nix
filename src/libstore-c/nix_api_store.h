@@ -12,6 +12,8 @@
  */
 
 #include "nix_api_util.h"
+#include "nix_api_store/store_path.h"
+#include "nix_api_store/derivation.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -21,10 +23,6 @@ extern "C" {
 
 /** @brief Reference to a Nix store */
 typedef struct Store Store;
-/** @brief Nix store path */
-typedef struct StorePath StorePath;
-/** @brief Nix Derivation */
-typedef struct nix_derivation nix_derivation;
 
 /**
  * @brief Initializes the Nix store library
@@ -119,30 +117,6 @@ nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_ca
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
 
 /**
- * @brief Get the path name (e.g. "name" in /nix/store/...-name)
- *
- * @param[in] store_path the path to get the name from
- * @param[in] callback called with the name
- * @param[in] user_data arbitrary data, passed to the callback when it's called.
- */
-void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data);
-
-/**
- * @brief Copy a StorePath
- *
- * @param[in] p the path to copy
- * @return a new StorePath
- */
-StorePath * nix_store_path_clone(const StorePath * p);
-
-/** @brief Deallocate a StorePath
- *
- * Does not fail.
- * @param[in] p the path to free
- */
-void nix_store_path_free(StorePath * p);
-
-/**
  * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in
  * the store)
  * @param[out] context Optional, stores error information
@@ -228,14 +202,6 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
  * @param[in] derivation nix_derivation to insert into the given store.
  */
 StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation);
-
-/**
- * @brief Deallocate a `nix_derivation`
- *
- * Does not fail.
- * @param[in] drv the derivation to free
- */
-void nix_derivation_free(nix_derivation * drv);
 
 /**
  * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
