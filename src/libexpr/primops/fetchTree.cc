@@ -35,7 +35,7 @@ void emitTreeAttrs(
     // FIXME: support arbitrary input attributes.
 
     if (auto narHash = input.getNarHash())
-        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
@@ -43,13 +43,13 @@ void emitTreeAttrs(
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
-            attrs.alloc("rev").mkString(rev->gitRev());
-            attrs.alloc("shortRev").mkString(rev->gitShortRev());
+            attrs.alloc("rev").mkString(rev->gitRev(), state.mem);
+            attrs.alloc("shortRev").mkString(rev->gitShortRev(), state.mem);
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(HashAlgorithm::SHA1);
-            attrs.alloc("rev").mkString(emptyHash.gitRev());
-            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
+            attrs.alloc("rev").mkString(emptyHash.gitRev(), state.mem);
+            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev(), state.mem);
         }
 
         if (auto revCount = input.getRevCount())
@@ -59,13 +59,14 @@ void emitTreeAttrs(
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
-        attrs.alloc("dirtyRev").mkString(*dirtyRev);
-        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
+        attrs.alloc("dirtyRev").mkString(*dirtyRev, state.mem);
+        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
     }
 
     if (auto lastModified = input.getLastModified()) {
         attrs.alloc("lastModified").mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate").mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+        attrs.alloc("lastModifiedDate")
+            .mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")), state.mem);
     }
 
     v.mkAttrs(attrs);

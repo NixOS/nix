@@ -268,7 +268,7 @@ struct StringPrintingTests : LibExprTest
     void test(std::string_view literal, std::string_view expected, unsigned int maxLength, A... args)
     {
         Value v;
-        v.mkString(literal);
+        v.mkString(literal, state.mem);
 
         std::stringstream out;
         printValue(state, out, v, PrintOptions{.maxStringLength = maxLength});
@@ -353,7 +353,7 @@ TEST_F(ValuePrintingTests, ansiColorsStringElided)
 TEST_F(ValuePrintingTests, ansiColorsPath)
 {
     Value v;
-    v.mkPath(state.rootPath(CanonPath("puppy")));
+    v.mkPath(state.rootPath(CanonPath("puppy")), state.mem);
 
     test(v, ANSI_GREEN "/puppy" ANSI_NORMAL, PrintOptions{.ansiColors = true});
 }

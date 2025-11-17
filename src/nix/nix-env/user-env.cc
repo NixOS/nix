@@ -58,20 +58,20 @@ bool createUserEnv(
         auto attrs = state.buildBindings(7 + outputs.size());
 
         attrs.alloc(state.s.type).mkStringNoCopy("derivation"_sds);
-        attrs.alloc(state.s.name).mkString(i.queryName());
+        attrs.alloc(state.s.name).mkString(i.queryName(), state.mem);
         auto system = i.querySystem();
         if (!system.empty())
-            attrs.alloc(state.s.system).mkString(system);
-        attrs.alloc(state.s.outPath).mkString(state.store->printStorePath(i.queryOutPath()));
+            attrs.alloc(state.s.system).mkString(system, state.mem);
+        attrs.alloc(state.s.outPath).mkString(state.store->printStorePath(i.queryOutPath()), state.mem);
         if (drvPath)
-            attrs.alloc(state.s.drvPath).mkString(state.store->printStorePath(*drvPath));
+            attrs.alloc(state.s.drvPath).mkString(state.store->printStorePath(*drvPath), state.mem);
 
         // Copy each output meant for installation.
         auto outputsList = state.buildList(outputs.size());
         for (const auto & [m, j] : enumerate(outputs)) {
-            (outputsList[m] = state.allocValue())->mkString(j.first);
+            (outputsList[m] = state.allocValue())->mkString(j.first, state.mem);
             auto outputAttrs = state.buildBindings(2);
-            outputAttrs.alloc(state.s.outPath).mkString(state.store->printStorePath(*j.second));
+            outputAttrs.alloc(state.s.outPath).mkString(state.store->printStorePath(*j.second), state.mem);
             attrs.alloc(j.first).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,

@@ -232,13 +232,13 @@ public:
      * Allocate StringData on the (possibly) GC-managed heap and copy
      * the contents of s to it.
      */
-    static const StringData & make(std::string_view s);
+    static const StringData & make(EvalMemory & mem, std::string_view s);
 
     /**
      * Allocate StringData on the (possibly) GC-managed heap.
      * @param size Length of the string (without the NUL terminator).
      */
-    static StringData & alloc(size_t size);
+    static StringData & alloc(EvalMemory & mem, size_t size);
 
     size_t size() const
     {
@@ -1147,13 +1147,13 @@ public:
         setStorage(StringWithContext{.str = &s, .context = context});
     }
 
-    void mkString(std::string_view s);
+    void mkString(std::string_view s, EvalMemory & mem);
 
     void mkString(std::string_view s, const NixStringContext & context, EvalMemory & mem);
 
     void mkStringMove(const StringData & s, const NixStringContext & context, EvalMemory & mem);
 
-    void mkPath(const SourcePath & path);
+    void mkPath(const SourcePath & path, EvalMemory & mem);
 
     inline void mkPath(SourceAccessor * accessor, const StringData & path) noexcept
     {

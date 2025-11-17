@@ -168,9 +168,9 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                                 ? state.rootPath(absPath(getCommandBaseDir()))
                                 : state.rootPath(".")));
                 },
-                [&](const AutoArgString & arg) { v->mkString(arg.s); },
-                [&](const AutoArgFile & arg) { v->mkString(readFile(arg.path.string())); },
-                [&](const AutoArgStdin & arg) { v->mkString(readFile(STDIN_FILENO)); }},
+                [&](const AutoArgString & arg) { v->mkString(arg.s, state.mem); },
+                [&](const AutoArgFile & arg) { v->mkString(readFile(arg.path.string()), state.mem); },
+                [&](const AutoArgStdin & arg) { v->mkString(readFile(STDIN_FILENO), state.mem); }},
             arg);
         res.insert(state.symbols.create(name), v);
     }
