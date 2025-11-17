@@ -18,6 +18,7 @@
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/build/derivation-builder-varlink.hh"
 #include "nix/util/terminal.hh"
 
 #include <queue>
@@ -108,7 +109,12 @@ public:
             ignoreExceptionInDestructor();
         }
         try {
-            stopDaemon();
+            stopWorkerProtoDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            stopVarlinkDaemon();
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -191,6 +197,21 @@ protected:
      * The daemon worker threads.
      */
     std::vector<std::thread> daemonWorkerThreads;
+
+    /**
+     * The Varlink builder RPC daemon socket.
+     */
+    AutoCloseFD varlinkSocket;
+
+    /**
+     * The Varlink daemon main thread.
+     */
+    std::thread varlinkThread;
+
+    /**
+     * The Varlink daemon worker threads.
+     */
+    std::vector<std::thread> varlinkWorkerThreads;
 
     const StorePathSet & originalPaths() override
     {
@@ -322,15 +343,26 @@ protected:
 private:
 
     /**
-     * Start an in-process nix daemon thread for recursive-nix.
+     * Start an in-process worker protocol daemon thread for recursive-nix.
      */
-    void startDaemon();
+    void startWorkerProtoDaemon();
 
     /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
+     * Stop the worker protocol daemon thread.
+     * @see startWorkerProtoDaemon
      */
-    void stopDaemon();
+    void stopWorkerProtoDaemon();
+
+    /**
+     * Start an in-process Varlink daemon thread for builder-rpc-v1.
+     */
+    void startVarlinkDaemon();
+
+    /**
+     * Stop the Varlink daemon thread.
+     * @see startVarlinkDaemon
+     */
+    void stopVarlinkDaemon();
 
 protected:
 
@@ -523,8 +555,9 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
        root. */
     killSandbox(true);
 
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
+    /* Terminate the recursive Nix daemons. */
+    stopWorkerProtoDaemon();
+    stopVarlinkDaemon();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug(
@@ -794,8 +827,11 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-        startDaemon();
+    auto requiredFeatures = drvOptions.getRequiredSystemFeatures(drv);
+    if (requiredFeatures.count("recursive-nix"))
+        startWorkerProtoDaemon();
+    if (requiredFeatures.count("builder-rpc-v1"))
+        startVarlinkDaemon();
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
@@ -1107,7 +1143,7 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::startDaemon()
+void DerivationBuilderImpl::startWorkerProtoDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
@@ -1150,15 +1186,15 @@ void DerivationBuilderImpl::startDaemon()
 
             unix::closeOnExec(remote.get());
 
-            debug("received daemon connection");
+            debug("received worker protocol daemon connection");
 
             auto workerThread = std::thread([store, remote{std::move(remote)}]() {
                 try {
                     daemon::processConnection(
                         store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
-                    debug("terminated daemon connection");
+                    debug("terminated worker protocol daemon connection");
                 } catch (const Interrupted &) {
-                    debug("interrupted daemon connection");
+                    debug("interrupted worker protocol daemon connection");
                 } catch (SystemError &) {
                     ignoreExceptionExceptInterrupt();
                 }
@@ -1167,11 +1203,11 @@ void DerivationBuilderImpl::startDaemon()
             daemonWorkerThreads.push_back(std::move(workerThread));
         }
 
-        debug("daemon shutting down");
+        debug("worker protocol daemon shutting down");
     });
 }
 
-void DerivationBuilderImpl::stopDaemon()
+void DerivationBuilderImpl::stopWorkerProtoDaemon()
 {
     if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
         // According to the POSIX standard, the 'shutdown' function should
@@ -1186,7 +1222,7 @@ void DerivationBuilderImpl::stopDaemon()
         if (errno == ENOTCONN) {
             daemonSocket.close();
         } else {
-            throw SysError("shutting down daemon socket");
+            throw SysError("shutting down worker protocol daemon socket");
         }
     }
 
@@ -1201,6 +1237,92 @@ void DerivationBuilderImpl::stopDaemon()
 
     // release the socket.
     daemonSocket.close();
+}
+
+void DerivationBuilderImpl::startVarlinkDaemon()
+{
+    experimentalFeatureSettings.require(Xp::RecursiveNix);
+
+    auto store = makeRestrictedStore(
+        [&] {
+            auto config = make_ref<LocalStore::Config>(*this->store.config);
+            config->pathInfoCacheSize = 0;
+            config->stateDir = "/no-such-path";
+            config->logDir = "/no-such-path";
+            return config;
+        }(),
+        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
+        *this);
+
+    auto socketName = ".nix-varlink-socket";
+    Path socketPath = tmpDir + "/" + socketName;
+    env["NIX_VARLINK_REMOTE"] = "unix://" + tmpDirInSandbox() + "/" + socketName;
+
+    varlinkSocket = createUnixDomainSocket(socketPath, 0600);
+
+    chownToBuilder(socketPath);
+
+    varlinkThread = std::thread([this, store]() {
+        while (true) {
+
+            /* Accept a connection. */
+            struct sockaddr_un remoteAddr;
+            socklen_t remoteAddrLen = sizeof(remoteAddr);
+
+            AutoCloseFD remote = accept(varlinkSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            if (!remote) {
+                if (errno == EINTR || errno == EAGAIN)
+                    continue;
+                if (errno == EINVAL || errno == ECONNABORTED)
+                    break;
+                throw SysError("accepting Varlink connection");
+            }
+
+            unix::closeOnExec(remote.get());
+
+            debug("received Varlink daemon connection");
+
+            auto workerThread = std::thread([store, remote{std::move(remote)}]() {
+                try {
+                    FdSource from(remote.get());
+                    FdSink to(remote.get());
+                    processVarlinkConnection(*store, from, to);
+                    debug("terminated Varlink daemon connection");
+                } catch (const Interrupted &) {
+                    debug("interrupted Varlink daemon connection");
+                } catch (SystemError &) {
+                    ignoreExceptionExceptInterrupt();
+                }
+            });
+
+            varlinkWorkerThreads.push_back(std::move(workerThread));
+        }
+
+        debug("Varlink daemon shutting down");
+    });
+}
+
+void DerivationBuilderImpl::stopVarlinkDaemon()
+{
+    if (varlinkSocket && shutdown(varlinkSocket.get(), SHUT_RDWR) == -1) {
+        if (errno == ENOTCONN) {
+            varlinkSocket.close();
+        } else {
+            throw SysError("shutting down Varlink daemon socket");
+        }
+    }
+
+    if (varlinkThread.joinable())
+        varlinkThread.join();
+
+    // FIXME: should prune worker threads more quickly.
+    // FIXME: shutdown the client socket to speed up worker termination.
+    for (auto & thread : varlinkWorkerThreads)
+        thread.join();
+    varlinkWorkerThreads.clear();
+
+    // release the socket.
+    varlinkSocket.close();
 }
 
 void DerivationBuilderImpl::addDependencyImpl(const StorePath & path)
