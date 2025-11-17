@@ -369,6 +369,10 @@ tar cfz "$TEST_ROOT"/flake.tar.gz -C "$TEST_ROOT" flake5
 
 nix build -o "$TEST_ROOT"/result file://"$TEST_ROOT"/flake.tar.gz
 
+nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked"
+[[ -e $TEST_ROOT/unpacked/flake.nix ]]
+expectStderr 1 nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked" | grep 'existing path'
+
 # Building with a tarball URL containing a SRI hash should also work.
 url=$(nix flake metadata --json file://"$TEST_ROOT"/flake.tar.gz | jq -r .url)
 [[ $url =~ sha256- ]]

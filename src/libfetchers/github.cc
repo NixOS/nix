@@ -426,12 +426,13 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const override
+    void clone(const Settings & settings, ref<Store> store, const Input & input, const std::filesystem::path & destDir)
+        const override
     {
         auto host = getHost(input);
         Input::fromURL(settings, fmt("git+https://%s/%s/%s.git", host, getOwner(input), getRepo(input)))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, destDir);
+            .clone(settings, store, destDir);
     }
 };
 
@@ -507,7 +508,8 @@ struct GitLabInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const override
+    void clone(const Settings & settings, ref<Store> store, const Input & input, const std::filesystem::path & destDir)
+        const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // FIXME: get username somewhere
@@ -515,7 +517,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             settings,
             fmt("git+https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, destDir);
+            .clone(settings, store, destDir);
     }
 };
 
@@ -596,14 +598,15 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const override
+    void clone(const Settings & settings, ref<Store> store, const Input & input, const std::filesystem::path & destDir)
+        const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
         Input::fromURL(
             settings,
             fmt("git+https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, destDir);
+            .clone(settings, store, destDir);
     }
 };
 

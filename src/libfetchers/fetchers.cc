@@ -6,6 +6,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/url.hh"
+#include "nix/util/archive.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -377,10 +378,10 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
     return scheme->applyOverrides(*this, ref, rev);
 }
 
-void Input::clone(const Settings & settings, const std::filesystem::path & destDir) const
+void Input::clone(const Settings & settings, ref<Store> store, const std::filesystem::path & destDir) const
 {
     assert(scheme);
-    scheme->clone(settings, *this, destDir);
+    scheme->clone(settings, store, *this, destDir);
 }
 
 std::optional<std::filesystem::path> Input::getSourcePath() const
@@ -493,9 +494,19 @@ void InputScheme::putFile(
     throw Error("input '%s' does not support modifying file '%s'", input.to_string(), path);
 }
 
-void InputScheme::clone(const Settings & settings, const Input & input, const std::filesystem::path & destDir) const
+void InputScheme::clone(
+    const Settings & settings, ref<Store> store, const Input & input, const std::filesystem::path & destDir) const
 {
-    throw Error("do not know how to clone input '%s'", input.to_string());
+    if (std::filesystem::exists(destDir))
+        throw Error("cannot clone into existing path %s", destDir);
+
+    auto [accessor, input2] = getAccessor(settings, store, input);
+
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), destDir));
+
+    auto source = sinkToSource([&](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
+
+    restorePath(destDir, *source);
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
