@@ -1019,7 +1019,7 @@ struct CmdFlakeNew : CmdFlakeInitCommon
 
 struct CmdFlakeClone : FlakeCommand
 {
-    Path destDir;
+    std::filesystem::path destDir;
 
     std::string description() override
     {
@@ -1049,7 +1049,7 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(fetchSettings, store).input.clone(fetchSettings, destDir);
+        getFlakeRef().resolve(fetchSettings, store).input.clone(fetchSettings, store, destDir);
     }
 };
 
