@@ -778,6 +778,16 @@ struct GitInputScheme : InputScheme
         }
     }
 
+    /**
+     * Decide whether we can do a shallow clone, which is faster. This is possible if the user explicitly specified
+     * `shallow = true`, or if we already have a `revCount`.
+     */
+    bool canDoShallow(const Input & input) const
+    {
+        bool shallow = getShallowAttr(input);
+        return shallow || input.getRevCount().has_value();
+    }
+
     std::pair<ref<SourceAccessor>, Input>
     getAccessorFromCommit(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
     {
@@ -786,7 +796,7 @@ struct GitInputScheme : InputScheme
         auto origRev = input.getRev();
 
         auto originalRef = input.getRef();
-        bool shallow = getShallowAttr(input);
+        bool shallow = canDoShallow(input);
         auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo, shallow);
         input.attrs.insert_or_assign("ref", ref);
 
@@ -831,7 +841,6 @@ struct GitInputScheme : InputScheme
             }
 
             if (doFetch) {
-                bool shallow = getShallowAttr(input);
                 try {
                     auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
                                     : input.getRev()                  ? input.getRev()->gitRev()
@@ -878,13 +887,6 @@ struct GitInputScheme : InputScheme
 
         auto repo = GitRepo::openRepo(repoDir);
 
-        auto isShallow = repo->isShallow();
-
-        if (isShallow && !getShallowAttr(input))
-            throw Error(
-                "'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified",
-                repoInfo.locationToArg());
-
         // FIXME: check whether rev is an ancestor of ref?
 
         auto rev = *input.getRev();
@@ -895,10 +897,16 @@ struct GitInputScheme : InputScheme
         if (!input.attrs.contains("lastModified"))
             input.attrs.insert_or_assign("lastModified", getLastModified(settings, repoInfo, repoDir, rev));
 
-        if (!getShallowAttr(input)) {
-            /* Like lastModified, skip revCount if supplied by the caller. */
-            if (!input.attrs.contains("revCount"))
-                input.attrs.insert_or_assign("revCount", getRevCount(settings, repoInfo, repoDir, rev));
+        /* Like lastModified, skip revCount if supplied by the caller. */
+        if (!shallow && !input.attrs.contains("revCount")) {
+            auto isShallow = repo->isShallow();
+
+            if (isShallow && !shallow)
+                throw Error(
+                    "'%s' is a shallow Git repository, but shallow repositories are only allowed when `shallow = true;` is specified",
+                    repoInfo.locationToArg());
+
+            input.attrs.insert_or_assign("revCount", getRevCount(settings, repoInfo, repoDir, rev));
         }
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
