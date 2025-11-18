@@ -269,6 +269,8 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       CXX_LD = "mold";
     };
 
+    dontUseCmakeConfigure = true;
+
     mesonFlags =
       map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
       ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
