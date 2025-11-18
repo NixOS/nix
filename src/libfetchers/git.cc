@@ -807,10 +807,26 @@ struct GitInputScheme : InputScheme
             if (!input.getRev())
                 input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
         } else {
+            auto rev = input.getRev();
             auto repoUrl = std::get<ParsedURL>(repoInfo.location);
             std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), shallow);
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
+
+            /* If shallow = false, but we have a non-shallow repo that already contains the desired rev, then use that
+             * repo instead. */
+            std::filesystem::path cacheDirNonShallow = getCachePath(repoUrl.to_string(), false);
+            if (rev && shallow && pathExists(cacheDirNonShallow)) {
+                auto nonShallowRepo = GitRepo::openRepo(cacheDirNonShallow, true, true);
+                if (nonShallowRepo->hasObject(*rev)) {
+                    debug(
+                        "using non-shallow cached repo for '%s' since it contains rev '%s'",
+                        repoUrl.to_string(),
+                        rev->gitRev());
+                    repoDir = cacheDirNonShallow;
+                    goto have_rev;
+                }
+            }
 
             std::filesystem::create_directories(cacheDir.parent_path());
             PathLocks cacheDirLock({cacheDir.string()});
@@ -827,7 +843,7 @@ struct GitInputScheme : InputScheme
 
             /* If a rev was specified, we need to fetch if it's not in the
                repo. */
-            if (auto rev = input.getRev()) {
+            if (rev) {
                 doFetch = !repo->hasObject(*rev);
             } else {
                 if (getAllRefsAttr(input)) {
@@ -868,7 +884,7 @@ struct GitInputScheme : InputScheme
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
             }
 
-            if (auto rev = input.getRev()) {
+            if (rev) {
                 if (!repo->hasObject(*rev))
                     throw Error(
                         "Cannot find Git revision '%s' in ref '%s' of repository '%s'! "
@@ -885,6 +901,7 @@ struct GitInputScheme : InputScheme
             // the remainder
         }
 
+    have_rev:
         auto repo = GitRepo::openRepo(repoDir);
 
         // FIXME: check whether rev is an ancestor of ref?
