@@ -889,12 +889,14 @@ struct GitInputScheme : InputScheme
 
         auto rev = *input.getRev();
 
-        input.attrs.insert_or_assign("lastModified", getLastModified(settings, repoInfo, repoDir, rev));
+        /* Skip lastModified computation if it's already supplied by the caller.
+           We don't care if they specify an incorrect value; it doesn't
+           matter for security, unlike narHash. */
+        if (!input.attrs.contains("lastModified"))
+            input.attrs.insert_or_assign("lastModified", getLastModified(settings, repoInfo, repoDir, rev));
 
         if (!getShallowAttr(input)) {
-            /* Skip revCount computation if it's already supplied by the caller.
-               We don't care if they specify an incorrect value; it doesn't
-               matter for security, unlike narHash. */
+            /* Like lastModified, skip revCount if supplied by the caller. */
             if (!input.attrs.contains("revCount"))
                 input.attrs.insert_or_assign("revCount", getRevCount(settings, repoInfo, repoDir, rev));
         }
