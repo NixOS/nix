@@ -74,9 +74,9 @@ void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) const
 {
-    typedef const decltype(attrs)::value_type * Attr;
+    typedef const AttrDefs::value_type * Attr;
     std::vector<Attr> sorted;
-    for (auto & i : attrs)
+    for (auto & i : *attrs)
         sorted.push_back(&i);
     std::sort(sorted.begin(), sorted.end(), [&](Attr a, Attr b) {
         std::string_view sa = symbols[a->first], sb = symbols[b->first];
@@ -122,7 +122,7 @@ void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) co
             str << "; ";
         }
     }
-    for (auto & i : dynamicAttrs) {
+    for (auto & i : *dynamicAttrs) {
         str << "\"${";
         i.nameExpr->show(symbols, str);
         str << "}\" = ";
@@ -401,15 +401,26 @@ ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const Static
 
 void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
+    // Move storage into the Exprs arena
+    {
+        auto arena = es.mem.exprs.alloc;
+        AttrDefs newAttrs{std::move(*attrs), arena};
+        attrs.emplace(std::move(newAttrs), arena);
+        DynamicAttrDefs newDynamicAttrs{std::move(*dynamicAttrs), arena};
+        dynamicAttrs.emplace(std::move(newDynamicAttrs), arena);
+        if (inheritFromExprs)
+            inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>(std::move(*inheritFromExprs), arena);
+    }
+
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
     if (recursive) {
         auto newEnv = [&]() -> std::shared_ptr<const StaticEnv> {
-            auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs.size());
+            auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->size());
 
             Displacement displ = 0;
-            for (auto & i : attrs)
+            for (auto & i : *attrs)
                 newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
             return newEnv;
         }();
@@ -417,20 +428,20 @@ void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> 
         // No need to sort newEnv since attrs is in sorted order.
 
         auto inheritFromEnv = bindInheritSources(es, newEnv);
-        for (auto & i : attrs)
+        for (auto & i : *attrs)
             i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
 
-        for (auto & i : dynamicAttrs) {
+        for (auto & i : *dynamicAttrs) {
             i.nameExpr->bindVars(es, newEnv);
             i.valueExpr->bindVars(es, newEnv);
         }
     } else {
         auto inheritFromEnv = bindInheritSources(es, env);
 
-        for (auto & i : attrs)
+        for (auto & i : *attrs)
             i.second.e->bindVars(es, i.second.chooseByKind(env, env, inheritFromEnv));
 
-        for (auto & i : dynamicAttrs) {
+        for (auto & i : *dynamicAttrs) {
             i.nameExpr->bindVars(es, env);
             i.valueExpr->bindVars(es, env);
         }
@@ -486,10 +497,10 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
     auto newEnv = [&]() -> std::shared_ptr<const StaticEnv> {
-        auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->attrs.size());
+        auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->attrs->size());
 
         Displacement displ = 0;
-        for (auto & i : attrs->attrs)
+        for (auto & i : *attrs->attrs)
             newEnv->vars.emplace_back(i.first, i.second.displ = displ++);
         return newEnv;
     }();
@@ -497,7 +508,7 @@ void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
     // No need to sort newEnv since attrs->attrs is in sorted order.
 
     auto inheritFromEnv = attrs->bindInheritSources(es, newEnv);
-    for (auto & i : attrs->attrs)
+    for (auto & i : *attrs->attrs)
         i.second.e->bindVars(es, i.second.chooseByKind(newEnv, env, inheritFromEnv));
 
     if (es.debugRepl)

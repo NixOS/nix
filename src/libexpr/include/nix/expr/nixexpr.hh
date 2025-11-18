@@ -395,9 +395,13 @@ struct ExprAttrs : Expr
         }
     };
 
-    typedef std::map<Symbol, AttrDef> AttrDefs;
-    AttrDefs attrs;
-    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
+    typedef std::pmr::map<Symbol, AttrDef> AttrDefs;
+    /**
+     * attrs will never be null. we use std::optional so that we can call emplace() to re-initialize the value with a
+     * new pmr::map using a different allocator (move assignment will copy into the old allocator)
+     */
+    std::optional<AttrDefs> attrs;
+    std::unique_ptr<std::pmr::vector<Expr *>> inheritFromExprs;
 
     struct DynamicAttrDef
     {
@@ -409,13 +413,20 @@ struct ExprAttrs : Expr
             , pos(pos) {};
     };
 
-    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
-    DynamicAttrDefs dynamicAttrs;
+    typedef std::pmr::vector<DynamicAttrDef> DynamicAttrDefs;
+    /**
+     * dynamicAttrs will never be null. See comment on AttrDefs above.
+     */
+    std::optional<DynamicAttrDefs> dynamicAttrs;
     ExprAttrs(const PosIdx & pos)
         : recursive(false)
-        , pos(pos) {};
+        , pos(pos)
+        , attrs(AttrDefs{})
+        , dynamicAttrs(DynamicAttrDefs{}) {};
     ExprAttrs()
-        : recursive(false) {};
+        : recursive(false)
+        , attrs(AttrDefs{})
+        , dynamicAttrs(DynamicAttrDefs{}) {};
 
     PosIdx getPos() const override
     {

@@ -211,7 +211,7 @@ expr_function
   | WITH expr ';' expr_function
     { $$ = state->exprs.add<ExprWith>(CUR_POS, $2, $4); }
   | LET binds IN_KW expr_function
-    { if (!$2->dynamicAttrs.empty())
+    { if (!$2->dynamicAttrs->empty())
         throw ParseError({
             .msg = HintFmt("dynamic attributes not allowed in let"),
             .pos = state->positions[CUR_POS]
@@ -413,9 +413,9 @@ binds1
   | binds[accum] INHERIT attrs ';'
     { $$ = $accum;
       for (auto & [i, iPos] : $attrs) {
-          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
-              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
-          $accum->attrs.emplace(
+          if ($accum->attrs->find(i.symbol) != $accum->attrs->end())
+              state->dupAttr(i.symbol, iPos, (*$accum->attrs)[i.symbol].pos);
+          $accum->attrs->emplace(
               i.symbol,
               ExprAttrs::AttrDef(state->exprs.add<ExprVar>(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
@@ -423,13 +423,13 @@ binds1
   | binds[accum] INHERIT '(' expr ')' attrs ';'
     { $$ = $accum;
       if (!$accum->inheritFromExprs)
-          $accum->inheritFromExprs = std::make_unique<std::vector<Expr *>>();
+          $accum->inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>();
       $accum->inheritFromExprs->push_back($expr);
       auto from = state->exprs.add<ExprInheritFrom>(state->at(@expr), $accum->inheritFromExprs->size() - 1);
       for (auto & [i, iPos] : $attrs) {
-          if ($accum->attrs.find(i.symbol) != $accum->attrs.end())
-              state->dupAttr(i.symbol, iPos, $accum->attrs[i.symbol].pos);
-          $accum->attrs.emplace(
+          if ($accum->attrs->find(i.symbol) != $accum->attrs->end())
+              state->dupAttr(i.symbol, iPos, (*$accum->attrs)[i.symbol].pos);
+          $accum->attrs->emplace(
               i.symbol,
               ExprAttrs::AttrDef(
                   state->exprs.add<ExprSelect>(state->exprs.alloc, iPos, from, i.symbol),
