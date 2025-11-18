@@ -207,8 +207,8 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
-        size_t headerCallback(void * contents, size_t size, size_t nmemb)
-        {
+        size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
@@ -261,6 +261,15 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
             return realSize;
+        } catch (...) {
+#if LIBCURL_VERSION_NUM >= 0x075700
+            /* https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html:
+               You can also abort the transfer by returning CURL_WRITEFUNC_ERROR. */
+            callbackException = std::current_exception();
+            return CURL_WRITEFUNC_ERROR;
+#else
+            return realSize;
+#endif
         }
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
