@@ -298,10 +298,13 @@ struct curlFileTransfer : public FileTransfer
             return item.progressCallback(isUpload ? ultotal : dltotal, isUpload ? ulnow : dlnow);
         }
 
-        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
-        {
+        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr) noexcept
+        try {
             if (type == CURLINFO_TEXT)
                 vomit("curl: %s", chomp(std::string(data, size)));
+            return 0;
+        } catch (...) {
+            /* Swallow the exception. Nothing left to do. */
             return 0;
         }
 
