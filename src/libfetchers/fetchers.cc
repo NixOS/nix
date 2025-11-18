@@ -269,15 +269,6 @@ void Input::checkLocks(Input specified, Input & result)
         }
     }
 
-    if (auto prevLastModified = specified.getLastModified()) {
-        if (result.getLastModified() != prevLastModified)
-            throw Error(
-                "'lastModified' attribute mismatch in input '%s', expected %d, got %d",
-                result.to_string(),
-                *prevLastModified,
-                result.getLastModified().value_or(-1));
-    }
-
     if (auto prevRev = specified.getRev()) {
         if (result.getRev() != prevRev)
             throw Error("'rev' attribute mismatch in input '%s', expected %s", result.to_string(), prevRev->gitRev());
