@@ -170,30 +170,28 @@ struct curlFileTransfer : public FileTransfer
 
         std::exception_ptr writeException;
 
-        size_t writeCallback(void * contents, size_t size, size_t nmemb)
-        {
-            try {
-                size_t realSize = size * nmemb;
-                result.bodySize += realSize;
+        size_t writeCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
+            size_t realSize = size * nmemb;
+            result.bodySize += realSize;
 
-                if (!decompressionSink) {
-                    decompressionSink = makeDecompressionSink(encoding, finalSink);
-                    if (!successfulStatuses.count(getHTTPStatus())) {
-                        // In this case we want to construct a TeeSink, to keep
-                        // the response around (which we figure won't be big
-                        // like an actual download should be) to improve error
-                        // messages.
-                        errorSink = StringSink{};
-                    }
+            if (!decompressionSink) {
+                decompressionSink = makeDecompressionSink(encoding, finalSink);
+                if (!successfulStatuses.count(getHTTPStatus())) {
+                    // In this case we want to construct a TeeSink, to keep
+                    // the response around (which we figure won't be big
+                    // like an actual download should be) to improve error
+                    // messages.
+                    errorSink = StringSink{};
                 }
-
-                (*decompressionSink)({(char *) contents, realSize});
-
-                return realSize;
-            } catch (...) {
-                writeException = std::current_exception();
-                return 0;
             }
+
+            (*decompressionSink)({(char *) contents, realSize});
+
+            return realSize;
+        } catch (...) {
+            writeException = std::current_exception();
+            return 0;
         }
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
