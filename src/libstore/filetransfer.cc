@@ -277,14 +277,17 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
         }
 
-        int progressCallback(curl_off_t dltotal, curl_off_t dlnow)
-        {
-            try {
-                act.progress(dlnow, dltotal);
-            } catch (nix::Interrupted &) {
-                assert(getInterrupted());
-            }
+        int progressCallback(curl_off_t dltotal, curl_off_t dlnow) noexcept
+        try {
+            act.progress(dlnow, dltotal);
             return getInterrupted();
+        } catch (nix::Interrupted &) {
+            assert(getInterrupted());
+            return 1;
+        } catch (...) {
+            /* Something unexpected has happened like logger throwing an exception. */
+            callbackException = std::current_exception();
+            return 1;
         }
 
         static int progressCallbackWrapper(
