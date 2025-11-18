@@ -87,11 +87,11 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
  * HTTP methods supported by FileTransfer.
  */
 enum struct HttpMethod {
-    GET,
-    PUT,
-    HEAD,
-    POST,
-    DELETE,
+    Get,
+    Put,
+    Head,
+    Post,
+    Delete,
 };
 
 /**
@@ -110,7 +110,7 @@ struct FileTransferRequest
     VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
-    HttpMethod method = HttpMethod::GET;
+    HttpMethod method = HttpMethod::Get;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
@@ -164,14 +164,14 @@ struct FileTransferRequest
     std::string verb() const
     {
         switch (method) {
-        case HttpMethod::HEAD:
-        case HttpMethod::GET:
+        case HttpMethod::Head:
+        case HttpMethod::Get:
             return "download";
-        case HttpMethod::PUT:
-        case HttpMethod::POST:
+        case HttpMethod::Put:
+        case HttpMethod::Post:
             assert(data);
             return "upload";
-        case HttpMethod::DELETE:
+        case HttpMethod::Delete:
             return "delet";
         }
         unreachable();

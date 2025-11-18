@@ -386,17 +386,17 @@ struct curlFileTransfer : public FileTransfer
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.method == HttpMethod::HEAD)
+            if (request.method == HttpMethod::Head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
-            if (request.method == HttpMethod::DELETE)
+            if (request.method == HttpMethod::Delete)
                 curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
 
             if (request.data) {
-                if (request.method == HttpMethod::POST) {
+                if (request.method == HttpMethod::Post) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->sizeHint);
-                } else if (request.method == HttpMethod::PUT) {
+                } else if (request.method == HttpMethod::Put) {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
                     curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->sizeHint);
                 } else {
