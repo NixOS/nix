@@ -300,6 +300,7 @@ struct curlFileTransfer : public FileTransfer
         } catch (EndOfFile &) {
             return 0;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_READFUNC_ABORT;
         }
 
@@ -331,6 +332,7 @@ struct curlFileTransfer : public FileTransfer
             }
             return CURL_SEEKFUNC_OK;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_SEEKFUNC_FAIL;
         }
 
