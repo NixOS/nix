@@ -120,7 +120,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
 
     try {
         FileTransferRequest request(makeRequest(path));
-        request.method = HttpMethod::HEAD;
+        request.method = HttpMethod::Head;
         getFileTransfer()->download(request);
         return true;
     } catch (FileTransferError & e) {
@@ -141,7 +141,7 @@ void HttpBinaryCacheStore::upload(
     std::optional<Headers> headers)
 {
     auto req = makeRequest(path);
-    req.method = HttpMethod::PUT;
+    req.method = HttpMethod::Put;
 
     if (headers) {
         req.headers.reserve(req.headers.size() + headers->size());

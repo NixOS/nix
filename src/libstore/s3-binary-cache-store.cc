@@ -295,7 +295,7 @@ std::string S3BinaryCacheStore::createMultipartUpload(
     url.query["uploads"] = "";
     req.uri = VerbatimURL(url);
 
-    req.method = HttpMethod::POST;
+    req.method = HttpMethod::Post;
     StringSource payload{std::string_view("")};
     req.data = {payload};
     req.mimeType = mimeType;
@@ -325,7 +325,7 @@ S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, 
     }
 
     auto req = makeRequest(key);
-    req.method = HttpMethod::PUT;
+    req.method = HttpMethod::Put;
     req.setupForS3();
 
     auto url = req.uri.parsed();
@@ -355,7 +355,7 @@ void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_
         auto url = req.uri.parsed();
         url.query["uploadId"] = uploadId;
         req.uri = VerbatimURL(url);
-        req.method = HttpMethod::DELETE;
+        req.method = HttpMethod::Delete;
 
         getFileTransfer()->enqueueFileTransfer(req).get();
     } catch (...) {
@@ -372,7 +372,7 @@ void S3BinaryCacheStore::completeMultipartUpload(
     auto url = req.uri.parsed();
     url.query["uploadId"] = uploadId;
     req.uri = VerbatimURL(url);
-    req.method = HttpMethod::POST;
+    req.method = HttpMethod::Post;
 
     std::string xml = "<CompleteMultipartUpload>";
     for (const auto & [idx, etag] : enumerate(partEtags)) {
