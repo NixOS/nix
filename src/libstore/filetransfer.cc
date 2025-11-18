@@ -168,7 +168,7 @@ struct curlFileTransfer : public FileTransfer
         std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
-        std::exception_ptr writeException;
+        std::exception_ptr callbackException;
 
         size_t writeCallback(void * contents, size_t size, size_t nmemb) noexcept
         try {
@@ -190,7 +190,7 @@ struct curlFileTransfer : public FileTransfer
 
             return realSize;
         } catch (...) {
-            writeException = std::current_exception();
+            callbackException = std::current_exception();
             return 0;
         }
 
@@ -474,7 +474,7 @@ struct curlFileTransfer : public FileTransfer
                 try {
                     decompressionSink->finish();
                 } catch (...) {
-                    writeException = std::current_exception();
+                    callbackException = std::current_exception();
                 }
             }
 
@@ -483,8 +483,8 @@ struct curlFileTransfer : public FileTransfer
                 httpStatus = 304;
             }
 
-            if (writeException)
-                failEx(writeException);
+            if (callbackException)
+                failEx(callbackException);
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
                 result.cached = httpStatus == 304;
