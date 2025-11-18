@@ -151,15 +151,23 @@ struct curlFileTransfer : public FileTransfer
             }
         }
 
-        void failEx(std::exception_ptr ex)
+        void failEx(std::exception_ptr ex) noexcept
         {
             assert(!done);
             done = true;
+            try {
+                std::rethrow_exception(ex);
+            } catch (nix::Error & e) {
+                /* Add more context to the error message. */
+                e.addTrace({}, "during %s of '%s'", Uncolored(request.verb()), request.uri.to_string());
+            } catch (...) {
+                /* Can't add more context to the error. */
+            }
             callback.rethrow(ex);
         }
 
         template<class T>
-        void fail(T && e)
+        void fail(T && e) noexcept
         {
             failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
