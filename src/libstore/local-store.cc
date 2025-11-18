@@ -1246,10 +1246,8 @@ StorePath LocalStore::addToStoreFromDump(
 
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
-        methodsMatch
-            ? dumpHash
-            : hashPath(PosixSourceAccessor::createAtRoot(tempPath), hashMethod.getFileIngestionMethod(), hashAlgo)
-                  .first,
+        methodsMatch ? dumpHash
+                     : hashPath(makeFSSourceAccessor(tempPath), hashMethod.getFileIngestionMethod(), hashAlgo).first,
         {
             .others = references,
             // caller is not capable of creating a self-reference, because this is content-addressed without modulus
@@ -1385,11 +1383,9 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
             checkInterrupt();
             auto name = link.path().filename();
             printMsg(lvlTalkative, "checking contents of %s", name);
-            std::string hash = hashPath(
-                                   PosixSourceAccessor::createAtRoot(link.path()),
-                                   FileIngestionMethod::NixArchive,
-                                   HashAlgorithm::SHA256)
-                                   .first.to_string(HashFormat::Nix32, false);
+            std::string hash =
+                hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
+                    .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
                 printError("link %s was modified! expected hash %s, got '%s'", link.path(), name, hash);
                 if (repair) {
