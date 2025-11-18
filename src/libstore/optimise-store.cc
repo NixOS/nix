@@ -172,7 +172,7 @@ void LocalStore::optimisePath_(
         auto stLink = lstat(linkPath.string());
         if (st.st_size != stLink.st_size || (repair && hash != ({
                                                            hashPath(
-                                                               PosixSourceAccessor::createAtRoot(linkPath),
+                                                               makeFSSourceAccessor(linkPath),
                                                                FileSerialisationMethod::NixArchive,
                                                                HashAlgorithm::SHA256)
                                                                .hash;
