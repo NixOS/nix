@@ -74,5 +74,9 @@ perl.pkgs.toPerlModule (
     ];
 
     strictDeps = false;
+
+    meta = {
+      platforms = lib.platforms.unix;
+    };
   })
 )

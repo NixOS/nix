@@ -130,15 +130,19 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
     ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
 
+    availableComponents = lib.filterAttrs (
+      k: v: lib.meta.availableOn pkgs.hostPlatform v
+    ) allComponents;
+
     activeComponents = buildInputsClosureCond isInternal (
-      lib.attrValues (finalAttrs.passthru.config.getComponents allComponents)
+      lib.attrValues (finalAttrs.passthru.config.getComponents availableComponents)
     );
 
     allComponents = lib.filterAttrs (k: v: lib.isDerivation v) pkgs.nixComponents2;
     internalDrvs = byDrvPath (
       # Drop the attr names (not present in buildInputs anyway)
-      lib.attrValues allComponents
-      ++ lib.concatMap (c: lib.attrValues c.tests or { }) (lib.attrValues allComponents)
+      lib.attrValues availableComponents
+      ++ lib.concatMap (c: lib.attrValues c.tests or { }) (lib.attrValues availableComponents)
     );
 
     isInternal =
@@ -187,19 +191,19 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
         );
 
       small =
-        (finalAttrs.finalPackage.withActiveComponents (c: {
-          inherit (c)
-            nix-cli
-            nix-util-tests
-            nix-store-tests
-            nix-expr-tests
-            nix-fetchers-tests
-            nix-flake-tests
-            nix-functional-tests
-            # Currently required
-            nix-perl-bindings
-            ;
-        })).overrideAttrs
+        (finalAttrs.finalPackage.withActiveComponents (
+          c:
+          lib.intersectAttrs (lib.genAttrs [
+            "nix-cli"
+            "nix-util-tests"
+            "nix-store-tests"
+            "nix-expr-tests"
+            "nix-fetchers-tests"
+            "nix-flake-tests"
+            "nix-functional-tests"
+            "nix-perl-bindings"
+          ] (_: null)) c
+        )).overrideAttrs
           (o: {
             mesonFlags = o.mesonFlags ++ [
               # TODO: infer from activeComponents or vice versa
