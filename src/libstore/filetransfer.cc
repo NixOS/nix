@@ -151,15 +151,23 @@ struct curlFileTransfer : public FileTransfer
             }
         }
 
-        void failEx(std::exception_ptr ex)
+        void failEx(std::exception_ptr ex) noexcept
         {
             assert(!done);
             done = true;
+            try {
+                std::rethrow_exception(ex);
+            } catch (nix::Error & e) {
+                /* Add more context to the error message. */
+                e.addTrace({}, "during %s of '%s'", Uncolored(request.verb()), request.uri.to_string());
+            } catch (...) {
+                /* Can't add more context to the error. */
+            }
             callback.rethrow(ex);
         }
 
         template<class T>
-        void fail(T && e)
+        void fail(T && e) noexcept
         {
             failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
@@ -168,32 +176,30 @@ struct curlFileTransfer : public FileTransfer
         std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
-        std::exception_ptr writeException;
+        std::exception_ptr callbackException;
 
-        size_t writeCallback(void * contents, size_t size, size_t nmemb)
-        {
-            try {
-                size_t realSize = size * nmemb;
-                result.bodySize += realSize;
+        size_t writeCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
+            size_t realSize = size * nmemb;
+            result.bodySize += realSize;
 
-                if (!decompressionSink) {
-                    decompressionSink = makeDecompressionSink(encoding, finalSink);
-                    if (!successfulStatuses.count(getHTTPStatus())) {
-                        // In this case we want to construct a TeeSink, to keep
-                        // the response around (which we figure won't be big
-                        // like an actual download should be) to improve error
-                        // messages.
-                        errorSink = StringSink{};
-                    }
+            if (!decompressionSink) {
+                decompressionSink = makeDecompressionSink(encoding, finalSink);
+                if (!successfulStatuses.count(getHTTPStatus())) {
+                    // In this case we want to construct a TeeSink, to keep
+                    // the response around (which we figure won't be big
+                    // like an actual download should be) to improve error
+                    // messages.
+                    errorSink = StringSink{};
                 }
-
-                (*decompressionSink)({(char *) contents, realSize});
-
-                return realSize;
-            } catch (...) {
-                writeException = std::current_exception();
-                return 0;
             }
+
+            (*decompressionSink)({(char *) contents, realSize});
+
+            return realSize;
+        } catch (...) {
+            callbackException = std::current_exception();
+            return 0;
         }
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -209,8 +215,8 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
-        size_t headerCallback(void * contents, size_t size, size_t nmemb)
-        {
+        size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
@@ -263,6 +269,15 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
             return realSize;
+        } catch (...) {
+#if LIBCURL_VERSION_NUM >= 0x075700
+            /* https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html:
+               You can also abort the transfer by returning CURL_WRITEFUNC_ERROR. */
+            callbackException = std::current_exception();
+            return CURL_WRITEFUNC_ERROR;
+#else
+            return realSize;
+#endif
         }
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -270,14 +285,17 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
         }
 
-        int progressCallback(curl_off_t dltotal, curl_off_t dlnow)
-        {
-            try {
-                act.progress(dlnow, dltotal);
-            } catch (nix::Interrupted &) {
-                assert(getInterrupted());
-            }
+        int progressCallback(curl_off_t dltotal, curl_off_t dlnow) noexcept
+        try {
+            act.progress(dlnow, dltotal);
             return getInterrupted();
+        } catch (nix::Interrupted &) {
+            assert(getInterrupted());
+            return 1;
+        } catch (...) {
+            /* Something unexpected has happened like logger throwing an exception. */
+            callbackException = std::current_exception();
+            return 1;
         }
 
         static int progressCallbackWrapper(
@@ -288,10 +306,13 @@ struct curlFileTransfer : public FileTransfer
             return item.progressCallback(isUpload ? ultotal : dltotal, isUpload ? ulnow : dlnow);
         }
 
-        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
-        {
+        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr) noexcept
+        try {
             if (type == CURLINFO_TEXT)
                 vomit("curl: %s", chomp(std::string(data, size)));
+            return 0;
+        } catch (...) {
+            /* Swallow the exception. Nothing left to do. */
             return 0;
         }
 
@@ -302,6 +323,7 @@ struct curlFileTransfer : public FileTransfer
         } catch (EndOfFile &) {
             return 0;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_READFUNC_ABORT;
         }
 
@@ -333,6 +355,7 @@ struct curlFileTransfer : public FileTransfer
             }
             return CURL_SEEKFUNC_OK;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_SEEKFUNC_FAIL;
         }
 
@@ -476,7 +499,7 @@ struct curlFileTransfer : public FileTransfer
                 try {
                     decompressionSink->finish();
                 } catch (...) {
-                    writeException = std::current_exception();
+                    callbackException = std::current_exception();
                 }
             }
 
@@ -485,8 +508,8 @@ struct curlFileTransfer : public FileTransfer
                 httpStatus = 304;
             }
 
-            if (writeException)
-                failEx(writeException);
+            if (callbackException)
+                failEx(callbackException);
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
                 result.cached = httpStatus == 304;
