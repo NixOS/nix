@@ -73,8 +73,34 @@ static std::filesystem::path append(const std::filesystem::path & src, const Can
 void RestoreSink::createDirectory(const CanonPath & path)
 {
     auto p = append(dstPath, path);
+
+#ifndef _WIN32
+    if (dirFd) {
+        if (path.isRoot())
+            /* Trying to create a directory that we already have a file descriptor for. */
+            throw Error("path '%s' already exists", p.string());
+
+        if (::mkdirat(dirFd.get(), path.rel_c_str(), 0777) == -1)
+            throw SysError("creating directory '%s'", p.string());
+
+        return;
+    }
+#endif
+
     if (!std::filesystem::create_directory(p))
         throw Error("path '%s' already exists", p.string());
+
+#ifndef _WIN32
+    if (path.isRoot()) {
+        assert(!dirFd); // Handled above
+
+        /* Open directory for further *at operations relative to the sink root
+           directory. */
+        dirFd = open(p.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (!dirFd)
+            throw SysError("creating directory '%1%'", p.string());
+    }
+#endif
 };
 
 struct RestoreRegularFile : CreateRegularFileSink
@@ -114,7 +140,14 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
             FILE_ATTRIBUTE_NORMAL,
             NULL)
 #else
-        open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666)
+        [&]() {
+            /* O_EXCL together with O_CREAT ensures symbolic links in the last
+              component are not followed. */
+            constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
+            if (!dirFd)
+                return ::open(p.c_str(), flags, 0666);
+            return ::openat(dirFd.get(), path.rel_c_str(), flags, 0666);
+        }();
 #endif
         ;
     if (!crf.fd)
@@ -161,6 +194,13 @@ void RestoreRegularFile::operator()(std::string_view data)
 void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
 {
     auto p = append(dstPath, path);
+#ifndef _WIN32
+    if (dirFd) {
+        if (::symlinkat(requireCString(target), dirFd.get(), path.rel_c_str()) == -1)
+            throw SysError("creating symlink from '%1%' -> '%2%'", p.string(), target);
+        return;
+    }
+#endif
     nix::createSymlink(target, p.string());
 }
 

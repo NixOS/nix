@@ -82,6 +82,18 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
+#ifndef _WIN32
+    /**
+     * File descriptor for the directory located at dstPath. Used for *at
+     * operations relative to this file descriptor. This sink must *never*
+     * follow intermediate symlinks (starting from dstPath) in case a file
+     * collision is encountered for various reasons like case-insensitivity or
+     * other types on normalization. using appropriate *at system calls and traversing
+     * only one path component at a time ensures that writing is race-free and is
+     * is not susceptible to symlink replacement.
+     */
+    AutoCloseFD dirFd;
+#endif
     bool startFsync = false;
 
     explicit RestoreSink(bool startFsync)
