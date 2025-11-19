@@ -39,7 +39,7 @@ ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std:
 
     if (cacheDir != "") {
         try {
-            nlohmann::json j = listNar(*narAccessor, CanonPath::root, true);
+            nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
             writeFile(makeCacheFile(hashPart, "ls"), j.dump());
         } catch (...) {
             ignoreExceptionExceptInterrupt();

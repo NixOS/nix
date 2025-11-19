@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/source-accessor.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 #include <functional>
 
@@ -34,10 +34,55 @@ GetNarBytes seekableGetNarBytes(const Path & path);
 
 ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes);
 
+struct NarListingRegularFile
+{
+    /**
+     * @see `SourceAccessor::Stat::fileSize`
+     */
+    std::optional<uint64_t> fileSize;
+
+    /**
+     * @see `SourceAccessor::Stat::narOffset`
+     *
+     * We only set to non-`std::nullopt` if it is also non-zero.
+     */
+    std::optional<uint64_t> narOffset;
+
+    auto operator<=>(const NarListingRegularFile &) const = default;
+};
+
 /**
- * Write a JSON representation of the contents of a NAR (except file
- * contents).
+ * Abstract syntax for a "NAR listing".
  */
-nlohmann::json listNar(SourceAccessor & accessor, const CanonPath & path, bool recurse);
+using NarListing = fso::VariantT<NarListingRegularFile, true>;
+
+/**
+ * Shallow NAR listing where directory children are not recursively expanded.
+ * Uses a variant that can hold Regular/Symlink fully, but Directory children
+ * are just unit types indicating presence without content.
+ */
+using ShallowNarListing = fso::VariantT<NarListingRegularFile, false>;
+
+/**
+ * Return a deep structured representation of the contents of a NAR (except file
+ * contents), recursively listing all children.
+ */
+NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path);
+
+/**
+ * Return a shallow structured representation of the contents of a NAR (except file
+ * contents), only listing immediate children without recursing.
+ */
+ShallowNarListing listNarShallow(SourceAccessor & accessor, const CanonPath & path);
+
+/**
+ * Serialize a NarListing to JSON.
+ */
+void to_json(nlohmann::json & j, const NarListing & listing);
+
+/**
+ * Serialize a ShallowNarListing to JSON.
+ */
+void to_json(nlohmann::json & j, const ShallowNarListing & listing);
 
 } // namespace nix

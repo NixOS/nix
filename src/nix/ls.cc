@@ -85,7 +85,12 @@ struct MixLs : virtual Args, MixJSON
         if (json) {
             if (showDirectory)
                 throw UsageError("'--directory' is useless with '--json'");
-            logger->cout("%s", listNar(*accessor, path, recursive));
+            nlohmann::json j;
+            if (recursive)
+                j = listNarDeep(*accessor, path);
+            else
+                j = listNarShallow(*accessor, path);
+            logger->cout("%s", j.dump());
         } else
             listText(accessor, std::move(path));
     }
@@ -150,7 +155,7 @@ struct CmdLsNar : Command, MixLs
             throw SysError("opening NAR file '%s'", narPath);
         auto source = FdSource{fd.get()};
         auto narAccessor = makeNarAccessor(source);
-        auto listing = listNar(*narAccessor, CanonPath::root, true);
+        nlohmann::json listing = listNarDeep(*narAccessor, CanonPath::root);
         list(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };

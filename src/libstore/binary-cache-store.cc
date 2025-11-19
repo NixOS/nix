@@ -208,7 +208,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     if (config.writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
-            {"root", listNar(*narAccessor, CanonPath::root, true)},
+            {"root", listNarDeep(*narAccessor, CanonPath::root)},
         };
 
         upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
