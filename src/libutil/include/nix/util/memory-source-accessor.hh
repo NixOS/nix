@@ -35,7 +35,7 @@ struct MemorySourceAccessor : virtual SourceAccessor
         {
             using Name = std::string;
 
-            std::map<Name, File, std::less<>> contents;
+            std::map<Name, File, std::less<>> entries;
 
             bool operator==(const Directory &) const noexcept;
             // TODO libc++ 16 (used by darwin) missing `std::map::operator <=>`, can't do yet.
@@ -95,7 +95,7 @@ inline bool MemorySourceAccessor::File::Directory::operator==(
 inline bool
 MemorySourceAccessor::File::Directory::operator<(const MemorySourceAccessor::File::Directory & other) const noexcept
 {
-    return contents < other.contents;
+    return entries < other.entries;
 }
 
 inline bool MemorySourceAccessor::File::operator==(const MemorySourceAccessor::File &) const noexcept = default;
