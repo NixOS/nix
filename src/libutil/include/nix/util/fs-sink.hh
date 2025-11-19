@@ -120,6 +120,10 @@ struct RestoreSink : FileSystemObjectSink
 
     void createDirectory(const CanonPath & path) override;
 
+#ifndef _WIN32
+    void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
+#endif
+
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const CanonPath & path, const std::string & target) override;

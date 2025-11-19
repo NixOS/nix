@@ -71,6 +71,29 @@ static std::filesystem::path append(const std::filesystem::path & src, const Can
     return dst;
 }
 
+#ifndef _WIN32
+void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
+{
+    if (path.isRoot()) {
+        createDirectory(path);
+        callback(*this, path);
+        return;
+    }
+
+    createDirectory(path);
+    assert(dirFd); // If that's not true the above call must have thrown an exception.
+
+    RestoreSink dirSink{startFsync};
+    dirSink.dstPath = append(dstPath, path);
+    dirSink.dirFd = ::openat(dirFd.get(), path.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+
+    if (!dirSink.dirFd)
+        throw SysError("opening directory '%s'", dirSink.dstPath.string());
+
+    callback(dirSink, CanonPath::root);
+}
+#endif
+
 void RestoreSink::createDirectory(const CanonPath & path)
 {
     auto p = append(dstPath, path);
