@@ -14,10 +14,10 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Source
 {
     debug("reading registry '%s'", path);
 
-    auto registry = std::make_shared<Registry>(settings, type);
+    auto registry = std::make_shared<Registry>(type);
 
     if (!path.pathExists())
-        return std::make_shared<Registry>(settings, type);
+        return std::make_shared<Registry>(type);
 
     try {
 
@@ -125,15 +125,15 @@ std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Pat
     return customRegistry;
 }
 
-std::shared_ptr<Registry> getFlagRegistry(const Settings & settings)
+std::shared_ptr<Registry> getFlagRegistry()
 {
-    static auto flagRegistry = std::make_shared<Registry>(settings, Registry::Flag);
+    static auto flagRegistry = std::make_shared<Registry>(Registry::Flag);
     return flagRegistry;
 }
 
-void overrideRegistry(const Settings & settings, const Input & from, const Input & to, const Attrs & extraAttrs)
+void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    getFlagRegistry(settings)->add(from, to, extraAttrs);
+    getFlagRegistry()->add(from, to, extraAttrs);
 }
 
 static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
@@ -141,7 +141,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
     static auto reg = [&]() {
         auto path = settings.flakeRegistry.get();
         if (path == "") {
-            return std::make_shared<Registry>(settings, Registry::Global); // empty registry
+            return std::make_shared<Registry>(Registry::Global); // empty registry
         }
 
         return Registry::read(
@@ -165,7 +165,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
 Registries getRegistries(const Settings & settings, Store & store)
 {
     Registries registries;
-    registries.push_back(getFlagRegistry(settings));
+    registries.push_back(getFlagRegistry());
     registries.push_back(getUserRegistry(settings));
     registries.push_back(getSystemRegistry(settings));
     registries.push_back(getGlobalRegistry(settings, store));
