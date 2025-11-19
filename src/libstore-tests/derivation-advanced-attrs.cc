@@ -3,7 +3,7 @@
 
 #include "nix/util/experimental-features.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivations.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/types.hh"
@@ -17,7 +17,7 @@ namespace nix {
 using namespace nlohmann;
 
 class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>,
-                                    public JsonCharacterizationTest<DerivationOptions>,
+                                    public JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>,
                                     public LibStoreTest
 {
 protected:
@@ -42,7 +42,8 @@ public:
     {
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
-            DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+            auto options = derivationOptionsFromStructuredAttrs(
+                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
         });
     }
@@ -51,11 +52,14 @@ public:
      * Helper function to test DerivationOptions parsing and comparison
      */
     void testDerivationOptions(
-        const std::string & fileName, const DerivationOptions & expected, const StringSet & expectedSystemFeatures)
+        const std::string & fileName,
+        const DerivationOptions<SingleDerivedPath> & expected,
+        const StringSet & expectedSystemFeatures)
     {
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
-            DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+            auto options = derivationOptionsFromStructuredAttrs(
+                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
             EXPECT_EQ(options, expected);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedSystemFeatures);
@@ -131,22 +135,38 @@ TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attribute
  * Since these are both repeated and sensative opaque values, it makes
  * sense to give them names in this file.
  */
-static std::string pathFoo = "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo",
-                   pathFooDev = "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
-                   pathBar = "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
-                   pathBarDev = "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev",
-                   pathBarDrvIA = "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv",
-                   pathBarDrvCA = "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
-                   placeholderFoo = "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9",
-                   placeholderFooDev = "/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z",
-                   placeholderBar = "/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g",
-                   placeholderBarDev = "/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8";
+static SingleDerivedPath
+    pathFoo = SingleDerivedPath::Opaque{StorePath{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"}},
+    pathFooDev = SingleDerivedPath::Opaque{StorePath{"z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"}},
+    pathBar = SingleDerivedPath::Opaque{StorePath{"r5cff30838majxk5mp3ip2diffi8vpaj-bar"}},
+    pathBarDev = SingleDerivedPath::Opaque{StorePath{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}},
+    pathBarDrvIA = SingleDerivedPath::Opaque{StorePath{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"}},
+    pathBarDrvCA = SingleDerivedPath::Opaque{StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}},
+    placeholderFoo =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv"}),
+            .output = "out",
+        },
+    placeholderFooDev =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv"}),
+            .output = "dev",
+        },
+    placeholderBar =
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}),
+            .output = "out",
+        },
+    placeholderBarDev = SingleDerivedPath::Built{
+        .drvPath = makeConstantStorePathRef(StorePath{"qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"}),
+        .output = "dev",
+    };
 
-using ExportReferencesMap = decltype(DerivationOptions::exportReferencesGraph);
+using ExportReferencesMap = decltype(DerivationOptions<SingleDerivedPath>::exportReferencesGraph);
 
-static const DerivationOptions advancedAttributes_defaults = {
+static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = {
     .outputChecks =
-        DerivationOptions::OutputChecks{
+        DerivationOptions<SingleDerivedPath>::OutputChecks{
             .ignoreSelfRefs = true,
         },
     .unsafeDiscardReferences = {},
@@ -167,7 +187,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
@@ -192,9 +213,9 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_defaults)
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 {
-    DerivationOptions expected = {
+    DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            DerivationOptions::OutputChecks{
+            DerivationOptions<SingleDerivedPath>::OutputChecks{
                 .ignoreSelfRefs = true,
             },
         .unsafeDiscardReferences = {},
@@ -212,12 +233,13 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
     this->readTest("advanced-attributes.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        options.outputChecks = DerivationOptions::OutputChecks{.ignoreSelfRefs = true};
+        options.outputChecks = DerivationOptions<SingleDerivedPath>::OutputChecks{.ignoreSelfRefs = true};
         options.exportReferencesGraph = {};
 
         EXPECT_EQ(options, expected);
@@ -227,14 +249,14 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
     });
 };
 
-DerivationOptions advancedAttributes_ia = {
+DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
     .outputChecks =
-        DerivationOptions::OutputChecks{
+        DerivationOptions<SingleDerivedPath>::OutputChecks{
             .ignoreSelfRefs = true,
-            .allowedReferences = StringSet{pathFoo},
-            .disallowedReferences = StringSet{pathBar, "dev"},
-            .allowedRequisites = StringSet{pathFooDev, "bin"},
-            .disallowedRequisites = StringSet{pathBarDev},
+            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
         },
     .unsafeDiscardReferences = {},
     .passAsFile = {},
@@ -257,14 +279,14 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
     testDerivationOptions("advanced-attributes.drv", advancedAttributes_ia, {"rainbow", "uid-range"});
 };
 
-DerivationOptions advancedAttributes_ca = {
+DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
     .outputChecks =
-        DerivationOptions::OutputChecks{
+        DerivationOptions<SingleDerivedPath>::OutputChecks{
             .ignoreSelfRefs = true,
-            .allowedReferences = StringSet{placeholderFoo},
-            .disallowedReferences = StringSet{placeholderBar, "dev"},
-            .allowedRequisites = StringSet{placeholderFooDev, "bin"},
-            .disallowedRequisites = StringSet{placeholderBarDev},
+            .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+            .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
         },
     .unsafeDiscardReferences = {},
     .passAsFile = {},
@@ -287,8 +309,8 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
     testDerivationOptions("advanced-attributes.drv", advancedAttributes_ca, {"rainbow", "uid-range", "ca-derivations"});
 };
 
-DerivationOptions advancedAttributes_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, DerivationOptions::OutputChecks>{},
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults = {
+    .outputChecks = std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>{},
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph = {},
@@ -307,7 +329,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
     this->readTest("advanced-attributes-structured-attrs-defaults.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 
@@ -332,11 +355,11 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_default
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 {
-    DerivationOptions expected = {
+    DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            std::map<std::string, DerivationOptions::OutputChecks>{
+            std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>{
                 {"dev",
-                 DerivationOptions::OutputChecks{
+                 DerivationOptions<SingleDerivedPath>::OutputChecks{
                      .maxSize = 789,
                      .maxClosureSize = 5909,
                  }},
@@ -357,7 +380,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
     this->readTest("advanced-attributes-structured-attrs.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        DerivationOptions options = DerivationOptions::fromStructuredAttrs(got.env, got.structuredAttrs);
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 
@@ -365,7 +389,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         {
             // Delete all keys but "dev" in options.outputChecks
             auto * outputChecksMapP =
-                std::get_if<std::map<std::string, DerivationOptions::OutputChecks>>(&options.outputChecks);
+                std::get_if<std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>>(
+                    &options.outputChecks);
             ASSERT_TRUE(outputChecksMapP);
             auto & outputChecksMap = *outputChecksMapP;
             auto devEntry = outputChecksMap.find("dev");
@@ -385,21 +410,21 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
     });
 };
 
-DerivationOptions advancedAttributes_structuredAttrs_ia = {
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
     .outputChecks =
-        std::map<std::string, DerivationOptions::OutputChecks>{
+        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>{
             {"out",
-             DerivationOptions::OutputChecks{
-                 .allowedReferences = StringSet{pathFoo},
-                 .allowedRequisites = StringSet{pathFooDev, "bin"},
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
+                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions::OutputChecks{
-                 .disallowedReferences = StringSet{pathBar, "dev"},
-                 .disallowedRequisites = StringSet{pathBarDev},
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
              }},
             {"dev",
-             DerivationOptions::OutputChecks{
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -427,21 +452,21 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         "advanced-attributes-structured-attrs.drv", advancedAttributes_structuredAttrs_ia, {"rainbow", "uid-range"});
 };
 
-DerivationOptions advancedAttributes_structuredAttrs_ca = {
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
     .outputChecks =
-        std::map<std::string, DerivationOptions::OutputChecks>{
+        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>{
             {"out",
-             DerivationOptions::OutputChecks{
-                 .allowedReferences = StringSet{placeholderFoo},
-                 .allowedRequisites = StringSet{placeholderFooDev, "bin"},
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
+                 .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions::OutputChecks{
-                 .disallowedReferences = StringSet{placeholderBar, "dev"},
-                 .disallowedRequisites = StringSet{placeholderBarDev},
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
              }},
             {"dev",
-             DerivationOptions::OutputChecks{
+             DerivationOptions<SingleDerivedPath>::OutputChecks{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -471,14 +496,16 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         {"rainbow", "uid-range", "ca-derivations"});
 };
 
-#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                                                             \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                                                  \
-    {                                                                                                      \
-        this->JsonCharacterizationTest<DerivationOptions>::readJsonTest(#VAR, advancedAttributes_##VAR2);  \
-    }                                                                                                      \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                                                    \
-    {                                                                                                      \
-        this->JsonCharacterizationTest<DerivationOptions>::writeJsonTest(#VAR, advancedAttributes_##VAR2); \
+#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                                               \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                                    \
+    {                                                                                        \
+        this->JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>::readJsonTest(  \
+            #VAR, advancedAttributes_##VAR2);                                                \
+    }                                                                                        \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                                      \
+    {                                                                                        \
+        this->JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>::writeJsonTest( \
+            #VAR, advancedAttributes_##VAR2);                                                \
     }
 
 TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, defaults, defaults)

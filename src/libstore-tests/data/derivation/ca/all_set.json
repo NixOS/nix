@@ -4,10 +4,13 @@
   "allowSubstitutes": false,
   "exportReferencesGraph": {
     "refs1": [
-      "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"
+      {
+        "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+        "output": "out"
+      }
     ],
     "refs2": [
-      "/nix/store/qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
+      "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
     ]
   },
   "impureEnvVars": [
@@ -20,18 +23,36 @@
   "outputChecks": {
     "forAllOutputs": {
       "allowedReferences": [
-        "/164j69y6zir9z0339n8pjigg3rckinlr77bxsavzizdaaljb7nh9"
+        {
+          "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+          "output": "out"
+        }
       ],
       "allowedRequisites": [
-        "/0nr45p69vn6izw9446wsh9bng9nndhvn19kpsm4n96a5mycw0s4z",
-        "bin"
+        {
+          "drvPath": "self",
+          "output": "bin"
+        },
+        {
+          "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+          "output": "dev"
+        }
       ],
       "disallowedReferences": [
-        "/0nyw57wm2iicnm9rglvjmbci3ikmcp823czdqdzdcgsnnwqps71g",
-        "dev"
+        {
+          "drvPath": "self",
+          "output": "dev"
+        },
+        {
+          "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+          "output": "out"
+        }
       ],
       "disallowedRequisites": [
-        "/07f301yqyz8c6wf6bbbavb2q39j4n8kmcly1s09xadyhgy6x2wr8"
+        {
+          "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+          "output": "dev"
+        }
       ],
       "ignoreSelfRefs": true,
       "maxClosureSize": null,

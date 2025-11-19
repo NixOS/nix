@@ -64,9 +64,10 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
-    auto drvOptions = [&]() -> DerivationOptions {
+    auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
-            return DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs);
+            return derivationOptionsFromStructuredAttrs(
+                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;

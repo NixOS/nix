@@ -243,6 +243,28 @@ std::string stripIndentation(std::string_view s);
 std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 /**
+ * Get a pointer to the contents of a `std::optional` if it is set, or a
+ * null pointer otherise.
+ *
+ * Const version.
+ */
+template<class T>
+const T * get(const std::optional<T> & opt)
+{
+    return opt ? &*opt : nullptr;
+}
+
+/**
+ * Non-const counterpart of `const T * get(const std::optional<T>)`.
+ * Takes a mutable reference, but returns a mutable pointer.
+ */
+template<class T>
+T * get(std::optional<T> & opt)
+{
+    return opt ? &*opt : nullptr;
+}
+
+/**
  * Get a value for the specified key from an associate container.
  */
 template<class T, typename K>
