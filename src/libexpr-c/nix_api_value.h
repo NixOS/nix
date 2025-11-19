@@ -507,55 +507,61 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value,
 /** @brief Set boolean value
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] b the boolean value
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_bool(nix_c_context * context, nix_value * value, bool b);
+nix_err nix_init_bool(nix_c_context * context, EvalState * state, nix_value * value, bool b);
 
 /** @brief Set a string
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] str the string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_string(nix_c_context * context, nix_value * value, const char * str);
+nix_err nix_init_string(nix_c_context * context, EvalState * state, nix_value * value, const char * str);
 
 /** @brief Set a path
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] str the path string, copied
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_path_string(nix_c_context * context, EvalState * s, nix_value * value, const char * str);
+nix_err nix_init_path_string(nix_c_context * context, EvalState * state, nix_value * value, const char * str);
 
 /** @brief Set a float
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] d the float, 64-bits
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_float(nix_c_context * context, nix_value * value, double d);
+nix_err nix_init_float(nix_c_context * context, EvalState * state, nix_value * value, double d);
 
 /** @brief Set an int
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] i the int
  * @return error code, NIX_OK on success.
  */
 
-nix_err nix_init_int(nix_c_context * context, nix_value * value, int64_t i);
+nix_err nix_init_int(nix_c_context * context, EvalState * state, nix_value * value, int64_t i);
 /** @brief Set null
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_null(nix_c_context * context, nix_value * value);
+nix_err nix_init_null(nix_c_context * context, EvalState * state, nix_value * value);
 
 /** @brief Set the value to a thunk that will perform a function application when needed.
  * @ingroup value_create
@@ -565,6 +571,7 @@ nix_err nix_init_null(nix_c_context * context, nix_value * value);
  * In such cases, you may use nix_value_call() instead (but note the different argument order).
  *
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] fn function to call
  * @param[in] arg argument to pass
@@ -572,16 +579,17 @@ nix_err nix_init_null(nix_c_context * context, nix_value * value);
  * @see nix_value_call() for a similar function that performs the call immediately and only stores the return value.
  *      Note the different argument order.
  */
-nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * fn, nix_value * arg);
+nix_err nix_init_apply(nix_c_context * context, EvalState * state, nix_value * value, nix_value * fn, nix_value * arg);
 
 /** @brief Set an external value
  * @ingroup value_create
  * @param[out] context Optional, stores error information
+ * @param[in] state nix evaluator state
  * @param[out] value Nix value to modify
  * @param[in] val the external value to set. Will be GC-referenced by the value.
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalValue * val);
+nix_err nix_init_external(nix_c_context * context, EvalState * state, nix_value * value, ExternalValue * val);
 
 /** @brief Create a list from a list builder
  * @ingroup value_create
@@ -645,7 +653,7 @@ nix_err nix_make_attrs(nix_c_context * context, nix_value * value, BindingsBuild
  * @see nix_alloc_primop
  * @return error code, NIX_OK on success.
  */
-nix_err nix_init_primop(nix_c_context * context, nix_value * value, PrimOp * op);
+nix_err nix_init_primop(nix_c_context * context, EvalState * s, nix_value * value, PrimOp * op);
 /** @brief Copy from another value
  * @ingroup value_create
  * @param[out] context Optional, stores error information

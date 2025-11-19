@@ -44,7 +44,7 @@ TEST_F(nix_api_expr_test, nix_expr_eval_external)
 {
     MyExternalValueDesc * external = new MyExternalValueDesc(42);
     ExternalValue * val = nix_create_external_value(ctx, external, external);
-    nix_init_external(ctx, value, val);
+    nix_init_external(ctx, state, value, val);
 
     EvalState * stateResult = nix_state_create(nullptr, nullptr, store);
     nix_value * valueResult = nix_alloc_value(nullptr, stateResult);

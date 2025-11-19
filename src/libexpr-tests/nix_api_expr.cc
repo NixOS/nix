@@ -241,7 +241,7 @@ primop_square(void * user_data, nix_c_context * context, EvalState * state, nix_
     assert(state);
     assert(user_data == SAMPLE_USER_DATA);
     auto i = nix_get_int(context, args[0]);
-    nix_init_int(context, ret, i * i);
+    nix_init_int(context, state, ret, i * i);
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop)
@@ -251,12 +251,12 @@ TEST_F(nix_api_expr_test, nix_expr_primop)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * three = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, three, 3);
+    nix_init_int(ctx, state, three, 3);
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
@@ -290,7 +290,7 @@ primop_repeat(void * user_data, nix_c_context * context, EvalState * state, nix_
     for (int i = 0; i < n; ++i)
         result += s;
 
-    nix_init_string(context, ret, result.c_str());
+    nix_init_string(context, state, ret, result.c_str());
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_multiple_calls)
@@ -300,17 +300,17 @@ TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_multiple_calls)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * hello = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_string(ctx, hello, "hello");
+    nix_init_string(ctx, state, hello, "hello");
     assert_ctx_ok();
 
     nix_value * three = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, three, 3);
+    nix_init_int(ctx, state, three, 3);
     assert_ctx_ok();
 
     nix_value * partial = nix_alloc_value(ctx, state);
@@ -335,17 +335,17 @@ TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_single_call)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * hello = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_string(ctx, hello, "hello");
+    nix_init_string(ctx, state, hello, "hello");
     assert_ctx_ok();
 
     nix_value * three = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, three, 3);
+    nix_init_int(ctx, state, three, 3);
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
@@ -372,12 +372,12 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * three = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, three, 3);
+    nix_init_int(ctx, state, three, 3);
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
@@ -393,7 +393,7 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_no_return)
 static void primop_bad_return_thunk(
     void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret)
 {
-    nix_init_apply(context, ret, args[0], args[1]);
+    nix_init_apply(context, state, ret, args[0], args[1]);
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
@@ -403,7 +403,7 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * toString = nix_alloc_value(ctx, state);
@@ -413,7 +413,7 @@ TEST_F(nix_api_expr_test, nix_expr_primop_bad_return_thunk)
 
     nix_value * four = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, four, 4);
+    nix_init_int(ctx, state, four, 4);
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
@@ -452,12 +452,12 @@ TEST_F(nix_api_expr_test, nix_expr_primop_nix_err_key_conversion)
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_primop(ctx, primopValue, primop);
+    nix_init_primop(ctx, state, primopValue, primop);
     assert_ctx_ok();
 
     nix_value * arg = nix_alloc_value(ctx, state);
     assert_ctx_ok();
-    nix_init_int(ctx, arg, 42);
+    nix_init_int(ctx, state, arg, 42);
     assert_ctx_ok();
 
     nix_value * result = nix_alloc_value(ctx, state);
@@ -479,7 +479,7 @@ TEST_F(nix_api_expr_test, nix_expr_primop_nix_err_key_conversion)
 TEST_F(nix_api_expr_test, nix_value_call_multi_no_args)
 {
     nix_value * n = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, n, 3);
+    nix_init_int(ctx, state, n, 3);
     assert_ctx_ok();
 
     nix_value * r = nix_alloc_value(ctx, state);

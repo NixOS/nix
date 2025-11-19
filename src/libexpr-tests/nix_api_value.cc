@@ -24,7 +24,7 @@ TEST_F(nix_api_expr_test, nix_value_get_int_invalid)
 TEST_F(nix_api_expr_test, nix_value_set_get_int)
 {
     int myInt = 1;
-    nix_init_int(ctx, value, myInt);
+    nix_init_int(ctx, state, value, myInt);
 
     ASSERT_EQ(myInt, nix_get_int(ctx, value));
     ASSERT_STREQ("an integer", nix_get_typename(ctx, value));
@@ -42,7 +42,7 @@ TEST_F(nix_api_expr_test, nix_value_set_get_float_invalid)
 TEST_F(nix_api_expr_test, nix_value_set_get_float)
 {
     double myDouble = 1.0;
-    nix_init_float(ctx, value, myDouble);
+    nix_init_float(ctx, state, value, myDouble);
 
     ASSERT_DOUBLE_EQ(myDouble, nix_get_float(ctx, value));
     ASSERT_STREQ("a float", nix_get_typename(ctx, value));
@@ -60,7 +60,7 @@ TEST_F(nix_api_expr_test, nix_value_set_get_bool_invalid)
 TEST_F(nix_api_expr_test, nix_value_set_get_bool)
 {
     bool myBool = true;
-    nix_init_bool(ctx, value, myBool);
+    nix_init_bool(ctx, state, value, myBool);
 
     ASSERT_EQ(myBool, nix_get_bool(ctx, value));
     ASSERT_STREQ("a Boolean", nix_get_typename(ctx, value));
@@ -80,7 +80,7 @@ TEST_F(nix_api_expr_test, nix_value_set_get_string)
 {
     std::string string_value;
     const char * myString = "some string";
-    nix_init_string(ctx, value, myString);
+    nix_init_string(ctx, state, value, myString);
 
     nix_get_string(ctx, value, OBSERVE_STRING(string_value));
     ASSERT_STREQ(myString, string_value.c_str());
@@ -96,7 +96,7 @@ TEST_F(nix_api_expr_test, nix_value_set_get_null_invalid)
 
 TEST_F(nix_api_expr_test, nix_value_set_get_null)
 {
-    nix_init_null(ctx, value);
+    nix_init_null(ctx, state, value);
 
     ASSERT_STREQ("null", nix_get_typename(ctx, value));
     ASSERT_EQ(NIX_TYPE_NULL, nix_get_type(ctx, value));
@@ -142,10 +142,10 @@ TEST_F(nix_api_expr_test, nix_build_and_init_list)
     nix_value * intValue2 = nix_alloc_value(ctx, state);
 
     // `init` and `insert` can be called in any order
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
     nix_list_builder_insert(ctx, builder, 0, intValue);
     nix_list_builder_insert(ctx, builder, 1, intValue2);
-    nix_init_int(ctx, intValue2, 43);
+    nix_init_int(ctx, state, intValue2, 43);
 
     nix_make_list(ctx, builder, value);
     nix_list_builder_free(builder);
@@ -167,7 +167,7 @@ TEST_F(nix_api_expr_test, nix_get_list_byidx_large_indices)
     // Create a small list to test extremely large out-of-bounds access
     ListBuilder * builder = nix_make_list_builder(ctx, state, 2);
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
     nix_list_builder_insert(ctx, builder, 0, intValue);
     nix_list_builder_insert(ctx, builder, 1, intValue);
     nix_make_list(ctx, builder, value);
@@ -203,12 +203,12 @@ TEST_F(nix_api_expr_test, nix_get_list_byidx_lazy)
         throwingFn);
     assert_ctx_ok();
 
-    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    nix_init_apply(ctx, state, throwingValue, throwingFn, throwingFn);
     assert_ctx_ok();
 
     // 2. Already evaluated int (not lazy)
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
     assert_ctx_ok();
 
     // 3. Lazy function application that would compute increment 5 = 6
@@ -218,10 +218,10 @@ TEST_F(nix_api_expr_test, nix_get_list_byidx_lazy)
 
     nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
     assert_ctx_ok();
-    nix_init_int(ctx, argFive, 5);
+    nix_init_int(ctx, state, argFive, 5);
 
     // Create a lazy application: (x: x + 1) 5
-    nix_init_apply(ctx, lazyApply, incrementFn, argFive);
+    nix_init_apply(ctx, state, lazyApply, incrementFn, argFive);
     assert_ctx_ok();
 
     ListBuilder * builder = nix_make_list_builder(ctx, state, 3);
@@ -303,10 +303,10 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, size);
 
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
 
     nix_value * stringValue = nix_alloc_value(ctx, state);
-    nix_init_string(ctx, stringValue, "foo");
+    nix_init_string(ctx, state, stringValue, "foo");
 
     nix_bindings_builder_insert(ctx, builder, "a", intValue);
     nix_bindings_builder_insert(ctx, builder, "b", stringValue);
@@ -358,7 +358,7 @@ TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
     const char ** out_name = (const char **) malloc(sizeof(char *));
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 2);
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
     nix_bindings_builder_insert(ctx, builder, "test", intValue);
     nix_make_attrs(ctx, value, builder);
     nix_bindings_builder_free(builder);
@@ -402,12 +402,12 @@ TEST_F(nix_api_expr_test, nix_get_attr_byname_lazy)
         throwingFn);
     assert_ctx_ok();
 
-    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    nix_init_apply(ctx, state, throwingValue, throwingFn, throwingFn);
     assert_ctx_ok();
 
     // 2. Already evaluated int (not lazy)
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 42);
+    nix_init_int(ctx, state, intValue, 42);
     assert_ctx_ok();
 
     // 3. Lazy function application that would compute increment 7 = 8
@@ -417,10 +417,10 @@ TEST_F(nix_api_expr_test, nix_get_attr_byname_lazy)
 
     nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
     assert_ctx_ok();
-    nix_init_int(ctx, argSeven, 7);
+    nix_init_int(ctx, state, argSeven, 7);
 
     // Create a lazy application: (x: x + 1) 7
-    nix_init_apply(ctx, lazyApply, incrementFn, argSeven);
+    nix_init_apply(ctx, state, lazyApply, incrementFn, argSeven);
     assert_ctx_ok();
 
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 3);
@@ -492,12 +492,12 @@ TEST_F(nix_api_expr_test, nix_get_attr_byidx_lazy)
         throwingFn);
     assert_ctx_ok();
 
-    nix_init_apply(ctx, throwingValue, throwingFn, throwingFn);
+    nix_init_apply(ctx, state, throwingValue, throwingFn, throwingFn);
     assert_ctx_ok();
 
     // 2. Already evaluated int (not lazy)
     nix_value * intValue = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, intValue, 99);
+    nix_init_int(ctx, state, intValue, 99);
     assert_ctx_ok();
 
     // 3. Lazy function application that would compute increment 10 = 11
@@ -507,10 +507,10 @@ TEST_F(nix_api_expr_test, nix_get_attr_byidx_lazy)
 
     nix_expr_eval_from_string(ctx, state, "x: x + 1", "<test>", incrementFn);
     assert_ctx_ok();
-    nix_init_int(ctx, argTen, 10);
+    nix_init_int(ctx, state, argTen, 10);
 
     // Create a lazy application: (x: x + 1) 10
-    nix_init_apply(ctx, lazyApply, incrementFn, argTen);
+    nix_init_apply(ctx, state, lazyApply, incrementFn, argTen);
     assert_ctx_ok();
 
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 3);
@@ -579,7 +579,7 @@ TEST_F(nix_api_expr_test, nix_value_init)
     // f = a: a * a;
 
     nix_value * two = nix_alloc_value(ctx, state);
-    nix_init_int(ctx, two, 2);
+    nix_init_int(ctx, state, two, 2);
 
     nix_value * f = nix_alloc_value(ctx, state);
     nix_expr_eval_from_string(
@@ -596,7 +596,7 @@ TEST_F(nix_api_expr_test, nix_value_init)
     // r = f two;
 
     nix_value * r = nix_alloc_value(ctx, state);
-    nix_init_apply(ctx, r, f, two);
+    nix_init_apply(ctx, state, r, f, two);
     assert_ctx_ok();
 
     ValueType t = nix_get_type(ctx, r);
@@ -625,11 +625,11 @@ TEST_F(nix_api_expr_test, nix_value_init)
 TEST_F(nix_api_expr_test, nix_value_init_apply_error)
 {
     nix_value * some_string = nix_alloc_value(ctx, state);
-    nix_init_string(ctx, some_string, "some string");
+    nix_init_string(ctx, state, some_string, "some string");
     assert_ctx_ok();
 
     nix_value * v = nix_alloc_value(ctx, state);
-    nix_init_apply(ctx, v, some_string, some_string);
+    nix_init_apply(ctx, state, v, some_string, some_string);
     assert_ctx_ok();
 
     // All ok. Call has not been evaluated yet.
@@ -679,13 +679,13 @@ TEST_F(nix_api_expr_test, nix_value_init_apply_lazy_arg)
             g);
         assert_ctx_ok();
 
-        nix_init_apply(ctx, e, g, g);
+        nix_init_apply(ctx, state, e, g, g);
         assert_ctx_ok();
         nix_gc_decref(ctx, g);
     }
 
     nix_value * r = nix_alloc_value(ctx, state);
-    nix_init_apply(ctx, r, f, e);
+    nix_init_apply(ctx, state, r, f, e);
     assert_ctx_ok();
 
     nix_value_force(ctx, state, r);
@@ -711,7 +711,7 @@ TEST_F(nix_api_expr_test, nix_copy_value)
 {
     nix_value * source = nix_alloc_value(ctx, state);
 
-    nix_init_int(ctx, source, 42);
+    nix_init_int(ctx, state, source, 42);
     nix_copy_value(ctx, value, source);
 
     ASSERT_EQ(42, nix_get_int(ctx, value));

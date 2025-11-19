@@ -485,7 +485,7 @@ const char * nix_get_attr_name_byidx(nix_c_context * context, nix_value * value,
     NIXC_CATCH_ERRS_NULL
 }
 
-nix_err nix_init_bool(nix_c_context * context, nix_value * value, bool b)
+nix_err nix_init_bool(nix_c_context * context, EvalState * state, nix_value * value, bool b)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -497,7 +497,7 @@ nix_err nix_init_bool(nix_c_context * context, nix_value * value, bool b)
 }
 
 // todo string context
-nix_err nix_init_string(nix_c_context * context, nix_value * value, const char * str)
+nix_err nix_init_string(nix_c_context * context, EvalState * state, nix_value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -508,18 +508,18 @@ nix_err nix_init_string(nix_c_context * context, nix_value * value, const char *
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_path_string(nix_c_context * context, EvalState * s, nix_value * value, const char * str)
+nix_err nix_init_path_string(nix_c_context * context, EvalState * state, nix_value * value, const char * str)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_out(value);
-        v.mkPath(s->state.rootPath(nix::CanonPath(str)));
+        v.mkPath(state->state.rootPath(nix::CanonPath(str)));
     }
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_float(nix_c_context * context, nix_value * value, double d)
+nix_err nix_init_float(nix_c_context * context, EvalState * state, nix_value * value, double d)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -530,7 +530,7 @@ nix_err nix_init_float(nix_c_context * context, nix_value * value, double d)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_int(nix_c_context * context, nix_value * value, int64_t i)
+nix_err nix_init_int(nix_c_context * context, EvalState * state, nix_value * value, int64_t i)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -541,7 +541,7 @@ nix_err nix_init_int(nix_c_context * context, nix_value * value, int64_t i)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_null(nix_c_context * context, nix_value * value)
+nix_err nix_init_null(nix_c_context * context, EvalState * state, nix_value * value)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -552,7 +552,7 @@ nix_err nix_init_null(nix_c_context * context, nix_value * value)
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * fn, nix_value * arg)
+nix_err nix_init_apply(nix_c_context * context, EvalState * state, nix_value * value, nix_value * fn, nix_value * arg)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -565,7 +565,7 @@ nix_err nix_init_apply(nix_c_context * context, nix_value * value, nix_value * f
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalValue * val)
+nix_err nix_init_external(nix_c_context * context, EvalState * state, nix_value * value, ExternalValue * val)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -624,7 +624,7 @@ nix_err nix_make_list(nix_c_context * context, ListBuilder * list_builder, nix_v
     NIXC_CATCH_ERRS
 }
 
-nix_err nix_init_primop(nix_c_context * context, nix_value * value, PrimOp * p)
+nix_err nix_init_primop(nix_c_context * context, EvalState * state, nix_value * value, PrimOp * p)
 {
     if (context)
         context->last_err_code = NIX_OK;
