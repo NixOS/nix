@@ -202,6 +202,40 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     }
 };
 
+struct CmdRegistryResolve : StoreCommand
+{
+    std::vector<std::string> urls;
+
+    std::string description() override
+    {
+        return "resolve flake references using the registry";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "registry-resolve.md"
+            ;
+    }
+
+    CmdRegistryResolve()
+    {
+        expectArgs({
+            .label = "flake-refs",
+            .handler = {&urls},
+        });
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        for (auto & url : urls) {
+            auto ref = parseFlakeRef(fetchSettings, url);
+            auto resolved = ref.resolve(fetchSettings, *store);
+            logger->cout("%s", resolved.to_string());
+        }
+    }
+};
+
 struct CmdRegistry : NixMultiCommand
 {
     CmdRegistry()
@@ -212,6 +246,7 @@ struct CmdRegistry : NixMultiCommand
                   {"add", []() { return make_ref<CmdRegistryAdd>(); }},
                   {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
                   {"pin", []() { return make_ref<CmdRegistryPin>(); }},
+                  {"resolve", []() { return make_ref<CmdRegistryResolve>(); }},
               })
     {
     }
