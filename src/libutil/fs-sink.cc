@@ -34,11 +34,12 @@ void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystem
     }
 
     case SourceAccessor::tDirectory: {
-        sink.createDirectory(to);
-        for (auto & [name, _] : accessor.readDirectory(from)) {
-            copyRecursive(accessor, from / name, sink, to / name);
-            break;
-        }
+        sink.createDirectory(to, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
+            for (auto & [name, _] : accessor.readDirectory(from)) {
+                copyRecursive(accessor, from / name, dirSink, relDirPath / name);
+                break;
+            }
+        });
         break;
     }
 

@@ -200,54 +200,54 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     }
 
     else if (type == "directory") {
-        sink.createDirectory(path);
+        sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
+            std::map<Path, int, CaseInsensitiveCompare> names;
 
-        std::map<Path, int, CaseInsensitiveCompare> names;
+            std::string prevName;
 
-        std::string prevName;
+            while (1) {
+                auto tag = getString();
 
-        while (1) {
-            auto tag = getString();
+                if (tag == ")")
+                    break;
 
-            if (tag == ")")
-                break;
+                if (tag != "entry")
+                    throw badArchive("expected tag 'entry' or ')', got '%s'", tag);
 
-            if (tag != "entry")
-                throw badArchive("expected tag 'entry' or ')', got '%s'", tag);
+                expectTag("(");
 
-            expectTag("(");
+                expectTag("name");
 
-            expectTag("name");
+                auto name = getString();
+                if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
+                    || name.find((char) 0) != std::string::npos)
+                    throw badArchive("NAR contains invalid file name '%1%'", name);
+                if (name <= prevName)
+                    throw badArchive("NAR directory is not sorted");
+                prevName = name;
+                if (archiveSettings.useCaseHack) {
+                    auto i = names.find(name);
+                    if (i != names.end()) {
+                        debug("case collision between '%1%' and '%2%'", i->first, name);
+                        name += caseHackSuffix;
+                        name += std::to_string(++i->second);
+                        auto j = names.find(name);
+                        if (j != names.end())
+                            throw badArchive(
+                                "NAR contains file name '%s' that collides with case-hacked file name '%s'",
+                                prevName,
+                                j->first);
+                    } else
+                        names[name] = 0;
+                }
 
-            auto name = getString();
-            if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
-                || name.find((char) 0) != std::string::npos)
-                throw badArchive("NAR contains invalid file name '%1%'", name);
-            if (name <= prevName)
-                throw badArchive("NAR directory is not sorted");
-            prevName = name;
-            if (archiveSettings.useCaseHack) {
-                auto i = names.find(name);
-                if (i != names.end()) {
-                    debug("case collision between '%1%' and '%2%'", i->first, name);
-                    name += caseHackSuffix;
-                    name += std::to_string(++i->second);
-                    auto j = names.find(name);
-                    if (j != names.end())
-                        throw badArchive(
-                            "NAR contains file name '%s' that collides with case-hacked file name '%s'",
-                            prevName,
-                            j->first);
-                } else
-                    names[name] = 0;
+                expectTag("node");
+
+                parse(dirSink, source, relDirPath / name);
+
+                expectTag(")");
             }
-
-            expectTag("node");
-
-            parse(sink, source, path / name);
-
-            expectTag(")");
-        }
+        });
     }
 
     else if (type == "symlink") {

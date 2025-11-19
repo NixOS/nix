@@ -36,6 +36,23 @@ struct FileSystemObjectSink
 
     virtual void createDirectory(const CanonPath & path) = 0;
 
+    using DirectoryCreatedCallback = std::function<void(FileSystemObjectSink & dirSink, const CanonPath & dirRelPath)>;
+
+    /**
+     * Create a directory and invoke a callback with a pair of sink + CanonPath
+     * of the created subdirectory relative to dirSink.
+     *
+     * @note This allows for UNIX RestoreSink implementations to implement
+     * *at-style accessors that always keep an open file descriptor for the
+     * freshly created directory. Use this when it's important to disallow any
+     * intermediate path components from being symlinks.
+     */
+    virtual void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
+    {
+        createDirectory(path);
+        callback(*this, path);
+    }
+
     /**
      * This function in general is no re-entrant. Only one file can be
      * written at a time.
