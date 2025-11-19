@@ -1,4 +1,4 @@
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 #include "nix/util/archive.hh"
 
 #include <map>

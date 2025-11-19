@@ -8,7 +8,7 @@
 #include "nix/util/sync.hh"
 #include "nix/store/remote-fs-accessor.hh"
 #include "nix/store/nar-info-disk-cache.hh"
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"

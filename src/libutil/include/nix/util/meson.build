@@ -50,6 +50,7 @@ headers = files(
   'memory-source-accessor.hh',
   'mounted-source-accessor.hh',
   'muxable-pipe.hh',
+  'nar-accessor.hh',
   'os-string.hh',
   'pool.hh',
   'pos-idx.hh',

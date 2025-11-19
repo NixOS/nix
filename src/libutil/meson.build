@@ -147,6 +147,7 @@ sources = [ config_priv_h ] + files(
   'logging.cc',
   'memory-source-accessor.cc',
   'mounted-source-accessor.cc',
+  'nar-accessor.cc',
   'pos-table.cc',
   'position.cc',
   'posix-source-accessor.cc',

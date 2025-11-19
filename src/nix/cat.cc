@@ -1,6 +1,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 
