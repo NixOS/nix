@@ -37,7 +37,6 @@ void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystem
         sink.createDirectory(to, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
             for (auto & [name, _] : accessor.readDirectory(from)) {
                 copyRecursive(accessor, from / name, dirSink, relDirPath / name);
-                break;
             }
         });
         break;
