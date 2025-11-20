@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
 
@@ -137,6 +138,11 @@ static void inputsToJson(json & res, const nix::FullInputs & inputs)
         inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
 }
 
+static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & inputs)
+{
+    inputsToJson(res, nix::FullInputs::fromSet(inputs));
+}
+
 template<typename Inputs>
 void adl_serializer<nix::DerivationT<Inputs>>::to_json(json & res, const nix::DerivationT<Inputs> & d)
 {
@@ -214,6 +220,13 @@ inputsFromJson<nix::FullInputs>(const json & inputsJson, const nix::Experimental
     }
 
     return inputs;
+}
+
+template<>
+std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>>(
+    const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
+{
+    return inputsFromJson<nix::FullInputs>(inputsJson, xpSettings).toSet();
 }
 
 template<typename Inputs>

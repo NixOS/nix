@@ -21,7 +21,6 @@ struct DerivationOutput;
 
 template<typename Inputs, typename Output>
 struct DerivationT;
-struct FullInputs;
 using BasicDerivation = DerivationT<StorePathSet, DerivationOutput>;
 
 struct StructuredAttrs;
@@ -214,7 +213,7 @@ struct DerivationOutput;
  */
 DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
-    const DerivedPathMap<StringSet> & inputDrvs,
+    const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn = true,

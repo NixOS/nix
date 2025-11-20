@@ -51,8 +51,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
     auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
-            return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
+            return derivationOptionsFromStructuredAttrs(worker.store, drv->inputs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
@@ -233,36 +232,42 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     /* Project down to the `BasicDerivation` the builder consumes,
        adding the outputs of the input derivations to the input
        sources. */
-    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const FullInputs & inputs) {
-        auto srcs = inputs.srcs;
-        for (auto & [depDrvPath, depNode] : inputs.drvs.map) {
-            for (auto & outputName : depNode.value) {
-                /* Don't need to worry about `inputGoals`, because
-                   impure derivations are always resolved above. Can
-                   just use DB. This case only happens in the (older)
-                   input addressed and fixed output derivation cases. */
-                auto outMap = [&] {
-                    for (auto * drvStore : {&worker.evalStore, &worker.store})
-                        if (drvStore->isValidPath(depDrvPath))
-                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
-                    assert(false);
-                }();
-                auto outMapPath = outMap.find(outputName);
-                if (outMapPath == outMap.end()) {
-                    throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath),
-                        outputName,
-                        worker.store.printStorePath(depDrvPath));
-                }
-                srcs.insert(outMapPath->second);
-            }
-        }
+    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const std::set<SingleDerivedPath> & inputs) {
+        StorePathSet srcs;
+        for (auto & input : inputs)
+            std::visit(
+                overloaded{
+                    [&](const SingleDerivedPath::Opaque & op) { srcs.insert(op.path); },
+                    [&](const SingleDerivedPath::Built & built) {
+                        auto depDrvPath = std::visit(
+                            overloaded{
+                                [&](const SingleDerivedPath::Opaque & op) { return op.path; },
+                                [&](const SingleDerivedPath::Built &) -> StorePath { std::abort(); }},
+                            built.drvPath->raw());
+                        auto outMap = [&] {
+                            for (auto * drvStore : {&worker.evalStore, &worker.store})
+                                if (drvStore->isValidPath(depDrvPath))
+                                    return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                            assert(false);
+                        }();
+                        auto outMapPath = outMap.find(built.output);
+                        if (outMapPath == outMap.end()) {
+                            throw Error(
+                                "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                                worker.store.printStorePath(drvPath),
+                                built.output,
+                                worker.store.printStorePath(depDrvPath));
+                        }
+                        srcs.insert(outMapPath->second);
+                    }},
+                input.raw());
         return srcs;
     }));
 
     if (storeDerivation) {
-        assert(drv->inputs.drvs.map.empty());
+        assert(std::ranges::none_of(drv->inputs, [](const auto & input) {
+            return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+        }));
         /* `writeDerivation` checks the derivation's references are valid,
            so the eval store's sources must be copied over first. */
         if (&worker.evalStore != &worker.store) {

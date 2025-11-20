@@ -41,9 +41,8 @@ struct DerivationOutput;
 
 template<typename Inputs, typename Output>
 struct DerivationT;
-struct FullInputs;
 using BasicDerivation = DerivationT<StorePathSet, DerivationOutput>;
-using Derivation = DerivationT<FullInputs, DerivationOutput>;
+using Derivation = DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

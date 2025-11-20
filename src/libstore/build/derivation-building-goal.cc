@@ -69,7 +69,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<Inp
     return msg;
 }
 
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<FullInputs> & drv);
+template std::string
+showKnownOutputs(const StoreDirConfig & store, const DerivationT<std::set<SingleDerivedPath>> & drv);
 template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<StorePathSet> & drv);
 
 namespace {

@@ -497,34 +497,27 @@ static void main_nix_build(int argc, char ** argv)
             }
         }
 
-        auto accumDerivedPath = [&](this auto & self,
-                                    ref<SingleDerivedPath> inputDrv,
-                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
-            if (!inputNode.value.empty())
-                pathsToBuild.push_back(
-                    DerivedPath::Built{
-                        .drvPath = inputDrv,
-                        .outputs = OutputsSpec::Names{inputNode.value},
-                    });
-            for (const auto & [outputName, childNode] : inputNode.childMap)
-                self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
-        };
-
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputNode] : drv.inputs.drvs.map) {
-            // To get around lambda capturing restrictions in the
-            // standard.
-            const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
-                    return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
-                })) {
-                accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
-                pathsToCopy.insert(inputDrv);
-            }
-        }
-        for (const auto & src : drv.inputs.srcs) {
-            pathsToBuild.emplace_back(DerivedPath::Opaque{src});
-            pathsToCopy.insert(src);
+        for (const auto & input : drv.inputs) {
+            // Check exclusion for top-level drvs
+            bool excluded = false;
+            std::visit(
+                overloaded{
+                    [&](const SingleDerivedPath::Opaque & op) { pathsToCopy.insert(op.path); },
+                    [&](const SingleDerivedPath::Built & built) {
+                        if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built.drvPath->raw())) {
+                            excluded =
+                                !std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
+                                    return !std::regex_search(store->printStorePath(opaque->path), std::regex(exclude));
+                                });
+                            if (!excluded)
+                                pathsToCopy.insert(opaque->path);
+                        }
+                    },
+                },
+                input.raw());
+            if (!excluded)
+                pathsToBuild.push_back(DerivedPath::fromSingle(input));
         }
 
         buildPaths(pathsToBuild);
@@ -592,27 +585,18 @@ static void main_nix_build(int argc, char ** argv)
         if (drv.structuredAttrs) {
             StorePathSet inputs;
 
-            fun<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure =
-                [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-                    // Only the depended-on outputs need realizing, so query partially rather than requiring every
-                    // output.
-                    auto outputs = deepQueryPartialDerivationOutputMap(*store, inputDrv, &*evalStore);
-                    for (auto & i : inputNode.value) {
-                        auto & o = outputs.at(i);
+            for (const auto & input : drv.inputs) {
+                if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
+                    // TODO: handle dynamic derivations properly
+                    if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built->drvPath->raw())) {
+                        auto outputs = store->queryPartialDerivationOutputMap(opaque->path, &*evalStore);
+                        auto & o = outputs.at(built->output);
                         if (!o)
-                            throw MissingRealisation(*store, inputDrv, i);
+                            throw MissingRealisation(*store, opaque->path, built->output);
                         store->computeFSClosure(*o, inputs);
                     }
-                    for (const auto & [outputName, childNode] : inputNode.childMap) {
-                        auto & o = outputs.at(outputName);
-                        if (!o)
-                            throw MissingRealisation(*store, inputDrv, outputName);
-                        accumInputClosure(*o, childNode);
-                    }
-                };
-
-            for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
-                accumInputClosure(inputDrv, inputNode);
+                }
+            }
 
             auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
 
