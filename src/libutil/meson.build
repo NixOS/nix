@@ -146,6 +146,7 @@ sources = [ config_priv_h ] + files(
   'json-utils.cc',
   'logging.cc',
   'memory-source-accessor.cc',
+  'memory-source-accessor/json.cc',
   'mounted-source-accessor.cc',
   'nar-accessor.cc',
   'pos-table.cc',
