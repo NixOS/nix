@@ -12,7 +12,7 @@ TEST(threadpool, correctValue)
     std::mutex mtx;
     for (int i = 0; i < 20; i++) {
         pool.enqueue([&] {
-            std::lock_guard<std::mutex> lock(mtx); 
+            std::lock_guard<std::mutex> lock(mtx);
             sum += 1;
         });
     }
@@ -26,13 +26,8 @@ TEST(threadpool, properlyHandlesDirectExceptions)
     {};
 
     ThreadPool pool(3);
-    pool.enqueue([&] {
-        throw TestExn();
-    });
-    EXPECT_THROW(
-        pool.process(),
-        TestExn);
+    pool.enqueue([&] { throw TestExn(); });
+    EXPECT_THROW(pool.process(), TestExn);
 }
-
 
 } // namespace nix
