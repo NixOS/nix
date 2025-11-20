@@ -1167,20 +1167,17 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             pushBuilder(names[n]);
     };
 
-    bool prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
+    void prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
     {
         std::span<const std::string> pathComponents2{pathComponents};
 
         updateBuilders(isDir ? pathComponents2 : pathComponents2.first(pathComponents2.size() - 1));
-
-        return true;
     }
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
     {
         auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        if (!prepareDirs(pathComponents, false))
-            return;
+        prepareDirs(pathComponents, false);
 
         using WriteStream = std::unique_ptr<::git_writestream, decltype([](::git_writestream * stream) {
                                                 if (stream)
@@ -1266,7 +1263,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
     {
         auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        (void) prepareDirs(pathComponents, true);
+        prepareDirs(pathComponents, true);
         if (callback)
             (*callback)(*this, path);
     }
@@ -1274,8 +1271,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     void createSymlink(const CanonPath & path, const std::string & target) override
     {
         auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
-        if (!prepareDirs(pathComponents, false))
-            return;
+        prepareDirs(pathComponents, false);
 
         git_oid oid;
         if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
@@ -1290,8 +1286,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         for (auto & c : path)
             pathComponents.emplace_back(c);
 
-        if (!prepareDirs(pathComponents, false))
-            return;
+        prepareDirs(pathComponents, false);
 
         // We can't just look up the path from the start of the root, since
         // some parent directories may not have finished yet, so we compute
