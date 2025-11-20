@@ -127,23 +127,16 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     std::function<void(DerivedPath)> doPath;
 
-    auto enqueueDerivedPaths = [&](this auto self,
-                                   ref<SingleDerivedPath> inputDrv,
-                                   const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
-        if (!inputNode.value.empty())
-            pool.enqueue(std::bind(doPath, DerivedPath::Built{inputDrv, inputNode.value}));
-        for (const auto & [outputName, childNode] : inputNode.childMap)
-            self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
-    };
-
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
         {
             auto state(state_.lock());
             state->res.willBuild.insert(drvPath);
         }
 
-        for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map) {
-            enqueueDerivedPaths(makeConstantStorePathRef(inputDrv), inputNode);
+        for (const auto & input : drv.inputs) {
+            if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
+                pool.enqueue(std::bind(doPath, DerivedPath::fromSingle(*built)));
+            }
         }
     };
 
@@ -230,7 +223,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         // FIXME: this is a lot of work just to get the value
                         // of `allowSubstitutes`.
                         drvOptions = derivationOptionsFromStructuredAttrs(
-                            *this, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
+                            *this, drv->inputs, drv->env, get(drv->structuredAttrs));
                     } catch (Error & e) {
                         e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                         throw;
@@ -355,38 +348,36 @@ drvOutputReferences(Store & store, const Derivation & drv, const StorePath & out
 
     std::set<Realisation> inputRealisations;
 
-    auto accumRealisations = [&](this auto & self,
-                                 const StorePath & inputDrv,
-                                 const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
-        if (!inputNode.value.empty()) {
-            auto outputHashes = staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
-            for (const auto & outputName : inputNode.value) {
-                auto outputHash = get(outputHashes, outputName);
-                if (!outputHash)
-                    throw Error(
-                        "output '%s' of derivation '%s' isn't realised", outputName, store.printStorePath(inputDrv));
-                DrvOutput key{*outputHash, outputName};
-                auto thisRealisation = store.queryRealisation(key);
-                if (!thisRealisation)
-                    throw Error(
-                        "output '%s' of derivation '%s' isn’t built", outputName, store.printStorePath(inputDrv));
-                inputRealisations.insert({*thisRealisation, std::move(key)});
-            }
-        }
-        if (!inputNode.value.empty()) {
-            auto d = makeConstantStorePathRef(inputDrv);
-            for (const auto & [outputName, childNode] : inputNode.childMap) {
-                SingleDerivedPath next = SingleDerivedPath::Built{d, outputName};
-                self(
-                    // TODO deep resolutions for dynamic derivations, issue #8947, would go here.
-                    resolveDerivedPath(store, next, evalStore_),
-                    childNode);
-            }
-        }
-    };
-
-    for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
-        accumRealisations(inputDrv, inputNode);
+    for (const auto & input : drv.inputs) {
+        std::visit(
+            overloaded{
+                [&](const SingleDerivedPath::Opaque &) {
+                    /* Source paths don't have realisations */
+                },
+                [&](const SingleDerivedPath::Built & built) {
+                    // TODO: handle dynamic derivations properly
+                    if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built.drvPath->raw())) {
+                        auto & inputDrv = opaque->path;
+                        auto outputHashes = staticOutputHashes(evalStore, evalStore.readDerivation(inputDrv));
+                        auto outputHash = get(outputHashes, built.output);
+                        if (!outputHash)
+                            throw Error(
+                                "output '%s' of derivation '%s' isn't realised",
+                                built.output,
+                                store.printStorePath(inputDrv));
+                        DrvOutput key{*outputHash, built.output};
+                        auto thisRealisation = store.queryRealisation(key);
+                        if (!thisRealisation)
+                            throw Error(
+                                "output '%s' of derivation '%s' isn't built",
+                                built.output,
+                                store.printStorePath(inputDrv));
+                        inputRealisations.insert({*thisRealisation, std::move(key)});
+                    }
+                },
+            },
+            input.raw());
+    }
 
     auto info = store.queryPathInfo(outputPath);
 

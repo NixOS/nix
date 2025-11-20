@@ -154,6 +154,8 @@ typedef std::map<StorePath, StringSet> DerivationInputs;
 
 /**
  * Inputs for full Derivation - both source and derivation inputs
+ *
+ * This is used for parsing on-disk formats, but then we convert to a set.
  */
 struct FullInputs
 {
@@ -167,6 +169,16 @@ struct FullInputs
     DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
 
     bool operator==(const FullInputs &) const = default;
+
+    /**
+     * Convert to a flat set of `SingleDerivedPath`
+     */
+    std::set<SingleDerivedPath> toSet() const;
+
+    /**
+     * Convert from a flat set of `SingleDerivedPath`
+     */
+    static FullInputs fromSet(const std::set<SingleDerivedPath> & inputs);
 };
 
 struct DerivationType
@@ -284,7 +296,7 @@ template<typename Inputs>
 struct DerivationT;
 
 using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+using Derivation = DerivationT<std::set<SingleDerivedPath>>;
 
 template<typename Inputs>
 struct DerivationT
@@ -341,7 +353,7 @@ struct DerivationT
         const StoreDirConfig & store,
         bool maskOutputs,
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -353,7 +365,7 @@ struct DerivationT
      *    paths.
      */
     std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
 
     /**
      * Like the above, but instead of querying the Nix database for
@@ -364,7 +376,7 @@ struct DerivationT
         Store & store,
         std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>>;
 
     /**
      * Convert a BasicDerivation to a full Derivation.

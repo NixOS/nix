@@ -10,8 +10,8 @@ class Store;
 
 template<typename Inputs>
 struct DerivationT;
-struct FullInputs;
-using Derivation = DerivationT<FullInputs>;
+struct SingleDerivedPath;
+using Derivation = DerivationT<std::set<SingleDerivedPath>>;
 
 template<typename Input>
 struct DerivationOptions;

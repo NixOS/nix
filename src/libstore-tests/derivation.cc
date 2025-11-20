@@ -224,24 +224,30 @@ Derivation makeSimpleDrv()
 {
     Derivation drv;
     drv.name = "simple-derivation";
-    drv.inputs.srcs = {
-        StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
-    };
-    drv.inputs.drvs = {
-        .map =
-            {
+    drv.inputs =
+        FullInputs{
+            .srcs =
                 {
-                    StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
-                    {
-                        .value =
-                            {
-                                "cat",
-                                "dog",
-                            },
-                    },
+                    StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
                 },
-            },
-    };
+            .drvs =
+                {
+                    .map =
+                        {
+                            {
+                                StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                                {
+                                    .value =
+                                        {
+                                            "cat",
+                                            "dog",
+                                        },
+                                },
+                            },
+                        },
+                },
+        }
+            .toSet();
     drv.platform = "wasm-sel4";
     drv.builder = "foo";
     drv.args = {
@@ -270,45 +276,51 @@ Derivation makeDynDepDerivation()
 {
     Derivation drv;
     drv.name = "dyn-dep-derivation";
-    drv.inputs.srcs = {
-        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
-    };
-    drv.inputs.drvs = {
-        .map =
-            {
+    drv.inputs =
+        FullInputs{
+            .srcs =
                 {
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                    DerivedPathMap<StringSet>::ChildNode{
-                        .value =
-                            {
-                                "cat",
-                                "dog",
-                            },
-                        .childMap =
-                            {
-                                {
-                                    "cat",
-                                    DerivedPathMap<StringSet>::ChildNode{
-                                        .value =
-                                            {
-                                                "kitten",
-                                            },
-                                    },
-                                },
-                                {
-                                    "goose",
-                                    DerivedPathMap<StringSet>::ChildNode{
-                                        .value =
-                                            {
-                                                "gosling",
-                                            },
-                                    },
-                                },
-                            },
-                    },
+                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
                 },
-            },
-    };
+            .drvs =
+                {
+                    .map =
+                        {
+                            {
+                                StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+                                DerivedPathMap<StringSet>::ChildNode{
+                                    .value =
+                                        {
+                                            "cat",
+                                            "dog",
+                                        },
+                                    .childMap =
+                                        {
+                                            {
+                                                "cat",
+                                                DerivedPathMap<StringSet>::ChildNode{
+                                                    .value =
+                                                        {
+                                                            "kitten",
+                                                        },
+                                                },
+                                            },
+                                            {
+                                                "goose",
+                                                DerivedPathMap<StringSet>::ChildNode{
+                                                    .value =
+                                                        {
+                                                            "gosling",
+                                                        },
+                                                },
+                                            },
+                                        },
+                                },
+                            },
+                        },
+                },
+        }
+            .toSet();
     drv.platform = "wasm-sel4";
     drv.builder = "foo";
     drv.args = {
