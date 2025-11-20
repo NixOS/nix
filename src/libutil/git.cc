@@ -217,29 +217,6 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     }
 }
 
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, std::function<RestoreHook> hook)
-{
-    parse(sink, CanonPath::root, source, BlobMode::Regular, hashAlgo, [&](CanonPath name, TreeEntry entry) {
-        auto [accessor, from] = hook(entry.hash);
-        auto stat = accessor->lstat(from);
-        auto gotOpt = convertMode(stat.type);
-        if (!gotOpt)
-            throw Error(
-                "file '%s' (git hash %s) has an unsupported type",
-                from,
-                entry.hash.to_string(HashFormat::Base16, false));
-        auto & got = *gotOpt;
-        if (got != entry.mode)
-            throw Error(
-                "git mode of file '%s' (git hash %s) is %o but expected %o",
-                from,
-                entry.hash.to_string(HashFormat::Base16, false),
-                (RawMode) got,
-                (RawMode) entry.mode);
-        copyRecursive(*accessor, from, sink, name);
-    });
-}
-
 void dumpBlobPrefix(uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);

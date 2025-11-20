@@ -137,13 +137,6 @@ std::optional<Mode> convertMode(SourceAccessor::Type type);
 using RestoreHook = SourcePath(Hash);
 
 /**
- * Wrapper around `parse` and `RestoreSink`
- *
- * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
- */
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, std::function<RestoreHook> hook);
-
-/**
  * Dumps a single file to a sink
  *
  * @param xpSettings for testing purposes
