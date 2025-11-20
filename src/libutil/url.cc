@@ -327,8 +327,11 @@ Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath)
         /* This is only really valid for UNIX. Windows has more restrictions. */
         if (comp.contains('/'))
             throw BadURL("URL path component '%s' contains '/', which is not allowed in file names", comp);
-        if (comp.contains(char(0)))
-            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", comp);
+        if (comp.contains(char(0))) {
+            using namespace std::string_view_literals;
+            auto str = replaceStrings(comp, "\0"sv, "␀"sv);
+            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", str);
+        }
     }
 
     return concatStringsSep("/", urlPath);
