@@ -495,9 +495,9 @@ void InputScheme::clone(
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), destDir));
 
-    auto source = sinkToSource([&](Sink & sink) { accessor->dumpPath(CanonPath::root, sink); });
-
-    restorePath(destDir, *source);
+    RestoreSink sink(/*startFsync=*/false);
+    sink.dstPath = destDir;
+    copyRecursive(*accessor, CanonPath::root, sink, CanonPath::root);
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const
