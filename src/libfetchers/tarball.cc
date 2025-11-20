@@ -182,7 +182,7 @@ static DownloadTarballResult downloadTarball_(
     auto tarballCache = settings.getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
-    auto tree = parseSink->flush();
+    auto treeEntry = parseSink->flush();
 
     act.reset();
 
@@ -196,7 +196,7 @@ static DownloadTarballResult downloadTarball_(
         infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(tree).gitRev());
+        infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(treeEntry.hash).gitRev());
         infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
         if (res->immutableUrl)
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
