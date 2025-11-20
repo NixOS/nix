@@ -6,7 +6,6 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
-#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
@@ -269,7 +268,7 @@ template<typename Inputs, typename Output = DerivationOutput>
 struct DerivationT;
 
 using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+using Derivation = DerivationT<std::set<SingleDerivedPath>>;
 
 template<typename Inputs, typename Output>
 struct DerivationT
@@ -331,7 +330,7 @@ struct DerivationT
      * Print a derivation (only meaningful for full Derivation).
      */
     std::string unparse(const StoreDirConfig & store) const
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Determine whether this derivation should be resolved before building.
@@ -345,7 +344,7 @@ struct DerivationT
      * - Any input derivations have outputs from dynamic derivations
      */
     bool shouldResolve() const
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -357,7 +356,7 @@ struct DerivationT
      *    paths.
      */
     std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Like the above, but instead of querying the Nix database for
@@ -368,7 +367,7 @@ struct DerivationT
         Store & store,
         fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Convert a BasicDerivation to a full Derivation.
@@ -428,7 +427,7 @@ struct DerivationT
      * @param drvName The derivation name (without .drv extension)
      */
     void fillInOutputPaths(Store & store)
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Parse a derivation from JSON, and also perform various
@@ -452,32 +451,32 @@ struct DerivationT
      * @throws Error if parsing fails, output paths can't be computed, or validation fails
      */
     static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json)
-        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
+        requires std::is_same_v<Inputs, std::set<SingleDerivedPath>> && std::is_same_v<Output, DerivationOutput>;
 };
 
 class Store;
 
 template<>
-std::string DerivationT<FullInputs>::unparse(const StoreDirConfig & store) const;
+std::string Derivation::unparse(const StoreDirConfig & store) const;
 template<>
-bool DerivationT<FullInputs>::shouldResolve() const;
+bool Derivation::shouldResolve() const;
 template<>
-std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(Store & store, Store * evalStore) const;
+std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const;
 template<>
-std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(
+std::optional<BasicDerivation> Derivation::tryResolve(
     Store & store,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const;
 template<>
-void DerivationT<FullInputs>::fillInOutputPaths(Store & store);
+void Derivation::fillInOutputPaths(Store & store);
 template<>
-Derivation DerivationT<FullInputs>::parseJsonAndValidate(Store & store, const nlohmann::json & json);
+Derivation Derivation::parseJsonAndValidate(Store & store, const nlohmann::json & json);
 template<>
 Derivation DerivationT<StorePathSet>::unresolve() const;
 template<>
 void DerivationT<StorePathSet>::checkInvariants(Store & store) const;
 template<>
-void DerivationT<FullInputs>::checkInvariants(Store & store) const;
+void Derivation::checkInvariants(Store & store) const;
 
 /**
  * Compute the store path that would be used for a derivation without writing it.

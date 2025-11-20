@@ -15,6 +15,7 @@
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/current-process.hh"
 
@@ -153,23 +154,36 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
 
        Note that some inputs might not be in the eval store because they
        are (resolved) derivation outputs in a resolved derivation. */
+
+    std::set<const SingleDerivedPath::Built *> builtInputs;
+
+    StorePathSet inputSrcs;
+
+    for (auto & input : drv->inputs)
+        std::visit(
+            overloaded{
+                [&](const SingleDerivedPath::Opaque & op) { inputSrcs.insert(op.path); },
+                [&](const SingleDerivedPath::Built & built) { builtInputs.insert(&built); },
+            },
+            input.raw());
+
     if (&worker.evalStore != &worker.store) {
-        RealisedPath::Set inputSrcs;
-        for (auto & i : drv->inputs.srcs)
-            if (worker.evalStore.isValidPath(i))
-                inputSrcs.insert(i);
-        copyClosure(worker.evalStore, worker.store, inputSrcs);
+        StorePathSet evalStorePaths;
+        for (auto & path : inputSrcs)
+            if (worker.evalStore.isValidPath(path))
+                evalStorePaths.insert(path);
+        copyClosure(worker.evalStore, worker.store, evalStorePaths);
     }
 
-    for (auto & i : drv->inputs.srcs) {
-        if (worker.store.isValidPath(i))
+    for (auto & path : inputSrcs) {
+        if (worker.store.isValidPath(path))
             continue;
         if (!worker.settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",
-                worker.store.printStorePath(i),
+                worker.store.printStorePath(path),
                 worker.store.printStorePath(drvPath));
-        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
+        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(path)));
     }
 
     co_await await(std::move(waitees));
@@ -193,7 +207,10 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     /* Determine the full set of input paths. */
 
     if (storeDerivation) {
-        assert(drv->inputs.drvs.map.empty());
+        /* For resolved derivations, there should be no Built inputs */
+        assert(std::ranges::none_of(drv->inputs, [](const auto & input) {
+            return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+        }));
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
         worker.store.writeDerivation(*drv);
@@ -201,38 +218,37 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
 
     StorePathSet inputPaths;
 
-    {
-        /* If we get this far, we know no dynamic drvs inputs */
+    /* Process source inputs */
+    worker.store.computeFSClosure(inputSrcs, inputPaths);
 
-        for (auto & [depDrvPath, depNode] : drv->inputs.drvs.map) {
-            for (auto & outputName : depNode.value) {
-                /* Don't need to worry about `inputGoals`, because
-                   impure derivations are always resolved above. Can
-                   just use DB. This case only happens in the (older)
-                   input addressed and fixed output derivation cases. */
-                auto outMap = [&] {
-                    for (auto * drvStore : {&worker.evalStore, &worker.store})
-                        if (drvStore->isValidPath(depDrvPath))
-                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
-                    assert(false);
-                }();
+    /* Process derivation inputs */
+    for (auto * built : builtInputs) {
+        /* Only handle simple (non-dynamic) derivation inputs */
+        if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&built->drvPath->raw())) {
+            auto & depDrvPath = opaque->path;
+            /* Don't need to worry about `inputGoals`, because
+               impure derivations are always resolved above. Can
+               just use DB. This case only happens in the (older)
+               input addressed and fixed output derivation cases. */
+            auto outMap = [&] {
+                for (auto * drvStore : {&worker.evalStore, &worker.store})
+                    if (drvStore->isValidPath(depDrvPath))
+                        return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                assert(false);
+            }();
 
-                auto outMapPath = outMap.find(outputName);
-                if (outMapPath == outMap.end()) {
-                    throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath),
-                        outputName,
-                        worker.store.printStorePath(depDrvPath));
-                }
-
-                worker.store.computeFSClosure(outMapPath->second, inputPaths);
+            auto outMapPath = outMap.find(built->output);
+            if (outMapPath == outMap.end()) {
+                throw Error(
+                    "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                    worker.store.printStorePath(drvPath),
+                    built->output,
+                    worker.store.printStorePath(depDrvPath));
             }
+
+            worker.store.computeFSClosure(outMapPath->second, inputPaths);
         }
     }
-
-    /* Second, the input sources. */
-    worker.store.computeFSClosure(drv->inputs.srcs, inputPaths);
 
     debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
               return "'" + worker.store.printStorePath(p) + "'";
@@ -339,7 +355,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     /* Project down to the `BasicDerivation` the builder consumes. */
     BasicDerivation resolvedDrv{
         .outputs = drv->outputs,
-        .inputs = drv->inputs.srcs,
+        .inputs = FullInputs::fromSet(drv->inputs).srcs,
         .platform = drv->platform,
         .builder = drv->builder,
         .args = drv->args,

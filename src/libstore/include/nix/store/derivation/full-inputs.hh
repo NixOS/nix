@@ -8,8 +8,12 @@
 
 namespace nix {
 
+struct SingleDerivedPath;
+
 /**
  * Inputs for full Derivation - both source and derivation inputs
+ *
+ * This is used for parsing on-disk formats, but then we convert to a set.
  */
 struct FullInputs
 {
@@ -23,6 +27,16 @@ struct FullInputs
     DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
 
     bool operator==(const FullInputs &) const = default;
+
+    /**
+     * Convert to a flat set of `SingleDerivedPath`
+     */
+    std::set<SingleDerivedPath> toSet() const;
+
+    /**
+     * Convert from a flat set of `SingleDerivedPath`
+     */
+    static FullInputs fromSet(const std::set<SingleDerivedPath> & inputs);
 };
 
 } // namespace nix

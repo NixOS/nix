@@ -302,6 +302,7 @@ sources = files(
   'daemon.cc',
   'derivation-json.cc',
   'derivation-options.cc',
+  'derivation/full-inputs.cc',
   'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',
