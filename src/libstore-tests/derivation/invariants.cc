@@ -33,10 +33,10 @@ protected:
             .outputs{
                 {
                     "out",
-                    DerivationOutput{DerivationOutput::CAFloating{
+                    DerivationOutput::CAFloating{
                         .method = ContentAddressMethod::Raw::NixArchive,
                         .hashAlgo = HashAlgorithm::SHA256,
-                    }},
+                    },
                 },
             },
             .platform = "x86_64-linux",
@@ -65,7 +65,7 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_emptyStringEnvVar)
 
     // Before: Derivation with deferred output
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .outputs = {{"out", DerivationOutput::Deferred{}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
         .env = {{"__doc", "Fill in deferred output with empty env var"}, {"out", ""}},
@@ -95,7 +95,7 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_empty_string_var)
 
     // Before: Derivation with deferred output
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .outputs = {{"out", DerivationOutput::Deferred{}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
         .env = {{"__doc", "Fill in deferred with missing env var"}},
@@ -213,15 +213,18 @@ TEST_F(FillInOutputPathsTest, throwsOnMixedOutputTypes)
 TEST_F(FillInOutputPathsTest, skipsEnvVarsWithBuilderRpc)
 {
     Derivation drv{
-        .outputs =
-            {{"out",
-              DerivationOutput{DerivationOutput::CAFixed{
-                  .ca =
-                      ContentAddress{
-                          .method = ContentAddressMethod::Raw::NixArchive,
-                          .hash = hashString(HashAlgorithm::SHA256, "foo"),
-                      },
-              }}}},
+        .outputs{
+            {
+                "out",
+                DerivationOutput{DerivationOutput::CAFixed{
+                    .ca =
+                        ContentAddress{
+                            .method = ContentAddressMethod::Raw::NixArchive,
+                            .hash = hashString(HashAlgorithm::SHA256, "foo"),
+                        },
+                }},
+            },
+        },
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
         .env =
@@ -270,8 +273,15 @@ TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 
     // Create a derivation that depends on the dependency
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .outputs{
+            {"out", DerivationOutput::Deferred{}},
+        },
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
         .env = {{"__doc", "Deferred stays deferred with CA dependencies"}, {"out", ""}},
@@ -301,8 +311,20 @@ TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeffered)
 
     // Create a derivation that depends on the dependency
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::InputAddressed{.path = wrongPath}}}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .outputs{
+            {
+                "out",
+                DerivationOutput{DerivationOutput::InputAddressed{
+                    .path = wrongPath,
+                }},
+            },
+        },
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
         .env = {{"__doc", "InputAddressed throws when should be deferred"}, {"out", ""}},

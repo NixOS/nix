@@ -220,6 +220,21 @@ const StorePath & DerivedPath::getBaseStorePath() const
     return getBaseStorePath_(*this);
 }
 
+bool SingleDerivedPath::Built::isDynamicDrvOutput() const
+{
+    return std::holds_alternative<SingleDerivedPath::Built>(drvPath->raw());
+}
+
+bool SingleDerivedPath::isDynamicDrvOutput() const
+{
+    return std::visit(
+        overloaded{
+            [](const SingleDerivedPath::Opaque &) { return false; },
+            [](const SingleDerivedPath::Built & b) { return b.isDynamicDrvOutput(); },
+        },
+        raw());
+}
+
 } // namespace nix
 
 namespace nlohmann {
