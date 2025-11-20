@@ -38,6 +38,6 @@ ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBy
  * Write a JSON representation of the contents of a NAR (except file
  * contents).
  */
-nlohmann::json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse);
+nlohmann::json listNar(SourceAccessor & accessor, const CanonPath & path, bool recurse);
 
 } // namespace nix

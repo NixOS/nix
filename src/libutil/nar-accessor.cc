@@ -274,9 +274,9 @@ GetNarBytes seekableGetNarBytes(const Path & path)
 
 using nlohmann::json;
 
-json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
+json listNar(SourceAccessor & accessor, const CanonPath & path, bool recurse)
 {
-    auto st = accessor->lstat(path);
+    auto st = accessor.lstat(path);
 
     json obj = json::object();
 
@@ -295,7 +295,7 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         {
             obj["entries"] = json::object();
             json & res2 = obj["entries"];
-            for (const auto & [name, type] : accessor->readDirectory(path)) {
+            for (const auto & [name, type] : accessor.readDirectory(path)) {
                 if (recurse) {
                     res2[name] = listNar(accessor, path / name, true);
                 } else
@@ -305,7 +305,7 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
         break;
     case SourceAccessor::Type::tSymlink:
         obj["type"] = "symlink";
-        obj["target"] = accessor->readLink(path);
+        obj["target"] = accessor.readLink(path);
         break;
     case SourceAccessor::Type::tBlock:
     case SourceAccessor::Type::tChar:

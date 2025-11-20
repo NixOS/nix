@@ -80,7 +80,7 @@ struct CmdCatNar : StoreCommand, MixCat
             throw SysError("opening NAR file '%s'", narPath);
         auto source = FdSource{fd.get()};
         auto narAccessor = makeNarAccessor(source);
-        auto listing = listNar(narAccessor, CanonPath::root, true);
+        auto listing = listNar(*narAccessor, CanonPath::root, true);
         cat(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };
