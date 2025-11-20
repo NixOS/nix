@@ -70,31 +70,7 @@ static std::filesystem::path append(const std::filesystem::path & src, const Can
     return dst;
 }
 
-#ifndef _WIN32
-void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
-{
-    if (path.isRoot()) {
-        createDirectory(path);
-        callback(*this, path);
-        return;
-    }
-
-    createDirectory(path);
-    assert(dirFd); // If that's not true the above call must have thrown an exception.
-
-    RestoreSink dirSink{startFsync};
-    dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd =
-        unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-
-    if (!dirSink.dirFd)
-        throw SysError("opening directory '%s'", dirSink.dstPath.string());
-
-    callback(dirSink, CanonPath::root);
-}
-#endif
-
-void RestoreSink::createDirectory(const CanonPath & path)
+void RestoreSink::createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback)
 {
     auto p = append(dstPath, path);
 
@@ -107,6 +83,16 @@ void RestoreSink::createDirectory(const CanonPath & path)
         if (::mkdirat(dirFd.get(), path.rel_c_str(), 0777) == -1)
             throw SysError("creating directory '%s'", p.string());
 
+        if (callback) {
+            RestoreSink dirSink{startFsync};
+            dirSink.dstPath =
+                unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+
+            if (!dirSink.dirFd)
+                throw SysError("opening directory '%s'", dirSink.dstPath.string());
+
+            (*callback)(dirSink, CanonPath::root);
+        }
         return;
     }
 #endif
@@ -125,7 +111,10 @@ void RestoreSink::createDirectory(const CanonPath & path)
             throw SysError("creating directory '%1%'", p.string());
     }
 #endif
-};
+
+    if (callback)
+        (*callback)(*this, path);
+}
 
 struct RestoreRegularFile : CreateRegularFileSink
 {

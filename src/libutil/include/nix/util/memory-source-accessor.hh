@@ -153,7 +153,7 @@ struct MemorySink : FileSystemObjectSink
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
+    void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override;
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 

@@ -1263,10 +1263,12 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         addToTree(*pathComponents.rbegin(), oid, crf.executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB);
     }
 
-    void createDirectory(const CanonPath & path) override
+    void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
     {
         auto pathComponents = tokenizeString<std::vector<std::string>>(path.rel(), "/");
         (void) prepareDirs(pathComponents, true);
+        if (callback)
+            (*callback)(*this, path);
     }
 
     void createSymlink(const CanonPath & path, const std::string & target) override

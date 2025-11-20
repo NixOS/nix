@@ -34,8 +34,6 @@ struct FileSystemObjectSink
 {
     virtual ~FileSystemObjectSink() = default;
 
-    virtual void createDirectory(const CanonPath & path) = 0;
-
     using DirectoryCreatedCallback = std::function<void(FileSystemObjectSink & dirSink, const CanonPath & dirRelPath)>;
 
     /**
@@ -47,11 +45,7 @@ struct FileSystemObjectSink
      * freshly created directory. Use this when it's important to disallow any
      * intermediate path components from being symlinks.
      */
-    virtual void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
-    {
-        createDirectory(path);
-        callback(*this, path);
-    }
+    virtual void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) = 0;
 
     /**
      * This function in general is no re-entrant. Only one file can be
@@ -86,7 +80,11 @@ void copyRecursive(
  */
 struct NullFileSystemObjectSink : FileSystemObjectSink
 {
-    void createDirectory(const CanonPath & path) override {}
+    void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
+    {
+        if (callback)
+            (*callback)(*this, CanonPath::root);
+    }
 
     void createSymlink(const CanonPath & path, const std::string & target) override {}
 
@@ -118,11 +116,7 @@ struct RestoreSink : FileSystemObjectSink
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
-
-#ifndef _WIN32
-    void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
-#endif
+    void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override;
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 
@@ -144,9 +138,15 @@ struct RegularFileSink : FileSystemObjectSink
     {
     }
 
-    void createDirectory(const CanonPath & path) override
+    void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
     {
         regular = false;
+        if (callback) {
+            NullFileSystemObjectSink s;
+            /* The children of the
+               directory that cannot exist also cannot exist */
+            (*callback)(s, CanonPath::root);
+        }
     }
 
     void createSymlink(const CanonPath & path, const std::string & target) override

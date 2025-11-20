@@ -146,7 +146,7 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
 
 using File = MemorySourceAccessor::File;
 
-void MemorySink::createDirectory(const CanonPath & path)
+void MemorySink::createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback)
 {
     auto * f = dst.open(path, File{File::Directory{}});
     if (!f)
@@ -154,7 +154,10 @@ void MemorySink::createDirectory(const CanonPath & path)
 
     if (!std::holds_alternative<File::Directory>(f->raw))
         throw Error("file '%s' is not a directory", path);
-};
+
+    if (callback)
+        (*callback)(*this, path);
+}
 
 struct CreateMemoryRegularFile : CreateRegularFileSink
 {
