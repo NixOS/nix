@@ -40,12 +40,11 @@ struct DrvOutput;
 namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
-struct FullInputs;
 struct Output;
 } // namespace derivation
 
 using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
-using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
+using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

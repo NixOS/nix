@@ -3,6 +3,7 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 
@@ -191,22 +192,24 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(
         Derivation{
             .outputs = {},
-            .inputs{
-                .srcs{
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
-                },
-                .drvs{.map{
-                    {
-                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+            .inputs =
+                derivation::FullInputs{
+                    .srcs{
+                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+                    },
+                    .drvs{.map{
                         {
-                            .value{
-                                "cat",
-                                "dog",
+                            StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+                            {
+                                .value{
+                                    "cat",
+                                    "dog",
+                                },
                             },
                         },
-                    },
-                }},
-            },
+                    }},
+                }
+                    .toSet(),
             .platform = "wasm-sel4",
             .builder = "foo",
             .args = {"bar", "baz"},
@@ -227,26 +230,28 @@ Derivation makeDynDepDerivation()
 {
     return Derivation{
         .outputs = {},
-        .inputs{
-            .srcs{
-                StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
-            },
-            .drvs{.map{
-                {
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                    DerivedPathMap<StringSet>::ChildNode{
-                        .value{
-                            "cat",
-                            "dog",
-                        },
-                        .childMap{
-                            {"cat", DerivedPathMap<StringSet>::ChildNode{.value = {"kitten"}}},
-                            {"goose", DerivedPathMap<StringSet>::ChildNode{.value = {"gosling"}}},
+        .inputs =
+            derivation::FullInputs{
+                .srcs{
+                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+                },
+                .drvs{.map{
+                    {
+                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+                        DerivedPathMap<StringSet>::ChildNode{
+                            .value{
+                                "cat",
+                                "dog",
+                            },
+                            .childMap{
+                                {"cat", DerivedPathMap<StringSet>::ChildNode{.value = {"kitten"}}},
+                                {"goose", DerivedPathMap<StringSet>::ChildNode{.value = {"gosling"}}},
+                            },
                         },
                     },
-                },
-            }},
-        },
+                }},
+            }
+                .toSet(),
         .platform = "wasm-sel4",
         .builder = "foo",
         .args = {"bar", "baz"},

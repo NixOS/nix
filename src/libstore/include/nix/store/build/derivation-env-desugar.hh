@@ -8,16 +8,17 @@ namespace nix {
 
 class Store;
 
+struct SingleDerivedPath;
+
 namespace derivation {
 template<typename Inputs, typename Out>
 struct Derivation;
-struct FullInputs;
 struct Output;
 template<typename Input>
 struct Options;
 } // namespace derivation
 
-using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
+using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
 using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
 
 /**
