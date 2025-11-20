@@ -98,11 +98,13 @@ struct NarAccessor : public SourceAccessor
             }
         }
 
-        void createDirectory(const CanonPath & path) override
+        void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
         {
             createMember(
                 path,
                 NarMember{.stat = {.type = Type::tDirectory, .fileSize = 0, .isExecutable = false, .narOffset = 0}});
+            if (callback)
+                (*callback)(*this, path);
         }
 
         void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
