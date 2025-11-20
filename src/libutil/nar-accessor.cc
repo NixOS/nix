@@ -1,4 +1,4 @@
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 #include "nix/util/archive.hh"
 
 #include <map>
@@ -272,41 +272,39 @@ GetNarBytes seekableGetNarBytes(const Path & path)
     };
 }
 
-using nlohmann::json;
+template<bool deep>
+using ListNarResult = std::conditional_t<deep, NarListing, ShallowNarListing>;
 
-json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
+template<bool deep>
+static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPath & path)
 {
-    auto st = accessor->lstat(path);
-
-    json obj = json::object();
+    auto st = accessor.lstat(path);
 
     switch (st.type) {
     case SourceAccessor::Type::tRegular:
-        obj["type"] = "regular";
-        if (st.fileSize)
-            obj["size"] = *st.fileSize;
-        if (st.isExecutable)
-            obj["executable"] = true;
-        if (st.narOffset && *st.narOffset)
-            obj["narOffset"] = *st.narOffset;
-        break;
-    case SourceAccessor::Type::tDirectory:
-        obj["type"] = "directory";
-        {
-            obj["entries"] = json::object();
-            json & res2 = obj["entries"];
-            for (const auto & [name, type] : accessor->readDirectory(path)) {
-                if (recurse) {
-                    res2[name] = listNar(accessor, path / name, true);
-                } else
-                    res2[name] = json::object();
+        return typename ListNarResult<deep>::Regular{
+            .executable = st.isExecutable,
+            .contents =
+                NarListingRegularFile{
+                    .fileSize = st.fileSize,
+                    .narOffset = st.narOffset && *st.narOffset ? st.narOffset : std::nullopt,
+                },
+        };
+    case SourceAccessor::Type::tDirectory: {
+        typename ListNarResult<deep>::Directory dir;
+        for (const auto & [name, type] : accessor.readDirectory(path)) {
+            if constexpr (deep) {
+                dir.entries.emplace(name, listNarImpl<true>(accessor, path / name));
+            } else {
+                dir.entries.emplace(name, fso::Opaque{});
             }
         }
-        break;
+        return dir;
+    }
     case SourceAccessor::Type::tSymlink:
-        obj["type"] = "symlink";
-        obj["target"] = accessor->readLink(path);
-        break;
+        return typename ListNarResult<deep>::Symlink{
+            .target = accessor.readLink(path),
+        };
     case SourceAccessor::Type::tBlock:
     case SourceAccessor::Type::tChar:
     case SourceAccessor::Type::tSocket:
@@ -314,7 +312,64 @@ json listNar(ref<SourceAccessor> accessor, const CanonPath & path, bool recurse)
     case SourceAccessor::Type::tUnknown:
         assert(false); // cannot happen for NARs
     }
-    return obj;
+}
+
+NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
+{
+    return listNarImpl<true>(accessor, path);
+}
+
+ShallowNarListing listNarShallow(SourceAccessor & accessor, const CanonPath & path)
+{
+    return listNarImpl<false>(accessor, path);
+}
+
+template<typename Listing>
+static void to_json_impl(nlohmann::json & j, const Listing & listing)
+{
+    std::visit(
+        overloaded{
+            [&](const typename Listing::Regular & r) {
+                j = nlohmann::json::object();
+                j["type"] = "regular";
+                if (r.contents.fileSize)
+                    j["size"] = *r.contents.fileSize;
+                if (r.executable)
+                    j["executable"] = true;
+                if (r.contents.narOffset)
+                    j["narOffset"] = *r.contents.narOffset;
+            },
+            [&](const typename Listing::Directory & d) {
+                j = nlohmann::json::object();
+                j["type"] = "directory";
+                j["entries"] = nlohmann::json::object();
+                for (const auto & [name, child] : d.entries) {
+                    if constexpr (std::is_same_v<Listing, NarListing>) {
+                        to_json(j["entries"][name], child);
+                    } else if constexpr (std::is_same_v<Listing, ShallowNarListing>) {
+                        j["entries"][name] = nlohmann::json::object();
+                    } else {
+                        static_assert(false);
+                    }
+                }
+            },
+            [&](const typename Listing::Symlink & s) {
+                j = nlohmann::json::object();
+                j["type"] = "symlink";
+                j["target"] = s.target;
+            },
+        },
+        listing.raw);
+}
+
+void to_json(nlohmann::json & j, const NarListing & listing)
+{
+    to_json_impl(j, listing);
+}
+
+void to_json(nlohmann::json & j, const ShallowNarListing & listing)
+{
+    to_json_impl(j, listing);
 }
 
 } // namespace nix

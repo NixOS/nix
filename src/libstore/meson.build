@@ -300,7 +300,6 @@ sources = files(
   'make-content-addressed.cc',
   'misc.cc',
   'names.cc',
-  'nar-accessor.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
   'optimise-store.cc',

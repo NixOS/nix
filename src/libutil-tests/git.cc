@@ -230,7 +230,7 @@ TEST_F(GitTest, both_roundrip)
 
     auto files = make_ref<MemorySourceAccessor>();
     files->root = File::Directory{
-        .contents{
+        .entries{
             {
                 "foo",
                 File::Regular{
@@ -240,7 +240,7 @@ TEST_F(GitTest, both_roundrip)
             {
                 "bar",
                 File::Directory{
-                    .contents =
+                    .entries =
                         {
                             {
                                 "baz",

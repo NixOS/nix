@@ -29,13 +29,13 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
             return nullptr;
         auto & curDir = *curDirP;
 
-        auto i = curDir.contents.find(name);
-        if (i == curDir.contents.end()) {
+        auto i = curDir.entries.find(name);
+        if (i == curDir.entries.end()) {
             if (!create)
                 return nullptr;
             else {
                 newF = true;
-                i = curDir.contents.insert(
+                i = curDir.entries.insert(
                     i,
                     {
                         std::string{name},
@@ -68,25 +68,26 @@ bool MemorySourceAccessor::pathExists(const CanonPath & path)
     return open(path, std::nullopt);
 }
 
-MemorySourceAccessor::Stat MemorySourceAccessor::File::lstat() const
+template<>
+SourceAccessor::Stat MemorySourceAccessor::File::lstat() const
 {
     return std::visit(
         overloaded{
             [](const Regular & r) {
-                return Stat{
-                    .type = tRegular,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tRegular,
                     .fileSize = r.contents.size(),
                     .isExecutable = r.executable,
                 };
             },
             [](const Directory &) {
-                return Stat{
-                    .type = tDirectory,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tDirectory,
                 };
             },
             [](const Symlink &) {
-                return Stat{
-                    .type = tSymlink,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tSymlink,
                 };
             },
         },
@@ -106,7 +107,7 @@ MemorySourceAccessor::DirEntries MemorySourceAccessor::readDirectory(const Canon
         throw Error("file '%s' does not exist", path);
     if (auto * d = std::get_if<File::Directory>(&f->raw)) {
         DirEntries res;
-        for (auto & [name, file] : d->contents)
+        for (auto & [name, file] : d->entries)
             res.insert_or_assign(name, file.lstat().type);
         return res;
     } else
