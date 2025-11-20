@@ -13,6 +13,7 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
+#include <optional>
 
 namespace nix {
 
@@ -791,71 +792,63 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 
 DerivationType BasicDerivation::type() const
 {
-    std::set<std::string_view> inputAddressedOutputs, fixedCAOutputs, floatingCAOutputs, deferredIAOutputs,
-        impureOutputs;
     std::optional<HashAlgorithm> floatingHashAlgo;
+    std::optional<DerivationType> ty;
+
+    auto decide = [&](DerivationType newTy) {
+        if (!ty)
+            ty = newTy;
+        else if (ty.value() != newTy)
+            throw Error("can't mix derivation output types");
+        else if (ty.value() == DerivationType::ContentAddressed{.sandboxed = false, .fixed = true})
+            // FIXME: Experimental feature?
+            throw Error("only one fixed output is allowed for now");
+    };
 
     for (auto & i : outputs) {
         std::visit(
             overloaded{
-                [&](const DerivationOutput::InputAddressed &) { inputAddressedOutputs.insert(i.first); },
-                [&](const DerivationOutput::CAFixed &) { fixedCAOutputs.insert(i.first); },
-                [&](const DerivationOutput::CAFloating & dof) {
-                    floatingCAOutputs.insert(i.first);
-                    if (!floatingHashAlgo) {
-                        floatingHashAlgo = dof.hashAlgo;
-                    } else {
-                        if (*floatingHashAlgo != dof.hashAlgo)
-                            throw Error("all floating outputs must use the same hash algorithm");
-                    }
+                [&](const DerivationOutput::InputAddressed &) {
+                    decide(
+                        DerivationType::InputAddressed{
+                            .deferred = false,
+                        });
                 },
-                [&](const DerivationOutput::Deferred &) { deferredIAOutputs.insert(i.first); },
-                [&](const DerivationOutput::Impure &) { impureOutputs.insert(i.first); },
+                [&](const DerivationOutput::CAFixed &) {
+                    decide(
+                        DerivationType::ContentAddressed{
+                            .sandboxed = false,
+                            .fixed = true,
+                        });
+                    if (i.first != "out"sv)
+                        throw Error("single fixed output must be named \"out\"");
+                },
+                [&](const DerivationOutput::CAFloating & dof) {
+                    decide(
+                        DerivationType::ContentAddressed{
+                            .sandboxed = true,
+                            .fixed = false,
+                        });
+                    if (!floatingHashAlgo)
+                        floatingHashAlgo = dof.hashAlgo;
+                    else if (*floatingHashAlgo != dof.hashAlgo)
+                        throw Error("all floating outputs must use the same hash algorithm");
+                },
+                [&](const DerivationOutput::Deferred &) {
+                    decide(
+                        DerivationType::InputAddressed{
+                            .deferred = true,
+                        });
+                },
+                [&](const DerivationOutput::Impure &) { decide(DerivationType::Impure{}); },
             },
             i.second.raw);
     }
 
-    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()
-        && deferredIAOutputs.empty() && impureOutputs.empty())
+    if (!ty)
         throw Error("must have at least one output");
 
-    if (!inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()
-        && deferredIAOutputs.empty() && impureOutputs.empty())
-        return DerivationType::InputAddressed{
-            .deferred = false,
-        };
-
-    if (inputAddressedOutputs.empty() && !fixedCAOutputs.empty() && floatingCAOutputs.empty()
-        && deferredIAOutputs.empty() && impureOutputs.empty()) {
-        if (fixedCAOutputs.size() > 1)
-            // FIXME: Experimental feature?
-            throw Error("only one fixed output is allowed for now");
-        if (*fixedCAOutputs.begin() != "out"sv)
-            throw Error("single fixed output must be named \"out\"");
-        return DerivationType::ContentAddressed{
-            .sandboxed = false,
-            .fixed = true,
-        };
-    }
-
-    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && !floatingCAOutputs.empty()
-        && deferredIAOutputs.empty() && impureOutputs.empty())
-        return DerivationType::ContentAddressed{
-            .sandboxed = true,
-            .fixed = false,
-        };
-
-    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()
-        && !deferredIAOutputs.empty() && impureOutputs.empty())
-        return DerivationType::InputAddressed{
-            .deferred = true,
-        };
-
-    if (inputAddressedOutputs.empty() && fixedCAOutputs.empty() && floatingCAOutputs.empty()
-        && deferredIAOutputs.empty() && !impureOutputs.empty())
-        return DerivationType::Impure{};
-
-    throw Error("can't mix derivation output types");
+    return ty.value();
 }
 
 DrvHashes drvHashes;
