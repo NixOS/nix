@@ -14,8 +14,8 @@ struct DerivationOutput;
 
 template<typename Inputs, typename Output>
 struct DerivationT;
-struct FullInputs;
-using Derivation = DerivationT<FullInputs, DerivationOutput>;
+struct SingleDerivedPath;
+using Derivation = DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,

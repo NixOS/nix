@@ -82,11 +82,11 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn,
     const ExperimentalFeatureSettings & mockXpSettings)
 {
-    /* Use the SingleDerivedPath version with empty inputDrvs, then
+    /* Use the SingleDerivedPath version with empty inputs, then
        resolve. */
-    DerivedPathMap<StringSet> emptyInputDrvs{};
+    std::set<SingleDerivedPath> emptyInputs{};
     auto singleDerivedPathOptions =
-        derivationOptionsFromStructuredAttrs(store, emptyInputDrvs, env, parsed, shouldWarn, mockXpSettings);
+        derivationOptionsFromStructuredAttrs(store, emptyInputs, env, parsed, shouldWarn, mockXpSettings);
 
     /* "Resolve" all SingleDerivedPath inputs to StorePath. */
     auto resolved = tryResolve(
@@ -116,7 +116,7 @@ static void flatten(const nlohmann::json & value, StringSet & res)
 
 DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
-    const DerivedPathMap<StringSet> & inputDrvs,
+    const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn,
@@ -126,33 +126,12 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 
     std::map<std::string, SingleDerivedPath::Built, std::less<>> placeholders;
     if (mockXpSettings.isEnabled(Xp::CaDerivations)) {
-        /* Initialize placeholder map from inputDrvs */
-        auto initPlaceholders = [&](this const auto & initPlaceholders,
-                                    ref<const SingleDerivedPath> basePath,
-                                    const DerivedPathMap<StringSet>::ChildNode & node) -> void {
-            for (const auto & outputName : node.value) {
-                auto built = SingleDerivedPath::Built{
-                    .drvPath = basePath,
-                    .output = outputName,
-                };
+        /* Initialize placeholder map from inputs */
+        for (const auto & input : inputs) {
+            if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
                 placeholders.insert_or_assign(
-                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(built, mockXpSettings).render(),
-                    std::move(built));
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(*built, mockXpSettings).render(), *built);
             }
-
-            for (const auto & [outputName, childNode] : node.childMap) {
-                initPlaceholders(
-                    make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
-                        .drvPath = basePath,
-                        .output = outputName,
-                    }),
-                    childNode);
-            }
-        };
-
-        for (const auto & [drvPath, outputs] : inputDrvs.map) {
-            auto basePath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{drvPath});
-            initPlaceholders(basePath, outputs);
         }
     }
 

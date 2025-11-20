@@ -166,18 +166,27 @@ TEST_F(TryResolveTest, withInputs)
         {"dev", caFloatingOutput()},
     };
 
+    auto dep1DrvPathRef = makeConstantStorePathRef(dep1DrvPath);
+    auto dep2DrvPathRef = makeConstantStorePathRef(dep2DrvPath);
+
     resolveExpect(
         "with-inputs",
         Derivation{
             .outputs = multiOutputs,
             .inputs =
                 {
-                    .drvs =
-                        {.map =
-                             {
-                                 {dep1DrvPath, {.value = {"out", "dev"}}},
-                                 {dep2DrvPath, {.value = {"out"}}},
-                             }},
+                    SingleDerivedPath::Built{
+                        .drvPath = dep1DrvPathRef,
+                        .output = "out",
+                    },
+                    SingleDerivedPath::Built{
+                        .drvPath = dep1DrvPathRef,
+                        .output = "dev",
+                    },
+                    SingleDerivedPath::Built{
+                        .drvPath = dep2DrvPathRef,
+                        .output = "out",
+                    },
                 },
             .platform = "x86_64-linux",
             .builder = "/bin/bash",
@@ -196,21 +205,21 @@ TEST_F(TryResolveTest, withInputs)
         {.dict{
             {
                 SingleDerivedPath::Built{
-                    .drvPath = makeConstantStorePathRef(dep1DrvPath),
+                    .drvPath = dep1DrvPathRef,
                     .output = "out",
                 },
                 dep1OutPath,
             },
             {
                 SingleDerivedPath::Built{
-                    .drvPath = makeConstantStorePathRef(dep1DrvPath),
+                    .drvPath = dep1DrvPathRef,
                     .output = "dev",
                 },
                 dep1DevPath,
             },
             {
                 SingleDerivedPath::Built{
-                    .drvPath = makeConstantStorePathRef(dep2DrvPath),
+                    .drvPath = dep2DrvPathRef,
                     .output = "out",
                 },
                 dep2OutPath,
@@ -243,7 +252,10 @@ TEST_F(TryResolveTest, resolutionFailure)
 
     Derivation drv{
         .outputs = {{"out", caFloatingOutput()}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .inputs = {SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(depDrvPath),
+            .output = "out",
+        }},
         .platform = "x86_64-linux",
         .builder = "/bin/bash",
         .name = "resolution-failure",
@@ -277,7 +289,7 @@ void TryResolveTest::exportRefGraphSubpathTest(
 
     nix::checkpointJson(*this, std::string{stem} + "-before", drv);
 
-    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputs.drvs, drv.env, parsed, true);
+    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputs, drv.env, parsed, true);
 
     nix::checkpointJson(*this, std::string{stem} + "-before-options", options);
 
@@ -334,7 +346,10 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath)
 
     Derivation drv{
         .outputs = {{"out", caFloatingOutput()}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .inputs = {SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(depDrvPath),
+            .output = "out",
+        }},
         .platform = "x86_64-linux",
         .builder = "/bin/bash",
         .env = {{"exportReferencesGraph", "refs " + placeholder + "/foo"}},
@@ -351,7 +366,10 @@ TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
 
     Derivation drv{
         .outputs = {{"out", caFloatingOutput()}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .inputs = {SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(depDrvPath),
+            .output = "out",
+        }},
         .platform = "x86_64-linux",
         .builder = "/bin/bash",
         .structuredAttrs = StructuredAttrs{{
