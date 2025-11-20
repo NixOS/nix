@@ -321,12 +321,12 @@ struct GitArchiveInputScheme : InputScheme
         auto tarballCache = settings.getTarballCache();
         auto parseSink = tarballCache->getFileSystemObjectSink();
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
-        auto tree = parseSink->flush();
+        auto treeEntry = parseSink->flush();
 
         act.reset();
 
         TarballInfo tarballInfo{
-            .treeHash = tarballCache->dereferenceSingletonDirectory(tree), .lastModified = lastModified};
+            .treeHash = tarballCache->dereferenceSingletonDirectory(treeEntry.hash), .lastModified = lastModified};
 
         cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
         cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});

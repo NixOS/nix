@@ -70,12 +70,6 @@ TEST_F(GitUtilsTest, sink_basic)
     auto repo = openRepo();
     auto sink = repo->getFileSystemObjectSink();
 
-    // TODO/Question: It seems a little odd that we use the tarball-like convention of requiring a top-level directory
-    // here
-    //                The sync method does not document this behavior, should probably renamed because it's not very
-    //                general, and I can't imagine that "non-conventional" archives or any other source to be handled by
-    //                this sink.
-
     sink->createDirectory(CanonPath("foo-1.1"));
 
     sink->createRegularFile(CanonPath("foo-1.1/hello"), [](CreateRegularFileSink & fileSink) {
@@ -91,7 +85,7 @@ TEST_F(GitUtilsTest, sink_basic)
 
     // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
 
-    auto result = repo->dereferenceSingletonDirectory(sink->flush());
+    auto result = repo->dereferenceSingletonDirectory(sink->flush().hash);
     auto accessor = repo->getAccessor(result, {}, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5u);
@@ -121,6 +115,51 @@ TEST_F(GitUtilsTest, sink_hardlink)
         ASSERT_THAT(e.msg(), testing::HasSubstr("/hello"));
         ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
     }
+};
+
+TEST_F(GitUtilsTest, sink_root_file)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createRegularFile(
+        CanonPath::root, [](CreateRegularFileSink & fileSink) { writeString(fileSink, "hello world", false); });
+
+    auto result = sink->flush();
+    ASSERT_EQ(result.mode, nix::git::Mode::Regular);
+    auto accessor = repo->getAccessor(result.hash, false, getRepoName());
+    ASSERT_EQ(accessor->readFile(CanonPath::root), "hello world");
+};
+
+TEST_F(GitUtilsTest, sink_root_symlink)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createSymlink(CanonPath::root, "target");
+
+    auto result = sink->flush();
+    ASSERT_EQ(result.mode, nix::git::Mode::Symlink);
+    auto accessor = repo->getAccessor(result.hash, false, getRepoName());
+    ASSERT_EQ(accessor->readLink(CanonPath::root), "target");
+};
+
+TEST_F(GitUtilsTest, sink_hardlink_to_root)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createRegularFile(
+        CanonPath("hello"), [](CreateRegularFileSink & fileSink) { writeString(fileSink, "hello world", false); });
+
+    sink->createDirectory(CanonPath("subdir"));
+    sink->createHardlink(CanonPath("subdir/link"), CanonPath("hello"));
+
+    auto result = sink->flush();
+    ASSERT_EQ(result.mode, nix::git::Mode::Directory);
+    auto accessor = repo->getAccessor(result.hash, false, getRepoName());
+    ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");
+    ASSERT_EQ(accessor->readFile(CanonPath("subdir/link")), "hello world");
 };
 
 TEST_F(GitUtilsTest, peel_reference)

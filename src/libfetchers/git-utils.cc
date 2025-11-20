@@ -962,15 +962,15 @@ struct GitSourceAccessor : SourceAccessor
 
     Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
     {
-        if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
-            return dupObject<Blob>((git_blob *) &*state.root);
-
         auto notExpected = [&]() {
             throw Error(expectSymlink ? "'%s' is not a symlink" : "'%s' is not a regular file", showPath(path));
         };
 
-        if (path.isRoot())
+        if (path.isRoot()) {
+            if (git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
+                return dupObject<Blob>((git_blob *) &*state.root);
             notExpected();
+        }
 
         auto entry = need(state, path);
 
@@ -1054,16 +1054,23 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
     }
 };
 
-struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
-{
-    ref<GitRepoImpl> repo;
+namespace {
 
+struct DirEntry
+{
+    git_oid oid;
+    git_filemode_t mode;
+};
+
+struct DirectoryState
+{
     struct PendingDir
     {
         std::string name;
         TreeBuilder builder;
     };
 
+    GitRepoImpl & repo;
     TreeBuilder rootBuilder;
     std::vector<PendingDir> pendingDirs;
 
@@ -1079,46 +1086,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
      */
     decltype(::git_odb_backend::refresh) packfileOdbRefresh = nullptr;
 
-    TreeBuilder makeBuilder(git_tree * prevTree = nullptr)
-    {
-        git_treebuilder * b;
-        if (git_treebuilder_new(&b, *repo, prevTree))
-            throw Error("creating a tree builder: %s", git_error_last()->message);
-        return TreeBuilder(b);
-    }
-
-    git_oid finishBuilder(TreeBuilder & builder)
-    {
-        git_oid oid;
-        if (git_treebuilder_write(&oid, builder.get()))
-            throw Error("creating a tree object: %s", git_error_last()->message);
-        return oid;
-    }
-
-    void pushBuilder(std::string name)
-    {
-        auto & parentBuilder = pendingDirs.empty() ? rootBuilder : pendingDirs.back().builder;
-        const git_tree_entry * entry;
-        Tree prevTree = nullptr;
-
-        if ((entry = git_treebuilder_get(parentBuilder.get(), name.c_str()))) {
-            /* Clone a tree that we've already finished. This happens
-               if a tarball has directory entries that are not
-               contiguous. */
-            if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
-                throw Error("parent of '%s' is not a directory", name);
-
-            if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(prevTree), *repo, entry))
-                throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
-        }
-
-        pendingDirs.push_back({
-            .name = std::move(name),
-            .builder = makeBuilder(prevTree.get()),
-        });
-    };
-
-    GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
+    DirectoryState(GitRepoImpl & repo)
         : repo(repo)
         , rootBuilder(makeBuilder())
     {
@@ -1147,62 +1115,143 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         }
     }
 
-    std::pair<git_oid, std::string> popBuilder()
-    {
-        assert(!pendingDirs.empty());
-        auto pending = std::move(pendingDirs.back());
-        pendingDirs.pop_back();
-        return {finishBuilder(pending.builder), pending.name};
-    };
+    TreeBuilder makeBuilder(git_tree * prevTree = nullptr);
 
-    void addToTree(const std::string & name, const git_oid & oid, git_filemode_t mode)
-    {
-        auto & builder = pendingDirs.empty() ? rootBuilder : pendingDirs.back().builder;
-        if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, mode))
-            throw Error("adding a file to a tree builder: %s", git_error_last()->message);
-    };
+    std::vector<std::string> prepareDirs(const CanonPath & path);
+    void updateBuilders(std::span<const std::string> names);
+    std::pair<git_oid, std::string> popBuilder();
+    void pushBuilder(std::string name);
+    void addToTree(const std::string & name, const DirEntry & entry);
+};
 
-    void updateBuilders(std::span<const std::string> names)
-    {
-        // Find the common prefix of pendingDirs and names.
-        size_t prefixLen = 0;
-        for (; prefixLen < names.size() && prefixLen < pendingDirs.size(); ++prefixLen)
-            if (names[prefixLen] != pendingDirs[prefixLen].name)
-                break;
+TreeBuilder DirectoryState::makeBuilder(git_tree * prevTree)
+{
+    TreeBuilder builder;
+    if (git_treebuilder_new(Setter(builder), repo, prevTree))
+        throw Error("creating a tree builder: %s", git_error_last()->message);
+    return builder;
+}
 
-        // Finish the builders that are not part of the common prefix.
-        for (auto n = pendingDirs.size(); n > prefixLen; --n) {
-            auto [oid, name] = popBuilder();
-            addToTree(name, oid, GIT_FILEMODE_TREE);
-        }
+git_oid finishBuilder(TreeBuilder & builder)
+{
+    git_oid oid;
+    if (git_treebuilder_write(&oid, builder.get()))
+        throw Error("creating a tree object: %s", git_error_last()->message);
+    return oid;
+}
 
-        // Create builders for the new directories.
-        for (auto n = prefixLen; n < names.size(); ++n)
-            pushBuilder(names[n]);
-    };
+void DirectoryState::pushBuilder(std::string name)
+{
+    auto & parentBuilder = pendingDirs.empty() ? rootBuilder : pendingDirs.back().builder;
+    const git_tree_entry * entry;
+    Tree prevTree = nullptr;
 
-    void prepareDirs(const std::vector<std::string> & pathComponents, bool isDir)
-    {
-        std::span<const std::string> pathComponents2{pathComponents};
+    if ((entry = git_treebuilder_get(parentBuilder.get(), name.c_str()))) {
+        /* Clone a tree that we've already finished. This happens
+           if a tarball has directory entries that are not
+           contiguous. */
+        if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+            throw Error("parent of '%s' is not a directory", name);
 
-        updateBuilders(isDir ? pathComponents2 : pathComponents2.first(pathComponents2.size() - 1));
+        if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(prevTree), repo, entry))
+            throw Error("looking up parent of '%s': %s", name, git_error_last()->message);
     }
 
-    std::vector<std::string> prepareDirs(const CanonPath & path, bool isDir)
+    pendingDirs.push_back({
+        .name = std::move(name),
+        .builder = makeBuilder(prevTree.get()),
+    });
+}
+
+std::pair<git_oid, std::string> DirectoryState::popBuilder()
+{
+    assert(!pendingDirs.empty());
+    auto pending = std::move(pendingDirs.back());
+    pendingDirs.pop_back();
+    return {finishBuilder(pending.builder), pending.name};
+}
+
+void DirectoryState::addToTree(const std::string & name, const DirEntry & entry)
+{
+    auto & builder = pendingDirs.empty() ? rootBuilder : pendingDirs.back().builder;
+    if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &entry.oid, entry.mode))
+        throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+}
+
+void DirectoryState::updateBuilders(std::span<const std::string> names)
+{
+    // Find the common prefix of pendingDirs and names.
+    size_t prefixLen = 0;
+    for (; prefixLen < names.size() && prefixLen < pendingDirs.size(); ++prefixLen)
+        if (names[prefixLen] != pendingDirs[prefixLen].name)
+            break;
+
+    // Finish the builders that are not part of the common prefix.
+    for (auto n = pendingDirs.size(); n > prefixLen; --n) {
+        auto [oid, name] = popBuilder();
+        addToTree(name, DirEntry{.oid = oid, .mode = GIT_FILEMODE_TREE});
+    }
+
+    // Create builders for the new directories.
+    for (auto n = prefixLen; n < names.size(); ++n)
+        pushBuilder(names[n]);
+}
+
+std::vector<std::string> DirectoryState::prepareDirs(const CanonPath & path)
+{
+    std::vector<std::string> pathComponents;
+    for (auto & c : path)
+        pathComponents.emplace_back(c);
+
+    updateBuilders(pathComponents);
+
+    return pathComponents;
+}
+
+struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
+{
+    ref<GitRepoImpl> repo;
+
+    /**
+     * Root state:
+     * - nullopt: nothing created yet
+     * - DirEntry: root is a single non-directory object (file/symlink)
+     * - DirectoryState: root is a directory with builders
+     */
+    std::optional<std::variant<DirEntry, DirectoryState>> root;
+
+    DirectoryState & ensureDirectoryState()
     {
-        std::vector<std::string> pathComponents;
-        for (auto & c : path)
-            pathComponents.emplace_back(c);
+        if (!root) {
+            root.emplace<DirectoryState>(*repo);
+        }
+        if (auto * dirState = std::get_if<DirectoryState>(&*root)) {
+            return *dirState;
+        }
+        throw Error("cannot create directory entry: root is not a directory");
+    }
 
-        prepareDirs(pathComponents, isDir);
+    GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
+        : repo(repo)
+    {
+    }
 
-        return pathComponents;
+    void addEntry(const CanonPath & path, const DirEntry & entry)
+    {
+        if (auto res = path.parentAndChild()) {
+            auto & [parent, child] = *res;
+            auto & dirState = ensureDirectoryState();
+            dirState.prepareDirs(parent);
+            dirState.addToTree(std::string(child), entry);
+        } else {
+            if (root)
+                throw Error("root already exists");
+            root = entry;
+        }
     }
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
     {
-        auto pathComponents = prepareDirs(path, false);
-
         using WriteStream = std::unique_ptr<::git_writestream, decltype([](::git_writestream * stream) {
                                                 if (stream)
                                                     stream->free(stream);
@@ -1281,44 +1330,59 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
                     "creating a blob object for '%s' from in-memory buffer: %s", path, git_error_last()->message);
         }
 
-        addToTree(*pathComponents.rbegin(), oid, crf.executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB);
+        addEntry(
+            path,
+            DirEntry{
+                .oid = oid,
+                .mode = crf.executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB,
+            });
     }
 
     void createDirectory(const CanonPath & path, std::optional<DirectoryCreatedCallback> callback = {}) override
     {
-        auto pathComponents = prepareDirs(path, true);
+        ensureDirectoryState().prepareDirs(path);
         if (callback)
             (*callback)(*this, path);
     }
 
     void createSymlink(const CanonPath & path, const std::string & target) override
     {
-        auto pathComponents = prepareDirs(path, false);
-
         git_oid oid;
         if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
             throw Error("creating a blob object for tarball symlink member '%s': %s", path, git_error_last()->message);
 
-        addToTree(*pathComponents.rbegin(), oid, GIT_FILEMODE_LINK);
+        addEntry(
+            path,
+            DirEntry{
+                .oid = oid,
+                .mode = GIT_FILEMODE_LINK,
+            });
     }
 
     void createHardlink(const CanonPath & path, const CanonPath & target) override
     {
-        auto pathComponents = prepareDirs(path, false);
+        auto & dirState = ensureDirectoryState();
+
+        auto res = path.parentAndChild();
+        if (!res)
+            throw Error("hard link cannot be root file system object");
+        auto & [parent, name] = *res;
+
+        dirState.prepareDirs(parent);
 
         // We can't just look up the path from the start of the root, since
         // some parent directories may not have finished yet, so we compute
         // a relative path that helps us find the right git_tree_builder or object.
-        auto relTarget = CanonPath(path).parent()->makeRelative(target);
+        auto relTarget = parent.makeRelative(target);
 
-        auto dir = pendingDirs.rbegin();
+        auto dir = dirState.pendingDirs.rbegin();
 
         // For each ../ component at the start, go up one directory.
         // CanonPath::makeRelative() always puts all .. elements at the start,
         // so they're all handled by this loop:
         std::string_view relTargetLeft(relTarget);
         while (hasPrefix(relTargetLeft, "../")) {
-            if (dir == pendingDirs.rend())
+            if (dir == dirState.pendingDirs.rend())
                 throw Error("invalid hard link target '%s' for path '%s'", target, path);
             ++dir;
             relTargetLeft = relTargetLeft.substr(3);
@@ -1327,7 +1391,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         // Look up the remainder of the target, starting at the
         // top-most `git_treebuilder`.
         std::variant<git_treebuilder *, git_oid> curDir{
-            dir == pendingDirs.rend() ? rootBuilder.get() : dir->builder.get()};
+            dir == dirState.pendingDirs.rend() ? dirState.rootBuilder.get() : dir->builder.get()};
         Object tree; // needed to keep `entry` alive
         const git_tree_entry * entry = nullptr;
 
@@ -1347,25 +1411,40 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
         assert(entry);
 
-        addToTree(*pathComponents.rbegin(), *git_tree_entry_id(entry), git_tree_entry_filemode(entry));
+        dirState.addToTree(
+            std::string(name),
+            DirEntry{.oid = *git_tree_entry_id(entry), .mode = git_tree_entry_filemode(entry)});
     }
 
-    Hash flush() override
+    git::TreeEntry flush() override
     {
-        updateBuilders({});
+        if (!root)
+            throw Error("nothing to flush");
 
-        auto oid = finishBuilder(rootBuilder);
+        auto [oid, mode] = std::visit(
+            overloaded{
+                [](DirEntry & entry) -> std::pair<git_oid, git_filemode_t> {
+                    return {entry.oid, entry.mode};
+                },
+                [](DirectoryState & dirState) -> std::pair<git_oid, git_filemode_t> {
+                    dirState.updateBuilders({});
+                    return {finishBuilder(dirState.rootBuilder), GIT_FILEMODE_TREE};
+                },
+            },
+            *root);
 
         if (auto * backend = repo->packBackend) {
             /* We are done writing blobs, can restore refresh functionality. */
-            backend->refresh = packfileOdbRefresh;
+            backend->refresh = dirState.packfileOdbRefresh;
         }
 
         repo->flush();
 
-        return toHash(oid);
+        return git::TreeEntry{.mode = static_cast<git::Mode>(mode), .hash = toHash(oid)};
     }
 };
+
+}
 
 ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, const GitAccessorOptions & options)
 {

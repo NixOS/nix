@@ -2,6 +2,7 @@
 
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/git.hh"
 
 namespace nix {
 
@@ -17,9 +18,9 @@ struct Settings;
 struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
     /**
-     * Flush builder and return a final Git hash.
+     * Flush builder and return the final Git tree entry (hash and mode).
      */
-    virtual Hash flush() = 0;
+    virtual git::TreeEntry flush() = 0;
 };
 
 struct GitAccessorOptions
