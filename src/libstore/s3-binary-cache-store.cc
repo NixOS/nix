@@ -401,9 +401,9 @@ StringSet S3BinaryCacheStoreConfig::uriSchemes()
 }
 
 S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , HttpBinaryCacheStoreConfig(scheme, _cacheUri, params)
+    nix::Settings & settings, std::string_view scheme, std::string_view _cacheUri, const Params & params)
+    : StoreConfig(settings, params)
+    , HttpBinaryCacheStoreConfig(settings, scheme, _cacheUri, params)
 {
     assert(cacheUri.query.empty());
     assert(cacheUri.scheme == "s3");

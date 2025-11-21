@@ -13,12 +13,12 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
     if (ctx.netrcData != "") {
-        settings.netrcFile = "netrc";
-        writeFile(settings.netrcFile, ctx.netrcData, 0600);
+        fileTransferSettings.netrcFile = "netrc";
+        writeFile(fileTransferSettings.netrcFile, ctx.netrcData, 0600);
     }
 
-    settings.caFile = "ca-certificates.crt";
-    writeFile(settings.caFile, ctx.caFileData, 0600);
+    fileTransferSettings.caFile = "ca-certificates.crt";
+    writeFile(fileTransferSettings.caFile, ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
     if (!out)
@@ -73,7 +73,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     /* Try the hashed mirrors first. */
     auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
-        for (auto hashedMirror : settings.hashedMirrors.get())
+        for (auto hashedMirror : ctx.hashedMirrors)
             try {
                 if (!hasSuffix(hashedMirror, "/"))
                     hashedMirror += '/';

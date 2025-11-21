@@ -10,7 +10,8 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
 {
     using HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig;
 
-    S3BinaryCacheStoreConfig(std::string_view uriScheme, std::string_view bucketName, const Params & params);
+    S3BinaryCacheStoreConfig(
+        nix::Settings & settings, std::string_view uriScheme, std::string_view bucketName, const Params & params);
 
     const Setting<std::string> profile{
         this,

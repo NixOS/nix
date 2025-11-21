@@ -15,7 +15,8 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
     using RemoteStoreConfig::RemoteStoreConfig;
 
-    SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+    SSHStoreConfig(
+        nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params);
 
     const Setting<Strings> remoteProgram{
         this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
@@ -39,8 +40,8 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
 
 struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
 {
-    MountedSSHStoreConfig(StringMap params);
-    MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params);
+    MountedSSHStoreConfig(nix::Settings & settings, StringMap params);
+    MountedSSHStoreConfig(nix::Settings & settings, std::string_view scheme, std::string_view host, StringMap params);
 
     static const std::string name()
     {

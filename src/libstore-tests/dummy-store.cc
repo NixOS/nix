@@ -4,14 +4,18 @@
 #include "nix/store/globals.hh"
 #include "nix/store/realisation.hh"
 
+#include "nix/store/tests/test-main.hh"
+
 namespace nix {
 
 TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);
 
-    auto store = [] {
-        auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
+    auto settings = getTestSettings();
+
+    auto store = [&] {
+        auto cfg = make_ref<DummyStoreConfig>(settings, StoreReference::Params{});
         cfg->readOnly = false;
         return cfg->openDummyStore();
     }();

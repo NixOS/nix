@@ -1,9 +1,12 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
+#include "nix/store/globals.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
-#include "nix/util/json-utils.hh"
+
+#include "nix/store/tests/test-main.hh"
 #include "nix/util/tests/characterization.hh"
 
 namespace nix::fetchers {
@@ -25,7 +28,8 @@ public:
 
 TEST_F(AccessKeysTest, singleOrgGitHub)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"github.com/a", "token"});
     auto i = Input::fromURL(fetchSettings, "github:a/b");
 
@@ -35,7 +39,8 @@ TEST_F(AccessKeysTest, singleOrgGitHub)
 
 TEST_F(AccessKeysTest, nonMatches)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"github.com", "token"});
     auto i = Input::fromURL(fetchSettings, "gitlab:github.com/evil");
 
@@ -45,7 +50,8 @@ TEST_F(AccessKeysTest, nonMatches)
 
 TEST_F(AccessKeysTest, noPartialMatches)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"github.com/partial", "token"});
     auto i = Input::fromURL(fetchSettings, "github:partial-match/repo");
 
@@ -55,7 +61,8 @@ TEST_F(AccessKeysTest, noPartialMatches)
 
 TEST_F(AccessKeysTest, repoGitHub)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"github.com", "token"});
     fetchSettings.accessTokens.get().insert({"github.com/a/b", "another_token"});
     fetchSettings.accessTokens.get().insert({"github.com/a/c", "yet_another_token"});
@@ -73,7 +80,8 @@ TEST_F(AccessKeysTest, repoGitHub)
 
 TEST_F(AccessKeysTest, multipleGitLab)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"gitlab.com", "token"});
     fetchSettings.accessTokens.get().insert({"gitlab.com/a/b", "another_token"});
     auto i = Input::fromURL(fetchSettings, "gitlab:a/b");
@@ -87,7 +95,8 @@ TEST_F(AccessKeysTest, multipleGitLab)
 
 TEST_F(AccessKeysTest, multipleSourceHut)
 {
-    fetchers::Settings fetchSettings = fetchers::Settings{};
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings = fetchers::Settings{settings};
     fetchSettings.accessTokens.get().insert({"git.sr.ht", "token"});
     fetchSettings.accessTokens.get().insert({"git.sr.ht/~a/b", "another_token"});
     auto i = Input::fromURL(fetchSettings, "sourcehut:a/b");

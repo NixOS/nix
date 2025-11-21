@@ -13,6 +13,11 @@
 
 namespace nix {
 
+class Settings;
+
+// FIXME: don't use a global variable.
+extern Settings settings;
+
 int handleExceptions(const std::string & programName, std::function<void()> fun);
 
 /**

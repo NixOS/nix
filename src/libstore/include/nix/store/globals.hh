@@ -62,6 +62,31 @@ const uint32_t maxIdsPerBuild =
 #endif
     ;
 
+/**
+ * Settings that are needed very early during initialization, before a
+ * main `Settings` object can be constructed.
+ *
+ * For now, unlike `Settings`, this remains a global variable. The good
+ * news is that it is immutable except for depending on env vars, so it
+ * is almost a constant.
+ */
+struct BootstrapSettings
+{
+    /**
+     * The directory where system configuration files are stored.
+     */
+    Path nixConfDir;
+
+    /**
+     * A list of user configuration files to load.
+     */
+    std::vector<Path> nixUserConfFiles;
+
+    BootstrapSettings();
+};
+
+extern const BootstrapSettings bootstrapSettings;
+
 class Settings : public Config
 {
 
@@ -70,8 +95,6 @@ class Settings : public Config
     StringSet getDefaultExtraPlatforms();
 
     bool isWSL1();
-
-    Path getDefaultSSLCertFile();
 
 public:
 
@@ -97,16 +120,6 @@ public:
      * The directory where state is stored.
      */
     Path nixStateDir;
-
-    /**
-     * The directory where system configuration files are stored.
-     */
-    Path nixConfDir;
-
-    /**
-     * A list of user configuration files to load.
-     */
-    std::vector<Path> nixUserConfFiles;
 
     /**
      * File name of the socket the daemon listens to.
@@ -292,7 +305,7 @@ public:
 
     Setting<std::string> builders{
         this,
-        "@" + nixConfDir + "/machines",
+        "@" + bootstrapSettings.nixConfDir + "/machines",
         "builders",
         R"(
           A semicolon- or newline-separated list of build machines.
@@ -1130,64 +1143,6 @@ public:
               /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
         )"};
 
-    Setting<unsigned int> downloadSpeed{
-        this,
-        0,
-        "download-speed",
-        R"(
-          Specify the maximum transfer rate in kilobytes per second you want
-          Nix to use for downloads.
-        )"};
-
-    Setting<std::string> netrcFile{
-        this,
-        fmt("%s/%s", nixConfDir, "netrc"),
-        "netrc-file",
-        R"(
-          If set to an absolute path to a `netrc` file, Nix uses the HTTP
-          authentication credentials in this file when trying to download from
-          a remote host through HTTP or HTTPS. Defaults to
-          `$NIX_CONF_DIR/netrc`.
-
-          The `netrc` file consists of a list of accounts in the following
-          format:
-
-              machine my-machine
-              login my-username
-              password my-password
-
-          For the exact syntax, see [the `curl`
-          documentation](https://ec.haxx.se/usingcurl-netrc.html).
-
-          > **Note**
-          >
-          > This must be an absolute path, and `~` is not resolved. For
-          > example, `~/.netrc` won't resolve to your home directory's
-          > `.netrc`.
-        )"};
-
-    Setting<Path> caFile{
-        this,
-        getDefaultSSLCertFile(),
-        "ssl-cert-file",
-        R"(
-          The path of a file containing CA certificates used to
-          authenticate `https://` downloads. Nix by default uses
-          the first of the following files that exists:
-
-          1. `/etc/ssl/certs/ca-certificates.crt`
-          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
-
-          The path can be overridden by the following environment
-          variables, in order of precedence:
-
-          1. `NIX_SSL_CERT_FILE`
-          2. `SSL_CERT_FILE`
-        )",
-        {},
-        // Don't document the machine-specific default value
-        false};
-
 #ifdef __linux__
     Setting<bool> filterSyscalls{
         this,
@@ -1444,9 +1399,6 @@ public:
     const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 };
 
-// FIXME: don't use a global variable.
-extern Settings settings;
-
 /**
  * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the
  * given configuration object.
@@ -1454,9 +1406,6 @@ extern Settings settings;
  * Usually called with `globalConfig`.
  */
 void loadConfFile(AbstractConfig & config);
-
-// Used by the Settings constructor
-std::vector<Path> getUserConfigFiles();
 
 /**
  * The version of Nix itself.

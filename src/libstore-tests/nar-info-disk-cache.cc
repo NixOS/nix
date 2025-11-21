@@ -1,9 +1,10 @@
-#include "nix/store/nar-info-disk-cache.hh"
-
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
-#include "nix/store/sqlite.hh"
 #include <sqlite3.h>
+
+#include "nix/store/globals.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 
 namespace nix {
 
@@ -23,8 +24,10 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     SQLite db;
     SQLiteStmt getIds;
 
+    Settings settings;
+
     {
-        auto cache = getTestNarInfoDiskCache(dbPath);
+        auto cache = getTestNarInfoDiskCache(settings, dbPath);
 
         // Set up "background noise" and check that different caches receive different ids
         {
@@ -48,7 +51,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
 
         // We're going to pay special attention to the id field because we had a bug
         // that changed it.
-        db = SQLite(dbPath);
+        db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
         getIds.create(db, "select id from BinaryCaches where url = 'http://foo'");
 
         {
@@ -73,7 +76,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     {
         // We can't clear the in-memory cache, so we use a new cache object. This is
         // more realistic anyway.
-        auto cache2 = getTestNarInfoDiskCache(dbPath);
+        auto cache2 = getTestNarInfoDiskCache(settings, dbPath);
 
         {
             auto r = cache2->upToDateCacheExists("http://foo");

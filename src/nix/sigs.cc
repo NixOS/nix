@@ -44,7 +44,7 @@ struct CmdCopySigs : StorePathsCommand
         // FIXME: factor out commonality with MixVerify.
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
-            substituters.push_back(openStore(s));
+            substituters.push_back(openStore(settings, s));
 
         ThreadPool pool{fileTransferSettings.httpConnections};
 

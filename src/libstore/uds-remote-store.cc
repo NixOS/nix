@@ -20,11 +20,14 @@
 namespace nix {
 
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(
-    std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
-    : Store::Config{params}
-    , LocalFSStore::Config{params}
-    , RemoteStore::Config{params}
-    , path{authority.empty() ? settings.nixDaemonSocketFile : authority}
+    nix::Settings & settings,
+    std::string_view scheme,
+    std::string_view authority,
+    const StoreReference::Params & params)
+    : Store::Config{settings, params}
+    , LocalFSStore::Config{settings, "", params}
+    , RemoteStore::Config{settings, params}
+    , path{authority.empty() ? settings.nixDaemonSocketFile : std::string{authority}}
 {
     if (uriSchemes().count(scheme) == 0) {
         throw UsageError("Scheme must be 'unix'");
@@ -42,8 +45,8 @@ std::string UDSRemoteStoreConfig::doc()
 // empty string will later default to the same nixDaemonSocketFile. Why
 // don't we just wire it all through? I believe there are cases where it
 // will live reload so we want to continue to account for that.
-UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
-    : UDSRemoteStoreConfig(*uriSchemes().begin(), "", params)
+UDSRemoteStoreConfig::UDSRemoteStoreConfig(nix::Settings & settings, const Params & params)
+    : UDSRemoteStoreConfig(settings, *uriSchemes().begin(), "", params)
 {
 }
 

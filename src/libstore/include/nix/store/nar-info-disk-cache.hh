@@ -7,6 +7,8 @@
 
 namespace nix {
 
+class Settings;
+
 class NarInfoDiskCache
 {
 public:
@@ -40,9 +42,12 @@ public:
 /**
  * Return a singleton cache object that can be used concurrently by
  * multiple threads.
+ *
+ * @todo should use refined reference just with fields relevant to this,
+ * not the whole global settings.
  */
-ref<NarInfoDiskCache> getNarInfoDiskCache();
+ref<NarInfoDiskCache> getNarInfoDiskCache(const Settings & settings);
 
-ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath);
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(const Settings & settings, Path dbPath);
 
 } // namespace nix

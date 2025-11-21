@@ -6,6 +6,7 @@
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <algorithm>
 #include <map>
@@ -46,10 +47,6 @@ namespace nix {
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
 
-Settings settings;
-
-static GlobalConfig::Register rSettings(&settings);
-
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
     , nixStore(
@@ -62,8 +59,6 @@ Settings::Settings()
     , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
-    , nixUserConfFiles(getUserConfigFiles())
     , nixDaemonSocketFile(
           canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
 {
@@ -71,10 +66,6 @@ Settings::Settings()
     buildUsersGroup = isRootUser() ? "nixbld" : "";
 #endif
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
-
-    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (sslOverride != "")
-        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -116,13 +107,13 @@ void loadConfFile(AbstractConfig & config)
         }
     };
 
-    applyConfigFile(settings.nixConfDir + "/nix.conf");
+    applyConfigFile(bootstrapSettings.nixConfDir + "/nix.conf");
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
     config.resetOverridden();
 
-    auto files = settings.nixUserConfFiles;
+    auto files = bootstrapSettings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
         applyConfigFile(*file);
     }
@@ -133,22 +124,27 @@ void loadConfFile(AbstractConfig & config)
     }
 }
 
-std::vector<Path> getUserConfigFiles()
-{
-    // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
-    auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
-    if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
-    }
+BootstrapSettings::BootstrapSettings()
+    : nixConfDir{canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR))}
+    , nixUserConfFiles{[] {
+        // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
+        auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
+        if (nixConfFiles.has_value()) {
+            return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
+        }
 
-    // Use the paths specified by the XDG spec
-    std::vector<Path> files;
-    auto dirs = getConfigDirs();
-    for (auto & dir : dirs) {
-        files.insert(files.end(), dir + "/nix.conf");
-    }
-    return files;
+        // Use the paths specified by the XDG spec
+        std::vector<Path> files;
+        auto dirs = getConfigDirs();
+        for (auto & dir : dirs) {
+            files.insert(files.end(), dir + "/nix.conf");
+        }
+        return files;
+    }()}
+{
 }
+
+const BootstrapSettings bootstrapSettings;
 
 unsigned int Settings::getDefaultCores()
 {
@@ -247,15 +243,6 @@ bool Settings::isWSL1()
 #else
     return false;
 #endif
-}
-
-Path Settings::getDefaultSSLCertFile()
-{
-    for (auto & fn :
-         {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-        if (pathAccessible(fn))
-            return fn;
-    return "";
 }
 
 const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)

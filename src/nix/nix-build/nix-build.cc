@@ -312,8 +312,8 @@ static void main_nix_build(int argc, char ** argv)
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
-    auto store = openStore();
-    auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
+    auto store = openStore(settings);
+    auto evalStore = myArgs.evalStoreUrl ? openStore(settings, *myArgs.evalStoreUrl) : store;
 
     auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
     state->repair = myArgs.repair;
