@@ -624,7 +624,7 @@ struct curlFileTransfer : public FileTransfer
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     try {
-                        fileTransfer.enqueueItem(shared_from_this());
+                        fileTransfer.enqueueItem(ref{shared_from_this()});
                     } catch (const nix::Error & e) {
                         // If enqueue fails (e.g., during shutdown), fail the transfer properly
                         // instead of letting the exception propagate, which would leave done=false
@@ -641,15 +641,13 @@ struct curlFileTransfer : public FileTransfer
     {
         struct EmbargoComparator
         {
-            bool operator()(const std::shared_ptr<TransferItem> & i1, const std::shared_ptr<TransferItem> & i2)
+            bool operator()(const ref<TransferItem> & i1, const ref<TransferItem> & i2)
             {
                 return i1->embargo > i2->embargo;
             }
         };
 
-        std::
-            priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator>
-                incoming;
+        std::priority_queue<ref<TransferItem>, std::vector<ref<TransferItem>>, EmbargoComparator> incoming;
     private:
         bool quitting = false;
     public:
@@ -851,7 +849,7 @@ struct curlFileTransfer : public FileTransfer
         }
     }
 
-    void enqueueItem(std::shared_ptr<TransferItem> item)
+    void enqueueItem(ref<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
             && item->request.uri.scheme() != "s3")
@@ -874,11 +872,11 @@ struct curlFileTransfer : public FileTransfer
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
-            enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+            enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
             return;
         }
 
-        enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
+        enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
     }
 };
 
