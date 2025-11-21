@@ -48,7 +48,7 @@ struct curlFileTransfer : public FileTransfer
     std::random_device rd;
     std::mt19937 mt19937;
 
-    struct TransferItem : public std::enable_shared_from_this<TransferItem>
+    struct TransferItem : public std::enable_shared_from_this<TransferItem>, public FileTransfer::Item
     {
         curlFileTransfer & fileTransfer;
         FileTransferRequest request;
@@ -849,7 +849,7 @@ struct curlFileTransfer : public FileTransfer
         }
     }
 
-    void enqueueItem(ref<TransferItem> item)
+    ItemHandle enqueueItem(ref<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
             && item->request.uri.scheme() != "s3")
@@ -864,19 +864,20 @@ struct curlFileTransfer : public FileTransfer
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
         writeFull(wakeupPipe.writeSide.get(), " ");
 #endif
+
+        return ItemHandle(static_cast<Item &>(*item));
     }
 
-    void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
+    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
-            enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-            return;
+            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
         }
 
-        enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
     }
 };
 

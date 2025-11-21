@@ -226,6 +226,26 @@ class Store;
 
 struct FileTransfer
 {
+protected:
+    class Item
+    {};
+
+public:
+    /**
+     * An opaque handle to the file transfer. Can be used to reference an in-flight transfer operations.
+     */
+    class ItemHandle
+    {
+        std::reference_wrapper<Item> item;
+        friend struct FileTransfer;
+
+    public:
+        ItemHandle(Item & item)
+            : item(item)
+        {
+        }
+    };
+
     virtual ~FileTransfer() {}
 
     /**
@@ -233,7 +253,8 @@ struct FileTransfer
      * the download. The future may throw a FileTransferError
      * exception.
      */
-    virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+    virtual ItemHandle
+    enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
