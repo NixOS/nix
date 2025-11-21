@@ -509,6 +509,9 @@ Derivation parseDerivation(
     }
 
     expect(str, ')');
+
+    drv.options = derivationOptionsFromStructuredAttrs(store, drv.inputDrvs, drv.env, drv.structuredAttrs);
+
     return drv;
 }
 
@@ -635,6 +638,14 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 std::string Derivation::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
+    {
+        auto optionsFromEnv = derivationOptionsFromStructuredAttrs(store, inputDrvs, env, structuredAttrs);
+
+        if (optionsFromEnv != options)
+            throw Error(
+                "'drv.options' and 'drv.env' are out of sync. This is probably an internal error, please open an issue!");
+    }
+
     std::string s;
     s.reserve(65536);
 
@@ -1120,7 +1131,8 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
     }
 }
 
-std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+Derivation::tryResolve(Store & store, Store * evalStore) const
 {
     return tryResolve(
         store, [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
@@ -1177,7 +1189,7 @@ static bool tryResolveInput(
     return true;
 }
 
-std::optional<BasicDerivation> Derivation::tryResolve(
+std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> Derivation::tryResolve(
     Store & store,
     std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const
@@ -1200,7 +1212,12 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 
     rewriteDerivation(store, resolved, inputRewrites);
 
-    return resolved;
+    auto resolvedOptions = nix::tryResolve(options, queryResolutionChain);
+
+    if (!resolvedOptions)
+        return std::nullopt;
+
+    return {{std::move(resolved), *std::move(resolvedOptions)}};
 }
 
 void Derivation::checkInvariants(Store & store, const StorePath & drvPath) const
@@ -1426,6 +1443,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     res["builder"] = d.builder;
     res["args"] = d.args;
     res["env"] = d.env;
+    res["options"] = d.options;
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
@@ -1511,6 +1529,11 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 
     if (auto structuredAttrs = get(json, "structuredAttrs"))
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+
+    if (auto options = get(json, "options"))
+        res.options = *options;
+    else
+        res.options = derivationOptionsFromStructuredAttrs(store, res.inputDrvs, res.env, res.structuredAttrs);
 
     return res;
 }

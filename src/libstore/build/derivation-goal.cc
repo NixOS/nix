@@ -64,16 +64,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
-    auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
-        try {
-            return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
-
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
@@ -99,7 +89,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
-        if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+        if (settings.useSubstitutes && drv->options.substitutesAllowed()) {
             if (!checkResult)
                 waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
             else {
@@ -152,7 +142,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     }
 
     if (resolutionGoal->resolvedDrv) {
-        auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
+        auto & [pathResolved, drvResolved, drvOptionsResolved] = *resolutionGoal->resolvedDrv;
 
         auto resolvedDrvGoal =
             worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode, /*storeDerivation=*/true);

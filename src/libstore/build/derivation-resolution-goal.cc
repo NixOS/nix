@@ -164,7 +164,8 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             }
             assert(attempt);
 
-            auto pathResolved = writeDerivation(worker.store, *attempt, NoRepair, /*readOnly =*/true);
+            // TODO check options compatibility with ATerm.
+            auto pathResolved = writeDerivation(worker.store, attempt->first, NoRepair, /*readOnly =*/true);
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",
@@ -180,8 +181,8 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                     worker.store.printStorePath(pathResolved),
                 });
 
-            resolvedDrv =
-                std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), *std::move(attempt));
+            resolvedDrv = std::make_unique<std::tuple<StorePath, BasicDerivation, DerivationOptions<StorePath>>>(
+                std::move(pathResolved), std::move(attempt->first), std::move(attempt->second));
         }
     }
 

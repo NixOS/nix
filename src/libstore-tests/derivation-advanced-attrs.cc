@@ -187,17 +187,14 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
-        EXPECT_EQ(options, advancedAttributes_defaults);
+        EXPECT_EQ(got.options, advancedAttributes_defaults);
 
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -233,19 +230,16 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
     this->readTest("advanced-attributes.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(!got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        options.outputChecks = DerivationOptions<SingleDerivedPath>::OutputChecks{.ignoreSelfRefs = true};
-        options.exportReferencesGraph = {};
+        got.options.outputChecks = DerivationOptions<SingleDerivedPath>::OutputChecks{.ignoreSelfRefs = true};
+        got.options.exportReferencesGraph = {};
 
-        EXPECT_EQ(options, expected);
+        EXPECT_EQ(got.options, expected);
 
-        EXPECT_EQ(options.substitutesAllowed(), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
@@ -334,12 +328,12 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
 
         EXPECT_TRUE(got.structuredAttrs);
 
-        EXPECT_EQ(options, advancedAttributes_structuredAttrs_defaults);
+        EXPECT_EQ(got.options, advancedAttributes_structuredAttrs_defaults);
 
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), true);
-        EXPECT_EQ(options.useUidRange(got), false);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), true);
+        EXPECT_EQ(got.options.useUidRange(got), false);
     });
 };
 
@@ -380,9 +374,6 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
     this->readTest("advanced-attributes-structured-attrs.drv", [&](auto encoded) {
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
-        auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
-
         EXPECT_TRUE(got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
@@ -390,7 +381,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
             // Delete all keys but "dev" in options.outputChecks
             auto * outputChecksMapP =
                 std::get_if<std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>>(
-                    &options.outputChecks);
+                    &got.options.outputChecks);
             ASSERT_TRUE(outputChecksMapP);
             auto & outputChecksMap = *outputChecksMapP;
             auto devEntry = outputChecksMap.find("dev");
@@ -399,14 +390,14 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
             outputChecksMap.clear();
             outputChecksMap.emplace("dev", std::move(devChecks));
         }
-        options.exportReferencesGraph = {};
+        got.options.exportReferencesGraph = {};
 
-        EXPECT_EQ(options, expected);
+        EXPECT_EQ(got.options, expected);
 
-        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
-        EXPECT_EQ(options.substitutesAllowed(), false);
-        EXPECT_EQ(options.useUidRange(got), true);
+        EXPECT_EQ(got.options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(got.options.substitutesAllowed(), false);
+        EXPECT_EQ(got.options.useUidRange(got), true);
     });
 };
 
@@ -516,5 +507,57 @@ TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, structuredAttrs_all_set, structur
 TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, structuredAttrs_all_set, structuredAttrs_ca)
 
 #undef TEST_JSON_OPTIONS
+
+#define SYNC_CONFLICT(NAME, VALUE)                   \
+    NAME = VALUE;                                    \
+    EXPECT_THROW(got.unparse(*store, false), Error); \
+    got.options = options;
+
+TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_option_syncConflict)
+{
+    readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = parseDerivation(*store, std::move(encoded), "foo");
+        auto options = got.options;
+
+        SYNC_CONFLICT(got.options.additionalSandboxProfile, "foobar");
+        SYNC_CONFLICT(got.options.noChroot, true);
+        SYNC_CONFLICT(got.options.impureHostDeps, StringSet{"/usr/bin/ditto"});
+        SYNC_CONFLICT(got.options.impureEnvVars, StringSet{"HELLO"});
+        SYNC_CONFLICT(got.options.allowLocalNetworking, true);
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedReferences, StringSet{"nothing"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).allowedRequisites, StringSet{"hey"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedReferences, StringSet{"BAR"});
+        SYNC_CONFLICT(std::get<0>(got.options.outputChecks).disallowedRequisites, StringSet{"FOO"});
+    });
+};
+
+#undef SYNC_CONFLICT
+
+#define SYNC_CONFLICT(NAME, VALUE)                   \
+    got.env[NAME] = VALUE;                           \
+    EXPECT_THROW(got.unparse(*store, false), Error); \
+    got.env = env;
+
+TEST_F(DerivationAdvancedAttrsTest, Derivation_advancedAttributes_env_syncConflict)
+{
+    readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
+        auto got = parseDerivation(*store, std::move(encoded), "foo");
+        auto env = got.env;
+
+        // TODO: Is there any way to serialize a boolean/StringSet into an env value (string)?
+        // Something like `State::coerceToString`
+        SYNC_CONFLICT("__sandboxProfile", "foobar");
+        SYNC_CONFLICT("__noChroot", "1");
+        SYNC_CONFLICT("__impureHostDeps", "/usr/bin/ditto");
+        SYNC_CONFLICT("impureEnvVars", "FOOBAR");
+        SYNC_CONFLICT("__darwinAllowLocalNetworking", "1");
+        SYNC_CONFLICT("allowedReferences", "nothing");
+        SYNC_CONFLICT("allowedRequisites", "hey");
+        SYNC_CONFLICT("disallowedReferences", "BAR");
+        SYNC_CONFLICT("disallowedRequisites", "FOO");
+    });
+};
+
+#undef SYNC_CONFLICT
 
 } // namespace nix
