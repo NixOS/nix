@@ -2216,8 +2216,15 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
+            size_t index = 0;
             for (auto v2 : v.listView())
-                recurse(*v2);
+                try {
+                    recurse(*v2);
+                    index++;
+                } catch (Error & e) {
+                    state.addErrorTrace(e, "while evaluating list element at index %1%", index);
+                    throw;
+                }
         }
     }(v);
 }
