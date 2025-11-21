@@ -16,6 +16,7 @@
 
 namespace nix {
 
+class Settings;
 class StorePath;
 
 /**
@@ -216,7 +217,7 @@ struct ProfileDirsOptions
 };
 
 /**
- * Create and return the path to a directory suitable for storing the user’s
+ * Create and return the path to a directory suitable for storing the user's
  * profiles.
  */
 std::filesystem::path profilesDir(ProfileDirsOptions opts);

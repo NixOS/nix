@@ -17,7 +17,9 @@ int main(int argc, char ** argv)
 
         initLibStore();
 
-        auto store = nix::openStore();
+        Settings settings;
+
+        auto store = nix::openStore(settings);
 
         // build the derivation
 

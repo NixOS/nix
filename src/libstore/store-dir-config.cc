@@ -149,6 +149,7 @@ StoreDirConfig::makeFixedOutputPathFromCA(std::string_view name, const ContentAd
 }
 
 std::pair<StorePath, Hash> StoreDirConfig::computeStorePath(
+    const Settings & settings,
     std::string_view name,
     const SourcePath & path,
     ContentAddressMethod method,

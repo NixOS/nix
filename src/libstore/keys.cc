@@ -4,7 +4,7 @@
 
 namespace nix {
 
-PublicKeys getDefaultPublicKeys()
+PublicKeys getDefaultPublicKeys(const Settings & settings)
 {
     PublicKeys publicKeys;
 

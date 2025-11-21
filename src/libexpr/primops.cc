@@ -1819,8 +1819,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        Unless we are in read-only mode, that is, in which case we do not
        write anything. Users commonly do this to speed up evaluation in
        contexts where they don't actually want to build anything. */
-    auto drvPath =
-        settings.readOnlyMode ? computeStorePath(*state.store, drv) : state.store->writeDerivation(drv, state.repair);
+    auto drvPath = state.settings.storeSettings.readOnlyMode ? computeStorePath(*state.store, drv)
+                                                             : state.store->writeDerivation(drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
@@ -1935,7 +1935,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     if (!state.store->isInStore(path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", path).atPos(pos).debugThrow();
     auto path2 = state.store->toStorePath(path.abs()).first;
-    if (!settings.readOnlyMode)
+    if (!state.settings.storeSettings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(NixStringContextElem::Opaque{.path = path2});
     v.mkString(path.abs(), context, state.mem);
@@ -2676,23 +2676,24 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
                 .debugThrow();
     }
 
-    auto storePath = settings.readOnlyMode ? state.store->makeFixedOutputPathFromCA(
-                                                 name,
-                                                 TextInfo{
-                                                     .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                     .references = std::move(refs),
-                                                 })
-                                           : ({
-                                                 StringSource s{contents};
-                                                 state.store->addToStoreFromDump(
-                                                     s,
-                                                     name,
-                                                     FileSerialisationMethod::Flat,
-                                                     ContentAddressMethod::Raw::Text,
-                                                     HashAlgorithm::SHA256,
-                                                     refs,
-                                                     state.repair);
-                                             });
+    auto storePath = state.settings.storeSettings.readOnlyMode
+                         ? state.store->makeFixedOutputPathFromCA(
+                               name,
+                               TextInfo{
+                                   .hash = hashString(HashAlgorithm::SHA256, contents),
+                                   .references = std::move(refs),
+                               })
+                         : ({
+                               StringSource s{contents};
+                               state.store->addToStoreFromDump(
+                                   s,
+                                   name,
+                                   FileSerialisationMethod::Flat,
+                                   ContentAddressMethod::Raw::Text,
+                                   HashAlgorithm::SHA256,
+                                   refs,
+                                   state.repair);
+                           });
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -2836,23 +2837,24 @@ static void addPath(
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
             // FIXME: support refs in fetchToStore()?
-            auto dstPath = refs.empty() ? fetchToStore(
-                                              state.fetchSettings,
-                                              *state.store,
-                                              path.resolveSymlinks(),
-                                              settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-                                              name,
-                                              method,
-                                              filter.get(),
-                                              state.repair)
-                                        : state.store->addToStore(
-                                              name,
-                                              path.resolveSymlinks(),
-                                              method,
-                                              HashAlgorithm::SHA256,
-                                              refs,
-                                              filter ? *filter.get() : defaultPathFilter,
-                                              state.repair);
+            auto dstPath = refs.empty()
+                               ? fetchToStore(
+                                     state.fetchSettings,
+                                     *state.store,
+                                     path.resolveSymlinks(),
+                                     state.settings.storeSettings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                                     name,
+                                     method,
+                                     filter.get(),
+                                     state.repair)
+                               : state.store->addToStore(
+                                     name,
+                                     path.resolveSymlinks(),
+                                     method,
+                                     HashAlgorithm::SHA256,
+                                     refs,
+                                     filter ? *filter.get() : defaultPathFilter,
+                                     state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.error<EvalError>("store path mismatch in (possibly filtered) path added from '%s'", path)
                     .atPos(pos)

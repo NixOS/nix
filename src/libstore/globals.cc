@@ -79,10 +79,6 @@ LogFileSettings::LogFileSettings()
 {
 }
 
-Settings settings;
-
-static GlobalConfig::Register rSettings(&settings);
-
 Settings::Settings()
     : nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixDaemonSocketFile(canonPath(getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))

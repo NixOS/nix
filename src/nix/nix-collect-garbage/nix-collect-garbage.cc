@@ -102,7 +102,7 @@ static int main_nix_collect_garbage(int argc, char ** argv)
                 removeOldGenerations(dir);
         }
 
-        auto store = openStore();
+        auto store = openStore(settings);
         auto & gcStore = require<GcStore>(*store);
         options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
         GCResults results;

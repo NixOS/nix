@@ -13,6 +13,9 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/export-import.hh"
 
+// TODO get rid of this, and stop relying on global store settings.
+#include "nix/main/shared.hh"
+
 #include <sodium.h>
 #include <nlohmann/json.hpp>
 
@@ -62,13 +65,13 @@ StoreWrapper::new(char * s = nullptr)
                 libStoreInitialized = true;
             }
             if (items == 1) {
-                _store = openStore();
+                _store = openStore(settings);
                 RETVAL = new StoreWrapper {
                     .store = ref<Store>{_store}
                 };
             } else {
                 RETVAL = new StoreWrapper {
-                    .store = openStore(s)
+                    .store = openStore(settings, s)
                 };
             }
         } catch (Error & e) {
@@ -424,4 +427,4 @@ StoreWrapper::addTempRoot(char * storePath)
 
 SV * getStoreDir()
     PPCODE:
-        XPUSHs(sv_2mortal(newSVpv(resolveStoreConfig(StoreReference{settings.storeUri.get()})->storeDir.c_str(), 0)));
+        XPUSHs(sv_2mortal(newSVpv(resolveStoreConfig(settings, StoreReference{settings.storeUri.get()})->storeDir.c_str(), 0)));

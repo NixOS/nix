@@ -1410,7 +1410,7 @@ static int main_nix_env(int argc, char ** argv)
         globals.instSource.type = srcUnknown;
         globals.instSource.systemFilter = "*";
 
-        std::filesystem::path nixExprPath = getNixDefExpr();
+        std::filesystem::path nixExprPath = getNixDefExpr(settings);
 
         if (!pathExists(nixExprPath)) {
             try {
@@ -1509,7 +1509,7 @@ static int main_nix_env(int argc, char ** argv)
         if (!op)
             throw UsageError("no operation specified");
 
-        auto store = openStore();
+        auto store = openStore(settings);
 
         globals.state =
             std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));

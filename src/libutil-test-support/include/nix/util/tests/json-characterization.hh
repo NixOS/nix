@@ -86,9 +86,11 @@ void checkpointJson(CharacterizationTest & test, PathView testStem, const T & go
 /**
  * Specialization for when we need to do "JSON -> `ref<T>`" in one
  * direction, but "`const T &` -> JSON" in the other direction.
+ *
+ * Additional arguments are forwarded to `from_json` (e.g., settings).
  */
 template<typename T>
-void checkpointJson(CharacterizationTest & test, PathView testStem, const ref<T> & got)
+void checkpointJson(CharacterizationTest & test, PathView testStem, const ref<T> & got, auto... args)
 {
     using namespace nlohmann;
 
@@ -103,7 +105,7 @@ void checkpointJson(CharacterizationTest & test, PathView testStem, const ref<T>
     } else {
         json expectedJson = json::parse(readFile(file));
         ASSERT_EQ(gotJson, expectedJson);
-        ref<T> expected = adl_serializer<ref<T>>::from_json(expectedJson);
+        ref<T> expected = adl_serializer<ref<T>>::from_json(args..., expectedJson);
         ASSERT_EQ(*got, *expected);
     }
 }
@@ -137,9 +139,10 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
         nix::writeJsonTest(*this, testStem, value);
     }
 
-    void checkpointJson(PathView testStem, const T & value)
+    template<typename... Args>
+    void checkpointJson(PathView testStem, const T & value, Args &&... args)
     {
-        nix::checkpointJson(*this, testStem, value);
+        nix::checkpointJson(*this, testStem, value, std::forward<Args>(args)...);
     }
 };
 

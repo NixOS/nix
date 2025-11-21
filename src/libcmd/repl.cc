@@ -564,7 +564,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             settings.readOnlyMode = true;
             Finally roModeReset([&]() { settings.readOnlyMode = false; });
             RunPager pager;
-            auto log = fetchBuildLog(state->store, drvPath, drvPathRaw);
+            auto log = fetchBuildLog(settings, state->store, drvPath, drvPathRaw);
             logger->writeToStdout(log);
         } else {
             runNix("nix-shell", {drvPathRaw});

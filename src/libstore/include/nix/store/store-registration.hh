@@ -14,6 +14,7 @@
  */
 
 #include "nix/store/store-api.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -40,7 +41,10 @@ struct StoreFactory
      * whatever comes after `<scheme>://` and before `?<query-params>`.
      */
     std::function<ref<StoreConfig>(
-        std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
+        Settings & settings,
+        std::string_view scheme,
+        std::string_view authorityPath,
+        const Store::Config::Params & params)>
         parseConfig;
 
     /**
@@ -64,10 +68,13 @@ struct Implementations
             .doc = TConfig::doc(),
             .uriSchemes = TConfig::uriSchemes(),
             .experimentalFeature = TConfig::experimentalFeature(),
-            .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
-                return make_ref<TConfig>(scheme, uri, params);
+            .parseConfig = ([](Settings & settings, auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
+                return make_ref<TConfig>(settings, scheme, uri, params);
             }),
-            .getConfig = ([]() -> ref<StoreConfig> { return make_ref<TConfig>(Store::Config::Params{}); }),
+            .getConfig = ([]() -> ref<StoreConfig> {
+                Settings settings;
+                return make_ref<TConfig>(settings, Store::Config::Params{});
+            }),
         };
         auto [it, didInsert] = registered().insert({TConfig::name(), std::move(factory)});
         if (!didInsert) {

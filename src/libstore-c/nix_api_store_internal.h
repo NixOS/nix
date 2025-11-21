@@ -5,6 +5,8 @@
 
 extern "C" {
 
+extern nix::Settings cStoreSettings;
+
 struct Store
 {
     nix::ref<nix::Store> ptr;

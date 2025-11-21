@@ -76,8 +76,8 @@ std::pair<StorePath, Hash> fetchToStore2(
     auto [storePath, hash] =
         mode == FetchMode::DryRun
             ? [&]() {
-                  auto [storePath, hash] =
-                      store.computeStorePath(name, path, method, HashAlgorithm::SHA256, {}, filter2);
+                  auto [storePath, hash] = store.computeStorePath(
+                      store.config.settings, name, path, method, HashAlgorithm::SHA256, {}, filter2);
                   debug(
                       "hashed '%s' to '%s' (hash '%s')",
                       path,

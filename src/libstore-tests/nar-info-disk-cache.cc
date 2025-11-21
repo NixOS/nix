@@ -1,10 +1,12 @@
-#include "nix/store/nar-info-disk-cache.hh"
-
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 #include "nix/store/globals.hh"
 #include "nix/store/sqlite.hh"
 #include <sqlite3.h>
+
+#include "nix/store/globals.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 
 namespace nix {
 
@@ -23,6 +25,8 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     int barId;
     SQLite db;
     SQLiteStmt getIds;
+
+    Settings settings;
 
     {
         auto cache = NarInfoDiskCache::getTest(

@@ -209,7 +209,7 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
             {.msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
              .pos = state.positions[pos]});
 
-    auto fromStore = openStore(std::move(storeRef));
+    auto fromStore = openStore(state.settings.storeSettings, std::move(storeRef));
 
     if (toPath)
         runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, *toPath, v);

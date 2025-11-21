@@ -4,6 +4,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
+#include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
@@ -75,7 +76,7 @@ ref<StoreConfig> StoreConfigCommand::getStoreConfig()
 
 ref<StoreConfig> StoreConfigCommand::createStoreConfig()
 {
-    return resolveStoreConfig(StoreReference{settings.storeUri.get()});
+    return resolveStoreConfig(settings, StoreReference{settings.storeUri.get()});
 }
 
 void StoreConfigCommand::run()
@@ -129,7 +130,7 @@ CopyCommand::CopyCommand()
 
 ref<StoreConfig> CopyCommand::createStoreConfig()
 {
-    return !srcUri ? StoreCommand::createStoreConfig() : resolveStoreConfig(StoreReference{*srcUri});
+    return !srcUri ? StoreCommand::createStoreConfig() : resolveStoreConfig(settings, StoreReference{*srcUri});
 }
 
 ref<Store> CopyCommand::getDstStore()
@@ -137,7 +138,7 @@ ref<Store> CopyCommand::getDstStore()
     if (!srcUri && !dstUri)
         throw UsageError("you must pass '--from' and/or '--to'");
 
-    return !dstUri ? openStore() : openStore(StoreReference{*dstUri});
+    return !dstUri ? openStore(settings) : openStore(settings, StoreReference{*dstUri});
 }
 
 EvalCommand::EvalCommand()
@@ -159,7 +160,7 @@ EvalCommand::~EvalCommand()
 ref<Store> EvalCommand::getEvalStore()
 {
     if (!evalStore)
-        evalStore = evalStoreUrl ? openStore(StoreReference{*evalStoreUrl}) : getStore();
+        evalStore = evalStoreUrl ? openStore(settings, StoreReference{*evalStoreUrl}) : getStore();
     return ref<Store>(evalStore);
 }
 

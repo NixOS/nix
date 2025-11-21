@@ -31,11 +31,16 @@
 
 #include "nix/util/exit.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/config-global.hh"
 
 #include "main-config-private.hh"
 #include "nix/expr/config.hh"
 
 namespace nix {
+
+Settings settings;
+
+static GlobalConfig::Register rSettings(&settings);
 
 char ** savedArgv;
 
@@ -335,8 +340,8 @@ void printVersion(const std::string & programName)
         std::cout << "System configuration file: " << nixConfFile() << "\n";
         std::cout << "User configuration files: "
                   << os_string_to_string(ExecutablePath{.directories = nixUserConfFiles()}.render()) << "\n";
-        std::cout << "Store directory: " << resolveStoreConfig(StoreReference{settings.storeUri.get()})->storeDir
-                  << "\n";
+        std::cout << "Store directory: "
+                  << resolveStoreConfig(settings, StoreReference{settings.storeUri.get()})->storeDir << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
     }
     throw Exit();

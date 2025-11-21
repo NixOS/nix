@@ -49,10 +49,10 @@ static int main_nix_copy_closure(int argc, char ** argv)
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
-        auto remoteConfig = make_ref<LegacySSHStoreConfig>("ssh", sshHost, LegacySSHStoreConfig::Params{});
+        auto remoteConfig = make_ref<LegacySSHStoreConfig>(settings, "ssh", sshHost, LegacySSHStoreConfig::Params{});
         remoteConfig->compress |= gzip;
-        auto to = toMode ? remoteConfig->openStore() : openStore();
-        auto from = toMode ? openStore() : remoteConfig->openStore();
+        auto to = toMode ? remoteConfig->openStore() : openStore(settings);
+        auto from = toMode ? openStore(settings) : remoteConfig->openStore();
 
         RealisedPath::Set storePaths2;
         for (auto & path : storePaths)

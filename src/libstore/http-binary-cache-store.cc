@@ -5,7 +5,6 @@
 #include "nix/store/sqlite.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
-#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -21,8 +20,9 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 }
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
+    nix::Settings & settings, std::string_view scheme, std::string_view _cacheUri, const Params & params)
     : HttpBinaryCacheStoreConfig(
+          settings,
           parseURL(
               std::string{scheme} + "://"
               + (!_cacheUri.empty()
@@ -32,9 +32,10 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
 {
 }
 
-HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
+HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
+    nix::Settings & settings, ParsedURL _cacheUri, const Params & params)
+    : StoreConfig(settings, params)
+    , BinaryCacheStoreConfig(settings, params)
     , cacheUri(std::move(_cacheUri))
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == "")
@@ -66,7 +67,8 @@ HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer>
     , fileTransfer{fileTransfer}
     , config{config}
 {
-    diskCache = NarInfoDiskCache::get(settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL});
+    diskCache = NarInfoDiskCache::get(
+        config->settings.getNarInfoDiskCacheSettings(), {.useWAL = config->settings.useSQLiteWAL});
 }
 
 void HttpBinaryCacheStore::init()
@@ -104,7 +106,7 @@ std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const 
 void HttpBinaryCacheStore::maybeDisable()
 {
     auto state(_state.lock());
-    if (state->enabled && settings.getWorkerSettings().tryFallback) {
+    if (state->enabled && config->settings.getWorkerSettings().tryFallback) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
         state->enabled = false;

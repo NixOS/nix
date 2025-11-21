@@ -5,6 +5,8 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
 
+#include "nix/store/tests/test-main.hh"
+
 #include <git2.h>
 #include <gtest/gtest.h>
 
@@ -180,13 +182,15 @@ TEST_F(GitTest, submodulePeriodSupport)
     // 6) Commit the addition in super
     commitAll(super.get(), "Add submodule with branch='.'");
 
-    auto store = [] {
-        auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
+    auto settings = getTestSettings();
+
+    auto store = [&] {
+        auto cfg = make_ref<DummyStoreConfig>(settings, StoreReference::Params{});
         cfg->readOnly = false;
         return cfg->openStore();
     }();
 
-    auto settings = fetchers::Settings{};
+    auto fetchSettings = fetchers::Settings{settings};
     auto input = fetchers::Input::fromAttrs(
         settings,
         {
@@ -196,7 +200,7 @@ TEST_F(GitTest, submodulePeriodSupport)
             {"ref", "main"},
         });
 
-    auto [accessor, i] = input.getAccessor(settings, *store);
+    auto [accessor, i] = input.getAccessor(fetchSettings, *store);
 
     ASSERT_EQ(accessor->readFile(CanonPath("deps/sub/lib.txt")), "hello from submodule\n");
 }

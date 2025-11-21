@@ -26,18 +26,18 @@ public:
     }
 
 protected:
-    LibExprTest(ref<Store> store, auto && makeEvalSettings)
-        : LibStoreTest()
-        , evalSettings(makeEvalSettings(readOnlyMode))
+    LibExprTest(auto && makeEvalSettings, auto &&... args)
+        : LibStoreTest(args...)
+        , evalSettings(makeEvalSettings(settings))
         , state({}, store, fetchSettings, evalSettings, nullptr)
     {
     }
 
     LibExprTest()
-        : LibExprTest(openStore("dummy://"), [](bool & readOnlyMode) {
-            EvalSettings settings{readOnlyMode};
-            settings.nixPath = {};
-            return settings;
+        : LibExprTest([](Settings & settings) {
+            EvalSettings evalSettings{settings};
+            evalSettings.nixPath = {};
+            return evalSettings;
         })
     {
     }
@@ -66,8 +66,8 @@ protected:
     }
 
     bool readOnlyMode = true;
-    fetchers::Settings fetchSettings{};
-    EvalSettings evalSettings{readOnlyMode};
+    fetchers::Settings fetchSettings{settings};
+    EvalSettings evalSettings{settings};
     EvalState state;
 };
 
