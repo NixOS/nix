@@ -85,9 +85,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     Sync<State> _state;
 
     NarInfoDiskCacheImpl(
-        const Settings & settings,
-        SQLiteSettings sqliteSettings,
-        Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
+        const Settings & settings, SQLiteSettings sqliteSettings, Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
         : NarInfoDiskCache{settings}
     {
         auto state(_state.lock());

@@ -249,7 +249,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     evalSettings.pureEval = true;
     EvalState state(
         {},
-        openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
+        openStore(settings, StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
         fetchSettings,
         evalSettings);
 
@@ -454,7 +454,7 @@ void mainWrapped(int argc, char ** argv)
         evalSettings.pureEval = false;
         EvalState state(
             {},
-            openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
+            openStore(settings, StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
             fetchSettings,
             evalSettings);
         auto builtinsJson = nlohmann::json::object();

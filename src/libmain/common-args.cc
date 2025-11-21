@@ -8,6 +8,7 @@
 #include "nix/main/loggers.hh"
 #include "nix/util/util.hh"
 #include "nix/main/plugin.hh"
+#include "nix/main/shared.hh"
 
 namespace nix {
 

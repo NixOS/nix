@@ -19,12 +19,12 @@
 
 namespace nix {
 
-fetchers::Settings fetchSettings;
+fetchers::Settings fetchSettings{settings};
 
 static GlobalConfig::Register rFetchSettings(&fetchSettings);
 
 EvalSettings evalSettings{
-    settings.readOnlyMode,
+    settings,
     {
         {
             "flake",
@@ -135,7 +135,7 @@ MixEvalArgs::MixEvalArgs()
             fetchers::overrideRegistry(from.input, to.input, extraAttrs);
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
-            completeFlakeRef(completions, openStore(), prefix);
+            completeFlakeRef(completions, openStore(settings), prefix);
         }},
     });
 

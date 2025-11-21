@@ -18,9 +18,10 @@
 
 namespace nix {
 
-LegacySSHStoreConfig::LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, ParsedURL::Authority::parse(authority), params)
+LegacySSHStoreConfig::LegacySSHStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+    : StoreConfig(settings, params)
+    , CommonSSHStoreConfig(settings, scheme, ParsedURL::Authority::parse(authority), params)
 {
 }
 
@@ -180,7 +181,7 @@ void LegacySSHStore::narFromPath(const StorePath & path, std::function<void(Sour
     conn->narFromPath(*this, path, fun);
 }
 
-static ServeProto::BuildOptions buildSettings()
+static ServeProto::BuildOptions buildSettings(const Settings & settings)
 {
     return {
         .maxSilentTime = settings.getWorkerSettings().maxSilentTime,
@@ -196,7 +197,7 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
 {
     auto conn(connections->get());
 
-    conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings());
+    conn->putBuildDerivationRequest(*this, drvPath, drv, buildSettings(config->settings));
 
     return conn->getBuildDerivationResponse(*this);
 }
@@ -240,7 +241,7 @@ void LegacySSHStore::buildPaths(
     }
     conn->to << ss;
 
-    ServeProto::write(*this, *conn, buildSettings());
+    ServeProto::write(*this, *conn, buildSettings(config->settings));
 
     conn->to.flush();
 

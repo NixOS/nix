@@ -360,26 +360,26 @@ StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivat
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::canBuildLocally(Store & localStore, const BasicDerivation & drv) const
+bool DerivationOptions<Input>::canBuildLocally(const StoreConfig & localStoreConfig, const BasicDerivation & drv) const
 {
-    if (drv.platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv.platform)
-        && !drv.isBuiltin())
+    if (drv.platform != localStoreConfig.settings.thisSystem.get()
+        && !localStoreConfig.settings.extraPlatforms.get().count(drv.platform) && !drv.isBuiltin())
         return false;
 
-    if (settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
+    if (localStoreConfig.settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
         return false;
 
     for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.config.systemFeatures.get().count(feature))
+        if (!localStoreConfig.systemFeatures.get().count(feature))
             return false;
 
     return true;
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::willBuildLocally(Store & localStore, const BasicDerivation & drv) const
+bool DerivationOptions<Input>::willBuildLocally(const StoreConfig & localStoreConfig, const BasicDerivation & drv) const
 {
-    return preferLocalBuild && canBuildLocally(localStore, drv);
+    return preferLocalBuild && canBuildLocally(localStoreConfig, drv);
 }
 
 template<typename Input>

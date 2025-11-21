@@ -3,6 +3,12 @@
 
 #include <string>
 
+namespace nix {
+
+class Settings;
+
+}
+
 namespace nix::linux {
 
 struct PersonalityArgs

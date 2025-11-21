@@ -12,19 +12,22 @@ namespace {
 class WriteDerivationTest : public LibStoreTest
 {
 protected:
-    WriteDerivationTest(ref<DummyStoreConfig> config_)
-        : LibStoreTest(config_->openDummyStore())
-        , config(std::move(config_))
+    WriteDerivationTest(auto && makeConfig)
+        : LibStoreTest([&](auto & settings) {
+            this->config = makeConfig(settings);
+            return config->openDummyStore();
+        })
     {
         config->readOnly = false;
     }
 
     WriteDerivationTest()
-        : WriteDerivationTest(make_ref<DummyStoreConfig>(DummyStoreConfig::Params{}))
+        : WriteDerivationTest(
+              [](auto & settings) { return make_ref<DummyStoreConfig>(settings, DummyStoreConfig::Params{}); })
     {
     }
 
-    ref<DummyStoreConfig> config;
+    std::shared_ptr<DummyStoreConfig> config;
 };
 
 static Derivation makeSimpleDrv()

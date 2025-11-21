@@ -22,9 +22,9 @@ Worker::Worker(Store & store, Store & evalStore)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
     , evalStore(evalStore)
-    , settings(nix::settings.getWorkerSettings())
-    , getSubstituters{[] {
-        return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
+    , settings(store.config.settings.getWorkerSettings())
+    , getSubstituters{[&] {
+        return settings.useSubstitutes ? getDefaultSubstituters(store.config.settings) : std::list<ref<Store>>{};
     }}
 {
     nrLocalBuilds = 0;
@@ -367,7 +367,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else if (awake.empty() && 0U == settings.maxBuildJobs) {
-            if (getMachines().empty())
+            if (getMachines(store.config.settings).empty())
                 throw Error(
                     "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
                     "\n"

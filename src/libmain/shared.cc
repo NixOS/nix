@@ -27,11 +27,16 @@
 
 #include "nix/util/exit.hh"
 #include "nix/util/strings.hh"
+#include "nix/util/config-global.hh"
 
 #include "main-config-private.hh"
 #include "nix/expr/config.hh"
 
 namespace nix {
+
+Settings settings;
+
+static GlobalConfig::Register rSettings(&settings);
 
 char ** savedArgv;
 

@@ -13,6 +13,13 @@
 
 namespace nix {
 
+class Settings;
+
+// FIXME: don't use a global variable.
+extern Settings settings;
+
+int handleExceptions(const std::string & programName, std::function<void()> fun);
+
 /**
  * Don't forget to call initPlugins() after settings are initialized!
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
