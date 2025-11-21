@@ -200,7 +200,7 @@ nix_value * nix_locked_flake_get_output_attrs(
     nix_clear_err(context);
     try {
         auto v = nix_alloc_value(context, evalState);
-        nix::flake::callFlake(evalState->state, *lockedFlake->lockedFlake, v->value);
+        nix::flake::callFlake(evalState->state, *lockedFlake->lockedFlake, *v->value);
         return v;
     }
     NIXC_CATCH_ERRS_NULL

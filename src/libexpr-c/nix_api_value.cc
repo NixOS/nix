@@ -20,7 +20,7 @@ static const nix::Value & check_value_not_null(const nix_value * value)
     if (!value) {
         throw std::runtime_error("nix_value is null");
     }
-    return *((const nix::Value *) value);
+    return *value->value;
 }
 
 static nix::Value & check_value_not_null(nix_value * value)
@@ -28,7 +28,7 @@ static nix::Value & check_value_not_null(nix_value * value)
     if (!value) {
         throw std::runtime_error("nix_value is null");
     }
-    return value->value;
+    return *value->value;
 }
 
 static const nix::Value & check_value_in(const nix_value * value)
@@ -58,9 +58,14 @@ static nix::Value & check_value_out(nix_value * value)
     return v;
 }
 
-static inline nix_value * as_nix_value_ptr(nix::Value * v)
+static inline nix_value * new_nix_value(nix::Value * v, nix::EvalMemory & mem)
 {
-    return reinterpret_cast<nix_value *>(v);
+    nix_value * ret = new (mem.allocBytes(sizeof(nix_value))) nix_value{
+        .value = v,
+        .mem = &mem,
+    };
+    nix_gc_incref(nullptr, ret);
+    return ret;
 }
 
 /**
@@ -69,7 +74,13 @@ static inline nix_value * as_nix_value_ptr(nix::Value * v)
  * Deals with errors and converts arguments from C++ into C types.
  */
 static void nix_c_primop_wrapper(
-    PrimOpFun f, void * userdata, nix::EvalState & state, const nix::PosIdx pos, nix::Value ** args, nix::Value & v)
+    PrimOpFun f,
+    void * userdata,
+    int arity,
+    nix::EvalState & state,
+    const nix::PosIdx pos,
+    nix::Value ** args,
+    nix::Value & v)
 {
     nix_c_context ctx;
 
@@ -85,8 +96,15 @@ static void nix_c_primop_wrapper(
     // ok because we don't see a need for this yet (e.g. inspecting thunks,
     // or maybe something to make blackholes work better; we don't know).
     nix::Value vTmp;
+    nix_value * vTmpPtr = new_nix_value(&vTmp, state.mem);
 
-    f(userdata, &ctx, (EvalState *) &state, (nix_value **) args, (nix_value *) &vTmp);
+    std::vector<nix_value *> external_args;
+    external_args.reserve(arity);
+    for (int i = 0; i < arity; i++) {
+        nix_value * external_arg = new_nix_value(args[i], state.mem);
+        external_args.push_back(external_arg);
+    }
+    f(userdata, &ctx, (EvalState *) &state, external_args.data(), vTmpPtr);
 
     if (ctx.last_err_code != NIX_OK) {
         /* TODO: Throw different errors depending on the error code */
@@ -135,7 +153,7 @@ PrimOp * nix_alloc_primop(
                     .args = {},
                     .arity = (size_t) arity,
                     .doc = doc,
-                    .fun = std::bind(nix_c_primop_wrapper, fun, user_data, _1, _2, _3, _4)};
+                    .fun = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
         if (args)
             for (size_t i = 0; args[i]; i++)
                 p->args.emplace_back(*args);
@@ -160,8 +178,7 @@ nix_value * nix_alloc_value(nix_c_context * context, EvalState * state)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix_value * res = as_nix_value_ptr(state->state.allocValue());
-        nix_gc_incref(nullptr, res);
+        nix_value * res = new_nix_value(state->state.allocValue(), state->state.mem);
         return res;
     }
     NIXC_CATCH_ERRS_NULL
@@ -331,10 +348,10 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
             return nullptr;
         }
         auto * p = v.listView()[ix];
-        nix_gc_incref(nullptr, p);
-        if (p != nullptr)
-            state->state.forceValue(*p, nix::noPos);
-        return as_nix_value_ptr(p);
+        if (p == nullptr)
+            return nullptr;
+        state->state.forceValue(*p, nix::noPos);
+        return new_nix_value(p, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -352,9 +369,8 @@ nix_get_list_byidx_lazy(nix_c_context * context, const nix_value * value, EvalSt
             return nullptr;
         }
         auto * p = v.listView()[ix];
-        nix_gc_incref(nullptr, p);
         // Note: intentionally NOT calling forceValue() to keep the element lazy
-        return as_nix_value_ptr(p);
+        return new_nix_value(p, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -369,9 +385,8 @@ nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value
         nix::Symbol s = state->state.symbols.create(name);
         auto attr = v.attrs()->get(s);
         if (attr) {
-            nix_gc_incref(nullptr, attr->value);
             state->state.forceValue(*attr->value, nix::noPos);
-            return as_nix_value_ptr(attr->value);
+            return new_nix_value(attr->value, state->state.mem);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
         return nullptr;
@@ -390,9 +405,8 @@ nix_get_attr_byname_lazy(nix_c_context * context, const nix_value * value, EvalS
         nix::Symbol s = state->state.symbols.create(name);
         auto attr = v.attrs()->get(s);
         if (attr) {
-            nix_gc_incref(nullptr, attr->value);
             // Note: intentionally NOT calling forceValue() to keep the attribute lazy
-            return as_nix_value_ptr(attr->value);
+            return new_nix_value(attr->value, state->state.mem);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
         return nullptr;
@@ -440,9 +454,8 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
         }
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
-        nix_gc_incref(nullptr, a.value);
         state->state.forceValue(*a.value, nix::noPos);
-        return as_nix_value_ptr(a.value);
+        return new_nix_value(a.value, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -461,9 +474,8 @@ nix_value * nix_get_attr_byidx_lazy(
         }
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
-        nix_gc_incref(nullptr, a.value);
         // Note: intentionally NOT calling forceValue() to keep the attribute lazy
-        return as_nix_value_ptr(a.value);
+        return new_nix_value(a.value, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL
 }
