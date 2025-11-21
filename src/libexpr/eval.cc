@@ -2188,6 +2188,8 @@ void EvalState::forceValueDeep(Value & v)
     std::set<const Value *> seen;
 
     [&, &state(*this)](this const auto & recurse, Value & v) {
+        auto _level = state.addCallDepth(v.determinePos(noPos));
+
         if (!seen.insert(&v).second)
             return;
 
