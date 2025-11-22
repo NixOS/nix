@@ -1025,6 +1025,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
+    ReceiveInterrupts receiveInterrupts;
 #endif
 
     /* Exchange the greeting. */
