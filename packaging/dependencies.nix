@@ -74,4 +74,14 @@ scope: {
         buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
+
+  libgit2 = pkgs.libgit2.overrideAttrs (attrs: {
+    cmakeFlags = (attrs.cmakeFlags or [ ]) ++ [
+      (lib.mesonBool "EXPERIMENTAL_SHA256" true)
+    ];
+
+    postInstall = (attrs.postInstall or "") + ''
+      substituteInPlace $(find $dev/include -type f) --replace-quiet '#include "git2/' '#include "git2-experimental/'
+    '';
+  });
 }

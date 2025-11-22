@@ -171,4 +171,14 @@ struct Setter
  */
 bool isLegalRefName(const std::string & refName);
 
+/**
+ * Parse a base16-encoded git hash string and determine the hash
+ * algorithm based on the length (40 chars = SHA1, 64 chars = SHA256).
+ *
+ * @note For Nix-native information we should *not* do length tricks,
+ * but instead always rely on an explicit algorithm. This hack should be
+ * only for foreign hash literals.
+ */
+Hash parseGitHash(std::string_view hashStr);
+
 } // namespace nix

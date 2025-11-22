@@ -23,7 +23,7 @@ struct IndirectInputScheme : InputScheme
         if (path.size() == 1) {
         } else if (path.size() == 2) {
             if (std::regex_match(path[1], revRegex))
-                rev = Hash::parseAny(path[1], HashAlgorithm::SHA1);
+                rev = parseGitHash(path[1]);
             else if (isLegalRefName(path[1]))
                 ref = path[1];
             else
@@ -34,7 +34,7 @@ struct IndirectInputScheme : InputScheme
             ref = path[1];
             if (!std::regex_match(path[2], revRegex))
                 throw BadURL("in flake URL '%s', '%s' is not a commit hash", url, path[2]);
-            rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
+            rev = parseGitHash(path[2]);
         } else
             throw BadURL("GitHub URL '%s' is invalid", url);
 

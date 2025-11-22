@@ -5,7 +5,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
 
-#include <git2/repository.h>
+#include <git2-experimental/repository.h>
 
 #include <nlohmann/json_fwd.hpp>
 

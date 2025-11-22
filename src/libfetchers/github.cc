@@ -48,7 +48,7 @@ struct GitArchiveInputScheme : InputScheme
         auto size = path.size();
         if (size == 3) {
             if (std::regex_match(path[2], revRegex))
-                rev = Hash::parseAny(path[2], HashAlgorithm::SHA1);
+                rev = parseGitHash(path[2]);
             else if (isLegalRefName(path[2]))
                 ref = path[2];
             else
@@ -74,7 +74,7 @@ struct GitArchiveInputScheme : InputScheme
             if (name == "rev") {
                 if (rev)
                     throw BadURL("URL '%s' contains multiple commit hashes", url);
-                rev = Hash::parseAny(value, HashAlgorithm::SHA1);
+                rev = parseGitHash(value);
             } else if (name == "ref") {
                 if (!isLegalRefName(value))
                     throw BadURL("URL '%s' contains an invalid branch/tag name", url);
@@ -435,8 +435,8 @@ struct GitHubInputScheme : GitArchiveInputScheme
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         return RefInfo{
-            .rev = Hash::parseAny(std::string{json["sha"]}, HashAlgorithm::SHA1),
-            .treeHash = Hash::parseAny(std::string{json["commit"]["tree"]["sha"]}, HashAlgorithm::SHA1)};
+            .rev = parseGitHash(std::string{json["sha"]}),
+            .treeHash = parseGitHash(std::string{json["commit"]["tree"]["sha"]})};
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
@@ -517,7 +517,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
         if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
-            return RefInfo{.rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)};
+            return RefInfo{.rev = parseGitHash(std::string(json[0]["id"]))};
         }
         if (json.is_array() && json.size() == 0) {
             throw Error("No commits returned by GitLab API -- does the git ref really exist?");
@@ -624,7 +624,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         if (!id)
             throw BadURL("in '%d', couldn't find ref '%d'", input.to_string(), ref);
 
-        return RefInfo{.rev = Hash::parseAny(*id, HashAlgorithm::SHA1)};
+        return RefInfo{.rev = parseGitHash(*id)};
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
