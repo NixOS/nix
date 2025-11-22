@@ -18,6 +18,7 @@
 #include "nix/store/keys.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
@@ -56,16 +57,100 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
+#include "nix/util/json-utils.hh"
 
 #include "store-config-private.hh"
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+constexpr static const LocalStoreConfigT<config::SettingInfoWithDefault> localStoreConfigDescriptions = {
+    .requireSigs{
+        {
+            .name = "require-sigs",
+            .description = "Whether store paths copied into this store should have a trusted signature.",
+        },
+        {
+            .makeDefault = [] { return settings.requireSigs.get(); },
+        },
+    },
+    .readOnly{
+        {
+            .name = "read-only",
+            .description = R"(
+              Allow this store to be opened when its [database](@docroot@/glossary.md#gloss-nix-database) is on a read-only filesystem.
+
+              Normally Nix attempts to open the store database in read-write mode, even for querying (when write access is not needed), causing it to fail if the database is on a read-only filesystem.
+
+              Enable read-only mode to disable locking and open the SQLite database with the [`immutable` parameter](https://www.sqlite.org/c3ref/open.html) set.
+
+              > **Warning**
+              > Do not use this unless the filesystem is read-only.
+              >
+              > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
+              > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .buildDir{
+        {
+            .name = "build-dir",
+            .description = R"(
+              The directory on the host, in which derivations' temporary build directories are created.
+
+              If not set, Nix will use the `builds` subdirectory of its configured state directory.
+
+              Note that builds are often performed by the Nix daemon, so its `build-dir` applies.
+
+              Nix will create this directory automatically with suitable permissions if it does not exist.
+              Otherwise its permissions must allow all users to traverse the directory (i.e. it must have `o+x` set, in unix parlance) for non-sandboxed builds to work correctly.
+
+              This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
+
+              If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](@docroot@/command-ref/conf-file.md#conf-sandbox-build-dir).
+
+              > **Warning**
+              >
+              > `build-dir` must not be set to a world-writable directory.
+              > Placing temporary build directories in a world-writable place allows other users to access or modify build data that is currently in use.
+              > This alone is merely an impurity, but combined with another factor this has allowed malicious derivations to escape the build sandbox.
+           )",
+        },
+        {
+            .makeDefault = []() -> std::optional<Path> { return std::nullopt; },
+        },
+    },
+};
+
+#define LOCAL_STORE_CONFIG_FIELDS(X) X(requireSigs), X(readOnly), X(buildDir),
+
+MAKE_PARSE(LocalStoreConfig, localStoreConfig, LOCAL_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(LocalStoreConfig, localStoreConfig, LOCAL_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap LocalStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = localStoreConfigDescriptions;
+        ret.merge(decltype(ret){LOCAL_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    return ret;
+}
+
+LocalStore::Config::LocalStoreConfig(
+    std::string_view scheme, std::string_view authority, const StoreConfig::Params & params)
+    : Store::Config(params)
+    , LocalFSStore::Config(*this, authority, params)
+    , LocalStoreConfigT<config::PlainValue>{localStoreConfigApplyParse(params)}
 {
 }
+
+LocalStoreConfig::LocalStoreConfig(const LocalStoreConfig &) = default;
 
 std::string LocalStoreConfig::doc()
 {
@@ -74,21 +159,16 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
-Path LocalBuildStoreConfig::getBuildDir() const
+Path LocalStoreConfig::getBuildDir() const
 {
     return settings.buildDir.get().has_value() ? *settings.buildDir.get()
-           : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+           : buildDir.has_value()              ? *buildDir
+                                               : stateDir + "/builds";
 }
 
 ref<Store> LocalStore::Config::openStore() const
 {
     return make_ref<LocalStore>(ref{shared_from_this()});
-}
-
-bool LocalStoreConfig::getDefaultRequireSigs()
-{
-    return settings.requireSigs;
 }
 
 struct LocalStore::State::Stmts
@@ -130,7 +210,7 @@ LocalStore::LocalStore(ref<const Config> config)
     state->stmts = std::make_unique<State::Stmts>();
 
     /* Create missing state directories if they don't already exist. */
-    createDirs(config->realStoreDir.get());
+    createDirs(config->realStoreDir);
     if (config->readOnly) {
         experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
     } else {
@@ -169,13 +249,13 @@ LocalStore::LocalStore(ref<const Config> config)
                 "warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
         else if (!config->readOnly) {
             struct stat st;
-            if (stat(config->realStoreDir.get().c_str(), &st))
+            if (stat(config->realStoreDir.c_str(), &st))
                 throw SysError("getting attributes of path '%1%'", config->realStoreDir);
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
+                if (chown(config->realStoreDir.c_str(), 0, gr->gr_gid) == -1)
                     throw SysError("changing ownership of path '%1%'", config->realStoreDir);
-                if (chmod(config->realStoreDir.get().c_str(), perm) == -1)
+                if (chmod(config->realStoreDir.c_str(), perm) == -1)
                     throw SysError("changing permissions on path '%1%'", config->realStoreDir);
             }
         }
@@ -184,7 +264,7 @@ LocalStore::LocalStore(ref<const Config> config)
 
     /* Ensure that the store and its parents are not symlinks. */
     if (!settings.allowSymlinkedStore) {
-        std::filesystem::path path = config->realStoreDir.get();
+        std::filesystem::path path = config->realStoreDir;
         std::filesystem::path root = path.root_path();
         while (path != root) {
             if (std::filesystem::is_symlink(path))
@@ -606,11 +686,11 @@ void LocalStore::makeStoreWritable()
         return;
     /* Check if /nix/store is on a read-only mount. */
     struct statvfs stat;
-    if (statvfs(config->realStoreDir.get().c_str(), &stat) != 0)
+    if (statvfs(config->realStoreDir.c_str(), &stat) != 0)
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
-        if (mount(0, config->realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
+        if (mount(0, config->realStoreDir.c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
             throw SysError("remounting %1% writable", config->realStoreDir);
     }
 #endif
@@ -921,7 +1001,7 @@ StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
             break;
         if (sub->storeDir != storeDir)
             continue;
-        if (!sub->config.wantMassQuery)
+        if (!sub->resolvedSubstConfig.wantMassQuery)
             continue;
 
         auto valid = sub->queryValidPaths(remaining);
@@ -1473,7 +1553,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
        database and the filesystem) in the loop below, in order to catch
        invalid states.
      */
-    for (auto & i : DirectoryIterator{config->realStoreDir.get()}) {
+    for (auto & i : DirectoryIterator{config->realStoreDir}) {
         checkInterrupt();
         try {
             storePathsInStoreDir.insert({i.path().filename().string()});

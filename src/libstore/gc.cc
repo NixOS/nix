@@ -109,7 +109,7 @@ restart:
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
-            auto socketPath = config->stateDir.get() + gcSocketPath;
+            auto socketPath = config->stateDir + gcSocketPath;
             debug("connecting to '%s'", socketPath);
             *fdRootsSocket = createUnixDomainSocket();
             try {
@@ -248,7 +248,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             else {
                 target = absPath(target, dirOf(path));
                 if (!pathExists(target)) {
-                    if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
+                    if (isInDir(path, std::filesystem::path{config->stateDir} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
                         unlink(path.c_str());
                     }
@@ -508,7 +508,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Start the server for receiving new roots. */
-    auto socketPath = config->stateDir.get() + gcSocketPath;
+    auto socketPath = config->stateDir + gcSocketPath;
     createDirs(dirOf(socketPath));
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
@@ -821,7 +821,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             printInfo("determining live/dead paths...");
 
         try {
-            AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
+            AutoCloseDir dir(opendir(config->realStoreDir.c_str()));
             if (!dir)
                 throw SysError("opening directory '%1%'", config->realStoreDir);
 
@@ -924,7 +924,7 @@ void LocalStore::autoGC(bool sync)
             return std::stoll(readFile(*fakeFreeSpaceFile));
 
         struct statvfs st;
-        if (statvfs(config->realStoreDir.get().c_str(), &st))
+        if (statvfs(config->realStoreDir.c_str(), &st))
             throw SysError("getting filesystem info about '%s'", config->realStoreDir);
 
         return (uint64_t) st.f_bavail * st.f_frsize;

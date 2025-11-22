@@ -32,7 +32,7 @@ TEST(S3BinaryCacheStore, constructConfigWithRegion)
             .authority = ParsedURL::Authority{.host = "my-bucket"},
             .query = (StringMap) {{"region", "eu-west-1"}},
         }));
-    EXPECT_EQ(config.region.get(), "eu-west-1");
+    EXPECT_EQ(config.region, "eu-west-1");
 }
 
 TEST(S3BinaryCacheStore, defaultSettings)
@@ -47,10 +47,10 @@ TEST(S3BinaryCacheStore, defaultSettings)
         }));
 
     // Check default values
-    EXPECT_EQ(config.region.get(), "us-east-1");
-    EXPECT_EQ(config.profile.get(), "default");
-    EXPECT_EQ(config.scheme.get(), "https");
-    EXPECT_EQ(config.endpoint.get(), "");
+    EXPECT_EQ(config.region, "us-east-1");
+    EXPECT_EQ(config.profile, "default");
+    EXPECT_EQ(config.scheme, "https");
+    EXPECT_EQ(config.endpoint, "");
 }
 
 /**
@@ -58,7 +58,7 @@ TEST(S3BinaryCacheStore, defaultSettings)
  */
 TEST(S3BinaryCacheStore, s3StoreConfigPreservesParameters)
 {
-    StringMap params;
+    StoreReference::Params params;
     params["region"] = "eu-west-1";
     params["endpoint"] = "custom.s3.com";
 
@@ -93,7 +93,7 @@ TEST(S3BinaryCacheStore, s3SchemeRegistration)
  */
 TEST(S3BinaryCacheStore, parameterFiltering)
 {
-    StringMap params;
+    StoreReference::Params params;
     params["region"] = "eu-west-1";
     params["endpoint"] = "minio.local";
     params["want-mass-query"] = "true"; // Non-S3 store parameter
@@ -111,8 +111,8 @@ TEST(S3BinaryCacheStore, parameterFiltering)
         }));
 
     // But the non-S3 params should still be set on the config
-    EXPECT_EQ(config.wantMassQuery.get(), true);
-    EXPECT_EQ(config.priority.get(), 10);
+    EXPECT_EQ(config.wantMassQuery, true);
+    EXPECT_EQ(config.priority, 10);
 
     // And all params (S3 and non-S3) should be returned by getReference()
     auto ref = config.getReference();
@@ -128,16 +128,16 @@ TEST(S3BinaryCacheStore, parameterFiltering)
 TEST(S3BinaryCacheStore, storageClassDefault)
 {
     S3BinaryCacheStoreConfig config{"s3", "test-bucket", {}};
-    EXPECT_EQ(config.storageClass.get(), std::nullopt);
+    EXPECT_EQ(config.storageClass, std::nullopt);
 }
 
 TEST(S3BinaryCacheStore, storageClassConfiguration)
 {
-    StringMap params;
+    StoreReference::Params params;
     params["storage-class"] = "GLACIER";
 
-    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
-    EXPECT_EQ(config.storageClass.get(), std::optional<std::string>("GLACIER"));
+    S3BinaryCacheStoreConfig config{"s3", "test-bucket", params};
+    EXPECT_EQ(config.storageClass, std::optional<std::string>("GLACIER"));
 }
 
 } // namespace nix

@@ -18,6 +18,7 @@
 // `addMultipleToStore`.
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -27,17 +28,6 @@
 using json = nlohmann::json;
 
 namespace nix {
-
-Path StoreConfigBase::getDefaultNixStoreDir()
-{
-    return settings.nixStore;
-}
-
-StoreConfig::StoreConfig(const Params & params)
-    : StoreConfigBase(params)
-    , StoreDirConfig{storeDir_}
-{
-}
 
 bool StoreDirConfig::isInStore(PathView path) const
 {
@@ -82,6 +72,124 @@ Path Store::followLinksToStore(std::string_view _path) const
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
     return toStorePath(followLinksToStore(path)).first;
+}
+
+constexpr static const StoreConfigT<config::SettingInfoWithDefault> storeConfigDescriptions = {
+    ._storeDir{
+        {
+            .name = "store",
+            .description = R"(
+              Logical location of the Nix store, usually
+              `/nix/store`. Note that you can only copy store paths
+              between stores if they have the same `store` setting.
+            )",
+        },
+        {
+            .makeDefault = []() -> Path { return settings.nixStore; },
+        },
+    },
+    .pathInfoCacheSize{
+        {
+            .name = "path-info-cache-size",
+            .description = "Size of the in-memory store path metadata cache.",
+        },
+        {
+            .makeDefault = [] { return 65536; },
+        },
+    },
+    .isTrusted{
+        {
+            .name = "trusted",
+            .description = R"(
+              Whether paths from this store can be used as substitutes
+              even if they are not signed by a key listed in the
+              [`trusted-public-keys`](@docroot@/command-ref/conf-file.md#conf-trusted-public-keys)
+              setting.
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .systemFeatures{
+        {
+            .name = "system-features",
+            .description = R"(
+              Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
+
+              Example: `"kvm"`
+            )",
+            // The default value is CPU- and OS-specific, and thus
+            // unsuitable to be rendered in the documentation.
+            .documentDefault = false,
+        },
+        {
+            .makeDefault = StoreConfig::getDefaultSystemFeatures,
+        },
+    },
+};
+
+constexpr static const SubstituterConfigT<config::SettingInfoWithDefault> substituterConfigDescriptions = {
+    .priority{
+        {
+            .name = "priority",
+            .description = R"(
+              Priority of this store when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+              A lower value means a higher priority.
+            )",
+        },
+        {
+            .makeDefault = [] { return 0; },
+        },
+    },
+    .wantMassQuery{
+        {
+            .name = "want-mass-query",
+            .description = R"(
+              Whether this store can be queried efficiently for path validity when used as a [substituter](@docroot@/command-ref/conf-file.md#conf-substituters).
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+};
+
+#define STORE_CONFIG_FIELDS(X) X(_storeDir), X(pathInfoCacheSize), X(isTrusted), X(systemFeatures),
+
+#define SUBSTITUTER_CONFIG_FIELDS(X) X(priority), X(wantMassQuery),
+
+MAKE_PARSE(StoreConfig, storeConfig, STORE_CONFIG_FIELDS)
+MAKE_PARSE(SubstituterConfig, substituterConfig, SUBSTITUTER_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(StoreConfig, storeConfig, STORE_CONFIG_FIELDS)
+
+SubstituterConfigT<config::PlainValue> substituterConfigDefaults()
+{
+#define F(FIELD) .FIELD = substituterConfigDescriptions.FIELD.makeDefault()
+    return {SUBSTITUTER_CONFIG_FIELDS(F)};
+#undef F
+}
+
+Store::Config::StoreConfig(const StoreConfig::Params & params)
+    : StoreConfigT<config::PlainValue>{storeConfigApplyParse(params)}
+    , StoreDirConfig{_storeDir}
+    , SubstituterConfigT<config::OptionalValue>{substituterConfigParse(params)}
+{
+}
+
+config::SettingDescriptionMap StoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    {
+        constexpr auto & descriptions = storeConfigDescriptions;
+        ret.merge(config::SettingDescriptionMap{STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    {
+        constexpr auto & descriptions = substituterConfigDescriptions;
+        ret.merge(config::SettingDescriptionMap{SUBSTITUTER_CONFIG_FIELDS(DESCRIBE_ROW)});
+    };
+    return ret;
 }
 
 StorePath Store::addToStore(

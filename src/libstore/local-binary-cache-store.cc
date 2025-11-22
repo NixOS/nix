@@ -8,10 +8,18 @@
 
 namespace nix {
 
+config::SettingDescriptionMap LocalBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    return ret;
+}
+
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     std::string_view scheme, PathView binaryCacheDir, const StoreReference::Params & params)
     : Store::Config{params}
-    , BinaryCacheStoreConfig{params}
+    , BinaryCacheStoreConfig{*this, params}
     , binaryCacheDir(binaryCacheDir)
 {
 }
@@ -38,9 +46,9 @@ struct LocalBinaryCacheStore : virtual BinaryCacheStore
 {
     using Config = LocalBinaryCacheStoreConfig;
 
-    ref<Config> config;
+    ref<const Config> config;
 
-    LocalBinaryCacheStore(ref<Config> config)
+    LocalBinaryCacheStore(ref<const Config> config)
         : Store{*config}
         , BinaryCacheStore{*config}
         , config{config}
@@ -122,9 +130,7 @@ StringSet LocalBinaryCacheStoreConfig::uriSchemes()
 
 ref<Store> LocalBinaryCacheStoreConfig::openStore() const
 {
-    auto store = make_ref<LocalBinaryCacheStore>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())});
+    auto store = make_ref<LocalBinaryCacheStore>(ref{shared_from_this()});
     store->init();
     return store;
 }

@@ -1,19 +1,73 @@
+#include "nix/store/dummy-store.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/config-parse-impl.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
 namespace nix {
+
+constexpr static const DummyStoreConfigT<config::SettingInfoWithDefault> dummyStoreConfigDescriptions = {
+    .readOnly{
+        {
+            .name = "read-only",
+            .description = R"(
+              Make any sort of write fail instead of succeeding.
+              No additional memory will be used, because no information needs to be stored.
+            )",
+        },
+        {
+            .makeDefault = [] { return true; },
+        },
+    },
+};
+
+#define DUMMY_STORE_CONFIG_FIELDS(X) X(readOnly)
+
+MAKE_PARSE(DummyStoreConfig, dummyStoreConfig, DUMMY_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(DummyStoreConfig, dummyStoreConfig, DUMMY_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap DummyStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(LocalFSStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = dummyStoreConfigDescriptions;
+        ret.merge(decltype(ret){DUMMY_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    return ret;
+}
+
+DummyStoreConfig::DummyStoreConfig(const Params & params)
+    : Store::Config(params)
+    , DummyStoreConfigT<config::PlainValue>{dummyStoreConfigApplyParse(params)}
+{
+    // Disable caching since this a temporary in-memory store.
+    pathInfoCacheSize = 0;
+}
 
 std::string DummyStoreConfig::doc()
 {
     return
 #include "dummy-store.md"
         ;
+}
+
+StoreReference DummyStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+            },
+        .params = getQueryParams(),
+    };
 }
 
 namespace {

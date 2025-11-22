@@ -1,5 +1,6 @@
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
@@ -23,7 +24,7 @@ static constexpr uint64_t AWS_MAX_PART_COUNT = 10000;
 class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
 {
 public:
-    S3BinaryCacheStore(ref<S3BinaryCacheStoreConfig> config)
+    S3BinaryCacheStore(ref<const S3BinaryCacheStoreConfig> config)
         : Store{*config}
         , BinaryCacheStore{*config}
         , HttpBinaryCacheStore{config}
@@ -35,7 +36,7 @@ public:
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
 private:
-    ref<S3BinaryCacheStoreConfig> s3Config;
+    ref<const S3BinaryCacheStoreConfig> s3Config;
 
     /**
      * Uploads a file to S3 using a regular (non-multipart) upload.
@@ -135,8 +136,8 @@ void S3BinaryCacheStore::upsertFile(
 {
     auto doUpload = [&](RestartableSource & src, uint64_t size, std::optional<Headers> headers) {
         Headers uploadHeaders = headers.value_or(Headers());
-        if (auto storageClass = s3Config->storageClass.get()) {
-            uploadHeaders.emplace_back("x-amz-storage-class", *storageClass);
+        if (s3Config->storageClass) {
+            uploadHeaders.emplace_back("x-amz-storage-class", *s3Config->storageClass);
         }
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
             uploadMultipart(path, src, size, mimeType, std::move(uploadHeaders));
@@ -220,7 +221,7 @@ S3BinaryCacheStore::MultipartSink::MultipartSink(
         warn(
             "adjusting S3 multipart chunk size from %s to %s "
             "to stay within %d part limit for %s file",
-            renderSize(store.s3Config->multipartChunkSize.get()),
+            renderSize(store.s3Config->multipartChunkSize),
             renderSize(minChunkSize),
             AWS_MAX_PART_COUNT,
             renderSize(sizeHint));
@@ -400,18 +401,170 @@ StringSet S3BinaryCacheStoreConfig::uriSchemes()
     return {"s3"};
 }
 
+// We don't want clang-format to move the brance to the next line causing
+// everything to be indented even more.
+
+// clang-format off
+constexpr static const S3BinaryCacheStoreConfigT<config::SettingInfoWithDefault> s3BinaryCacheStoreConfigDescriptions = {
+    // clang-format on
+    .profile{
+        {
+            .name = "profile",
+            .description = R"(
+              The name of the AWS configuration profile to use. By default
+              Nix uses the `default` profile.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
+    },
+    .region{
+        {
+            .name = "region",
+            .description = R"(
+              The region of the S3 bucket. If your bucket is not in
+              `us–east-1`, you should always explicitly specify the region
+              parameter.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{"us-east-1"}; },
+        },
+    },
+    .scheme{
+        {
+            .name = "scheme",
+            .description = R"(
+              The scheme used for S3 requests, `https` (default) or `http`. This
+              option allows you to disable HTTPS for binary caches which don't
+              support it.
+
+              > **Note**
+              >
+              > HTTPS should be used if the cache might contain sensitive
+              > information.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
+    },
+    .endpoint{
+        {
+            .name = "endpoint",
+            .description = R"(
+              The S3 endpoint to use. When empty (default), uses AWS S3 with
+              region-specific endpoints (e.g., s3.us-east-1.amazonaws.com).
+              For S3-compatible services such as MinIO, set this to your service's endpoint.
+
+              > **Note**
+              >
+              > This endpoint must support HTTPS and uses path-based
+              > addressing instead of virtual host based addressing.
+            )",
+        },
+        {
+            .makeDefault = [] { return std::string{}; },
+        },
+    },
+    .multipartUpload{
+        {
+            .name = "multipart-upload",
+            .description = R"(
+              Whether to use multipart uploads for large files. When enabled,
+              files exceeding the multipart threshold will be uploaded in
+              multiple parts, which is required for files larger than 5 GiB and
+              can improve performance and reliability for large uploads.
+            )",
+        },
+        {
+            .makeDefault = [] { return false; },
+        },
+    },
+    .multipartChunkSize{
+        {
+            .name = "multipart-chunk-size",
+            .description = R"(
+              The size (in bytes) of each part in multipart uploads. Must be
+              at least 5 MiB (AWS S3 requirement). Larger chunk sizes reduce the
+              number of requests but use more memory. Default is 5 MiB.
+            )",
+        },
+        {
+            .makeDefault = [] { return (uint64_t) (5 * 1024 * 1024); },
+        },
+    },
+    .multipartThreshold{
+        {
+            .name = "multipart-threshold",
+            .description = R"(
+              The minimum file size (in bytes) for using multipart uploads.
+              Files smaller than this threshold will use regular PUT requests.
+              Default is 100 MiB. Only takes effect when multipart-upload is enabled.
+            )",
+        },
+        {
+            .makeDefault = [] { return (uint64_t) (100 * 1024 * 1024); },
+        },
+    },
+    .storageClass{
+        {
+            .name = "storage-class",
+            .description = R"(
+              The S3 storage class to use for uploaded objects. When not set (default),
+              uses the bucket's default storage class. Valid values include:
+              - STANDARD (default, frequently accessed data)
+              - REDUCED_REDUNDANCY (less frequently accessed data)
+              - STANDARD_IA (infrequent access)
+              - ONEZONE_IA (infrequent access, single AZ)
+              - INTELLIGENT_TIERING (automatic cost optimization)
+              - GLACIER (archival with retrieval times in minutes to hours)
+              - DEEP_ARCHIVE (long-term archival with 12-hour retrieval)
+              - GLACIER_IR (instant retrieval archival)
+
+              See AWS S3 documentation for detailed storage class descriptions and pricing:
+              https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
+            )",
+        },
+        {
+            .makeDefault = [] { return std::optional<std::string>{}; },
+        },
+    },
+};
+
+#define S3_BINARY_CACHE_STORE_CONFIG_FIELDS(X)                                                                       \
+    X(profile), X(region), X(scheme), X(endpoint), X(multipartUpload), X(multipartChunkSize), X(multipartThreshold), \
+        X(storageClass)
+
+MAKE_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(S3BinaryCacheStoreConfig, s3BinaryCacheStoreConfig, S3_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap S3BinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = s3BinaryCacheStoreConfigDescriptions;
+        ret.merge(decltype(ret){S3_BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    return ret;
+}
+
+static const std::set<std::string> s3UriParams = {"profile", "region", "scheme", "endpoint"};
+
 S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , HttpBinaryCacheStoreConfig(scheme, _cacheUri, params)
+    std::string_view scheme, std::string_view authority, const StoreConfig::Params & params)
+    : HttpBinaryCacheStoreConfig{scheme, authority, params}
+    , S3BinaryCacheStoreConfigT<config::PlainValue>{s3BinaryCacheStoreConfigApplyParse(params)}
 {
     assert(cacheUri.query.empty());
     assert(cacheUri.scheme == "s3");
 
     for (const auto & [key, value] : params) {
-        auto s3Params =
-            std::views::transform(s3UriSettings, [](const AbstractSetting * setting) { return setting->name; });
-        if (std::ranges::contains(s3Params, key)) {
+        if (s3UriParams.contains(key)) {
             cacheUri.query[key] = value;
         }
     }
@@ -420,22 +573,22 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
         throw UsageError(
             "multipart-chunk-size must be at least %s, got %s",
             renderSize(AWS_MIN_PART_SIZE),
-            renderSize(multipartChunkSize.get()));
+            renderSize(multipartChunkSize));
     }
 
     if (multipartChunkSize > AWS_MAX_PART_SIZE) {
         throw UsageError(
             "multipart-chunk-size must be at most %s, got %s",
             renderSize(AWS_MAX_PART_SIZE),
-            renderSize(multipartChunkSize.get()));
+            renderSize(multipartChunkSize));
     }
 
     if (multipartUpload && multipartThreshold < multipartChunkSize) {
         warn(
             "multipart-threshold (%s) is less than multipart-chunk-size (%s), "
             "which may result in single-part multipart uploads",
-            renderSize(multipartThreshold.get()),
-            renderSize(multipartChunkSize.get()));
+            renderSize(multipartThreshold),
+            renderSize(multipartChunkSize));
     }
 }
 
@@ -444,9 +597,9 @@ std::string S3BinaryCacheStoreConfig::getHumanReadableURI() const
     auto reference = getReference();
     reference.params = [&]() {
         Params relevantParams;
-        for (auto & setting : s3UriSettings)
-            if (setting->overridden)
-                relevantParams.insert({setting->name, reference.params.at(setting->name)});
+        for (const auto & param : s3UriParams)
+            if (auto it = reference.params.find(param); it != reference.params.end())
+                relevantParams.insert(*it);
         return relevantParams;
     }();
     return reference.render();
@@ -463,9 +616,8 @@ std::string S3BinaryCacheStoreConfig::doc()
 
 ref<Store> S3BinaryCacheStoreConfig::openStore() const
 {
-    auto sharedThis = std::const_pointer_cast<S3BinaryCacheStoreConfig>(
-        std::static_pointer_cast<const S3BinaryCacheStoreConfig>(shared_from_this()));
-    return make_ref<S3BinaryCacheStore>(ref{sharedThis});
+    return make_ref<S3BinaryCacheStore>(
+        ref{std::enable_shared_from_this<S3BinaryCacheStoreConfig>::shared_from_this()});
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;
