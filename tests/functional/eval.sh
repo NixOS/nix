@@ -39,6 +39,13 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 ln -sfn cycle.nix "$TEST_ROOT/cycle.nix"
 (! nix eval --file "$TEST_ROOT/cycle.nix")
 
+# Test that printing deep data structures produces a controlled error.
+# The expression creates a non-cyclic but infinitely deep structure:
+# f returns immediately with a thunk, so Nix call depth stays at 1,
+# but Printer::print recurses on the C++ stack.
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
 # --file and --pure-eval don't mix.
 expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
 
