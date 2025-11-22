@@ -50,6 +50,14 @@ expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0' \
 expectStderr 1 nix eval --expr 'builtins.toXML (let f = n: { inner = f (n + 1); }; in f 0)' \
   | grepQuiet "stack overflow; max-call-depth exceeded"
 
+# Same for equality comparison (n is not observable, so structures are equal)
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0 == f 1' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Same for assert with equality (uses assertEqValues)
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in assert f 0 == f 1; true' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
 # --file and --pure-eval don't mix.
 expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
 
