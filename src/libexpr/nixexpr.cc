@@ -486,6 +486,12 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
 
 void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
+    // Move storage into the Exprs arena
+    {
+        auto arena = es.mem.exprs.alloc;
+        std::pmr::vector<Expr *> newArgs{std::move(*args), arena};
+        args.emplace(std::move(newArgs), arena);
+    }
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
