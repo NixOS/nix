@@ -70,12 +70,12 @@ struct FileTransferSettings : Config
 
     Setting<size_t> downloadBufferSize{
         this,
-        64 * 1024 * 1024,
+        1 * 1024 * 1024,
         "download-buffer-size",
         R"(
           The size of Nix's internal download buffer in bytes during `curl` transfers. If data is
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
-          The default is 67108864 (64 MiB).
+          The default is 1048576 (1 MiB).
         )"};
 };
 
