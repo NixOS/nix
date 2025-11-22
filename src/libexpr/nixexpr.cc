@@ -191,7 +191,7 @@ void ExprCall::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << '(';
     fun->show(symbols, str);
-    for (auto e : args) {
+    for (auto e : *args) {
         str << ' ';
         e->show(symbols, str);
     }
@@ -490,7 +490,7 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
         es.exprEnvs.insert(std::make_pair(this, env));
 
     fun->bindVars(es, env);
-    for (auto e : args)
+    for (auto e : *args)
         e->bindVars(es, env);
 }
 

@@ -115,7 +115,7 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
 
 static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
     if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
-        e2->args.push_back(arg);
+        e2->args->push_back(arg);
         return fn;
     }
     return exprs.add<ExprCall>(pos, fn, {arg});

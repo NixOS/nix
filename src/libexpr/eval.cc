@@ -1751,9 +1751,9 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     // 4: about 60
     // 5: under 10
     // This excluded attrset lambdas (`{...}:`). Contributions of mixed lambdas appears insignificant at ~150 total.
-    SmallValueVector<4> vArgs(args.size());
-    for (size_t i = 0; i < args.size(); ++i)
-        vArgs[i] = args[i]->maybeThunk(state, env);
+    SmallValueVector<4> vArgs(args->size());
+    for (size_t i = 0; i < args->size(); ++i)
+        vArgs[i] = (*args)[i]->maybeThunk(state, env);
 
     state.callFunction(vFun, vArgs, v, pos);
 }

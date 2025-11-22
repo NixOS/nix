@@ -592,7 +592,10 @@ public:
 struct ExprCall : Expr
 {
     Expr * fun;
-    std::pmr::vector<Expr *> args;
+    /**
+     * args will never be null. See comment on ExprAttrs::AttrDefs below.
+     */
+    std::optional<std::pmr::vector<Expr *>> args;
     PosIdx pos;
     std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
 
