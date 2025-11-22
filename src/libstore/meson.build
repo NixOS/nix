@@ -114,6 +114,15 @@ boost = dependency(
 deps_other += boost
 
 curl = dependency('libcurl', 'curl', version : '>= 7.75.0')
+if curl.version().version_compare('>=8.16.0 <8.17.0')
+  # Out of precaution, avoid building with libcurl version that suffer from https://github.com/curl/curl/issues/19334.
+  error(
+    'curl @0@ has issues with write pausing, please use libcurl < 8.16 or >= 8.17, see https://github.com/curl/curl/issues/19334'.format(
+      curl.version(),
+    ),
+  )
+endif
+
 deps_private += curl
 
 # seccomp only makes sense on Linux
