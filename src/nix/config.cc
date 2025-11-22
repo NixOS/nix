@@ -2,7 +2,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 
 #include <nlohmann/json.hpp>
 

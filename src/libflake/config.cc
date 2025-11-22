@@ -14,7 +14,7 @@
 #include <format>
 
 #include "nix/util/users.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/flake/settings.hh"
 #include "nix/flake/flake.hh"
 #include "nix/util/ansicolor.hh"

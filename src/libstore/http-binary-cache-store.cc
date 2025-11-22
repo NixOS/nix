@@ -3,9 +3,63 @@
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
+#include "nix/store/config-parse-impl.hh"
 #include "nix/store/store-registration.hh"
 
 namespace nix {
+
+constexpr static const HttpBinaryCacheStoreConfigT<config::SettingInfoWithDefault>
+    httpBinaryCacheStoreConfigDescriptions = {
+        .narinfoCompression{
+            {
+                .name = "narinfo-compression",
+                .description = "Compression method for `.narinfo` files.",
+            },
+            {
+                .makeDefault = [] { return std::string{}; },
+            },
+        },
+        .lsCompression{
+            {
+                .name = "ls-compression",
+                .description = "Compression method for `.ls` files.",
+            },
+            {
+                .makeDefault = [] { return std::string{}; },
+            },
+        },
+        .logCompression{
+            {
+                .name = "log-compression",
+                .description = R"(
+              Compression method for `log/*` files. It is recommended to
+              use a compression method supported by most web browsers
+              (e.g. `brotli`).
+            )",
+            },
+            {
+                .makeDefault = [] { return std::string{}; },
+            },
+        },
+};
+
+#define HTTP_BINARY_CACHE_STORE_CONFIG_FIELDS(X) X(narinfoCompression), X(lsCompression), X(logCompression)
+
+MAKE_PARSE(HttpBinaryCacheStoreConfig, httpBinaryCacheStoreConfig, HTTP_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+MAKE_APPLY_PARSE(HttpBinaryCacheStoreConfig, httpBinaryCacheStoreConfig, HTTP_BINARY_CACHE_STORE_CONFIG_FIELDS)
+
+config::SettingDescriptionMap HttpBinaryCacheStoreConfig::descriptions()
+{
+    config::SettingDescriptionMap ret;
+    ret.merge(StoreConfig::descriptions());
+    ret.merge(BinaryCacheStoreConfig::descriptions());
+    {
+        constexpr auto & descriptions = httpBinaryCacheStoreConfigDescriptions;
+        ret.merge(decltype(ret){HTTP_BINARY_CACHE_STORE_CONFIG_FIELDS(DESCRIBE_ROW)});
+    }
+    return ret;
+}
 
 MakeError(UploadToHTTP, Error);
 
@@ -19,9 +73,10 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 }
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
+    std::string_view scheme, std::string_view _cacheUri, const StoreConfig::Params & params)
+    : Store::Config{params}
+    , BinaryCacheStoreConfig{*this, params}
+    , HttpBinaryCacheStoreConfigT<config::PlainValue>{httpBinaryCacheStoreConfigApplyParse(params)}
     , cacheUri(parseURL(
           std::string{scheme} + "://"
           + (!_cacheUri.empty() ? _cacheUri
@@ -29,6 +84,7 @@ HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == "")
         cacheUri.path.pop_back();
+    assert(cacheUri.query.empty());
 }
 
 StoreReference HttpBinaryCacheStoreConfig::getReference() const
@@ -50,8 +106,8 @@ std::string HttpBinaryCacheStoreConfig::doc()
         ;
 }
 
-HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config)
-    : Store{*config} // TODO it will actually mutate the configuration
+HttpBinaryCacheStore::HttpBinaryCacheStore(ref<const Config> config)
+    : Store{*config}
     , BinaryCacheStore{*config}
     , config{config}
 {
@@ -66,25 +122,25 @@ void HttpBinaryCacheStore::init()
     auto cacheKey = config->getReference().render(/*withParams=*/false);
 
     if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
-        config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-        config->priority.setDefault(cacheInfo->priority);
+        resolvedSubstConfig.wantMassQuery = config->storeConfig.wantMassQuery.value_or(cacheInfo->wantMassQuery);
+        resolvedSubstConfig.priority = config->storeConfig.priority.value_or(cacheInfo->priority);
     } else {
         try {
             BinaryCacheStore::init();
         } catch (UploadToHTTP &) {
             throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
         }
-        diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
+        diskCache->createCache(cacheKey, storeDir, resolvedSubstConfig.wantMassQuery, resolvedSubstConfig.priority);
     }
 }
 
 std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
 {
-    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.empty())
         return config->narinfoCompression;
-    else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+    else if (hasSuffix(path, ".ls") && !config->lsCompression.empty())
         return config->lsCompression;
-    else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+    else if (hasPrefix(path, "log/") && !config->logCompression.empty())
         return config->logCompression;
     else
         return std::nullopt;
@@ -268,9 +324,7 @@ std::optional<TrustedFlag> HttpBinaryCacheStore::isTrustedClient()
 
 ref<Store> HttpBinaryCacheStore::Config::openStore() const
 {
-    return make_ref<HttpBinaryCacheStore>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
+    return make_ref<HttpBinaryCacheStore>(ref{shared_from_this()});
 }
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;

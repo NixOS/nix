@@ -16,7 +16,7 @@ protected:
         : LibStoreTest(config_->openDummyStore())
         , config(std::move(config_))
     {
-        config->readOnly = false;
+        config->readOnly = {false};
     }
 
     WriteDerivationTest()
@@ -45,7 +45,7 @@ TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
     auto drv = makeSimpleDrv();
 
     auto path1 = writeDerivation(*store, drv, NoRepair);
-    config->readOnly = true;
+    config->readOnly = {true};
     auto path2 = writeDerivation(*store, drv, NoRepair);
     EXPECT_EQ(path1, path2);
     EXPECT_THAT(
