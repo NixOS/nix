@@ -267,6 +267,7 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
+  'build/derivation-builder-varlink.cc',
   'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
