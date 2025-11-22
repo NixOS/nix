@@ -46,6 +46,10 @@ ln -sfn cycle.nix "$TEST_ROOT/cycle.nix"
 expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0' \
   | grepQuiet "stack overflow; max-call-depth exceeded"
 
+# Same for builtins.toXML
+expectStderr 1 nix eval --expr 'builtins.toXML (let f = n: { inner = f (n + 1); }; in f 0)' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
 # --file and --pure-eval don't mix.
 expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
 
