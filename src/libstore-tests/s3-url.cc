@@ -104,7 +104,38 @@ INSTANTIATE_TEST_SUITE_P(
                     },
             },
             "with_absolute_endpoint_uri",
-        }),
+        }
+#if NIX_WITH_AWS_AUTH
+        ,
+        ParsedS3URLTestCase{
+            "s3://my-bucket/key?use-transfer-acceleration=true",
+            {
+                .bucket = "my-bucket",
+                .key = {"key"},
+                .use_transfer_acceleration = true,
+            },
+            "with_transfer_acceleration",
+        },
+        ParsedS3URLTestCase{
+            "s3://my-bucket/key?use-transfer-acceleration=false",
+            {
+                .bucket = "my-bucket",
+                .key = {"key"},
+                .use_transfer_acceleration = false,
+            },
+            "with_transfer_acceleration_false",
+        },
+        ParsedS3URLTestCase{
+            "s3://my-bucket/key?use-transfer-acceleration=1",
+            {
+                .bucket = "my-bucket",
+                .key = {"key"},
+                .use_transfer_acceleration = true,
+            },
+            "with_transfer_acceleration_numeric",
+        }
+#endif
+        ),
     [](const ::testing::TestParamInfo<ParsedS3URLTestCase> & info) { return info.param.description; });
 
 // Parameterized test for invalid S3 URLs
@@ -137,6 +168,62 @@ INSTANTIATE_TEST_SUITE_P(
         InvalidS3URLTestCase{"s3://", "error: URI has a missing or invalid bucket name", "completely_empty"},
         InvalidS3URLTestCase{"s3://bucket", "error: URI has a missing or invalid key", "missing_key"}),
     [](const ::testing::TestParamInfo<InvalidS3URLTestCase> & info) { return info.param.description; });
+
+#if NIX_WITH_AWS_AUTH
+// =============================================================================
+// Transfer Acceleration Bucket Name Validation Tests
+// =============================================================================
+
+struct InvalidTransferAccelerationBucketTestCase
+{
+    std::string url;
+    std::string expectedErrorSubstring;
+    std::string description;
+};
+
+class InvalidTransferAccelerationBucketTest
+    : public ::testing::WithParamInterface<InvalidTransferAccelerationBucketTestCase>,
+      public ::testing::Test
+{};
+
+TEST_P(InvalidTransferAccelerationBucketTest, rejectsInvalidBucketNames)
+{
+    const auto & testCase = GetParam();
+    auto parsed = ParsedS3URL::parse(parseURL(testCase.url));
+
+    ASSERT_THAT(
+        [&parsed]() { parsed.toHttpsUrl(); },
+        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher(testCase.expectedErrorSubstring)));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidBucketNames,
+    InvalidTransferAccelerationBucketTest,
+    ::testing::Values(
+        InvalidTransferAccelerationBucketTestCase{
+            "s3://bucket.with.dots/key?use-transfer-acceleration=true",
+            "is not compatible with S3 Transfer Acceleration",
+            "bucket_with_dots",
+        },
+        InvalidTransferAccelerationBucketTestCase{
+            "s3://my.bucket.name/key?use-transfer-acceleration=true",
+            "is not compatible with S3 Transfer Acceleration",
+            "bucket_with_multiple_dots",
+        },
+        InvalidTransferAccelerationBucketTestCase{
+            "s3://bucket.name/key?use-transfer-acceleration=true",
+            "is not compatible with S3 Transfer Acceleration",
+            "bucket_with_single_dot",
+        },
+        InvalidTransferAccelerationBucketTestCase{
+            "s3://bucket/key?use-transfer-acceleration=true&endpoint=minio.local",
+            "cannot be used with custom endpoints",
+            "acceleration_with_custom_endpoint",
+        }),
+    [](const ::testing::TestParamInfo<InvalidTransferAccelerationBucketTestCase> & info) {
+        return info.param.description;
+    });
+#endif
 
 // =============================================================================
 // S3 URL to HTTPS Conversion Tests
@@ -272,7 +359,53 @@ INSTANTIATE_TEST_SUITE_P(
             },
             "https://s3.eu-west-1.amazonaws.com/versioned-bucket/path/to/object?versionId=version456",
             "with_region_and_versionId",
-        }),
+        },
+#if NIX_WITH_AWS_AUTH
+        S3ToHttpsConversionTestCase{
+            ParsedS3URL{
+                .bucket = "my-cache",
+                .key = {"nix", "store", "abc123.nar.xz"},
+                .use_transfer_acceleration = true,
+            },
+            ParsedURL{
+                .scheme = "https",
+                .authority = ParsedURL::Authority{.host = "my-cache.s3-accelerate.amazonaws.com"},
+                .path = {"", "nix", "store", "abc123.nar.xz"},
+            },
+            "https://my-cache.s3-accelerate.amazonaws.com/nix/store/abc123.nar.xz",
+            "transfer_acceleration_enabled",
+        },
+        S3ToHttpsConversionTestCase{
+            ParsedS3URL{
+                .bucket = "tokyo-cache",
+                .key = {"key.txt"},
+                .region = "ap-northeast-1",
+                .use_transfer_acceleration = true,
+            },
+            ParsedURL{
+                .scheme = "https",
+                .authority = ParsedURL::Authority{.host = "tokyo-cache.s3-accelerate.amazonaws.com"},
+                .path = {"", "key.txt"},
+            },
+            "https://tokyo-cache.s3-accelerate.amazonaws.com/key.txt",
+            "transfer_acceleration_with_region",
+        },
+        S3ToHttpsConversionTestCase{
+            ParsedS3URL{
+                .bucket = "my-bucket",
+                .key = {"file"},
+                .use_transfer_acceleration = false,
+            },
+            ParsedURL{
+                .scheme = "https",
+                .authority = ParsedURL::Authority{.host = "s3.us-east-1.amazonaws.com"},
+                .path = {"", "my-bucket", "file"},
+            },
+            "https://s3.us-east-1.amazonaws.com/my-bucket/file",
+            "transfer_acceleration_explicitly_disabled",
+        }
+#endif
+        ),
     [](const ::testing::TestParamInfo<S3ToHttpsConversionTestCase> & info) { return info.param.description; });
 
 } // namespace nix
