@@ -964,7 +964,7 @@ static void performOp(
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            auto outputId = DrvOutput::parse(readString(conn.from));
+            auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
             auto outputPath = StorePath(readString(conn.from));
             store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
         } else {
@@ -977,7 +977,7 @@ static void performOp(
 
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(conn.from));
+        auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
