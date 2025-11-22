@@ -378,6 +378,8 @@ static void getDerivations(
     Done & done,
     bool ignoreAssertionFailures)
 {
+    auto _level = state.addCallDepth(vIn.determinePos(noPos));
+
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
 

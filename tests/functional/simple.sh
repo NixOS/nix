@@ -35,3 +35,8 @@ if test "$outPath" != "/foo/xxiwa5zlaajv6xdjynf9yym9g319d6mn-big-derivation-attr
     echo "big-derivation-attr.nix hash appears broken, got $outPath. Memory corruption in large drv attr?"
     exit 1
 fi
+
+# Test that nix-instantiate on a deeply nested recurseForDerivations structure
+# produces a controlled stack overflow error rather than a segfault.
+expectStderr 1 nix-instantiate --expr 'let x = { recurseForDerivations = true; more = x; }; in x' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
