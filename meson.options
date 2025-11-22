@@ -41,3 +41,10 @@ option(
   value : true,
   description : 'Check JSON schema validity of schemas and examples (requires jv)',
 )
+
+option(
+  'color',
+  type : 'boolean',
+  value : true,
+  description : 'Output ANSI escape sequences',
+)

@@ -65,4 +65,7 @@ if get_option('json-schema-checks')
 endif
 if get_option('kaitai-struct-checks')
   subproject('kaitai-struct-checks')
+
+if get_option('color')
+  add_project_arguments('-DNIX_COLOR', language: ['c', 'cpp'])
 endif
