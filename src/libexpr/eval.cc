@@ -2188,6 +2188,8 @@ void EvalState::forceValueDeep(Value & v)
     std::set<const Value *> seen;
 
     [&, &state(*this)](this const auto & recurse, Value & v) {
+        auto _level = state.addCallDepth(v.determinePos(noPos));
+
         if (!seen.insert(&v).second)
             return;
 
@@ -2214,8 +2216,15 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
+            size_t index = 0;
             for (auto v2 : v.listView())
-                recurse(*v2);
+                try {
+                    recurse(*v2);
+                    index++;
+                } catch (Error & e) {
+                    state.addErrorTrace(e, "while evaluating list element at index %1%", index);
+                    throw;
+                }
         }
     }(v);
 }
