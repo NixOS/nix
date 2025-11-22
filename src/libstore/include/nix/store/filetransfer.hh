@@ -70,12 +70,12 @@ struct FileTransferSettings : Config
 
     Setting<size_t> downloadBufferSize{
         this,
-        64 * 1024 * 1024,
+        1 * 1024 * 1024,
         "download-buffer-size",
         R"(
           The size of Nix's internal download buffer in bytes during `curl` transfers. If data is
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
-          The default is 67108864 (64 MiB).
+          The default is 1048576 (1 MiB).
         )"};
 };
 
@@ -103,6 +103,11 @@ struct UsernameAuth
 {
     std::string username;
     std::optional<std::string> password;
+};
+
+enum class PauseTransfer : bool {
+    No = false,
+    Yes = true,
 };
 
 struct FileTransferRequest
@@ -136,7 +141,14 @@ struct FileTransferRequest
 
     std::optional<UploadData> data;
     std::string mimeType;
-    std::function<void(std::string_view data)> dataCallback;
+
+    /**
+     * Callbacked invoked with a chunk of received data.
+     * Can pause the transfer by returning PauseTransfer::Yes. No data must be consumed
+     * if transfer is paused.
+     */
+    std::function<PauseTransfer(std::string_view data)> dataCallback;
+
     /**
      * Optional username and password for HTTP basic authentication.
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
@@ -226,6 +238,25 @@ class Store;
 
 struct FileTransfer
 {
+protected:
+    class Item
+    {};
+
+public:
+    /**
+     * An opaque handle to the file transfer. Can be used to reference an in-flight transfer operations.
+     */
+    struct ItemHandle
+    {
+        std::reference_wrapper<Item> item;
+        friend struct FileTransfer;
+
+        ItemHandle(Item & item)
+            : item(item)
+        {
+        }
+    };
+
     virtual ~FileTransfer() {}
 
     /**
@@ -233,7 +264,13 @@ struct FileTransfer
      * the download. The future may throw a FileTransferError
      * exception.
      */
-    virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+    virtual ItemHandle
+    enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+
+    /**
+     * Unpause a transfer that has been previously paused by a dataCallback.
+     */
+    virtual void unpauseTransfer(ItemHandle handle) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
