@@ -134,6 +134,11 @@ std::optional<Path> getSelfExe()
             return std::nullopt;
         }
 
+        // FreeBSD's sysctl(KERN_PROC_PATHNAME) includes the null terminator in
+        // pathLen. Strip it to prevent Nix evaluation errors when the path is
+        // serialized to JSON and evaluated as a Nix string.
+        path.pop_back();
+
         return Path(path.begin(), path.end());
 #else
         return std::nullopt;
