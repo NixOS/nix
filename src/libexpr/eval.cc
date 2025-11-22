@@ -2403,6 +2403,8 @@ BackedStringView EvalState::coerceToString(
     bool copyToStore,
     bool canonicalizePath)
 {
+    auto _level = addCallDepth(pos);
+
     forceValue(v, pos);
 
     if (v.type() == nString) {

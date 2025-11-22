@@ -58,6 +58,11 @@ expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0 == f 1
 expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in assert f 0 == f 1; true' \
   | grepQuiet "stack overflow; max-call-depth exceeded"
 
+# Same for string coercion with __toString
+# shellcheck disable=SC2016
+expectStderr 1 nix eval --expr 'let f = n: { __toString = _: f (n + 1); }; in "${f 0}"' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
 # --file and --pure-eval don't mix.
 expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
 
