@@ -1,0 +1,242 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-options-v1.json"
+title: Derivation Options
+description: |
+  JSON representation of Nix's `DerivationOptions` type.
+
+  This schema describes various build-time options and constraints that can be specified for a derivation.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - outputChecks
+  - unsafeDiscardReferences
+  - passAsFile
+  - exportReferencesGraph
+  - additionalSandboxProfile
+  - noChroot
+  - impureHostDeps
+  - impureEnvVars
+  - allowLocalNetworking
+  - requiredSystemFeatures
+  - preferLocalBuild
+  - allowSubstitutes
+properties:
+  outputChecks:
+    type: object
+    title: Output Check
+    description: |
+      Constraints on what the derivation's outputs can and cannot reference.
+      Can either apply to all outputs or be specified per output.
+    oneOf:
+      - title: Output Checks For All Outputs
+        description: |
+          Output checks that apply to all outputs of the derivation.
+        required:
+          - forAllOutputs
+        properties:
+          forAllOutputs:
+            "$ref": "#/$defs/outputCheckSpec"
+        additionalProperties: false
+
+      - title: Output Checks Per Output
+        description: |
+          Output checks specified individually for each output.
+        required:
+          - perOutput
+        properties:
+          perOutput:
+            type: object
+            additionalProperties:
+              "$ref": "#/$defs/outputCheckSpec"
+        additionalProperties: false
+
+  unsafeDiscardReferences:
+    type: object
+    title: Unsafe Discard References
+    description: |
+      A map specifying which references should be unsafely discarded from each output.
+      This is generally not recommended and requires special permissions.
+    additionalProperties:
+      type: array
+      items:
+        type: string
+
+  passAsFile:
+    type: array
+    title: Pass As File
+    description: |
+      List of environment variable names whose values should be passed as files rather than directly.
+    items:
+      type: string
+
+  exportReferencesGraph:
+    type: object
+    title: Export References Graph
+    description: |
+      Specify paths whose references graph should be exported to files.
+    additionalProperties:
+      type: array
+      items:
+        "$ref": "deriving-path-v1.yaml"
+
+  additionalSandboxProfile:
+    type: string
+    title: Additional Sandbox Profile
+    description: |
+      Additional sandbox profile directives (macOS specific).
+
+  noChroot:
+    type: boolean
+    title: No Chroot
+    description: |
+      Whether to disable the build sandbox, if allowed.
+
+  impureHostDeps:
+    type: array
+    title: Impure Host Dependencies
+    description: |
+      List of host paths that the build can access.
+    items:
+      type: string
+
+  impureEnvVars:
+    type: array
+    title: Impure Environment Variables
+    description: |
+      List of environment variable names that should be passed through to the build from the calling environment.
+    items:
+      type: string
+
+  allowLocalNetworking:
+    type: boolean
+    title: Allow Local Networking
+    description: |
+      Whether the build should have access to local network (macOS specific).
+
+  requiredSystemFeatures:
+    type: array
+    title: Required System Features
+    description: |
+      List of system features required to build this derivation (e.g., "kvm", "nixos-test").
+    items:
+      type: string
+
+  preferLocalBuild:
+    type: boolean
+    title: Prefer Local Build
+    description: |
+      Whether this derivation should preferably be built locally rather than its outputs substituted.
+
+  allowSubstitutes:
+    type: boolean
+    title: Allow Substitutes
+    description: |
+      Whether substituting from other stores should be allowed for this derivation's outputs.
+
+additionalProperties: false
+
+$defs:
+
+  outputCheckSpec:
+    type: object
+    title: Output Check Specification
+    description: |
+      Constraints on what a specific output can reference.
+    required:
+      - ignoreSelfRefs
+      - maxSize
+      - maxClosureSize
+      - allowedReferences
+      - allowedRequisites
+      - disallowedReferences
+      - disallowedRequisites
+    properties:
+      ignoreSelfRefs:
+        type: boolean
+        title: Ignore Self References
+        description: |
+          Whether references from this output to itself should be ignored when checking references.
+
+      maxSize:
+        type: ["integer", "null"]
+        title: Maximum Size
+        description: |
+          Maximum allowed size of this output in bytes, or null for no limit.
+        minimum: 0
+
+      maxClosureSize:
+        type: ["integer", "null"]
+        title: Maximum Closure Size
+        description: |
+          Maximum allowed size of this output's closure in bytes, or null for no limit.
+        minimum: 0
+
+      allowedReferences:
+        oneOf:
+          - type: array
+            items:
+              "$ref": "#/$defs/drvRef"
+          - type: "null"
+        title: Allowed References
+        description: |
+          If set, the output can only reference paths in this list.
+          If null, no restrictions apply.
+
+      allowedRequisites:
+        oneOf:
+          - type: array
+            items:
+              "$ref": "#/$defs/drvRef"
+          - type: "null"
+        title: Allowed Requisites
+        description: |
+          If set, the output's closure can only contain paths in this list.
+          If null, no restrictions apply.
+
+      disallowedReferences:
+        type: array
+        title: Disallowed References
+        description: |
+          The output must not reference any paths in this list.
+        items:
+          "$ref": "#/$defs/drvRef"
+
+      disallowedRequisites:
+        type: array
+        title: Disallowed Requisites
+        description: |
+          The output's closure must not contain any paths in this list.
+        items:
+          "$ref": "#/$defs/drvRef"
+    additionalProperties: false
+
+  drvRef:
+    # TODO fix bug in checker, should be `oneOf`
+    anyOf:
+      - type: object
+        title: Current derivation Output Reference
+        description: |
+          A reference to a specific output of the current derivation.
+        required:
+          - drvPath
+          - output
+        properties:
+          drvPath:
+            type: string
+            const: "self"
+            title: This derivation
+            description: |
+              Won't be confused for a deriving path
+          output:
+            type: string
+            title: Output Name
+            description: |
+              The name of the output being referenced.
+        additionalProperties: false
+      - "$ref": "deriving-path-v1.yaml"
