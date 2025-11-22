@@ -40,3 +40,9 @@ fi
 # produces a controlled stack overflow error rather than a segfault.
 expectStderr 1 nix-instantiate --expr 'let x = { recurseForDerivations = true; more = x; }; in x' \
   | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Test that nix-env -qa --meta on deeply nested meta attributes produces a
+# controlled stack overflow error rather than a segfault.
+echo 'let f = n: { type = "derivation"; name = "test"; system = "x86_64-linux"; meta.nested = f (n + 1); }; in { pkg = f 0; }' > "$TEST_ROOT/deep-meta.nix"
+expectStderr 1 nix-env -qa -f "$TEST_ROOT/deep-meta.nix" --json --meta \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
