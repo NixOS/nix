@@ -59,7 +59,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 std::tuple<StorePath, Hash> prefetchFile(
     ref<Store> store,
     const VerbatimURL & url,
-    std::optional<std::string> name,
+    std::optional<std::string> maybeName,
     HashAlgorithm hashAlgo,
     std::optional<Hash> expectedHash,
     bool unpack,
@@ -68,16 +68,21 @@ std::tuple<StorePath, Hash> prefetchFile(
     ContentAddressMethod method =
         unpack || executable ? ContentAddressMethod::Raw::NixArchive : ContentAddressMethod::Raw::Flat;
 
-    /* Figure out a name in the Nix store. */
-    if (!name) {
-        name = url.lastPathSegment();
-        if (!name || name->empty())
-            throw Error("cannot figure out file name for '%s'", url.to_string());
-    }
+    std::string name = maybeName
+                           .or_else([&]() {
+                               /* Figure out a name in the Nix store. */
+                               auto derivedFromUrl = url.lastPathSegment();
+                               if (!derivedFromUrl || derivedFromUrl->empty())
+                                   throw Error("cannot figure out file name for '%s'", url.to_string());
+                               return derivedFromUrl;
+                           })
+                           .value();
+
     try {
-        checkName(*name);
+        checkName(name);
     } catch (BadStorePathName & e) {
-        e.addTrace({}, "file name '%s' was extracted from URL '%s'", *name, url.to_string());
+        if (!maybeName)
+            e.addTrace({}, "file name '%s' was extracted from URL '%s'", name, url.to_string());
         throw;
     }
 
@@ -89,7 +94,7 @@ std::tuple<StorePath, Hash> prefetchFile(
     if (expectedHash) {
         hashAlgo = expectedHash->algo;
         storePath =
-            store->makeFixedOutputPathFromCA(*name, ContentAddressWithReferences::fromParts(method, *expectedHash, {}));
+            store->makeFixedOutputPathFromCA(name, ContentAddressWithReferences::fromParts(method, *expectedHash, {}));
         if (store->isValidPath(*storePath))
             hash = expectedHash;
         else
@@ -138,7 +143,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
         Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url.to_string()));
 
-        auto info = store->addToStoreSlow(*name, makeFSSourceAccessor(tmpFile), method, hashAlgo, {}, expectedHash);
+        auto info = store->addToStoreSlow(name, makeFSSourceAccessor(tmpFile), method, hashAlgo, {}, expectedHash);
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
