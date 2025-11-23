@@ -101,9 +101,18 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
     return canonPath(path, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
+std::filesystem::path absPath(
+    const std::filesystem::path & path,
+    std::optional<std::filesystem::path> dir, 
+    bool resolveSymlinks)
 {
-    return absPath(path.string(), std::nullopt, resolveSymlinks);
+    if (!dir) {
+        return absPath(
+            PathView{path.string()}, 
+            PathView{dir->string()},
+            resolveSymlinks);
+    }
+    return absPath(PathView{path.string()}, std::nullopt, resolveSymlinks);
 }
 
 Path canonPath(PathView path, bool resolveSymlinks)

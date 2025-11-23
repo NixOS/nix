@@ -55,7 +55,10 @@ inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool re
     return absPath(PathView{path}, dir, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
+std::filesystem::path absPath(
+    const std::filesystem::path & path, 
+    std::optional<std::filesystem::path> dir = {}, 
+    bool resolveSymlinks = false);
 
 /**
  * Canonicalise a path by removing all `.` or `..` components and
