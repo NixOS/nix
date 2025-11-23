@@ -271,7 +271,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     );
 
     auto vDump = state.allocValue();
-    vDump->mkString(toplevel.dumpCli());
+    vDump->mkString(toplevel.dumpCli(), state.mem);
 
     auto vRes = state.allocValue();
     Value * args[]{&state.getBuiltin("false"), vDump};

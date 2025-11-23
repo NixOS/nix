@@ -11,7 +11,7 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
     NixStringContext context;
     auto s = state.coerceToString(
         pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
-    v.mkString(*s);
+    v.mkString(*s, state.mem);
 }
 
 static RegisterPrimOp primop_unsafeDiscardStringContext({
@@ -218,7 +218,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
         if (!info.second.outputs.empty()) {
             auto list = state.buildList(info.second.outputs.size());
             for (const auto & [i, output] : enumerate(info.second.outputs))
-                (list[i] = state.allocValue())->mkString(output);
+                (list[i] = state.allocValue())->mkString(output, state.mem);
             infoAttrs.alloc(state.s.outputs).mkList(list);
         }
         attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);

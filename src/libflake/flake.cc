@@ -956,7 +956,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
         auto key = keyMap.find(node);
         assert(key != keyMap.end());
 
-        override.alloc(state.symbols.create("dir")).mkString(CanonPath(subdir).rel());
+        override.alloc(state.symbols.create("dir")).mkString(CanonPath(subdir).rel(), state.mem);
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }
@@ -966,7 +966,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     Value * vCallFlake = requireInternalFile(state, CanonPath("call-flake.nix"));
 
     auto vLocks = state.allocValue();
-    vLocks->mkString(lockFileStr);
+    vLocks->mkString(lockFileStr, state.mem);
 
     auto vFetchFinalTree = get(state.internalPrimOps, "fetchFinalTree");
     assert(vFetchFinalTree);

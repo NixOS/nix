@@ -132,7 +132,7 @@ static void getAllExprs(EvalState & state, const SourcePath & path, StringSet & 
             }
             /* Load the expression on demand. */
             auto vArg = state.allocValue();
-            vArg->mkPath(path2);
+            vArg->mkPath(path2, state.mem);
             if (seen.size() == maxAttrs)
                 throw Error("too many Nix expressions in directory '%1%'", path);
             attrs.alloc(attrName).mkApp(&state.getBuiltin("import"), vArg);
@@ -483,7 +483,7 @@ static bool keep(PackageInfo & drv)
 static void setMetaFlag(EvalState & state, PackageInfo & drv, const std::string & name, const std::string & value)
 {
     auto v = state.allocValue();
-    v->mkString(value);
+    v->mkString(value, state.mem);
     drv.setMeta(name, v);
 }
 
