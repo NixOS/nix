@@ -50,7 +50,7 @@ struct HookInstance
 
     std::map<ActivityId, Activity> activities;
 
-    HookInstance();
+    HookInstance(const Strings & buildHookArgs);
 
     ~HookInstance();
 };

@@ -30,7 +30,7 @@ struct CmdLog : InstallableCommand
     {
         settings.readOnlyMode = true;
 
-        auto subs = getDefaultSubstituters();
+        auto subs = getDefaultSubstituters(settings);
 
         subs.push_front(store);
 

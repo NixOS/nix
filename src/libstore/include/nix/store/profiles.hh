@@ -15,6 +15,7 @@
 
 namespace nix {
 
+class Settings;
 class StorePath;
 
 /**
@@ -208,31 +209,31 @@ void lockProfile(PathLocks & lock, const Path & profile);
 std::string optimisticLockProfile(const Path & profile);
 
 /**
- * Create and return the path to a directory suitable for storing the user’s
+ * Create and return the path to a directory suitable for storing the user's
  * profiles.
  */
-Path profilesDir();
+Path profilesDir(const Settings & settings);
 
 /**
  * Return the path to the profile directory for root (but don't try creating it)
  */
-Path rootProfilesDir();
+Path rootProfilesDir(const Settings & settings);
 
 /**
  * Create and return the path to the file used for storing the users's channels
  */
-Path defaultChannelsDir();
+Path defaultChannelsDir(const Settings & settings);
 
 /**
  * Return the path to the channel directory for root (but don't try creating it)
  */
-Path rootChannelsDir();
+Path rootChannelsDir(const Settings & settings);
 
 /**
  * Resolve the default profile (~/.nix-profile by default,
  * $XDG_STATE_HOME/nix/profile if XDG Base Directory Support is enabled),
  * and create if doesn't exist
  */
-Path getDefaultProfile();
+Path getDefaultProfile(const Settings & settings);
 
 } // namespace nix

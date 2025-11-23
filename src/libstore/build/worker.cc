@@ -184,7 +184,7 @@ void Worker::removeGoal(GoalPtr goal)
         topGoals.erase(goal);
         /* If a top-level goal failed, then kill all other goals
            (unless keepGoing was set). */
-        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
+        if (goal->exitCode == Goal::ecFailed && !store.config.settings.keepGoing)
             topGoals.clear();
     }
 
@@ -285,8 +285,8 @@ void Worker::waitForBuildSlot(GoalPtr goal)
 {
     goal->trace("wait for build slot");
     bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
-    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs)
-        || (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
+    if ((!isSubstitutionGoal && getNrLocalBuilds() < store.config.settings.maxBuildJobs)
+        || (isSubstitutionGoal && getNrSubstitutions() < store.config.settings.maxSubstitutionJobs))
         wakeUp(goal); /* we can do it right away */
     else
         addToWeakGoals(wantingToBuild, goal);
@@ -358,8 +358,8 @@ void Worker::run(const Goals & _topGoals)
         /* Wait for input. */
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
-        else if (awake.empty() && 0U == settings.maxBuildJobs) {
-            if (getMachines().empty())
+        else if (awake.empty() && 0U == store.config.settings.maxBuildJobs) {
+            if (getMachines(store.config.settings).empty())
                 throw Error(
                     "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
                     "\n"
@@ -376,9 +376,9 @@ void Worker::run(const Goals & _topGoals)
     /* If --keep-going is not set, it's possible that the main goal
        exited while some of its subgoals were still active.  But if
        --keep-going *is* set, then they must all be finished now. */
-    assert(!settings.keepGoing || awake.empty());
-    assert(!settings.keepGoing || wantingToBuild.empty());
-    assert(!settings.keepGoing || children.empty());
+    assert(!store.config.settings.keepGoing || awake.empty());
+    assert(!store.config.settings.keepGoing || wantingToBuild.empty());
+    assert(!store.config.settings.keepGoing || children.empty());
 }
 
 void Worker::waitForInput()
@@ -399,16 +399,16 @@ void Worker::waitForInput()
        is a build timeout, then wait for input until the first
        deadline for any child. */
     auto nearest = steady_time_point::max(); // nearest deadline
-    if (settings.minFree.get() != 0)
+    if (store.config.settings.minFree.get() != 0)
         // Periodicallty wake up to see if we need to run the garbage collector.
         nearest = before + std::chrono::seconds(10);
     for (auto & i : children) {
         if (!i.respectTimeouts)
             continue;
-        if (0 != settings.maxSilentTime)
-            nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
-        if (0 != settings.buildTimeout)
-            nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
+        if (0 != store.config.settings.maxSilentTime)
+            nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(store.config.settings.maxSilentTime));
+        if (0 != store.config.settings.buildTimeout)
+            nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(store.config.settings.buildTimeout));
     }
     if (nearest != steady_time_point::max()) {
         timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
@@ -424,7 +424,7 @@ void Worker::waitForInput()
         timeout = std::max(
             1L,
             (long) std::chrono::duration_cast<std::chrono::seconds>(
-                lastWokenUp + std::chrono::seconds(settings.pollInterval) - before)
+                lastWokenUp + std::chrono::seconds(store.config.settings.pollInterval) - before)
                 .count());
     } else
         lastWokenUp = steady_time_point::min();
@@ -477,20 +477,21 @@ void Worker::waitForInput()
                 goal->handleEOF(k);
             });
 
-        if (goal->exitCode == Goal::ecBusy && 0 != settings.maxSilentTime && j->respectTimeouts
-            && after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime)) {
-            goal->timedOut(
-                Error("%1% timed out after %2% seconds of silence", goal->getName(), settings.maxSilentTime));
+        if (goal->exitCode == Goal::ecBusy && 0 != store.config.settings.maxSilentTime && j->respectTimeouts
+            && after - j->lastOutput >= std::chrono::seconds(store.config.settings.maxSilentTime)) {
+            goal->timedOut(Error(
+                "%1% timed out after %2% seconds of silence", goal->getName(), store.config.settings.maxSilentTime));
         }
 
         else if (
-            goal->exitCode == Goal::ecBusy && 0 != settings.buildTimeout && j->respectTimeouts
-            && after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout)) {
-            goal->timedOut(Error("%1% timed out after %2% seconds", goal->getName(), settings.buildTimeout));
+            goal->exitCode == Goal::ecBusy && 0 != store.config.settings.buildTimeout && j->respectTimeouts
+            && after - j->timeStarted >= std::chrono::seconds(store.config.settings.buildTimeout)) {
+            goal->timedOut(
+                Error("%1% timed out after %2% seconds", goal->getName(), store.config.settings.buildTimeout));
         }
     }
 
-    if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(settings.pollInterval) <= after) {
+    if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(store.config.settings.pollInterval) <= after) {
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
             GoalPtr goal = i.lock();

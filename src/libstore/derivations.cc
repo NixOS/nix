@@ -128,7 +128,7 @@ static auto infoForDerivation(Store & store, const Derivation & drv)
 
 StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
 {
-    if (readOnly || settings.readOnlyMode) {
+    if (readOnly || store.config.settings.readOnlyMode) {
         auto [_x, _y, _z, path] = infoForDerivation(store, drv);
         return path;
     } else

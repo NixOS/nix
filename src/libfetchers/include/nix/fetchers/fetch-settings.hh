@@ -13,9 +13,10 @@
 
 namespace nix {
 
+class Settings;
 struct GitRepo;
 
-}
+} // namespace nix
 
 namespace nix::fetchers {
 
@@ -23,7 +24,12 @@ struct Cache;
 
 struct Settings : public Config
 {
-    Settings();
+    /**
+     * Reference to the "parent" store-layer settings.
+     */
+    const nix::Settings & settings;
+
+    Settings(const nix::Settings & settings);
 
     Setting<StringMap> accessTokens{
         this,

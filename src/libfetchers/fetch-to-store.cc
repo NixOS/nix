@@ -53,9 +53,11 @@ StorePath fetchToStore(
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
-    auto storePath = mode == FetchMode::DryRun
-                         ? store.computeStorePath(name, path, method, HashAlgorithm::SHA256, {}, filter2).first
-                         : store.addToStore(name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
+    auto storePath =
+        mode == FetchMode::DryRun
+            ? store.computeStorePath(store.config.settings, name, path, method, HashAlgorithm::SHA256, {}, filter2)
+                  .first
+            : store.addToStore(name, path, method, HashAlgorithm::SHA256, {}, filter2, repair);
 
     debug(mode == FetchMode::DryRun ? "hashed '%s'" : "copied '%s' to '%s'", path, store.printStorePath(storePath));
 

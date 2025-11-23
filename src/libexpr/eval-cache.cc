@@ -63,7 +63,7 @@ struct AttrDb
 
     SymbolTable & symbols;
 
-    AttrDb(const StoreDirConfig & cfg, const Hash & fingerprint, SymbolTable & symbols)
+    AttrDb(bool useSQLiteWAL, const StoreDirConfig & cfg, const Hash & fingerprint, SymbolTable & symbols)
         : cfg(cfg)
         , _state(std::make_unique<Sync<State>>())
         , symbols(symbols)
@@ -75,7 +75,7 @@ struct AttrDb
 
         auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 
@@ -287,10 +287,11 @@ struct AttrDb
     }
 };
 
-static std::shared_ptr<AttrDb> makeAttrDb(const StoreDirConfig & cfg, const Hash & fingerprint, SymbolTable & symbols)
+static std::shared_ptr<AttrDb>
+makeAttrDb(bool useSQLiteWAL, const StoreDirConfig & cfg, const Hash & fingerprint, SymbolTable & symbols)
 {
     try {
-        return std::make_shared<AttrDb>(cfg, fingerprint, symbols);
+        return std::make_shared<AttrDb>(useSQLiteWAL, cfg, fingerprint, symbols);
     } catch (SQLiteError &) {
         ignoreExceptionExceptInterrupt();
         return nullptr;
@@ -299,7 +300,8 @@ static std::shared_ptr<AttrDb> makeAttrDb(const StoreDirConfig & cfg, const Hash
 
 EvalCache::EvalCache(
     std::optional<std::reference_wrapper<const Hash>> useCache, EvalState & state, RootLoader rootLoader)
-    : db(useCache ? makeAttrDb(*state.store, *useCache, state.symbols) : nullptr)
+    : db(useCache ? makeAttrDb(state.store->config.settings.useSQLiteWAL, *state.store, *useCache, state.symbols)
+                  : nullptr)
     , state(state)
     , rootLoader(rootLoader)
 {
@@ -707,7 +709,7 @@ StorePath AttrCursor::forceDerivation()
     auto aDrvPath = getAttr(root->state.s.drvPath);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
-    if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
+    if (!root->state.store->isValidPath(drvPath) && !root->state.store->config.settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
            been garbage-collected. So force it to be regenerated. */
         aDrvPath->forceValue();

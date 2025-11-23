@@ -285,23 +285,23 @@ std::string optimisticLockProfile(const Path & profile)
     return pathExists(profile) ? readLink(profile) : "";
 }
 
-Path profilesDir()
+Path profilesDir(const Settings & settings)
 {
-    auto profileRoot = isRootUser() ? rootProfilesDir() : createNixStateDir() + "/profiles";
+    auto profileRoot = isRootUser() ? rootProfilesDir(settings) : createNixStateDir() + "/profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-Path rootProfilesDir()
+Path rootProfilesDir(const Settings & settings)
 {
     return settings.nixStateDir + "/profiles/per-user/root";
 }
 
-Path getDefaultProfile()
+Path getDefaultProfile(const Settings & settings)
 {
     Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
     try {
-        auto profile = profilesDir() + "/profile";
+        auto profile = profilesDir(settings) + "/profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
@@ -319,14 +319,14 @@ Path getDefaultProfile()
     }
 }
 
-Path defaultChannelsDir()
+Path defaultChannelsDir(const Settings & settings)
 {
-    return profilesDir() + "/channels";
+    return profilesDir(settings) + "/channels";
 }
 
-Path rootChannelsDir()
+Path rootChannelsDir(const Settings & settings)
 {
-    return rootProfilesDir() + "/channels";
+    return rootProfilesDir(settings) + "/channels";
 }
 
 } // namespace nix

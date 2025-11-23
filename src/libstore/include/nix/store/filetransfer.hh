@@ -12,6 +12,7 @@
 #include "nix/util/url.hh"
 
 #include "nix/store/config.hh"
+#include "nix/store/globals.hh"
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
@@ -21,6 +22,12 @@ namespace nix {
 
 struct FileTransferSettings : Config
 {
+private:
+    static Path getDefaultSSLCertFile();
+
+public:
+    FileTransferSettings();
+
     Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
     Setting<std::string> userAgentSuffix{
@@ -77,6 +84,64 @@ struct FileTransferSettings : Config
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
           The default is 1048576 (1 MiB).
         )"};
+
+    Setting<unsigned int> downloadSpeed{
+        this,
+        0,
+        "download-speed",
+        R"(
+          Specify the maximum transfer rate in kilobytes per second you want
+          Nix to use for downloads.
+        )"};
+
+    Setting<std::string> netrcFile{
+        this,
+        fmt("%s/%s", bootstrapSettings.nixConfDir, "netrc"),
+        "netrc-file",
+        R"(
+          If set to an absolute path to a `netrc` file, Nix uses the HTTP
+          authentication credentials in this file when trying to download from
+          a remote host through HTTP or HTTPS. Defaults to
+          `$NIX_CONF_DIR/netrc`.
+
+          The `netrc` file consists of a list of accounts in the following
+          format:
+
+              machine my-machine
+              login my-username
+              password my-password
+
+          For the exact syntax, see [the `curl`
+          documentation](https://ec.haxx.se/usingcurl-netrc.html).
+
+          > **Note**
+          >
+          > This must be an absolute path, and `~` is not resolved. For
+          > example, `~/.netrc` won't resolve to your home directory's
+          > `.netrc`.
+        )"};
+
+    Setting<Path> caFile{
+        this,
+        getDefaultSSLCertFile(),
+        "ssl-cert-file",
+        R"(
+          The path of a file containing CA certificates used to
+          authenticate `https://` downloads. Nix by default uses
+          the first of the following files that exists:
+
+          1. `/etc/ssl/certs/ca-certificates.crt`
+          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+
+          The path can be overridden by the following environment
+          variables, in order of precedence:
+
+          1. `NIX_SSL_CERT_FILE`
+          2. `SSL_CERT_FILE`
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 };
 
 extern FileTransferSettings fileTransferSettings;

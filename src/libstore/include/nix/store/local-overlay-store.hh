@@ -7,15 +7,15 @@ namespace nix {
  */
 struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
-    LocalOverlayStoreConfig(const StringMap & params)
-        : LocalOverlayStoreConfig("local-overlay", "", params)
+    LocalOverlayStoreConfig(nix::Settings & settings, const StringMap & params)
+        : LocalOverlayStoreConfig(settings, "local-overlay", "", params)
     {
     }
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
-        : StoreConfig(params)
-        , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
+    LocalOverlayStoreConfig(nix::Settings & settings, std::string_view scheme, PathView path, const Params & params)
+        : StoreConfig(settings, params)
+        , LocalFSStoreConfig(settings, path, params)
+        , LocalStoreConfig(settings, scheme, path, params)
     {
     }
 

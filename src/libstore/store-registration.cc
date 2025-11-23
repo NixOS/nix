@@ -6,24 +6,24 @@
 
 namespace nix {
 
-ref<Store> openStore()
+ref<Store> openStore(Settings & settings)
 {
-    return openStore(settings.storeUri.get());
+    return openStore(settings, settings.storeUri.get());
 }
 
-ref<Store> openStore(const std::string & uri, const Store::Config::Params & extraParams)
+ref<Store> openStore(Settings & settings, const std::string & uri, const Store::Config::Params & extraParams)
 {
-    return openStore(StoreReference::parse(uri, extraParams));
+    return openStore(settings, StoreReference::parse(uri, extraParams));
 }
 
-ref<Store> openStore(StoreReference && storeURI)
+ref<Store> openStore(Settings & settings, StoreReference && storeURI)
 {
-    auto store = resolveStoreConfig(std::move(storeURI))->openStore();
+    auto store = resolveStoreConfig(settings, std::move(storeURI))->openStore();
     store->init();
     return store;
 }
 
-ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
+ref<StoreConfig> resolveStoreConfig(Settings & settings, StoreReference && storeURI)
 {
     auto & params = storeURI.params;
 
@@ -32,9 +32,9 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
                 auto stateDir = getOr(params, "state", settings.nixStateDir);
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-                    return make_ref<LocalStore::Config>(params);
+                    return make_ref<LocalStore::Config>(settings, params);
                 else if (pathExists(settings.nixDaemonSocketFile))
-                    return make_ref<UDSRemoteStore::Config>(params);
+                    return make_ref<UDSRemoteStore::Config>(settings, params);
 #ifdef __linux__
                 else if (
                     !pathExists(stateDir) && params.empty() && !isRootUser() && !getEnv("NIX_STORE_DIR").has_value()
@@ -47,21 +47,21 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                         try {
                             createDirs(chrootStore);
                         } catch (SystemError & e) {
-                            return make_ref<LocalStore::Config>(params);
+                            return make_ref<LocalStore::Config>(settings, params);
                         }
                         warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
                     } else
                         debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                    return make_ref<LocalStore::Config>("local", chrootStore, params);
+                    return make_ref<LocalStore::Config>(settings, "local", chrootStore, params);
                 }
 #endif
                 else
-                    return make_ref<LocalStore::Config>(params);
+                    return make_ref<LocalStore::Config>(settings, params);
             },
             [&](const StoreReference::Specified & g) {
                 for (const auto & [storeName, implem] : Implementations::registered())
                     if (implem.uriSchemes.count(g.scheme))
-                        return implem.parseConfig(g.scheme, g.authority, params);
+                        return implem.parseConfig(settings, g.scheme, g.authority, params);
 
                 throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
             },
@@ -74,9 +74,9 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     return storeConfig;
 }
 
-std::list<ref<Store>> getDefaultSubstituters()
+std::list<ref<Store>> getDefaultSubstituters(Settings & settings)
 {
-    static auto stores([]() {
+    static auto stores([&]() {
         std::list<ref<Store>> stores;
 
         StringSet done;
@@ -85,7 +85,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             if (!done.insert(uri).second)
                 return;
             try {
-                stores.push_back(openStore(uri));
+                stores.push_back(openStore(settings, uri));
             } catch (Error & e) {
                 logWarning(e.info());
             }

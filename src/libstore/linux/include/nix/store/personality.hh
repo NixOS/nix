@@ -3,8 +3,14 @@
 
 #include <string>
 
+namespace nix {
+
+class Settings;
+
+}
+
 namespace nix::linux {
 
-void setPersonality(std::string_view system);
+void setPersonality(const nix::Settings & settings, std::string_view system);
 
 }

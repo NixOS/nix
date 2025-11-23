@@ -15,6 +15,8 @@
 
 namespace nix {
 
+class Settings;
+
 /**
  * Denotes a build failure that stemmed from the builder exiting with a
  * failing exist status.
@@ -54,6 +56,8 @@ typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source 
  */
 struct DerivationBuilderParams
 {
+    Settings & settings;
+
     /** The path of the derivation. */
     const StorePath & drvPath;
 

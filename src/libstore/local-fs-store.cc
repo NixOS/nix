@@ -8,18 +8,18 @@
 
 namespace nix {
 
-Path LocalFSStoreConfig::getDefaultStateDir()
+Path LocalFSStoreConfig::getDefaultStateDir(const nix::Settings & settings)
 {
     return settings.nixStateDir;
 }
 
-Path LocalFSStoreConfig::getDefaultLogDir()
+Path LocalFSStoreConfig::getDefaultLogDir(const nix::Settings & settings)
 {
     return settings.nixLogDir;
 }
 
-LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
-    : StoreConfig(params)
+LocalFSStoreConfig::LocalFSStoreConfig(nix::Settings & settings, PathView rootDir, const Params & params)
+    : StoreConfig(settings, params)
     /* Default `?root` from `rootDir` if non set
      * NOTE: We would like to just do rootDir.set(...), which would take care of
      * all normalization and error checking for us. Unfortunately we cannot do

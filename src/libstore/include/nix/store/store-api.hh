@@ -43,6 +43,8 @@ struct SourceAccessor;
 class NarInfoDiskCache;
 class Store;
 
+class Settings;
+
 typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
@@ -79,19 +81,32 @@ struct StoreConfigBase : Config
 {
     using Config::Config;
 
+    /**
+     * Global settings, which are we trying to triage and give better
+     * homes. Putting a reference to them on stores will help a bit with
+     * this, though we may find that some of the things here should
+     * *not* be per-store.
+     */
+    nix::Settings & settings;
+
+    StoreConfigBase(nix::Settings & settings)
+        : settings{settings}
+    {
+    }
+
 private:
 
     /**
      * An indirection so that we don't need to refer to global settings
      * in headers.
      */
-    static Path getDefaultNixStoreDir();
+    static Path getDefaultNixStoreDir(const nix::Settings & settings);
 
 public:
 
     const PathSetting storeDir_{
         this,
-        getDefaultNixStoreDir(),
+        getDefaultNixStoreDir(settings),
         "store",
         R"(
           Logical location of the Nix store, usually
@@ -136,13 +151,13 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
     using Params = StoreReference::Params;
 
-    StoreConfig(const Params & params);
+    StoreConfig(nix::Settings & settings, const Params & params);
 
     StoreConfig() = delete;
 
     virtual ~StoreConfig() {}
 
-    static StringSet getDefaultSystemFeatures();
+    static StringSet getDefaultSystemFeatures(const nix::Settings & settings);
 
     /**
      * Documentation for this type of store.
@@ -207,7 +222,7 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 
     Setting<StringSet> systemFeatures{
         this,
-        getDefaultSystemFeatures(),
+        getDefaultSystemFeatures(settings),
         "system-features",
         R"(
           Optional [system features](@docroot@/command-ref/conf-file.md#conf-system-features) available on the system this store uses to build derivations.
@@ -294,7 +309,7 @@ protected:
          * Whether the value is valid as a cache entry. The path may not
          * exist.
          */
-        bool isKnownNow();
+        bool isKnownNow(const nix::Settings & settings);
 
         /**
          * Past tense, because a path can only be assumed to exists when
