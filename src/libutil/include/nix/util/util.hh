@@ -58,6 +58,12 @@ Strings quoteStrings(const C & c, char quote = '\'')
     return res;
 }
 
+inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char quote = '\'')
+{
+    return paths | std::views::transform([&](const auto & p) { return quoteString(p.string(), quote); })
+           | std::ranges::to<Strings>();
+}
+
 /**
  * Remove trailing whitespace from a string.
  *

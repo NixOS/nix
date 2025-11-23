@@ -101,9 +101,13 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
     return canonPath(path, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
+std::filesystem::path
+absPath(const std::filesystem::path & path, std::optional<std::filesystem::path> dir, bool resolveSymlinks)
 {
-    return absPath(path.string(), std::nullopt, resolveSymlinks);
+    if (dir) {
+        return absPath(PathView{path.string()}, PathView{dir->string()}, resolveSymlinks);
+    }
+    return absPath(PathView{path.string()}, std::nullopt, resolveSymlinks);
 }
 
 Path canonPath(PathView path, bool resolveSymlinks)
@@ -242,10 +246,15 @@ bool pathAccessible(const std::filesystem::path & path)
     }
 }
 
-Path readLink(const Path & path)
+std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
-    return std::filesystem::read_symlink(path).string();
+    return std::filesystem::read_symlink(path);
+}
+
+Path readLink(const Path & path)
+{
+    return readLink(std::filesystem::path{path}).string();
 }
 
 std::string readFile(const Path & path)

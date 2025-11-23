@@ -50,7 +50,8 @@ protected:
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
         // because this is not allowed for a nix store.
-        auto tmpl = nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", true);
+        auto tmpl =
+            nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", std::nullopt, true);
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 

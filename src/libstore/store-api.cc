@@ -1126,6 +1126,11 @@ std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
     return s;
 }
 
+std::string showPaths(const std::set<std::filesystem::path> paths)
+{
+    return concatStringsSep(", ", quoteFSPaths(paths));
+}
+
 std::string showPaths(const PathSet & paths)
 {
     return concatStringsSep(", ", quoteStrings(paths));
