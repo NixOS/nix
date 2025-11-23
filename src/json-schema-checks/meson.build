@@ -64,9 +64,11 @@ schemas = [
   },
   {
     'stem' : 'build-trace-entry',
-    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'schema' : schema_dir / 'build-trace-entry-v2.yaml',
     'files' : [
       'simple.json',
+      # The field is no longer supported, but we want to show that we
+      # ignore it during parsing.
       'with-dependent-realisations.json',
       'with-signature.json',
     ],
@@ -196,6 +198,19 @@ schemas += [
     'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
     'files' : [
       'impure.json',
+    ],
+  },
+]
+
+# Dummy store
+schemas += [
+  {
+    'stem' : 'store',
+    'schema' : schema_dir / 'store-v1.yaml',
+    'files' : [
+      'empty.json',
+      'one-flat-file.json',
+      'one-derivation.json',
     ],
   },
 ]

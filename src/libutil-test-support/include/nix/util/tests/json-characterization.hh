@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/types.hh"
+#include "nix/util/ref.hh"
 #include "nix/util/file-system.hh"
 
 #include "nix/util/tests/characterization.hh"
@@ -35,6 +36,21 @@ void writeJsonTest(CharacterizationTest & test, PathView testStem, const T & val
     test.writeTest(
         Path{testStem} + ".json",
         [&]() -> json { return static_cast<json>(value); },
+        [](const auto & file) { return json::parse(readFile(file)); },
+        [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
+}
+
+/**
+ * Specialization for when we need to return do JSON -> `ref<T>`, but
+ * `const T &` -> JSON.
+ */
+template<typename T>
+void writeJsonTest(CharacterizationTest & test, PathView testStem, const ref<T> & value)
+{
+    using namespace nlohmann;
+    test.writeTest(
+        Path{testStem} + ".json",
+        [&]() -> json { return static_cast<json>(*value); },
         [](const auto & file) { return json::parse(readFile(file)); },
         [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
 }

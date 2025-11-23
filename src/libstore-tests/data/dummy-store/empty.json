@@ -1,0 +1,8 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {},
+  "derivations": {}
+}
