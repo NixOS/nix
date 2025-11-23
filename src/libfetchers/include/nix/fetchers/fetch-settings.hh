@@ -135,8 +135,6 @@ struct Settings : public Config
 
 private:
     mutable Sync<std::shared_ptr<Cache>> _cache;
-
-    mutable Sync<std::shared_ptr<GitRepo>> _tarballCache;
 };
 
 } // namespace nix::fetchers
