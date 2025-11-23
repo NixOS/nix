@@ -188,23 +188,23 @@ using namespace nix;
 
 #define ARG fso::Regular<RegularContents>
 template<typename RegularContents>
-JSON_IMPL_INNER(ARG)
+JSON_IMPL_INNER(ARG);
 #undef ARG
 
 #define ARG fso::DirectoryT<Child>
 template<typename Child>
-JSON_IMPL_INNER(ARG)
+JSON_IMPL_INNER(ARG);
 #undef ARG
 
 template<>
-JSON_IMPL_INNER(fso::Symlink)
+JSON_IMPL_INNER(fso::Symlink);
 
 template<>
-JSON_IMPL_INNER(fso::Opaque)
+JSON_IMPL_INNER(fso::Opaque);
 
 #define ARG fso::VariantT<RegularContents, recur>
 template<typename RegularContents, bool recur>
-JSON_IMPL_INNER(ARG)
+JSON_IMPL_INNER(ARG);
 #undef ARG
 
 } // namespace nlohmann
