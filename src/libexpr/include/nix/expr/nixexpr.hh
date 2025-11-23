@@ -592,11 +592,14 @@ public:
 struct ExprCall : Expr
 {
     Expr * fun;
-    std::vector<Expr *> args;
+    /**
+     * args will never be null. See comment on ExprAttrs::AttrDefs below.
+     */
+    std::optional<std::pmr::vector<Expr *>> args;
     PosIdx pos;
     std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
+    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
         : fun(fun)
         , args(args)
         , pos(pos)
@@ -604,7 +607,7 @@ struct ExprCall : Expr
     {
     }
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         : fun(fun)
         , args(args)
         , pos(pos)
@@ -836,7 +839,7 @@ public:
     // we define some calls to add explicitly so that the argument can be passed in as initializer lists
     template<class C>
     [[gnu::always_inline]]
-    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
+    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
         requires(std::same_as<C, ExprCall>)
     {
         return alloc.new_object<C>(pos, fun, std::move(args));
@@ -844,7 +847,7 @@ public:
 
     template<class C>
     [[gnu::always_inline]]
-    C * add(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         requires(std::same_as<C, ExprCall>)
     {
         return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));

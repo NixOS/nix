@@ -115,7 +115,7 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
 
 static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
     if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
-        e2->args.push_back(arg);
+        e2->args->push_back(arg);
         return fn;
     }
     return exprs.add<ExprCall>(pos, fn, {arg});
@@ -129,7 +129,7 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %type <Expr *> start expr expr_function expr_if expr_op
 %type <Expr *> expr_select expr_simple expr_app
 %type <Expr *> expr_pipe_from expr_pipe_into
-%type <std::vector<Expr *>> list
+%type <std::pmr::vector<Expr *>> list
 %type <ExprAttrs *> binds binds1
 %type <FormalsBuilder> formals formal_set
 %type <Formal> formal
