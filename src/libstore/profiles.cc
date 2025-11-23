@@ -319,7 +319,7 @@ std::filesystem::path getDefaultProfile()
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
-        return profileLink.parent_path() / std::filesystem::read_symlink(profileLink);
+        return profileLink.parent_path() / readLink(profileLink);
     } catch (Error &) {
         return profileLink;
     } catch (std::filesystem::filesystem_error &) {

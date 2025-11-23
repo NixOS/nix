@@ -250,8 +250,7 @@ std::filesystem::path readLink(const std::filesystem::path & path)
 
 Path readLink(const Path & path)
 {
-    checkInterrupt();
-    return std::filesystem::read_symlink(path).string();
+    return readLink(std::filesystem::path{path}).string();
 }
 
 std::string readFile(const Path & path)
