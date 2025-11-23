@@ -242,6 +242,12 @@ bool pathAccessible(const std::filesystem::path & path)
     }
 }
 
+std::filesystem::path readLink(const std::filesystem::path & path)
+{
+    checkInterrupt();
+    return std::filesystem::read_symlink(path);
+}
+
 Path readLink(const Path & path)
 {
     checkInterrupt();

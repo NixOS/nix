@@ -58,12 +58,10 @@ Strings quoteStrings(const C & c, char quote = '\'')
     return res;
 }
 
-inline Strings quoteFSPaths(std::set<std::filesystem::path> paths, char quote = '\'')
+inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char quote = '\'')
 {
-    Strings res;
-    for (auto & s : paths)
-        res.push_back(quoteString(s.string()));
-    return res;
+    return paths | std::views::transform([&](const auto & p) { return quoteString(p.string(), quote); })
+           | std::ranges::to<Strings>();
 }
 
 /**

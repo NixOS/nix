@@ -153,6 +153,12 @@ bool pathAccessible(const std::filesystem::path & path);
 Path readLink(const Path & path);
 
 /**
+ * Read the contents (target) of a symbolic link.  The result is not
+ * in any way canonicalised.
+ */
+std::filesystem::path readLink(const std::filesystem::path & path);
+
+/**
  * Open a `Descriptor` with read-only access to the given directory.
  */
 Descriptor openDirectory(const std::filesystem::path & path);

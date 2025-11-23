@@ -30,10 +30,6 @@
 #include <unistd.h>
 #include <nlohmann/json.hpp>
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 using std::cout;
 
@@ -1415,7 +1411,7 @@ static int main_nix_env(int argc, char ** argv)
 
         if (!pathExists(nixExprPath)) {
             try {
-                std::filesystem::create_directories(nixExprPath);
+                createDirs(nixExprPath);
                 replaceSymlink(defaultChannelsDir(), nixExprPath / "channels");
                 if (!isRootUser())
                     replaceSymlink(rootChannelsDir(), nixExprPath / "channels_root");

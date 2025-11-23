@@ -48,9 +48,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
 
     gens.sort([](const Generation & a, const Generation & b) { return a.number < b.number; });
 
-    return {
-        gens,
-        pathExists(profile) ? parseName(profileName, std::filesystem::read_symlink(profile).string()) : std::nullopt};
+    return {gens, pathExists(profile) ? parseName(profileName, readLink(profile).string()) : std::nullopt};
 }
 
 /**
@@ -58,7 +56,7 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::fil
  */
 static std::filesystem::path makeName(const std::filesystem::path & profile, GenerationNumber num)
 {
-    /* NB std::filesystem::path when put in format strings is 
+    /* NB std::filesystem::path when put in format strings is
        quoted automatically. */
     return fmt("%s-%s-link", profile.string(), num);
 }
@@ -73,7 +71,7 @@ std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::pa
     if (gens.size() > 0) {
         Generation last = gens.back();
 
-        if (std::filesystem::read_symlink(last.path) == store.printStorePath(outPath)) {
+        if (readLink(last.path) == store.printStorePath(outPath)) {
             /* We only create a new generation symlink if it differs
                from the last one.
 
@@ -94,16 +92,25 @@ std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::pa
        to the permanent roots (of which the GC would have a stale
        view).  If we didn't do it this way, the GC might remove the
        user environment etc. we've just built. */
-    std::filesystem::path generation = makeName(profile, num + 1);
+    auto generation = makeName(profile, num + 1);
     store.addPermRoot(outPath, generation.string());
 
     return generation;
 }
 
+static void removeFile(const std::filesystem::path & path)
+{
+    try {
+        std::filesystem::remove(path);
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("removeing file '%1%'", path);
+    }
+}
+
 void deleteGeneration(const std::filesystem::path & profile, GenerationNumber gen)
 {
     std::filesystem::path generation = makeName(profile, gen);
-    std::filesystem::remove(generation);
+    removeFile(generation);
 }
 
 /**
@@ -281,13 +288,13 @@ void lockProfile(PathLocks & lock, const std::filesystem::path & profile)
 
 std::string optimisticLockProfile(const std::filesystem::path & profile)
 {
-    return pathExists(profile) ? std::filesystem::read_symlink(profile).string() : "";
+    return pathExists(profile) ? readLink(profile).string() : "";
 }
 
 std::filesystem::path profilesDir()
 {
     auto profileRoot = isRootUser() ? rootProfilesDir() : std::filesystem::path{createNixStateDir()} / "profiles";
-    std::filesystem::create_directories(profileRoot);
+    createDirs(profileRoot);
     return profileRoot;
 }
 
@@ -308,7 +315,7 @@ std::filesystem::path getDefaultProfile()
         }
         // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
-        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles/default";
+        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles" / "default";
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
