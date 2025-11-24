@@ -362,10 +362,13 @@ void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Val
 }
 
 static RegisterPrimOp primop_fetchFinalTree({
-    .name = "fetchFinalTree",
+    .name = "__fetchFinalTree",
     .args = {"input"},
+    .doc = R"(
+      Like `fetchTree`, but does not return any additional fetcher attributes (like `revCount`).
+      This allows inputs to be substituted if `narHash` is specified.
+    )",
     .fun = prim_fetchFinalTree,
-    .internal = true,
 });
 
 static void fetch(
