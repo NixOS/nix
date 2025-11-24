@@ -215,7 +215,11 @@ void nix_derivation_free(nix_derivation * drv)
 
 StorePath * nix_store_path_clone(const StorePath * p)
 {
-    return new StorePath{p->path};
+    try {
+        return new StorePath{p->path};
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json)
