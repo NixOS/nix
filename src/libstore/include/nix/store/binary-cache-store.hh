@@ -12,6 +12,7 @@
 namespace nix {
 
 struct NarInfo;
+class NarCache;
 class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
@@ -88,6 +89,8 @@ protected:
     constexpr const static std::string realisationsPrefix = "realisations";
 
     constexpr const static std::string cacheInfoFile = "nix-cache-info";
+
+    std::shared_ptr<NarCache> narCache;
 
     BinaryCacheStore(Config &);
 

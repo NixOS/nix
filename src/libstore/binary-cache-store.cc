@@ -13,6 +13,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
+#include "nix/store/nar-cache.hh"
 
 #include <chrono>
 #include <future>
@@ -26,6 +27,7 @@ namespace nix {
 
 BinaryCacheStore::BinaryCacheStore(Config & config)
     : config{config}
+    , narCache{config.localNarCache.get() ? std::make_shared<NarCache>(*config.localNarCache.get()) : nullptr}
 {
     if (config.secretKeyFile != "")
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile)}));
@@ -552,7 +554,7 @@ void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 
 ref<RemoteFSAccessor> BinaryCacheStore::getRemoteFSAccessor(bool requireValidPath)
 {
-    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, config.localNarCache);
+    return make_ref<RemoteFSAccessor>(ref<Store>(shared_from_this()), requireValidPath, narCache);
 }
 
 ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
