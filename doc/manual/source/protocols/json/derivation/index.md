@@ -1,4 +1,4 @@
-{{#include derivation-v4-fixed.md}}
+{{#include ../derivation-v4-fixed.md}}
 
 <!-- need to convert YAML to JSON first
 ## Raw Schema
