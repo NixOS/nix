@@ -228,20 +228,10 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     return {
         .outputChecks = [&]() -> OutputChecksVariant<SingleDerivedPath> {
             if (parsed) {
-                auto & structuredAttrs = parsed->structuredAttrs;
-
                 std::map<std::string, OutputChecks<SingleDerivedPath>> res;
-                if (auto * outputChecks = get(structuredAttrs, "outputChecks")) {
+                if (auto * outputChecks = get(parsed->structuredAttrs, "outputChecks")) {
                     for (auto & [outputName, output_] : getObject(*outputChecks)) {
-                        OutputChecks<SingleDerivedPath> checks;
-
                         auto & output = getObject(output_);
-
-                        if (auto maxSize = get(output, "maxSize"))
-                            checks.maxSize = maxSize->get<uint64_t>();
-
-                        if (auto maxClosureSize = get(output, "maxClosureSize"))
-                            checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
                         auto get_ =
                             [&](const std::string & name) -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {

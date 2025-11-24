@@ -241,6 +241,13 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
 
+template<typename T>
+struct json_avoids_null;
+
+template<typename Input>
+struct json_avoids_null<DerivationOptions<Input>> : std::true_type
+{};
+
 }; // namespace nix
 
 JSON_IMPL(nix::DerivationOptions<nix::StorePath>);

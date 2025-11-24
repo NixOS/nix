@@ -67,7 +67,8 @@ struct DerivationBuilderParams
     /**
      * The derivation options of `drv`.
      *
-     * @todo this should be part of `Derivation`.
+     * @todo this should be part of `Derivation`/`BasicDerivation`, if
+     * those two were distinguished by type arguments not subtyping.
      */
     const DerivationOptions<StorePath> & drvOptions;
 

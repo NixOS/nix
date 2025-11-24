@@ -8,6 +8,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
@@ -333,6 +334,16 @@ struct Derivation : BasicDerivation
     DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
 
     /**
+     * Derivation options
+     *
+     * @todo instead of `BasicDerivation`/`Derivation`, should just have
+     * `template<...> Derivation`, and then the choice of template
+     * parameter would control "possibly-unresolved vs definitely
+     * resolved" and this field would use the overall type parameter.
+     */
+    DerivationOptions<SingleDerivedPath> options;
+
+    /**
      * Print a derivation.
      */
     std::string unparse(
@@ -349,14 +360,15 @@ struct Derivation : BasicDerivation
      * 2. Input placeholders are replaced with realized input store
      *    paths.
      */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const;
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>>
+    tryResolve(Store & store, Store * evalStore = nullptr) const;
 
     /**
      * Like the above, but instead of querying the Nix database for
      * realisations, uses a given mapping from input derivation paths +
      * output names to actual output store paths.
      */
-    std::optional<BasicDerivation> tryResolve(
+    std::optional<std::pair<BasicDerivation, DerivationOptions<StorePath>>> tryResolve(
         Store & store,
         std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const;

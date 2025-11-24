@@ -225,18 +225,8 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         return;
 
                     auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-                    DerivationOptions<SingleDerivedPath> drvOptions;
-                    try {
-                        // FIXME: this is a lot of work just to get the value
-                        // of `allowSubstitutes`.
-                        drvOptions = derivationOptionsFromStructuredAttrs(
-                            *this, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
-                    } catch (Error & e) {
-                        e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
-                        throw;
-                    }
 
-                    if (!knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+                    if (!knownOutputPaths && settings.useSubstitutes && drv->options.substitutesAllowed()) {
                         experimentalFeatureSettings.require(Xp::CaDerivations);
 
                         // If there are unknown output paths, attempt to find if the
@@ -266,7 +256,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         }
                     }
 
-                    if (knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+                    if (knownOutputPaths && settings.useSubstitutes && drv->options.substitutesAllowed()) {
                         auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                         for (auto & output : invalid)
                             pool.enqueue(std::bind(checkOutput, drvPath, drv, output, drvState));
