@@ -12,7 +12,7 @@
 
   We ultimately want to rectify this issue with all JSON formats to the extent allowed by our stability promises. To start with, we are changing the JSON format for derivations because the `nix derivation` commands are — in addition to being formally unstable — less widely used than other unstable commands.
 
-  See the documentation on the [JSON format for derivations](@docroot@/protocols/json/derivation.md) for further details.
+  See the documentation on the [JSON format for derivations](@docroot@/protocols/json/derivation/index.md) for further details.
 
 - C API: `nix_get_attr_name_byidx`, `nix_get_attr_byidx` take a `nix_value *` instead of `const nix_value *` [#13987](https://github.com/NixOS/nix/pull/13987)
 
