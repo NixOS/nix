@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/types.hh"
+#include "nix/util/ref.hh"
 #include "nix/util/file-system.hh"
 
 #include "nix/util/tests/characterization.hh"
@@ -35,6 +36,25 @@ void writeJsonTest(CharacterizationTest & test, PathView testStem, const T & val
     test.writeTest(
         Path{testStem} + ".json",
         [&]() -> json { return static_cast<json>(value); },
+        [](const auto & file) { return json::parse(readFile(file)); },
+        [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
+}
+
+/**
+ * Specialization for when we need to do "JSON -> `ref<T>`" in one
+ * direction, but "`const T &` -> JSON" in the other direction.
+ *
+ * We can't just return `const T &`, but it would be wasteful to
+ * requires a `const ref<T> &` double indirection (and mandatory shared
+ * pointer), so we break the symmetry as the best remaining option.
+ */
+template<typename T>
+void writeJsonTest(CharacterizationTest & test, PathView testStem, const ref<T> & value)
+{
+    using namespace nlohmann;
+    test.writeTest(
+        Path{testStem} + ".json",
+        [&]() -> json { return static_cast<json>(*value); },
         [](const auto & file) { return json::parse(readFile(file)); },
         [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
 }
