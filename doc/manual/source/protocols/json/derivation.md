@@ -3,5 +3,5 @@
 <!-- need to convert YAML to JSON first
 ## Raw Schema
 
-[JSON Schema for Derivation v3](schema/derivation-v4.json)
+[JSON Schema for Derivation v4](schema/derivation-v4.json)
 -->
