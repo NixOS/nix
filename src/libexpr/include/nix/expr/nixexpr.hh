@@ -438,6 +438,7 @@ struct ExprAttrs : Expr
     std::shared_ptr<const StaticEnv> bindInheritSources(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
     Env * buildInheritFromEnv(EvalState & state, Env & up);
     void showBindings(const SymbolTable & symbols, std::ostream & str) const;
+    void moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc);
 };
 
 struct ExprList : Expr
@@ -622,6 +623,7 @@ struct ExprCall : Expr
 
     virtual void resetCursedOr() override;
     virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
+    void moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc);
     COMMON_METHODS
 };
 

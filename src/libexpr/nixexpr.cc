@@ -399,18 +399,19 @@ ExprAttrs::bindInheritSources(EvalState & es, const std::shared_ptr<const Static
     return inner;
 }
 
+void ExprAttrs::moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc)
+{
+    AttrDefs newAttrs{std::move(*attrs), alloc};
+    attrs.emplace(std::move(newAttrs), alloc);
+    DynamicAttrDefs newDynamicAttrs{std::move(*dynamicAttrs), alloc};
+    dynamicAttrs.emplace(std::move(newDynamicAttrs), alloc);
+    if (inheritFromExprs)
+        inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>(std::move(*inheritFromExprs), alloc);
+}
+
 void ExprAttrs::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    // Move storage into the Exprs arena
-    {
-        auto arena = es.mem.exprs.alloc;
-        AttrDefs newAttrs{std::move(*attrs), arena};
-        attrs.emplace(std::move(newAttrs), arena);
-        DynamicAttrDefs newDynamicAttrs{std::move(*dynamicAttrs), arena};
-        dynamicAttrs.emplace(std::move(newDynamicAttrs), arena);
-        if (inheritFromExprs)
-            inheritFromExprs = std::make_unique<std::pmr::vector<Expr *>>(std::move(*inheritFromExprs), arena);
-    }
+    moveDataToAllocator(es.mem.exprs.alloc);
 
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
@@ -484,14 +485,15 @@ void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv>
     body->bindVars(es, newEnv);
 }
 
+void ExprCall::moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc)
+{
+    std::pmr::vector<Expr *> newArgs{std::move(*args), alloc};
+    args.emplace(std::move(newArgs), alloc);
+}
+
 void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    // Move storage into the Exprs arena
-    {
-        auto arena = es.mem.exprs.alloc;
-        std::pmr::vector<Expr *> newArgs{std::move(*args), arena};
-        args.emplace(std::move(newArgs), arena);
-    }
+    moveDataToAllocator(es.mem.exprs.alloc);
     if (es.debugRepl)
         es.exprEnvs.insert(std::make_pair(this, env));
 
