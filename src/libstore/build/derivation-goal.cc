@@ -6,7 +6,7 @@
 #  include "nix/store/build/derivation-builder.hh"
 #endif
 #include "nix/util/processes.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 #include "nix/util/compression.hh"

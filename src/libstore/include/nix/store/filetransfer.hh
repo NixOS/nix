@@ -7,7 +7,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
 

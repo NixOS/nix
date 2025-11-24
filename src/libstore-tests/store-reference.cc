@@ -17,14 +17,14 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
 
     std::filesystem::path goldenMaster(PathView testStem) const override
     {
-        return unitTestData / (testStem + ".txt");
+        return unitTestData / testStem;
     }
 };
 
 #define URI_TEST_READ(STEM, OBJ)                                \
     TEST_F(StoreReferenceTest, PathInfo_##STEM##_from_uri)      \
     {                                                           \
-        readTest(#STEM, ([&](const auto & encoded) {            \
+        readTest(#STEM ".txt", ([&](const auto & encoded) {     \
                      StoreReference expected = OBJ;             \
                      auto got = StoreReference::parse(encoded); \
                      ASSERT_EQ(got, expected);                  \
@@ -35,7 +35,7 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
     TEST_F(StoreReferenceTest, PathInfo_##STEM##_to_uri)                                        \
     {                                                                                           \
         writeTest(                                                                              \
-            #STEM,                                                                              \
+            #STEM ".txt",                                                                       \
             [&]() -> StoreReference { return OBJ; },                                            \
             [](const auto & file) { return StoreReference::parse(readFile(file)); },            \
             [](const auto & file, const auto & got) { return writeFile(file, got.render()); }); \
@@ -45,14 +45,43 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
     URI_TEST_READ(STEM, OBJ) \
     URI_TEST_WRITE(STEM, OBJ)
 
-URI_TEST(
+#define JSON_TEST_READ(STEM, OBJ)                             \
+    TEST_F(StoreReferenceTest, PathInfo_##STEM##_from_json)   \
+    {                                                         \
+        readTest(#STEM ".json", ([&](const auto & encoded_) { \
+                     auto encoded = json::parse(encoded_);    \
+                     StoreReference expected = OBJ;           \
+                     StoreReference got = encoded;            \
+                     ASSERT_EQ(got, expected);                \
+                 }));                                         \
+    }
+
+#define JSON_TEST_WRITE(STEM, OBJ)                                                                          \
+    TEST_F(StoreReferenceTest, PathInfo_##STEM##_to_json)                                                   \
+    {                                                                                                       \
+        writeTest(                                                                                          \
+            #STEM ".json",                                                                                  \
+            [&]() -> StoreReference { return OBJ; },                                                        \
+            [](const auto & file) -> StoreReference { return json::parse(readFile(file)); },                \
+            [](const auto & file, const auto & got) { return writeFile(file, json(got).dump(2) + "\n"); }); \
+    }
+
+#define JSON_TEST(STEM, OBJ)  \
+    JSON_TEST_READ(STEM, OBJ) \
+    JSON_TEST_WRITE(STEM, OBJ)
+
+#define BOTH_FORMATS_TEST(STEM, OBJ) \
+    URI_TEST(STEM, OBJ)              \
+    JSON_TEST(STEM, OBJ)
+
+BOTH_FORMATS_TEST(
     auto,
     (StoreReference{
         .variant = StoreReference::Auto{},
         .params = {},
     }))
 
-URI_TEST(
+BOTH_FORMATS_TEST(
     auto_param,
     (StoreReference{
         .variant = StoreReference::Auto{},
@@ -81,7 +110,7 @@ static StoreReference localExample_2{
         },
     .params =
         {
-            {"trusted", "true"},
+            {"trusted", true},
         },
 };
 
@@ -96,9 +125,9 @@ static StoreReference localExample_3{
         },
 };
 
-URI_TEST(local_1, localExample_1)
+BOTH_FORMATS_TEST(local_1, localExample_1)
 
-URI_TEST(local_2, localExample_2)
+BOTH_FORMATS_TEST(local_2, localExample_2)
 
 /* Test path with encoded spaces */
 URI_TEST(local_3, localExample_3)
@@ -124,16 +153,16 @@ static StoreReference unixExample{
         },
     .params =
         {
-            {"max-connections", "7"},
-            {"trusted", "true"},
+            {"max-connections", 7},
+            {"trusted", true},
         },
 };
 
-URI_TEST(unix, unixExample)
+BOTH_FORMATS_TEST(unix, unixExample)
 
 URI_TEST_READ(unix_shorthand, unixExample)
 
-URI_TEST(
+BOTH_FORMATS_TEST(
     ssh,
     (StoreReference{
         .variant =

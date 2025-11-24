@@ -1,4 +1,4 @@
-#include "nix/util/args/root.hh"
+#include "nix/main/args/root.hh"
 #include "nix/util/current-process.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
@@ -205,7 +205,7 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
                 auto & j = stores[storeName];
                 j["doc"] = implem.doc;
                 j["uri-schemes"] = implem.uriSchemes;
-                j["settings"] = implem.getConfig()->toJSON();
+                j["settings"] = implem.configDescriptions();
                 j["experimentalFeature"] = implem.experimentalFeature;
             }
         }

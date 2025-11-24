@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/expr/eval-profiler-settings.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/source-path.hh"
 
 namespace nix {

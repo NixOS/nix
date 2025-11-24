@@ -7,7 +7,6 @@
 
 #include "nix/util/archive.hh"
 #include "nix/util/alignment.hh"
-#include "nix/util/config-global.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
@@ -15,22 +14,18 @@
 
 namespace nix {
 
-struct ArchiveSettings : Config
-{
-    Setting<bool> useCaseHack{
-        this,
+const extern ArchiveSettings<config::PlainValue> archiveSettingsDefaults = {
+    .useCaseHack =
+        {.value =
 #ifdef __APPLE__
-        true,
+             true
 #else
-        false,
+             false
 #endif
-        "use-case-hack",
-        "Whether to enable a macOS-specific hack for dealing with file name case collisions."};
+        },
 };
 
-static ArchiveSettings archiveSettings;
-
-static GlobalConfig::Register rArchiveSettings(&archiveSettings);
+ArchiveSettings<config::PlainValue> archiveSettings = archiveSettingsDefaults;
 
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 

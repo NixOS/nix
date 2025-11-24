@@ -64,8 +64,8 @@ StoreReference Machine::completeStoreReference() const
     auto * generic = std::get_if<StoreReference::Specified>(&storeUri.variant);
 
     if (generic && generic->scheme == "ssh") {
-        storeUri.params["max-connections"] = "1";
-        storeUri.params["log-fd"] = "4";
+        storeUri.params["max-connections"] = 1;
+        storeUri.params["log-fd"] = 4;
     }
 
     if (generic && (generic->scheme == "ssh" || generic->scheme == "ssh-ng")) {
@@ -77,15 +77,12 @@ StoreReference Machine::completeStoreReference() const
 
     {
         auto & fs = storeUri.params["system-features"];
-        auto append = [&](auto feats) {
-            for (auto & f : feats) {
-                if (fs.size() > 0)
-                    fs += ' ';
-                fs += f;
-            }
-        };
-        append(supportedFeatures);
-        append(mandatoryFeatures);
+        if (!fs.is_array())
+            fs = nlohmann::json::array();
+        auto features = supportedFeatures;
+        features.insert(supportedFeatures.begin(), supportedFeatures.end());
+        for (auto & feat : features)
+            fs += feat;
     }
 
     return storeUri;

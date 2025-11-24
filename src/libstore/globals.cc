@@ -1,9 +1,9 @@
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/archive.hh"
-#include "nix/util/args.hh"
-#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/main/args.hh"
+#include "nix/main/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
 #include "nix/util/signals.hh"
 
@@ -29,7 +29,7 @@
 #  include "nix/util/processes.hh"
 #endif
 
-#include "nix/util/config-impl.hh"
+#include "nix/main/config-impl.hh"
 
 #ifdef __APPLE__
 #  include <sys/sysctl.h>

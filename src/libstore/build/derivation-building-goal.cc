@@ -626,7 +626,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 .initialOutputs = initialOutputs,
                 .buildMode = buildMode,
                 .defaultPathsInChroot = std::move(defaultPathsInChroot),
-                .systemFeatures = worker.store.config.systemFeatures.get(),
+                .systemFeatures = worker.store.config.systemFeatures,
                 .desugaredEnv = std::move(desugaredEnv),
             };
 

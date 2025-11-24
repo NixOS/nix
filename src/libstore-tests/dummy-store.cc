@@ -6,13 +6,25 @@
 
 namespace nix {
 
+TEST(DummyStore, constructConfig)
+{
+    DummyStoreConfig config{"dummy", "", {}};
+
+    EXPECT_EQ(config.storeDir, settings.nixStore);
+}
+
+TEST(DummyStore, constructConfigNoAuthority)
+{
+    EXPECT_THROW(DummyStoreConfig("dummy", "not-allowed", {}), UsageError);
+}
+
 TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);
 
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
-        cfg->readOnly = false;
+        cfg->readOnly = {false};
         return cfg->openDummyStore();
     }();
 

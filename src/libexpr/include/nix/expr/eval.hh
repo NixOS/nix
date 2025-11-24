@@ -8,7 +8,7 @@
 #include "nix/expr/value.hh"
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/symbol-table.hh"
-#include "nix/util/configuration.hh"
+#include "nix/main/configuration.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/position.hh"
 #include "nix/util/pos-table.hh"

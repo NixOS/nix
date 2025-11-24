@@ -11,7 +11,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/globals.hh"
-#include "nix/util/config-global.hh"
+#include "nix/main/config-global.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/legacy.hh"
@@ -249,9 +249,9 @@ static PeerInfo getPeerInfo(int remote)
  */
 static ref<Store> openUncachedStore()
 {
-    Store::Config::Params params; // FIXME: get params from somewhere
+    StoreConfig::Params params; // FIXME: get params from somewhere
     // Disable caching since the client already does that.
-    params["path-info-cache-size"] = "0";
+    params["path-info-cache-size"] = 0;
     return openStore(settings.storeUri, params);
 }
 
