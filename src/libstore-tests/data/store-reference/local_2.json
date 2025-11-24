@@ -1,0 +1,5 @@
+{
+  "authority": "/foo/bar/baz",
+  "scheme": "local",
+  "trusted": true
+}

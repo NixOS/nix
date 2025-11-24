@@ -29,6 +29,8 @@ headers = [ config_pub_h ] + files(
   'common-protocol-impl.hh',
   'common-protocol.hh',
   'common-ssh-store-config.hh',
+  'config-parse-impl.hh',
+  'config-parse.hh',
   'content-address.hh',
   'daemon.hh',
   'derivation-options.hh',

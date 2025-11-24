@@ -8,17 +8,27 @@
 
 namespace nix {
 
-struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
-                        virtual RemoteStoreConfig,
-                        virtual CommonSSHStoreConfig
+template<template<typename> class F>
+struct SSHStoreConfigT
 {
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+    F<Strings>::type remoteProgram;
+};
 
-    SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
+                        Store::Config,
+                        RemoteStore::Config,
+                        CommonSSHStoreConfig,
+                        SSHStoreConfigT<config::PlainValue>
+{
+    static config::SettingDescriptionMap descriptions();
 
-    const Setting<Strings> remoteProgram{
-        this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
+    std::optional<LocalFSStore::Config> mounted;
+
+    SSHStoreConfig(
+        std::string_view scheme,
+        std::string_view authority,
+        const StoreConfig::Params & params,
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     static const std::string name()
     {
@@ -35,31 +45,6 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
     ref<Store> openStore() const override;
 
     StoreReference getReference() const override;
-};
-
-struct MountedSSHStoreConfig : virtual SSHStoreConfig, virtual LocalFSStoreConfig
-{
-    MountedSSHStoreConfig(StringMap params);
-    MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params);
-
-    static const std::string name()
-    {
-        return "Experimental SSH Store with filesystem mounted";
-    }
-
-    static StringSet uriSchemes()
-    {
-        return {"mounted-ssh-ng"};
-    }
-
-    static std::string doc();
-
-    static std::optional<ExperimentalFeature> experimentalFeature()
-    {
-        return ExperimentalFeature::MountedSSHStore;
-    }
-
-    ref<Store> openStore() const override;
 };
 
 } // namespace nix
