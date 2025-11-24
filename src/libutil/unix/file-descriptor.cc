@@ -1,3 +1,4 @@
+#include "nix/util/canon-path.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
@@ -6,6 +7,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
+
+#if defined(__linux__) && defined(__NR_openat2)
+#  define HAVE_OPENAT2 1
+#  include <sys/syscall.h>
+#  include <linux/openat2.h>
+#else
+#  define HAVE_OPENAT2 0
+#endif
 
 #include "util-config-private.hh"
 #include "util-unix-config-private.hh"
@@ -221,6 +230,106 @@ void unix::closeOnExec(int fd)
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 || fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
+}
+
+#ifdef __linux__
+
+namespace linux {
+
+std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve)
+{
+#  if HAVE_OPENAT2
+    /* Cache the result of whether openat2 is not supported. */
+    static std::atomic_flag unsupported{};
+
+    if (!unsupported.test()) {
+        /* No glibc wrapper yet, but there's a patch:
+         * https://patchwork.sourceware.org/project/glibc/patch/20251029200519.3203914-1-adhemerval.zanella@linaro.org/
+         */
+        auto how = ::open_how{.flags = flags, .mode = mode, .resolve = resolve};
+        auto res = ::syscall(__NR_openat2, dirFd, path, &how, sizeof(how));
+        /* Cache that the syscall is not supported. */
+        if (res < 0 && errno == ENOSYS) {
+            unsupported.test_and_set();
+            return std::nullopt;
+        }
+
+        return res;
+    }
+#  endif
+    return std::nullopt;
+}
+
+} // namespace linux
+
+#endif
+
+static Descriptor
+openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+{
+    AutoCloseFD parentFd;
+    auto nrComponents = std::ranges::distance(path);
+    auto components = std::views::take(path, nrComponents - 1); /* Everything but last component */
+    auto getParentFd = [&]() { return parentFd ? parentFd.get() : dirFd; };
+
+    /* This rather convoluted loop is necessary to avoid TOCTOU when validating that
+       no inner path component is a symlink. */
+    for (auto it = components.begin(); it != components.end(); ++it) {
+        auto component = std::string(*it);                        /* Copy into a string to make NUL terminated. */
+        assert(component != ".." && !component.starts_with('/')); /* In case invariant is broken somehow.. */
+
+        AutoCloseFD parentFd2 = ::openat(
+            getParentFd(), /* First iteration uses dirFd. */
+            component.c_str(),
+            O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
+#ifdef __linux__
+                | O_PATH /* Linux-specific optimization. Files are open only for path resolution purposes. */
+#endif
+#ifdef __FreeBSD__
+                | O_RESOLVE_BENEATH /* Further guard against any possible SNAFUs. */
+#endif
+        );
+
+        if (!parentFd2) {
+            /* Construct the CanonPath for error message. */
+            auto path2 = std::ranges::fold_left(components.begin(), ++it, CanonPath::root, [](auto lhs, auto rhs) {
+                lhs.push(rhs);
+                return lhs;
+            });
+
+            if (errno == ENOTDIR) /* Path component might be a symlink. */ {
+                struct ::stat st;
+                if (::fstatat(getParentFd(), component.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(st.st_mode))
+                    throw unix::SymlinkNotAllowed(path2);
+                errno = ENOTDIR; /* Restore the errno. */
+            } else if (errno == ELOOP) {
+                throw unix::SymlinkNotAllowed(path2);
+            }
+
+            return INVALID_DESCRIPTOR;
+        }
+
+        parentFd = std::move(parentFd2);
+    }
+
+    auto res = ::openat(getParentFd(), std::string(path.baseName().value()).c_str(), flags | O_NOFOLLOW, mode);
+    if (res < 0 && errno == ELOOP)
+        throw unix::SymlinkNotAllowed(path);
+    return res;
+}
+
+Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+{
+#ifdef __linux__
+    auto maybeFd = linux::openat2(
+        dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
+    if (maybeFd) {
+        if (*maybeFd < 0 && errno == ELOOP)
+            throw unix::SymlinkNotAllowed(path);
+        return *maybeFd;
+    }
+#endif
+    return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
 }
 
 } // namespace nix
