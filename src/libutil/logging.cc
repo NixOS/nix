@@ -370,7 +370,7 @@ void applyJSONLogger()
     if (!loggerSettings.jsonLogPath.get().empty()) {
         try {
             std::vector<std::unique_ptr<Logger>> loggers;
-            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            loggers.push_back(makeJSONLogger(loggerSettings.jsonLogPath.get(), false));
             try {
                 logger = makeTeeLogger(std::move(logger), std::move(loggers));
             } catch (...) {

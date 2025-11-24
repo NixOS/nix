@@ -134,6 +134,7 @@ DECLARE_CONFIG_SERIALISER(Strings)
 DECLARE_CONFIG_SERIALISER(StringSet)
 DECLARE_CONFIG_SERIALISER(StringMap)
 DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
+DECLARE_CONFIG_SERIALISER(std::filesystem::path)
 
 template<typename T>
 T BaseSetting<T>::parse(const std::string & str) const

@@ -433,6 +433,18 @@ std::string BaseSetting<StringMap>::to_string() const
         [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
+template<>
+std::filesystem::path BaseSetting<std::filesystem::path>::parse(const std::string & str) const
+{
+    return std::filesystem::path(str).lexically_normal();
+}
+
+template<>
+std::string BaseSetting<std::filesystem::path>::to_string() const
+{
+    return value.string();
+}
+
 template class BaseSetting<int>;
 template class BaseSetting<unsigned int>;
 template class BaseSetting<long>;
@@ -445,6 +457,7 @@ template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
+template class BaseSetting<std::filesystem::path>;
 
 static Path parsePath(const AbstractSetting & s, const std::string & str)
 {
