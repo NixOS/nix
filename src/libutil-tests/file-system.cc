@@ -329,6 +329,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 {
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+    using namespace nix::unix;
 
     {
         RestoreSink sink(/*startFsync=*/false);
@@ -341,11 +342,18 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         sink.createSymlink(CanonPath("a/absolute_symlink"), tmpDir.string());
         sink.createSymlink(CanonPath("a/relative_symlink"), "../.");
         sink.createSymlink(CanonPath("a/broken_symlink"), "./nonexistent");
+        sink.createDirectory(CanonPath("a/b"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {
+            dirSink.createDirectory(CanonPath("d"));
+            dirSink.createSymlink(CanonPath("c"), "./d");
+        });
+        sink.createDirectory(CanonPath("a/b/c/e")); // FIXME: This still follows symlinks
+        ASSERT_THROW(
+            sink.createDirectory(
+                CanonPath("a/b/c/f"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {}),
+            SymlinkNotAllowed);
     }
 
     AutoCloseFD dirFd = openDirectory(tmpDir);
-
-    using namespace nix::unix;
 
     auto open = [&](std::string_view path, int flags, mode_t mode = 0) {
         return openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), flags, mode);
@@ -356,6 +364,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     EXPECT_THROW(open("a/absolute_symlink/a", O_RDONLY), SymlinkNotAllowed);
     EXPECT_THROW(open("a/absolute_symlink/c/d", O_RDONLY), SymlinkNotAllowed);
     EXPECT_THROW(open("a/relative_symlink/c", O_RDONLY), SymlinkNotAllowed);
+    EXPECT_THROW(open("a/b/c/d", O_RDONLY), SymlinkNotAllowed);
     EXPECT_EQ(open("a/broken_symlink", O_CREAT | O_WRONLY | O_EXCL, 0666), INVALID_DESCRIPTOR);
     /* Sanity check, no symlink shenanigans and behaves the same as regular openat with O_EXCL | O_CREAT. */
     EXPECT_EQ(errno, EEXIST);
