@@ -8,24 +8,25 @@
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, const Path & cacheDir)
+RemoteFSAccessor::RemoteFSAccessor(
+    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir_)
     : store(store)
     , requireValidPath(requireValidPath)
-    , cacheDir(cacheDir)
+    , cacheDir(std::move(cacheDir_))
 {
-    if (cacheDir != "")
-        createDirs(cacheDir);
+    if (cacheDir)
+        createDirs(*cacheDir);
 }
 
-Path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
+std::filesystem::path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
 {
-    assert(cacheDir != "");
-    return fmt("%s/%s.%s", cacheDir, hashPart, ext);
+    assert(cacheDir);
+    return (*cacheDir / hashPart) + "." + ext;
 }
 
 ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::string && nar)
 {
-    if (cacheDir != "") {
+    if (cacheDir) {
         try {
             /* FIXME: do this asynchronously. */
             writeFile(makeCacheFile(hashPart, "nar"), nar);
@@ -37,7 +38,7 @@ ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std:
     auto narAccessor = makeNarAccessor(std::move(nar));
     nars.emplace(hashPart, narAccessor);
 
-    if (cacheDir != "") {
+    if (cacheDir) {
         try {
             nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
             writeFile(makeCacheFile(hashPart, "ls"), j.dump());
@@ -64,9 +65,9 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
         return i->second;
 
     std::string listing;
-    Path cacheFile;
+    std::filesystem::path cacheFile;
 
-    if (cacheDir != "" && nix::pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
+    if (cacheDir && nix::pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
 
         try {
             listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
