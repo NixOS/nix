@@ -27,7 +27,7 @@ TEST(DummyStore, realisation_read)
         .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
     };
 
-    store->buildTrace.insert({drvHash, {{outputName, make_ref<UnkeyedRealisation>(value)}}});
+    store->buildTrace.insert({drvHash, {{outputName, value}}});
 
     auto value2 = store->queryRealisation({drvHash, outputName});
 

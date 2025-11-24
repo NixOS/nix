@@ -47,7 +47,7 @@ struct DummyStore : virtual Store
      * outer map for the derivation, and inner maps for the outputs of a
      * given derivation.
      */
-    boost::concurrent_flat_map<Hash, std::map<std::string, ref<UnkeyedRealisation>>> buildTrace;
+    boost::concurrent_flat_map<Hash, std::map<std::string, UnkeyedRealisation>> buildTrace;
 
     DummyStore(ref<const Config> config)
         : Store{*config}
