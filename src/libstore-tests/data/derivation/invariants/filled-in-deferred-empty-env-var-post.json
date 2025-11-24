@@ -1,0 +1,20 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "Fill in deferred output with empty env var",
+    "out": "/nix/store/bilpz1nq8qi9r3bzsp72n34yjgqg43ws-filled-in-deferred-empty-env-var"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "filled-in-deferred-empty-env-var",
+  "outputs": {
+    "out": {
+      "path": "bilpz1nq8qi9r3bzsp72n34yjgqg43ws-filled-in-deferred-empty-env-var"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

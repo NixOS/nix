@@ -223,13 +223,7 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto drv = static_cast<nix::Derivation>(nlohmann::json::parse(json));
-
-        auto drvPath = nix::writeDerivation(*store->ptr, drv, nix::NoRepair, /* read only */ true);
-
-        drv.checkInvariants(*store->ptr, drvPath);
-
-        return new nix_derivation{drv};
+        return new nix_derivation{nix::Derivation::parseJsonAndValidate(*store->ptr, nlohmann::json::parse(json))};
     }
     NIXC_CATCH_ERRS_NULL
 }
