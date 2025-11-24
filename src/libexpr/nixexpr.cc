@@ -504,6 +504,7 @@ void ExprCall::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 
 void ExprLet::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
+    attrs->moveDataToAllocator(es.mem.exprs.alloc);
     auto newEnv = [&]() -> std::shared_ptr<const StaticEnv> {
         auto newEnv = std::make_shared<StaticEnv>(nullptr, env, attrs->attrs->size());
 
