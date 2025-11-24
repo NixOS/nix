@@ -18,33 +18,40 @@ struct OutputsSpec;
 /**
  * A general `Realisation` key.
  *
- * This is similar to a `DerivedPath::Opaque`, but the derivation is
- * identified by its "hash modulo" instead of by its store path.
+ * This is similar to a `DerivedPath::Built`, except it is only a single
+ * step: `drvPath` is a `StorePath` rather than a `DerivedPath`.
  */
 struct DrvOutput
 {
     /**
-     * The hash modulo of the derivation.
-     *
-     * Computed from the derivation itself for most types of
-     * derivations, but computed from the (fixed) content address of the
-     * output for fixed-output derivations.
+     * The store path to the derivation
      */
-    Hash drvHash;
+    StorePath drvPath;
 
     /**
      * The name of the output.
      */
     OutputName outputName;
 
+    /**
+     * Skips the store dir on the `drvPath`
+     */
     std::string to_string() const;
 
-    std::string strHash() const
-    {
-        return drvHash.to_string(HashFormat::Base16, true);
-    }
+    /**
+     * Skips the store dir on the `drvPath`
+     */
+    static DrvOutput from_string(std::string_view);
 
-    static DrvOutput parse(const std::string &);
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    std::string render(const StoreDirConfig & store) const;
+
+    /**
+     * Includes the store dir on `drvPath`
+     */
+    static DrvOutput parse(const StoreDirConfig & store, std::string_view);
 
     bool operator==(const DrvOutput &) const = default;
     auto operator<=>(const DrvOutput &) const = default;
@@ -56,14 +63,6 @@ struct UnkeyedRealisation
 
     StringSet signatures;
 
-    /**
-     * The realisations that are required for the current one to be valid.
-     *
-     * When importing this realisation, the store will first check that all its
-     * dependencies exist, and map to the correct output path
-     */
-    std::map<DrvOutput, StorePath> dependentRealisations;
-
     std::string fingerprint(const DrvOutput & key) const;
 
     void sign(const DrvOutput & key, const Signer &);
@@ -71,6 +70,16 @@ struct UnkeyedRealisation
     bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const;
 
     size_t checkSignatures(const DrvOutput & key, const PublicKeys & publicKeys) const;
+
+    /**
+     * Just check the `outPath`. Signatures don't matter for this.
+     * Callers must ensure that the corresponding key is the same for
+     * most use-cases.
+     */
+    bool isCompatibleWith(const UnkeyedRealisation & other) const
+    {
+        return outPath == other.outPath;
+    }
 
     const StorePath & getPath() const
     {
@@ -85,12 +94,6 @@ struct Realisation : UnkeyedRealisation
 {
     DrvOutput id;
 
-    bool isCompatibleWith(const UnkeyedRealisation & other) const;
-
-    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
-
-    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
-
     bool operator==(const Realisation &) const = default;
     auto operator<=>(const Realisation &) const = default;
 };
@@ -101,16 +104,7 @@ struct Realisation : UnkeyedRealisation
  * Since these are the outputs of a single derivation, we know the
  * output names are unique so we can use them as the map key.
  */
-typedef std::map<OutputName, Realisation> SingleDrvOutputs;
-
-/**
- * Collection type for multiple derivations' outputs' `Realisation`s.
- *
- * `DrvOutput` is used because in general the derivations are not all
- * the same, so we need to identify firstly which derivation, and
- * secondly which output of that derivation.
- */
-typedef std::map<DrvOutput, Realisation> DrvOutputs;
+typedef std::map<OutputName, UnkeyedRealisation> SingleDrvOutputs;
 
 struct OpaquePath
 {
@@ -154,10 +148,6 @@ struct RealisedPath
      */
     const StorePath & path() const &;
 
-    void closure(Store & store, Set & ret) const;
-    static void closure(Store & store, const Set & startPaths, Set & ret);
-    Set closure(Store & store) const;
-
     bool operator==(const RealisedPath &) const = default;
     auto operator<=>(const RealisedPath &) const = default;
 };
@@ -165,19 +155,17 @@ struct RealisedPath
 class MissingRealisation : public Error
 {
 public:
-    MissingRealisation(DrvOutput & outputId)
-        : MissingRealisation(outputId.outputName, outputId.strHash())
+    MissingRealisation(const StoreDirConfig & store, DrvOutput & outputId)
+        : MissingRealisation(store, outputId.drvPath, outputId.outputName)
     {
     }
 
-    MissingRealisation(std::string_view drv, OutputName outputName)
-        : Error(
-              "cannot operate on output '%s' of the "
-              "unbuilt derivation '%s'",
-              outputName,
-              drv)
-    {
-    }
+    MissingRealisation(const StoreDirConfig & store, const StorePath & drvPath, const OutputName & outputName);
+    MissingRealisation(
+        const StoreDirConfig & store,
+        const SingleDerivedPath & drvPath,
+        const StorePath & drvPathResolved,
+        const OutputName & outputName);
 };
 
 } // namespace nix
