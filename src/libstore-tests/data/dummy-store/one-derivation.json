@@ -1,0 +1,22 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {},
+  "derivations": {
+    "rlqjbbb65ggcx9hy577hvnn929wz1aj0-foo.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {},
+        "srcs": []
+      },
+      "name": "foo",
+      "outputs": {},
+      "system": "",
+      "version": 4
+    }
+  }
+}

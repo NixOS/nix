@@ -2,6 +2,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/json-utils.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
 
@@ -14,6 +15,16 @@ std::string DummyStoreConfig::doc()
     return
 #include "dummy-store.md"
         ;
+}
+
+bool DummyStore::PathInfoAndContents::operator==(const PathInfoAndContents & other) const
+{
+    return info == other.info && contents->root == other.contents->root;
+}
+
+bool DummyStore::operator==(const DummyStore & other) const
+{
+    return contents == other.contents && derivations == other.derivations && buildTrace == other.buildTrace;
 }
 
 namespace {
@@ -320,9 +331,8 @@ struct DummyStoreImpl : DummyStore
 
     void registerDrvOutput(const Realisation & output) override
     {
-        auto ref = make_ref<UnkeyedRealisation>(output);
-        buildTrace.insert_or_visit({output.id.drvHash, {{output.id.outputName, ref}}}, [&](auto & kv) {
-            kv.second.insert_or_assign(output.id.outputName, make_ref<UnkeyedRealisation>(output));
+        buildTrace.insert_or_visit({output.id.drvHash, {{output.id.outputName, output}}}, [&](auto & kv) {
+            kv.second.insert_or_assign(output.id.outputName, output);
         });
     }
 
@@ -333,7 +343,7 @@ struct DummyStoreImpl : DummyStore
         buildTrace.cvisit(drvOutput.drvHash, [&](const auto & kv) {
             if (auto it = kv.second.find(drvOutput.outputName); it != kv.second.end()) {
                 visited = true;
-                callback(it->second.get_ptr());
+                callback(std::make_shared<UnkeyedRealisation>(it->second));
             }
         });
 
@@ -377,3 +387,100 @@ ref<DummyStore> DummyStore::Config::openDummyStore() const
 static RegisterStoreImplementation<DummyStore::Config> regDummyStore;
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+DummyStore::PathInfoAndContents adl_serializer<DummyStore::PathInfoAndContents>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    return DummyStore::PathInfoAndContents{
+        .info = valueAt(obj, "info"),
+        .contents = make_ref<MemorySourceAccessor>(valueAt(obj, "contents")),
+    };
+}
+
+void adl_serializer<DummyStore::PathInfoAndContents>::to_json(json & json, const DummyStore::PathInfoAndContents & val)
+{
+    json = {
+        {"info", val.info},
+        {"contents", *val.contents},
+    };
+}
+
+ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    auto cfg = make_ref<DummyStore::Config>(DummyStore::Config::Params{});
+    const_cast<PathSetting &>(cfg->storeDir_).set(getString(valueAt(obj, "store")));
+    cfg->readOnly = true;
+    return cfg;
+}
+
+void adl_serializer<DummyStoreConfig>::to_json(json & json, const DummyStoreConfig & val)
+{
+    json = {
+        {"store", val.storeDir},
+    };
+}
+
+ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
+{
+    auto & obj = getObject(json);
+    ref<DummyStore> res = adl_serializer<ref<DummyStoreConfig>>::from_json(valueAt(obj, "config"))->openDummyStore();
+    for (auto & [k, v] : getObject(valueAt(obj, "contents")))
+        res->contents.insert({StorePath{k}, v});
+    for (auto & [k, v] : getObject(valueAt(obj, "derivations")))
+        res->derivations.insert({StorePath{k}, v});
+    for (auto & [k0, v] : getObject(valueAt(obj, "buildTrace"))) {
+        for (auto & [k1, v2] : getObject(v)) {
+            UnkeyedRealisation realisation = v2;
+            res->buildTrace.insert_or_visit(
+                {
+                    Hash::parseExplicitFormatUnprefixed(k0, HashAlgorithm::SHA256, HashFormat::Base64),
+                    {{k1, realisation}},
+                },
+                [&](auto & kv) { kv.second.insert_or_assign(k1, realisation); });
+        }
+    }
+    return res;
+}
+
+void adl_serializer<DummyStore>::to_json(json & json, const DummyStore & val)
+{
+    json = {
+        {"config", *val.config},
+        {"contents",
+         [&] {
+             auto obj = json::object();
+             val.contents.cvisit_all([&](const auto & kv) {
+                 auto & [k, v] = kv;
+                 obj[k.to_string()] = v;
+             });
+             return obj;
+         }()},
+        {"derivations",
+         [&] {
+             auto obj = json::object();
+             val.derivations.cvisit_all([&](const auto & kv) {
+                 auto & [k, v] = kv;
+                 obj[k.to_string()] = v;
+             });
+             return obj;
+         }()},
+        {"buildTrace",
+         [&] {
+             auto obj = json::object();
+             val.buildTrace.cvisit_all([&](const auto & kv) {
+                 auto & [k, v] = kv;
+                 auto & obj2 = obj[k.to_string(HashFormat::Base64, false)] = json::object();
+                 for (auto & [k2, v2] : kv.second)
+                     obj2[k2] = v2;
+             });
+             return obj;
+         }()},
+    };
+}
+
+} // namespace nlohmann

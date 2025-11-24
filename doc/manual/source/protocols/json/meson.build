@@ -19,6 +19,7 @@ schemas = [
   'deriving-path-v1',
   'build-trace-entry-v1',
   'build-result-v1',
+  'store-v1',
 ]
 
 schema_files = files()
