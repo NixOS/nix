@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/canon-path.hh"
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
 
@@ -203,6 +204,26 @@ void closeOnExec(Descriptor fd);
 } // namespace unix
 #endif
 
+#ifdef __linux__
+namespace linux {
+
+/**
+ * Wrapper around Linux's openat2 syscall introduced in Linux 5.6.
+ *
+ * @see https://man7.org/linux/man-pages/man2/openat2.2.html
+ * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
+v*
+ * @param flags O_* flags
+ * @param mode Mode for O_{CREAT,TMPFILE}
+ * @param resolve RESOLVE_* flags
+ *
+ * @return nullopt if openat2 is not supported by the kernel.
+ */
+std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
+
+} // namespace linux
+#endif
+
 #if defined(_WIN32) && _WIN32_WINNT >= 0x0600
 namespace windows {
 
@@ -210,6 +231,43 @@ Path handleToPath(Descriptor handle);
 std::wstring handleToFileName(Descriptor handle);
 
 } // namespace windows
+#endif
+
+#ifndef _WIN32
+namespace unix {
+
+struct SymlinkNotAllowed : public Error
+{
+    CanonPath path;
+
+    SymlinkNotAllowed(CanonPath path)
+        /* Can't provide better error message, since the parent directory is only known to the caller. */
+        : Error("relative path '%s' points to a symlink, which is not allowed", path.rel())
+        , path(std::move(path))
+    {
+    }
+};
+
+/**
+ * Safe(r) function to open \param path file relative to \param dirFd, while
+ * disallowing escaping from a directory and resolving any symlinks in the
+ * process.
+ *
+ * @note When not on Linux or when openat2 is not available this is implemented
+ * via openat single path component traversal. Uses RESOLVE_BENEATH with openat2
+ * or O_RESOLVE_BENEATH.
+ *
+ * @note Since this is Unix-only path is specified as CanonPath, which models
+ * Unix-style paths and ensures that there are no .. or . components.
+ *
+ * @param flags O_* flags
+ * @param mode Mode for O_{CREAT,TMPFILE}
+ *
+ * @throws SymlinkNotAllowed if any path components
+ */
+Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+
+} // namespace unix
 #endif
 
 MakeError(EndOfFile, Error);

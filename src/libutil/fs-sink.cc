@@ -84,7 +84,8 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
 
     RestoreSink dirSink{startFsync};
     dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd = ::openat(dirFd.get(), path.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    dirSink.dirFd =
+        unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 
     if (!dirSink.dirFd)
         throw SysError("opening directory '%s'", dirSink.dstPath.string());
