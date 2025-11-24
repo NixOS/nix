@@ -297,7 +297,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile();
+    profile = getDefaultProfile().string();
 }
 
 MixEnvironment::MixEnvironment()
@@ -391,7 +391,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                     auto symlink = outLink;
                     if (i)
                         symlink += fmt("-%d", i);
-                    store.addPermRoot(bo.path, absPath(symlink.string()));
+                    store.addPermRoot(bo.path, absPath(symlink).string());
                 },
                 [&](const BuiltPath::Built & bfd) {
                     for (auto & output : bfd.outputs) {
@@ -400,7 +400,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                             symlink += fmt("-%d", i);
                         if (output.first != "out")
                             symlink += fmt("-%s", output.first);
-                        store.addPermRoot(output.second, absPath(symlink.string()));
+                        store.addPermRoot(output.second, absPath(symlink).string());
                     }
                 },
             },

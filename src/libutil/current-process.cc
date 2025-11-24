@@ -124,7 +124,7 @@ std::optional<Path> getSelfExe()
 {
     static auto cached = []() -> std::optional<Path> {
 #if defined(__linux__) || defined(__GNU__)
-        return readLink("/proc/self/exe");
+        return readLink(std::filesystem::path{"/proc/self/exe"});
 #elif defined(__APPLE__)
         char buf[1024];
         uint32_t size = sizeof(buf);
