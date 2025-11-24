@@ -3,6 +3,7 @@
 
 #include "nix/util/source-accessor.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/nar-cache.hh"
 #include "nix/store/store-api.hh"
 
 namespace nix {
@@ -13,19 +14,14 @@ class RemoteFSAccessor : public SourceAccessor
 
     /**
      * Map from store path hash part to NAR hash. Used to then look up
-     * in `nars`. The indirection allows avoiding opening multiple
+     * in the NAR cache. The indirection allows avoiding opening multiple
      * redundant NAR accessors for the same NAR.
      */
     std::map<std::string, Hash, std::less<>> narHashes;
 
-    /**
-     * Map from NAR hash to NAR accessor.
-     */
-    std::map<Hash, ref<SourceAccessor>> nars;
+    NarCache narCache;
 
     bool requireValidPath;
-
-    std::optional<std::filesystem::path> cacheDir;
 
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
