@@ -23,6 +23,8 @@ struct DummyStore : virtual Store
     {
         UnkeyedValidPathInfo info;
         ref<MemorySourceAccessor> contents;
+
+        bool operator==(const PathInfoAndContents &) const;
     };
 
     /**
@@ -54,6 +56,8 @@ struct DummyStore : virtual Store
         , config(config)
     {
     }
+
+    bool operator==(const DummyStore &) const;
 };
 
 } // namespace nix

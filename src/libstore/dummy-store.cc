@@ -16,6 +16,16 @@ std::string DummyStoreConfig::doc()
         ;
 }
 
+bool DummyStore::PathInfoAndContents::operator==(const PathInfoAndContents & other) const
+{
+    return info == other.info && contents->root == other.contents->root;
+}
+
+bool DummyStore::operator==(const DummyStore & other) const
+{
+    return contents == other.contents && derivations == other.derivations && buildTrace == other.buildTrace;
+}
+
 namespace {
 
 class WholeStoreViewAccessor : public SourceAccessor
