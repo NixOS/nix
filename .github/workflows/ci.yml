@@ -24,7 +24,7 @@ jobs:
   eval:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -40,7 +40,7 @@ jobs:
     name: pre-commit checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/install-nix-action
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -87,7 +87,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -162,7 +162,7 @@ jobs:
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Download installer tarball
       uses: actions/download-artifact@v6
       with:
@@ -227,7 +227,7 @@ jobs:
       github.ref_name == 'master'
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -276,14 +276,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout flake-regressions
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
@@ -303,7 +303,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref_name == 'master'
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
