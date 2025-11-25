@@ -470,7 +470,8 @@ public:
         std::string res;
 
         auto renderActivity =
-            [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
+            [&] [[nodiscard]] (
+                ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
                 auto & act = state.activitiesByType[type];
                 uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
                 for (auto & j : act.its) {
@@ -514,7 +515,7 @@ public:
                 return s;
             };
 
-        auto renderSizeActivity = [&](ActivityType type, const std::string & itemFmt = "%s") {
+        auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, const std::string & itemFmt = "%s") {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
             for (auto & j : act.its) {
@@ -573,14 +574,17 @@ public:
             return s;
         };
 
+        auto maybeAppendToResult = [&](std::string_view s) {
+            if (s.empty())
+                return;
+            if (!res.empty())
+                res += ", ";
+            res += s;
+        };
+
         auto showActivity =
             [&](ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
-                auto s = renderActivity(type, itemFmt, numberFmt, unit);
-                if (s.empty())
-                    return;
-                if (!res.empty())
-                    res += ", ";
-                res += s;
+                maybeAppendToResult(renderActivity(type, itemFmt, numberFmt, unit));
             };
 
         showActivity(actBuilds, "%s built");
@@ -602,7 +606,7 @@ public:
             }
         }
 
-        renderSizeActivity(actFileTransfer, "%s DL");
+        maybeAppendToResult(renderSizeActivity(actFileTransfer, "%s DL"));
 
         {
             auto s = renderActivity(actOptimiseStore, "%s paths optimised");
