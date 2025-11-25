@@ -7,6 +7,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/url.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -56,6 +57,14 @@ void emitTreeAttrs(
             attrs.alloc("revCount").mkInt(*revCount);
         else if (emptyRevFallback)
             attrs.alloc("revCount").mkInt(0);
+    }
+
+    // Unclear whether adding "ref" is yet a good idea even
+    // when it's not pure.
+    if (getEnv("_NIX_TEST_ATTRS_REF") == "1") {
+        if (input.getRef() && !state.settings.pureEval) {
+            attrs.alloc("ref").mkString(*input.getRef());
+        }
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
