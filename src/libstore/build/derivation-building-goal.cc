@@ -378,12 +378,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             useHook = false;
         } else {
             switch (tryBuildHook(initialOutputs, drvOptions)) {
-            case rpAccept:
+            case HookReply::Accept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 useHook = true;
                 break;
-            case rpPostpone:
+            case HookReply::Postpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
                 if (!actLock)
@@ -395,7 +395,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 outputLocks.unlock();
                 co_await waitForAWhile();
                 continue;
-            case rpDecline:
+            case HookReply::Decline:
                 /* We should do it ourselves.
 
                    Now that we've decided we can't / won't do a remote build, check
@@ -834,12 +834,12 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
-    return rpDecline;
+    return HookReply::Decline;
 #else
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
     if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
-        return rpDecline;
+        return HookReply::Decline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
@@ -877,13 +877,13 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         debug("hook reply is '%1%'", reply);
 
         if (reply == "decline")
-            return rpDecline;
+            return HookReply::Decline;
         else if (reply == "decline-permanently") {
             worker.tryBuildHook = false;
             worker.hook = 0;
-            return rpDecline;
+            return HookReply::Decline;
         } else if (reply == "postpone")
-            return rpPostpone;
+            return HookReply::Postpone;
         else if (reply != "accept")
             throw Error("bad hook reply '%s'", reply);
 
@@ -891,7 +891,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         if (e.errNo == EPIPE) {
             printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
-            return rpDecline;
+            return HookReply::Decline;
         } else
             throw;
     }
@@ -935,7 +935,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
-    return rpAccept;
+    return HookReply::Accept;
 #endif
 }
 
