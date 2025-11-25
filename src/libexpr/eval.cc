@@ -165,17 +165,17 @@ std::string showType(const Value & v)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (v.getInternalType()) {
-    case tString:
+    case InternalType::String:
         return v.context() ? "a string with context" : "a string";
-    case tPrimOp:
+    case InternalType::PrimOp:
         return fmt("the built-in function '%s'", std::string(v.primOp()->name));
-    case tPrimOpApp:
+    case InternalType::PrimOpApp:
         return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
-    case tExternal:
+    case InternalType::External:
         return v.external()->showType();
-    case tThunk:
+    case InternalType::Thunk:
         return v.isBlackhole() ? "a black hole" : "a thunk";
-    case tApp:
+    case InternalType::App:
         return "a function application";
     default:
         return std::string(showType(v.type()));
@@ -189,11 +189,11 @@ PosIdx Value::determinePos(const PosIdx pos) const
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (getInternalType()) {
-    case tAttrs:
+    case InternalType::Attrs:
         return attrs()->pos;
-    case tLambda:
+    case InternalType::Lambda:
         return lambda().fun->pos;
-    case tApp:
+    case InternalType::App:
         return app().left->determinePos(pos);
     default:
         return pos;
@@ -203,8 +203,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
 
 bool Value::isTrivial() const
 {
-    return !isa<tApp, tPrimOpApp>()
-           && (!isa<tThunk>()
+    return !isa<InternalType::App, InternalType::PrimOpApp>()
+           && (!isa<InternalType::Thunk>()
                || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs->empty())
                || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr));
 }
@@ -1637,7 +1637,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             size_t argsLeft = vCur.primOp()->arity;
 
             if (args.size() < argsLeft) {
-                /* We don't have enough arguments, so create a tPrimOpApp chain. */
+                /* We don't have enough arguments, so create a InternalType::PrimOpApp chain. */
                 makeAppChain();
                 return;
             } else {
@@ -1673,7 +1673,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             auto argsLeft = arity - argsDone;
 
             if (args.size() < argsLeft) {
-                /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
+                /* We still don't have enough arguments, so extend the InternalType::PrimOpApp chain. */
                 makeAppChain();
                 return;
             } else {

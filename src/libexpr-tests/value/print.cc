@@ -19,42 +19,42 @@ struct ValuePrintingTests : LibExprTest
     }
 };
 
-TEST_F(ValuePrintingTests, tInt)
+TEST_F(ValuePrintingTests, printInt)
 {
     Value vInt;
     vInt.mkInt(10);
     test(vInt, "10");
 }
 
-TEST_F(ValuePrintingTests, tBool)
+TEST_F(ValuePrintingTests, printBool)
 {
     Value vBool;
     vBool.mkBool(true);
     test(vBool, "true");
 }
 
-TEST_F(ValuePrintingTests, tString)
+TEST_F(ValuePrintingTests, printString)
 {
     Value vString;
     vString.mkStringNoCopy("some-string"_sds);
     test(vString, "\"some-string\"");
 }
 
-TEST_F(ValuePrintingTests, tPath)
+TEST_F(ValuePrintingTests, printPath)
 {
     Value vPath;
     vPath.mkStringNoCopy("/foo"_sds);
     test(vPath, "\"/foo\"");
 }
 
-TEST_F(ValuePrintingTests, tNull)
+TEST_F(ValuePrintingTests, printNull)
 {
     Value vNull;
     vNull.mkNull();
     test(vNull, "null");
 }
 
-TEST_F(ValuePrintingTests, tAttrs)
+TEST_F(ValuePrintingTests, printAttrs)
 {
     Value vOne;
     vOne.mkInt(1);
