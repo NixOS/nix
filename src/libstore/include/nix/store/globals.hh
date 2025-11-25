@@ -17,7 +17,7 @@
 
 namespace nix {
 
-typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+enum class SandboxMode { Enabled, Relaxed, Disabled };
 
 template<>
 SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
@@ -679,9 +679,9 @@ public:
     Setting<SandboxMode> sandboxMode{
         this,
 #ifdef __linux__
-        smEnabled
+        SandboxMode::Enabled
 #else
-        smDisabled
+        SandboxMode::Disabled
 #endif
         ,
         "sandbox",

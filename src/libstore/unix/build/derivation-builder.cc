@@ -1956,7 +1956,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 
     /* Are we doing a sandboxed build? */
     {
-        if (settings.sandboxMode == smEnabled) {
+        if (settings.sandboxMode == SandboxMode::Enabled) {
             if (params.drvOptions.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
@@ -1970,9 +1970,9 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
                     store.printStorePath(params.drvPath));
 #endif
             useSandbox = true;
-        } else if (settings.sandboxMode == smDisabled)
+        } else if (settings.sandboxMode == SandboxMode::Disabled)
             useSandbox = false;
-        else if (settings.sandboxMode == smRelaxed)
+        else if (settings.sandboxMode == SandboxMode::Relaxed)
             // FIXME: cache derivationType
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
