@@ -164,6 +164,15 @@ in
           """
           def decorator(test_func):
               def wrapper():
+                  # Restart nix-daemon on both machines to clear the credential provider cache.
+                  # The AwsCredentialProviderImpl singleton persists in the daemon process,
+                  # and its cache can cause credentials from previous tests to be reused.
+                  # We reset-failed first to avoid systemd's start rate limiting.
+                  server.succeed("systemctl reset-failed nix-daemon.service nix-daemon.socket")
+                  server.succeed("systemctl restart nix-daemon")
+                  client.succeed("systemctl reset-failed nix-daemon.service nix-daemon.socket")
+                  client.succeed("systemctl restart nix-daemon")
+
                   bucket = str(uuid.uuid4())
                   server.succeed(f"mc mb minio/{bucket}")
                   try:
