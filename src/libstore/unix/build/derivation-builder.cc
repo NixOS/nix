@@ -1398,6 +1398,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         StorePathSet refs;
     };
 
+    /* inverse map of scratchOutputs for efficient lookup */
+    std::map<StorePath, std::string> scratchOutputsInverse;
+    for (auto & [outputName, path] : scratchOutputs)
+        scratchOutputsInverse.insert_or_assign(path, outputName);
+
     std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
     for (auto & [outputName, _] : drv.outputs) {
@@ -1486,11 +1491,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 [&](const AlreadyRegistered &) { return StringSet{}; },
                 [&](const PerhapsNeedToRegister & refs) {
                     StringSet referencedOutputs;
-                    /* FIXME build inverted map up front so no quadratic waste here */
                     for (auto & r : refs.refs)
-                        for (auto & [o, p] : scratchOutputs)
-                            if (r == p)
-                                referencedOutputs.insert(o);
+                        if (auto * o = get(scratchOutputsInverse, r))
+                            referencedOutputs.insert(*o);
                     return referencedOutputs;
                 },
             },
