@@ -1396,6 +1396,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     struct PerhapsNeedToRegister
     {
         StorePathSet refs;
+        /**
+         * References to other outputs. Built by looking up in
+         * `scratchOutputsInverse`.
+         */
+        StringSet otherOutputs;
     };
 
     /* inverse map of scratchOutputs for efficient lookup */
@@ -1471,12 +1476,24 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             references = scanForReferences(blank, actualPath, referenceablePaths);
         }
 
-        outputReferencesIfUnregistered.insert_or_assign(outputName, PerhapsNeedToRegister{.refs = references});
+        StringSet referencedOutputs;
+        for (auto & r : references)
+            if (auto * o = get(scratchOutputsInverse, r))
+                referencedOutputs.insert(*o);
+
+        outputReferencesIfUnregistered.insert_or_assign(
+            outputName,
+            PerhapsNeedToRegister{
+                .refs = references,
+                .otherOutputs = referencedOutputs,
+            });
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) {
-        auto orifu = get(outputReferencesIfUnregistered, name);
+    StringSet emptySet;
+
+    auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) -> const StringSet & {
+        auto * orifu = get(outputReferencesIfUnregistered, name);
         if (!orifu)
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
@@ -1488,14 +1505,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* Since we'll use the already installed versions of these, we
                    can treat them as leaves and ignore any references they
                    have. */
-                [&](const AlreadyRegistered &) { return StringSet{}; },
-                [&](const PerhapsNeedToRegister & refs) {
-                    StringSet referencedOutputs;
-                    for (auto & r : refs.refs)
-                        if (auto * o = get(scratchOutputsInverse, r))
-                            referencedOutputs.insert(*o);
-                    return referencedOutputs;
-                },
+                [&](const AlreadyRegistered &) -> const StringSet & { return emptySet; },
+                [&](const PerhapsNeedToRegister & refs) -> const StringSet & { return refs.otherOutputs; },
             },
             *orifu);
     });
