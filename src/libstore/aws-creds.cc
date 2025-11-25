@@ -142,6 +142,12 @@ public:
             warn("failed to create TLS context for AWS SSO; SSO authentication will be unavailable");
             tlsContext = nullptr;
         }
+
+        // Get bootstrap (lives as long as apiHandle)
+        bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+        if (!bootstrap) {
+            throw AwsAuthError("failed to create AWS client bootstrap");
+        }
     }
 
     AwsCredentials getCredentialsRaw(const std::string & profile);
@@ -163,6 +169,7 @@ public:
 private:
     Aws::Crt::ApiHandle apiHandle;
     std::shared_ptr<Aws::Crt::Io::TlsContext> tlsContext;
+    Aws::Crt::Io::ClientBootstrap * bootstrap;
     boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>
         credentialProviderCache;
 };
@@ -170,35 +177,24 @@ private:
 std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>
 AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
 {
-    debug(
-        "[pid=%d] creating new AWS credential provider for profile '%s'",
-        getpid(),
-        profile.empty() ? "(default)" : profile.c_str());
+    // profileDisplayName is only used for debug logging - SDK uses its default profile
+    // when ProfileNameOverride is not set
+    const char * profileDisplayName = profile.empty() ? "(default)" : profile.c_str();
 
-    auto bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-    if (!bootstrap) {
-        throw AwsAuthError("failed to create AWS client bootstrap");
-    }
+    debug("[pid=%d] creating new AWS credential provider for profile '%s'", getpid(), profileDisplayName);
 
-    // If no profile specified, use the default chain
-    if (profile.empty()) {
-        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-        config.Bootstrap = bootstrap;
-        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
-    }
-
-    // For named profiles, build a custom credential chain: Environment → SSO → Profile → IMDS
-    // The SSO provider will gracefully fail if SSO isn't configured for this profile,
-    // and the chain will move on to the next provider.
+    // Build a custom credential chain: Environment → SSO → Profile → IMDS
+    // This works for both default and named profiles, ensuring consistent behavior
+    // including SSO support and proper TLS context for STS-based role assumption.
     Aws::Crt::Auth::CredentialsProviderChainConfig chainConfig;
     auto allocator = Aws::Crt::ApiAllocator();
 
     auto addProviderToChain = [&](std::string_view name, auto createProvider) {
         if (auto provider = createProvider()) {
             chainConfig.Providers.push_back(provider);
-            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profile);
+            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profileDisplayName);
         } else {
-            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profile);
+            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profileDisplayName);
         }
     };
 
@@ -211,14 +207,17 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
     if (tlsContext) {
         addProviderToChain("SSO", [&]() { return createSSOProvider(profile, bootstrap, tlsContext.get(), allocator); });
     } else {
-        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profile);
+        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profileDisplayName);
     }
 
-    // 3. Profile provider (for static credentials)
+    // 3. Profile provider (for static credentials and role_arn/source_profile with STS)
     addProviderToChain("Profile", [&]() {
         Aws::Crt::Auth::CredentialsProviderProfileConfig profileConfig;
         profileConfig.Bootstrap = bootstrap;
-        profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        profileConfig.TlsContext = tlsContext.get();
+        if (!profile.empty()) {
+            profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        }
         return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
     });
 
