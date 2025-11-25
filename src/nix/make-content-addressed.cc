@@ -30,7 +30,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
 
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
-        auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+        auto dstStore = dstUri.empty() ? openStore(settings) : openStore(settings, dstUri);
 
         auto remappings =
             makeContentAddressed(*srcStore, *dstStore, StorePathSet(storePaths.begin(), storePaths.end()));

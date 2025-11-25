@@ -1893,7 +1893,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     if (!state.store->isInStore(path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", path).atPos(pos).debugThrow();
     auto path2 = state.store->toStorePath(path.abs()).first;
-    if (!settings.readOnlyMode)
+    if (!state.settings.settings.readOnlyMode)
         state.store->ensurePath(path2);
     context.insert(NixStringContextElem::Opaque{.path = path2});
     v.mkString(path.abs(), context, state.mem);
@@ -2634,23 +2634,23 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
                 .debugThrow();
     }
 
-    auto storePath = settings.readOnlyMode ? state.store->makeFixedOutputPathFromCA(
-                                                 name,
-                                                 TextInfo{
-                                                     .hash = hashString(HashAlgorithm::SHA256, contents),
-                                                     .references = std::move(refs),
-                                                 })
-                                           : ({
-                                                 StringSource s{contents};
-                                                 state.store->addToStoreFromDump(
-                                                     s,
-                                                     name,
-                                                     FileSerialisationMethod::Flat,
-                                                     ContentAddressMethod::Raw::Text,
-                                                     HashAlgorithm::SHA256,
-                                                     refs,
-                                                     state.repair);
-                                             });
+    auto storePath = state.settings.settings.readOnlyMode ? state.store->makeFixedOutputPathFromCA(
+                                                                name,
+                                                                TextInfo{
+                                                                    .hash = hashString(HashAlgorithm::SHA256, contents),
+                                                                    .references = std::move(refs),
+                                                                })
+                                                          : ({
+                                                                StringSource s{contents};
+                                                                state.store->addToStoreFromDump(
+                                                                    s,
+                                                                    name,
+                                                                    FileSerialisationMethod::Flat,
+                                                                    ContentAddressMethod::Raw::Text,
+                                                                    HashAlgorithm::SHA256,
+                                                                    refs,
+                                                                    state.repair);
+                                                            });
 
     /* Note: we don't need to add `context' to the context of the
        result, since `storePath' itself has references to the paths
@@ -2790,7 +2790,7 @@ static void addPath(
                 state.fetchSettings,
                 *state.store,
                 path.resolveSymlinks(),
-                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                state.settings.settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
                 name,
                 method,
                 filter.get(),

@@ -5,14 +5,15 @@
 
 namespace nix {
 
-CommonSSHStoreConfig::CommonSSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : CommonSSHStoreConfig(scheme, ParsedURL::Authority::parse(authority), params)
+CommonSSHStoreConfig::CommonSSHStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+    : CommonSSHStoreConfig(settings, scheme, ParsedURL::Authority::parse(authority), params)
 {
 }
 
 CommonSSHStoreConfig::CommonSSHStoreConfig(
-    std::string_view scheme, const ParsedURL::Authority & authority, const Params & params)
-    : StoreConfig(params)
+    nix::Settings & settings, std::string_view scheme, const ParsedURL::Authority & authority, const Params & params)
+    : StoreConfig(settings, params)
     , authority(authority)
 {
 }

@@ -99,7 +99,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
-        if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+        if (worker.store.config.settings.useSubstitutes
+            && drvOptions.substitutesAllowed(worker.store.config.settings)) {
             if (!checkResult)
                 waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
             else {
@@ -117,7 +118,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         assert(!drv->type().isImpure());
 
-        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
+        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !worker.store.config.settings.tryFallback) {
             co_return doneFailure(BuildError(
                 BuildResult::Failure::TransientFailure,
                 "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",

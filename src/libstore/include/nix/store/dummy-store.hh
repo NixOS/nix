@@ -12,15 +12,16 @@ struct DummyStore;
 
 struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>, virtual StoreConfig
 {
-    DummyStoreConfig(const Params & params)
-        : StoreConfig(params)
+    DummyStoreConfig(nix::Settings & settings, const Params & params)
+        : StoreConfig(settings, params)
     {
         // Disable caching since this a temporary in-memory store.
         pathInfoCacheSize = 0;
     }
 
-    DummyStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-        : DummyStoreConfig(params)
+    DummyStoreConfig(
+        nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+        : DummyStoreConfig(settings, params)
     {
         if (!authority.empty())
             throw UsageError("`%s` store URIs must not contain an authority part %s", scheme, authority);
@@ -89,10 +90,16 @@ namespace nlohmann {
 template<>
 JSON_IMPL_INNER_TO(nix::DummyStoreConfig);
 template<>
-JSON_IMPL_INNER_FROM(nix::ref<nix::DummyStoreConfig>);
+struct adl_serializer<nix::ref<nix::DummyStoreConfig>>
+{
+    static nix::ref<nix::DummyStoreConfig> from_json(nix::Settings & settings, const json & json);
+};
 template<>
 JSON_IMPL_INNER_TO(nix::DummyStore);
 template<>
-JSON_IMPL_INNER_FROM(nix::ref<nix::DummyStore>);
+struct adl_serializer<nix::ref<nix::DummyStore>>
+{
+    static nix::ref<nix::DummyStore> from_json(nix::Settings & settings, const json & json);
+};
 
 } // namespace nlohmann

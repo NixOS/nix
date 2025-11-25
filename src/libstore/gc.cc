@@ -463,6 +463,8 @@ struct GCLimitReached
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
+    const auto & settings = config->settings;
+
     bool shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
     bool gcKeepOutputs = settings.gcKeepOutputs;
     bool gcKeepDerivations = settings.gcKeepDerivations;
@@ -917,6 +919,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 void LocalStore::autoGC(bool sync)
 {
 #if HAVE_STATVFS
+    const auto & settings = config->settings;
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 
     auto getAvail = [this]() -> uint64_t {
@@ -961,7 +964,7 @@ void LocalStore::autoGC(bool sync)
         std::promise<void> promise;
         future = state->gcFuture = promise.get_future().share();
 
-        std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
+        std::thread([promise{std::move(promise)}, this, avail, getAvail, &settings]() mutable {
             try {
 
                 /* Wake up any threads waiting for the auto-GC to finish. */

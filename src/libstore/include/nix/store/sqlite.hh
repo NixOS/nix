@@ -42,7 +42,13 @@ struct SQLite
 
     SQLite() {}
 
-    SQLite(const std::filesystem::path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
+    struct Settings
+    {
+        SQLiteOpenMode mode = SQLiteOpenMode::Normal;
+        bool useWAL;
+    };
+
+    SQLite(const std::filesystem::path & path, Settings && settings);
     SQLite(const SQLite & from) = delete;
     SQLite & operator=(const SQLite & from) = delete;
 

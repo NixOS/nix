@@ -62,7 +62,7 @@ static void traceSQL(void * x, const char * sql)
     notice("SQL<[%1%]>", sql);
 };
 
-SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
+SQLite::SQLite(const std::filesystem::path & path, Settings && settings)
 {
     // Work around a ZFS issue where SQLite's truncate() call on
     // db.sqlite-shm can randomly take up to a few seconds. See
@@ -89,10 +89,10 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
     // useSQLiteWAL also indicates what virtual file system we need.  Using
     // `unix-dotfile` is needed on NFS file systems and on Windows' Subsystem
     // for Linux (WSL) where useSQLiteWAL should be false by default.
-    const char * vfs = settings.useSQLiteWAL ? 0 : "unix-dotfile";
-    bool immutable = mode == SQLiteOpenMode::Immutable;
+    const char * vfs = settings.useWAL ? 0 : "unix-dotfile";
+    bool immutable = settings.mode == SQLiteOpenMode::Immutable;
     int flags = immutable ? SQLITE_OPEN_READONLY : SQLITE_OPEN_READWRITE;
-    if (mode == SQLiteOpenMode::Normal)
+    if (settings.mode == SQLiteOpenMode::Normal)
         flags |= SQLITE_OPEN_CREATE;
     auto uri = "file:" + percentEncode(path.string()) + "?immutable=" + (immutable ? "1" : "0");
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);

@@ -42,6 +42,11 @@ struct SimpleUserLock : UserLock
     gid_t gid;
     std::vector<gid_t> supplementaryGIDs;
 
+    SimpleUserLock(const Settings & settings)
+        : UserLock{settings}
+    {
+    }
+
     uid_t getUID() override
     {
         assert(uid);
@@ -64,7 +69,7 @@ struct SimpleUserLock : UserLock
         return supplementaryGIDs;
     }
 
-    static std::unique_ptr<UserLock> acquire()
+    static std::unique_ptr<UserLock> acquire(const Settings & settings)
     {
         assert(settings.buildUsersGroup != "");
         createDirs(settings.nixStateDir + "/userpool");
@@ -100,7 +105,7 @@ struct SimpleUserLock : UserLock
                 throw SysError("opening user lock '%s'", fnUserLock);
 
             if (lockFile(fd.get(), ltWrite, false)) {
-                auto lock = std::make_unique<SimpleUserLock>();
+                auto lock = std::make_unique<SimpleUserLock>(settings);
 
                 lock->fdUserLock = std::move(fd);
                 lock->uid = pw->pw_uid;
@@ -136,6 +141,11 @@ struct AutoUserLock : UserLock
     gid_t firstGid = 0;
     uid_t nrIds = 1;
 
+    AutoUserLock(const Settings & settings)
+        : UserLock{settings}
+    {
+    }
+
     uid_t getUID() override
     {
         assert(firstUid);
@@ -158,7 +168,7 @@ struct AutoUserLock : UserLock
         return {};
     }
 
-    static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useUserNamespace)
+    static std::unique_ptr<UserLock> acquire(const Settings & settings, uid_t nrIds, bool useUserNamespace)
     {
 #if !defined(__linux__)
         useUserNamespace = false;
@@ -193,7 +203,7 @@ struct AutoUserLock : UserLock
                 if (pw)
                     throw Error("auto-allocated UID %d clashes with existing user account '%s'", firstUid, pw->pw_name);
 
-                auto lock = std::make_unique<AutoUserLock>();
+                auto lock = std::make_unique<AutoUserLock>(settings);
                 lock->fdUserLock = std::move(fd);
                 lock->firstUid = firstUid;
                 if (useUserNamespace)
@@ -214,15 +224,15 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
+std::unique_ptr<UserLock> acquireUserLock(const Settings & settings, uid_t nrIds, bool useUserNamespace)
 {
     if (settings.autoAllocateUids)
-        return AutoUserLock::acquire(nrIds, useUserNamespace);
+        return AutoUserLock::acquire(settings, nrIds, useUserNamespace);
     else
-        return SimpleUserLock::acquire();
+        return SimpleUserLock::acquire(settings);
 }
 
-bool useBuildUsers()
+bool useBuildUsers(const Settings & settings)
 {
 #ifdef __linux__
     static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();

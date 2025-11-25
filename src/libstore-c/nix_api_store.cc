@@ -17,6 +17,9 @@
 
 extern "C" {
 
+// FIXME: This is going to conflict with the one in libmain.
+nix::Settings cStoreSettings;
+
 nix_err nix_libstore_init(nix_c_context * context)
 {
     if (context)
@@ -45,16 +48,16 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         std::string uri_str = uri ? uri : "";
 
         if (uri_str.empty())
-            return new Store{nix::openStore()};
+            return new Store{nix::openStore(cStoreSettings)};
 
         if (!params)
-            return new Store{nix::openStore(uri_str)};
+            return new Store{nix::openStore(cStoreSettings, uri_str)};
 
         nix::Store::Config::Params params_map;
         for (size_t i = 0; params[i] != nullptr; i++) {
             params_map[params[i][0]] = params[i][1];
         }
-        return new Store{nix::openStore(uri_str, params_map)};
+        return new Store{nix::openStore(cStoreSettings, uri_str, params_map)};
     }
     NIXC_CATCH_ERRS_NULL
 }

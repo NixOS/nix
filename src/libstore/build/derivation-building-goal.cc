@@ -95,7 +95,11 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
 }
 
 static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+    const Settings & settings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
@@ -119,7 +123,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i))
             continue;
-        if (!settings.useSubstitutes)
+        if (!worker.store.config.settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i),
@@ -369,7 +373,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
            `preferLocalBuild' set.  Also, check and repair modes are only
            supported for local builds. */
         bool buildLocally = (buildMode != bmNormal || drvOptions.willBuildLocally(worker.store, *drv))
-                            && settings.maxBuildJobs.get() != 0;
+                            && worker.store.config.settings.maxBuildJobs.get() != 0;
 
         if (buildLocally) {
             useHook = false;
@@ -401,7 +405,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                    use that. If there is not, then check if we can do a "true" local
                    build. */
 
-                externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
+                externalBuilder = worker.store.config.settings.findExternalDerivationBuilderIfSupported(*drv);
 
                 if (!externalBuilder && !drvOptions.canBuildLocally(worker.store, *drv)) {
                     auto msg =
@@ -413,12 +417,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                             Magenta(worker.store.printStorePath(drvPath)),
                             Magenta(drv->platform),
                             concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(*drv)),
-                            Magenta(settings.thisSystem),
+                            Magenta(worker.store.config.settings.thisSystem),
                             concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
 
                     // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
                     // we should tell them to run the command to install Darwin 2
-                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+                    if (drv->platform == "x86_64-darwin" && worker.store.config.settings.thisSystem == "aarch64-darwin")
                         msg += fmt(
                             "\nNote: run `%s` to run programs for x86_64-darwin",
                             Magenta(
@@ -513,7 +517,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         StorePathSet outputPaths;
         for (auto & [_, output] : builtOutputs)
             outputPaths.insert(output.outPath);
-        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+        runPostBuildHook(worker.store.config.settings, worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -548,7 +552,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     while (true) {
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= settings.maxBuildJobs) {
+        if (curBuilds >= worker.store.config.settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
             co_return tryToBuild();
@@ -590,7 +594,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
             assert(localStoreP);
 
-            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
+            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot =
+                worker.store.config.settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
             /* Add the closure of store paths to the chroot. */
@@ -618,6 +623,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             }
 
             DerivationBuilderParams params{
+                .settings = worker.store.config.settings,
                 .drvPath = drvPath,
                 .buildResult = buildResult,
                 .drv = *drv,
@@ -716,7 +722,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
-        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+        runPostBuildHook(worker.store.config.settings, worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -730,7 +736,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 }
 
 static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
+    const Settings & settings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths)
 {
     auto hook = settings.postBuildHook;
     if (hook == "")
@@ -835,17 +845,19 @@ HookReply DerivationBuildingGoal::tryBuildHook(
 #else
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
-    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
+    if (worker.store.config.settings.buildHook.get().empty() || !worker.tryBuildHook
+        || !worker.store.isValidPath(drvPath))
         return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>();
+        worker.hook = std::make_unique<HookInstance>(worker.store.config.settings.buildHook.get());
 
     try {
 
         /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0) << drv->platform
-                          << worker.store.printStorePath(drvPath) << drvOptions.getRequiredSystemFeatures(*drv);
+        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.store.config.settings.maxBuildJobs ? 1 : 0)
+                          << drv->platform << worker.store.printStorePath(drvPath)
+                          << drvOptions.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -940,7 +952,7 @@ Path DerivationBuildingGoal::openLogFile()
 {
     logSize = 0;
 
-    if (!settings.keepLog)
+    if (!worker.store.config.settings.keepLog)
         return "";
 
     auto baseName = std::string(baseNameOf(worker.store.printStorePath(drvPath)));
@@ -950,11 +962,11 @@ Path DerivationBuildingGoal::openLogFile()
     if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
         logDir = localStore->config->logDir;
     else
-        logDir = settings.nixLogDir;
+        logDir = worker.store.config.settings.nixLogDir;
     Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), settings.compressLog ? ".bz2" : "");
+    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), worker.store.config.settings.compressLog ? ".bz2" : "");
 
     fdLogFile = toDescriptor(open(
         logFileName.c_str(),
@@ -969,7 +981,7 @@ Path DerivationBuildingGoal::openLogFile()
 
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
-    if (settings.compressLog)
+    if (worker.store.config.settings.compressLog)
         logSink = std::shared_ptr<CompressionSink>(makeCompressionSink("bzip2", *logFileSink));
     else
         logSink = logFileSink;
@@ -1003,7 +1015,7 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
     auto isWrittenToLog = isReadDesc(fd);
     if (isWrittenToLog) {
         logSize += data.size();
-        if (settings.maxLogSize && logSize > settings.maxLogSize) {
+        if (worker.store.config.settings.maxLogSize && logSize > worker.store.config.settings.maxLogSize) {
             killChild();
             // We're not inside a coroutine, hence we can't use co_return here.
             // Thus we ignore the return value.
@@ -1011,7 +1023,7 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
                 BuildResult::Failure::LogLimitExceeded,
                 "%s killed after writing more than %d bytes of log output",
                 getName(),
-                settings.maxLogSize));
+                worker.store.config.settings.maxLogSize));
             return;
         }
 
@@ -1081,7 +1093,7 @@ void DerivationBuildingGoal::flushLine()
 
     else {
         logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines)
+        if (logTail.size() > worker.store.config.settings.logLines)
             logTail.pop_front();
 
         act->result(resBuildLogLine, currentLogLine);

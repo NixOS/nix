@@ -252,7 +252,7 @@ static ref<Store> openUncachedStore()
     Store::Config::Params params; // FIXME: get params from somewhere
     // Disable caching since the client already does that.
     params["path-info-cache-size"] = "0";
-    return openStore(settings.storeUri, params);
+    return openStore(settings, settings.storeUri, params);
 }
 
 /**

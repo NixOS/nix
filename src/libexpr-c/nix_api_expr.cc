@@ -132,9 +132,8 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
         return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
             return nix_eval_state_builder{
                 .store = nix::ref<nix::Store>(store->ptr),
-                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
-                .fetchSettings = nix::fetchers::Settings{},
-                .readOnlyMode = true,
+                .settings = nix::EvalSettings{cStoreSettings},
+                .fetchSettings = nix::fetchers::Settings{cStoreSettings},
             };
         });
     }
@@ -153,8 +152,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        // TODO: load in one go?
-        builder->settings.readOnlyMode = nix::settings.readOnlyMode;
+        loadConfFile(cStoreSettings);
         loadConfFile(builder->settings);
         loadConfFile(builder->fetchSettings);
     }

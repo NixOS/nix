@@ -4,6 +4,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
+#include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/derivations.hh"
@@ -74,7 +75,7 @@ ref<Store> StoreCommand::getStore()
 
 ref<Store> StoreCommand::createStore()
 {
-    return openStore();
+    return openStore(settings);
 }
 
 void StoreCommand::run()
@@ -101,7 +102,7 @@ CopyCommand::CopyCommand()
 
 ref<Store> CopyCommand::createStore()
 {
-    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+    return srcUri.empty() ? StoreCommand::createStore() : openStore(settings, srcUri);
 }
 
 ref<Store> CopyCommand::getDstStore()
@@ -109,7 +110,7 @@ ref<Store> CopyCommand::getDstStore()
     if (srcUri.empty() && dstUri.empty())
         throw UsageError("you must pass '--from' and/or '--to'");
 
-    return dstUri.empty() ? openStore() : openStore(dstUri);
+    return dstUri.empty() ? openStore(settings) : openStore(settings, dstUri);
 }
 
 EvalCommand::EvalCommand()
@@ -131,7 +132,7 @@ EvalCommand::~EvalCommand()
 ref<Store> EvalCommand::getEvalStore()
 {
     if (!evalStore)
-        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+        evalStore = evalStoreUrl ? openStore(settings, *evalStoreUrl) : getStore();
     return ref<Store>(evalStore);
 }
 
@@ -297,7 +298,7 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile().string();
+    profile = getDefaultProfile(settings).string();
 }
 
 MixEnvironment::MixEnvironment()

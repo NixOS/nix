@@ -409,10 +409,10 @@ void adl_serializer<DummyStore::PathInfoAndContents>::to_json(json & json, const
     };
 }
 
-ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(const json & json)
+ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(Settings & settings, const json & json)
 {
     auto & obj = getObject(json);
-    auto cfg = make_ref<DummyStore::Config>(DummyStore::Config::Params{});
+    auto cfg = make_ref<DummyStore::Config>(settings, DummyStore::Config::Params{});
     const_cast<PathSetting &>(cfg->storeDir_).set(getString(valueAt(obj, "store")));
     cfg->readOnly = true;
     return cfg;
@@ -425,10 +425,10 @@ void adl_serializer<DummyStoreConfig>::to_json(json & json, const DummyStoreConf
     };
 }
 
-ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
+ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(Settings & settings, const json & json)
 {
     auto & obj = getObject(json);
-    ref<DummyStore> res = adl_serializer<ref<DummyStoreConfig>>::from_json(valueAt(obj, "config"))->openDummyStore();
+    ref<DummyStore> res = adl_serializer<ref<DummyStoreConfig>>::from_json(settings, valueAt(obj, "config"))->openDummyStore();
     for (auto & [k, v] : getObject(valueAt(obj, "contents")))
         res->contents.insert({StorePath{k}, v});
     for (auto & [k, v] : getObject(valueAt(obj, "derivations")))

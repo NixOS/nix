@@ -28,13 +28,13 @@ using json = nlohmann::json;
 
 namespace nix {
 
-Path StoreConfigBase::getDefaultNixStoreDir()
+Path StoreConfigBase::getDefaultNixStoreDir(const nix::Settings & settings)
 {
     return settings.nixStore;
 }
 
-StoreConfig::StoreConfig(const Params & params)
-    : StoreConfigBase(params)
+StoreConfig::StoreConfig(nix::Settings & settings, const Params & params)
+    : StoreConfigBase(settings)
     , StoreDirConfig{storeDir_}
 {
 }
@@ -110,7 +110,7 @@ StorePath Store::addToStore(
     auto sink = sourceToSink([&](Source & source) {
         LengthSource lengthSource(source);
         storePath = addToStoreFromDump(lengthSource, name, fsm, method, hashAlgo, references, repair);
-        if (settings.warnLargePathThreshold && lengthSource.total >= settings.warnLargePathThreshold)
+        if (config.settings.warnLargePathThreshold && lengthSource.total >= config.settings.warnLargePathThreshold)
             warn("copied large path '%s' to the store (%s)", path, renderSize(lengthSource.total));
     });
     dumpPath(path, *sink, fsm, filter);
@@ -176,7 +176,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                     addToStore(info, *source, repair, checkSigs);
                 } catch (Error & e) {
                     nrFailed++;
-                    if (!settings.keepGoing)
+                    if (!config.settings.keepGoing)
                         throw e;
                     printMsg(lvlError, "could not copy %s: %s", printStorePath(path), e.what());
                     showProgress();
@@ -307,7 +307,7 @@ void Store::narFromPath(const StorePath & path, Sink & sink)
     dumpPath(sourcePath, sink, FileSerialisationMethod::NixArchive);
 }
 
-StringSet Store::Config::getDefaultSystemFeatures()
+StringSet Store::Config::getDefaultSystemFeatures(const nix::Settings & settings)
 {
     auto res = settings.systemFeatures.get();
 
@@ -333,7 +333,7 @@ StoreReference StoreConfig::getReference() const
     return {.variant = StoreReference::Auto{}};
 }
 
-bool Store::PathInfoCacheValue::isKnownNow()
+bool Store::PathInfoCacheValue::isKnownNow(const nix::Settings & settings)
 {
     std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
                                            : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
@@ -407,12 +407,12 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 
 void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
 {
-    if (!settings.useSubstitutes)
+    if (!config.settings.useSubstitutes)
         return;
 
     for (auto & path : paths) {
         std::optional<Error> lastStoresException = std::nullopt;
-        for (auto & sub : getDefaultSubstituters()) {
+        for (auto & sub : getDefaultSubstituters(config.settings)) {
             if (lastStoresException.has_value()) {
                 logError(lastStoresException->info());
                 lastStoresException.reset();
@@ -461,7 +461,7 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
             }
         }
         if (lastStoresException.has_value()) {
-            if (!settings.tryFallback) {
+            if (!config.settings.tryFallback) {
                 throw *lastStoresException;
             } else
                 logError(lastStoresException->info());
@@ -472,7 +472,7 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
 bool Store::isValidPath(const StorePath & storePath)
 {
     auto res = pathInfoCache->lock()->get(storePath.to_string());
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(config.settings)) {
         stats.narInfoReadAverted++;
         return res->didExist();
     }
@@ -538,7 +538,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     auto hashPart = std::string(storePath.hashPart());
 
     auto res = pathInfoCache->lock()->get(storePath.to_string());
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(config.settings)) {
         stats.narInfoReadAverted++;
         if (res->didExist())
             return std::make_optional(res->value);
@@ -1195,7 +1195,7 @@ void Store::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.secretKeyFiles;
+    auto secretKeyFiles = config.settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));
@@ -1208,7 +1208,7 @@ void Store::signRealisation(Realisation & realisation)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.secretKeyFiles;
+    auto secretKeyFiles = config.settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
         SecretKey secretKey(readFile(secretKeyFile));

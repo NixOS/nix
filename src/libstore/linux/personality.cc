@@ -8,7 +8,7 @@
 
 namespace nix::linux {
 
-void setPersonality(std::string_view system)
+void setPersonality(const Settings & settings, std::string_view system)
 {
     /* Change the personality to 32-bit if we're doing an
        i686-linux build on an x86_64-linux machine. */

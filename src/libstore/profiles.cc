@@ -291,25 +291,25 @@ std::string optimisticLockProfile(const std::filesystem::path & profile)
     return pathExists(profile) ? readLink(profile).string() : "";
 }
 
-std::filesystem::path profilesDir()
+std::filesystem::path profilesDir(const Settings & settings)
 {
-    auto profileRoot = isRootUser() ? rootProfilesDir() : std::filesystem::path{createNixStateDir()} / "profiles";
+    auto profileRoot = isRootUser() ? rootProfilesDir(settings) : std::filesystem::path{createNixStateDir()} / "profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-std::filesystem::path rootProfilesDir()
+std::filesystem::path rootProfilesDir(const Settings & settings)
 {
     return std::filesystem::path{settings.nixStateDir} / "profiles/per-user/root";
 }
 
-std::filesystem::path getDefaultProfile()
+std::filesystem::path getDefaultProfile(const Settings & settings)
 {
     std::filesystem::path profileLink = settings.useXDGBaseDirectories
                                             ? std::filesystem::path{createNixStateDir()} / "profile"
                                             : std::filesystem::path{getHome()} / ".nix-profile";
     try {
-        auto profile = profilesDir() / "profile";
+        auto profile = profilesDir(settings) / "profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
@@ -328,14 +328,14 @@ std::filesystem::path getDefaultProfile()
     }
 }
 
-std::filesystem::path defaultChannelsDir()
+std::filesystem::path defaultChannelsDir(const Settings & settings)
 {
-    return profilesDir() / "channels";
+    return profilesDir(settings) / "channels";
 }
 
-std::filesystem::path rootChannelsDir()
+std::filesystem::path rootChannelsDir(const Settings & settings)
 {
-    return rootProfilesDir() / "channels";
+    return rootProfilesDir(settings) / "channels";
 }
 
 } // namespace nix

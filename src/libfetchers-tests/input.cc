@@ -1,6 +1,10 @@
+#include "nix/store/globals.hh"
+
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
+
+#include "nix/store/tests/test-main.hh"
 
 #include <gtest/gtest.h>
 
@@ -23,7 +27,8 @@ class InputFromAttrsTest : public ::testing::WithParamInterface<InputFromAttrsTe
 
 TEST_P(InputFromAttrsTest, attrsAreCorrectAndRoundTrips)
 {
-    fetchers::Settings fetchSettings;
+    auto settings = getTestSettings();
+    fetchers::Settings fetchSettings{settings};
 
     const auto & testCase = GetParam();
 

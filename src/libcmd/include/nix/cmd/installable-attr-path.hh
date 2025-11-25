@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "nix/store/globals.hh"
 #include "nix/cmd/installable-value.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/cmd/command.hh"

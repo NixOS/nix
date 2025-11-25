@@ -26,6 +26,8 @@ create table if not exists Cache (
 
 struct CacheImpl : Cache
 {
+    const nix::Settings & settings;
+
     struct State
     {
         SQLite db;
@@ -34,14 +36,15 @@ struct CacheImpl : Cache
 
     Sync<State> _state;
 
-    CacheImpl()
+    CacheImpl(const nix::Settings & settings)
+        : settings(settings)
     {
         auto state(_state.lock());
 
         auto dbPath = getCacheDir() + "/fetcher-cache-v4.sqlite";
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 
@@ -154,7 +157,7 @@ ref<Cache> Settings::getCache() const
 {
     auto cache(_cache.lock());
     if (!*cache)
-        *cache = std::make_shared<CacheImpl>();
+        *cache = std::make_shared<CacheImpl>(settings);
     return ref<Cache>(*cache);
 }
 

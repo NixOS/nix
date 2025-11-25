@@ -6,6 +6,7 @@
   perl,
   perlPackages,
   nix-store,
+  nix-main,
   version,
   curl,
   bzip2,
@@ -45,6 +46,7 @@ perl.pkgs.toPerlModule (
 
     buildInputs = [
       nix-store
+      nix-main
       bzip2
       libsodium
     ];

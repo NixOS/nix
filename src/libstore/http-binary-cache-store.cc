@@ -19,9 +19,9 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 }
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , BinaryCacheStoreConfig(params)
+    nix::Settings & settings, std::string_view scheme, std::string_view _cacheUri, const Params & params)
+    : StoreConfig(settings, params)
+    , BinaryCacheStoreConfig(settings, params)
     , cacheUri(parseURL(
           std::string{scheme} + "://"
           + (!_cacheUri.empty() ? _cacheUri
@@ -55,7 +55,7 @@ HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config)
     , BinaryCacheStore{*config}
     , config{config}
 {
-    diskCache = getNarInfoDiskCache();
+    diskCache = getNarInfoDiskCache(config->settings);
 }
 
 void HttpBinaryCacheStore::init()
@@ -93,7 +93,7 @@ std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std:
 void HttpBinaryCacheStore::maybeDisable()
 {
     auto state(_state.lock());
-    if (state->enabled && settings.tryFallback) {
+    if (state->enabled && config->settings.tryFallback) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
         state->enabled = false;

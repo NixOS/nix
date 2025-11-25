@@ -81,7 +81,7 @@ static int main_build_remote(int argc, char ** argv)
 
         initPlugins();
 
-        auto store = openStore();
+        auto store = openStore(settings);
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
@@ -94,7 +94,7 @@ static int main_build_remote(int argc, char ** argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        auto machines = getMachines();
+        auto machines = getMachines(settings);
         debug("got %d remote builders", machines.size());
 
         if (machines.empty()) {
@@ -234,7 +234,7 @@ static int main_build_remote(int argc, char ** argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", storeUri));
 
-                    sshStore = bestMachine->openStore();
+                    sshStore = bestMachine->openStore(settings);
                     sshStore->connect();
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, false));

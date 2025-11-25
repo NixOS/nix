@@ -297,7 +297,7 @@ public:
         nix_api_store_test_base::SetUp();
 
         nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-        nix::settings.substituters = {};
+        cStoreSettings.substituters = {};
 
         store = open_local_store();
 
@@ -307,7 +307,7 @@ public:
         buffer << t.rdbuf();
 
         // Replace the hardcoded system with the current system
-        std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+        std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", cStoreSettings.thisSystem.get());
 
         drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
         assert_ctx_ok();
@@ -352,7 +352,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
 {
     // FIXME get rid of these
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    cStoreSettings.substituters = {};
 
     auto * store = open_local_store();
 
@@ -363,7 +363,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
     buffer << t.rdbuf();
 
     // Replace the hardcoded system with the current system
-    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", cStoreSettings.thisSystem.get());
 
     auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
     assert_ctx_ok();
@@ -399,7 +399,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 {
     // Test that nix_store_realise properly reports errors when the system is invalid
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    cStoreSettings.substituters = {};
 
     auto * store = open_local_store();
 
@@ -444,7 +444,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 {
     // Test that nix_store_realise properly reports errors when the builder fails
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    cStoreSettings.substituters = {};
 
     auto * store = open_local_store();
 
@@ -454,7 +454,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
     buffer << t.rdbuf();
 
     // Replace with current system and make builder command fail
-    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", cStoreSettings.thisSystem.get());
     jsonStr = nix::replaceStrings(jsonStr, "echo $name foo > $out", "exit 1");
 
     auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
@@ -489,7 +489,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 {
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    cStoreSettings.substituters = {};
 
     auto * store = open_local_store();
 
@@ -499,7 +499,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
     buffer << t.rdbuf();
 
     // Replace with current system and make builder succeed but not produce output
-    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", cStoreSettings.thisSystem.get());
     jsonStr = nix::replaceStrings(jsonStr, "echo $name foo > $out", "true");
 
     auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
@@ -685,7 +685,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     // This test uses a CA derivation with 10 outputs in randomized input order
     // to verify that the callback order is deterministic and alphabetical.
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    cStoreSettings.substituters = {};
 
     auto * store = open_local_store();
 
@@ -704,14 +704,14 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     std::string drvJson = R"({
         "version": 4,
         "name": "multi-output-test",
-        "system": ")" + nix::settings.thisSystem.get()
+        "system": ")" + cStoreSettings.thisSystem.get()
                           + R"(",
         "builder": "/bin/sh",
         "args": ["-c", "echo a > $outa; echo b > $outb; echo c > $outc; echo d > $outd; echo e > $oute; echo f > $outf; echo g > $outg; echo h > $outh; echo i > $outi; echo j > $outj"],
         "env": {
             "builder": "/bin/sh",
             "name": "multi-output-test",
-            "system": ")" + nix::settings.thisSystem.get()
+            "system": ")" + cStoreSettings.thisSystem.get()
                           + R"(",
             "outf": ")" + outf_ph
                           + R"(",
