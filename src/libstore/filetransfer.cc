@@ -136,8 +136,8 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+            for (auto & [key, value] : request.headers) {
+                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", key, value).c_str());
             }
         }
 
