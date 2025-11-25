@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <ranges>
 
 namespace nix {
 
@@ -151,7 +152,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      * user. Process in priority order to reduce unnecessary
      * symlink/unlink steps.
      */
-    std::sort(pkgs.begin(), pkgs.end(), [](const Package & a, const Package & b) {
+    std::ranges::sort(pkgs, [](const Package & a, const Package & b) {
         return a.priority < b.priority || (a.priority == b.priority && a.path < b.path);
     });
     for (const auto & pkg : pkgs)
