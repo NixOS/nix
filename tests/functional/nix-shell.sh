@@ -262,3 +262,9 @@ assert (!(args ? inNixShell));
 (import $shellDotNix { }).shellDrv
 EOF
 nix-shell $TEST_ROOT/shell-ellipsis.nix --run "true"
+
+if [[ -z ${NIX_TESTS_CA_BY_DEFAULT:-} ]]; then
+  # `nix develop` should also work with fixed-output derivations
+  # shellcheck disable=SC2016
+  nix develop -f "$shellDotNix" fixed -c bash -c '[[ -n $stdenv ]]'
+fi
