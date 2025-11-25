@@ -175,7 +175,7 @@ cat >"$TEST_ROOT"/marco/polo/default.nix <<EOF
 (import $TEST_ROOT/lookup-test/shell.nix {}).polo
 EOF
 chmod a+x "$TEST_ROOT"/marco/polo/default.nix
-(cd "$TEST_ROOT"/marco && ./polo/default.nix | grepQuiet "Polo")
+(cd "$TEST_ROOT"/marco && ./polo/default.nix < /dev/null | grepQuiet "Polo")
 
 # https://github.com/NixOS/nix/issues/11892
 mkdir "$TEST_ROOT"/issue-11892
