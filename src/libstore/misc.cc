@@ -100,7 +100,7 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv)
 
 MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 {
-    Activity act(*logger, Verbosity::Debug, actUnknown, "querying info about missing paths");
+    Activity act(*logger, Verbosity::Debug, ActivityType::Unknown, "querying info about missing paths");
 
     // FIXME: make async.
     ThreadPool pool(fileTransferSettings.httpConnections);

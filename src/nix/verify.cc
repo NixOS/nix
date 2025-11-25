@@ -69,7 +69,7 @@ struct CmdVerify : StorePathsCommand
 
         auto publicKeys = getDefaultPublicKeys();
 
-        Activity act(*logger, actVerifyPaths);
+        Activity act(*logger, ActivityType::VerifyPaths);
 
         std::atomic<size_t> done{0};
         std::atomic<size_t> untrusted{0};
@@ -94,7 +94,10 @@ struct CmdVerify : StorePathsCommand
                 // for binary cache stores when using --all (since we
                 // can't enumerate names efficiently).
                 Activity act2(
-                    *logger, Verbosity::Info, actUnknown, fmt("checking '%s'", store->printStorePath(info->path)));
+                    *logger,
+                    Verbosity::Info,
+                    ActivityType::Unknown,
+                    fmt("checking '%s'", store->printStorePath(info->path)));
 
                 if (!noContents) {
 

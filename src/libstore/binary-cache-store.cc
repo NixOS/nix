@@ -452,7 +452,7 @@ void BinaryCacheStore::queryPathInfoUncached(
     auto act = std::make_shared<Activity>(
         *logger,
         Verbosity::Talkative,
-        actQueryPathInfo,
+        ActivityType::QueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri),
         Logger::Fields{storePathS, uri});
     PushActivity pact(act->id);

@@ -100,7 +100,7 @@ struct curlFileTransfer : public FileTransfer
             , request(request)
             , act(*logger,
                   Verbosity::Talkative,
-                  actFileTransfer,
+                  ActivityType::FileTransfer,
                   fmt("%sing '%s'", request.verb(), request.uri),
                   {request.uri.to_string()},
                   request.parentAct)

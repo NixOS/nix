@@ -97,7 +97,10 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve(attrPath);
 
             Activity act(
-                *logger, Verbosity::Info, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+                *logger,
+                Verbosity::Info,
+                ActivityType::Unknown,
+                fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {

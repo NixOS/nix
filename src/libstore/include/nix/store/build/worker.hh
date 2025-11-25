@@ -355,8 +355,8 @@ public:
         actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
         actSubstitutions.progress(
             doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
-        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
+        act.setExpected(ActivityType::FileTransfer, expectedDownloadSize + doneDownloadSize);
+        act.setExpected(ActivityType::CopyPath, expectedNarSize + doneNarSize);
     }
 };
 

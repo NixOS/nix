@@ -234,7 +234,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
             Activity act(
                 *logger,
-                actSubstitute,
+                ActivityType::Substitute,
                 Logger::Fields{worker.store.printStorePath(storePath), sub->config.getHumanReadableURI()});
             PushActivity pact(act.id);
 

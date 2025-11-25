@@ -421,7 +421,7 @@ bool handleJSONLogMessage(
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == actFileTransfer)
+            if (trusted || type == ActivityType::FileTransfer)
                 activities.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),

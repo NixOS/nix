@@ -232,7 +232,8 @@ static int main_build_remote(int argc, char ** argv)
                 try {
                     storeUri = bestMachine->storeUri.render();
 
-                    Activity act(*logger, Verbosity::Talkative, actUnknown, fmt("connecting to '%s'", storeUri));
+                    Activity act(
+                        *logger, Verbosity::Talkative, ActivityType::Unknown, fmt("connecting to '%s'", storeUri));
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
@@ -275,7 +276,10 @@ static int main_build_remote(int argc, char ** argv)
 
         {
             Activity act(
-                *logger, Verbosity::Talkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
+                *logger,
+                Verbosity::Talkative,
+                ActivityType::Unknown,
+                fmt("waiting for the upload lock to '%s'", storeUri));
 
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
@@ -288,7 +292,8 @@ static int main_build_remote(int argc, char ** argv)
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
-            Activity act(*logger, Verbosity::Talkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
+            Activity act(
+                *logger, Verbosity::Talkative, ActivityType::Unknown, fmt("copying dependencies to '%s'", storeUri));
             copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
@@ -378,7 +383,8 @@ static int main_build_remote(int argc, char ** argv)
         }
 
         if (!missingPaths.empty()) {
-            Activity act(*logger, Verbosity::Talkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
+            Activity act(
+                *logger, Verbosity::Talkative, ActivityType::Unknown, fmt("copying outputs from '%s'", storeUri));
             if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
                 for (auto & path : missingPaths)
                     localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */

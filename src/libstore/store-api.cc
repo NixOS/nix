@@ -136,7 +136,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
         storePathsToAdd.insert(thingToAdd.first.path);
     }
 
-    act.setExpected(actCopyPath, bytesExpected);
+    act.setExpected(ActivityType::CopyPath, bytesExpected);
 
     auto showProgress = [&, nrTotal = pathsToCopy.size()]() { act.progress(nrDone, nrTotal, nrRunning, nrFailed); };
 
@@ -862,7 +862,7 @@ void copyStorePath(
     Activity act(
         *logger,
         Verbosity::Info,
-        actCopyPath,
+        ActivityType::CopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
         {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
     PushActivity pact(act.id);
@@ -973,7 +973,7 @@ std::map<StorePath, StorePath> copyPaths(
         if (!valid.count(path))
             missing.insert(path);
 
-    Activity act(*logger, Verbosity::Info, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, Verbosity::Info, ActivityType::CopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
@@ -1023,7 +1023,7 @@ std::map<StorePath, StorePath> copyPaths(
             Activity act(
                 *logger,
                 Verbosity::Info,
-                actCopyPath,
+                ActivityType::CopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),
                 {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
             PushActivity pact(act.id);

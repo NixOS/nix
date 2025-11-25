@@ -155,7 +155,8 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << static_cast<uint64_t>(lvl) << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << static_cast<uint64_t>(lvl) << static_cast<uint64_t>(type) << s << fields
+            << parent;
         enqueueMsg(buf.s);
     }
 

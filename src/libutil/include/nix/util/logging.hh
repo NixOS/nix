@@ -12,22 +12,22 @@
 
 namespace nix {
 
-typedef enum {
-    actUnknown = 0,
-    actCopyPath = 100,
-    actFileTransfer = 101,
-    actRealise = 102,
-    actCopyPaths = 103,
-    actBuilds = 104,
-    actBuild = 105,
-    actOptimiseStore = 106,
-    actVerifyPaths = 107,
-    actSubstitute = 108,
-    actQueryPathInfo = 109,
-    actPostBuildHook = 110,
-    actBuildWaiting = 111,
-    actFetchTree = 112,
-} ActivityType;
+enum class ActivityType {
+    Unknown = 0,
+    CopyPath = 100,
+    FileTransfer = 101,
+    Realise = 102,
+    CopyPaths = 103,
+    Builds = 104,
+    Build = 105,
+    OptimiseStore = 106,
+    VerifyPaths = 107,
+    Substitute = 108,
+    QueryPathInfo = 109,
+    PostBuildHook = 110,
+    BuildWaiting = 111,
+    FetchTree = 112,
+};
 
 typedef enum {
     resFileLinked = 100,
@@ -98,6 +98,12 @@ public:
         Field(const uint64_t & i)
             : type(tInt)
             , i(i)
+        {
+        }
+
+        Field(const ActivityType & a)
+            : type(tInt)
+            , i(static_cast<uint64_t>(a))
         {
         }
     };

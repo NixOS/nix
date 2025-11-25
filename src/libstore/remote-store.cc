@@ -453,7 +453,7 @@ void RemoteStore::addMultipleToStore(
     for (auto & [pathInfo, _] : pathsToCopy) {
         bytesExpected += pathInfo.narSize;
     }
-    act.setExpected(actCopyPath, bytesExpected);
+    act.setExpected(ActivityType::CopyPath, bytesExpected);
 
     auto source = sinkToSource([&](Sink & sink) {
         size_t nrTotal = pathsToCopy.size();

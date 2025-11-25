@@ -721,7 +721,10 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
             upgradedCount++;
 
             Activity act(
-                *logger, Verbosity::Chatty, actUnknown, fmt("checking '%s' for updates", element.source->attrPath));
+                *logger,
+                Verbosity::Chatty,
+                ActivityType::Unknown,
+                fmt("checking '%s' for updates", element.source->attrPath));
 
             auto installable = make_ref<InstallableFlake>(
                 this,

@@ -154,7 +154,7 @@ struct PathInputScheme : InputScheme
 
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store.isValidPath(*storePath)) {
-            Activity act(*logger, Verbosity::Talkative, actUnknown, fmt("copying %s to the store", absPath));
+            Activity act(*logger, Verbosity::Talkative, ActivityType::Unknown, fmt("copying %s to the store", absPath));
             // FIXME: try to substitute storePath.
             auto src = sinkToSource(
                 [&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter); });

@@ -287,7 +287,10 @@ struct MercurialInputScheme : InputScheme
                          .second
                      == "1")) {
             Activity act(
-                *logger, Verbosity::Talkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
+                *logger,
+                Verbosity::Talkative,
+                ActivityType::Unknown,
+                fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {

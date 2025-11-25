@@ -16,9 +16,9 @@
 namespace nix {
 
 Worker::Worker(Store & store, Store & evalStore)
-    : act(*logger, actRealise)
-    , actDerivations(*logger, actBuilds)
-    , actSubstitutions(*logger, actCopyPaths)
+    : act(*logger, ActivityType::Realise)
+    , actDerivations(*logger, ActivityType::Builds)
+    , actSubstitutions(*logger, ActivityType::CopyPaths)
     , store(store)
     , evalStore(evalStore)
 {
