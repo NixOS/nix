@@ -312,8 +312,8 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 }
                 cmdline.push_back(script);
                 commandBaseDir = dirOf(script);
-                for (auto pos = savedArgs.begin(); pos != savedArgs.end(); pos++)
-                    cmdline.push_back(*pos);
+                for (auto & arg : savedArgs)
+                    cmdline.push_back(arg);
             }
         } catch (SystemError &) {
         }
