@@ -4,10 +4,7 @@
 
 #  include <aws/crt/Types.h>
 #  include "nix/store/s3-url.hh"
-#  include "nix/util/finally.hh"
 #  include "nix/util/logging.hh"
-#  include "nix/util/url.hh"
-#  include "nix/util/util.hh"
 
 #  include <aws/crt/Api.h>
 #  include <aws/crt/auth/Credentials.h>
