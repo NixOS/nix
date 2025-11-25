@@ -47,6 +47,79 @@ struct ParserLocation
     }
 };
 
+/**
+ * This represents a string-like parse that possibly has yet to be constructed.
+ *
+ * Examples:
+ * "foo"
+ * ${"foo" + "bar"}
+ * "foo.bar"
+ * "foo-${a}"
+ *
+ * Using this type allows us to avoid construction altogether in cases where what we actually need is the string
+ * contents. For example in foo."bar.baz", there is no need to construct an AST node for "bar.baz", but we don't know
+ * that until we bubble the value up during parsing and see that it's a node in an AttrPath.
+ */
+class ToBeStringyExpr
+{
+private:
+    using Raw = std::variant<std::monostate, std::string_view, Expr *>;
+    Raw raw;
+
+public:
+    ToBeStringyExpr() = default;
+
+    ToBeStringyExpr(std::string_view v)
+        : raw(v)
+    {
+    }
+
+    ToBeStringyExpr(Expr * expr)
+        : raw(expr)
+    {
+        assert(expr);
+    }
+
+    /**
+     * Visits the expression and invokes an overloaded functor object \ref f.
+     * If the underlying Expr has a dynamic type of ExprString the overload taking std::string_view
+     * is invoked.
+     *
+     * Used to consistently handle simple StringExpr ${"string"} as non-dynamic attributes.
+     * @see https://github.com/NixOS/nix/issues/14642
+     */
+    template<class F>
+    void visit(F && f)
+    {
+        std::visit(
+            overloaded{
+                [&](std::string_view str) { f(str); },
+                [&](Expr * expr) {
+                    ExprString * str = dynamic_cast<ExprString *>(expr);
+                    if (str)
+                        f(str->v.string_view());
+                    else
+                        f(expr);
+                },
+                [](std::monostate) { unreachable(); }},
+            raw);
+    }
+
+    /**
+     * Get or create an Expr from either an existing Expr or from a string.
+     * Delays the allocation or an AST node in case the parser only cares about string contents.
+     */
+    Expr * toExpr(Exprs & exprs)
+    {
+        return std::visit(
+            overloaded{
+                [&](std::string_view str) -> Expr * { return exprs.add<ExprString>(exprs.alloc, str); },
+                [&](Expr * expr) { return expr; },
+                [](std::monostate) -> Expr * { unreachable(); }},
+            raw);
+    }
+};
+
 struct LexerState
 {
     /**
