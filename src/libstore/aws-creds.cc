@@ -138,6 +138,10 @@ public:
         auto tlsCtxOptions = Aws::Crt::Io::TlsContextOptions::InitDefaultClient(allocator);
         tlsContext =
             std::make_shared<Aws::Crt::Io::TlsContext>(tlsCtxOptions, Aws::Crt::Io::TlsMode::CLIENT, allocator);
+        if (!tlsContext || !*tlsContext) {
+            warn("failed to create TLS context for AWS SSO; SSO authentication will be unavailable");
+            tlsContext = nullptr;
+        }
     }
 
     AwsCredentials getCredentialsRaw(const std::string & profile);
@@ -172,6 +176,9 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
         profile.empty() ? "(default)" : profile.c_str());
 
     auto bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+    if (!bootstrap) {
+        throw AwsAuthError("failed to create AWS client bootstrap");
+    }
 
     // If no profile specified, use the default chain
     if (profile.empty()) {
@@ -186,36 +193,41 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
     Aws::Crt::Auth::CredentialsProviderChainConfig chainConfig;
     auto allocator = Aws::Crt::ApiAllocator();
 
+    auto addProviderToChain = [&](std::string_view name, auto createProvider) {
+        if (auto provider = createProvider()) {
+            chainConfig.Providers.push_back(provider);
+            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profile);
+        } else {
+            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profile);
+        }
+    };
+
     // 1. Environment variables (highest priority)
-    auto envProvider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderEnvironment(allocator);
-    if (envProvider) {
-        chainConfig.Providers.push_back(envProvider);
-    }
+    addProviderToChain("Environment", [&]() {
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderEnvironment(allocator);
+    });
 
     // 2. SSO provider (try it, will fail gracefully if not configured)
-    auto ssoProvider = createSSOProvider(profile, bootstrap, tlsContext.get(), allocator);
-    if (ssoProvider) {
-        debug("[pid=%d] added SSO provider to credential chain for profile '%s'", getpid(), profile.c_str());
-        chainConfig.Providers.push_back(ssoProvider);
+    if (tlsContext) {
+        addProviderToChain("SSO", [&]() { return createSSOProvider(profile, bootstrap, tlsContext.get(), allocator); });
+    } else {
+        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profile);
     }
 
     // 3. Profile provider (for static credentials)
-    Aws::Crt::Auth::CredentialsProviderProfileConfig profileConfig;
-    profileConfig.Bootstrap = bootstrap;
-    profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
-    auto profileProvider =
-        Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
-    if (profileProvider) {
-        chainConfig.Providers.push_back(profileProvider);
-    }
+    addProviderToChain("Profile", [&]() {
+        Aws::Crt::Auth::CredentialsProviderProfileConfig profileConfig;
+        profileConfig.Bootstrap = bootstrap;
+        profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
+    });
 
     // 4. IMDS provider (for EC2 instances, lowest priority)
-    Aws::Crt::Auth::CredentialsProviderImdsConfig imdsConfig;
-    imdsConfig.Bootstrap = bootstrap;
-    auto imdsProvider = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderImds(imdsConfig, allocator);
-    if (imdsProvider) {
-        chainConfig.Providers.push_back(imdsProvider);
-    }
+    addProviderToChain("IMDS", [&]() {
+        Aws::Crt::Auth::CredentialsProviderImdsConfig imdsConfig;
+        imdsConfig.Bootstrap = bootstrap;
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderImds(imdsConfig, allocator);
+    });
 
     return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
 }
