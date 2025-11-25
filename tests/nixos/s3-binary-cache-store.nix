@@ -147,7 +147,7 @@ in
               else:
                   machine.fail(f"nix path-info {pkg}")
 
-      def setup_s3(populate_bucket=[], public=False, versioned=False):
+      def setup_s3(populate_bucket=[], public=False, versioned=False, profiles=None):
           """
           Decorator that creates/destroys a unique bucket for each test.
           Optionally pre-populates bucket with specified packages.
@@ -157,6 +157,10 @@ in
               populate_bucket: List of packages to upload before test runs
               public: If True, make the bucket publicly accessible
               versioned: If True, enable versioning on the bucket before populating
+              profiles: Dict of AWS profiles to create, e.g.:
+                  {"valid": {"access_key": "...", "secret_key": "..."},
+                   "invalid": {"access_key": "WRONG", "secret_key": "WRONG"}}
+                  Profiles are created on the client machine at /root/.aws/credentials
           """
           def decorator(test_func):
               def wrapper():
@@ -167,6 +171,15 @@ in
                           server.succeed(f"mc anonymous set download minio/{bucket}")
                       if versioned:
                           server.succeed(f"mc version enable minio/{bucket}")
+                      if profiles:
+                          # Build credentials file content
+                          creds_content = ""
+                          for name, creds in profiles.items():
+                              creds_content += f"[{name}]\n"
+                              creds_content += f"aws_access_key_id = {creds['access_key']}\n"
+                              creds_content += f"aws_secret_access_key = {creds['secret_key']}\n\n"
+                          client.succeed("mkdir -p /root/.aws")
+                          client.succeed(f"cat > /root/.aws/credentials << 'AWSCREDS'\n{creds_content}AWSCREDS")
                       if populate_bucket:
                           store_url = make_s3_url(bucket)
                           for pkg in populate_bucket:
@@ -174,6 +187,9 @@ in
                       test_func(bucket)
                   finally:
                       server.succeed(f"mc rb --force minio/{bucket}")
+                      # Clean up AWS profiles if created
+                      if profiles:
+                          client.succeed("rm -rf /root/.aws")
                       # Clean up client store - only delete if path exists
                       for pkg in PKGS.values():
                           client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
