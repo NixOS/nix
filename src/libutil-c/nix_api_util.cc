@@ -13,7 +13,11 @@ extern "C" {
 
 nix_c_context * nix_c_context_create()
 {
-    return new nix_c_context();
+    try {
+        return new nix_c_context();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 void nix_c_context_free(nix_c_context * context)
