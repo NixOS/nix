@@ -185,28 +185,13 @@ struct ExprFloat : Expr
 
 struct ExprString : Expr
 {
+    std::string s;
     Value v;
 
-    /**
-     * This is only for strings already allocated in our polymorphic allocator,
-     * or that live at least that long (e.g. c++ string literals)
-     */
-    ExprString(const char * s)
+    ExprString(std::string && s)
+        : s(std::move(s))
     {
-        v.mkStringNoCopy(s);
-    };
-
-    ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
-    {
-        auto len = sv.length();
-        if (len == 0) {
-            v.mkStringNoCopy("");
-            return;
-        }
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkStringNoCopy(s);
+        v.mkStringNoCopy(this->s.data());
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
