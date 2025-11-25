@@ -136,7 +136,6 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
   std::vector<nix::AttrName> * attrNames;
   std::vector<std::pair<nix::AttrName, nix::PosIdx>> * inheritAttrs;
   std::vector<std::pair<nix::PosIdx, nix::Expr *>> * string_parts;
-  std::variant<nix::Expr *, std::string_view> * to_be_string;
   std::vector<std::pair<nix::PosIdx, std::variant<nix::Expr *, nix::StringToken>>> * ind_string_parts;
 }
 
@@ -151,8 +150,7 @@ static Expr * makeCall(PosIdx pos, Expr * fn, Expr * arg) {
 %type <inheritAttrs> attrs
 %type <string_parts> string_parts_interpolated
 %type <ind_string_parts> ind_string_parts
-%type <e> path_start
-%type <to_be_string> string_parts string_attr
+%type <e> path_start string_parts string_attr
 %type <id> attr
 %token <id> ID
 %token <str> STR IND_STR
@@ -307,13 +305,7 @@ expr_simple
   }
   | INT_LIT { $$ = new ExprInt($1); }
   | FLOAT_LIT { $$ = new ExprFloat($1); }
-  | '"' string_parts '"' {
-      std::visit(overloaded{
-          [&](std::string_view str) { $$ = new ExprString(state->alloc, str); },
-          [&](Expr * expr) { $$ = expr; }},
-      *$2);
-      delete $2;
-  }
+  | '"' string_parts '"' { $$ = $2; }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = state->stripIndentation(CUR_POS, std::move(*$2));
       delete $2;
@@ -324,11 +316,11 @@ expr_simple
       $$ = new ExprConcatStrings(CUR_POS, false, $2);
   }
   | SPATH {
-      std::string_view path($1.p + 1, $1.l - 2);
+      std::string path($1.p + 1, $1.l - 2);
       $$ = new ExprCall(CUR_POS,
           new ExprVar(state->s.findFile),
           {new ExprVar(state->s.nixPath),
-           new ExprString(state->alloc, path)});
+           new ExprString(std::move(path))});
   }
   | URI {
       static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
@@ -337,7 +329,7 @@ expr_simple
               .msg = HintFmt("URL literals are disabled"),
               .pos = state->positions[CUR_POS]
           });
-      $$ = new ExprString(state->alloc, $1);
+      $$ = new ExprString(std::string($1));
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
@@ -354,19 +346,19 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = new std::variant<Expr *, std::string_view>($1); }
-  | string_parts_interpolated { $$ = new std::variant<Expr *, std::string_view>(new ExprConcatStrings(CUR_POS, true, $1)); }
-  | { $$ = new std::variant<Expr *, std::string_view>(std::string_view()); }
+  : STR { $$ = new ExprString(std::string($1)); }
+  | string_parts_interpolated { $$ = new ExprConcatStrings(CUR_POS, true, $1); }
+  | { $$ = new ExprString(""); }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(state->alloc, $2)); }
+  { $$ = $1; $1->emplace_back(state->at(@2), new ExprString(std::string($2))); }
   | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = $1; $1->emplace_back(state->at(@2), $3); }
   | DOLLAR_CURLY expr '}' { $$ = new std::vector<std::pair<PosIdx, Expr *>>; $$->emplace_back(state->at(@1), $2); }
   | STR DOLLAR_CURLY expr '}' {
       $$ = new std::vector<std::pair<PosIdx, Expr *>>;
-      $$->emplace_back(state->at(@1), new ExprString(state->alloc, $1));
+      $$->emplace_back(state->at(@1), new ExprString(std::string($1)));
       $$->emplace_back(state->at(@2), $3);
     }
   ;
@@ -464,16 +456,15 @@ attrs
   : attrs attr { $$ = $1; $1->emplace_back(AttrName(state->symbols.create($2)), state->at(@2)); }
   | attrs string_attr
     { $$ = $1;
-      std::visit(overloaded {
-          [&](std::string_view str) { $$->emplace_back(AttrName(state->symbols.create(str)), state->at(@2)); },
-          [&](Expr * expr) {
-              throw ParseError({
-                  .msg = HintFmt("dynamic attributes not allowed in inherit"),
-                  .pos = state->positions[state->at(@2)]
-              });
-          }
-      }, *$2);
-      delete $2;
+      ExprString * str = dynamic_cast<ExprString *>($2);
+      if (str) {
+          $$->emplace_back(AttrName(state->symbols.create(str->s)), state->at(@2));
+          delete str;
+      } else
+          throw ParseError({
+              .msg = HintFmt("dynamic attributes not allowed in inherit"),
+              .pos = state->positions[state->at(@2)]
+          });
     }
   | { $$ = new std::vector<std::pair<AttrName, PosIdx>>; }
   ;
@@ -482,20 +473,22 @@ attrpath
   : attrpath '.' attr { $$ = $1; $1->push_back(AttrName(state->symbols.create($3))); }
   | attrpath '.' string_attr
     { $$ = $1;
-      std::visit(overloaded {
-          [&](std::string_view str) { $$->push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$->push_back(AttrName(expr)); }
-      }, *$3);
-      delete $3;
+      ExprString * str = dynamic_cast<ExprString *>($3);
+      if (str) {
+          $$->push_back(AttrName(state->symbols.create(str->s)));
+          delete str;
+      } else
+          $$->push_back(AttrName($3));
     }
   | attr { $$ = new std::vector<AttrName>; $$->push_back(AttrName(state->symbols.create($1))); }
   | string_attr
     { $$ = new std::vector<AttrName>;
-      std::visit(overloaded {
-          [&](std::string_view str) { $$->push_back(AttrName(state->symbols.create(str))); },
-          [&](Expr * expr) { $$->push_back(AttrName(expr)); }
-      }, *$1);
-      delete $1;
+      ExprString *str = dynamic_cast<ExprString *>($1);
+      if (str) {
+          $$->push_back(AttrName(state->symbols.create(str->s)));
+          delete str;
+      } else
+          $$->push_back(AttrName($1));
     }
   ;
 
@@ -506,7 +499,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = $2; }
-  | DOLLAR_CURLY expr '}' { $$ = new std::variant<Expr *, std::string_view>($2); }
+  | DOLLAR_CURLY expr '}' { $$ = $2; }
   ;
 
 expr_list

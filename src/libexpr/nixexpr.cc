@@ -40,7 +40,7 @@ void ExprFloat::show(const SymbolTable & symbols, std::ostream & str) const
 
 void ExprString::show(const SymbolTable & symbols, std::ostream & str) const
 {
-    printLiteralString(str, v.string_view());
+    printLiteralString(str, s);
 }
 
 void ExprPath::show(const SymbolTable & symbols, std::ostream & str) const
