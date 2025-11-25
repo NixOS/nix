@@ -1,4 +1,5 @@
 #include <limits>
+#include <ranges>
 #include <sstream>
 
 #include "nix/expr/print.hh"
@@ -346,9 +347,9 @@ private:
                 sorted.emplace_back(std::pair(state.symbols[i.name], i.value));
 
             if (options.maxAttrs == std::numeric_limits<size_t>::max())
-                std::sort(sorted.begin(), sorted.end());
+                std::ranges::sort(sorted);
             else
-                std::sort(sorted.begin(), sorted.end(), ImportantFirstAttrNameCmp());
+                std::ranges::sort(sorted, ImportantFirstAttrNameCmp());
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
