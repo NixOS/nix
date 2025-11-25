@@ -16,14 +16,14 @@ namespace nix {
 static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
-    assert(fields[n].type == Logger::Field::tString);
+    assert(fields[n].type == Logger::Field::Type::String);
     return fields[n].s;
 }
 
 static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
 {
     assert(n < fields.size());
-    assert(fields[n].type == Logger::Field::tInt);
+    assert(fields[n].type == Logger::Field::Type::Int);
     return fields[n].i;
 }
 

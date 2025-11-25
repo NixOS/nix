@@ -30,10 +30,10 @@ Sink & operator<<(Sink & sink, const Logger::Fields & fields)
 {
     sink << fields.size();
     for (auto & f : fields) {
-        sink << f.type;
-        if (f.type == Logger::Field::tInt)
+        sink << static_cast<int>(f.type);
+        if (f.type == Logger::Field::Type::Int)
             sink << f.i;
-        else if (f.type == Logger::Field::tString)
+        else if (f.type == Logger::Field::Type::String)
             sink << f.s;
         else
             unreachable();

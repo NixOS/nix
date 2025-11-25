@@ -228,9 +228,9 @@ struct JSONLogger : Logger
             return;
         auto & arr = json["fields"] = nlohmann::json::array();
         for (auto & f : fields)
-            if (f.type == Logger::Field::tInt)
+            if (f.type == Logger::Field::Type::Int)
                 arr.push_back(f.i);
-            else if (f.type == Logger::Field::tString)
+            else if (f.type == Logger::Field::Type::String)
                 arr.push_back(f.s);
             else
                 unreachable();

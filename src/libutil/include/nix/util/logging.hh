@@ -78,31 +78,32 @@ public:
     struct Field
     {
         // FIXME: use std::variant.
-        enum { tInt = 0, tString = 1 } type;
+        enum class Type { Int = 0, String = 1 };
+        Type type;
 
         uint64_t i = 0;
         std::string s;
 
         Field(const std::string & s)
-            : type(tString)
+            : type(Type::String)
             , s(s)
         {
         }
 
         Field(const char * s)
-            : type(tString)
+            : type(Type::String)
             , s(s)
         {
         }
 
         Field(const uint64_t & i)
-            : type(tInt)
+            : type(Type::Int)
             , i(i)
         {
         }
 
         Field(const ActivityType & a)
-            : type(tInt)
+            : type(Type::Int)
             , i(static_cast<uint64_t>(a))
         {
         }
