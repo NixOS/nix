@@ -8,6 +8,8 @@
 // Need specialization involving `SymbolStr` just in this one module.
 #include "nix/util/strings-inline.hh"
 
+#include <ranges>
+
 namespace nix::eval_cache {
 
 CachedEvalError::CachedEvalError(ref<AttrCursor> cursor, Symbol attr)
@@ -685,7 +687,7 @@ std::vector<Symbol> AttrCursor::getAttrs()
     std::vector<Symbol> attrs;
     for (auto & attr : *getValue().attrs())
         attrs.push_back(attr.name);
-    std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
+    std::ranges::sort(attrs, [&](Symbol a, Symbol b) {
         std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
         return sa < sb;
     });
