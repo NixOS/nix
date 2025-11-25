@@ -113,7 +113,7 @@ private:
 };
 
 template<typename T, typename... Args>
-inline ref<T> make_ref(Args &&... args)
+[[nodiscard]] inline ref<T> make_ref(Args &&... args)
 {
     auto p = std::make_shared<T>(std::forward<Args>(args)...);
     return ref<T>(p);
