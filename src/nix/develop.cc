@@ -267,12 +267,26 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.inputSrcs.insert(std::move(getEnvShPath));
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{}, drv.env[output.first] = hashPlaceholder(output.first);
+            output.second = DerivationOutput::Deferred{};
+            drv.env[output.first] = hashPlaceholder(output.first);
         }
     } else {
-        for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{};
-            drv.env[output.first] = "";
+        for (auto & [outputName, output] : drv.outputs) {
+            std::visit(
+                overloaded{
+                    [&](const DerivationOutput::InputAddressed &) {
+                        output = DerivationOutput::Deferred{};
+                        drv.env[outputName] = "";
+                    },
+                    [&](const DerivationOutput::CAFixed &) {
+                        output = DerivationOutput::Deferred{};
+                        drv.env[outputName] = "";
+                    },
+                    [&](const auto &) {
+                        // Do nothing for other types (CAFloating, Deferred, Impure)
+                    },
+                },
+                output.raw);
         }
         auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
