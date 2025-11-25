@@ -29,17 +29,17 @@ enum class ActivityType {
     FetchTree = 112,
 };
 
-typedef enum {
-    resFileLinked = 100,
-    resBuildLogLine = 101,
-    resUntrustedPath = 102,
-    resCorruptedPath = 103,
-    resSetPhase = 104,
-    resProgress = 105,
-    resSetExpected = 106,
-    resPostBuildLogLine = 107,
-    resFetchStatus = 108,
-} ResultType;
+enum class ResultType {
+    FileLinked = 100,
+    BuildLogLine = 101,
+    UntrustedPath = 102,
+    CorruptedPath = 103,
+    SetPhase = 104,
+    Progress = 105,
+    SetExpected = 106,
+    PostBuildLogLine = 107,
+    FetchStatus = 108,
+};
 
 typedef uint64_t ActivityId;
 
@@ -220,12 +220,12 @@ struct Activity
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
     {
-        result(resProgress, done, expected, running, failed);
+        result(ResultType::Progress, done, expected, running, failed);
     }
 
     void setExpected(ActivityType type2, uint64_t expected) const
     {
-        result(resSetExpected, type2, expected);
+        result(ResultType::SetExpected, type2, expected);
     }
 
     template<typename... Args>

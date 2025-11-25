@@ -305,20 +305,20 @@ public:
     {
         auto state(state_.lock());
 
-        if (type == resFileLinked) {
+        if (type == ResultType::FileLinked) {
             state->filesLinked++;
             state->bytesLinked += getI(fields, 0);
             update(*state);
         }
 
-        else if (type == resBuildLogLine || type == resPostBuildLogLine) {
+        else if (type == ResultType::BuildLogLine || type == ResultType::PostBuildLogLine) {
             auto lastLine = chomp(getS(fields, 0));
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo info = *i->second;
             if (printBuildLogs) {
                 auto suffix = "> ";
-                if (type == resPostBuildLogLine) {
+                if (type == ResultType::PostBuildLogLine) {
                     suffix = " (post)> ";
                 }
                 log(*state,
@@ -333,24 +333,24 @@ public:
             }
         }
 
-        else if (type == resUntrustedPath) {
+        else if (type == ResultType::UntrustedPath) {
             state->untrustedPaths++;
             update(*state);
         }
 
-        else if (type == resCorruptedPath) {
+        else if (type == ResultType::CorruptedPath) {
             state->corruptedPaths++;
             update(*state);
         }
 
-        else if (type == resSetPhase) {
+        else if (type == ResultType::SetPhase) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             i->second->phase = getS(fields, 0);
             update(*state);
         }
 
-        else if (type == resProgress) {
+        else if (type == ResultType::Progress) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -361,7 +361,7 @@ public:
             update(*state);
         }
 
-        else if (type == resSetExpected) {
+        else if (type == ResultType::SetExpected) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;
@@ -373,7 +373,7 @@ public:
             update(*state);
         }
 
-        else if (type == resFetchStatus) {
+        else if (type == ResultType::FetchStatus) {
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo & actInfo = *i->second;

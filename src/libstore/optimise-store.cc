@@ -273,7 +273,7 @@ void LocalStore::optimisePath_(
 
     if (act)
         act->result(
-            resFileLinked,
+            ResultType::FileLinked,
             st.st_size
 #ifndef _WIN32
             ,

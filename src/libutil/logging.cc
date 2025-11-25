@@ -138,10 +138,10 @@ public:
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (type == resBuildLogLine && printBuildLogs) {
+        if (type == ResultType::BuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError(lastLine);
-        } else if (type == resPostBuildLogLine && printBuildLogs) {
+        } else if (type == ResultType::PostBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError("post-build-hook: " + lastLine);
         }
@@ -440,7 +440,7 @@ bool handleJSONLogMessage(
 
         else if (action == "setPhase") {
             std::string phase = json["phase"];
-            act.result(resSetPhase, phase);
+            act.result(ResultType::SetPhase, phase);
         }
 
         else if (action == "msg") {

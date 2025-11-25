@@ -775,7 +775,7 @@ static void runPostBuildHook(
 
         void flushLine()
         {
-            act.result(resPostBuildLogLine, currentLine);
+            act.result(ResultType::PostBuildLogLine, currentLine);
             currentLine.clear();
         }
 
@@ -1045,9 +1045,9 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
                     if (s && !isWrittenToLog && logSink) {
                         const auto type = (*json)["type"];
                         const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
+                        if (type == ResultType::BuildLogLine) {
                             (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && !fields.is_null()) {
+                        } else if (type == ResultType::SetPhase && !fields.is_null()) {
                             const auto phase = fields[0];
                             if (!phase.is_null()) {
                                 // nixpkgs' stdenv produces lines in the log to signal
@@ -1087,7 +1087,7 @@ void DerivationBuildingGoal::flushLine()
         if (logTail.size() > settings.logLines)
             logTail.pop_front();
 
-        act->result(resBuildLogLine, currentLogLine);
+        act->result(ResultType::BuildLogLine, currentLogLine);
     }
 
     currentLogLine = "";

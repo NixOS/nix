@@ -174,7 +174,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20)
             return;
         StringSink buf;
-        buf << STDERR_RESULT << act << type << fields;
+        buf << STDERR_RESULT << act << static_cast<uint64_t>(type) << fields;
         enqueueMsg(buf.s);
     }
 };
