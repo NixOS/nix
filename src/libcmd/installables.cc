@@ -132,7 +132,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputAttrPath(inputAttrPath),
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()), true));
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -173,7 +173,7 @@ MixFlakeOptions::MixFlakeOptions()
             auto flake = flake::lockFlake(
                 flakeSettings,
                 *evalState,
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir())),
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string()),
                 {.writeLockFile = false});
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
@@ -263,7 +263,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, *file)));
+            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, file->string())));
 
             Value root;
             state->eval(e, root);
@@ -465,10 +465,10 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
             state->eval(e, *vFile);
         } else if (file) {
             auto dir = absPath(getCommandBaseDir());
-            state->evalFile(lookupFileArg(*state, *file, &dir), *vFile);
+            state->evalFile(lookupFileArg(*state, file->string(), &dir), *vFile);
         } else {
-            Path dir = absPath(getCommandBaseDir());
-            auto e = state->parseExprFromString(*expr, state->rootPath(dir));
+            auto dir = absPath(getCommandBaseDir());
+            auto e = state->parseExprFromString(*expr, state->rootPath(dir.string()));
             state->eval(e, *vFile);
         }
 
@@ -801,7 +801,8 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
     for (const auto & i : rawInstallables)
-        res.push_back(parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir())).first);
+        res.push_back(
+            parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir()).string()).first);
     return res;
 }
 
@@ -820,7 +821,8 @@ void RawInstallablesCommand::run(ref<Store> store)
 
 std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
 {
-    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir())).first};
+    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir()).string())
+                .first};
 }
 
 void InstallablesCommand::run(ref<Store> store, std::vector<std::string> && rawInstallables)

@@ -371,13 +371,13 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         d.completer(*completions, d.n, d.prefix);
 }
 
-Path Args::getCommandBaseDir() const
+std::filesystem::path Args::getCommandBaseDir() const
 {
     assert(parent);
     return parent->getCommandBaseDir();
 }
 
-Path RootArgs::getCommandBaseDir() const
+std::filesystem::path RootArgs::getCommandBaseDir() const
 {
     return commandBaseDir;
 }

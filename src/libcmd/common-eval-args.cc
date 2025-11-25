@@ -165,7 +165,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                         state.parseExprFromString(
                             arg.expr,
                             compatibilitySettings.nixShellShebangArgumentsRelativeToScript
-                                ? state.rootPath(absPath(getCommandBaseDir()))
+                                ? state.rootPath(absPath(getCommandBaseDir()).string())
                                 : state.rootPath(".")));
                 },
                 [&](const AutoArgString & arg) { v->mkString(arg.s, state.mem); },
@@ -177,7 +177,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
     return res.finish();
 }
 
-SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * baseDir)
+SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir)
 {
     if (EvalSettings::isPseudoUrl(s)) {
         auto accessor = fetchers::downloadTarball(*state.store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
@@ -197,12 +197,13 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const Path * bas
     }
 
     else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
-        Path p(s.substr(1, s.size() - 2));
+        // Should perhaps be a `CanonPath`?
+        std::string p(s.substr(1, s.size() - 2));
         return state.findFile(p);
     }
 
     else
-        return state.rootPath(baseDir ? absPath(s, *baseDir) : absPath(s));
+        return state.rootPath(absPath(std::filesystem::path{s}, baseDir).string());
 }
 
 } // namespace nix
