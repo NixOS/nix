@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <exception>
+#include <ranges>
 #include <iostream>
 
 #include <cstdlib>
@@ -83,13 +84,12 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
         std::for_each(missing.willSubstitute.begin(), missing.willSubstitute.end(), [&](const StorePath & p) {
             willSubstituteSorted.push_back(&p);
         });
-        std::sort(
-            willSubstituteSorted.begin(), willSubstituteSorted.end(), [](const StorePath * lhs, const StorePath * rhs) {
-                if (lhs->name() == rhs->name())
-                    return lhs->to_string() < rhs->to_string();
-                else
-                    return lhs->name() < rhs->name();
-            });
+        std::ranges::sort(willSubstituteSorted, [](const StorePath * lhs, const StorePath * rhs) {
+            if (lhs->name() == rhs->name())
+                return lhs->to_string() < rhs->to_string();
+            else
+                return lhs->name() < rhs->name();
+        });
         for (auto p : willSubstituteSorted)
             printMsg(lvl, "  %s", store->printStorePath(*p));
     }
