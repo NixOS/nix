@@ -36,7 +36,7 @@ std::unique_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
-    log(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
+    log(Verbosity::Warn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -88,22 +88,22 @@ public:
         if (systemd) {
             char c;
             switch (lvl) {
-            case lvlError:
+            case Verbosity::Error:
                 c = '3';
                 break;
-            case lvlWarn:
+            case Verbosity::Warn:
                 c = '4';
                 break;
-            case lvlNotice:
-            case lvlInfo:
+            case Verbosity::Notice:
+            case Verbosity::Info:
                 c = '5';
                 break;
-            case lvlTalkative:
-            case lvlChatty:
+            case Verbosity::Talkative:
+            case Verbosity::Chatty:
                 c = '6';
                 break;
-            case lvlDebug:
-            case lvlVomit:
+            case Verbosity::Debug:
+            case Verbosity::Vomit:
                 c = '7';
                 break;
             default:
@@ -148,7 +148,7 @@ public:
     }
 };
 
-Verbosity verbosity = lvlInfo;
+Verbosity verbosity = Verbosity::Info;
 
 void writeToStderr(std::string_view s)
 {

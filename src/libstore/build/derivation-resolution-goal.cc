@@ -172,7 +172,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                     worker.store.printStorePath(pathResolved));
             act = std::make_unique<Activity>(
                 *logger,
-                lvlInfo,
+                Verbosity::Info,
                 actBuildWaiting,
                 msg,
                 Logger::Fields{

@@ -724,7 +724,10 @@ struct GitInputScheme : InputScheme
             return getIntAttr(*revCountAttrs, "revCount");
 
         Activity act(
-            *logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
+            *logger,
+            Verbosity::Chatty,
+            actUnknown,
+            fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
 
         auto revCount = GitRepo::openRepo(repoDir)->getRevCount(rev);
 

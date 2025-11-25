@@ -93,7 +93,7 @@ namespace nix {
     TEST(logEI, loggingErrorOnInfoLevel) {
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = lvlInfo,
+        logger->logEI({ .level = Verbosity::Info,
                         .name = "Info name",
             });
 
@@ -102,11 +102,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnTalkativeLevel) {
-        verbosity = lvlTalkative;
+        verbosity = Verbosity::Talkative;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = lvlTalkative,
+        logger->logEI({ .level = Verbosity::Talkative,
                         .name = "Talkative name",
             });
 
@@ -115,11 +115,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnChattyLevel) {
-        verbosity = lvlChatty;
+        verbosity = Verbosity::Chatty;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = lvlChatty,
+        logger->logEI({ .level = Verbosity::Chatty,
                         .name = "Chatty name",
             });
 
@@ -128,11 +128,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnDebugLevel) {
-        verbosity = lvlDebug;
+        verbosity = Verbosity::Debug;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = lvlDebug,
+        logger->logEI({ .level = Verbosity::Debug,
                         .name = "Debug name",
             });
 
@@ -141,11 +141,11 @@ namespace nix {
     }
 
     TEST(logEI, loggingErrorOnVomitLevel) {
-        verbosity = lvlVomit;
+        verbosity = Verbosity::Vomit;
 
         testing::internal::CaptureStderr();
 
-        logger->logEI({ .level = lvlVomit,
+        logger->logEI({ .level = Verbosity::Vomit,
                         .name = "Vomit name",
             });
 

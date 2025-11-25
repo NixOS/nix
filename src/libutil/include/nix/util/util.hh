@@ -216,7 +216,7 @@ std::string escapeShellArgAlways(const std::string_view s);
  * but ideally we propagate the exception using an exception_ptr in such cases.
  * See e.g. `PackBuilderContext`
  */
-void ignoreExceptionInDestructor(Verbosity lvl = lvlError);
+void ignoreExceptionInDestructor(Verbosity lvl = Verbosity::Error);
 
 /**
  * Not destructor-safe.
@@ -225,7 +225,7 @@ void ignoreExceptionInDestructor(Verbosity lvl = lvlError);
  *
  * This may be used in a few places where Interrupt can't happen, but that's ok.
  */
-void ignoreExceptionExceptInterrupt(Verbosity lvl = lvlError);
+void ignoreExceptionExceptInterrupt(Verbosity lvl = Verbosity::Error);
 
 /**
  * Tree formatting.

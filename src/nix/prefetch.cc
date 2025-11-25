@@ -125,7 +125,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
         /* Optionally unpack the file. */
         if (unpack) {
-            Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url.to_string()));
+            Activity act(*logger, Verbosity::Chatty, actUnknown, fmt("unpacking '%s'", url.to_string()));
             auto unpacked = (tmpDir.path() / "unpacked").string();
             createDirs(unpacked);
             unpackTarfile(tmpFile.string(), unpacked);
@@ -141,7 +141,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             }
         }
 
-        Activity act(*logger, lvlChatty, actUnknown, fmt("adding '%s' to the store", url.to_string()));
+        Activity act(*logger, Verbosity::Chatty, actUnknown, fmt("adding '%s' to the store", url.to_string()));
 
         auto info = store->addToStoreSlow(name, makeFSSourceAccessor(tmpFile), method, hashAlgo, {}, expectedHash);
         storePath = info.path;

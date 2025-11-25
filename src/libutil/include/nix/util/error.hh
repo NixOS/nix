@@ -30,7 +30,32 @@
 
 namespace nix {
 
-typedef enum { lvlError = 0, lvlWarn, lvlNotice, lvlInfo, lvlTalkative, lvlChatty, lvlDebug, lvlVomit } Verbosity;
+enum class Verbosity {
+    Error = 0,
+    Warn,
+    Notice,
+    Info,
+    Talkative,
+    Chatty,
+    Debug,
+    Vomit,
+};
+
+/// Increment verbosity, clamping at Vomit
+constexpr Verbosity & operator++(Verbosity & v)
+{
+    if (v != Verbosity::Vomit)
+        v = static_cast<Verbosity>(static_cast<int>(v) + 1);
+    return v;
+}
+
+/// Decrement verbosity, clamping at Error
+constexpr Verbosity & operator--(Verbosity & v)
+{
+    if (v != Verbosity::Error)
+        v = static_cast<Verbosity>(static_cast<int>(v) - 1);
+    return v;
+}
 
 /**
  * The lines of code surrounding an error.
@@ -124,24 +149,24 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .status = status}
+        : err{.level = Verbosity::Error, .msg = HintFmt(args...), .status = status}
     {
     }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, args...)}
+        : err{.level = Verbosity::Error, .msg = HintFmt(fs, args...)}
     {
     }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .suggestions = sug}
+        : err{.level = Verbosity::Error, .msg = HintFmt(args...), .suggestions = sug}
     {
     }
 
     BaseError(HintFmt hint)
-        : err{.level = lvlError, .msg = hint}
+        : err{.level = Verbosity::Error, .msg = hint}
     {
     }
 
