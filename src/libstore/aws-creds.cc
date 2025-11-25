@@ -184,25 +184,19 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
         throw AwsAuthError("failed to create AWS client bootstrap");
     }
 
-    // If no profile specified, use the default chain
-    if (profile.empty()) {
-        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-        config.Bootstrap = bootstrap;
-        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
-    }
-
-    // For named profiles, build a custom credential chain: Environment → SSO → Profile → IMDS
-    // The SSO provider will gracefully fail if SSO isn't configured for this profile,
-    // and the chain will move on to the next provider.
+    // Build a custom credential chain: Environment → SSO → Profile → IMDS
+    // This works for both default and named profiles, ensuring consistent behavior
+    // including SSO support and proper TLS context for STS-based role assumption.
     Aws::Crt::Auth::CredentialsProviderChainConfig chainConfig;
     auto allocator = Aws::Crt::ApiAllocator();
+    const char * profileName = profile.empty() ? "(default)" : profile.c_str();
 
     auto addProviderToChain = [&](std::string_view name, auto createProvider) {
         if (auto provider = createProvider()) {
             chainConfig.Providers.push_back(provider);
-            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profile);
+            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profileName);
         } else {
-            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profile);
+            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profileName);
         }
     };
 
@@ -215,14 +209,17 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
     if (tlsContext) {
         addProviderToChain("SSO", [&]() { return createSSOProvider(profile, bootstrap, tlsContext.get(), allocator); });
     } else {
-        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profile);
+        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profileName);
     }
 
-    // 3. Profile provider (for static credentials)
+    // 3. Profile provider (for static credentials and role_arn/source_profile with STS)
     addProviderToChain("Profile", [&]() {
         Aws::Crt::Auth::CredentialsProviderProfileConfig profileConfig;
         profileConfig.Bootstrap = bootstrap;
-        profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        profileConfig.TlsContext = tlsContext.get();
+        if (!profile.empty()) {
+            profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        }
         return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
     });
 
