@@ -6,6 +6,7 @@
 #include "nix/expr/eval.hh"
 
 #include <functional>
+#include <span>
 #include <variant>
 
 namespace nix::eval_cache {
@@ -146,7 +147,7 @@ public:
      * Get an attribute along a chain of attrsets. Note that this does
      * not auto-call functors or functions.
      */
-    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath);
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(std::span<const Symbol> attrPath);
 
     std::string getString();
 

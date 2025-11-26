@@ -513,7 +513,7 @@ ref<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
-OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath)
+OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(std::span<const Symbol> attrPath)
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {
