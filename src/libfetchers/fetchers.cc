@@ -439,6 +439,9 @@ std::optional<Hash> Input::getRev() const
         } catch (BadHash & e) {
             // Default to sha1 for backwards compatibility with existing
             // usages (e.g. `builtins.fetchTree` calls or flake inputs).
+            //
+            // Note that means that for SHA-256 git repos, prefixing
+            // must be used.
             hash = Hash::parseAny(*s, HashAlgorithm::SHA1);
         }
     }
