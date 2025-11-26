@@ -57,8 +57,8 @@ getFlakeRef(const fetchers::Settings & fetchSettings, const nlohmann::json & jso
         if (info) {
             auto j = json.find(info);
             if (j != json.end()) {
-                for (auto k : fetchers::jsonToAttrs(*j))
-                    attrs.insert_or_assign(k.first, k.second);
+                for (auto [name, value] : fetchers::jsonToAttrs(*j))
+                    attrs.insert_or_assign(name, value);
             }
         }
         return FlakeRef::fromAttrs(fetchSettings, attrs);
@@ -213,14 +213,14 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
 
         if (!node->inputs.empty()) {
             auto inputs = nlohmann::json::object();
-            for (auto & i : node->inputs) {
-                if (auto child = std::get_if<0>(&i.second)) {
-                    inputs[i.first] = dumpNode(i.first, *child);
-                } else if (auto follows = std::get_if<1>(&i.second)) {
+            for (auto & [inputName, inputValue] : node->inputs) {
+                if (auto child = std::get_if<0>(&inputValue)) {
+                    inputs[inputName] = dumpNode(inputName, *child);
+                } else if (auto follows = std::get_if<1>(&inputValue)) {
                     auto arr = nlohmann::json::array();
                     for (auto & x : *follows)
                         arr.push_back(x);
-                    inputs[i.first] = std::move(arr);
+                    inputs[inputName] = std::move(arr);
                 }
             }
             n["inputs"] = std::move(inputs);

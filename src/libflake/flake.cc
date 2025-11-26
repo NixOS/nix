@@ -356,10 +356,10 @@ static FlakeRef applySelfAttrs(const FlakeRef & ref, const Flake & flake)
 
     StringSet allowedAttrs{"submodules", "lfs"};
 
-    for (auto & attr : flake.selfAttrs) {
-        if (!allowedAttrs.contains(attr.first))
-            throw Error("flake 'self' attribute '%s' is not supported", attr.first);
-        newRef.input.attrs.insert_or_assign(attr.first, attr.second);
+    for (auto & [attrName, attrValue] : flake.selfAttrs) {
+        if (!allowedAttrs.contains(attrName))
+            throw Error("flake 'self' attribute '%s' is not supported", attrName);
+        newRef.input.attrs.insert_or_assign(attrName, attrValue);
     }
 
     return newRef;
@@ -456,18 +456,18 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
         std::set<InputAttrPath> overridesUsed, updatesUsed;
         std::map<ref<Node>, SourcePath> nodePaths;
 
-        for (auto & i : lockFlags.inputOverrides) {
+        for (auto & [inputPath, inputRef] : lockFlags.inputOverrides) {
             overrides.emplace(
-                i.first,
+                inputPath,
                 OverrideTarget{
-                    .input = FlakeInput{.ref = i.second},
+                    .input = FlakeInput{.ref = inputRef},
                     /* Note: any relative overrides
                        (e.g. `--override-input B/C "path:./foo/bar"`)
                        are interpreted relative to the top-level
                        flake. */
                     .sourcePath = flake.path,
                 });
-            explicitCliOverrides.insert(i.first);
+            explicitCliOverrides.insert(inputPath);
         }
 
         LockFile newLockFile;
