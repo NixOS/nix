@@ -7,6 +7,7 @@
 #include <cassert>
 #include <iostream>
 #include <set>
+#include <span>
 #include <vector>
 #include <ranges>
 
@@ -68,9 +69,9 @@ public:
     }
 
     /**
-     * Construct a canon path from a vector of elements.
+     * Construct a canon path from a span of elements.
      */
-    CanonPath(const std::vector<std::string> & elems);
+    CanonPath(std::span<const std::string> elems);
 
     static const CanonPath root;
 

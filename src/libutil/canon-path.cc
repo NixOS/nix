@@ -40,7 +40,7 @@ CanonPath::CanonPath(std::string_view raw, const CanonPath & root)
     ensureNoNullBytes(raw);
 }
 
-CanonPath::CanonPath(const std::vector<std::string> & elems)
+CanonPath::CanonPath(std::span<const std::string> elems)
     : path("/")
 {
     for (auto & s : elems)
