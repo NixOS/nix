@@ -192,7 +192,7 @@ There are two formats, documented separately:
 
 - The legacy ["ATerm" format](@docroot@/protocols/derivation-aterm.md)
 
-- The experimental, currently under development and changing [JSON format](@docroot@/protocols/json/derivation.md)
+- The experimental, currently under development and changing [JSON format](@docroot@/protocols/json/derivation/index.md)
 
 Every derivation has a canonical choice of encoding used to serialize it to a store object.
 This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).

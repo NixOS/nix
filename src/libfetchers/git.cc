@@ -42,10 +42,10 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
     return st.st_mtime + static_cast<time_t>(settings.tarballTtl) > now;
 }
 
-Path getCachePath(std::string_view key, bool shallow)
+std::filesystem::path getCachePath(std::string_view key, bool shallow)
 {
-    return getCacheDir() + "/gitv3/" + hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false)
-           + (shallow ? "-shallow" : "");
+    return getCacheDir() / "gitv3"
+           / (hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : ""));
 }
 
 // Returns the name of the HEAD branch.
@@ -55,7 +55,7 @@ Path getCachePath(std::string_view key, bool shallow)
 //
 //   ref: refs/heads/main       HEAD
 //   ...
-std::optional<std::string> readHead(const Path & path)
+std::optional<std::string> readHead(const std::filesystem::path & path)
 {
     auto [status, output] = runProgram(
         RunOptions{
@@ -86,7 +86,7 @@ std::optional<std::string> readHead(const Path & path)
 // Persist the HEAD ref from the remote repo in the local cached repo.
 bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::string & headRef)
 {
-    Path cacheDir = getCachePath(actualUrl, shallow);
+    std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
     try {
         runProgram("git", true, {"-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
     } catch (ExecError & e) {
@@ -109,8 +109,8 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
-    Path cacheDir = getCachePath(actualUrl, shallow);
-    Path headRefFile = cacheDir + "/HEAD";
+    std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
+    std::filesystem::path headRefFile = cacheDir / "HEAD";
 
     time_t now = time(0);
     struct stat st;

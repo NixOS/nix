@@ -71,6 +71,18 @@ schemas = [
       'with-signature.json',
     ],
   },
+  {
+    'stem' : 'derivation-options',
+    'schema' : schema_dir / 'derivation-options-v1.yaml',
+    'files' : [
+      'ia' / 'defaults.json',
+      'ia' / 'all_set.json',
+      'ia' / 'structuredAttrs_defaults.json',
+      'ia' / 'structuredAttrs_all_set.json',
+      'ca' / 'all_set.json',
+      'ca' / 'structuredAttrs_all_set.json',
+    ],
+  },
 ]
 
 # Derivation and Derivation output
@@ -196,6 +208,19 @@ schemas += [
     'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
     'files' : [
       'impure.json',
+    ],
+  },
+]
+
+# Dummy store
+schemas += [
+  {
+    'stem' : 'store',
+    'schema' : schema_dir / 'store-v1.yaml',
+    'files' : [
+      'empty.json',
+      'one-flat-file.json',
+      'one-derivation.json',
     ],
   },
 ]

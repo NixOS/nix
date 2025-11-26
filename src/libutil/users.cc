@@ -5,7 +5,7 @@
 
 namespace nix {
 
-Path getCacheDir()
+std::filesystem::path getCacheDir()
 {
     auto dir = getEnv("NIX_CACHE_HOME");
     if (dir) {
@@ -13,14 +13,14 @@ Path getCacheDir()
     } else {
         auto xdgDir = getEnv("XDG_CACHE_HOME");
         if (xdgDir) {
-            return *xdgDir + "/nix";
+            return std::filesystem::path{*xdgDir} / "nix";
         } else {
-            return getHome() + "/.cache/nix";
+            return getHome() / ".cache" / "nix";
         }
     }
 }
 
-Path getConfigDir()
+std::filesystem::path getConfigDir()
 {
     auto dir = getEnv("NIX_CONFIG_HOME");
     if (dir) {
@@ -28,26 +28,27 @@ Path getConfigDir()
     } else {
         auto xdgDir = getEnv("XDG_CONFIG_HOME");
         if (xdgDir) {
-            return *xdgDir + "/nix";
+            return std::filesystem::path{*xdgDir} / "nix";
         } else {
-            return getHome() + "/.config/nix";
+            return getHome() / ".config" / "nix";
         }
     }
 }
 
-std::vector<Path> getConfigDirs()
+std::vector<std::filesystem::path> getConfigDirs()
 {
-    Path configHome = getConfigDir();
+    std::filesystem::path configHome = getConfigDir();
     auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    std::vector<Path> result = tokenizeString<std::vector<std::string>>(configDirs, ":");
-    for (auto & p : result) {
-        p += "/nix";
+    auto tokens = tokenizeString<std::vector<std::string>>(configDirs, ":");
+    std::vector<std::filesystem::path> result;
+    result.push_back(configHome);
+    for (auto & token : tokens) {
+        result.push_back(std::filesystem::path{token} / "nix");
     }
-    result.insert(result.begin(), configHome);
     return result;
 }
 
-Path getDataDir()
+std::filesystem::path getDataDir()
 {
     auto dir = getEnv("NIX_DATA_HOME");
     if (dir) {
@@ -55,14 +56,14 @@ Path getDataDir()
     } else {
         auto xdgDir = getEnv("XDG_DATA_HOME");
         if (xdgDir) {
-            return *xdgDir + "/nix";
+            return std::filesystem::path{*xdgDir} / "nix";
         } else {
-            return getHome() + "/.local/share/nix";
+            return getHome() / ".local" / "share" / "nix";
         }
     }
 }
 
-Path getStateDir()
+std::filesystem::path getStateDir()
 {
     auto dir = getEnv("NIX_STATE_HOME");
     if (dir) {
@@ -70,16 +71,16 @@ Path getStateDir()
     } else {
         auto xdgDir = getEnv("XDG_STATE_HOME");
         if (xdgDir) {
-            return *xdgDir + "/nix";
+            return std::filesystem::path{*xdgDir} / "nix";
         } else {
-            return getHome() + "/.local/state/nix";
+            return getHome() / ".local" / "state" / "nix";
         }
     }
 }
 
-Path createNixStateDir()
+std::filesystem::path createNixStateDir()
 {
-    Path dir = getStateDir();
+    std::filesystem::path dir = getStateDir();
     createDirs(dir);
     return dir;
 }

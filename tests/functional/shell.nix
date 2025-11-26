@@ -84,6 +84,16 @@ let
       '';
     };
 
+    # Shells should also work with fixed-output derivations
+    fixed = mkDerivation {
+      name = "fixed";
+      FOO = "was a fixed-output derivation";
+      outputHash = "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
+      outputs = [ "out" ];
+    };
+
     # Used by nix-shell -p
     runCommand =
       name: args: buildCommand:

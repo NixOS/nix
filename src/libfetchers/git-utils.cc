@@ -206,7 +206,7 @@ static void initRepoAtomically(std::filesystem::path & path, bool bare)
     if (pathExists(path.string()))
         return;
 
-    Path tmpDir = createTempDir(os_string_to_string(PathViewNG{std::filesystem::path(path).parent_path()}));
+    std::filesystem::path tmpDir = createTempDir(path.parent_path());
     AutoDelete delTmpDir(tmpDir, true);
     Repository tmpRepo;
 

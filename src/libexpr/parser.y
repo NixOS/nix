@@ -138,7 +138,7 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %type <std::vector<std::pair<PosIdx, Expr *>>> string_parts_interpolated
 %type <std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>> ind_string_parts
 %type <Expr *> path_start
-%type <std::variant<Expr *, std::string_view>> string_parts string_attr
+%type <ToBeStringyExpr> string_parts string_attr
 %type <StringToken> attr
 %token <StringToken> ID
 %token <StringToken> STR IND_STR
@@ -297,12 +297,7 @@ expr_simple
   }
   | INT_LIT { $$ = state->exprs.add<ExprInt>($1); }
   | FLOAT_LIT { $$ = state->exprs.add<ExprFloat>($1); }
-  | '"' string_parts '"' {
-      std::visit(overloaded{
-          [&](std::string_view str) { $$ = state->exprs.add<ExprString>(state->exprs.alloc, str); },
-          [&](Expr * expr) { $$ = expr; }},
-      $2);
-  }
+  | '"' string_parts '"' { $$ = $2.toExpr(state->exprs); }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = state->stripIndentation(CUR_POS, $2);
   }
@@ -342,9 +337,9 @@ expr_simple
   ;
 
 string_parts
-  : STR { $$ = $1; }
-  | string_parts_interpolated { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, true, $1); }
-  | { $$ = std::string_view(); }
+  : STR { $$ = {$1}; }
+  | string_parts_interpolated { $$ = {state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, true, $1)}; }
+  | { $$ = {std::string_view()}; }
   ;
 
 string_parts_interpolated
@@ -389,7 +384,7 @@ path_start
             std::string_view($1.p, $1.l)
         );
     }
-    Path path(getHome() + std::string($1.p + 1, $1.l - 1));
+    Path path(getHome().string() + std::string($1.p + 1, $1.l - 1));
     $$ = state->exprs.add<ExprPath>(state->exprs.alloc, ref<SourceAccessor>(state->rootFS), path);
   }
   ;
@@ -447,15 +442,15 @@ attrs
   : attrs attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($2), state->at(@2)); }
   | attrs string_attr
     { $$ = std::move($1);
-      std::visit(overloaded {
+      $2.visit(overloaded{
           [&](std::string_view str) { $$.emplace_back(state->symbols.create(str), state->at(@2)); },
           [&](Expr * expr) {
-              throw ParseError({
-                  .msg = HintFmt("dynamic attributes not allowed in inherit"),
-                  .pos = state->positions[state->at(@2)]
-              });
-          }
-      }, $2);
+                throw ParseError({
+                    .msg = HintFmt("dynamic attributes not allowed in inherit"),
+                    .pos = state->positions[state->at(@2)]
+                });
+          }}
+      );
     }
   | { }
   ;
@@ -464,17 +459,17 @@ attrpath
   : attrpath '.' attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($3)); }
   | attrpath '.' string_attr
     { $$ = std::move($1);
-      std::visit(overloaded {
+      $3.visit(overloaded{
           [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
-          [&](Expr * expr) { $$.emplace_back(expr); }
-      }, std::move($3));
+          [&](Expr * expr) { $$.emplace_back(expr); }}
+      );
     }
   | attr { $$.emplace_back(state->symbols.create($1)); }
   | string_attr
-    { std::visit(overloaded {
+    { $1.visit(overloaded{
           [&](std::string_view str) { $$.emplace_back(state->symbols.create(str)); },
-          [&](Expr * expr) { $$.emplace_back(expr); }
-      }, std::move($1));
+          [&](Expr * expr) { $$.emplace_back(expr); }}
+      );
     }
   ;
 
@@ -485,7 +480,7 @@ attr
 
 string_attr
   : '"' string_parts '"' { $$ = std::move($2); }
-  | DOLLAR_CURLY expr '}' { $$ = $2; }
+  | DOLLAR_CURLY expr '}' { $$ = {$2}; }
   ;
 
 list

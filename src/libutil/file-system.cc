@@ -101,9 +101,11 @@ Path absPath(PathView path, std::optional<PathView> dir, bool resolveSymlinks)
     return canonPath(path, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks)
+std::filesystem::path
+absPath(const std::filesystem::path & path, const std::filesystem::path * dir_, bool resolveSymlinks)
 {
-    return absPath(path.string(), std::nullopt, resolveSymlinks);
+    std::optional<std::string> dir = dir_ ? std::optional<std::string>{dir_->string()} : std::nullopt;
+    return absPath(PathView{path.string()}, dir.transform([](auto & p) { return PathView(p); }), resolveSymlinks);
 }
 
 Path canonPath(PathView path, bool resolveSymlinks)
@@ -242,10 +244,15 @@ bool pathAccessible(const std::filesystem::path & path)
     }
 }
 
-Path readLink(const Path & path)
+std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
-    return std::filesystem::read_symlink(path).string();
+    return std::filesystem::read_symlink(path);
+}
+
+Path readLink(const Path & path)
+{
+    return readLink(std::filesystem::path{path}).string();
 }
 
 std::string readFile(const Path & path)
@@ -669,16 +676,16 @@ void AutoUnmount::cancel()
 
 //////////////////////////////////////////////////////////////////////
 
-std::string defaultTempDir()
+std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
-Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
+std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {
     while (1) {
         checkInterrupt();
-        Path tmpDir = makeTempPath(tmpRoot, prefix);
+        std::filesystem::path tmpDir = makeTempPath(tmpRoot, prefix);
         if (mkdir(
                 tmpDir.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -720,11 +727,11 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     return {std::move(fd), tmpl};
 }
 
-Path makeTempPath(const Path & root, const Path & suffix)
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
-    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir().string() : root.string(), true);
     return fmt("%1%/%2%-%3%-%4%", tmpRoot, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 

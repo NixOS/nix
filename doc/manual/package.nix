@@ -42,10 +42,12 @@ mkMesonDerivation (finalAttrs: {
         ../../src/libstore-tests/data/content-address
         ../../src/libstore-tests/data/store-path
         ../../src/libstore-tests/data/realisation
+        ../../src/libstore-tests/data/derivation
         ../../src/libstore-tests/data/derived-path
         ../../src/libstore-tests/data/path-info
         ../../src/libstore-tests/data/nar-info
         ../../src/libstore-tests/data/build-result
+        ../../src/libstore-tests/data/dummy-store
         # Too many different types of files to filter for now
         ../../doc/manual
         ./.

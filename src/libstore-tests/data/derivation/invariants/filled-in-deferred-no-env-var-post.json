@@ -1,0 +1,20 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "Fill in deferred with missing env var",
+    "out": "/nix/store/wpk9qrgg77fyswhailap0gicgw98izx9-filled-in-deferred-no-env-var"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "filled-in-deferred-no-env-var",
+  "outputs": {
+    "out": {
+      "path": "wpk9qrgg77fyswhailap0gicgw98izx9-filled-in-deferred-no-env-var"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

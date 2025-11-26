@@ -268,10 +268,10 @@ void Fetch::fetch(
         return;
     }
 
-    Path cacheDir = getCacheDir() + "/git-lfs";
+    std::filesystem::path cacheDir = getCacheDir() / "git-lfs";
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
-    Path cachePath = cacheDir + "/" + key;
+    std::filesystem::path cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
         sink(readFile(cachePath));
@@ -302,8 +302,8 @@ void Fetch::fetch(
         downloadToSink(ourl, authHeader, sink, sha256, size);
 
         debug("creating cache entry %s -> %s", key, cachePath);
-        if (!pathExists(dirOf(cachePath)))
-            createDirs(dirOf(cachePath));
+        if (!pathExists(cachePath.parent_path()))
+            createDirs(cachePath.parent_path());
         writeFile(cachePath, sink.s);
 
         debug("%s fetched with git-lfs", pointerFilePath);

@@ -101,7 +101,7 @@ public:
     /**
      * The directory where system configuration files are stored.
      */
-    Path nixConfDir;
+    std::filesystem::path nixConfDir;
 
     /**
      * A list of user configuration files to load.
@@ -292,7 +292,7 @@ public:
 
     Setting<std::string> builders{
         this,
-        "@" + nixConfDir + "/machines",
+        "@" + nixConfDir.string() + "/machines",
         "builders",
         R"(
           A semicolon- or newline-separated list of build machines.

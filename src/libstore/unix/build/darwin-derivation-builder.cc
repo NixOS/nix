@@ -174,7 +174,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different
            mechanisms to find temporary directories, so we want to open up a broader place for them to put their files,
            if needed. */
-        Path globalTmpDir = canonPath(defaultTempDir(), true);
+        Path globalTmpDir = canonPath(defaultTempDir().string(), true);
 
         /* They don't like trailing slashes on subpath directives */
         while (!globalTmpDir.empty() && globalTmpDir.back() == '/')

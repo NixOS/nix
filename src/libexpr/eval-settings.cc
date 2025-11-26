@@ -60,18 +60,18 @@ EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lo
 Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
-    auto add = [&](const Path & p, const std::string & s = std::string()) {
+    auto add = [&](const std::filesystem::path & p, const std::string & s = std::string()) {
         if (std::filesystem::exists(p)) {
             if (s.empty()) {
-                res.push_back(p);
+                res.push_back(p.string());
             } else {
-                res.push_back(s + "=" + p);
+                res.push_back(s + "=" + p.string());
             }
         }
     };
 
-    add(getNixDefExpr() + "/channels");
-    add(rootChannelsDir() + "/nixpkgs", "nixpkgs");
+    add(std::filesystem::path{getNixDefExpr()} / "channels");
+    add(rootChannelsDir() / "nixpkgs", "nixpkgs");
     add(rootChannelsDir());
 
     return res;
@@ -103,9 +103,9 @@ const std::string & EvalSettings::getCurrentSystem() const
     return evalSystem != "" ? evalSystem : settings.thisSystem.get();
 }
 
-Path getNixDefExpr()
+std::filesystem::path getNixDefExpr()
 {
-    return settings.useXDGBaseDirectories ? getStateDir() + "/defexpr" : getHome() + "/.nix-defexpr";
+    return settings.useXDGBaseDirectories ? getStateDir() / "defexpr" : getHome() / ".nix-defexpr";
 }
 
 } // namespace nix

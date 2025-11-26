@@ -23,6 +23,8 @@ struct DummyStore : virtual Store
     {
         UnkeyedValidPathInfo info;
         ref<MemorySourceAccessor> contents;
+
+        bool operator==(const PathInfoAndContents &) const;
     };
 
     /**
@@ -47,13 +49,21 @@ struct DummyStore : virtual Store
      * outer map for the derivation, and inner maps for the outputs of a
      * given derivation.
      */
-    boost::concurrent_flat_map<Hash, std::map<std::string, ref<UnkeyedRealisation>>> buildTrace;
+    boost::concurrent_flat_map<Hash, std::map<std::string, UnkeyedRealisation>> buildTrace;
 
     DummyStore(ref<const Config> config)
         : Store{*config}
         , config(config)
     {
     }
+
+    bool operator==(const DummyStore &) const;
 };
 
+template<>
+struct json_avoids_null<DummyStore::PathInfoAndContents> : std::true_type
+{};
+
 } // namespace nix
+
+JSON_IMPL(nix::DummyStore::PathInfoAndContents)

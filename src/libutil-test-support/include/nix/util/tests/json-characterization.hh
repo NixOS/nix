@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/types.hh"
+#include "nix/util/ref.hh"
 #include "nix/util/file-system.hh"
 
 #include "nix/util/tests/characterization.hh"
@@ -40,6 +41,49 @@ void writeJsonTest(CharacterizationTest & test, PathView testStem, const T & val
 }
 
 /**
+ * Specialization for when we need to do "JSON -> `ref<T>`" in one
+ * direction, but "`const T &` -> JSON" in the other direction.
+ *
+ * We can't just return `const T &`, but it would be wasteful to
+ * requires a `const ref<T> &` double indirection (and mandatory shared
+ * pointer), so we break the symmetry as the best remaining option.
+ */
+template<typename T>
+void writeJsonTest(CharacterizationTest & test, PathView testStem, const ref<T> & value)
+{
+    using namespace nlohmann;
+    test.writeTest(
+        Path{testStem} + ".json",
+        [&]() -> json { return static_cast<json>(*value); },
+        [](const auto & file) { return json::parse(readFile(file)); },
+        [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
+}
+
+/**
+ * Golden test in the middle of something
+ */
+template<typename T>
+void checkpointJson(CharacterizationTest & test, PathView testStem, const T & got)
+{
+    using namespace nlohmann;
+
+    auto file = test.goldenMaster(Path{testStem} + ".json");
+
+    json gotJson = static_cast<json>(got);
+
+    if (testAccept()) {
+        std::filesystem::create_directories(file.parent_path());
+        writeFile(file, gotJson.dump(2) + "\n");
+        ADD_FAILURE() << "Updating golden master " << file;
+    } else {
+        json expectedJson = json::parse(readFile(file));
+        ASSERT_EQ(gotJson, expectedJson);
+        T expected = adl_serializer<T>::from_json(expectedJson);
+        ASSERT_EQ(got, expected);
+    }
+}
+
+/**
  * Mixin class for writing characterization tests for `nlohmann::json`
  * conversions for a given type.
  */
@@ -66,6 +110,11 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
     void writeJsonTest(PathView testStem, const T & value)
     {
         nix::writeJsonTest(*this, testStem, value);
+    }
+
+    void checkpointJson(PathView testStem, const T & value)
+    {
+        nix::checkpointJson(*this, testStem, value);
     }
 };
 

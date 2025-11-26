@@ -1332,7 +1332,7 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
         /* There is a slight possibility that `tmpDir' gets deleted by
            the GC between createTempDir() and when we acquire a lock on it.
            We'll repeat until 'tmpDir' exists and we've locked it. */
-        tmpDirFn = createTempDir(config->realStoreDir, "tmp");
+        tmpDirFn = createTempDir(std::filesystem::path{config->realStoreDir.get()}, "tmp");
         tmpDirFd = openDirectory(tmpDirFn);
         if (!tmpDirFd) {
             continue;

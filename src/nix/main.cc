@@ -584,7 +584,9 @@ int main(int argc, char ** argv)
 #ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    nix::setStackSize(64 * 1024 * 1024);
+    // This used to be 64 MiB, but macOS as deployed on GitHub Actions has a
+    // hard limit slightly under that, so we round it down a bit.
+    nix::setStackSize(60 * 1024 * 1024);
 #endif
 
     return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });
