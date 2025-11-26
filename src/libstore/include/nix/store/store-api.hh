@@ -373,7 +373,7 @@ public:
         unsupported("queryAllValidPaths");
     }
 
-    constexpr static const char * MissingName = "x";
+    static constexpr const char * MissingName = "x";
 
     /**
      * Query information about a valid path. It is permitted to omit

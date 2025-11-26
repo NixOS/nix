@@ -7,7 +7,7 @@ namespace nix {
 /**
  * Magic header of exportPath() output (obsolete).
  */
-const uint32_t exportMagic = 0x4558494e;
+constexpr uint32_t exportMagic = 0x4558494e;
 
 /**
  * Export multiple paths in the format expected by `nix-store

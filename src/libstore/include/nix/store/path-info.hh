@@ -153,7 +153,7 @@ struct ValidPathInfo : virtual UnkeyedValidPathInfo
      */
     bool isContentAddressed(const StoreDirConfig & store) const;
 
-    static const size_t maxSigs = std::numeric_limits<size_t>::max();
+    static constexpr size_t maxSigs = std::numeric_limits<size_t>::max();
 
     /**
      * Return the number of signatures on this .narinfo that were

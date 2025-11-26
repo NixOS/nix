@@ -54,7 +54,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     unsigned int parse(const std::string & str) const override;
 };
 
-const uint32_t maxIdsPerBuild =
+constexpr uint32_t maxIdsPerBuild =
 #ifdef __linux__
     1 << 16
 #else

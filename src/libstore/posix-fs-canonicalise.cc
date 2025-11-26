@@ -13,7 +13,7 @@
 
 namespace nix {
 
-const time_t mtimeStore = 1; /* 1 second into the epoch */
+constexpr time_t mtimeStore = 1; /* 1 second into the epoch */
 
 static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
 {
