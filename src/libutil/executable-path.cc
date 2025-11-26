@@ -6,7 +6,7 @@
 
 namespace nix {
 
-constexpr static const OsStringView path_var_separator{
+static constexpr OsStringView path_var_separator{
     &ExecutablePath::separator,
     1,
 };
