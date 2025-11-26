@@ -355,7 +355,7 @@ private:
 
             size_t currentAttrsPrinted = 0;
 
-            for (auto & i : sorted) {
+            for (auto & [name, value] : sorted) {
                 printSpace(prettyPrint);
 
                 if (totalAttrsPrinted >= options.maxAttrs) {
@@ -363,9 +363,9 @@ private:
                     break;
                 }
 
-                printAttributeName(output, i.first);
+                printAttributeName(output, name);
                 output << " = ";
-                print(*i.second, depth + 1);
+                print(*value, depth + 1);
                 output << ";";
                 totalAttrsPrinted++;
                 currentAttrsPrinted++;

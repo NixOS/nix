@@ -645,8 +645,8 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 {
     std::cout << ANSI_MAGENTA;
-    for (auto & i : se.vars)
-        std::cout << st[i.first] << " ";
+    for (auto & [symbol, _] : se.vars)
+        std::cout << st[symbol] << " ";
     std::cout << ANSI_NORMAL;
     std::cout << std::endl;
 }
@@ -682,9 +682,9 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
         std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
-        for (auto & i : se.vars)
-            if (!hasPrefix(st[i.first], "__"))
-                std::cout << st[i.first] << " ";
+        for (auto & [symbol, _] : se.vars)
+            if (!hasPrefix(st[symbol], "__"))
+                std::cout << st[symbol] << " ";
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
         if (se.isWith)
@@ -715,8 +715,8 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
                 vm.insert_or_assign(std::string(st[j.name]), j.value);
         } else {
             // iterate through staticenv bindings and add them.
-            for (auto & i : se.vars)
-                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
+            for (auto & [symbol, displ] : se.vars)
+                vm.insert_or_assign(std::string(st[symbol]), env.values[displ]);
         }
     }
 }

@@ -4108,11 +4108,11 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
 
     auto attrs2 = state.buildBindings(attrs.size());
 
-    for (auto & i : attrs) {
-        auto size = i.second.size();
+    for (auto & [name, values] : attrs) {
+        auto size = values.size();
         auto list = state.buildList(size);
-        memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
-        attrs2.alloc(i.first).mkList(list);
+        memcpy(list.elems, values.data(), sizeof(Value *) * size);
+        attrs2.alloc(name).mkList(list);
     }
 
     v.mkAttrs(attrs2.alreadySorted());
