@@ -76,9 +76,7 @@ std::string LocalStoreConfig::doc()
 
 Path LocalBuildStoreConfig::getBuildDir() const
 {
-    return settings.buildDir.get().has_value() ? *settings.buildDir.get()
-           : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+    return settings.buildDir.get().or_else([&]() { return buildDir.get(); }).value_or(stateDir.get() + "/builds");
 }
 
 ref<Store> LocalStore::Config::openStore() const
