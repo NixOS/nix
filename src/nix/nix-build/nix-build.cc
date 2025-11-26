@@ -565,14 +565,14 @@ static void main_nix_build(int argc, char ** argv)
 
         int fileNr = 0;
 
-        for (auto & var : drv.env)
-            if (drvOptions.passAsFile.count(var.first)) {
+        for (auto & [varName, varValue] : drv.env)
+            if (drvOptions.passAsFile.count(varName)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
                 Path p = (tmpDir.path() / fn).string();
-                writeFile(p, var.second);
-                env[var.first + "Path"] = p;
+                writeFile(p, varValue);
+                env[varName + "Path"] = p;
             } else
-                env[var.first] = var.second;
+                env[varName] = varValue;
 
         std::string structuredAttrsRC;
 
@@ -653,8 +653,8 @@ static void main_nix_build(int argc, char ** argv)
         writeFile(rcfile, rc);
 
         Strings envStrs;
-        for (auto & i : env)
-            envStrs.push_back(i.first + "=" + i.second);
+        for (auto & [name, value] : env)
+            envStrs.push_back(name + "=" + value);
 
         auto args = interactive ? Strings{"bash", "--rcfile", rcfile} : Strings{"bash", rcfile};
 

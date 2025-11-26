@@ -133,9 +133,9 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     .dist = path == dependencyPath ? 0 : inf});
 
         // Transpose the graph.
-        for (auto & node : graph)
-            for (auto & ref : node.second.refs)
-                graph.find(ref)->second.rrefs.insert(node.first);
+        for (auto & [path, node] : graph)
+            for (auto & ref : node.refs)
+                graph.find(ref)->second.rrefs.insert(path);
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */

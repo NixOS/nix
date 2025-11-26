@@ -271,16 +271,17 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
             [&](this const auto & recurse, const Node & node, const std::string & prefix) -> void {
                 for (const auto & [i, input] : enumerate(node.inputs)) {
+                    auto & [inputName, inputValue] = input;
                     bool last = i + 1 == node.inputs.size();
 
-                    if (auto lockedNode = std::get_if<0>(&input.second)) {
+                    if (auto lockedNode = std::get_if<0>(&inputValue)) {
                         std::string lastModifiedStr = "";
                         if (auto lastModified = (*lockedNode)->lockedRef.input.getLastModified())
                             lastModifiedStr = fmt(" (%s)", std::put_time(std::gmtime(&*lastModified), "%F %T"));
                         logger->cout(
                             "%s" ANSI_BOLD "%s" ANSI_NORMAL ": %s%s",
                             prefix + (last ? treeLast : treeConn),
-                            input.first,
+                            inputName,
                             (*lockedNode)->lockedRef,
                             lastModifiedStr);
 
@@ -288,11 +289,11 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
 
                         if (firstVisit)
                             recurse(**lockedNode, prefix + (last ? treeNull : treeLine));
-                    } else if (auto follows = std::get_if<1>(&input.second)) {
+                    } else if (auto follows = std::get_if<1>(&inputValue)) {
                         logger->cout(
                             "%s" ANSI_BOLD "%s" ANSI_NORMAL " follows input '%s'",
                             prefix + (last ? treeLast : treeConn),
-                            input.first,
+                            inputName,
                             printInputAttrPath(*follows));
                     }
                 }

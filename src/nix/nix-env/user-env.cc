@@ -68,18 +68,19 @@ bool createUserEnv(
 
         // Copy each output meant for installation.
         auto outputsList = state.buildList(outputs.size());
-        for (const auto & [m, j] : enumerate(outputs)) {
-            (outputsList[m] = state.allocValue())->mkString(j.first, state.mem);
+        for (const auto & [m, output] : enumerate(outputs)) {
+            auto & [outputName, outputPath] = output;
+            (outputsList[m] = state.allocValue())->mkString(outputName, state.mem);
             auto outputAttrs = state.buildBindings(2);
-            outputAttrs.alloc(state.s.outPath).mkString(state.store->printStorePath(*j.second), state.mem);
-            attrs.alloc(j.first).mkAttrs(outputAttrs);
+            outputAttrs.alloc(state.s.outPath).mkString(state.store->printStorePath(*outputPath), state.mem);
+            attrs.alloc(outputName).mkAttrs(outputAttrs);
 
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
-            state.store->addTempRoot(*j.second);
-            state.store->ensurePath(*j.second);
+            state.store->addTempRoot(*outputPath);
+            state.store->ensurePath(*outputPath);
 
-            references.insert(*j.second);
+            references.insert(*outputPath);
         }
         attrs.alloc(state.s.outputs).mkList(outputsList);
 
