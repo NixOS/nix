@@ -10,9 +10,28 @@ For S3 compatible binary caches, consult that cache's documentation.
 
 ### Anonymous reads to your S3-compatible binary cache
 
-> If your binary cache is publicly accessible and does not require authentication,
-> it is simplest to use the [HTTP Binary Cache Store] rather than S3 Binary Cache Store with
-> <https://example-nix-cache.s3.amazonaws.com> instead of <s3://example-nix-cache>.
+For publicly accessible binary caches that don't require authentication, you have two options:
+
+**Option 1: HTTP URLs (Recommended)**
+
+Use direct HTTPS URLs to avoid S3 credential lookup:
+
+```
+# AWS S3 (virtual-hosted style)
+https://bucket-name.s3.region.amazonaws.com
+
+# AWS S3 (path style)
+https://s3.region.amazonaws.com/bucket-name
+
+# S3-compatible services
+https://endpoint/bucket-name
+```
+
+This approach bypasses AWS credential lookup entirely, avoiding timeouts on non-AWS infrastructure.
+
+**Option 2: S3 URLs**
+
+You can still use `s3://bucket-name` URLs, though this may be slower due to credential lookup attempts before falling back to unauthenticated access.
 
 Your bucket will need a
 [bucket policy](https://docs.aws.amazon.com/AmazonS3/v1/userguide/bucket-policies.html)
