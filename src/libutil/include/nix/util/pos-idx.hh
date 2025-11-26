@@ -13,7 +13,7 @@ class PosIdx
     friend class std::hash<PosIdx>;
 
 private:
-    uint32_t id;
+    uint32_t id = 0;
 
     explicit PosIdx(uint32_t id)
         : id(id)
@@ -21,10 +21,7 @@ private:
     }
 
 public:
-    PosIdx()
-        : id(0)
-    {
-    }
+    PosIdx() = default;
 
     explicit operator bool() const
     {

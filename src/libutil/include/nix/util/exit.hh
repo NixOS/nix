@@ -10,12 +10,9 @@ namespace nix {
 class Exit : public std::exception
 {
 public:
-    int status;
+    int status = 0;
 
-    Exit()
-        : status(0)
-    {
-    }
+    Exit() = default;
 
     explicit Exit(int status)
         : status(status)
