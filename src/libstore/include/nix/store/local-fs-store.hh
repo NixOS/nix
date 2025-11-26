@@ -10,7 +10,8 @@ namespace nix {
 struct LocalFSStoreConfig : virtual StoreConfig
 {
 private:
-    static OptionalPathSetting makeRootDirSetting(LocalFSStoreConfig & self, std::optional<Path> defaultValue)
+    static Setting<std::optional<std::filesystem::path>>
+    makeRootDirSetting(LocalFSStoreConfig & self, std::optional<Path> defaultValue)
     {
         return {
             &self,
@@ -32,7 +33,7 @@ public:
      */
     LocalFSStoreConfig(PathView path, const Params & params);
 
-    OptionalPathSetting rootDir = makeRootDirSetting(*this, std::nullopt);
+    Setting<std::optional<std::filesystem::path>> rootDir = makeRootDirSetting(*this, std::nullopt);
 
 private:
 
@@ -50,19 +51,19 @@ private:
 
 public:
 
-    PathSetting stateDir{
+    Setting<std::filesystem::path> stateDir{
         this,
         rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
         "state",
         "Directory where Nix stores state."};
 
-    PathSetting logDir{
+    Setting<std::filesystem::path> logDir{
         this,
         rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
         "log",
         "directory where Nix stores log files."};
 
-    PathSetting realStoreDir{
+    Setting<std::filesystem::path> realStoreDir{
         this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
 };
 
@@ -77,7 +78,7 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
 
     inline static std::string operationName = "Local Filesystem Store";
 
-    const static std::string drvsLogDir;
+    const static std::filesystem::path drvsLogDir;
 
     LocalFSStore(const Config & params);
 
@@ -100,7 +101,7 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
      */
     virtual Path addPermRoot(const StorePath & storePath, const Path & gcRoot) = 0;
 
-    virtual Path getRealStoreDir()
+    virtual std::filesystem::path getRealStoreDir()
     {
         return config.realStoreDir;
     }

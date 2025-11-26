@@ -121,19 +121,23 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
            to 'baseDir'). If so, search upward to the root of the
            repo (i.e. the directory containing .git). */
 
-        path = absPath(path, baseDir->string(), true);
+        {
+            auto baseDirPath = *baseDir;
+            path = absPath(path, &baseDirPath, true).string();
+        }
 
         if (isFlake) {
 
             if (!S_ISDIR(lstat(path).st_mode)) {
                 if (baseNameOf(path) == "flake.nix") {
                     // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
+                    auto parentPath = std::filesystem::path(path).parent_path().string();
                     warn(
                         "Path '%s' should point at the directory containing the 'flake.nix' file, not the file itself. "
                         "Pretending that you meant '%s'",
                         path,
-                        dirOf(path));
-                    path = dirOf(path);
+                        parentPath);
+                    path = parentPath;
                 } else {
                     throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
                 }
@@ -157,7 +161,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         if (lstat(path).st_dev != device)
                             throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
                     }
-                    path = dirOf(path);
+                    path = std::filesystem::path(path).parent_path().string();
                 }
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
@@ -192,12 +196,12 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                 }
 
                 subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
-                flakeRoot = dirOf(flakeRoot);
+                flakeRoot = std::filesystem::path(flakeRoot).parent_path().string();
             }
         }
 
     } else {
-        if (!preserveRelativePaths && !isAbsolute(path))
+        if (!preserveRelativePaths && !std::filesystem::path(path).is_absolute())
             throw BadURL("flake reference '%s' is not an absolute path", url);
     }
 
@@ -251,8 +255,10 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
         if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
             /* Here we know that the path must not contain encoded '/' or NUL bytes. */
             auto path = renderUrlPathEnsureLegal(parsed.path);
-            if (!isAbsolute(path))
-                parsed.path = splitString<std::vector<std::string>>(absPath(path, baseDir->string()), "/");
+            if (!std::filesystem::path(path).is_absolute()) {
+                auto baseDirPath = *baseDir;
+                parsed.path = splitString<std::vector<std::string>>(absPath(path, &baseDirPath).string(), "/");
+            }
         }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {

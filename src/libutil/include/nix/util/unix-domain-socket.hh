@@ -19,12 +19,12 @@ AutoCloseFD createUnixDomainSocket();
 /**
  * Create a Unix domain socket in listen mode.
  */
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode);
+AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mode);
 
 /**
  * Bind a Unix domain socket to a path.
  */
-void bind(Socket fd, const std::string & path);
+void bind(Socket fd, const std::filesystem::path & path);
 
 /**
  * Connect to a Unix domain socket.

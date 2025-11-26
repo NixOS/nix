@@ -74,7 +74,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     for (auto & c : context) {
         auto ensureValid = [&](const StorePath & p) {
             if (!store->isValidPath(p))
-                error<InvalidPathError>(store->printStorePath(p)).debugThrow();
+                error<InvalidPathError>(p).debugThrow();
         };
         std::visit(
             overloaded{
@@ -503,7 +503,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
     try {
         auto _ = state.realiseContext(context); // FIXME: Handle CA derivations
     } catch (InvalidPathError & e) {
-        state.error<EvalError>("cannot execute '%1%', since path '%2%' is not valid", program, e.path)
+        state.error<EvalError>("cannot execute '%1%', since path '%2%' is not valid", program, e.path.to_string())
             .atPos(pos)
             .debugThrow();
     }
@@ -1931,7 +1931,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
     if (!state.store->isStorePath(path.abs()))
-        path = CanonPath(canonPath(path.abs(), true));
+        path = CanonPath(canonPath(path.abs(), true).string());
     if (!state.store->isInStore(path.abs()))
         state.error<EvalError>("path '%1%' is not in the Nix store", path).atPos(pos).debugThrow();
     auto path2 = state.store->toStorePath(path.abs()).first;
@@ -2152,7 +2152,7 @@ static void prim_findFile(EvalState & state, const PosIdx pos, Value ** args, Va
             auto rewrites = state.realiseContext(context);
             path = rewriteStrings(std::move(path), rewrites);
         } catch (InvalidPathError & e) {
-            state.error<EvalError>("cannot find '%1%', since path '%2%' is not valid", path, e.path)
+            state.error<EvalError>("cannot find '%1%', since path '%2%' is not valid", path, state.store->printStorePath(e.path))
                 .atPos(pos)
                 .debugThrow();
         }

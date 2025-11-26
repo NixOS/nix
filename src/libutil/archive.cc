@@ -32,7 +32,7 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
-PathFilter defaultPathFilter = [](const Path &) { return true; };
+PathFilter defaultPathFilter = [](const std::string &) { return true; };
 
 void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
 {
@@ -101,14 +101,14 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
     }(path);
 }
 
-time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
+time_t dumpPathAndGetMtime(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
 {
     auto path2 = PosixSourceAccessor::createAtRoot(path, /*trackLastModified=*/true);
     path2.dumpPath(sink, filter);
     return path2.accessor->getLastModified().value();
 }
 
-void dumpPath(const Path & path, Sink & sink, PathFilter & filter)
+void dumpPath(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
 {
     dumpPathAndGetMtime(path, sink, filter);
 }
@@ -201,7 +201,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
     else if (type == "directory") {
         sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
-            std::map<Path, int, CaseInsensitiveCompare> names;
+            std::map<std::string, int, CaseInsensitiveCompare> names;
 
             std::string prevName;
 

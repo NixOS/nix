@@ -207,12 +207,12 @@ private:
 
 public:
 
-    const Path dbDir;
-    const Path linksDir;
-    const Path reservedPath;
-    const Path schemaPath;
-    const Path tempRootsDir;
-    const Path fnTempRoots;
+    const std::filesystem::path dbDir;
+    const std::filesystem::path linksDir;
+    const std::filesystem::path reservedPath;
+    const std::filesystem::path schemaPath;
+    const std::filesystem::path tempRootsDir;
+    const std::filesystem::path fnTempRoots;
 
 private:
 

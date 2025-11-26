@@ -388,7 +388,8 @@ path_start
         });
     }
 
-    Path path(absPath(literal, state->basePath.path.abs()));
+    auto basePath = std::filesystem::path(state->basePath.path.abs());
+    Path path(absPath(literal, &basePath).string());
     /* add back in the trailing '/' to the first segment */
     if (literal.size() > 1 && literal.back() == '/')
       path += '/';

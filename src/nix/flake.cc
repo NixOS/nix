@@ -946,7 +946,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                        createSymlink(target, os_string_to_string(PathViewNG{to2}));
+                        createSymlink(target, to2.string());
                 } else
                     throw Error(
                         "path '%s' needs to be a symlink, file, or directory but instead is a %s",

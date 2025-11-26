@@ -321,7 +321,7 @@ std::string encodeQuery(const StringMap & ss)
     return res;
 }
 
-Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath)
+std::string renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath)
 {
     for (const auto & comp : urlPath) {
         /* This is only really valid for UNIX. Windows has more restrictions. */

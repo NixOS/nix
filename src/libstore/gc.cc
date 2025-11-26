@@ -60,7 +60,7 @@ void LocalStore::createTempRootsFile()
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
 
-        debug("acquiring write lock on '%s'", fnTempRoots);
+        debug("acquiring write lock on %s", PathFmt(fnTempRoots));
         lockFile(fdTempRoots->get(), ltWrite, true);
 
         /* Check whether the garbage collector didn't get in our
@@ -241,7 +241,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 
             /* Handle indirect roots. */
             else {
-                target = absPath(target, dirOf(path));
+                auto parentPath = std::filesystem::path(path).parent_path();
+                target = absPath(target, &parentPath);
                 if (!pathExists(target)) {
                     if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
@@ -287,8 +288,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(config->stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    findRoots((config->stateDir.get() / gcRootsDir).string(), std::filesystem::file_type::unknown, roots);
+    findRoots((config->stateDir.get() / "profiles").string(), std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
@@ -374,7 +375,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Start the server for receiving new roots. */
     auto socketPath = config->stateDir.get() + gcSocketPath;
-    createDirs(dirOf(socketPath));
+    createDirs(std::filesystem::path(socketPath).parent_path());
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
     // TODO nonblocking socket on windows?
@@ -514,7 +515,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
         Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = config->realStoreDir + "/" + std::string(baseName);
+        Path realPath = (config->realStoreDir.get() / std::string(baseName)).string();
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
@@ -689,12 +690,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         try {
             AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
             if (!dir)
-                throw SysError("opening directory '%1%'", config->realStoreDir);
+                throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
 
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
-            auto linksName = baseNameOf(linksDir);
+            auto linksName = linksDir.filename().string();
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
@@ -733,7 +734,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         AutoCloseDir dir(opendir(linksDir.c_str()));
         if (!dir)
-            throw SysError("opening directory '%1%'", linksDir);
+            throw SysError("opening directory %1%", PathFmt(linksDir));
 
         int64_t actualSize = 0, unsharedSize = 0;
 

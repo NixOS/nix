@@ -179,7 +179,7 @@ static DownloadTarballResult downloadTarball_(
         auto [fdTemp, path] = createTempFile("nix-zipfile");
         cleanupTemp.cancel();
         cleanupTemp = {path};
-        debug("downloading '%s' into '%s'...", url, path);
+        debug("downloading '%s' into %s...", url, PathFmt(path));
         {
             FdSink sink(fdTemp.get());
             source->drainInto(sink);

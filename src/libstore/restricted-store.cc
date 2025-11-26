@@ -53,7 +53,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
     {
     }
 
-    Path getRealStoreDir() override
+    std::filesystem::path getRealStoreDir() override
     {
         return next->config->realStoreDir;
     }

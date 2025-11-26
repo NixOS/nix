@@ -78,9 +78,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
                     if (!S_ISDIR(lstat(target).st_mode))
-                        throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
+                        throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking '%1%'", dstFile);
+                        throw SysError("unlinking %1%", PathFmt(dstFile));
                     if (mkdir(
                             dstFile.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -108,7 +108,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking '%1%'", dstFile);
+                        throw SysError("unlinking %1%", PathFmt(dstFile));
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }

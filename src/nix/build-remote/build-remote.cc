@@ -87,7 +87,7 @@ static int main_build_remote(int argc, char ** argv)
            that gets cleared on reboot, but it wouldn't work on macOS. */
         auto currentLoadName = "/current-load";
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = std::string{localStore->config.stateDir} + currentLoadName;
+            currentLoad = (localStore->config.stateDir.get() / currentLoadName).string();
         else
             currentLoad = settings.nixStateDir + currentLoadName;
 

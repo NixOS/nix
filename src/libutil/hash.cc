@@ -369,7 +369,7 @@ Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureS
     return hash;
 }
 
-Hash hashFile(HashAlgorithm ha, const Path & path)
+Hash hashFile(HashAlgorithm ha, const std::filesystem::path & path)
 {
     HashSink sink(ha);
     readFile(path, sink);

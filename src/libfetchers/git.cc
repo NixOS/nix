@@ -630,7 +630,7 @@ struct GitInputScheme : InputScheme
         if (url.scheme == "file" && !forceHttp && !isBareRepository(renderUrlPathEnsureLegal(url.path))) {
             auto path = renderUrlPathEnsureLegal(url.path);
 
-            if (!isAbsolute(path)) {
+            if (!std::filesystem::path(path).is_absolute()) {
                 warn(
                     "Fetching Git repository '%s', which uses a path relative to the current directory. "
                     "This is not supported and will stop working in a future release. "

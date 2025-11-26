@@ -119,12 +119,12 @@ LocalStore::LocalStore(ref<const Config> config)
     , LocalFSStore{*config}
     , config{config}
     , _state(make_ref<Sync<State>>())
-    , dbDir(config->stateDir + "/db")
-    , linksDir(config->realStoreDir + "/.links")
-    , reservedPath(dbDir + "/reserved")
-    , schemaPath(dbDir + "/schema")
-    , tempRootsDir(config->stateDir + "/temproots")
-    , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
+    , dbDir(config->stateDir.get() / "db")
+    , linksDir(config->realStoreDir.get() / ".links")
+    , reservedPath(dbDir / "reserved")
+    , schemaPath(dbDir / "schema")
+    , tempRootsDir(config->stateDir.get() / "temproots")
+    , fnTempRoots(tempRootsDir / std::to_string(getpid()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -137,11 +137,11 @@ LocalStore::LocalStore(ref<const Config> config)
         makeStoreWritable();
     }
     createDirs(linksDir);
-    Path profilesDir = config->stateDir + "/profiles";
+    Path profilesDir = (config->stateDir.get() / "profiles").string();
     createDirs(profilesDir);
     createDirs(tempRootsDir);
     createDirs(dbDir);
-    Path gcRootsDir = config->stateDir + "/gcroots";
+    Path gcRootsDir = (config->stateDir.get() / "gcroots").string();
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
@@ -233,7 +233,7 @@ LocalStore::LocalStore(ref<const Config> config)
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     if (!config->readOnly) {
-        Path globalLockPath = dbDir + "/big-lock";
+        auto globalLockPath = dbDir / "big-lock";
         try {
             globalLock = openLockFile(globalLockPath.c_str(), true);
         } catch (SystemError & e) {
@@ -395,7 +395,7 @@ LocalStore::LocalStore(ref<const Config> config)
 
 AutoCloseFD LocalStore::openGCLock()
 {
-    Path fnGCLock = config->stateDir + "/gc.lock";
+    Path fnGCLock = (config->stateDir.get() / "gc.lock").string();
     auto fdGCLock = open(
         fnGCLock.c_str(),
         O_RDWR | O_CREAT
@@ -485,7 +485,7 @@ int LocalStore::getSchema()
         auto s = readFile(schemaPath);
         auto n = string2Int<int>(s);
         if (!n)
-            throw Error("'%1%' is corrupt", schemaPath);
+            throw Error("%1% is corrupt", PathFmt(schemaPath));
         curSchema = *n;
     }
     return curSchema;
@@ -498,14 +498,14 @@ void LocalStore::openDB(State & state, bool create)
     }
 
     if (access(dbDir.c_str(), R_OK | (config->readOnly ? 0 : W_OK)))
-        throw SysError("Nix database directory '%1%' is not writable", dbDir);
+        throw SysError("Nix database directory %1% is not writable", PathFmt(dbDir));
 
     /* Open the Nix database. */
     auto & db(state.db);
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                     : create         ? SQLiteOpenMode::Normal
                                      : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
+    state.db = SQLite(dbDir / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -1585,14 +1585,15 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto baseName = drvPath.to_string();
 
-    auto logPath = fmt("%s/%s/%s/%s.bz2", config->logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+    auto logPath =
+        config->logDir.get() / drvsLogDir / baseName.substr(0, 2) / (std::string(baseName.substr(2)) + ".bz2");
 
     if (pathExists(logPath))
         return;
 
-    createDirs(dirOf(logPath));
+    createDirs(std::filesystem::path(logPath).parent_path());
 
-    auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
+    auto tmpFile = fmt("%s.tmp.%d", logPath.string(), getpid());
 
     writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
 

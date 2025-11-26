@@ -35,7 +35,7 @@ StoreReference LocalOverlayStoreConfig::getReference() const
 
 Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
-    return upperLayer + "/" + path.to_string();
+    return (upperLayer.get() / path.to_string()).string();
 }
 
 LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
@@ -49,7 +49,7 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
         std::smatch match;
         std::string mountInfo;
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
-        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir.get() + R"( .*(\n|$))");
+        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir.get().string() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
         // Loop until the last match, which will be the current state of the mount point.
@@ -58,16 +58,16 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
             mounts = match.suffix();
         }
 
-        auto checkOption = [&](std::string option, std::string value) {
-            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value + "( |,)"));
+        auto checkOption = [&](std::string_view option, const std::filesystem::path & value) {
+            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value.string() + "( |,)"));
         };
 
         auto expectedLowerDir = lowerStore->config.realStoreDir.get();
-        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer)) {
-            debug("expected lowerdir: %s", expectedLowerDir);
-            debug("expected upperdir: %s", config->upperLayer);
+        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer.get())) {
+            debug("expected lowerdir: %s", PathFmt(lowerStore->config.realStoreDir.get()));
+            debug("expected upperdir: %s", PathFmt(config->upperLayer.get()));
             debug("actual mount: %s", mountInfo);
-            throw Error("overlay filesystem '%s' mounted incorrectly", config->realStoreDir.get());
+            throw Error("overlay filesystem %s mounted incorrectly", PathFmt(config->realStoreDir.get()));
         }
     }
 }
@@ -281,9 +281,9 @@ void LocalOverlayStore::remountIfNecessary()
         return;
 
     if (config->remountHook.get().empty()) {
-        warn("'%s' needs remounting, set remount-hook to do this automatically", config->realStoreDir.get());
+        warn("%s needs remounting, set remount-hook to do this automatically", PathFmt(config->realStoreDir.get()));
     } else {
-        runProgram(config->remountHook, false, {config->realStoreDir});
+        runProgram(config->remountHook.get(), false, {config->realStoreDir.get().string()});
     }
 
     _remountRequired = false;

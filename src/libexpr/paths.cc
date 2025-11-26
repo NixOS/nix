@@ -12,7 +12,7 @@ SourcePath EvalState::rootPath(CanonPath path)
 
 SourcePath EvalState::rootPath(PathView path)
 {
-    return {rootFS, CanonPath(absPath(path))};
+    return {rootFS, CanonPath(absPath(std::filesystem::path{path}).string())};
 }
 
 SourcePath EvalState::storePath(const StorePath & path)

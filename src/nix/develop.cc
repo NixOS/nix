@@ -596,7 +596,7 @@ struct CmdDevelop : Common, MixEnvironment
         if (verbosity >= lvlDebug)
             script += "set -x\n";
 
-        script += fmt("command rm -f '%s'\n", rcFilePath);
+        script += fmt("command rm -f '%s'\n", rcFilePath.string());
 
         if (phase) {
             if (!command.empty())

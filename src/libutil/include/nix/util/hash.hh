@@ -165,7 +165,7 @@ Hash hashString(
  *
  * (Metadata, such as the executable permission bit, is ignored.)
  */
-Hash hashFile(HashAlgorithm ha, const Path & path);
+Hash hashFile(HashAlgorithm ha, const std::filesystem::path & path);
 
 /**
  * The final hash and the number of bytes digested.

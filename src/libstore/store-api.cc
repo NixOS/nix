@@ -79,7 +79,8 @@ Path Store::followLinksToStore(std::string_view _path) const
             throw Error("too many symbolic links encountered while resolving '%s'", _path);
 
         auto target = readLink(path);
-        path = absPath(target, dirOf(path));
+        auto parentPath = std::filesystem::path(path).parent_path();
+        path = absPath(target, &parentPath);
     }
 
     if (!isInStore(path))

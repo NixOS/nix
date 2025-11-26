@@ -137,7 +137,7 @@ static void update(const StringSet & channelNames)
                     false,
                     {"--no-out-link",
                      "--expr",
-                     "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
+                     "import " + unpackChannelPath.string() + "{ name = \"" + cname + "\"; channelName = \"" + name
                          + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"});
                 unpacked = true;
             }

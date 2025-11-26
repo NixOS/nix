@@ -120,9 +120,9 @@ void restoreProcessContext(bool restoreMounts)
 
 //////////////////////////////////////////////////////////////////////
 
-std::optional<Path> getSelfExe()
+std::optional<std::filesystem::path> getSelfExe()
 {
-    static auto cached = []() -> std::optional<Path> {
+    static auto cached = []() -> std::optional<std::filesystem::path> {
 #if defined(__linux__) || defined(__GNU__)
         return readLink(std::filesystem::path{"/proc/self/exe"});
 #elif defined(__APPLE__)

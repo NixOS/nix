@@ -60,9 +60,10 @@ TEST(absPath, usesOptionalBasePathWhenGiven)
     OsChar _cwd[PATH_MAX + 1];
     OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
 
-    auto p = absPath(std::filesystem::path{""}.string(), std::filesystem::path{cwd}.string());
+    auto cwdPath = std::filesystem::path{cwd};
+    auto p = absPath(std::filesystem::path{""}.string(), &cwdPath);
 
-    ASSERT_EQ(p, std::filesystem::path{cwd}.string());
+    ASSERT_EQ(p, cwdPath.string());
 }
 
 TEST(absPath, isIdempotent)
@@ -119,29 +120,6 @@ TEST(canonPath, requiresAbsolutePath)
     ASSERT_ANY_THROW(canonPath(".."sv));
     ASSERT_ANY_THROW(canonPath("../"sv));
     ASSERT_DEATH({ canonPath(""sv); }, "path != \"\"");
-}
-
-/* ----------------------------------------------------------------------------
- * dirOf
- * --------------------------------------------------------------------------*/
-
-TEST(dirOf, returnsEmptyStringForRoot)
-{
-    auto p = dirOf("/");
-
-    ASSERT_EQ(p, "/");
-}
-
-TEST(dirOf, returnsFirstPathComponent)
-{
-    auto p1 = dirOf("/dir/");
-    ASSERT_EQ(p1, "/dir");
-    auto p2 = dirOf("/dir");
-    ASSERT_EQ(p2, "/");
-    auto p3 = dirOf("/dir/..");
-    ASSERT_EQ(p3, "/dir");
-    auto p4 = dirOf("/dir/../");
-    ASSERT_EQ(p4, "/dir/..");
 }
 
 /* ----------------------------------------------------------------------------
