@@ -65,7 +65,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
  * @note subclasses must implement at least one of the two
  * virtual getFile() methods.
  */
-struct BinaryCacheStore : virtual Store, virtual LogStore
+struct alignas(8) /* Work around ASAN failures on i686-linux. */
+    BinaryCacheStore : virtual Store,
+                       virtual LogStore
 {
     using Config = BinaryCacheStoreConfig;
 
