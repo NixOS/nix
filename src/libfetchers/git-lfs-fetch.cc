@@ -13,6 +13,7 @@
 #include <git2/remote.h>
 
 #include <nlohmann/json.hpp>
+#include <ranges>
 
 namespace nix::lfs {
 
@@ -160,12 +161,12 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
         debug("Custom extension '%s' found, ignoring", line);
     }
 
-    if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), ::isxdigit)) {
+    if (oid.length() != 64 || !std::ranges::all_of(oid, ::isxdigit)) {
         debug("Invalid sha256 %s, skipping", oid);
         return std::nullopt;
     }
 
-    if (size.length() == 0 || !std::all_of(size.begin(), size.end(), ::isdigit)) {
+    if (size.length() == 0 || !std::ranges::all_of(size, ::isdigit)) {
         debug("Invalid size %s, skipping", size);
         return std::nullopt;
     }
