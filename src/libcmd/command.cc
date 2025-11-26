@@ -409,7 +409,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
     }
 }
 
-void MixOutLinkBase::createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store)
+void MixOutLinkBase::createOutLinksMaybe(std::span<const BuiltPathWithResult> buildables, ref<Store> & store)
 {
     if (outLink != "")
         if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
