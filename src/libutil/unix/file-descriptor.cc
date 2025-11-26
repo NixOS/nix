@@ -269,6 +269,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
 {
     AutoCloseFD parentFd;
     auto nrComponents = std::ranges::distance(path);
+    assert(nrComponents >= 1);
     auto components = std::views::take(path, nrComponents - 1); /* Everything but last component */
     auto getParentFd = [&]() { return parentFd ? parentFd.get() : dirFd; };
 
@@ -320,6 +321,8 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
 
 Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
 {
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    assert(!path.isRoot());
 #ifdef __linux__
     auto maybeFd = linux::openat2(
         dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
