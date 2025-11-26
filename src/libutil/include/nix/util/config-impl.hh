@@ -16,6 +16,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/file-path.hh"
 
 namespace nix {
 
@@ -135,6 +136,7 @@ DECLARE_CONFIG_SERIALISER(StringSet)
 DECLARE_CONFIG_SERIALISER(StringMap)
 DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
 DECLARE_CONFIG_SERIALISER(std::filesystem::path)
+DECLARE_CONFIG_SERIALISER(std::optional<std::filesystem::path>)
 
 template<typename T>
 T BaseSetting<T>::parse(const std::string & str) const
