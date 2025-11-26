@@ -384,7 +384,7 @@ path_start
             std::string_view($1.p, $1.l)
         );
     }
-    Path path(getHome() + std::string($1.p + 1, $1.l - 1));
+    Path path(getHome().string() + std::string($1.p + 1, $1.l - 1));
     $$ = state->exprs.add<ExprPath>(state->exprs.alloc, ref<SourceAccessor>(state->rootFS), path);
   }
   ;

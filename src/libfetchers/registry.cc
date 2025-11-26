@@ -56,7 +56,7 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Source
     return registry;
 }
 
-void Registry::write(const Path & path)
+void Registry::write(const std::filesystem::path & path)
 {
     nlohmann::json arr;
     for (auto & entry : entries) {
@@ -74,7 +74,7 @@ void Registry::write(const Path & path)
     json["version"] = 2;
     json["flakes"] = std::move(arr);
 
-    createDirs(dirOf(path));
+    createDirs(path.parent_path());
     writeFile(path, json.dump(2));
 }
 
@@ -90,38 +90,38 @@ void Registry::remove(const Input & input)
         entries.end());
 }
 
-static Path getSystemRegistryPath()
+static std::filesystem::path getSystemRegistryPath()
 {
-    return settings.nixConfDir + "/registry.json";
+    return settings.nixConfDir / "registry.json";
 }
 
 static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
 {
     static auto systemRegistry = Registry::read(
         settings,
-        SourcePath{getFSSourceAccessor(), CanonPath{getSystemRegistryPath()}}.resolveSymlinks(),
+        SourcePath{getFSSourceAccessor(), CanonPath{getSystemRegistryPath().string()}}.resolveSymlinks(),
         Registry::System);
     return systemRegistry;
 }
 
-Path getUserRegistryPath()
+std::filesystem::path getUserRegistryPath()
 {
-    return getConfigDir() + "/registry.json";
+    return getConfigDir() / "registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
 {
     static auto userRegistry = Registry::read(
         settings,
-        SourcePath{getFSSourceAccessor(), CanonPath{getUserRegistryPath()}}.resolveSymlinks(),
+        SourcePath{getFSSourceAccessor(), CanonPath{getUserRegistryPath().string()}}.resolveSymlinks(),
         Registry::User);
     return userRegistry;
 }
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Path & p)
+std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry =
-        Registry::read(settings, SourcePath{getFSSourceAccessor(), CanonPath{p}}.resolveSymlinks(), Registry::Custom);
+    static auto customRegistry = Registry::read(
+        settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
     return customRegistry;
 }
 

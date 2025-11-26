@@ -334,7 +334,8 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", mode_t mode = 0755);
+std::filesystem::path
+createTempDir(const std::filesystem::path & tmpRoot = "", const std::string & prefix = "nix", mode_t mode = 0755);
 
 /**
  * Create a temporary file, returning a file handle and its path.
@@ -344,7 +345,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 /**
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
  */
-Path defaultTempDir();
+std::filesystem::path defaultTempDir();
 
 /**
  * Interpret `exe` as a location in the ambient file system and return
@@ -358,7 +359,7 @@ bool isExecutableFileAmbient(const std::filesystem::path & exe);
  * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
  * path nested in a directory, provide a suffix starting with `/`.
  */
-Path makeTempPath(const Path & root, const Path & suffix = ".tmp");
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
 
 /**
  * Used in various places.
