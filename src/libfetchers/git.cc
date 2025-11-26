@@ -443,7 +443,7 @@ struct GitInputScheme : InputScheme
         args.push_back(repoInfo.locationToArg());
 
         if (auto ref = input.getRef()) {
-            args.push_back("--branch");
+            args.emplace_back("--branch");
             args.push_back(*ref);
         }
 
