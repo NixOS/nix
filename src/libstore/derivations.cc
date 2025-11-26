@@ -14,6 +14,7 @@
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <ranges>
 
 namespace nix {
 
@@ -625,11 +626,7 @@ static void unparseDerivedPathMapNode(
  */
 static bool hasDynamicDrvDep(const Derivation & drv)
 {
-    return std::find_if(
-               drv.inputDrvs.map.begin(),
-               drv.inputDrvs.map.end(),
-               [](auto & kv) { return !kv.second.childMap.empty(); })
-           != drv.inputDrvs.map.end();
+    return std::ranges::any_of(drv.inputDrvs.map, [](auto & kv) { return !kv.second.childMap.empty(); });
 }
 
 std::string Derivation::unparse(
