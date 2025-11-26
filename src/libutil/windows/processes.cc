@@ -214,13 +214,13 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
 
     std::string envline;
     // Retain the current processes' environment variables.
-    for (const auto & envVar : getEnv()) {
-        envline += (envVar.first + '=' + envVar.second + '\0');
+    for (const auto & [name, value] : getEnv()) {
+        envline += (name + '=' + value + '\0');
     }
     // Also add new ones specified in options.
     if (options.environment) {
-        for (const auto & envVar : *options.environment) {
-            envline += (envVar.first + '=' + envVar.second + '\0');
+        for (const auto & [name, value] : *options.environment) {
+            envline += (name + '=' + value + '\0');
         }
     }
 

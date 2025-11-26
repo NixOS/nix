@@ -74,24 +74,24 @@ AbstractConfig::AbstractConfig(StringMap initials)
 
 void AbstractConfig::warnUnknownSettings()
 {
-    for (const auto & s : unknownSettings)
-        warn("unknown setting '%s'", s.first);
+    for (const auto & [name, _] : unknownSettings)
+        warn("unknown setting '%s'", name);
 }
 
 void AbstractConfig::reapplyUnknownSettings()
 {
     auto unknownSettings2 = std::move(unknownSettings);
     unknownSettings = {};
-    for (auto & s : unknownSettings2)
-        set(s.first, s.second);
+    for (auto & [name, value] : unknownSettings2)
+        set(name, value);
 }
 
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
-    for (const auto & opt : _settings)
-        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
-            && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
-            res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
+    for (const auto & [name, data] : _settings)
+        if (!data.isAlias && (!overriddenOnly || data.setting->overridden)
+            && experimentalFeatureSettings.isEnabled(data.setting->experimentalFeature))
+            res.emplace(name, SettingInfo{data.setting->to_string(), data.setting->description});
 }
 
 /**
@@ -193,33 +193,33 @@ void AbstractConfig::applyConfig(const std::string & contents, const std::string
 
 void Config::resetOverridden()
 {
-    for (auto & s : _settings)
-        s.second.setting->overridden = false;
+    for (auto & [_, data] : _settings)
+        data.setting->overridden = false;
 }
 
 nlohmann::json Config::toJSON()
 {
     auto res = nlohmann::json::object();
-    for (const auto & s : _settings)
-        if (!s.second.isAlias)
-            res.emplace(s.first, s.second.setting->toJSON());
+    for (const auto & [name, data] : _settings)
+        if (!data.isAlias)
+            res.emplace(name, data.setting->toJSON());
     return res;
 }
 
 std::string Config::toKeyValue()
 {
     std::string res;
-    for (const auto & s : _settings)
-        if (s.second.isAlias)
-            res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
+    for (const auto & [name, data] : _settings)
+        if (data.isAlias)
+            res += fmt("%s = %s\n", name, data.setting->to_string());
     return res;
 }
 
 void Config::convertToArgs(Args & args, const std::string & category)
 {
-    for (auto & s : _settings) {
-        if (!s.second.isAlias)
-            s.second.setting->convertToArg(args, category);
+    for (auto & [_, data] : _settings) {
+        if (!data.isAlias)
+            data.setting->convertToArg(args, category);
     }
 }
 
@@ -431,7 +431,10 @@ std::string BaseSetting<StringMap>::to_string() const
         value.cend(),
         std::string{},
         [](const auto & l, const auto & r) { return l + " " + r; },
-        [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
+        [](const auto & kv) {
+            auto & [key, val] = kv;
+            return key + "=" + val;
+        });
 }
 
 template class BaseSetting<int>;

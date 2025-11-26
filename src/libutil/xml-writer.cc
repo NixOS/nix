@@ -70,10 +70,10 @@ void XMLWriter::writeEmptyElement(std::string_view name, const XMLAttrs & attrs)
 
 void XMLWriter::writeAttrs(const XMLAttrs & attrs)
 {
-    for (auto & i : attrs) {
-        output << " " << i.first << "=\"";
-        for (size_t j = 0; j < i.second.size(); ++j) {
-            char c = i.second[j];
+    for (auto & [name, value] : attrs) {
+        output << " " << name << "=\"";
+        for (size_t j = 0; j < value.size(); ++j) {
+            char c = value[j];
             if (c == '"')
                 output << "&quot;";
             else if (c == '<')

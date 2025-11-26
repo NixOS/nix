@@ -37,15 +37,15 @@ StringMap getEnv()
 
 void clearEnv()
 {
-    for (auto & name : getEnv())
-        unsetenv(name.first.c_str());
+    for (auto & [name, _] : getEnv())
+        unsetenv(name.c_str());
 }
 
 void replaceEnv(const StringMap & newEnv)
 {
     clearEnv();
-    for (auto & newEnvVar : newEnv)
-        setEnv(newEnvVar.first.c_str(), newEnvVar.second.c_str());
+    for (auto & [name, value] : newEnv)
+        setEnv(name.c_str(), value.c_str());
 }
 
 } // namespace nix

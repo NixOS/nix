@@ -69,24 +69,24 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
             StringMap unhacked;
-            for (auto & i : this_.readDirectory(path))
+            for (auto & [filename, _] : this_.readDirectory(path))
                 if (archiveSettings.useCaseHack) {
-                    std::string name(i.first);
-                    size_t pos = i.first.find(caseHackSuffix);
+                    std::string name(filename);
+                    size_t pos = filename.find(caseHackSuffix);
                     if (pos != std::string::npos) {
-                        debug("removing case hack suffix from '%s'", path / i.first);
+                        debug("removing case hack suffix from '%s'", path / filename);
                         name.erase(pos);
                     }
-                    if (!unhacked.emplace(name, i.first).second)
+                    if (!unhacked.emplace(name, filename).second)
                         throw Error(
-                            "file name collision between '%s' and '%s'", (path / unhacked[name]), (path / i.first));
+                            "file name collision between '%s' and '%s'", (path / unhacked[name]), (path / filename));
                 } else
-                    unhacked.emplace(i.first, i.first);
+                    unhacked.emplace(filename, filename);
 
-            for (auto & i : unhacked)
-                if (filter((path / i.first).abs())) {
-                    sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path / i.second);
+            for (auto & [displayName, actualName] : unhacked)
+                if (filter((path / displayName).abs())) {
+                    sink << "entry" << "(" << "name" << displayName << "node";
+                    dump(path / actualName);
                     sink << ")";
                 }
         }
