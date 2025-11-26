@@ -9,6 +9,7 @@
 #include "nix/store/build-result.hh"
 
 #include <optional>
+#include <span>
 
 namespace nix {
 
@@ -86,7 +87,7 @@ struct BuiltPathWithResult
     std::optional<BuildResult> result;
 };
 
-BuiltPaths toBuiltPaths(const std::vector<BuiltPathWithResult> & builtPathsWithResult);
+BuiltPaths toBuiltPaths(std::span<const BuiltPathWithResult> builtPathsWithResult);
 
 /**
  * Shorthand, for less typing and helping us keep the choice of
