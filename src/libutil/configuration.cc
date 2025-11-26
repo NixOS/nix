@@ -433,16 +433,40 @@ std::string BaseSetting<StringMap>::to_string() const
         [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
+static Path parsePath(const AbstractSetting & s, const std::string & str)
+{
+    if (str == "")
+        throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
+    else
+        return canonPath(str);
+}
+
 template<>
 std::filesystem::path BaseSetting<std::filesystem::path>::parse(const std::string & str) const
 {
-    return std::filesystem::path(str).lexically_normal();
+    return parsePath(*this, str);
 }
 
 template<>
 std::string BaseSetting<std::filesystem::path>::to_string() const
 {
     return value.string();
+}
+
+template<>
+std::optional<std::filesystem::path>
+BaseSetting<std::optional<std::filesystem::path>>::parse(const std::string & str) const
+{
+    if (str == "")
+        return std::nullopt;
+    else
+        return parsePath(*this, str);
+}
+
+template<>
+std::string BaseSetting<std::optional<std::filesystem::path>>::to_string() const
+{
+    return value ? value->string() : "";
 }
 
 template class BaseSetting<int>;
@@ -458,14 +482,7 @@ template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
 template class BaseSetting<std::filesystem::path>;
-
-static Path parsePath(const AbstractSetting & s, const std::string & str)
-{
-    if (str == "")
-        throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
-    else
-        return canonPath(str);
-}
+template class BaseSetting<std::optional<std::filesystem::path>>;
 
 PathSetting::PathSetting(
     Config * options,
