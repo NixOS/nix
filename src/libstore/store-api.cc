@@ -132,9 +132,10 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
     std::map<StorePath, PathWithInfo *> infosMap;
     StorePathSet storePathsToAdd;
     for (auto & thingToAdd : pathsToCopy) {
-        bytesExpected += thingToAdd.first.narSize;
-        infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
-        storePathsToAdd.insert(thingToAdd.first.path);
+        auto & [info, _] = thingToAdd;
+        bytesExpected += info.narSize;
+        infosMap.insert_or_assign(info.path, &thingToAdd);
+        storePathsToAdd.insert(info.path);
     }
 
     act.setExpected(ActivityType::CopyPath, bytesExpected);
@@ -400,8 +401,8 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
     auto outputMap = this->queryDerivationOutputMap(path);
     StorePathSet outputPaths;
-    for (auto & i : outputMap) {
-        outputPaths.emplace(std::move(i.second));
+    for (auto & [_, output] : outputMap) {
+        outputPaths.emplace(std::move(output));
     }
     return outputPaths;
 }

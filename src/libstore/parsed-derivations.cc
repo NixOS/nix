@@ -109,8 +109,8 @@ nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
 
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputsJson;
-    for (auto & i : outputs)
-        outputsJson[i.first] = hashPlaceholder(i.first);
+    for (auto & [outputName, _] : outputs)
+        outputsJson[outputName] = hashPlaceholder(outputName);
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */

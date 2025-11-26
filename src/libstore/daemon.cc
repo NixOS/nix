@@ -242,9 +242,7 @@ struct ClientSettings
         settings.buildCores = buildCores;
         settings.useSubstitutes = useSubstitutes;
 
-        for (auto & i : overrides) {
-            auto & name(i.first);
-            auto & value(i.second);
+        for (auto & [name, value] : overrides) {
 
             auto setSubstituters = [&](Setting<Strings> & res) {
                 if (name != res.name && res.aliases.count(name) == 0)
@@ -728,8 +726,8 @@ static void performOp(
         logger->stopWork();
 
         size_t size = 0;
-        for (auto & i : roots)
-            size += i.second.size();
+        for (auto & [_, links] : roots)
+            size += links.size();
 
         conn.to << size;
 
@@ -832,11 +830,11 @@ static void performOp(
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         conn.to << infos.size();
-        for (auto & i : infos) {
-            WorkerProto::write(*store, wconn, i.first);
-            WorkerProto::write(*store, wconn, i.second.deriver);
-            WorkerProto::write(*store, wconn, i.second.references);
-            conn.to << i.second.downloadSize << i.second.narSize;
+        for (auto & [path, info] : infos) {
+            WorkerProto::write(*store, wconn, path);
+            WorkerProto::write(*store, wconn, info.deriver);
+            WorkerProto::write(*store, wconn, info.references);
+            conn.to << info.downloadSize << info.narSize;
         }
         break;
     }

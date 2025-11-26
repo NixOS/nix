@@ -714,11 +714,12 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, boo
         if (checkOutputs)
             drv.checkInvariants(*this, info.path);
 
-        for (auto & i : drv.outputsAndOptPaths(*this)) {
+        for (auto & [outputName, outputAndPath] : drv.outputsAndOptPaths(*this)) {
+            auto & [_, optPath] = outputAndPath;
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
-            if (i.second.second)
-                cacheDrvOutputMapping(state, id, i.first, *i.second.second);
+            if (optPath)
+                cacheDrvOutputMapping(state, id, outputName, *optPath);
         }
     }
 
