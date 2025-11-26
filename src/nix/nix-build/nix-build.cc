@@ -6,6 +6,7 @@
 #include <sstream>
 #include <vector>
 #include <map>
+#include <ranges>
 
 #include <nlohmann/json.hpp>
 
@@ -509,7 +510,7 @@ static void main_nix_build(int argc, char ** argv)
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
+            if (std::ranges::all_of(envExclude, [&](const std::string & exclude) {
                     return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
                 })) {
                 accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
