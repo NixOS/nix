@@ -44,7 +44,7 @@ struct ProfileElementSource
     }
 };
 
-const int defaultPriority = 5;
+constexpr int defaultPriority = 5;
 
 struct ProfileElement
 {
