@@ -9,6 +9,7 @@
 #include "nix/util/config-impl.hh"
 
 #include <nlohmann/json.hpp>
+#include <ranges>
 
 #include "nix/util/strings.hh"
 
@@ -497,7 +498,7 @@ void OptionalPathSetting::operator=(const std::optional<Path> & v)
 bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
 {
     auto & f = experimentalFeatures.get();
-    return std::find(f.begin(), f.end(), feature) != f.end();
+    return std::ranges::contains(f, feature);
 }
 
 void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const
