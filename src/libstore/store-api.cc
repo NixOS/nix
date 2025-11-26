@@ -334,7 +334,7 @@ StoreReference StoreConfig::getReference() const
     return {.variant = StoreReference::Auto{}};
 }
 
-bool Store::PathInfoCacheValue::isKnownNow()
+bool Store::PathInfoCacheValue::isKnownNow() const
 {
     std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
                                            : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
