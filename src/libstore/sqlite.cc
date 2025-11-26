@@ -136,7 +136,7 @@ void SQLite::exec(const std::string & stmt)
     });
 }
 
-uint64_t SQLite::getLastInsertedRowId()
+uint64_t SQLite::getLastInsertedRowId() const
 {
     return sqlite3_last_insert_rowid(db);
 }

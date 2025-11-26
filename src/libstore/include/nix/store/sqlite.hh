@@ -68,7 +68,7 @@ struct SQLite
 
     void exec(const std::string & stmt);
 
-    uint64_t getLastInsertedRowId();
+    uint64_t getLastInsertedRowId() const;
 };
 
 /**
