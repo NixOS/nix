@@ -55,5 +55,39 @@ echo "_=..." >> "$TEST_ROOT"/actual-env
 sort "$TEST_ROOT"/actual-env | uniq > "$TEST_ROOT"/actual-env.sorted
 diff "$TEST_ROOT"/expected-env.sorted "$TEST_ROOT"/actual-env.sorted
 
+# Test for issue #13994: verify behavior of -- separator with installable
+# Create a flake with an app that prints its arguments
 clearStore
+rm -rf "$TEST_HOME"/.cache "$TEST_HOME"/.config "$TEST_HOME"/.local
+cd "$TEST_HOME"
+
+cat <<'EOF' > print-args.sh
+#!/bin/sh
+printf "ARGS:"
+for arg in "$@"; do
+    printf " %s" "$arg"
+done
+printf "\n"
+EOF
+chmod +x print-args.sh
+
+cat <<EOF > flake.nix
+{
+  outputs = {self}: {
+    apps.$system.default = {
+      type = "app";
+      program = "\${self}/print-args.sh";
+    };
+  };
+}
+EOF
+
+# Test correct usage: installable before --
+nix run --no-write-lock-file . -- myarg1 myarg2 2>&1 | grepQuiet "ARGS: myarg1 myarg2"
+
+# Test that first positional argument is still treated as installable after -- (issue #13994)
+nix run --no-write-lock-file -- . myarg1 myarg2 2>&1 | grepQuiet "ARGS: myarg1 myarg2"
+
+# And verify that a non-installable first argument causes an error
+expectStderr 1 nix run --no-write-lock-file -- myarg1 myarg2 | grepQuiet "error.*myarg1"
 
