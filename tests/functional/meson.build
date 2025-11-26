@@ -160,6 +160,7 @@ suites = [
       'nix-profile.sh',
       'suggestions.sh',
       'store-info.sh',
+      'store-print-env.sh',
       'fetchClosure.sh',
       'completions.sh',
       'impure-derivations.sh',
