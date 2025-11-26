@@ -148,8 +148,9 @@ static void update(const StringSet & channelNames)
                         OS_STR("--no-out-link"),
                         OS_STR("--expr"),
                         string_to_os_string(
-                            "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
-                            + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"),
+                            "import " + unpackChannelPath.string() + "{ name = \"" + cname + "\"; channelName = \""
+                            + name + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath)
+                            + "\"; }"),
                     });
                 unpacked = true;
             }

@@ -654,7 +654,7 @@ static void main_nix_build(int argc, char ** argv)
                 escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                escapeShellArgAlways(dirOf(*shell)),
+                escapeShellArgAlways(std::filesystem::path(*shell).parent_path().string()),
                 escapeShellArgAlways(*shell),
                 tzExport,
                 envCommand);

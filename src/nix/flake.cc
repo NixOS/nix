@@ -920,11 +920,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
                     if (std::filesystem::exists(to_st)) {
-                        auto contents2 = readFile(to2.string());
+                        auto contents2 = readFile(to2);
                         if (contents != contents2) {
                             printError(
-                                "refusing to overwrite existing file '%s'\n please merge it manually with '%s'",
-                                to2.string(),
+                                "refusing to overwrite existing file %s\n please merge it manually with '%s'",
+                                PathFmt(to2),
                                 from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -938,8 +938,8 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                     if (std::filesystem::exists(to_st)) {
                         if (std::filesystem::read_symlink(to2) != target) {
                             printError(
-                                "refusing to overwrite existing file '%s'\n please merge it manually with '%s'",
-                                to2.string(),
+                                "refusing to overwrite existing file %s\n please merge it manually with '%s'",
+                                PathFmt(to2),
                                 from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -947,7 +947,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         }
                         continue;
                     } else
-                        createSymlink(target, os_string_to_string(PathViewNG{to2}));
+                        createSymlink(target, to2);
                 } else
                     throw Error(
                         "path '%s' needs to be a symlink, file, or directory but instead is a %s",

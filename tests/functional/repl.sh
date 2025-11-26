@@ -68,7 +68,7 @@ testRepl () {
     echo "$replOutput" | grepInverse "error: Cannot run 'nix-shell'"
 
     expectStderr 1 nix repl "${testDir}/simple.nix" \
-      | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
+      | grepQuiet -s "error: path \"$testDir/simple.nix\" is not a flake"
 }
 
 # Simple test, try building a drv

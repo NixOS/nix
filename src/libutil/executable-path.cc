@@ -55,7 +55,7 @@ void ExecutablePath::parseAppend(const OsString & path)
 
 OsString ExecutablePath::render() const
 {
-    std::vector<PathViewNG> path2;
+    std::vector<PathView> path2;
     path2.reserve(directories.size());
     for (auto & p : directories)
         path2.push_back(p.native());

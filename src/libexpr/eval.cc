@@ -426,29 +426,36 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
     return false;
 }
 
-void EvalState::checkURI(const std::string & uri)
+void EvalState::checkURI(const std::string & uri0)
 {
     if (!settings.restrictEval)
         return;
 
-    if (isAllowedURI(uri, settings.allowedUris.get()))
+    if (isAllowedURI(uri0, settings.allowedUris.get()))
         return;
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
-    if (isAbsolute(uri)) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-            rootFS2->checkAccess(CanonPath(uri));
-        return;
+    {
+        std::filesystem::path path(uri0);
+        if (path.is_absolute()) {
+            if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
+                rootFS2->checkAccess(CanonPath(path.string()));
+            return;
+        }
     }
 
-    if (hasPrefix(uri, "file://")) {
-        if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
-            rootFS2->checkAccess(CanonPath(uri.substr(7)));
-        return;
+    try {
+        ParsedURL uri = parseURL(uri0);
+        if (uri.scheme == "file") {
+            if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
+                rootFS2->checkAccess(CanonPath(urlPathToPath(uri.path).string()));
+            return;
+        }
+    } catch (BadURL &) {
     }
 
-    throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri);
+    throw RestrictedPathError("access to URI '%s' is forbidden in restricted mode", uri0);
 }
 
 Value * EvalState::addConstant(const std::string & name, Value & v, Constant info)

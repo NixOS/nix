@@ -63,15 +63,15 @@ std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
         return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
 }
 
-Path Store::followLinksToStore(std::string_view _path) const
+std::filesystem::path Store::followLinksToStore(std::string_view _path) const
 {
-    Path path = absPath(std::string(_path));
+    auto path = absPath(std::string(_path));
 
     // Limit symlink follows to prevent infinite loops
     unsigned int followCount = 0;
     const unsigned int maxFollow = 1024;
 
-    while (!isInStore(path)) {
+    while (!isInStore(path.string())) {
         if (!std::filesystem::is_symlink(path))
             break;
 
@@ -79,17 +79,18 @@ Path Store::followLinksToStore(std::string_view _path) const
             throw Error("too many symbolic links encountered while resolving '%s'", _path);
 
         auto target = readLink(path);
-        path = absPath(target, dirOf(path));
+        auto parentPath = path.parent_path();
+        path = absPath(target, &parentPath);
     }
 
-    if (!isInStore(path))
-        throw BadStorePath("path '%1%' is not in the Nix store", path);
+    if (!isInStore(path.string()))
+        throw BadStorePath("path '%1%' is not in the Nix store", PathFmt(path));
     return path;
 }
 
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
-    return toStorePath(followLinksToStore(path)).first;
+    return toStorePath(followLinksToStore(path).string()).first;
 }
 
 StorePath Store::addToStore(

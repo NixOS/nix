@@ -228,12 +228,12 @@ private:
 
 public:
 
-    const Path dbDir;
-    const Path linksDir;
-    const Path reservedPath;
-    const Path schemaPath;
-    const Path tempRootsDir;
-    const Path fnTempRoots;
+    const std::filesystem::path dbDir;
+    const std::filesystem::path linksDir;
+    const std::filesystem::path reservedPath;
+    const std::filesystem::path schemaPath;
+    const std::filesystem::path tempRootsDir;
+    const std::filesystem::path fnTempRoots;
 
 private:
 
@@ -492,9 +492,13 @@ private:
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    Strings readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash);
-    void
-    optimisePath_(Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair);
+    Strings readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
+    void optimisePath_(
+        Activity * act,
+        OptimiseStats & stats,
+        const std::filesystem::path & path,
+        InodeHash & inodeHash,
+        RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);

@@ -5,7 +5,7 @@ namespace nix {
 void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
 {
     /* Create directories up to `gcRoot'. */
-    createDirs(dirOf(link));
+    createDirs(std::filesystem::path(link).parent_path());
 
     /* Create the new symlink. */
     Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), rand());
@@ -33,7 +33,7 @@ Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _g
 
     /* Don't clobber the link if it already exists and doesn't
        point to the Nix store. */
-    if (pathExists(gcRoot) && (!std::filesystem::is_symlink(gcRoot) || !isInStore(readLink(gcRoot))))
+    if (pathExists(gcRoot) && (!std::filesystem::is_symlink(gcRoot) || !isInStore(readLink(gcRoot).string())))
         throw Error("cannot create symlink '%1%'; already exists", gcRoot);
 
     makeSymlink(gcRoot, printStorePath(storePath));

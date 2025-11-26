@@ -699,7 +699,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             .program = "git",
             .args{
                 OS_STR("-c"),
-                string_to_os_string("gpg.ssh.allowedSignersFile=" + allowedSignersFile),
+                OS_STR("gpg.ssh.allowedSignersFile=") + allowedSignersFile.native(),
                 OS_STR("-C"),
                 path.native(),
                 OS_STR("verify-commit"),

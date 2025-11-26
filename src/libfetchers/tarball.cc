@@ -15,7 +15,7 @@ namespace nix::fetchers {
 DownloadFileResult downloadFile(
     Store & store,
     const Settings & settings,
-    const std::string & url,
+    const VerbatimURL & url,
     const std::string & name,
     const Headers & headers)
 {
@@ -24,7 +24,7 @@ DownloadFileResult downloadFile(
     Cache::Key key{
         "file",
         {{
-            {"url", url},
+            {"url", url.to_string()},
             {"name", name},
         }}};
 
@@ -42,7 +42,7 @@ DownloadFileResult downloadFile(
     if (cached && !cached->expired)
         return useCached();
 
-    FileTransferRequest request(VerbatimURL{url});
+    FileTransferRequest request(url);
     request.headers = headers;
     if (cached)
         request.expectedETag = getStrAttr(cached->value, "etag");
@@ -179,7 +179,7 @@ static DownloadTarballResult downloadTarball_(
         auto [fdTemp, path] = createTempFile("nix-zipfile");
         cleanupTemp.cancel();
         cleanupTemp = {path};
-        debug("downloading '%s' into '%s'...", url, path);
+        debug("downloading '%s' into %s...", url, PathFmt(path));
         {
             FdSink sink(fdTemp.get());
             source->drainInto(sink);

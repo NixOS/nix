@@ -119,12 +119,12 @@ LocalStore::LocalStore(ref<const Config> config)
     , LocalFSStore{*config}
     , config{config}
     , _state(make_ref<Sync<State>>())
-    , dbDir(config->stateDir + "/db")
-    , linksDir(config->realStoreDir + "/.links")
-    , reservedPath(dbDir + "/reserved")
-    , schemaPath(dbDir + "/schema")
-    , tempRootsDir(config->stateDir + "/temproots")
-    , fnTempRoots(fmt("%s/%d", tempRootsDir, getpid()))
+    , dbDir(config->stateDir.get() / "db")
+    , linksDir(config->realStoreDir.get() / ".links")
+    , reservedPath(dbDir / "reserved")
+    , schemaPath(dbDir / "schema")
+    , tempRootsDir(config->stateDir.get() / "temproots")
+    , fnTempRoots(tempRootsDir / std::to_string(getpid()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -137,16 +137,19 @@ LocalStore::LocalStore(ref<const Config> config)
         makeStoreWritable();
     }
     createDirs(linksDir);
-    Path profilesDir = config->stateDir + "/profiles";
+    auto profilesDir = config->stateDir.get() / "profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
     createDirs(dbDir);
-    Path gcRootsDir = config->stateDir + "/gcroots";
+    auto gcRootsDir = config->stateDir.get() / "gcroots";
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
-    createDirs(gcRootsDir);
+    if (!pathExists(gcRootsDir)) {
+        createDirs(gcRootsDir);
+        replaceSymlink(profilesDir, gcRootsDir / "profiles");
+    }
 
-    for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
+    for (auto & perUserDir : {profilesDir / "per-user", gcRootsDir / "per-user"}) {
         createDirs(perUserDir);
         if (!config->readOnly) {
             // Skip chmod call if the directory already has the correct permissions (0755).
@@ -172,7 +175,7 @@ LocalStore::LocalStore(ref<const Config> config)
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError("changing ownership of path '%1%'", config->realStoreDir);
+                    throw SysError("changing ownership of path '%s'", PathFmt(config->realStoreDir.get()));
                 chmod(config->realStoreDir.get(), perm);
             }
         }
@@ -230,7 +233,7 @@ LocalStore::LocalStore(ref<const Config> config)
     /* Acquire the big fat lock in shared mode to make sure that no
        schema upgrade is in progress. */
     if (!config->readOnly) {
-        Path globalLockPath = dbDir + "/big-lock";
+        auto globalLockPath = dbDir / "big-lock";
         try {
             globalLock = openLockFile(globalLockPath.c_str(), true);
         } catch (SystemError & e) {
@@ -392,7 +395,7 @@ LocalStore::LocalStore(ref<const Config> config)
 
 AutoCloseFD LocalStore::openGCLock()
 {
-    Path fnGCLock = config->stateDir + "/gc.lock";
+    auto fnGCLock = config->stateDir.get() / "gc.lock";
     auto fdGCLock = open(
         fnGCLock.c_str(),
         O_RDWR | O_CREAT
@@ -402,7 +405,7 @@ AutoCloseFD LocalStore::openGCLock()
         ,
         0600);
     if (!fdGCLock)
-        throw SysError("opening global GC lock '%1%'", fnGCLock);
+        throw SysError("opening global GC lock '%1%'", PathFmt(fnGCLock));
     return toDescriptor(fdGCLock);
 }
 
@@ -487,7 +490,7 @@ int LocalStore::getSchema()
         auto s = readFile(schemaPath);
         auto n = string2Int<int>(s);
         if (!n)
-            throw Error("'%1%' is corrupt", schemaPath);
+            throw Error("%1% is corrupt", PathFmt(schemaPath));
         curSchema = *n;
     }
     return curSchema;
@@ -500,14 +503,14 @@ void LocalStore::openDB(State & state, bool create)
     }
 
     if (access(dbDir.c_str(), R_OK | (config->readOnly ? 0 : W_OK)))
-        throw SysError("Nix database directory '%1%' is not writable", dbDir);
+        throw SysError("Nix database directory %1% is not writable", PathFmt(dbDir));
 
     /* Open the Nix database. */
     auto & db(state.db);
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                     : create         ? SQLiteOpenMode::Normal
                                      : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
+    state.db = SQLite(dbDir / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -620,7 +623,7 @@ void LocalStore::makeStoreWritable()
 
     if (stat.f_flag & ST_RDONLY) {
         if (mount(0, config->realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
-            throw SysError("remounting %1% writable", config->realStoreDir);
+            throw SysError("remounting %s writable", PathFmt(config->realStoreDir.get()));
     }
 #endif
 }
@@ -1587,14 +1590,16 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto baseName = drvPath.to_string();
 
-    auto logPath = fmt("%s/%s/%s/%s.bz2", config->logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+    auto logPath =
+        config->logDir.get() / drvsLogDir / baseName.substr(0, 2) / (std::string(baseName.substr(2)) + ".bz2");
 
     if (pathExists(logPath))
         return;
 
-    createDirs(dirOf(logPath));
+    createDirs(logPath.parent_path());
 
-    auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
+    auto tmpFile = logPath;
+    tmpFile += ".tmp." + std::to_string(getpid());
 
     writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
 

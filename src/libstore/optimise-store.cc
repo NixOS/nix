@@ -18,7 +18,7 @@
 
 namespace nix {
 
-static void makeWritable(const Path & path)
+static void makeWritable(const std::filesystem::path & path)
 {
     auto st = lstat(path);
     chmod(path, st.st_mode | S_IWUSR);
@@ -26,10 +26,10 @@ static void makeWritable(const Path & path)
 
 struct MakeReadOnly
 {
-    Path path;
+    std::filesystem::path path;
 
-    MakeReadOnly(const PathView path)
-        : path(path)
+    MakeReadOnly(std::filesystem::path path)
+        : path(std::move(path))
     {
     }
 
@@ -37,8 +37,8 @@ struct MakeReadOnly
     {
         try {
             /* This will make the path read-only. */
-            if (path != "")
-                canonicaliseTimestampAndPermissions(path);
+            if (!path.empty())
+                canonicaliseTimestampAndPermissions(path.string());
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -52,7 +52,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir)
-        throw SysError("opening directory '%1%'", linksDir);
+        throw SysError("opening directory %1%", PathFmt(linksDir));
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -61,20 +61,20 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
         inodeHash.insert(dirent->d_ino);
     }
     if (errno)
-        throw SysError("reading directory '%1%'", linksDir);
+        throw SysError("reading directory %1%", PathFmt(linksDir));
 
     printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
 
-Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHash & inodeHash)
+Strings LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash)
 {
     Strings names;
 
     AutoCloseDir dir(opendir(path.c_str()));
     if (!dir)
-        throw SysError("opening directory '%1%'", path);
+        throw SysError("opening directory '%s'", PathFmt(path));
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -91,13 +91,13 @@ Strings LocalStore::readDirectoryIgnoringInodes(const Path & path, const InodeHa
         names.push_back(name);
     }
     if (errno)
-        throw SysError("reading directory '%1%'", path);
+        throw SysError("reading directory '%s'", PathFmt(path));
 
     return names;
 }
 
 void LocalStore::optimisePath_(
-    Activity * act, OptimiseStats & stats, const Path & path, InodeHash & inodeHash, RepairFlag repair)
+    Activity * act, OptimiseStats & stats, const std::filesystem::path & path, InodeHash & inodeHash, RepairFlag repair)
 {
     checkInterrupt();
 
@@ -110,8 +110,8 @@ void LocalStore::optimisePath_(
        See https://github.com/NixOS/nix/issues/1443 and
        https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
-    if (std::regex_search(path, std::regex("\\.app/Contents/.+$"))) {
-        debug("'%1%' is not allowed to be linked in macOS", path);
+    if (std::regex_search(path.string(), std::regex("\\.app/Contents/.+$"))) {
+        debug("'%s' is not allowed to be linked in macOS", PathFmt(path));
         return;
     }
 #endif
@@ -119,7 +119,7 @@ void LocalStore::optimisePath_(
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path + "/" + i, inodeHash, repair);
+            optimisePath_(act, stats, path / i, inodeHash, repair);
         return;
     }
 
@@ -136,13 +136,13 @@ void LocalStore::optimisePath_(
        NixOS (example: $fontconfig/var/cache being modified).  Skip
        those files.  FIXME: check the modification time. */
     if (S_ISREG(st.st_mode) && (st.st_mode & S_IWUSR)) {
-        warn("skipping suspicious writable file '%1%'", path);
+        warn("skipping suspicious writable file '%s'", PathFmt(path));
         return;
     }
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        debug("'%s' is already linked, with %d other file(s)", path, st.st_nlink - 2);
+        debug("'%s' is already linked, with %d other file(s)", PathFmt(path), st.st_nlink - 2);
         return;
     }
 
@@ -157,12 +157,12 @@ void LocalStore::optimisePath_(
        the contents of the target (which may not even exist). */
     Hash hash = ({
         hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
+            {make_ref<PosixSourceAccessor>(), CanonPath(path.string())},
             FileSerialisationMethod::NixArchive,
             HashAlgorithm::SHA256)
             .hash;
     });
-    debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
+    debug("'%s' has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
@@ -203,12 +203,12 @@ void LocalStore::optimisePath_(
                    just effectively disable deduplication of this
                    file.
                    */
-                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), path, e.code().message());
+                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), PathFmt(path), e.code().message());
                 return;
             }
 
             else
-                throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), path);
+                throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(path));
         }
     }
 
@@ -226,14 +226,14 @@ void LocalStore::optimisePath_(
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    const Path dirOfPath(dirOf(path));
+    const auto dirOfPath = path.parent_path();
     bool mustToggle = dirOfPath != config->realStoreDir.get();
     if (mustToggle)
         makeWritable(dirOfPath);
 
     /* When we're done, make the directory read-only again and reset
        its timestamp back to 0. */
-    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
+    MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : std::filesystem::path{});
 
     std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
 
@@ -270,7 +270,7 @@ void LocalStore::optimisePath_(
             debug("%s has reached maximum number of links", PathFmt(linkPath));
             return;
         }
-        throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tempLink), path);
+        throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tempLink), PathFmt(path));
     }
 
     stats.filesLinked++;
@@ -304,7 +304,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
             continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
+            optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());
