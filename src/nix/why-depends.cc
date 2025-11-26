@@ -13,7 +13,7 @@ static std::string hilite(const std::string & s, size_t pos, size_t len, const s
     return std::string(s, 0, pos) + colour + std::string(s, pos, len) + ANSI_NORMAL + std::string(s, pos + len);
 }
 
-static std::string filterPrintable(const std::string & s)
+static std::string filterPrintable(std::string_view s)
 {
     std::string res;
     for (char c : s)

@@ -174,7 +174,7 @@ static bool matchUser(std::string_view user, const struct group & gr)
  *
  * Otherwise: No.
  */
-static bool matchUser(const std::string & user, const std::string & group, const Strings & users)
+static bool matchUser(std::string_view user, std::string_view group, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
