@@ -290,8 +290,8 @@ public:
             actByType.done += i->second->done;
             actByType.failed += i->second->failed;
 
-            for (auto & j : i->second->expectedByType)
-                state->activitiesByType[j.first].expected -= j.second;
+            for (auto & [type, expected] : i->second->expectedByType)
+                state->activitiesByType[type].expected -= expected;
 
             actByType.its.erase(act);
             state->activities.erase(i->second);
@@ -477,11 +477,11 @@ public:
                 ActivityType type, const std::string & itemFmt, const std::string & numberFmt = "%d", double unit = 1) {
                 auto & act = state.activitiesByType[type];
                 uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-                for (auto & j : act.its) {
-                    done += j.second->done;
-                    expected += j.second->expected;
-                    running += j.second->running;
-                    failed += j.second->failed;
+                for (auto & [_, info] : act.its) {
+                    done += info->done;
+                    expected += info->expected;
+                    running += info->running;
+                    failed += info->failed;
                 }
 
                 expected = std::max(expected, act.expected);
@@ -521,11 +521,11 @@ public:
         auto renderSizeActivity = [&] [[nodiscard]] (ActivityType type, const std::string & itemFmt = "%s") {
             auto & act = state.activitiesByType[type];
             uint64_t done = act.done, expected = act.done, running = 0, failed = act.failed;
-            for (auto & j : act.its) {
-                done += j.second->done;
-                expected += j.second->expected;
-                running += j.second->running;
-                failed += j.second->failed;
+            for (auto & [_, info] : act.its) {
+                done += info->done;
+                expected += info->expected;
+                running += info->running;
+                failed += info->failed;
             }
 
             expected = std::max(expected, act.expected);
