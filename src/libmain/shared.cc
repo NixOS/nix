@@ -80,10 +80,9 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
                 renderSize(missing.downloadSize),
                 renderSize(missing.narSize));
         }
-        std::vector<const StorePath *> willSubstituteSorted = {};
-        std::for_each(missing.willSubstitute.begin(), missing.willSubstitute.end(), [&](const StorePath & p) {
+        std::vector<const StorePath *> willSubstituteSorted;
+        for (const auto & p : missing.willSubstitute)
             willSubstituteSorted.push_back(&p);
-        });
         std::ranges::sort(willSubstituteSorted, [](const StorePath * lhs, const StorePath * rhs) {
             if (lhs->name() == rhs->name())
                 return lhs->to_string() < rhs->to_string();
