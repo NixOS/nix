@@ -223,6 +223,44 @@ let
         );
     };
 
+  enableClangTidyLayer =
+    finalAttrs: prevAttrs:
+    let
+      # Components without clang-tidy infrastructure (non-C++ or special builds)
+      excludedComponents = [
+        "nix-perl"
+        "nix-manual"
+        "nix-internal-api-docs"
+        "nix-external-api-docs"
+        "nix-json-schema-checks"
+        "nix-kaitai-struct-checks"
+        "nix-functional-tests"
+      ];
+      shouldRunClangTidy = !builtins.elem (prevAttrs.pname or "") excludedComponents;
+    in
+    lib.optionalAttrs (scope.withClangTidy && shouldRunClangTidy) {
+      nativeBuildInputs =
+        (prevAttrs.nativeBuildInputs or [ ])
+        ++ [
+          pkgs.buildPackages.llvmPackages.clang-tools # provides run-clang-tidy
+        ]
+        ++ lib.optionals (prevAttrs.pname or "" != "nix-clang-tidy-plugin") [
+          scope.nix-clang-tidy-plugin
+        ];
+
+      # Use debug build for faster compilation (no optimizations)
+      mesonBuildType = "debug";
+
+      # Skip tests - we only care about clang-tidy results
+      doCheck = false;
+
+      # Run clang-tidy after the normal build
+      postBuild = (prevAttrs.postBuild or "") + ''
+        echo "Running clang-tidy on ${finalAttrs.pname}..."
+        ninja clang-tidy
+      '';
+    };
+
   nixDefaultsLayer = finalAttrs: prevAttrs: {
     strictDeps = prevAttrs.strictDeps or true;
     enableParallelBuilding = true;
@@ -274,6 +312,11 @@ in
     Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
   */
   withUBSan = false;
+
+  /**
+    Whether meson components are checked with [clang-tidy](https://clang.llvm.org/extra/clang-tidy/).
+  */
+  withClangTidy = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
@@ -362,6 +405,7 @@ in
     mesonLayer
     fixupStaticLayer
     enableSanitizersLayer
+    enableClangTidyLayer
     scope.mesonComponentOverrides
   ];
   mkMesonExecutable = mkPackageBuilder [
@@ -373,6 +417,7 @@ in
     mesonBuildLayer
     fixupStaticLayer
     enableSanitizersLayer
+    enableClangTidyLayer
     scope.mesonComponentOverrides
   ];
   mkMesonLibrary = mkPackageBuilder [
@@ -385,6 +430,7 @@ in
     mesonLibraryLayer
     fixupStaticLayer
     enableSanitizersLayer
+    enableClangTidyLayer
     scope.mesonComponentOverrides
   ];
 
@@ -449,6 +495,10 @@ in
   nix-kaitai-struct-checks = callPackage ../src/kaitai-struct-checks/package.nix { };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
+
+  nix-clang-tidy-plugin = callPackage ../src/clang-tidy-plugin/package.nix {
+    llvmPackages = pkgs.buildPackages.llvmPackages;
+  };
 
   /**
     Combined package that has the CLI, libraries, and (assuming non-cross, no overrides) it requires that all tests succeed.

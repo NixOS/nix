@@ -66,3 +66,6 @@ endif
 if get_option('kaitai-struct-checks')
   subproject('kaitai-struct-checks')
 endif
+
+# Static Analysis
+subdir('nix-meson-build-support/common/clang-tidy')
