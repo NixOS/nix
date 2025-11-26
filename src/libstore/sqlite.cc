@@ -233,20 +233,20 @@ bool SQLiteStmt::Use::next()
     return r == SQLITE_ROW;
 }
 
-std::string SQLiteStmt::Use::getStr(int col)
+std::string SQLiteStmt::Use::getStr(int col) const
 {
     auto s = (const char *) sqlite3_column_text(stmt, col);
     assert(s);
     return s;
 }
 
-int64_t SQLiteStmt::Use::getInt(int col)
+int64_t SQLiteStmt::Use::getInt(int col) const
 {
     // FIXME: detect nulls?
     return sqlite3_column_int64(stmt, col);
 }
 
-bool SQLiteStmt::Use::isNull(int col)
+bool SQLiteStmt::Use::isNull(int col) const
 {
     return sqlite3_column_type(stmt, col) == SQLITE_NULL;
 }
