@@ -676,16 +676,16 @@ void AutoUnmount::cancel()
 
 //////////////////////////////////////////////////////////////////////
 
-std::string defaultTempDir()
+std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
-Path createTempDir(const Path & tmpRoot, const Path & prefix, mode_t mode)
+std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {
     while (1) {
         checkInterrupt();
-        Path tmpDir = makeTempPath(tmpRoot, prefix);
+        std::filesystem::path tmpDir = makeTempPath(tmpRoot, prefix);
         if (mkdir(
                 tmpDir.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -727,11 +727,11 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     return {std::move(fd), tmpl};
 }
 
-Path makeTempPath(const Path & root, const Path & suffix)
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
-    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir().string() : root.string(), true);
     return fmt("%1%/%2%-%3%-%4%", tmpRoot, suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 

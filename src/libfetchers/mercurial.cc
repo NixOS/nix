@@ -213,11 +213,11 @@ struct MercurialInputScheme : InputScheme
                     runHg({"status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0"}),
                     "\0"s);
 
-                Path actualPath(absPath(actualUrl));
+                std::filesystem::path actualPath(absPath(actualUrl));
 
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualPath));
-                    std::string file(p, actualPath.size() + 1);
+                    assert(hasPrefix(p, actualPath.string()));
+                    std::string file(p, actualPath.string().size() + 1);
 
                     auto st = lstat(p);
 
@@ -232,7 +232,7 @@ struct MercurialInputScheme : InputScheme
 
                 auto storePath = store.addToStore(
                     input.getName(),
-                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(actualPath.string())},
                     ContentAddressMethod::Raw::NixArchive,
                     HashAlgorithm::SHA256,
                     {},
@@ -275,10 +275,8 @@ struct MercurialInputScheme : InputScheme
                 return makeResult(res->value, res->storePath);
         }
 
-        Path cacheDir =
-            fmt("%s/hg/%s",
-                getCacheDir(),
-                hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false));
+        std::filesystem::path cacheDir =
+            getCacheDir() / "hg" / hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false);
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
@@ -292,7 +290,7 @@ struct MercurialInputScheme : InputScheme
                 try {
                     runHg({"pull", "-R", cacheDir, "--", actualUrl});
                 } catch (ExecError & e) {
-                    auto transJournal = cacheDir + "/.hg/store/journal";
+                    auto transJournal = cacheDir / ".hg" / "store" / "journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
                         runHg({"recover", "-R", cacheDir});
@@ -302,7 +300,7 @@ struct MercurialInputScheme : InputScheme
                     }
                 }
             } else {
-                createDirs(dirOf(cacheDir));
+                createDirs(dirOf(cacheDir.string()));
                 runHg({"clone", "--noupdate", "--", actualUrl, cacheDir});
             }
         }
@@ -328,14 +326,14 @@ struct MercurialInputScheme : InputScheme
         if (auto res = settings.getCache()->lookupStorePath(revInfoKey(rev), store))
             return makeResult(res->value, res->storePath);
 
-        Path tmpDir = createTempDir();
+        std::filesystem::path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
         runHg({"archive", "-R", cacheDir, "-r", rev.gitRev(), tmpDir});
 
-        deletePath(tmpDir + "/.hg_archival.txt");
+        deletePath(tmpDir / ".hg_archival.txt");
 
-        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
+        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir.string())});
 
         Attrs infoAttrs({
             {"revCount", (uint64_t) revCount},
