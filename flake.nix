@@ -424,6 +424,10 @@
               "nix-perl-bindings" = {
                 supportsCross = false;
               };
+
+              "nix-clang-tidy-plugin" = {
+                supportsCross = false;
+              };
             }
             (
               pkgName:
