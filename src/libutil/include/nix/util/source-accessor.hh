@@ -117,8 +117,8 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
          */
         std::optional<uint64_t> narOffset;
 
-        bool isNotNARSerialisable();
-        std::string typeString();
+        bool isNotNARSerialisable() const;
+        std::string typeString() const;
     };
 
     virtual Stat lstat(const CanonPath & path);

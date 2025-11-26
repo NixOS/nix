@@ -5,12 +5,12 @@ namespace nix {
 
 static std::atomic<size_t> nextNumber{0};
 
-bool SourceAccessor::Stat::isNotNARSerialisable()
+bool SourceAccessor::Stat::isNotNARSerialisable() const
 {
     return this->type != tRegular && this->type != tSymlink && this->type != tDirectory;
 }
 
-std::string SourceAccessor::Stat::typeString()
+std::string SourceAccessor::Stat::typeString() const
 {
     switch (this->type) {
     case tRegular:
