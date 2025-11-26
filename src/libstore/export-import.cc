@@ -6,6 +6,7 @@
 #include "nix/store/common-protocol-impl.hh"
 
 #include <algorithm>
+#include <ranges>
 
 namespace nix {
 
@@ -37,7 +38,7 @@ static void exportPath(Store & store, const StorePath & path, Sink & sink)
 void exportPaths(Store & store, const StorePathSet & paths, Sink & sink)
 {
     auto sorted = store.topoSortPaths(paths);
-    std::reverse(sorted.begin(), sorted.end());
+    std::ranges::reverse(sorted);
 
     for (auto & path : sorted) {
         sink << 1;

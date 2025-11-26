@@ -1,6 +1,8 @@
 #include "nix/store/make-content-addressed.hh"
 #include "nix/store/references.hh"
 
+#include <ranges>
+
 namespace nix {
 
 std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & dstStore, const StorePathSet & storePaths)
@@ -10,7 +12,7 @@ std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & ds
 
     auto paths = srcStore.topoSortPaths(closure);
 
-    std::reverse(paths.begin(), paths.end());
+    std::ranges::reverse(paths);
 
     std::map<StorePath, StorePath> remappings;
 
