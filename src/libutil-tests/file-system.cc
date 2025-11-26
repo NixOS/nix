@@ -351,6 +351,10 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             sink.createDirectory(
                 CanonPath("a/b/c/f"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {}),
             SymlinkNotAllowed);
+        ASSERT_THROW(
+            sink.createRegularFile(
+                CanonPath("a/b/c/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); }),
+            SymlinkNotAllowed);
     }
 
     AutoCloseFD dirFd = openDirectory(tmpDir);
