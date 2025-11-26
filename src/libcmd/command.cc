@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <ranges>
 #include <nlohmann/json.hpp>
 
 #include "nix/cmd/command.hh"
@@ -233,7 +234,7 @@ void StorePathsCommand::run(ref<Store> store, BuiltPaths && allPaths, BuiltPaths
             storePaths.insert(p);
 
     auto sorted = store->topoSortPaths(storePaths);
-    std::reverse(sorted.begin(), sorted.end());
+    std::ranges::reverse(sorted);
 
     run(store, std::move(sorted));
 }
