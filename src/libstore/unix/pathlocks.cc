@@ -19,7 +19,7 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 
     fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
-        throw SysError("opening lock file '%1%'", path);
+        throw SysError("opening lock file %1%", path);
 
     return fd;
 }
@@ -83,7 +83,7 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
         checkInterrupt();
         std::filesystem::path lockPath = path + ".lock";
 
-        debug("locking path '%1%'", path);
+        debug("locking path %1%", path);
 
         AutoCloseFD fd;
 
@@ -106,19 +106,19 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
                 }
             }
 
-            debug("lock acquired on '%1%'", lockPath);
+            debug("lock acquired on %1%", lockPath);
 
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
             struct stat st;
             if (fstat(fd.get(), &st) == -1)
-                throw SysError("statting lock file '%1%'", lockPath);
+                throw SysError("statting lock file %1%", lockPath);
             if (st.st_size != 0)
                 /* This lock file has been unlinked, so we're holding
                    a lock on a deleted file.  This means that other
                    processes may create and acquire a lock on
                    `lockPath', and proceed.  So we must retry. */
-                debug("open lock file '%1%' has become stale", lockPath);
+                debug("open lock file %1% has become stale", lockPath);
             else
                 break;
         }
@@ -137,9 +137,9 @@ void PathLocks::unlock()
             deleteLockFile(i.second, i.first);
 
         if (close(i.first) == -1)
-            printError("error (ignored): cannot close lock file on '%1%'", i.second);
+            printError("error (ignored): cannot close lock file on %1%", i.second);
 
-        debug("lock released on '%1%'", i.second);
+        debug("lock released on %1%", i.second);
     }
 
     fds.clear();

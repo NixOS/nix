@@ -28,9 +28,9 @@ void PathLocks::unlock()
             deleteLockFile(i.second, i.first);
 
         if (CloseHandle(i.first) == -1)
-            printError("error (ignored): cannot close lock file on '%1%'", i.second);
+            printError("error (ignored): cannot close lock file on %1%", i.second);
 
-        debug("lock released on '%1%'", i.second);
+        debug("lock released on %1%", i.second);
     }
 
     fds.clear();
@@ -111,7 +111,7 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
         checkInterrupt();
         std::filesystem::path lockPath = path;
         lockPath += L".lock";
-        debug("locking path '%1%'", path);
+        debug("locking path %1%", path);
 
         AutoCloseFD fd;
 
@@ -128,13 +128,13 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
                 }
             }
 
-            debug("lock acquired on '%1%'", lockPath);
+            debug("lock acquired on %1%", lockPath);
 
             struct _stat st;
             if (_fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
-                throw SysError("statting lock file '%1%'", lockPath);
+                throw SysError("statting lock file %1%", lockPath);
             if (st.st_size != 0)
-                debug("open lock file '%1%' has become stale", lockPath);
+                debug("open lock file %1% has become stale", lockPath);
             else
                 break;
         }
