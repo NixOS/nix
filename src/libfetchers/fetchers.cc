@@ -236,12 +236,12 @@ void Input::checkLocks(Input specified, Input & result)
         if (auto prevNarHash = specified.getNarHash())
             specified.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
 
-        for (auto & field : specified.attrs) {
-            auto field2 = result.attrs.find(field.first);
-            if (field2 != result.attrs.end() && field.second != field2->second)
+        for (auto & [fieldName, fieldValue] : specified.attrs) {
+            auto field2 = result.attrs.find(fieldName);
+            if (field2 != result.attrs.end() && fieldValue != field2->second)
                 throw Error(
                     "mismatch in field '%s' of input '%s', got '%s'",
-                    field.first,
+                    fieldName,
                     attrsToJSON(specified.attrs),
                     attrsToJSON(result.attrs));
         }

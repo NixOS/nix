@@ -53,9 +53,8 @@ struct CacheImpl : Cache
 
     void upsert(const Key & key, const Attrs & value) override
     {
-        _state.lock()
-            ->upsert.use()(key.first)(attrsToJSON(key.second).dump())(attrsToJSON(value).dump())(time(0))
-            .exec();
+        auto & [domain, attrs] = key;
+        _state.lock()->upsert.use()(domain)(attrsToJSON(attrs).dump())(attrsToJSON(value).dump())(time(0)).exec();
     }
 
     std::optional<Attrs> lookup(const Key & key) override
@@ -67,30 +66,32 @@ struct CacheImpl : Cache
 
     std::optional<Attrs> lookupWithTTL(const Key & key) override
     {
+        auto & [domain, attrs] = key;
         if (auto res = lookupExpired(key)) {
             if (!res->expired)
                 return std::move(res->value);
-            debug("ignoring expired cache entry '%s:%s'", key.first, attrsToJSON(key.second).dump());
+            debug("ignoring expired cache entry '%s:%s'", domain, attrsToJSON(attrs).dump());
         }
         return {};
     }
 
     std::optional<Result> lookupExpired(const Key & key) override
     {
+        auto & [domain, attrs] = key;
         auto state(_state.lock());
 
-        auto keyJSON = attrsToJSON(key.second).dump();
+        auto keyJSON = attrsToJSON(attrs).dump();
 
-        auto stmt(state->lookup.use()(key.first)(keyJSON));
+        auto stmt(state->lookup.use()(domain)(keyJSON));
         if (!stmt.next()) {
-            debug("did not find cache entry for '%s:%s'", key.first, keyJSON);
+            debug("did not find cache entry for '%s:%s'", domain, keyJSON);
             return {};
         }
 
         auto valueJSON = stmt.getStr(0);
         auto timestamp = stmt.getInt(1);
 
-        debug("using cache entry '%s:%s' -> '%s'", key.first, keyJSON, valueJSON);
+        debug("using cache entry '%s:%s' -> '%s'", domain, keyJSON, valueJSON);
 
         return Result{
             .expired = settings.tarballTtl.get() == 0 || timestamp + settings.tarballTtl < time(0),
