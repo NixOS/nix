@@ -2,6 +2,7 @@
 ///@file
 
 #include <memory_resource>
+#include <span>
 #include "nix/expr/value.hh"
 #include "nix/expr/static-string-data.hh"
 #include "nix/util/chunked-vector.hh"
@@ -290,7 +291,7 @@ public:
         return Symbol(*symbols.insert(SymbolStr::Key{store, s, buffer}).first);
     }
 
-    std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
+    std::vector<SymbolStr> resolve(std::span<const Symbol> symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());
