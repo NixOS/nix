@@ -215,6 +215,24 @@ jobs:
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
+  clang-tidy:
+    needs: basic-checks
+    runs-on: ubuntu-24.04
+    name: clang-tidy
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        extra_nix_config: "sandbox = true"
+    - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+    - name: Run clang-tidy
+      run: nix build .#hydraJobs.clangTidy.x86_64-linux -L
+
+
   flake_regressions:
     needs: tests
     runs-on: ubuntu-24.04
