@@ -6,6 +6,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <sstream>
