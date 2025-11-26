@@ -123,7 +123,7 @@ struct BufferedSource : Source
     /**
      * Return true if the buffer is not empty.
      */
-    bool hasData();
+    bool hasData() const;
 
 protected:
     /**
@@ -201,7 +201,7 @@ struct FdSource : BufferedSource
      * Return true if the buffer is not empty after a non-blocking
      * read.
      */
-    bool hasData();
+    bool hasData() const;
 
     void skip(size_t len) override;
 

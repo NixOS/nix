@@ -138,7 +138,7 @@ size_t BufferedSource::read(char * data, size_t len)
     return n;
 }
 
-bool BufferedSource::hasData()
+bool BufferedSource::hasData() const
 {
     return bufPosOut < bufPosIn;
 }
@@ -176,7 +176,7 @@ bool FdSource::good()
     return _good;
 }
 
-bool FdSource::hasData()
+bool FdSource::hasData() const
 {
     if (BufferedSource::hasData())
         return true;
