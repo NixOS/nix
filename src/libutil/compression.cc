@@ -8,6 +8,7 @@
 #include <archive_entry.h>
 #include <cstdio>
 #include <cstring>
+#include <ranges>
 
 #include <brotli/decode.h>
 #include <brotli/encode.h>
@@ -293,7 +294,7 @@ ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & next
 {
     std::vector<std::string> la_supports = {
         "bzip2", "compress", "grzip", "gzip", "lrzip", "lz4", "lzip", "lzma", "lzop", "xz", "zstd"};
-    if (std::find(la_supports.begin(), la_supports.end(), method) != la_supports.end()) {
+    if (std::ranges::contains(la_supports, method)) {
         return make_ref<ArchiveCompressionSink>(nextSink, method, parallel, level);
     }
     if (method == "none")
