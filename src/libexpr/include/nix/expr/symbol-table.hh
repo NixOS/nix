@@ -43,7 +43,7 @@ class Symbol
     friend class StaticSymbolTable;
 
 private:
-    uint32_t id;
+    uint32_t id = 0;
 
     explicit constexpr Symbol(uint32_t id) noexcept
         : id(id)
@@ -51,10 +51,7 @@ private:
     }
 
 public:
-    constexpr Symbol() noexcept
-        : id(0)
-    {
-    }
+    constexpr Symbol() noexcept = default;
 
     [[gnu::always_inline]]
     constexpr explicit operator bool() const noexcept
