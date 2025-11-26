@@ -424,9 +424,7 @@ std::optional<Hash> Input::getNarHash() const
 
 std::optional<std::string> Input::getRef() const
 {
-    if (auto s = maybeGetStrAttr(attrs, "ref"))
-        return *s;
-    return {};
+    return maybeGetStrAttr(attrs, "ref");
 }
 
 std::optional<Hash> Input::getRev() const
@@ -448,16 +446,12 @@ std::optional<Hash> Input::getRev() const
 
 std::optional<uint64_t> Input::getRevCount() const
 {
-    if (auto n = maybeGetIntAttr(attrs, "revCount"))
-        return *n;
-    return {};
+    return maybeGetIntAttr(attrs, "revCount");
 }
 
 std::optional<time_t> Input::getLastModified() const
 {
-    if (auto n = maybeGetIntAttr(attrs, "lastModified"))
-        return *n;
-    return {};
+    return maybeGetIntAttr(attrs, "lastModified");
 }
 
 ParsedURL InputScheme::toURL(const Input & input) const
