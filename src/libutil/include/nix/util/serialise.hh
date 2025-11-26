@@ -447,18 +447,27 @@ struct LengthSource : Source
  */
 struct LambdaSink : Sink
 {
-    typedef std::function<void(std::string_view data)> lambda_t;
+    typedef std::function<void(std::string_view data)> data_t;
+    typedef std::function<void()> cleanup_t;
 
-    lambda_t lambda;
+    data_t dataFun;
+    cleanup_t cleanupFun;
 
-    LambdaSink(const lambda_t & lambda)
-        : lambda(lambda)
+    LambdaSink(
+        const data_t & dataFun, const cleanup_t & cleanupFun = []() {})
+        : dataFun(dataFun)
+        , cleanupFun(cleanupFun)
     {
+    }
+
+    ~LambdaSink()
+    {
+        cleanupFun();
     }
 
     void operator()(std::string_view data) override
     {
-        lambda(data);
+        dataFun(data);
     }
 };
 
