@@ -331,9 +331,24 @@ void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 }
 
 template<>
+std::list<std::filesystem::path> BaseSetting<std::list<std::filesystem::path>>::parse(const std::string & str) const
+{
+    auto tokens = tokenizeString<std::list<std::string>>(str);
+    return {tokens.begin(), tokens.end()};
+}
+
+template<>
 Strings BaseSetting<Strings>::parse(const std::string & str) const
 {
     return tokenizeString<Strings>(str);
+}
+
+template<>
+void BaseSetting<std::list<std::filesystem::path>>::appendOrSet(std::list<std::filesystem::path> newValue, bool append)
+{
+    if (!append)
+        value.clear();
+    value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 template<>
@@ -342,6 +357,14 @@ void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
     if (!append)
         value.clear();
     value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+}
+
+template<>
+std::string BaseSetting<std::list<std::filesystem::path>>::to_string() const
+{
+    return concatStringsSep(" ", value | std::views::transform([](const auto & p) {
+                                     return p.string();
+                                 }) | std::ranges::to<std::list<std::string>>());
 }
 
 template<>
@@ -477,6 +500,7 @@ template class BaseSetting<long long>;
 template class BaseSetting<unsigned long long>;
 template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
+template class BaseSetting<std::list<std::filesystem::path>>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;

@@ -10,30 +10,30 @@
 
 namespace nix {
 
-struct PluginFilesSetting : public BaseSetting<Paths>
+struct PluginFilesSetting : public BaseSetting<std::list<std::filesystem::path>>
 {
     bool pluginsLoaded = false;
 
     PluginFilesSetting(
         Config * options,
-        const Paths & def,
+        const std::list<std::filesystem::path> & def,
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {})
-        : BaseSetting<Paths>(def, true, name, description, aliases)
+        : BaseSetting<std::list<std::filesystem::path>>(def, true, name, description, aliases)
     {
         options->addSetting(this);
     }
 
-    Paths parse(const std::string & str) const override;
+    std::list<std::filesystem::path> parse(const std::string & str) const override;
 };
 
-Paths PluginFilesSetting::parse(const std::string & str) const
+std::list<std::filesystem::path> PluginFilesSetting::parse(const std::string & str) const
 {
     if (pluginsLoaded)
         throw UsageError(
             "plugin-files set after plugins were loaded, you may need to move the flag before the subcommand");
-    return BaseSetting<Paths>::parse(str);
+    return BaseSetting<std::list<std::filesystem::path>>::parse(str);
 }
 
 struct PluginSettings : Config
