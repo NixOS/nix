@@ -1470,32 +1470,32 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto topoSortResult = topoSort(outputsToSort, {[&](const std::string & name) {
-                                       auto orifu = get(outputReferencesIfUnregistered, name);
-                                       if (!orifu)
-                                           throw BuildError(
-                                               BuildResult::Failure::OutputRejected,
-                                               "no output reference for '%s' in build of '%s'",
-                                               name,
-                                               store.printStorePath(drvPath));
-                                       return std::visit(
-                                           overloaded{
-                                               /* Since we'll use the already installed versions of these, we
-                                                  can treat them as leaves and ignore any references they
-                                                  have. */
-                                               [&](const AlreadyRegistered &) { return StringSet{}; },
-                                               [&](const PerhapsNeedToRegister & refs) {
-                                                   StringSet referencedOutputs;
-                                                   /* FIXME build inverted map up front so no quadratic waste here */
-                                                   for (auto & r : refs.refs)
-                                                       for (auto & [o, p] : scratchOutputs)
-                                                           if (r == p)
-                                                               referencedOutputs.insert(o);
-                                                   return referencedOutputs;
-                                               },
-                                           },
-                                           *orifu);
-                                   }});
+    auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) {
+        auto orifu = get(outputReferencesIfUnregistered, name);
+        if (!orifu)
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "no output reference for '%s' in build of '%s'",
+                name,
+                store.printStorePath(drvPath));
+        return std::visit(
+            overloaded{
+                /* Since we'll use the already installed versions of these, we
+                   can treat them as leaves and ignore any references they
+                   have. */
+                [&](const AlreadyRegistered &) { return StringSet{}; },
+                [&](const PerhapsNeedToRegister & refs) {
+                    StringSet referencedOutputs;
+                    /* FIXME build inverted map up front so no quadratic waste here */
+                    for (auto & r : refs.refs)
+                        for (auto & [o, p] : scratchOutputs)
+                            if (r == p)
+                                referencedOutputs.insert(o);
+                    return referencedOutputs;
+                },
+            },
+            *orifu);
+    });
 
     auto sortedOutputNames = std::visit(
         overloaded{

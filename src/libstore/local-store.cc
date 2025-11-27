@@ -989,10 +989,10 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        auto topoSortResult = topoSort(paths, {[&](const StorePath & path) {
-                                           auto i = infos.find(path);
-                                           return i == infos.end() ? StorePathSet() : i->second.references;
-                                       }});
+        auto topoSortResult = topoSort(paths, [&](const StorePath & path) {
+            auto i = infos.find(path);
+            return i == infos.end() ? StorePathSet() : i->second.references;
+        });
 
         std::visit(
             overloaded{
