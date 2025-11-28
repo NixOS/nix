@@ -14,12 +14,4 @@
 
 namespace nixC {
 
-TEST_F(nix_api_expr_test, as_nix_value_ptr)
-{
-    // nix_alloc_value casts nix::Value to nix_value
-    // It should be obvious from the decl that that works, but if it doesn't,
-    // the whole implementation would be utterly broken.
-    ASSERT_EQ(sizeof(nix::Value), sizeof(nix_value));
-}
-
 } // namespace nixC

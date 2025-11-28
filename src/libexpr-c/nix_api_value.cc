@@ -58,7 +58,7 @@ static nix::Value & check_value_out(nix_value * value)
     return v;
 }
 
-static inline nix_value * new_nix_value(nix::Value * v, nix::EvalMemory & mem)
+static nix_value * new_nix_value(nix::Value * v, nix::EvalMemory & mem)
 {
     nix_value * ret = new (mem.allocBytes(sizeof(nix_value))) nix_value{
         .value = v,
