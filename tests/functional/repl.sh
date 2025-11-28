@@ -350,10 +350,9 @@ runRepl () {
   local testDirNoUnderscores
   testDirNoUnderscores="${testDir//_/}"
 
-  # TODO: pass arguments to nix repl; see lang.sh
   _NIX_TEST_RAW_MARKDOWN=1 \
   _NIX_TEST_REPL_ECHO=1 \
-  nix repl 2>&1 \
+  nix repl "$@" 2>&1 \
     | stripColors \
     | tr -d '\0' \
     | stripEmptyLinesBeforePrompt \
@@ -373,7 +372,12 @@ for test in $(cd "$testDir/repl"; echo *.in); do
     in="$testDir/repl/$test.in"
     actual="$TEST_ROOT/$test.actual"
     expected="$testDir/repl/$test.expected"
-    (cd "$testDir/repl"; set +x; runRepl 2>&1) < "$in" > "$actual" || {
+    declare -a flags=()
+    if test -e "$testDir/repl/$test.flags"; then
+      read -r -a flags < "$testDir/repl/$test.flags"
+    fi
+
+    (cd "$testDir/repl"; set +x; runRepl "${flags[@]}" 2>&1) < "$in" > "$actual" || {
         echo "FAIL: $test (exit code $?)" >&2
         badExitCode=1
     }
