@@ -43,7 +43,7 @@ error:
              |                       ^
            91|   };
 
-       (19999 duplicate frames omitted)
+       (199 duplicate frames omitted)
 
        error: stack overflow; max-call-depth exceeded
        at /path/to/tests/functional/repl/doc-functor.nix:90:23:
@@ -56,7 +56,7 @@ nix-repl> :doc diverging
 error:
        … while partially calling '__functor' to retrieve documentation
 
-       (10000 duplicate frames omitted)
+       (100 duplicate frames omitted)
 
        … while calling '__functor'
          at /path/to/tests/functional/repl/doc-functor.nix:103:21:
