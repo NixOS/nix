@@ -70,7 +70,7 @@ properties:
       "^[A-Za-z0-9+/]{43}=$":
         type: object
         additionalProperties:
-          "$ref": "./build-trace-entry-v1.yaml#/$defs/value"
+          "$ref": "./build-trace-entry-v2.yaml#/$defs/value"
     additionalProperties: false
 
 "$defs":
