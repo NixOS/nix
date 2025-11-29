@@ -1,0 +1,76 @@
+UseColor: true
+Checks:
+  - -*
+  - bugprone-*
+  # Too many warnings
+  - -bugprone-assignment-in-if-condition
+  # Too many warnings
+  - -bugprone-narrowing-conversions
+  # Kind of nonsense
+  - -bugprone-easily-swappable-parameters
+  # Too many warnings for now
+  - -bugprone-implicit-widening-of-multiplication-result
+  # Exception handling patterns in Nix
+  - -bugprone-empty-catch
+  # Many warnings
+  - -bugprone-unchecked-optional-access
+  # Many warnings, questionable lint
+  - -bugprone-branch-clone
+  # Extremely noisy before clang 19: https://github.com/llvm/llvm-project/issues/93959
+  - -bugprone-multi-level-implicit-pointer-conversion
+  # We don't compile out our asserts
+  - -bugprone-assert-side-effect
+  # TODO: figure out if this warning is useful
+  - -bugprone-exception-escape
+  # We use pointers to aggregates intentionally; void * would look weird
+  - -bugprone-sizeof-expression
+  #
+  # Checks disabled to pass on current codebase (can be progressively enabled):
+  #
+  # 11 warnings - optional value conversions in various places
+  - -bugprone-optional-value-conversion
+  # 4 warnings - switches without default cases
+  - -bugprone-switch-missing-default-case
+  # 4 warnings - string_view::data() usage patterns
+  - -bugprone-suspicious-stringview-data-usage
+  # 4 warnings - .cc files included in other files (intentional pattern)
+  - -bugprone-suspicious-include
+  # 2 warnings - unused return values (AllowCastToVoid helps but some remain)
+  - -bugprone-unused-return-value
+  # 2 warnings - unused local RAII-style variables
+  - -bugprone-unused-local-non-trivial-variable
+  # 2 warnings - returning const& from parameter
+  - -bugprone-return-const-ref-from-parameter
+  # 1 warning - unsafe C functions (e.g., getenv)
+  - -bugprone-unsafe-functions
+  # 1 warning - signed char misuse
+  - -bugprone-signed-char-misuse
+  # 1 warning - calling parent virtual instead of override
+  - -bugprone-parent-virtual-call
+  # 1 warning - null termination issues
+  - -bugprone-not-null-terminated-result
+  # 1 warning - macro parentheses
+  - -bugprone-macro-parentheses
+  # 1 warning - increment/decrement in conditions
+  - -bugprone-inc-dec-in-conditions
+  #
+  # Non-bugprone checks (also disabled to pass on current codebase):
+  #
+  # 4 warnings - exceptions not derived from std::exception
+  # All thrown exceptions must derive from std::exception
+  # - hicpp-exception-baseclass
+  # 88 warnings - C-style casts should be explicit about intent
+  # - cppcoreguidelines-pro-type-cstyle-cast
+  # Capturing async lambdas are dangerous (no warnings, kept enabled)
+  - cppcoreguidelines-avoid-capturing-lambda-coroutines
+  # Custom nix checks (when added)
+  - nix-*
+
+CheckOptions:
+  # __asan_default_options: ASAN runtime configuration function (see nix-meson-build-support/common/asan-options/)
+  # __wrap___assert_fail: Linker-wrapped assert handler for better stack traces (see nix-meson-build-support/common/assert-fail/)
+  # _SingleDerivedPathRaw, _DerivedPathRaw: Internal type aliases in derived-path.hh (leading underscore pattern)
+  # _SingleBuiltPathRaw, _BuiltPathRaw: Internal type aliases in built-path.hh (leading underscore pattern)
+  bugprone-reserved-identifier.AllowedIdentifiers: '__asan_default_options;__wrap___assert_fail;_SingleDerivedPathRaw;_DerivedPathRaw;_SingleBuiltPathRaw;_BuiltPathRaw'
+  # Allow explicitly discarding return values with (void) cast
+  bugprone-unused-return-value.AllowCastToVoid: true
