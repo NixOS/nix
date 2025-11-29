@@ -508,7 +508,14 @@ Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatur
 {
     auto & obj = getObject(json);
     auto algo = parseHashAlgo(getString(valueAt(obj, "algorithm")), xpSettings);
-    auto format = parseHashFormat(getString(valueAt(obj, "format")));
+    auto formatStr = getString(valueAt(obj, "format"));
+    auto format = parseHashFormat(formatStr);
+
+    // Only base16 format is supported for JSON serialization
+    if (format != HashFormat::Base16) {
+        throw Error("hash format '%s' is not supported in JSON; only 'base16' is currently supported", formatStr);
+    }
+
     auto & hashS = getString(valueAt(obj, "hash"));
     return Hash::parseExplicitFormatUnprefixed(hashS, algo, format, xpSettings);
 }
@@ -516,9 +523,9 @@ Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatur
 void adl_serializer<Hash>::to_json(json & json, const Hash & hash)
 {
     json = {
-        {"format", printHashFormat(HashFormat::Base64)},
+        {"format", printHashFormat(HashFormat::Base16)},
         {"algorithm", printHashAlgo(hash.algo)},
-        {"hash", hash.to_string(HashFormat::Base64, false)},
+        {"hash", hash.to_string(HashFormat::Base16, false)},
     };
 }
 

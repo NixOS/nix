@@ -12,18 +12,14 @@ properties:
   format:
     type: string
     enum:
-    - base64
-    - nix32
     - base16
-    - sri
     title: Hash format
     description: |
       The encoding format of the hash value.
 
-      - `base64` uses standard Base64 encoding [RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4)
-      - `nix32` is Nix-specific base-32 encoding
-      - `base16` is lowercase hexadecimal
-      - `sri` is the [Subresource Integrity format](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity).
+      `base16` (lowercase hexadecimal) is the only format that is currently supported for JSON serialization.
+      This field exists primarily to reduce ambiguity about what the hash means.
+      It would also help us support other formats in the future, but there are no concrete plans to do so at this.
   hash:
     type: string
     title: Hash
