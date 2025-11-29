@@ -1396,7 +1396,17 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     struct PerhapsNeedToRegister
     {
         StorePathSet refs;
+        /**
+         * References to other outputs. Built by looking up in
+         * `scratchOutputsInverse`.
+         */
+        StringSet otherOutputs;
     };
+
+    /* inverse map of scratchOutputs for efficient lookup */
+    std::map<StorePath, std::string> scratchOutputsInverse;
+    for (auto & [outputName, path] : scratchOutputs)
+        scratchOutputsInverse.insert_or_assign(path, outputName);
 
     std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
@@ -1466,36 +1476,40 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             references = scanForReferences(blank, actualPath, referenceablePaths);
         }
 
-        outputReferencesIfUnregistered.insert_or_assign(outputName, PerhapsNeedToRegister{.refs = references});
+        StringSet referencedOutputs;
+        for (auto & r : references)
+            if (auto * o = get(scratchOutputsInverse, r))
+                referencedOutputs.insert(*o);
+
+        outputReferencesIfUnregistered.insert_or_assign(
+            outputName,
+            PerhapsNeedToRegister{
+                .refs = references,
+                .otherOutputs = referencedOutputs,
+            });
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto topoSortResult = topoSort(outputsToSort, {[&](const std::string & name) {
-                                       auto orifu = get(outputReferencesIfUnregistered, name);
-                                       if (!orifu)
-                                           throw BuildError(
-                                               BuildResult::Failure::OutputRejected,
-                                               "no output reference for '%s' in build of '%s'",
-                                               name,
-                                               store.printStorePath(drvPath));
-                                       return std::visit(
-                                           overloaded{
-                                               /* Since we'll use the already installed versions of these, we
-                                                  can treat them as leaves and ignore any references they
-                                                  have. */
-                                               [&](const AlreadyRegistered &) { return StringSet{}; },
-                                               [&](const PerhapsNeedToRegister & refs) {
-                                                   StringSet referencedOutputs;
-                                                   /* FIXME build inverted map up front so no quadratic waste here */
-                                                   for (auto & r : refs.refs)
-                                                       for (auto & [o, p] : scratchOutputs)
-                                                           if (r == p)
-                                                               referencedOutputs.insert(o);
-                                                   return referencedOutputs;
-                                               },
-                                           },
-                                           *orifu);
-                                   }});
+    StringSet emptySet;
+
+    auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) -> const StringSet & {
+        auto * orifu = get(outputReferencesIfUnregistered, name);
+        if (!orifu)
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "no output reference for '%s' in build of '%s'",
+                name,
+                store.printStorePath(drvPath));
+        return std::visit(
+            overloaded{
+                /* Since we'll use the already installed versions of these, we
+                   can treat them as leaves and ignore any references they
+                   have. */
+                [&](const AlreadyRegistered &) -> const StringSet & { return emptySet; },
+                [&](const PerhapsNeedToRegister & refs) -> const StringSet & { return refs.otherOutputs; },
+            },
+            *orifu);
+    });
 
     auto sortedOutputNames = std::visit(
         overloaded{

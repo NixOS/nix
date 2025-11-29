@@ -3,6 +3,7 @@
 
 #include "nix/util/error.hh"
 #include <variant>
+#include <concepts>
 
 namespace nix {
 
@@ -16,8 +17,9 @@ struct Cycle
 template<typename T>
 using TopoSortResult = std::variant<std::vector<T>, Cycle<T>>;
 
-template<typename T, typename Compare>
-TopoSortResult<T> topoSort(std::set<T, Compare> items, std::function<std::set<T, Compare>(const T &)> getChildren)
+template<typename T, typename Compare, std::invocable<const T &> F>
+    requires std::same_as<std::remove_cvref_t<std::invoke_result_t<F, const T &>>, std::set<T, Compare>>
+TopoSortResult<T> topoSort(std::set<T, Compare> items, F && getChildren)
 {
     std::vector<T> sorted;
     decltype(items) visited, parents;
@@ -34,7 +36,7 @@ TopoSortResult<T> topoSort(std::set<T, Compare> items, std::function<std::set<T,
         }
         parents.insert(path);
 
-        auto references = getChildren(path);
+        auto && references = std::invoke(getChildren, path);
 
         for (auto & i : references)
             /* Don't traverse into items that don't exist in our starting set. */
