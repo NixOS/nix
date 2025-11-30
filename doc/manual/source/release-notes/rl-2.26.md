@@ -112,7 +112,7 @@ This release was made possible by the following 45 contributors:
 - Connor Baker [**(@ConnorBaker)**](https://github.com/ConnorBaker)
 - Cole Helbling [**(@cole-h)**](https://github.com/cole-h)
 - Jack Wilsdon [**(@jackwilsdon)**](https://github.com/jackwilsdon)
-- ‮rekcäH nitraM‮ [**(@dwt)**](https://github.com/dwt)
+- Martin Häcker [**(@dwt)**](https://github.com/dwt)
 - Martin Fischer [**(@not-my-profile)**](https://github.com/not-my-profile)
 - John Ericson [**(@Ericson2314)**](https://github.com/Ericson2314)
 - Graham Christensen [**(@grahamc)**](https://github.com/grahamc)
