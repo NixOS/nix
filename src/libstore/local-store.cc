@@ -1634,6 +1634,10 @@ void LocalStore::queryRealisationUncached(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
+        if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+            callback(nullptr);
+            return;
+        }
         auto maybeRealisation = retrySQLite<std::optional<const UnkeyedRealisation>>(
             [&]() { return queryRealisation_(*_state->lock(), id); });
         if (maybeRealisation)
