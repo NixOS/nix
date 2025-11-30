@@ -13,7 +13,7 @@ static std::string hilite(const std::string & s, size_t pos, size_t len, const s
     return std::string(s, 0, pos) + colour + std::string(s, pos, len) + ANSI_NORMAL + std::string(s, pos + len);
 }
 
-static std::string filterPrintable(const std::string & s)
+static std::string filterPrintable(std::string_view s)
 {
     std::string res;
     for (char c : s)
@@ -133,9 +133,9 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                     .dist = path == dependencyPath ? 0 : inf});
 
         // Transpose the graph.
-        for (auto & node : graph)
-            for (auto & ref : node.second.refs)
-                graph.find(ref)->second.rrefs.insert(node.first);
+        for (auto & [path, node] : graph)
+            for (auto & ref : node.refs)
+                graph.find(ref)->second.rrefs.insert(path);
 
         /* Run Dijkstra's shortest path algorithm to get the distance
            of every path in the closure to 'dependency'. */

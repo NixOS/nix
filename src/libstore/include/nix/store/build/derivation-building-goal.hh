@@ -20,7 +20,7 @@ struct HookInstance;
 struct DerivationBuilder;
 #endif
 
-typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
+enum class HookReply { Accept, Decline, Postpone };
 
 /**
  * A goal for building a derivation. Substitution, (or any other method of

@@ -17,7 +17,7 @@
 
 namespace nix {
 
-typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+enum class SandboxMode { Enabled, Relaxed, Disabled };
 
 template<>
 SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
@@ -54,7 +54,7 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     unsigned int parse(const std::string & str) const override;
 };
 
-const uint32_t maxIdsPerBuild =
+constexpr uint32_t maxIdsPerBuild =
 #ifdef __linux__
     1 << 16
 #else
@@ -679,9 +679,9 @@ public:
     Setting<SandboxMode> sandboxMode{
         this,
 #ifdef __linux__
-        smEnabled
+        SandboxMode::Enabled
 #else
-        smDisabled
+        SandboxMode::Disabled
 #endif
         ,
         "sandbox",

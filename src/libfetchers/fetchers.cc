@@ -236,12 +236,12 @@ void Input::checkLocks(Input specified, Input & result)
         if (auto prevNarHash = specified.getNarHash())
             specified.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
 
-        for (auto & field : specified.attrs) {
-            auto field2 = result.attrs.find(field.first);
-            if (field2 != result.attrs.end() && field.second != field2->second)
+        for (auto & [fieldName, fieldValue] : specified.attrs) {
+            auto field2 = result.attrs.find(fieldName);
+            if (field2 != result.attrs.end() && fieldValue != field2->second)
                 throw Error(
                     "mismatch in field '%s' of input '%s', got '%s'",
-                    field.first,
+                    fieldName,
                     attrsToJSON(specified.attrs),
                     attrsToJSON(result.attrs));
         }
@@ -424,9 +424,7 @@ std::optional<Hash> Input::getNarHash() const
 
 std::optional<std::string> Input::getRef() const
 {
-    if (auto s = maybeGetStrAttr(attrs, "ref"))
-        return *s;
-    return {};
+    return maybeGetStrAttr(attrs, "ref");
 }
 
 std::optional<Hash> Input::getRev() const
@@ -448,16 +446,12 @@ std::optional<Hash> Input::getRev() const
 
 std::optional<uint64_t> Input::getRevCount() const
 {
-    if (auto n = maybeGetIntAttr(attrs, "revCount"))
-        return *n;
-    return {};
+    return maybeGetIntAttr(attrs, "revCount");
 }
 
 std::optional<time_t> Input::getLastModified() const
 {
-    if (auto n = maybeGetIntAttr(attrs, "lastModified"))
-        return *n;
-    return {};
+    return maybeGetIntAttr(attrs, "lastModified");
 }
 
 ParsedURL InputScheme::toURL(const Input & input) const
@@ -493,7 +487,11 @@ void InputScheme::clone(
 
     auto [accessor, input2] = getAccessor(settings, store, input);
 
-    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), destDir));
+    Activity act(
+        *logger,
+        Verbosity::Talkative,
+        ActivityType::Unknown,
+        fmt("copying '%s' to %s...", input2.to_string(), destDir));
 
     RestoreSink sink(/*startFsync=*/false);
     sink.dstPath = destDir;

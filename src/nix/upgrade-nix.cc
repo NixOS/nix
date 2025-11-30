@@ -80,13 +80,20 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         }
 
         {
-            Activity act(*logger, lvlInfo, actUnknown, fmt("downloading '%s'...", store->printStorePath(storePath)));
+            Activity act(
+                *logger,
+                Verbosity::Info,
+                ActivityType::Unknown,
+                fmt("downloading '%s'...", store->printStorePath(storePath)));
             store->ensurePath(storePath);
         }
 
         {
             Activity act(
-                *logger, lvlInfo, actUnknown, fmt("verifying that '%s' works...", store->printStorePath(storePath)));
+                *logger,
+                Verbosity::Info,
+                ActivityType::Unknown,
+                fmt("verifying that '%s' works...", store->printStorePath(storePath)));
             auto program = store->printStorePath(storePath) + "/bin/nix-env";
             auto s = runProgram(program, false, {"--version"});
             if (s.find("Nix") == std::string::npos)
@@ -98,8 +105,8 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         {
             Activity act(
                 *logger,
-                lvlInfo,
-                actUnknown,
+                Verbosity::Info,
+                ActivityType::Unknown,
                 fmt("installing '%s' into profile %s...", store->printStorePath(storePath), profileDir));
 
             // FIXME: don't call an external process.
@@ -153,7 +160,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
     /* Return the store path of the latest stable Nix. */
     StorePath getLatestNix(ref<Store> store)
     {
-        Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
+        Activity act(*logger, Verbosity::Info, ActivityType::Unknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
         auto req = FileTransferRequest(parseURL(settings.upgradeNixStorePathUrl.get()));

@@ -14,6 +14,7 @@
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <ranges>
 
 namespace nix {
 
@@ -109,8 +110,8 @@ bool BasicDerivation::isBuiltin() const
 static auto infoForDerivation(Store & store, const Derivation & drv)
 {
     auto references = drv.inputSrcs;
-    for (auto & i : drv.inputDrvs.map)
-        references.insert(i.first);
+    for (auto & [drvPath, _] : drv.inputDrvs.map)
+        references.insert(drvPath);
     /* Note that the outputs of a derivation are *not* references
        (that can be missing (of course) and should not necessarily be
        held during a garbage collection). */
@@ -625,11 +626,7 @@ static void unparseDerivedPathMapNode(
  */
 static bool hasDynamicDrvDep(const Derivation & drv)
 {
-    return std::find_if(
-               drv.inputDrvs.map.begin(),
-               drv.inputDrvs.map.end(),
-               [](auto & kv) { return !kv.second.childMap.empty(); })
-           != drv.inputDrvs.map.end();
+    return std::ranges::any_of(drv.inputDrvs.map, [](auto & kv) { return !kv.second.childMap.empty(); });
 }
 
 std::string Derivation::unparse(
@@ -652,13 +649,13 @@ std::string Derivation::unparse(
 
     bool first = true;
     s += '[';
-    for (auto & i : outputs) {
+    for (auto & [outputName, output] : outputs) {
         if (first)
             first = false;
         else
             s += ',';
         s += '(';
-        printUnquotedString(s, i.first);
+        printUnquotedString(s, outputName);
         std::visit(
             overloaded{
                 [&](const DerivationOutput::InputAddressed & doi) {
@@ -671,7 +668,8 @@ std::string Derivation::unparse(
                 },
                 [&](const DerivationOutput::CAFixed & dof) {
                     s += ',';
-                    printUnquotedString(s, maskOutputs ? ""sv : store.printStorePath(dof.path(store, name, i.first)));
+                    printUnquotedString(
+                        s, maskOutputs ? ""sv : store.printStorePath(dof.path(store, name, outputName)));
                     s += ',';
                     printUnquotedString(s, dof.ca.printMethodAlgo());
                     s += ',';
@@ -702,7 +700,7 @@ std::string Derivation::unparse(
                     s += ',';
                     printUnquotedString(s, "impure"sv);
                 }},
-            i.second.raw);
+            output.raw);
         s += ')';
     }
 
@@ -747,15 +745,15 @@ std::string Derivation::unparse(
     first = true;
 
     auto unparseEnv = [&](const StringPairs atermEnv) {
-        for (auto & i : atermEnv) {
+        for (auto & [envKey, envValue] : atermEnv) {
             if (first)
                 first = false;
             else
                 s += ',';
             s += '(';
-            printString(s, i.first);
+            printString(s, envKey);
             s += ',';
-            printString(s, maskOutputs && outputs.count(i.first) ? ""sv : i.second);
+            printString(s, maskOutputs && outputs.count(envKey) ? ""sv : envValue);
             s += ')';
         }
     };
@@ -805,7 +803,7 @@ DerivationType BasicDerivation::type() const
             throw Error("only one fixed output is allowed for now");
     };
 
-    for (auto & i : outputs) {
+    for (auto & [outputName, output] : outputs) {
         std::visit(
             overloaded{
                 [&](const DerivationOutput::InputAddressed &) {
@@ -820,7 +818,7 @@ DerivationType BasicDerivation::type() const
                             .sandboxed = false,
                             .fixed = true,
                         });
-                    if (i.first != "out"sv)
+                    if (outputName != "out"sv)
                         throw Error("single fixed output must be named \"out\"");
                 },
                 [&](const DerivationOutput::CAFloating & dof) {
@@ -842,7 +840,7 @@ DerivationType BasicDerivation::type() const
                 },
                 [&](const DerivationOutput::Impure &) { decide(DerivationType::Impure{}); },
             },
-            i.second.raw);
+            output.raw);
     }
 
     if (!ty)
@@ -895,13 +893,13 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
     /* Return a fixed hash for fixed-output derivations. */
     if (type.isFixed()) {
         std::map<std::string, Hash> outputHashes;
-        for (const auto & i : drv.outputs) {
-            auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
+        for (const auto & [outputName, output] : drv.outputs) {
+            auto & dof = std::get<DerivationOutput::CAFixed>(output.raw);
             auto hash = hashString(
                 HashAlgorithm::SHA256,
                 "fixed:out:" + dof.ca.printMethodAlgo() + ":" + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
-                    + store.printStorePath(dof.path(store, drv.name, i.first)));
-            outputHashes.insert_or_assign(i.first, std::move(hash));
+                    + store.printStorePath(dof.path(store, drv.name, outputName)));
+            outputHashes.insert_or_assign(outputName, std::move(hash));
         }
         return DrvHash{
             .hashes = outputHashes,
@@ -965,8 +963,8 @@ static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig &
 StringSet BasicDerivation::outputNames() const
 {
     StringSet names;
-    for (auto & i : outputs)
-        names.insert(i.first);
+    for (auto & [outputName, _] : outputs)
+        names.insert(outputName);
     return names;
 }
 
@@ -1017,8 +1015,8 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv)
 {
     out << drv.outputs.size();
-    for (auto & i : drv.outputs) {
-        out << i.first;
+    for (auto & [outputName, output] : drv.outputs) {
+        out << outputName;
         std::visit(
             overloaded{
                 [&](const DerivationOutput::InputAddressed & doi) {
@@ -1026,7 +1024,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
                         << "";
                 },
                 [&](const DerivationOutput::CAFixed & dof) {
-                    out << store.printStorePath(dof.path(store, drv.name, i.first)) << dof.ca.printMethodAlgo()
+                    out << store.printStorePath(dof.path(store, drv.name, outputName)) << dof.ca.printMethodAlgo()
                         << dof.ca.hash.to_string(HashFormat::Base16, false);
                 },
                 [&](const DerivationOutput::CAFloating & dof) {
@@ -1041,7 +1039,7 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
                     out << "" << (std::string{doi.method.renderPrefix()} + printHashAlgo(doi.hashAlgo)) << "impure";
                 },
             },
-            i.second.raw);
+            output.raw);
     }
     CommonProto::write(store, CommonProto::WriteConn{.to = out}, drv.inputSrcs);
     out << drv.platform << drv.builder << drv.args;
@@ -1077,18 +1075,18 @@ void BasicDerivation::applyRewrites(const StringMap & rewrites)
 
     debug("rewriting the derivation");
 
-    for (auto & rewrite : rewrites)
-        debug("rewriting %s as %s", rewrite.first, rewrite.second);
+    for (auto & [from, to] : rewrites)
+        debug("rewriting %s as %s", from, to);
 
     builder = rewriteStrings(builder, rewrites);
     for (auto & arg : args)
         arg = rewriteStrings(arg, rewrites);
 
     StringPairs newEnv;
-    for (auto & envVar : env) {
-        auto envName = rewriteStrings(envVar.first, rewrites);
-        auto envValue = rewriteStrings(envVar.second, rewrites);
-        newEnv.emplace(envName, envValue);
+    for (auto & [envName, envValue] : env) {
+        auto newName = rewriteStrings(envName, rewrites);
+        auto newValue = rewriteStrings(envValue, rewrites);
+        newEnv.emplace(newName, newValue);
     }
     env = std::move(newEnv);
 

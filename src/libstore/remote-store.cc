@@ -106,9 +106,10 @@ void RemoteStore::initConnection(Connection & conn)
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.keepGoing << settings.tryFallback
-            << verbosity << settings.maxBuildJobs << settings.maxSilentTime << true
-            << (settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
-            << 0                                                  /* obsolete print build trace */
+            << static_cast<uint64_t>(verbosity) << settings.maxBuildJobs << settings.maxSilentTime << true
+            << static_cast<uint64_t>(settings.verboseBuild ? Verbosity::Error : Verbosity::Vomit)
+            << 0 // obsolete log type
+            << 0 /* obsolete print build trace */
             << settings.buildCores << settings.useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;
@@ -452,7 +453,7 @@ void RemoteStore::addMultipleToStore(
     for (auto & [pathInfo, _] : pathsToCopy) {
         bytesExpected += pathInfo.narSize;
     }
-    act.setExpected(actCopyPath, bytesExpected);
+    act.setExpected(ActivityType::CopyPath, bytesExpected);
 
     auto source = sinkToSource([&](Sink & sink) {
         size_t nrTotal = pathsToCopy.size();

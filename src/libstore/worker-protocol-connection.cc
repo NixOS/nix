@@ -22,9 +22,9 @@ static Logger::Fields readFields(Source & from)
     size_t size = readInt(from);
     for (size_t n = 0; n < size; n++) {
         auto type = (decltype(Logger::Field::type)) readInt(from);
-        if (type == Logger::Field::tInt)
+        if (type == Logger::Field::Type::Int)
             fields.push_back(readNum<uint64_t>(from));
-        else if (type == Logger::Field::tString)
+        else if (type == Logger::Field::Type::String)
             fields.push_back(readString(from));
         else
             throw Error("got unsupported field type %x from Nix daemon", (int) type);

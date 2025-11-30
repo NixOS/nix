@@ -76,9 +76,7 @@ std::string LocalStoreConfig::doc()
 
 Path LocalBuildStoreConfig::getBuildDir() const
 {
-    return settings.buildDir.get().has_value() ? *settings.buildDir.get()
-           : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+    return settings.buildDir.get().or_else([&]() { return buildDir.get(); }).value_or(stateDir.get() + "/builds");
 }
 
 ref<Store> LocalStore::Config::openStore() const
@@ -714,11 +712,12 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, boo
         if (checkOutputs)
             drv.checkInvariants(*this, info.path);
 
-        for (auto & i : drv.outputsAndOptPaths(*this)) {
+        for (auto & [outputName, outputAndPath] : drv.outputsAndOptPaths(*this)) {
+            auto & [_, optPath] = outputAndPath;
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
-            if (i.second.second)
-                cacheDrvOutputMapping(state, id, i.first, *i.second.second);
+            if (optPath)
+                cacheDrvOutputMapping(state, id, outputName, *optPath);
         }
     }
 
@@ -1382,7 +1381,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of %s", name);
+            printMsg(Verbosity::Talkative, "checking contents of %s", name);
             std::string hash =
                 hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
@@ -1407,7 +1406,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
-                printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
+                printMsg(Verbosity::Talkative, "checking contents of '%s'", printStorePath(i));
 
                 auto hashSink = HashSink(info->narHash.algo);
 

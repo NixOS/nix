@@ -99,8 +99,8 @@ struct curlFileTransfer : public FileTransfer
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger,
-                  lvlTalkative,
-                  actFileTransfer,
+                  Verbosity::Talkative,
+                  ActivityType::FileTransfer,
                   fmt("%sing '%s'", request.verb(), request.uri),
                   {request.uri.to_string()},
                   request.parentAct)
@@ -136,8 +136,8 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+            for (auto & [key, value] : request.headers) {
+                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", key, value).c_str());
             }
         }
 
@@ -234,7 +234,7 @@ struct curlFileTransfer : public FileTransfer
         try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
+            printMsg(Verbosity::Vomit, "got header for '%s': %s", request.uri, trim(line));
 
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
@@ -395,7 +395,7 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
-            if (verbosity >= lvlVomit) {
+            if (verbosity >= Verbosity::Vomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }

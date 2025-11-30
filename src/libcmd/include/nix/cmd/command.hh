@@ -8,6 +8,7 @@
 #include "nix/flake/lockfile.hh"
 
 #include <optional>
+#include <span>
 
 namespace nix {
 
@@ -398,7 +399,7 @@ struct MixOutLinkBase : virtual Args
     {
     }
 
-    void createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store);
+    void createOutLinksMaybe(std::span<const BuiltPathWithResult> buildables, ref<Store> & store);
 };
 
 /** `--out-link`, `--no-link`, `createOutLinksMaybe` */

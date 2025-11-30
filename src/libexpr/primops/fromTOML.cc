@@ -99,9 +99,9 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
             auto table = toml::get<toml::table>(t);
             auto attrs = state.buildBindings(table.size());
 
-            for (auto & elem : table) {
-                forceNoNullByte(elem.first);
-                self(attrs.alloc(elem.first), elem.second);
+            for (auto & [key, val] : table) {
+                forceNoNullByte(key);
+                self(attrs.alloc(key), val);
             }
 
             v.mkAttrs(attrs);

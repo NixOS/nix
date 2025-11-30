@@ -6,6 +6,7 @@
 #include "nix/store/common-protocol-impl.hh"
 
 #include <algorithm>
+#include <ranges>
 
 namespace nix {
 
@@ -37,7 +38,7 @@ static void exportPath(Store & store, const StorePath & path, Sink & sink)
 void exportPaths(Store & store, const StorePathSet & paths, Sink & sink)
 {
     auto sorted = store.topoSortPaths(paths);
-    std::reverse(sorted.begin(), sorted.end());
+    std::ranges::reverse(sorted);
 
     for (auto & path : sorted) {
         sink << 1;
@@ -69,7 +70,7 @@ StorePaths importPaths(Store & store, Source & source, CheckSigsFlag checkSigs)
 
         auto path = store.parseStorePath(readString(source));
 
-        // Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
+        // Activity act(*logger, Verbosity::Info, "importing path '%s'", info.path);
 
         auto references = CommonProto::Serialise<StorePathSet>::read(store, CommonProto::ReadConn{.from = source});
         auto deriver = readString(source);

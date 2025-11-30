@@ -2,6 +2,7 @@
 ///@file
 
 #include <memory_resource>
+#include <span>
 #include "nix/expr/value.hh"
 #include "nix/expr/static-string-data.hh"
 #include "nix/util/chunked-vector.hh"
@@ -42,7 +43,7 @@ class Symbol
     friend class StaticSymbolTable;
 
 private:
-    uint32_t id;
+    uint32_t id = 0;
 
     explicit constexpr Symbol(uint32_t id) noexcept
         : id(id)
@@ -50,10 +51,7 @@ private:
     }
 
 public:
-    constexpr Symbol() noexcept
-        : id(0)
-    {
-    }
+    constexpr Symbol() noexcept = default;
 
     [[gnu::always_inline]]
     constexpr explicit operator bool() const noexcept
@@ -290,7 +288,7 @@ public:
         return Symbol(*symbols.insert(SymbolStr::Key{store, s, buffer}).first);
     }
 
-    std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
+    std::vector<SymbolStr> resolve(std::span<const Symbol> symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());

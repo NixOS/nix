@@ -13,6 +13,7 @@
 #include <git2/remote.h>
 
 #include <nlohmann/json.hpp>
+#include <ranges>
 
 namespace nix::lfs {
 
@@ -28,7 +29,7 @@ static void downloadToSink(
     FileTransferRequest request(parseURL(url));
     Headers headers;
     if (authHeader.has_value())
-        headers.push_back({"Authorization", *authHeader});
+        headers.emplace_back("Authorization", *authHeader);
     request.headers = headers;
     getFileTransfer()->download(std::move(request), sink);
 
@@ -67,11 +68,11 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         hostnameAndUser << url.authority->host;
         args.push_back(std::move(hostnameAndUser).str());
 
-        args.push_back("--");
-        args.push_back("git-lfs-authenticate");
+        args.emplace_back("--");
+        args.emplace_back("git-lfs-authenticate");
         // FIXME %2F encode slashes? Does this command take/accept percent encoding?
-        args.push_back(url.renderPath(/*encode=*/false));
-        args.push_back("download");
+        args.emplace_back(url.renderPath(/*encode=*/false));
+        args.emplace_back("download");
 
         auto [status, output] = runProgram({.program = "ssh", .args = args});
 
@@ -160,12 +161,12 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
         debug("Custom extension '%s' found, ignoring", line);
     }
 
-    if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), ::isxdigit)) {
+    if (oid.length() != 64 || !std::ranges::all_of(oid, ::isxdigit)) {
         debug("Invalid sha256 %s, skipping", oid);
         return std::nullopt;
     }
 
-    if (size.length() == 0 || !std::all_of(size.begin(), size.end(), ::isdigit)) {
+    if (size.length() == 0 || !std::ranges::all_of(size, ::isdigit)) {
         debug("Invalid size %s, skipping", size);
         return std::nullopt;
     }
@@ -212,9 +213,9 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     request.method = HttpMethod::Post;
     Headers headers;
     if (authHeader.has_value())
-        headers.push_back({"Authorization", *authHeader});
-    headers.push_back({"Content-Type", "application/vnd.git-lfs+json"});
-    headers.push_back({"Accept", "application/vnd.git-lfs+json"});
+        headers.emplace_back("Authorization", *authHeader);
+    headers.emplace_back("Content-Type", "application/vnd.git-lfs+json");
+    headers.emplace_back("Accept", "application/vnd.git-lfs+json");
     request.headers = headers;
     nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
@@ -240,7 +241,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
 
         return objects;
     } catch (const nlohmann::json::parse_error & e) {
-        printMsg(lvlTalkative, "Full response: '%1%'", responseString);
+        printMsg(Verbosity::Talkative, "Full response: '%1%'", responseString);
         throw Error("response did not parse as json: %s", e.what());
     }
 }

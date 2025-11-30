@@ -26,7 +26,7 @@ using Descriptor =
 #endif
     ;
 
-const Descriptor INVALID_DESCRIPTOR =
+constexpr Descriptor INVALID_DESCRIPTOR =
 #ifdef _WIN32
     INVALID_HANDLE_VALUE
 #else

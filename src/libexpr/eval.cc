@@ -165,17 +165,17 @@ std::string showType(const Value & v)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (v.getInternalType()) {
-    case tString:
+    case InternalType::String:
         return v.context() ? "a string with context" : "a string";
-    case tPrimOp:
+    case InternalType::PrimOp:
         return fmt("the built-in function '%s'", std::string(v.primOp()->name));
-    case tPrimOpApp:
+    case InternalType::PrimOpApp:
         return fmt("the partially applied built-in function '%s'", v.primOpAppPrimOp()->name);
-    case tExternal:
+    case InternalType::External:
         return v.external()->showType();
-    case tThunk:
+    case InternalType::Thunk:
         return v.isBlackhole() ? "a black hole" : "a thunk";
-    case tApp:
+    case InternalType::App:
         return "a function application";
     default:
         return std::string(showType(v.type()));
@@ -189,11 +189,11 @@ PosIdx Value::determinePos(const PosIdx pos) const
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (getInternalType()) {
-    case tAttrs:
+    case InternalType::Attrs:
         return attrs()->pos;
-    case tLambda:
+    case InternalType::Lambda:
         return lambda().fun->pos;
-    case tApp:
+    case InternalType::App:
         return app().left->determinePos(pos);
     default:
         return pos;
@@ -203,8 +203,8 @@ PosIdx Value::determinePos(const PosIdx pos) const
 
 bool Value::isTrivial() const
 {
-    return !isa<tApp, tPrimOpApp>()
-           && (!isa<tThunk>()
+    return !isa<InternalType::App, InternalType::PrimOpApp>()
+           && (!isa<InternalType::Thunk>()
                || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs->empty())
                || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr));
 }
@@ -645,8 +645,8 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
 void printStaticEnvBindings(const SymbolTable & st, const StaticEnv & se)
 {
     std::cout << ANSI_MAGENTA;
-    for (auto & i : se.vars)
-        std::cout << st[i.first] << " ";
+    for (auto & [symbol, _] : se.vars)
+        std::cout << st[symbol] << " ";
     std::cout << ANSI_NORMAL;
     std::cout << std::endl;
 }
@@ -682,9 +682,9 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
         std::cout << ANSI_MAGENTA;
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
-        for (auto & i : se.vars)
-            if (!hasPrefix(st[i.first], "__"))
-                std::cout << st[i.first] << " ";
+        for (auto & [symbol, _] : se.vars)
+            if (!hasPrefix(st[symbol], "__"))
+                std::cout << st[symbol] << " ";
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
         if (se.isWith)
@@ -715,8 +715,8 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
                 vm.insert_or_assign(std::string(st[j.name]), j.value);
         } else {
             // iterate through staticenv bindings and add them.
-            for (auto & i : se.vars)
-                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
+            for (auto & [symbol, displ] : se.vars)
+                vm.insert_or_assign(std::string(st[symbol]), env.values[displ]);
         }
     }
 }
@@ -795,7 +795,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     if (error) {
         printError("%s\n", error->what());
 
-        if (trylevel > 0 && error->info().level != lvlInfo)
+        if (trylevel > 0 && error->info().level != Verbosity::Info)
             printError(
                 "This exception occurred in a 'tryEval' call. Use " ANSI_GREEN "--ignore-try" ANSI_NORMAL
                 " to skip these.\n");
@@ -1637,7 +1637,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             size_t argsLeft = vCur.primOp()->arity;
 
             if (args.size() < argsLeft) {
-                /* We don't have enough arguments, so create a tPrimOpApp chain. */
+                /* We don't have enough arguments, so create a InternalType::PrimOpApp chain. */
                 makeAppChain();
                 return;
             } else {
@@ -1673,7 +1673,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             auto argsLeft = arity - argsDone;
 
             if (args.size() < argsLeft) {
-                /* We still don't have enough arguments, so extend the tPrimOpApp chain. */
+                /* We still don't have enough arguments, so extend the InternalType::PrimOpApp chain. */
                 makeAppChain();
                 return;
             } else {
@@ -2509,7 +2509,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             repair);
         allowPath(dstPath);
         srcToStore->try_emplace(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        printMsg(Verbosity::Chatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
         return dstPath;
     }();
 
@@ -3133,7 +3133,7 @@ Expr * EvalState::parseStdin()
     // NOTE this method (and parseExprFromString) must take care to *fully copy* their
     // input into their respective Pos::Origin until the parser stops overwriting its
     // input data.
-    // Activity act(*logger, lvlTalkative, "parsing standard input");
+    // Activity act(*logger, Verbosity::Talkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);

@@ -9,14 +9,14 @@
 
 namespace nix {
 
-static bool isNonUriPath(const std::string & spec)
+static bool isNonUriPath(std::string_view spec)
 {
     return
         // is not a URL
-        spec.find("://") == std::string::npos
+        spec.find("://") == std::string_view::npos
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
-        && spec.find("/") != std::string::npos;
+        && spec.find("/") != std::string_view::npos;
 }
 
 std::string StoreReference::render(bool withParams) const

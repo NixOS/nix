@@ -85,9 +85,7 @@ void Registry::add(const Input & from, const Input & to, const Attrs & extraAttr
 
 void Registry::remove(const Input & input)
 {
-    entries.erase(
-        std::remove_if(entries.begin(), entries.end(), [&](const Entry & entry) { return entry.from == input; }),
-        entries.end());
+    std::erase_if(entries, [&](const Entry & entry) { return entry.from == input; });
 }
 
 static std::filesystem::path getSystemRegistryPath()

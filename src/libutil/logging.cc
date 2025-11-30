@@ -36,7 +36,7 @@ std::unique_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
-    log(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
+    log(Verbosity::Warn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
 }
 
 void Logger::writeToStdout(std::string_view s)
@@ -88,22 +88,22 @@ public:
         if (systemd) {
             char c;
             switch (lvl) {
-            case lvlError:
+            case Verbosity::Error:
                 c = '3';
                 break;
-            case lvlWarn:
+            case Verbosity::Warn:
                 c = '4';
                 break;
-            case lvlNotice:
-            case lvlInfo:
+            case Verbosity::Notice:
+            case Verbosity::Info:
                 c = '5';
                 break;
-            case lvlTalkative:
-            case lvlChatty:
+            case Verbosity::Talkative:
+            case Verbosity::Chatty:
                 c = '6';
                 break;
-            case lvlDebug:
-            case lvlVomit:
+            case Verbosity::Debug:
+            case Verbosity::Vomit:
                 c = '7';
                 break;
             default:
@@ -138,17 +138,17 @@ public:
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (type == resBuildLogLine && printBuildLogs) {
+        if (type == ResultType::BuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError(lastLine);
-        } else if (type == resPostBuildLogLine && printBuildLogs) {
+        } else if (type == ResultType::PostBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
             printError("post-build-hook: " + lastLine);
         }
     }
 };
 
-Verbosity verbosity = lvlInfo;
+Verbosity verbosity = Verbosity::Info;
 
 void writeToStderr(std::string_view s)
 {
@@ -228,9 +228,9 @@ struct JSONLogger : Logger
             return;
         auto & arr = json["fields"] = nlohmann::json::array();
         for (auto & f : fields)
-            if (f.type == Logger::Field::tInt)
+            if (f.type == Logger::Field::Type::Int)
                 arr.push_back(f.i);
-            else if (f.type == Logger::Field::tString)
+            else if (f.type == Logger::Field::Type::String)
                 arr.push_back(f.s);
             else
                 unreachable();
@@ -421,7 +421,7 @@ bool handleJSONLogMessage(
 
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == actFileTransfer)
+            if (trusted || type == ActivityType::FileTransfer)
                 activities.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
@@ -440,7 +440,7 @@ bool handleJSONLogMessage(
 
         else if (action == "setPhase") {
             std::string phase = json["phase"];
-            act.result(resSetPhase, phase);
+            act.result(ResultType::SetPhase, phase);
         }
 
         else if (action == "msg") {

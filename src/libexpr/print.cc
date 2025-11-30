@@ -1,4 +1,5 @@
 #include <limits>
+#include <ranges>
 #include <sstream>
 
 #include "nix/expr/print.hh"
@@ -346,15 +347,15 @@ private:
                 sorted.emplace_back(std::pair(state.symbols[i.name], i.value));
 
             if (options.maxAttrs == std::numeric_limits<size_t>::max())
-                std::sort(sorted.begin(), sorted.end());
+                std::ranges::sort(sorted);
             else
-                std::sort(sorted.begin(), sorted.end(), ImportantFirstAttrNameCmp());
+                std::ranges::sort(sorted, ImportantFirstAttrNameCmp());
 
             auto prettyPrint = shouldPrettyPrintAttrs(sorted);
 
             size_t currentAttrsPrinted = 0;
 
-            for (auto & i : sorted) {
+            for (auto & [name, value] : sorted) {
                 printSpace(prettyPrint);
 
                 if (totalAttrsPrinted >= options.maxAttrs) {
@@ -362,9 +363,9 @@ private:
                     break;
                 }
 
-                printAttributeName(output, i.first);
+                printAttributeName(output, name);
                 output << " = ";
-                print(*i.second, depth + 1);
+                print(*value, depth + 1);
                 output << ";";
                 totalAttrsPrinted++;
                 currentAttrsPrinted++;

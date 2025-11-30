@@ -94,26 +94,26 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
 {
-    auto res = fetch(path);
-    return res.first->maybeLstat(res.second);
+    auto [accessor, subPath] = fetch(path);
+    return accessor->maybeLstat(subPath);
 }
 
 SourceAccessor::DirEntries RemoteFSAccessor::readDirectory(const CanonPath & path)
 {
-    auto res = fetch(path);
-    return res.first->readDirectory(res.second);
+    auto [accessor, subPath] = fetch(path);
+    return accessor->readDirectory(subPath);
 }
 
 std::string RemoteFSAccessor::readFile(const CanonPath & path)
 {
-    auto res = fetch(path);
-    return res.first->readFile(res.second);
+    auto [accessor, subPath] = fetch(path);
+    return accessor->readFile(subPath);
 }
 
 std::string RemoteFSAccessor::readLink(const CanonPath & path)
 {
-    auto res = fetch(path);
-    return res.first->readLink(res.second);
+    auto [accessor, subPath] = fetch(path);
+    return accessor->readLink(subPath);
 }
 
 } // namespace nix

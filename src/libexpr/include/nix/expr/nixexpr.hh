@@ -356,7 +356,7 @@ struct ExprOpHasAttr : Expr
 
 struct ExprAttrs : Expr
 {
-    bool recursive;
+    bool recursive = false;
     PosIdx pos;
 
     struct AttrDef
@@ -419,13 +419,11 @@ struct ExprAttrs : Expr
      */
     std::optional<DynamicAttrDefs> dynamicAttrs;
     ExprAttrs(const PosIdx & pos)
-        : recursive(false)
-        , pos(pos)
+        : pos(pos)
         , attrs(AttrDefs{})
         , dynamicAttrs(DynamicAttrDefs{}) {};
     ExprAttrs()
-        : recursive(false)
-        , attrs(AttrDefs{})
+        : attrs(AttrDefs{})
         , dynamicAttrs(DynamicAttrDefs{}) {};
 
     PosIdx getPos() const override

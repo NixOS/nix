@@ -145,12 +145,12 @@ public:
 /**
  * Helper that defaults empty hashes to the 0 hash.
  */
-Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha);
+[[nodiscard]] Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha);
 
 /**
  * Compute the hash of the given string.
  */
-Hash hashString(
+[[nodiscard]] Hash hashString(
     HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
@@ -158,7 +158,7 @@ Hash hashString(
  *
  * (Metadata, such as the executable permission bit, is ignored.)
  */
-Hash hashFile(HashAlgorithm ha, const Path & path);
+[[nodiscard]] Hash hashFile(HashAlgorithm ha, const Path & path);
 
 /**
  * The final hash and the number of bytes digested.
@@ -173,39 +173,39 @@ struct HashResult
  * Compress a hash to the specified number of bytes by cyclically
  * XORing bytes together.
  */
-Hash compressHash(const Hash & hash, unsigned int newSize);
+[[nodiscard]] Hash compressHash(const Hash & hash, unsigned int newSize);
 
 /**
  * Parse a string representing a hash format.
  */
-HashFormat parseHashFormat(std::string_view hashFormatName);
+[[nodiscard]] HashFormat parseHashFormat(std::string_view hashFormatName);
 
 /**
  * std::optional version of parseHashFormat that doesn't throw error.
  */
-std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
+[[nodiscard]] std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
 
 /**
  * The reverse of parseHashFormat.
  */
-std::string_view printHashFormat(HashFormat hashFormat);
+[[nodiscard]] std::string_view printHashFormat(HashFormat hashFormat);
 
 /**
  * Parse a string representing a hash algorithm.
  */
-HashAlgorithm
+[[nodiscard]] HashAlgorithm
 parseHashAlgo(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Will return nothing on parse error
  */
-std::optional<HashAlgorithm>
+[[nodiscard]] std::optional<HashAlgorithm>
 parseHashAlgoOpt(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * And the reverse.
  */
-std::string_view printHashAlgo(HashAlgorithm ha);
+[[nodiscard]] std::string_view printHashAlgo(HashAlgorithm ha);
 
 struct AbstractHashSink : virtual Sink
 {

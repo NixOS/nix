@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <ranges>
 #include <sstream>
 #include <regex>
 
@@ -928,7 +929,7 @@ static RegisterPrimOp primop_break(
          if (state.canDebug()) {
              auto error = Error(
                  ErrorInfo{
-                     .level = lvlInfo,
+                     .level = Verbosity::Info,
                      .msg = HintFmt("breakpoint reached"),
                      .pos = state.positions[pos],
                  });
@@ -1278,7 +1279,7 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
         BaseError msg(std::string{msgStr});
         msg.atPos(state.positions[pos]);
         auto info = msg.info();
-        info.level = lvlWarn;
+        info.level = Verbosity::Warn;
         info.isFromExpr = true;
         logWarning(info);
     }
@@ -1781,7 +1782,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     auto drvPath = writeDerivation(*state.store, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
-    printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
+    printMsg(Verbosity::Chatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't
@@ -2974,7 +2975,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
-    std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
+    std::ranges::sort(list, [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
 }
@@ -3001,7 +3002,7 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value ** args, 
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = (Value *) &i;
 
-    std::sort(list.begin(), list.end(), [&](Value * v1, Value * v2) {
+    std::ranges::sort(list, [&](Value * v1, Value * v2) {
         std::string_view s1 = state.symbols[((Attr *) v1)->name], s2 = state.symbols[((Attr *) v2)->name];
         return s1 < s2;
     });
@@ -4107,11 +4108,11 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
 
     auto attrs2 = state.buildBindings(attrs.size());
 
-    for (auto & i : attrs) {
-        auto size = i.second.size();
+    for (auto & [name, values] : attrs) {
+        auto size = values.size();
         auto list = state.buildList(size);
-        memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
-        attrs2.alloc(i.first).mkList(list);
+        memcpy(list.elems, values.data(), sizeof(Value *) * size);
+        attrs2.alloc(name).mkList(list);
     }
 
     v.mkAttrs(attrs2.alreadySorted());

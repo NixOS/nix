@@ -63,7 +63,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     if (errno)
         throw SysError("reading directory '%1%'", linksDir);
 
-    printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
+    printMsg(Verbosity::Talkative, "loaded %1% hash inodes", inodeHash.size());
 
     return inodeHash;
 }
@@ -220,7 +220,7 @@ void LocalStore::optimisePath_(
         return;
     }
 
-    printMsg(lvlTalkative, "linking '%1%' to %2%", path, linkPath);
+    printMsg(Verbosity::Talkative, "linking '%1%' to %2%", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -273,7 +273,7 @@ void LocalStore::optimisePath_(
 
     if (act)
         act->result(
-            resFileLinked,
+            ResultType::FileLinked,
             st.st_size
 #ifndef _WIN32
             ,
@@ -284,7 +284,7 @@ void LocalStore::optimisePath_(
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
-    Activity act(*logger, actOptimiseStore);
+    Activity act(*logger, ActivityType::OptimiseStore);
 
     auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
@@ -298,7 +298,8 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i))
             continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            Activity act(
+                *logger, Verbosity::Talkative, ActivityType::Unknown, fmt("optimising path '%s'", printStorePath(i)));
             optimisePath_(&act, stats, config->realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
         }
         done++;

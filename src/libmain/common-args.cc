@@ -19,23 +19,21 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .shortName = 'v',
         .description = "Increase the logging verbosity level.",
         .category = loggingCategory,
-        .handler = {[]() {
-            verbosity = (Verbosity) std::min<std::underlying_type_t<Verbosity>>(verbosity + 1, lvlVomit);
-        }},
+        .handler = {[]() { ++verbosity; }},
     });
 
     addFlag({
         .longName = "quiet",
         .description = "Decrease the logging verbosity level.",
         .category = loggingCategory,
-        .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
+        .handler = {[]() { --verbosity; }},
     });
 
     addFlag({
         .longName = "debug",
         .description = "Set the logging verbosity level to 'debug'.",
         .category = loggingCategory,
-        .handler = {[]() { verbosity = lvlDebug; }},
+        .handler = {[]() { verbosity = Verbosity::Debug; }},
     });
 
     addFlag({
@@ -56,9 +54,9 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                 if (index == 0) {
                     std::map<std::string, Config::SettingInfo> settings;
                     globalConfig.getSettings(settings);
-                    for (auto & s : settings)
-                        if (hasPrefix(s.first, prefix))
-                            completions.add(s.first, fmt("Set the `%s` setting.", s.first));
+                    for (auto & [name, _] : settings)
+                        if (hasPrefix(name, prefix))
+                            completions.add(name, fmt("Set the `%s` setting.", name));
                 }
             },
     });

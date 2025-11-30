@@ -798,10 +798,10 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
         startDaemon();
 
     /* Run the builder. */
-    printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
-    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
+    printMsg(Verbosity::Chatty, "executing builder '%1%'", drv.builder);
+    printMsg(Verbosity::Chatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
     for (auto & i : drv.env)
-        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        printMsg(Verbosity::Vomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
     miscMethods->openLogFile();
@@ -884,7 +884,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     }
 
     if (settings.preBuildHook != "") {
-        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
+        printMsg(Verbosity::Chatty, "executing pre-build hook '%1%'", settings.preBuildHook);
 
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
@@ -1970,7 +1970,7 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
 
     /* Are we doing a sandboxed build? */
     {
-        if (settings.sandboxMode == smEnabled) {
+        if (settings.sandboxMode == SandboxMode::Enabled) {
             if (params.drvOptions.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
@@ -1984,9 +1984,9 @@ std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
                     store.printStorePath(params.drvPath));
 #endif
             useSandbox = true;
-        } else if (settings.sandboxMode == smDisabled)
+        } else if (settings.sandboxMode == SandboxMode::Disabled)
             useSandbox = false;
-        else if (settings.sandboxMode == smRelaxed)
+        else if (settings.sandboxMode == SandboxMode::Relaxed)
             // FIXME: cache derivationType
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }

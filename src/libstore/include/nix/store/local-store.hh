@@ -23,7 +23,7 @@ namespace nix {
  * Version 4 is Nix 0.11.  Version 5 is Nix 0.12-0.16.  Version 6 is
  * Nix 1.0.  Version 7 is Nix 1.3. Version 10 is 2.0.
  */
-const int nixSchemaVersion = 10;
+constexpr int nixSchemaVersion = 10;
 
 struct OptimiseStats
 {

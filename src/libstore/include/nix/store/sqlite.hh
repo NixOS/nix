@@ -68,7 +68,7 @@ struct SQLite
 
     void exec(const std::string & stmt);
 
-    uint64_t getLastInsertedRowId();
+    uint64_t getLastInsertedRowId() const;
 };
 
 /**
@@ -131,9 +131,9 @@ struct SQLiteStmt
          */
         bool next();
 
-        std::string getStr(int col);
-        int64_t getInt(int col);
-        bool isNull(int col);
+        std::string getStr(int col) const;
+        int64_t getInt(int col) const;
+        bool isNull(int col) const;
     };
 
     Use use()

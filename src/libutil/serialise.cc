@@ -138,7 +138,7 @@ size_t BufferedSource::read(char * data, size_t len)
     return n;
 }
 
-bool BufferedSource::hasData()
+bool BufferedSource::hasData() const
 {
     return bufPosOut < bufPosIn;
 }
@@ -176,7 +176,7 @@ bool FdSource::good()
     return _good;
 }
 
-bool FdSource::hasData()
+bool FdSource::hasData() const
 {
     if (BufferedSource::hasData())
         return true;
@@ -424,8 +424,8 @@ Sink & operator<<(Sink & sink, const StringSet & s)
 Sink & operator<<(Sink & sink, const Error & ex)
 {
     auto & info = ex.info();
-    sink << "Error" << info.level << "Error" // removed
-         << info.msg.str() << 0              // FIXME: info.errPos
+    sink << "Error" << static_cast<uint64_t>(info.level) << "Error" // removed
+         << info.msg.str() << 0                                     // FIXME: info.errPos
          << info.traces.size();
     for (auto & trace : info.traces) {
         sink << 0; // FIXME: trace.pos

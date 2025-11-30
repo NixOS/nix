@@ -4,6 +4,7 @@
 #include "nix/store/store-open.hh"
 
 #include <algorithm>
+#include <ranges>
 
 namespace nix {
 
@@ -45,16 +46,14 @@ bool Machine::systemSupported(const std::string & system) const
 
 bool Machine::allSupported(const StringSet & features) const
 {
-    return std::all_of(features.begin(), features.end(), [&](const std::string & feature) {
+    return std::ranges::all_of(features, [&](const std::string & feature) {
         return supportedFeatures.count(feature) || mandatoryFeatures.count(feature);
     });
 }
 
 bool Machine::mandatoryMet(const StringSet & features) const
 {
-    return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(), [&](const std::string & feature) {
-        return features.count(feature);
-    });
+    return std::ranges::all_of(mandatoryFeatures, [&](const std::string & feature) { return features.count(feature); });
 }
 
 StoreReference Machine::completeStoreReference() const

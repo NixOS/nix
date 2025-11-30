@@ -85,12 +85,12 @@ std::string replaceStrings(std::string res, std::string_view from, std::string_v
 
 std::string rewriteStrings(std::string s, const StringMap & rewrites)
 {
-    for (auto & i : rewrites) {
-        if (i.first == i.second)
+    for (auto & [from, to] : rewrites) {
+        if (from == to)
             continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != s.npos)
-            s.replace(j, i.first.size(), i.second);
+        while ((j = s.find(from, j)) != s.npos)
+            s.replace(j, from.size(), to);
     }
     return s;
 }

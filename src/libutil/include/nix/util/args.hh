@@ -68,7 +68,7 @@ protected:
      * handlers/flags/arguments that accept an arbitrary number of
      * arguments.
      */
-    static const size_t ArityAny = std::numeric_limits<size_t>::max();
+    static constexpr size_t ArityAny = std::numeric_limits<size_t>::max();
 
     /**
      * Arguments (flags/options and positional) have a "handler" which is

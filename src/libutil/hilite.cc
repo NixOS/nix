@@ -1,5 +1,7 @@
 #include "nix/util/hilite.hh"
 
+#include <algorithm>
+
 namespace nix {
 
 std::string
@@ -9,8 +11,7 @@ hiliteMatches(std::string_view s, std::vector<std::smatch> matches, std::string_
     if (matches.size() == 0)
         return std::string(s);
 
-    std::sort(
-        matches.begin(), matches.end(), [](const auto & a, const auto & b) { return a.position() < b.position(); });
+    std::ranges::sort(matches, [](const auto & a, const auto & b) { return a.position() < b.position(); });
 
     std::string out;
     ssize_t last_end = 0;

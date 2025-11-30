@@ -26,17 +26,17 @@ struct UnixPathTrait
 
     constexpr static char preferredSep = '/';
 
-    static inline bool isPathSep(char c)
+    static constexpr bool isPathSep(char c)
     {
         return c == '/';
     }
 
-    static inline size_t findPathSep(StringView path, size_t from = 0)
+    static constexpr size_t findPathSep(StringView path, size_t from = 0)
     {
         return path.find('/', from);
     }
 
-    static inline size_t rfindPathSep(StringView path, size_t from = StringView::npos)
+    static constexpr size_t rfindPathSep(StringView path, size_t from = StringView::npos)
     {
         return path.rfind('/', from);
     }
@@ -65,19 +65,19 @@ struct WindowsPathTrait
 
     constexpr static CharT preferredSep = '\\';
 
-    static inline bool isPathSep(CharT c)
+    static constexpr bool isPathSep(CharT c)
     {
         return c == '/' || c == preferredSep;
     }
 
-    static size_t findPathSep(StringView path, size_t from = 0)
+    static constexpr size_t findPathSep(StringView path, size_t from = 0)
     {
         size_t p1 = path.find('/', from);
         size_t p2 = path.find(preferredSep, from);
         return p1 == String::npos ? p2 : p2 == String::npos ? p1 : std::min(p1, p2);
     }
 
-    static size_t rfindPathSep(StringView path, size_t from = String::npos)
+    static constexpr size_t rfindPathSep(StringView path, size_t from = String::npos)
     {
         size_t p1 = path.rfind('/', from);
         size_t p2 = path.rfind(preferredSep, from);

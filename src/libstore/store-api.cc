@@ -20,6 +20,7 @@
 #include "nix/util/signals.hh"
 
 #include <filesystem>
+#include <ranges>
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
@@ -131,12 +132,13 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
     std::map<StorePath, PathWithInfo *> infosMap;
     StorePathSet storePathsToAdd;
     for (auto & thingToAdd : pathsToCopy) {
-        bytesExpected += thingToAdd.first.narSize;
-        infosMap.insert_or_assign(thingToAdd.first.path, &thingToAdd);
-        storePathsToAdd.insert(thingToAdd.first.path);
+        auto & [info, _] = thingToAdd;
+        bytesExpected += info.narSize;
+        infosMap.insert_or_assign(info.path, &thingToAdd);
+        storePathsToAdd.insert(info.path);
     }
 
-    act.setExpected(actCopyPath, bytesExpected);
+    act.setExpected(ActivityType::CopyPath, bytesExpected);
 
     auto showProgress = [&, nrTotal = pathsToCopy.size()]() { act.progress(nrDone, nrTotal, nrRunning, nrFailed); };
 
@@ -178,7 +180,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    printMsg(lvlError, "could not copy %s: %s", printStorePath(path), e.what());
+                    printMsg(Verbosity::Error, "could not copy %s: %s", printStorePath(path), e.what());
                     showProgress();
                     return;
                 }
@@ -333,7 +335,7 @@ StoreReference StoreConfig::getReference() const
     return {.variant = StoreReference::Auto{}};
 }
 
-bool Store::PathInfoCacheValue::isKnownNow()
+bool Store::PathInfoCacheValue::isKnownNow() const
 {
     std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
                                            : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
@@ -399,8 +401,8 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
     auto outputMap = this->queryDerivationOutputMap(path);
     StorePathSet outputPaths;
-    for (auto & i : outputMap) {
-        outputPaths.emplace(std::move(i.second));
+    for (auto & [_, output] : outputMap) {
+        outputPaths.emplace(std::move(output));
     }
     return outputPaths;
 }
@@ -861,8 +863,8 @@ void copyStorePath(
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
         *logger,
-        lvlInfo,
-        actCopyPath,
+        Verbosity::Info,
+        ActivityType::CopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
         {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
     PushActivity pact(act.id);
@@ -973,12 +975,12 @@ std::map<StorePath, StorePath> copyPaths(
         if (!valid.count(path))
             missing.insert(path);
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, Verbosity::Info, ActivityType::CopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
     auto sortedMissing = srcStore.topoSortPaths(missing);
-    std::reverse(sortedMissing.begin(), sortedMissing.end());
+    std::ranges::reverse(sortedMissing);
 
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)
@@ -1022,8 +1024,8 @@ std::map<StorePath, StorePath> copyPaths(
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,
-                lvlInfo,
-                actCopyPath,
+                Verbosity::Info,
+                ActivityType::CopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),
                 {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
             PushActivity pact(act.id);

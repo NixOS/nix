@@ -19,7 +19,7 @@ struct BaseNix32
 private:
     static const std::array<uint8_t, 256> reverseMap;
 
-    const static constexpr uint8_t invalid = 0xFF;
+    static constexpr uint8_t invalid = 0xFF;
 
 public:
     static inline std::optional<uint8_t> lookupReverse(char base32)
@@ -34,7 +34,7 @@ public:
     /**
      * Returns the length of a base-32 representation of this hash.
      */
-    [[nodiscard]] constexpr static inline size_t encodedLength(size_t originalLength)
+    [[nodiscard]] static constexpr size_t encodedLength(size_t originalLength)
     {
         return (originalLength * 8 - 1) / 5 + 1;
     }

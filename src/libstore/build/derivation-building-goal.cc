@@ -269,8 +269,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
         act = std::make_unique<Activity>(
             *logger,
-            lvlInfo,
-            actBuild,
+            Verbosity::Info,
+            ActivityType::Build,
             msg,
             Logger::Fields{
                 worker.store.printStorePath(drvPath),
@@ -328,7 +328,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         if (!outputLocks.lockPaths(lockFiles, "", false)) {
             Activity act(
-                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+                *logger,
+                Verbosity::Warn,
+                ActivityType::BuildWaiting,
+                fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
 
             /* Wait then try locking again, repeat until success (returned
                boolean is true). */
@@ -375,24 +378,24 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             useHook = false;
         } else {
             switch (tryBuildHook(initialOutputs, drvOptions)) {
-            case rpAccept:
+            case HookReply::Accept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 useHook = true;
                 break;
-            case rpPostpone:
+            case HookReply::Postpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
                 if (!actLock)
                     actLock = std::make_unique<Activity>(
                         *logger,
-                        lvlWarn,
-                        actBuildWaiting,
+                        Verbosity::Warn,
+                        ActivityType::BuildWaiting,
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 outputLocks.unlock();
                 co_await waitForAWhile();
                 continue;
-            case rpDecline:
+            case HookReply::Decline:
                 /* We should do it ourselves.
 
                    Now that we've decided we can't / won't do a remote build, check
@@ -649,8 +652,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
-                    lvlWarn,
-                    actBuildWaiting,
+                    Verbosity::Warn,
+                    ActivityType::BuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
             continue;
@@ -738,8 +741,8 @@ static void runPostBuildHook(
 
     Activity act(
         logger,
-        lvlTalkative,
-        actPostBuildHook,
+        Verbosity::Talkative,
+        ActivityType::PostBuildHook,
         fmt("running post-build-hook '%s'", settings.postBuildHook),
         Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
@@ -772,7 +775,7 @@ static void runPostBuildHook(
 
         void flushLine()
         {
-            act.result(resPostBuildLogLine, currentLine);
+            act.result(ResultType::PostBuildLogLine, currentLine);
             currentLine.clear();
         }
 
@@ -831,12 +834,12 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
-    return rpDecline;
+    return HookReply::Decline;
 #else
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
     if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
-        return rpDecline;
+        return HookReply::Decline;
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>();
@@ -874,13 +877,13 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         debug("hook reply is '%1%'", reply);
 
         if (reply == "decline")
-            return rpDecline;
+            return HookReply::Decline;
         else if (reply == "decline-permanently") {
             worker.tryBuildHook = false;
             worker.hook = 0;
-            return rpDecline;
+            return HookReply::Decline;
         } else if (reply == "postpone")
-            return rpPostpone;
+            return HookReply::Postpone;
         else if (reply != "accept")
             throw Error("bad hook reply '%s'", reply);
 
@@ -888,7 +891,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         if (e.errNo == EPIPE) {
             printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
-            return rpDecline;
+            return HookReply::Decline;
         } else
             throw;
     }
@@ -932,7 +935,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
-    return rpAccept;
+    return HookReply::Accept;
 #endif
 }
 
@@ -1042,9 +1045,9 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
                     if (s && !isWrittenToLog && logSink) {
                         const auto type = (*json)["type"];
                         const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
+                        if (type == ResultType::BuildLogLine) {
                             (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && !fields.is_null()) {
+                        } else if (type == ResultType::SetPhase && !fields.is_null()) {
                             const auto phase = fields[0];
                             if (!phase.is_null()) {
                                 // nixpkgs' stdenv produces lines in the log to signal
@@ -1084,7 +1087,7 @@ void DerivationBuildingGoal::flushLine()
         if (logTail.size() > settings.logLines)
             logTail.pop_front();
 
-        act->result(resBuildLogLine, currentLogLine);
+        act->result(ResultType::BuildLogLine, currentLogLine);
     }
 
     currentLogLine = "";

@@ -556,7 +556,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     static int sidebandProgressCallback(const char * str, int len, void * payload)
     {
         auto act = (Activity *) payload;
-        act->result(resFetchStatus, trim(std::string_view(str, len)));
+        act->result(ResultType::FetchStatus, trim(std::string_view(str, len)));
         return getInterrupted() ? -1 : 0;
     }
 
@@ -564,7 +564,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         auto act = (Activity *) payload;
         act->result(
-            resFetchStatus,
+            ResultType::FetchStatus,
             fmt("%d/%d objects received, %d/%d deltas indexed, %s",
                 stats->received_objects,
                 stats->total_objects,
@@ -576,7 +576,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void fetch(const std::string & url, const std::string & refspec, bool shallow) override
     {
-        Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
+        Activity act(*logger, Verbosity::Talkative, ActivityType::FetchTree, fmt("fetching Git repository '%s'", url));
 
         // TODO: implement git-credential helper support (preferably via libgit2, which as of 2024-01 does not support
         // that)

@@ -16,9 +16,9 @@
 namespace nix {
 
 Worker::Worker(Store & store, Store & evalStore)
-    : act(*logger, actRealise)
-    , actDerivations(*logger, actBuilds)
-    , actSubstitutions(*logger, actCopyPaths)
+    : act(*logger, ActivityType::Realise)
+    , actDerivations(*logger, ActivityType::Builds)
+    , actSubstitutions(*logger, ActivityType::CopyPaths)
     , store(store)
     , evalStore(evalStore)
 {
@@ -383,7 +383,7 @@ void Worker::run(const Goals & _topGoals)
 
 void Worker::waitForInput()
 {
-    printMsg(lvlVomit, "waiting for children");
+    printMsg(Verbosity::Vomit, "waiting for children");
 
     /* Process output from the file descriptors attached to the
        children, namely log output and output path creation commands.
@@ -468,7 +468,7 @@ void Worker::waitForInput()
         state.iterate(
             j->channels,
             [&](Descriptor k, std::string_view data) {
-                printMsg(lvlVomit, "%1%: read %2% bytes", goal->getName(), data.size());
+                printMsg(Verbosity::Vomit, "%1%: read %2% bytes", goal->getName(), data.size());
                 j->lastOutput = after;
                 goal->handleChildOutput(k, data);
             },

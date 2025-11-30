@@ -37,7 +37,7 @@ int testMainForBuidingPre(int argc, char ** argv)
 #ifdef __APPLE__
     // Avoid this error, when already running in a sandbox:
     // sandbox-exec: sandbox_apply: Operation not permitted
-    settings.sandboxMode = smDisabled;
+    settings.sandboxMode = SandboxMode::Disabled;
     setEnv("_NIX_TEST_NO_SANDBOX", "1");
 #endif
 

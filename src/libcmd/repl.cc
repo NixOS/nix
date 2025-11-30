@@ -219,9 +219,9 @@ ReplExitStatus NixRepl::mainLoop()
         } catch (IncompleteReplExpr &) {
             continue;
         } catch (Error & e) {
-            printMsg(lvlError, e.msg());
+            printMsg(Verbosity::Error, e.msg());
         } catch (Interrupted & e) {
-            printMsg(lvlError, e.msg());
+            printMsg(Verbosity::Error, e.msg());
         }
 
         // We handled the current input fully, so we should clear it

@@ -26,13 +26,13 @@ Attrs jsonToAttrs(const nlohmann::json & json)
 nlohmann::json attrsToJSON(const Attrs & attrs)
 {
     nlohmann::json json;
-    for (auto & attr : attrs) {
-        if (auto v = std::get_if<uint64_t>(&attr.second)) {
-            json[attr.first] = *v;
-        } else if (auto v = std::get_if<std::string>(&attr.second)) {
-            json[attr.first] = *v;
-        } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
-            json[attr.first] = v->t;
+    for (auto & [name, value] : attrs) {
+        if (auto v = std::get_if<uint64_t>(&value)) {
+            json[name] = *v;
+        } else if (auto v = std::get_if<std::string>(&value)) {
+            json[name] = *v;
+        } else if (auto v = std::get_if<Explicit<bool>>(&value)) {
+            json[name] = v->t;
         } else
             unreachable();
     }
@@ -96,13 +96,13 @@ bool getBoolAttr(const Attrs & attrs, const std::string & name)
 StringMap attrsToQuery(const Attrs & attrs)
 {
     StringMap query;
-    for (auto & attr : attrs) {
-        if (auto v = std::get_if<uint64_t>(&attr.second)) {
-            query.insert_or_assign(attr.first, fmt("%d", *v));
-        } else if (auto v = std::get_if<std::string>(&attr.second)) {
-            query.insert_or_assign(attr.first, *v);
-        } else if (auto v = std::get_if<Explicit<bool>>(&attr.second)) {
-            query.insert_or_assign(attr.first, v->t ? "1" : "0");
+    for (auto & [name, value] : attrs) {
+        if (auto v = std::get_if<uint64_t>(&value)) {
+            query.insert_or_assign(name, fmt("%d", *v));
+        } else if (auto v = std::get_if<std::string>(&value)) {
+            query.insert_or_assign(name, *v);
+        } else if (auto v = std::get_if<Explicit<bool>>(&value)) {
+            query.insert_or_assign(name, v->t ? "1" : "0");
         } else
             unreachable();
     }

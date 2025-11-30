@@ -35,27 +35,27 @@ class BindingsBuilder;
  * about how this is mapped into the alignment bits to save significant memory.
  * This also restricts the number of internal types represented with distinct memory layouts.
  */
-typedef enum {
-    tUninitialized = 0,
+enum class InternalType {
+    Uninitialized = 0,
     /* layout: Single/zero field payload */
-    tInt = 1,
-    tBool,
-    tNull,
-    tFloat,
-    tExternal,
-    tPrimOp,
-    tAttrs,
+    Int = 1,
+    Bool,
+    Null,
+    Float,
+    External,
+    PrimOp,
+    Attrs,
     /* layout: Pair of pointers payload */
-    tListSmall,
-    tPrimOpApp,
-    tApp,
-    tThunk,
-    tLambda,
+    ListSmall,
+    PrimOpApp,
+    App,
+    Thunk,
+    Lambda,
     /* layout: Single untaggable field */
-    tListN,
-    tString,
-    tPath,
-} InternalType;
+    ListN,
+    String,
+    Path,
+};
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -396,7 +396,7 @@ struct ValueBase
 
     /**
      * Like FunctionApplicationThunk, but must be a distinct type in order to
-     * resolve overloads to `tPrimOpApp` instead of `tApp`.
+     * resolve overloads to `InternalType::PrimOpApp` instead of `InternalType::App`.
      * This type helps with the efficient implementation of arity>=2 primop calls.
      */
     struct PrimOpApplicationThunk
@@ -428,22 +428,22 @@ struct PayloadTypeToInternalType
  * overload resolution in setStorage. This ensures there's a bijection from
  * InternalType <-> C++ type.
  */
-#define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)                     \
-    MACRO(NixInt, integer, tInt)                                    \
-    MACRO(bool, boolean, tBool)                                     \
-    MACRO(ValueBase::StringWithContext, string, tString)            \
-    MACRO(ValueBase::Path, path, tPath)                             \
-    MACRO(ValueBase::Null, null_, tNull)                            \
-    MACRO(Bindings *, attrs, tAttrs)                                \
-    MACRO(ValueBase::List, bigList, tListN)                         \
-    MACRO(ValueBase::SmallList, smallList, tListSmall)              \
-    MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
-    MACRO(ValueBase::FunctionApplicationThunk, app, tApp)           \
-    MACRO(ValueBase::Lambda, lambda, tLambda)                       \
-    MACRO(PrimOp *, primOp, tPrimOp)                                \
-    MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
-    MACRO(ExternalValueBase *, external, tExternal)                 \
-    MACRO(NixFloat, fpoint, tFloat)
+#define NIX_VALUE_STORAGE_FOR_EACH_FIELD(MACRO)                                  \
+    MACRO(NixInt, integer, InternalType::Int)                                    \
+    MACRO(bool, boolean, InternalType::Bool)                                     \
+    MACRO(ValueBase::StringWithContext, string, InternalType::String)            \
+    MACRO(ValueBase::Path, path, InternalType::Path)                             \
+    MACRO(ValueBase::Null, null_, InternalType::Null)                            \
+    MACRO(Bindings *, attrs, InternalType::Attrs)                                \
+    MACRO(ValueBase::List, bigList, InternalType::ListN)                         \
+    MACRO(ValueBase::SmallList, smallList, InternalType::ListSmall)              \
+    MACRO(ValueBase::ClosureThunk, thunk, InternalType::Thunk)                   \
+    MACRO(ValueBase::FunctionApplicationThunk, app, InternalType::App)           \
+    MACRO(ValueBase::Lambda, lambda, InternalType::Lambda)                       \
+    MACRO(PrimOp *, primOp, InternalType::PrimOp)                                \
+    MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, InternalType::PrimOpApp) \
+    MACRO(ExternalValueBase *, external, InternalType::External)                 \
+    MACRO(NixFloat, fpoint, InternalType::Float)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
     template<>                                               \
@@ -484,7 +484,7 @@ protected:
     };
 
 private:
-    InternalType internalType = tUninitialized;
+    InternalType internalType = InternalType::Uninitialized;
     Payload payload;
 
 protected:
@@ -568,8 +568,8 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
      *
      * PrimaryDiscriminator::pdListN - pdPath - Only has 3 available padding bits
      * because:
-     * - tListN needs a size, whose lower bits we can't borrow.
-     * - tString and tPath have C-string fields, which don't necessarily need to
+     * - InternalType::ListN needs a size, whose lower bits we can't borrow.
+     * - InternalType::String and InternalType::Path have C-string fields, which don't necessarily need to
      * be aligned.
      *
      * In this case we reserve their discriminators directly in the PrimaryDiscriminator
@@ -630,7 +630,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     template<InternalType type, typename T, typename U>
     void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
     {
-        static_assert(type >= tListSmall && type <= tLambda);
+        static_assert(type >= InternalType::ListSmall && type <= InternalType::Lambda);
         {
             auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
             assertAligned(firstFieldPayload);
@@ -639,7 +639,7 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         {
             auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
             assertAligned(secondFieldPayload);
-            payload[1] = (type - tListSmall) | secondFieldPayload;
+            payload[1] = (static_cast<int>(type) - static_cast<int>(InternalType::ListSmall)) | secondFieldPayload;
         }
     }
 
@@ -658,7 +658,7 @@ protected:
         switch (auto pd = getPrimaryDiscriminator()) {
         case pdUninitialized:
             /* Discriminator value of zero is used to distinguish uninitialized values. */
-            return tUninitialized;
+            return InternalType::Uninitialized;
         case pdSingleDWord:
             /* Payloads that only use up a single double word store the InternalType
                in the upper bits of the first double word. */
@@ -667,9 +667,10 @@ protected:
         case pdListN:
         case pdString:
         case pdPath:
-            return static_cast<InternalType>(tListN + (pd - pdListN));
+            return static_cast<InternalType>(static_cast<int>(InternalType::ListN) + (pd - pdListN));
         case pdPairOfPointers:
-            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
+            return static_cast<InternalType>(
+                static_cast<int>(InternalType::ListSmall) + (payload[1] & discriminatorMask));
         [[unlikely]] default:
             unreachable();
         }
@@ -749,37 +750,37 @@ protected:
 
     void setStorage(NixInt integer) noexcept
     {
-        setSingleDWordPayload<tInt>(integer.value);
+        setSingleDWordPayload<InternalType::Int>(integer.value);
     }
 
     void setStorage(bool boolean) noexcept
     {
-        setSingleDWordPayload<tBool>(boolean);
+        setSingleDWordPayload<InternalType::Bool>(boolean);
     }
 
     void setStorage(Null path) noexcept
     {
-        setSingleDWordPayload<tNull>(0);
+        setSingleDWordPayload<InternalType::Null>(0);
     }
 
     void setStorage(NixFloat fpoint) noexcept
     {
-        setSingleDWordPayload<tFloat>(std::bit_cast<PackedPointer>(fpoint));
+        setSingleDWordPayload<InternalType::Float>(std::bit_cast<PackedPointer>(fpoint));
     }
 
     void setStorage(ExternalValueBase * external) noexcept
     {
-        setSingleDWordPayload<tExternal>(std::bit_cast<PackedPointer>(external));
+        setSingleDWordPayload<InternalType::External>(std::bit_cast<PackedPointer>(external));
     }
 
     void setStorage(PrimOp * primOp) noexcept
     {
-        setSingleDWordPayload<tPrimOp>(std::bit_cast<PackedPointer>(primOp));
+        setSingleDWordPayload<InternalType::PrimOp>(std::bit_cast<PackedPointer>(primOp));
     }
 
     void setStorage(Bindings * bindings) noexcept
     {
-        setSingleDWordPayload<tAttrs>(std::bit_cast<PackedPointer>(bindings));
+        setSingleDWordPayload<InternalType::Attrs>(std::bit_cast<PackedPointer>(bindings));
     }
 
     void setStorage(List list) noexcept
@@ -1046,12 +1047,12 @@ public:
     // type() == nThunk
     inline bool isThunk() const
     {
-        return isa<tThunk>();
+        return isa<InternalType::Thunk>();
     };
 
     inline bool isApp() const
     {
-        return isa<tApp>();
+        return isa<InternalType::App>();
     };
 
     inline bool isBlackhole() const;
@@ -1059,17 +1060,17 @@ public:
     // type() == nFunction
     inline bool isLambda() const
     {
-        return isa<tLambda>();
+        return isa<InternalType::Lambda>();
     };
 
     inline bool isPrimOp() const
     {
-        return isa<tPrimOp>();
+        return isa<InternalType::PrimOp>();
     };
 
     inline bool isPrimOpApp() const
     {
-        return isa<tPrimOpApp>();
+        return isa<InternalType::PrimOpApp>();
     };
 
     /**
@@ -1082,33 +1083,33 @@ public:
     inline ValueType type(bool invalidIsThunk = false) const
     {
         switch (getInternalType()) {
-        case tUninitialized:
+        case InternalType::Uninitialized:
             break;
-        case tInt:
+        case InternalType::Int:
             return nInt;
-        case tBool:
+        case InternalType::Bool:
             return nBool;
-        case tString:
+        case InternalType::String:
             return nString;
-        case tPath:
+        case InternalType::Path:
             return nPath;
-        case tNull:
+        case InternalType::Null:
             return nNull;
-        case tAttrs:
+        case InternalType::Attrs:
             return nAttrs;
-        case tListSmall:
-        case tListN:
+        case InternalType::ListSmall:
+        case InternalType::ListN:
             return nList;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
+        case InternalType::Lambda:
+        case InternalType::PrimOp:
+        case InternalType::PrimOpApp:
             return nFunction;
-        case tExternal:
+        case InternalType::External:
             return nExternal;
-        case tFloat:
+        case InternalType::Float:
             return nFloat;
-        case tThunk:
-        case tApp:
+        case InternalType::Thunk:
+        case InternalType::App:
             return nThunk;
         }
         if (invalidIsThunk)
@@ -1124,7 +1125,7 @@ public:
      */
     inline bool isValid() const noexcept
     {
-        return !isa<tUninitialized>();
+        return !isa<InternalType::Uninitialized>();
     }
 
     inline void mkInt(NixInt::Inner n) noexcept
@@ -1215,7 +1216,7 @@ public:
     }
 
     /**
-     * For a `tPrimOpApp` value, get the original `PrimOp` value.
+     * For a `InternalType::PrimOpApp` value, get the original `PrimOp` value.
      */
     const PrimOp * primOpAppPrimOp() const;
 
@@ -1231,17 +1232,18 @@ public:
 
     bool isList() const noexcept
     {
-        return isa<tListSmall, tListN>();
+        return isa<InternalType::ListSmall, InternalType::ListN>();
     }
 
     ListView listView() const noexcept
     {
-        return isa<tListSmall>() ? ListView(getStorage<SmallList>()) : ListView(getStorage<List>());
+        return isa<InternalType::ListSmall>() ? ListView(getStorage<SmallList>()) : ListView(getStorage<List>());
     }
 
     size_t listSize() const noexcept
     {
-        return isa<tListSmall>() ? (getStorage<SmallList>()[1] == nullptr ? 1 : 2) : getStorage<List>().size;
+        return isa<InternalType::ListSmall>() ? (getStorage<SmallList>()[1] == nullptr ? 1 : 2)
+                                              : getStorage<List>().size;
     }
 
     PosIdx determinePos(const PosIdx pos) const;

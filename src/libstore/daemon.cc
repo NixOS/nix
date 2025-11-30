@@ -30,10 +30,10 @@ Sink & operator<<(Sink & sink, const Logger::Fields & fields)
 {
     sink << fields.size();
     for (auto & f : fields) {
-        sink << f.type;
-        if (f.type == Logger::Field::tInt)
+        sink << static_cast<int>(f.type);
+        if (f.type == Logger::Field::Type::Int)
             sink << f.i;
-        else if (f.type == Logger::Field::tString)
+        else if (f.type == Logger::Field::Type::String)
             sink << f.s;
         else
             unreachable();
@@ -155,7 +155,8 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << static_cast<uint64_t>(lvl) << static_cast<uint64_t>(type) << s << fields
+            << parent;
         enqueueMsg(buf.s);
     }
 
@@ -173,7 +174,7 @@ struct TunnelLogger : public Logger
         if (GET_PROTOCOL_MINOR(clientVersion) < 20)
             return;
         StringSink buf;
-        buf << STDERR_RESULT << act << type << fields;
+        buf << STDERR_RESULT << act << static_cast<uint64_t>(type) << fields;
         enqueueMsg(buf.s);
     }
 };
@@ -241,9 +242,7 @@ struct ClientSettings
         settings.buildCores = buildCores;
         settings.useSubstitutes = useSubstitutes;
 
-        for (auto & i : overrides) {
-            auto & name(i.first);
-            auto & value(i.second);
+        for (auto & [name, value] : overrides) {
 
             auto setSubstituters = [&](Setting<Strings> & res) {
                 if (name != res.name && res.aliases.count(name) == 0)
@@ -727,8 +726,8 @@ static void performOp(
         logger->stopWork();
 
         size_t size = 0;
-        for (auto & i : roots)
-            size += i.second.size();
+        for (auto & [_, links] : roots)
+            size += links.size();
 
         conn.to << size;
 
@@ -776,7 +775,7 @@ static void performOp(
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(conn.from);
+        clientSettings.verboseBuild = Verbosity::Error == (Verbosity) readInt(conn.from);
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);
@@ -831,11 +830,11 @@ static void performOp(
         store->querySubstitutablePathInfos(pathsMap, infos);
         logger->stopWork();
         conn.to << infos.size();
-        for (auto & i : infos) {
-            WorkerProto::write(*store, wconn, i.first);
-            WorkerProto::write(*store, wconn, i.second.deriver);
-            WorkerProto::write(*store, wconn, i.second.references);
-            conn.to << i.second.downloadSize << i.second.narSize;
+        for (auto & [path, info] : infos) {
+            WorkerProto::write(*store, wconn, path);
+            WorkerProto::write(*store, wconn, info.deriver);
+            WorkerProto::write(*store, wconn, info.references);
+            conn.to << info.downloadSize << info.narSize;
         }
         break;
     }
@@ -1056,7 +1055,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 
     Finally finally([&]() {
         setInterrupted(false);
-        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
+        printMsgUsing(prevLogger, Verbosity::Debug, "%d operations", opCount);
     });
 
     conn.postHandshake(
@@ -1087,7 +1086,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
                 break;
             }
 
-            printMsgUsing(prevLogger, lvlDebug, "received daemon op %d", op);
+            printMsgUsing(prevLogger, Verbosity::Debug, "received daemon op %d", op);
 
             opCount++;
 

@@ -663,9 +663,9 @@ public:
     /**
      * Force `v`, and then verify that it has the expected type.
      */
-    NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
-    NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
-    bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx);
+    [[nodiscard]] NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);
+    [[nodiscard]] NixFloat forceFloat(Value & v, const PosIdx pos, std::string_view errorCtx);
+    [[nodiscard]] bool forceBool(Value & v, const PosIdx pos, std::string_view errorCtx);
 
     void forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx);
 
@@ -703,7 +703,7 @@ public:
      * @return true iff the value `v` denotes a derivation (i.e. a
      * set with attribute `type = "derivation"`).
      */
-    bool isDerivation(Value & v);
+    [[nodiscard]] bool isDerivation(Value & v);
 
     std::optional<std::string> tryAttrsToString(
         const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
@@ -895,7 +895,7 @@ public:
      */
     void assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx);
 
-    bool isFunctor(const Value & fun) const;
+    [[nodiscard]] bool isFunctor(const Value & fun) const;
 
     void callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos);
 

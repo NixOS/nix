@@ -47,8 +47,8 @@ StorePath fetchToStore(
 
     Activity act(
         *logger,
-        lvlChatty,
-        actUnknown,
+        Verbosity::Chatty,
+        ActivityType::Unknown,
         fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
 
     auto filter2 = filter ? *filter : defaultPathFilter;

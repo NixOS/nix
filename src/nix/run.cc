@@ -38,8 +38,8 @@ namespace nix {
 Strings toEnvp(StringMap env)
 {
     Strings envStrs;
-    for (auto & i : env) {
-        envStrs.push_back(i.first + "=" + i.second);
+    for (auto & [name, value] : env) {
+        envStrs.push_back(name + "=" + value);
     }
 
     return envStrs;

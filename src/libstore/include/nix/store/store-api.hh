@@ -294,13 +294,13 @@ protected:
          * Whether the value is valid as a cache entry. The path may not
          * exist.
          */
-        bool isKnownNow();
+        bool isKnownNow() const;
 
         /**
          * Past tense, because a path can only be assumed to exists when
          * isKnownNow() && didExist()
          */
-        inline bool didExist()
+        inline bool didExist() const
         {
             return value != nullptr;
         }
@@ -373,7 +373,7 @@ public:
         unsupported("queryAllValidPaths");
     }
 
-    constexpr static const char * MissingName = "x";
+    static constexpr const char * MissingName = "x";
 
     /**
      * Query information about a valid path. It is permitted to omit

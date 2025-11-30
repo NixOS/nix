@@ -8,7 +8,7 @@ using namespace std::literals;
 
 namespace nix {
 
-constexpr static const std::array<char, 16> base16Chars = "0123456789abcdef"_arrayNoNull;
+static constexpr std::array<char, 16> base16Chars = "0123456789abcdef"_arrayNoNull;
 
 std::string base16::encode(std::span<const std::byte> b)
 {
@@ -46,7 +46,7 @@ std::string base16::decode(std::string_view s)
     return res;
 }
 
-constexpr static const std::array<char, 64> base64Chars =
+static constexpr std::array<char, 64> base64Chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"_arrayNoNull;
 
 std::string base64::encode(std::span<const std::byte> s)

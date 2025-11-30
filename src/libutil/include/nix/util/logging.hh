@@ -12,34 +12,34 @@
 
 namespace nix {
 
-typedef enum {
-    actUnknown = 0,
-    actCopyPath = 100,
-    actFileTransfer = 101,
-    actRealise = 102,
-    actCopyPaths = 103,
-    actBuilds = 104,
-    actBuild = 105,
-    actOptimiseStore = 106,
-    actVerifyPaths = 107,
-    actSubstitute = 108,
-    actQueryPathInfo = 109,
-    actPostBuildHook = 110,
-    actBuildWaiting = 111,
-    actFetchTree = 112,
-} ActivityType;
+enum class ActivityType {
+    Unknown = 0,
+    CopyPath = 100,
+    FileTransfer = 101,
+    Realise = 102,
+    CopyPaths = 103,
+    Builds = 104,
+    Build = 105,
+    OptimiseStore = 106,
+    VerifyPaths = 107,
+    Substitute = 108,
+    QueryPathInfo = 109,
+    PostBuildHook = 110,
+    BuildWaiting = 111,
+    FetchTree = 112,
+};
 
-typedef enum {
-    resFileLinked = 100,
-    resBuildLogLine = 101,
-    resUntrustedPath = 102,
-    resCorruptedPath = 103,
-    resSetPhase = 104,
-    resProgress = 105,
-    resSetExpected = 106,
-    resPostBuildLogLine = 107,
-    resFetchStatus = 108,
-} ResultType;
+enum class ResultType {
+    FileLinked = 100,
+    BuildLogLine = 101,
+    UntrustedPath = 102,
+    CorruptedPath = 103,
+    SetPhase = 104,
+    Progress = 105,
+    SetExpected = 106,
+    PostBuildLogLine = 107,
+    FetchStatus = 108,
+};
 
 typedef uint64_t ActivityId;
 
@@ -78,26 +78,33 @@ public:
     struct Field
     {
         // FIXME: use std::variant.
-        enum { tInt = 0, tString = 1 } type;
+        enum class Type { Int = 0, String = 1 };
+        Type type;
 
         uint64_t i = 0;
         std::string s;
 
         Field(const std::string & s)
-            : type(tString)
+            : type(Type::String)
             , s(s)
         {
         }
 
         Field(const char * s)
-            : type(tString)
+            : type(Type::String)
             , s(s)
         {
         }
 
         Field(const uint64_t & i)
-            : type(tInt)
+            : type(Type::Int)
             , i(i)
+        {
+        }
+
+        Field(const ActivityType & a)
+            : type(Type::Int)
+            , i(static_cast<uint64_t>(a))
         {
         }
     };
@@ -133,7 +140,7 @@ public:
 
     void log(std::string_view s)
     {
-        log(lvlInfo, s);
+        log(Verbosity::Info, s);
     }
 
     virtual void logEI(const ErrorInfo & ei) = 0;
@@ -206,7 +213,7 @@ struct Activity
 
     Activity(
         Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
-        : Activity(logger, lvlError, type, "", fields, parent) {};
+        : Activity(logger, Verbosity::Error, type, "", fields, parent) {};
 
     Activity(const Activity & act) = delete;
 
@@ -214,12 +221,12 @@ struct Activity
 
     void progress(uint64_t done = 0, uint64_t expected = 0, uint64_t running = 0, uint64_t failed = 0) const
     {
-        result(resProgress, done, expected, running, failed);
+        result(ResultType::Progress, done, expected, running, failed);
     }
 
     void setExpected(ActivityType type2, uint64_t expected) const
     {
-        result(resSetExpected, type2, expected);
+        result(ResultType::SetExpected, type2, expected);
     }
 
     template<typename... Args>
@@ -315,8 +322,8 @@ extern Verbosity verbosity;
         }                                      \
     } while (0)
 
-#define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
-#define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
+#define logError(errorInfo...) logErrorInfo(Verbosity::Error, errorInfo)
+#define logWarning(errorInfo...) logErrorInfo(Verbosity::Warn, errorInfo)
 
 /**
  * Print a string message if the current log level is at least the specified
@@ -332,15 +339,15 @@ extern Verbosity verbosity;
     } while (0)
 #define printMsg(level, args...) printMsgUsing(logger, level, args)
 
-#define printError(args...) printMsg(lvlError, args)
-#define notice(args...) printMsg(lvlNotice, args)
-#define printInfo(args...) printMsg(lvlInfo, args)
-#define printTalkative(args...) printMsg(lvlTalkative, args)
-#define debug(args...) printMsg(lvlDebug, args)
-#define vomit(args...) printMsg(lvlVomit, args)
+#define printError(args...) printMsg(Verbosity::Error, args)
+#define notice(args...) printMsg(Verbosity::Notice, args)
+#define printInfo(args...) printMsg(Verbosity::Info, args)
+#define printTalkative(args...) printMsg(Verbosity::Talkative, args)
+#define debug(args...) printMsg(Verbosity::Debug, args)
+#define vomit(args...) printMsg(Verbosity::Vomit, args)
 
 /**
- * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ * if verbosity >= Verbosity::Warn, print a message with a yellow 'warning:' prefix.
  */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args &... args)

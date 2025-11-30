@@ -203,7 +203,8 @@ struct BuildEnvironment
             return *arr;
         } else if (auto assoc = std::get_if<Associative>(&value)) {
             Array assocKeys;
-            std::for_each(assoc->begin(), assoc->end(), [&](auto & n) { assocKeys.push_back(n.first); });
+            for (const auto & n : *assoc)
+                assocKeys.push_back(n.first);
             return assocKeys;
         } else
             throw Error("bash variable is not a string or array");
@@ -597,7 +598,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto script = makeRcScript(store, buildEnvironment, tmpDir);
 
-        if (verbosity >= lvlDebug)
+        if (verbosity >= Verbosity::Debug)
             script += "set -x\n";
 
         script += fmt("command rm -f '%s'\n", rcFilePath);

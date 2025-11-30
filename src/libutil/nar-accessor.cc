@@ -206,8 +206,8 @@ struct NarAccessor : public SourceAccessor
             throw Error("path '%1%' inside NAR file is not a directory", path);
 
         DirEntries res;
-        for (const auto & child : i.children)
-            res.insert_or_assign(child.first, std::nullopt);
+        for (const auto & [name, _] : i.children)
+            res.insert_or_assign(name, std::nullopt);
 
         return res;
     }

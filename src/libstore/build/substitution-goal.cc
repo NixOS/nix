@@ -234,7 +234,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
             Activity act(
                 *logger,
-                actSubstitute,
+                ActivityType::Substitute,
                 Logger::Fields{worker.store.printStorePath(storePath), sub->config.getHumanReadableURI()});
             PushActivity pact(act.id);
 
@@ -288,7 +288,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
     worker.markContentsGood(storePath);
 
-    printMsg(lvlChatty, "substitution of path '%s' succeeded", worker.store.printStorePath(storePath));
+    printMsg(Verbosity::Chatty, "substitution of path '%s' succeeded", worker.store.printStorePath(storePath));
 
     maintainRunningSubstitutions.reset();
 

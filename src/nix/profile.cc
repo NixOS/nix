@@ -14,6 +14,7 @@
 #include "nix/flake/url-name.hh"
 
 #include <nlohmann/json.hpp>
+#include <ranges>
 #include <regex>
 #include <iomanip>
 
@@ -43,7 +44,7 @@ struct ProfileElementSource
     }
 };
 
-const int defaultPriority = 5;
+constexpr int defaultPriority = 5;
 
 struct ProfileElement
 {
@@ -601,11 +602,8 @@ public:
             throw UsageError("No packages specified.");
         }
 
-        if (std::find_if(
-                _matchers.begin(),
-                _matchers.end(),
-                [](const ref<Matcher> & m) { return m.dynamic_pointer_cast<AllMatcher>(); })
-                != _matchers.end()
+        if (std::ranges::any_of(
+                _matchers, [](const ref<Matcher> & m) { return m.dynamic_pointer_cast<AllMatcher>() != nullptr; })
             && _matchers.size() > 1) {
             throw UsageError("--all cannot be used with package names or regular expressions.");
         }
@@ -720,7 +718,11 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
             upgradedCount++;
 
-            Activity act(*logger, lvlChatty, actUnknown, fmt("checking '%s' for updates", element.source->attrPath));
+            Activity act(
+                *logger,
+                Verbosity::Chatty,
+                ActivityType::Unknown,
+                fmt("checking '%s' for updates", element.source->attrPath));
 
             auto installable = make_ref<InstallableFlake>(
                 this,

@@ -218,8 +218,8 @@ StringSet Settings::getDefaultExtraPlatforms()
 
 #ifdef __linux__
     StringSet levels = computeLevels();
-    for (auto iter = levels.begin(); iter != levels.end(); ++iter)
-        extraPlatforms.insert(*iter + "-linux");
+    for (auto & level : levels)
+        extraPlatforms.insert(level + "-linux");
 #elif defined(__APPLE__)
     // Rosetta 2 emulation layer can run x86_64 binaries on aarch64
     // machines. Note that we can’t force processes from executing
@@ -272,20 +272,20 @@ std::string nixVersion = PACKAGE_VERSION;
 NLOHMANN_JSON_SERIALIZE_ENUM(
     SandboxMode,
     {
-        {SandboxMode::smEnabled, true},
-        {SandboxMode::smRelaxed, "relaxed"},
-        {SandboxMode::smDisabled, false},
+        {SandboxMode::Enabled, true},
+        {SandboxMode::Relaxed, "relaxed"},
+        {SandboxMode::Disabled, false},
     });
 
 template<>
 SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const
 {
     if (str == "true")
-        return smEnabled;
+        return SandboxMode::Enabled;
     else if (str == "relaxed")
-        return smRelaxed;
+        return SandboxMode::Relaxed;
     else if (str == "false")
-        return smDisabled;
+        return SandboxMode::Disabled;
     else
         throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
@@ -299,11 +299,11 @@ struct BaseSetting<SandboxMode>::trait
 template<>
 std::string BaseSetting<SandboxMode>::to_string() const
 {
-    if (value == smEnabled)
+    if (value == SandboxMode::Enabled)
         return "true";
-    else if (value == smRelaxed)
+    else if (value == SandboxMode::Relaxed)
         return "relaxed";
-    else if (value == smDisabled)
+    else if (value == SandboxMode::Disabled)
         return "false";
     else
         unreachable();
@@ -317,21 +317,21 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
         .aliases = aliases,
         .description = "Enable sandboxing.",
         .category = category,
-        .handler = {[this]() { override(smEnabled); }},
+        .handler = {[this]() { override(SandboxMode::Enabled); }},
     });
     args.addFlag({
         .longName = "no-" + name,
         .aliases = aliases,
         .description = "Disable sandboxing.",
         .category = category,
-        .handler = {[this]() { override(smDisabled); }},
+        .handler = {[this]() { override(SandboxMode::Disabled); }},
     });
     args.addFlag({
         .longName = "relaxed-" + name,
         .aliases = aliases,
         .description = "Enable sandboxing, but allow builds to disable it.",
         .category = category,
-        .handler = {[this]() { override(smRelaxed); }},
+        .handler = {[this]() { override(SandboxMode::Relaxed); }},
     });
 }
 

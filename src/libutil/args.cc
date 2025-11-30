@@ -276,7 +276,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         assert(n > 0 && n <= cmdline.size());
         *std::next(cmdline.begin(), n - 1) += completionMarker;
         completions = std::make_shared<Completions>();
-        verbosity = lvlError;
+        verbosity = Verbosity::Error;
     }
 
     // Heuristic to see if we're invoked as a shebang script, namely,
@@ -312,8 +312,8 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 }
                 cmdline.push_back(script);
                 commandBaseDir = dirOf(script);
-                for (auto pos = savedArgs.begin(); pos != savedArgs.end(); pos++)
-                    cmdline.push_back(*pos);
+                for (auto & arg : savedArgs)
+                    cmdline.push_back(arg);
             }
         } catch (SystemError &) {
         }
