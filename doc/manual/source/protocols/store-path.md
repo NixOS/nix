@@ -18,7 +18,7 @@ where
 
 - `name` = the name of the store object.
 
-- `store-dir` = the [store directory](@docroot@/store/store-path.md#store-directory)
+- `store-dir` = the [path of the store directory](@docroot@/store/store-path.md#store-directory-path)
 
 - `digest` = base-32 representation of the compressed to 160 bits [SHA-256] hash of `fingerprint`
 
