@@ -69,7 +69,7 @@ StorePaths importPaths(Store & store, Source & source, CheckSigsFlag checkSigs)
 
         auto path = store.parseStorePath(readString(source));
 
-        // Activity act(*logger, lvlInfo, "importing path '%s'", info.path);
+        // Activity act(*logger, Verbosity::Info, "importing path '%s'", info.path);
 
         auto references = CommonProto::Serialise<StorePathSet>::read(store, CommonProto::ReadConn{.from = source});
         auto deriver = readString(source);

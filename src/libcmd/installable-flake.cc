@@ -78,7 +78,7 @@ InstallableFlake::InstallableFlake(
 
 DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
-    Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
+    Activity act(*logger, Verbosity::Talkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
     auto attr = getCursor(*state);
 

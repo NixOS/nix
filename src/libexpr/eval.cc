@@ -795,7 +795,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
     if (error) {
         printError("%s\n", error->what());
 
-        if (trylevel > 0 && error->info().level != lvlInfo)
+        if (trylevel > 0 && error->info().level != Verbosity::Info)
             printError(
                 "This exception occurred in a 'tryEval' call. Use " ANSI_GREEN "--ignore-try" ANSI_NORMAL
                 " to skip these.\n");
@@ -2509,7 +2509,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             repair);
         allowPath(dstPath);
         srcToStore->try_emplace(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
+        printMsg(Verbosity::Chatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
         return dstPath;
     }();
 
@@ -3133,7 +3133,7 @@ Expr * EvalState::parseStdin()
     // NOTE this method (and parseExprFromString) must take care to *fully copy* their
     // input into their respective Pos::Origin until the parser stops overwriting its
     // input data.
-    // Activity act(*logger, lvlTalkative, "parsing standard input");
+    // Activity act(*logger, Verbosity::Talkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);

@@ -315,7 +315,7 @@ struct GitArchiveInputScheme : InputScheme
         });
 
         auto act = std::make_unique<Activity>(
-            *logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", input.to_string()));
+            *logger, Verbosity::Info, actUnknown, fmt("unpacking '%s' into the Git cache", input.to_string()));
 
         TarArchive archive{*source};
         auto tarballCache = settings.getTarballCache();

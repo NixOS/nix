@@ -147,7 +147,7 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
                 for (auto & b : i->toDerivedPaths())
                     pathsToBuild.push_back(b.path);
 
-            printMissing(store, pathsToBuild, lvlError);
+            printMissing(store, pathsToBuild, Verbosity::Error);
 
             if (json)
                 printJSON(derivedPathsToJSON(pathsToBuild, *store));

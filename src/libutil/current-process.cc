@@ -49,7 +49,7 @@ unsigned int getMaxCPU()
         if (quota != "max")
             return std::ceil(std::stoi(quota) / std::stof(period));
     } catch (Error &) {
-        ignoreExceptionInDestructor(lvlDebug);
+        ignoreExceptionInDestructor(Verbosity::Debug);
     }
 #endif
 
@@ -69,7 +69,7 @@ void setStackSize(size_t stackSize)
         if (limit.rlim_max < static_cast<rlim_t>(stackSize)) {
             if (getEnv("_NIX_TEST_NO_ENVIRONMENT_WARNINGS") != "1") {
                 logger->log(
-                    lvlWarn,
+                    Verbosity::Warn,
                     HintFmt(
                         "Stack size hard limit is %1%, which is less than the desired %2%. If possible, increase the hard limit, e.g. with 'ulimit -Hs %3%'.",
                         limit.rlim_max,
@@ -82,7 +82,7 @@ void setStackSize(size_t stackSize)
         limit.rlim_cur = requestedSize;
         if (setrlimit(RLIMIT_STACK, &limit) != 0) {
             logger->log(
-                lvlError,
+                Verbosity::Error,
                 HintFmt(
                     "Failed to increase stack size from %1% to %2% (desired: %3%, maximum allowed: %4%): %5%",
                     savedStackSize,

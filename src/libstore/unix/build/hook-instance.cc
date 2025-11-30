@@ -33,7 +33,7 @@ HookInstance::HookInstance()
     for (auto & arg : buildHookArgs)
         args.push_back(arg);
 
-    args.push_back(std::to_string(verbosity));
+    args.push_back(std::to_string(static_cast<int>(verbosity)));
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();

@@ -276,7 +276,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         assert(n > 0 && n <= cmdline.size());
         *std::next(cmdline.begin(), n - 1) += completionMarker;
         completions = std::make_shared<Completions>();
-        verbosity = lvlError;
+        verbosity = Verbosity::Error;
     }
 
     // Heuristic to see if we're invoked as a shebang script, namely,

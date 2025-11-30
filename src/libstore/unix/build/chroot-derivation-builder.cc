@@ -64,7 +64,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in '%1%'", chrootParentDir);
+        printMsg(Verbosity::Chatty, "setting up chroot environment in '%1%'", chrootParentDir);
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
             throw SysError("cannot create '%s'", chrootRootDir);

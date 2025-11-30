@@ -1382,7 +1382,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of %s", name);
+            printMsg(Verbosity::Talkative, "checking contents of %s", name);
             std::string hash =
                 hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
@@ -1407,7 +1407,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                     std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
-                printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
+                printMsg(Verbosity::Talkative, "checking contents of '%s'", printStorePath(i));
 
                 auto hashSink = HashSink(info->narHash.algo);
 

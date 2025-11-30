@@ -186,7 +186,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
                 addCommonSSHOpts(args);
                 if (socketPath != "")
                     args.insert(args.end(), {"-S", socketPath});
-                if (verbosity >= lvlChatty)
+                if (verbosity >= Verbosity::Chatty)
                     args.push_back("-v");
                 args.splice(args.end(), std::move(extraSshArgs));
                 args.push_back("--");
@@ -261,7 +261,7 @@ Path SSHMaster::startMaster()
                 throw SysError("duping over stdout");
 
             Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
-            if (verbosity >= lvlChatty)
+            if (verbosity >= Verbosity::Chatty)
                 args.push_back("-v");
             addCommonSSHOpts(args);
             auto env = createSSHEnv();

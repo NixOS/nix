@@ -211,38 +211,38 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 {
     std::string prefix;
     switch (einfo.level) {
-    case Verbosity::lvlError: {
+    case Verbosity::Error: {
         prefix = ANSI_RED "error";
         break;
     }
-    case Verbosity::lvlNotice: {
+    case Verbosity::Notice: {
         prefix = ANSI_RED "note";
         break;
     }
-    case Verbosity::lvlWarn: {
+    case Verbosity::Warn: {
         if (einfo.isFromExpr)
             prefix = ANSI_WARNING "evaluation warning";
         else
             prefix = ANSI_WARNING "warning";
         break;
     }
-    case Verbosity::lvlInfo: {
+    case Verbosity::Info: {
         prefix = ANSI_GREEN "info";
         break;
     }
-    case Verbosity::lvlTalkative: {
+    case Verbosity::Talkative: {
         prefix = ANSI_GREEN "talk";
         break;
     }
-    case Verbosity::lvlChatty: {
+    case Verbosity::Chatty: {
         prefix = ANSI_GREEN "chat";
         break;
     }
-    case Verbosity::lvlVomit: {
+    case Verbosity::Vomit: {
         prefix = ANSI_GREEN "vomit";
         break;
     }
-    case Verbosity::lvlDebug: {
+    case Verbosity::Debug: {
         prefix = ANSI_WARNING "debug";
         break;
     }

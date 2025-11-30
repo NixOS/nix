@@ -887,7 +887,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 continue;
             }
 
-            printMsg(lvlTalkative, "deleting unused link '%1%'", path);
+            printMsg(Verbosity::Talkative, "deleting unused link '%1%'", path);
 
             if (unlink(path.c_str()) == -1)
                 throw SysError("deleting '%1%'", path);

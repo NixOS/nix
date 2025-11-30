@@ -398,7 +398,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto checkDerivation =
             [&](const std::string & attrPath, Value & v, const PosIdx pos) -> std::optional<StorePath> {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking derivation %s", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking derivation %s", attrPath));
                 auto packageInfo = getDerivation(*state, v, false);
                 if (!packageInfo)
                     throw Error("flake attribute '%s' is not a derivation", attrPath);
@@ -407,7 +407,8 @@ struct CmdFlakeCheck : FlakeCommand
                     auto storePath = packageInfo->queryDrvPath();
                     if (storePath) {
                         logger->log(
-                            lvlInfo, fmt("derivation evaluated to %s", store->printStorePath(storePath.value())));
+                            Verbosity::Info,
+                            fmt("derivation evaluated to %s", store->printStorePath(storePath.value())));
                     }
                     return storePath;
                 }
@@ -422,7 +423,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking app '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking app '%s'", attrPath));
                 state->forceAttrs(v, pos, "");
                 if (auto attr = v.attrs()->get(state->symbols.create("type")))
                     state->forceStringNoCtx(*attr->value, attr->pos, "");
@@ -463,7 +464,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkOverlay = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking overlay '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking overlay '%s'", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda()) {
                     throw Error("overlay is not a function, but %s instead", showType(v));
@@ -480,7 +481,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkModule = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking NixOS module '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking NixOS module '%s'", attrPath));
                 state->forceValue(v, pos);
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the NixOS module '%s'", attrPath));
@@ -492,7 +493,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         checkHydraJobs = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking Hydra job '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking Hydra job '%s'", attrPath));
                 state->forceAttrs(v, pos, "");
 
                 if (state->isDerivation(v))
@@ -502,7 +503,7 @@ struct CmdFlakeCheck : FlakeCommand
                     state->forceAttrs(*attr.value, attr.pos, "");
                     auto attrPath2 = concatStrings(attrPath, ".", state->symbols[attr.name]);
                     if (state->isDerivation(*attr.value)) {
-                        Activity act(*logger, lvlInfo, actUnknown, fmt("checking Hydra job '%s'", attrPath2));
+                        Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking Hydra job '%s'", attrPath2));
                         checkDerivation(attrPath2, *attr.value, attr.pos);
                     } else
                         checkHydraJobs(attrPath2, *attr.value, attr.pos);
@@ -516,7 +517,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkNixOSConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking NixOS configuration '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking NixOS configuration '%s'", attrPath));
                 Bindings & bindings = Bindings::emptyBindings;
                 auto vToplevel = findAlongAttrPath(*state, "config.system.build.toplevel", bindings, v).first;
                 state->forceValue(*vToplevel, pos);
@@ -530,7 +531,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkTemplate = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking template '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking template '%s'", attrPath));
 
                 state->forceAttrs(v, pos, "");
 
@@ -563,7 +564,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto checkBundler = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking bundler '%s'", attrPath));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking bundler '%s'", attrPath));
                 state->forceValue(v, pos);
                 if (!v.isLambda())
                     throw Error("bundler must be a function");
@@ -575,13 +576,13 @@ struct CmdFlakeCheck : FlakeCommand
         };
 
         {
-            Activity act(*logger, lvlInfo, actUnknown, "evaluating flake");
+            Activity act(*logger, Verbosity::Info, actUnknown, "evaluating flake");
 
             auto vFlake = state->allocValue();
             flake::callFlake(*state, flake, *vFlake);
 
             enumerateOutputs(*state, *vFlake, [&](std::string_view name, Value & vOutput, const PosIdx pos) {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking flake output '%s'", name));
+                Activity act(*logger, Verbosity::Info, actUnknown, fmt("checking flake output '%s'", name));
 
                 try {
                     evalSettings.enableImportFromDerivation.setDefault(name != "hydraJobs");
@@ -811,7 +812,7 @@ struct CmdFlakeCheck : FlakeCommand
                     });
             }
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
+            Activity act(*logger, Verbosity::Info, actUnknown, fmt("running %d flake checks", toBuild.size()));
             auto results = store->buildPathsWithResults(toBuild);
 
             // Report build failures with attribute paths
@@ -838,7 +839,7 @@ struct CmdFlakeCheck : FlakeCommand
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
 
-        logger->log(lvlInfo, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
+        logger->log(Verbosity::Info, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
 
         if (!omittedSystems.empty()) {
             // TODO: empty system is not visible; render all as nix strings?
@@ -1238,7 +1239,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
             auto attrPathS = state->symbols.resolve(attrPath);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(
+                *logger, Verbosity::Info, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
 
             try {
                 auto recurse = [&]() {

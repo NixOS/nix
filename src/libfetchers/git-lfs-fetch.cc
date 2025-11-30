@@ -240,7 +240,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
 
         return objects;
     } catch (const nlohmann::json::parse_error & e) {
-        printMsg(lvlTalkative, "Full response: '%1%'", responseString);
+        printMsg(Verbosity::Talkative, "Full response: '%1%'", responseString);
         throw Error("response did not parse as json: %s", e.what());
     }
 }

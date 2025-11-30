@@ -8,7 +8,7 @@ void FunctionCallTrace::preFunctionCallHook(
 {
     auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
-    printMsg(lvlInfo, "function-trace entered %1% at %2%", state.positions[pos], ns.count());
+    printMsg(Verbosity::Info, "function-trace entered %1% at %2%", state.positions[pos], ns.count());
 }
 
 void FunctionCallTrace::postFunctionCallHook(
@@ -16,7 +16,7 @@ void FunctionCallTrace::postFunctionCallHook(
 {
     auto duration = std::chrono::high_resolution_clock::now().time_since_epoch();
     auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(duration);
-    printMsg(lvlInfo, "function-trace exited %1% at %2%", state.positions[pos], ns.count());
+    printMsg(Verbosity::Info, "function-trace exited %1% at %2%", state.positions[pos], ns.count());
 }
 
 } // namespace nix

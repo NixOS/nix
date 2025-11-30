@@ -798,10 +798,10 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
         startDaemon();
 
     /* Run the builder. */
-    printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
-    printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
+    printMsg(Verbosity::Chatty, "executing builder '%1%'", drv.builder);
+    printMsg(Verbosity::Chatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
     for (auto & i : drv.env)
-        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        printMsg(Verbosity::Vomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
 
     /* Create the log file. */
     miscMethods->openLogFile();
@@ -884,7 +884,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     }
 
     if (settings.preBuildHook != "") {
-        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
+        printMsg(Verbosity::Chatty, "executing pre-build hook '%1%'", settings.preBuildHook);
 
         enum BuildHookState { stBegin, stExtraChrootDirs };
 

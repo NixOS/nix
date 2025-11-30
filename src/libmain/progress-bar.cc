@@ -150,7 +150,8 @@ public:
     {
         auto state(state_.lock());
         if (state->suspensions == 0) {
-            log(lvlError, "nix::ProgressBar: resume() called without a matching preceding pause(). This is a bug.");
+            log(Verbosity::Error,
+                "nix::ProgressBar: resume() called without a matching preceding pause(). This is a bug.");
             return;
         } else {
             state->suspensions--;
@@ -320,7 +321,9 @@ public:
                 if (type == resPostBuildLogLine) {
                     suffix = " (post)> ";
                 }
-                log(*state, lvlInfo, ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
+                log(*state,
+                    Verbosity::Info,
+                    ANSI_FAINT + info.name.value_or("unnamed") + suffix + ANSI_NORMAL + lastLine);
             } else {
                 state->activities.erase(i->second);
                 info.lastLine = lastLine;

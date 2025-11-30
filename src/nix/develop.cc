@@ -597,7 +597,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         auto script = makeRcScript(store, buildEnvironment, tmpDir);
 
-        if (verbosity >= lvlDebug)
+        if (verbosity >= Verbosity::Debug)
             script += "set -x\n";
 
         script += fmt("command rm -f '%s'\n", rcFilePath);

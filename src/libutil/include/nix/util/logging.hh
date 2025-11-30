@@ -133,7 +133,7 @@ public:
 
     void log(std::string_view s)
     {
-        log(lvlInfo, s);
+        log(Verbosity::Info, s);
     }
 
     virtual void logEI(const ErrorInfo & ei) = 0;
@@ -206,7 +206,7 @@ struct Activity
 
     Activity(
         Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
-        : Activity(logger, lvlError, type, "", fields, parent) {};
+        : Activity(logger, Verbosity::Error, type, "", fields, parent) {};
 
     Activity(const Activity & act) = delete;
 
@@ -315,8 +315,8 @@ extern Verbosity verbosity;
         }                                      \
     } while (0)
 
-#define logError(errorInfo...) logErrorInfo(lvlError, errorInfo)
-#define logWarning(errorInfo...) logErrorInfo(lvlWarn, errorInfo)
+#define logError(errorInfo...) logErrorInfo(Verbosity::Error, errorInfo)
+#define logWarning(errorInfo...) logErrorInfo(Verbosity::Warn, errorInfo)
 
 /**
  * Print a string message if the current log level is at least the specified
@@ -332,15 +332,15 @@ extern Verbosity verbosity;
     } while (0)
 #define printMsg(level, args...) printMsgUsing(logger, level, args)
 
-#define printError(args...) printMsg(lvlError, args)
-#define notice(args...) printMsg(lvlNotice, args)
-#define printInfo(args...) printMsg(lvlInfo, args)
-#define printTalkative(args...) printMsg(lvlTalkative, args)
-#define debug(args...) printMsg(lvlDebug, args)
-#define vomit(args...) printMsg(lvlVomit, args)
+#define printError(args...) printMsg(Verbosity::Error, args)
+#define notice(args...) printMsg(Verbosity::Notice, args)
+#define printInfo(args...) printMsg(Verbosity::Info, args)
+#define printTalkative(args...) printMsg(Verbosity::Talkative, args)
+#define debug(args...) printMsg(Verbosity::Debug, args)
+#define vomit(args...) printMsg(Verbosity::Vomit, args)
 
 /**
- * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ * if verbosity >= Verbosity::Warn, print a message with a yellow 'warning:' prefix.
  */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args &... args)

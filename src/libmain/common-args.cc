@@ -19,23 +19,21 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .shortName = 'v',
         .description = "Increase the logging verbosity level.",
         .category = loggingCategory,
-        .handler = {[]() {
-            verbosity = (Verbosity) std::min<std::underlying_type_t<Verbosity>>(verbosity + 1, lvlVomit);
-        }},
+        .handler = {[]() { ++verbosity; }},
     });
 
     addFlag({
         .longName = "quiet",
         .description = "Decrease the logging verbosity level.",
         .category = loggingCategory,
-        .handler = {[]() { verbosity = verbosity > lvlError ? (Verbosity) (verbosity - 1) : lvlError; }},
+        .handler = {[]() { --verbosity; }},
     });
 
     addFlag({
         .longName = "debug",
         .description = "Set the logging verbosity level to 'debug'.",
         .category = loggingCategory,
-        .handler = {[]() { verbosity = lvlDebug; }},
+        .handler = {[]() { verbosity = Verbosity::Debug; }},
     });
 
     addFlag({

@@ -584,7 +584,7 @@ static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const
                 if (!failedResult->second->errorMsg.empty()) {
                     logError(
                         ErrorInfo{
-                            .level = lvlError,
+                            .level = Verbosity::Error,
                             .msg = failedResult->second->errorMsg,
                         });
                 }
@@ -623,7 +623,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     case Realise::Nothing:
     case Realise::Derivation:
-        printMissing(store, pathsToBuild, lvlError);
+        printMissing(store, pathsToBuild, Verbosity::Error);
 
         for (auto & path : pathsToBuild) {
             for (auto & aux : backmap[path]) {
@@ -653,7 +653,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     case Realise::Outputs: {
         if (settings.printMissing)
-            printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, Verbosity::Info);
 
         auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
         throwBuildErrors(buildResults, *store);

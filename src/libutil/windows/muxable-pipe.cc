@@ -34,7 +34,7 @@ void MuxablePipePollState::iterate(
         ++nextp;
         for (ULONG i = 0; i < removed; i++) {
             if (oentries[i].lpCompletionKey == ((ULONG_PTR) ((*p)->readSide.get()) ^ 0x5555)) {
-                printMsg(lvlVomit, "read %s bytes", oentries[i].dwNumberOfBytesTransferred);
+                printMsg(Verbosity::Vomit, "read %s bytes", oentries[i].dwNumberOfBytesTransferred);
                 if (oentries[i].dwNumberOfBytesTransferred > 0) {
                     std::string data{
                         (char *) (*p)->buffer.data(),

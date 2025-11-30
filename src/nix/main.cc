@@ -427,9 +427,9 @@ void mainWrapped(int argc, char ** argv)
 
     // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
     if (nix::isTTY()) {
-        verbosity = lvlNotice;
+        verbosity = Verbosity::Notice;
     } else {
-        verbosity = lvlInfo;
+        verbosity = Verbosity::Info;
     }
 
     NixArgs args;

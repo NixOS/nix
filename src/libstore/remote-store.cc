@@ -106,9 +106,10 @@ void RemoteStore::initConnection(Connection & conn)
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.keepGoing << settings.tryFallback
-            << verbosity << settings.maxBuildJobs << settings.maxSilentTime << true
-            << (settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
-            << 0                                                  /* obsolete print build trace */
+            << static_cast<uint64_t>(verbosity) << settings.maxBuildJobs << settings.maxSilentTime << true
+            << static_cast<uint64_t>(settings.verboseBuild ? Verbosity::Error : Verbosity::Vomit)
+            << 0 // obsolete log type
+            << 0 /* obsolete print build trace */
             << settings.buildCores << settings.useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;

@@ -33,7 +33,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
             else if (*arg == "--include-outputs")
                 includeOutputs = true;
             else if (*arg == "--show-progress")
-                printMsg(lvlError, "Warning: '--show-progress' is not implemented");
+                printMsg(Verbosity::Error, "Warning: '--show-progress' is not implemented");
             else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--use-substitutes" || *arg == "-s")
