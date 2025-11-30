@@ -16,7 +16,7 @@ Concretely, this would cause a "mass rebuild" whenever any fetching detail chang
 To solve this problem, we compute output hashes differently, so that certain output hashes become identical.
 We call this concept quotient hashing, in reference to quotient types or sets.
 
-So how do we compute the hash part of the output paths of an input-addressed derivation?
+So how do we compute the [hash part](@docroot@/store/store-path.md#digest) of the output paths of an input-addressed derivation?
 This is done by the function `hashQuotientDerivation`, shown below.
 
 First, a word on inputs.

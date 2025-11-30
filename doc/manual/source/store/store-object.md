@@ -66,3 +66,9 @@ A store can only contain a store object if it also contains all the store object
 >
 > The "closure property" isn't meant to prohibit, for example, [lazy loading](https://en.wikipedia.org/wiki/Lazy_loading) of store objects.
 > However, the "closure property" and immutability in conjunction imply that any such lazy loading ought to be deterministic.
+
+### Store Object Metadata {#metadata}
+
+[Store implementations](@docroot@/store/types/index.md) currently associate more information than described above with a store object.
+Quite arguably some of this information doesn't belong here, because it conflates concerns.
+For details see the [store object info](@docroot@/protocols/json/store-object-info.md) JSON format or the [narinfo](@docroot@/protocols/binary-cache/narinfo.md) format.

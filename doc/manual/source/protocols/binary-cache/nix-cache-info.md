@@ -1,6 +1,6 @@
-# Nix Cache Info Format
+# `nix-cache-info` Format
 
-The `nix-cache-info` file is a metadata file at the root of a [binary cache](@docroot@/package-management/binary-cache-substituter.md) (e.g., `https://cache.example.com/nix-cache-info`).
+The `nix-cache-info` file is a metadata file at the root of a [binary cache](@docroot@/protocols/binary-cache/index.md) (e.g., `https://cache.example.com/nix-cache-info`).
 
 MIME type: `text/x-nix-cache-info`
 

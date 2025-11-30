@@ -165,7 +165,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
   >
   > for an Autoconf-style package.
 
-  The name of an output is combined with the name of the derivation to create the name part of the output's store path, unless it is `out`, in which case just the name of the derivation is used.
+  The name of an output is combined with the name of the derivation to create the [name part](@docroot@/store/store-path.md#name) of the output's store path, unless it is `out`, in which case just the name of the derivation is used.
 
   > **Example**
   >

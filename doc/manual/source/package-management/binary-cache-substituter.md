@@ -19,7 +19,7 @@ whatever port you like:
 $ nix-serve -p 8080
 ```
 
-To check whether it works, try fetching the [`nix-cache-info`](@docroot@/protocols/nix-cache-info.md) file on the client:
+To check whether it works, try fetching the [`nix-cache-info`](@docroot@/protocols/binary-cache/nix-cache-info.md) file on the client:
 
 ```console
 $ curl http://avalon:8080/nix-cache-info
@@ -28,7 +28,7 @@ WantMassQuery: 1
 Priority: 30
 ```
 
-When writing to a binary cache (e.g., with [`nix copy`](@docroot@/command-ref/new-cli/nix3-copy.md)), Nix creates [`nix-cache-info`](@docroot@/protocols/nix-cache-info.md) automatically if it doesn't exist.
+When writing to a binary cache (e.g., with [`nix copy`](@docroot@/command-ref/new-cli/nix3-copy.md)), Nix creates [`nix-cache-info`](@docroot@/protocols/binary-cache/nix-cache-info.md) automatically if it doesn't exist.
 
 On the client side, you can tell Nix to use your binary cache using
 `--substituters`, e.g.:

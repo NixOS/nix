@@ -32,7 +32,7 @@ Otherwise, the file is downloaded, and an error is signaled if the
 actual hash of the file does not match the specified hash.
 
 This command prints the hash on standard output.
-The hash is printed using base-32 unless `--type md5` is specified,
+The hash is printed using [Nix32](@docroot@/protocols/nix32.md) unless `--type md5` is specified,
 in which case it's printed using base-16.
 Additionally, if the option `--print-path` is used,
 the path of the downloaded file in the Nix store is also printed.

@@ -104,7 +104,7 @@
 
   A derivation can be thought of as a [pure function](https://en.wikipedia.org/wiki/Pure_function) that produces new [store objects][store object] from existing store objects.
 
-  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md#builder-execution).
+  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md).
   This sandbox by default only allows reading from store objects specified as inputs, and only allows writing to designated [outputs][output] to be [captured as store objects](@docroot@/store/building.md#processing-outputs).
 
   A derivation is typically specified as a [derivation expression] in the [Nix language], and [instantiated][instantiate] to a [store derivation].
@@ -374,6 +374,13 @@
   [string]: ./language/types.md#type-string
   [path]: ./language/types.md#type-path
   [attribute name]: ./language/types.md#type-attrs
+
+- [SRI]{#gloss-sri}
+
+  [Subresource Integrity](https://www.w3.org/TR/SRI/) (SRI) is a [W3C specification](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) for integrity metadata.
+  Nix uses the SRI hash format (`<algorithm>-<Base64 hash>`) to specify content hashes in a way that is self-describing, since the hash algorithm is part of the format.
+
+  [SRI]: #gloss-sri
 
 - [substitute]{#gloss-substitute}
 
