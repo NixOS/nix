@@ -151,11 +151,6 @@ static void fetchTree(
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
-        // fetchTree should fetch git repos with shallow = true by default
-        if (type == "git" && !params.isFetchGit && !attrs.contains("shallow")) {
-            attrs.emplace("shallow", Explicit<bool>{true});
-        }
-
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>("argument 'name' isn’t supported in call to '%s'", fetcher)
