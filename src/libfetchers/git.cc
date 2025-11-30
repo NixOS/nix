@@ -682,7 +682,7 @@ struct GitInputScheme : InputScheme
                     auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
                                     : input.getRev()                  ? input.getRev()->gitRev()
                                     : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
-                                    : ref == "HEAD"                   ? ref
+                                    : ref == "HEAD"                   ? "HEAD:HEAD"
                                                                       : fmt("%1%:%1%", "refs/heads/" + ref);
 
                     repo->fetch(repoUrl.to_string(), fetchRef, shallow);
