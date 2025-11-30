@@ -255,8 +255,12 @@ void LocalStore::optimisePath_(
     try {
         std::filesystem::rename(tempLink, path);
     } catch (std::filesystem::filesystem_error & e) {
-        std::filesystem::remove(tempLink);
-        printError("unable to unlink %1%", tempLink);
+        {
+            std::error_code ec;
+            remove(tempLink, ec); /* Clean up after ourselves. */
+            if (ec)
+                printError("unable to unlink %1%: %2%", tempLink, ec.message());
+        }
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
