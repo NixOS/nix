@@ -2986,6 +2986,13 @@ static RegisterPrimOp primop_attrNames({
       Return the names of the attributes in the set *set* in an
       alphabetically sorted list. For instance, `builtins.attrNames { y
       = 1; x = "foo"; }` evaluates to `[ "x" "y" ]`.
+
+      # Time Complexity
+
+      - O(n) best case (attribute set already sorted)
+      - O(n log n) worst case (requires sorting), where:
+
+      n = number of attributes in the set
     )",
     .fun = prim_attrNames,
 });
@@ -3018,6 +3025,13 @@ static RegisterPrimOp primop_attrValues({
     .doc = R"(
       Return the values of the attributes in the set *set* in the order
       corresponding to the sorted attribute names.
+
+      # Time Complexity
+
+      - O(n) best case (attribute set already sorted)
+      - O(n log n) worst case (requires sorting), where:
+
+      n = number of attributes in the set
     )",
     .fun = prim_attrValues,
 });
@@ -3043,6 +3057,10 @@ static RegisterPrimOp primop_getAttr({
       aborts if the attribute doesn’t exist. This is a dynamic version of
       the `.` operator, since *s* is an expression rather than an
       identifier.
+
+      # Time Complexity
+
+      O(log n) where n = number of attributes in the set
     )",
     .fun = prim_getAttr,
 });
@@ -3131,6 +3149,10 @@ static RegisterPrimOp primop_hasAttr({
       `hasAttr` returns `true` if *set* has an attribute named *s*, and
       `false` otherwise. This is a dynamic version of the `?` operator,
       since *s* is an expression rather than an identifier.
+
+      # Time Complexity
+
+      O(log n) where n = number of attributes in the set
     )",
     .fun = prim_hasAttr,
 });
@@ -3190,6 +3212,13 @@ static RegisterPrimOp primop_removeAttrs({
       ```
 
       evaluates to `{ y = 2; }`.
+
+      # Time Complexity
+
+      O(n + k log k) where:
+
+      n = number of attributes in input set
+      k = number of attribute names to remove
     )",
     .fun = prim_removeAttrs,
 });
@@ -3277,6 +3306,10 @@ static RegisterPrimOp primop_listToAttrs({
       ```nix
       { foo = 123; bar = 456; }
       ```
+
+      # Time Complexity
+
+      O(n log n) where n = number of list elements
     )",
     .fun = prim_listToAttrs,
 });
@@ -3353,7 +3386,12 @@ static RegisterPrimOp primop_intersectAttrs({
       Return a set consisting of the attributes in the set *e2* which have the
       same name as some attribute in *e1*.
 
-      Performs in O(*n* log *m*) where *n* is the size of the smaller set and *m* the larger set's size.
+      # Time Complexity
+
+      O(n * log m) where:
+
+      n = number of attributes in the smaller set
+      m = number of attributes in the larger set
     )",
     .fun = prim_intersectAttrs,
 });
@@ -3393,6 +3431,13 @@ static RegisterPrimOp primop_catAttrs({
       ```
 
       evaluates to `[1 2]`.
+
+      # Time Complexity
+
+      O(n * log m) where:
+
+      n = number of sets in input list
+      m = average number of attributes per set
     )",
     .fun = prim_catAttrs,
 });
@@ -3436,6 +3481,10 @@ static RegisterPrimOp primop_functionArgs({
       "Formal argument" here refers to the attributes pattern-matched by
       the function. Plain lambdas are not included, e.g. `functionArgs (x:
       ...) = { }`.
+
+      # Time Complexity
+
+      O(n) where n = number of formal arguments
     )",
     .fun = prim_functionArgs,
 });
@@ -3468,6 +3517,13 @@ static RegisterPrimOp primop_mapAttrs({
       ```
 
       evaluates to `{ a = 10; b = 20; }`.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = number of attributes
+      T_f = function evaluation time
     )",
     .fun = prim_mapAttrs,
 });
@@ -3555,6 +3611,15 @@ static RegisterPrimOp primop_zipAttrsWith({
         b = { name = "b"; values = [ "z" ]; };
       }
       ```
+
+      # Time Complexity
+
+      O(n * k * log k) worst case, where:
+
+      n = number of attribute sets in input list
+      k = number of unique keys across all sets
+
+      More precisely: O(n * m * log k) where m ≤ k is average number of attributes per set
     )",
     .fun = prim_zipAttrsWith,
 });
@@ -3620,6 +3685,10 @@ static RegisterPrimOp primop_head({
       Return the first element of a list; abort evaluation if the argument
       isn’t a list or is an empty list. You can test whether a list is
       empty by comparing it with `[]`.
+
+      # Time Complexity
+
+      O(1)
     )",
     .fun = prim_head,
 });
@@ -3651,6 +3720,10 @@ static RegisterPrimOp primop_tail({
       > This function should generally be avoided since it's inefficient:
       > unlike Haskell's `tail`, it takes O(n) time, so recursing over a
       > list by repeatedly calling `tail` takes O(n^2) time.
+
+      # Time Complexity
+
+      O(n) where n = list length (must copy n-1 elements)
     )",
     .fun = prim_tail,
 });
@@ -3685,6 +3758,13 @@ static RegisterPrimOp primop_map({
       ```
 
       evaluates to `[ "foobar" "foobla" "fooabc" ]`.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = list length
+      T_f = function evaluation time
     )",
     .fun = prim_map,
 });
@@ -3734,6 +3814,13 @@ static RegisterPrimOp primop_filter({
     .doc = R"(
       Return a list consisting of the elements of *list* for which the
       function *f* returns `true`.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = list length
+      T_f = predicate evaluation time
     )",
     .fun = prim_filter,
 });
@@ -3757,6 +3844,15 @@ static RegisterPrimOp primop_elem({
     .doc = R"(
       Return `true` if a value equal to *x* occurs in the list *xs*, and
       `false` otherwise.
+
+      # Time Complexity
+
+      O(n * T) (worst case) where:
+
+      n = list length
+      T = time to compare average element
+
+      returns early if the elements is found
     )",
     .fun = prim_elem,
 });
@@ -3779,6 +3875,13 @@ static RegisterPrimOp primop_concatLists({
     .args = {"lists"},
     .doc = R"(
       Concatenate a list of lists into a single list.
+
+      # Time Complexity
+
+      O(k + N) where:
+
+      k = number of input lists
+      N = total number of elements across all lists
     )",
     .fun = prim_concatLists,
 });
@@ -3795,6 +3898,10 @@ static RegisterPrimOp primop_length({
     .args = {"e"},
     .doc = R"(
       Return the length of the list *e*.
+
+      # Time Complexity
+
+      O(1)
     )",
     .fun = prim_length,
 });
@@ -3838,6 +3945,13 @@ static RegisterPrimOp primop_foldlStrict({
       argument is the current element being processed. The return value
       of each application of `op` is evaluated immediately, even for
       intermediate values.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = list length
+      T_f = fold function evaluation time
     )",
     .fun = prim_foldlStrict,
 });
@@ -3876,6 +3990,15 @@ static RegisterPrimOp primop_any({
     .doc = R"(
       Return `true` if the function *pred* returns `true` for at least one
       element of *list*, and `false` otherwise.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      - n = list length
+      - T_f = predicate evaluation time
+
+      returns early when predicate returns true
     )",
     .fun = prim_any,
 });
@@ -3891,6 +4014,13 @@ static RegisterPrimOp primop_all({
     .doc = R"(
       Return `true` if the function *pred* returns `true` for all elements
       of *list*, and `false` otherwise.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      - n = list length
+      - T_f = predicate evaluation time
     )",
     .fun = prim_all,
 });
@@ -3929,6 +4059,13 @@ static RegisterPrimOp primop_genList({
       ```
 
       returns the list `[ 0 1 4 9 16 ]`.
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = requested length
+      T_f = generator function evaluation time
     )",
     .fun = prim_genList,
 });
@@ -4023,6 +4160,14 @@ static RegisterPrimOp primop_sort({
 
       If the *comparator* violates any of these properties, then `builtins.sort`
       reorders elements in an unspecified manner.
+
+      # Time Complexity
+
+      O(n log n * T_cmp) worst case
+      O(n * T_cmp) best case (input already sorted), where:
+
+      n = list length
+      T_cmp = comparator evaluation time
     )",
     .fun = prim_sort,
 });
@@ -4084,6 +4229,13 @@ static RegisterPrimOp primop_partition({
       ```nix
       { right = [ 23 42 ]; wrong = [ 1 9 3 ]; }
       ```
+
+      # Time Complexity
+
+      O(n * T_f) where:
+
+      n = list length
+      T_f = predicate evaluation time
     )",
     .fun = prim_partition,
 });
@@ -4137,6 +4289,14 @@ static RegisterPrimOp primop_groupBy({
       ```nix
       { b = [ "bar" "baz" ]; f = [ "foo" ]; }
       ```
+
+      # Time Complexity
+
+      O(N * T_f + N * log k) where:
+
+      N = number of list elements
+      T_f = grouping function evaluation time
+      k = number of unique groups
     )",
     .fun = prim_groupBy,
 });
@@ -4179,6 +4339,14 @@ static RegisterPrimOp primop_concatMap({
     .doc = R"(
       This function is equivalent to `builtins.concatLists (map f list)`
       but is more efficient.
+
+      # Time Complexity
+
+      O(k * T_f + N) where:
+
+      k = length of input list
+      T_f = time to evaluate function on each element
+      N = total elements in all output lists
     )",
     .fun = prim_concatMap,
 });
@@ -4875,6 +5043,10 @@ static RegisterPrimOp primop_concatStringsSep({
       Concatenate a list of strings with a separator between each
       element, e.g. `concatStringsSep "/" ["usr" "local" "bin"] ==
       "usr/local/bin"`.
+
+      # Time Complexity
+
+      O(n) where n = total length of output string
     )",
     .fun = prim_concatStringsSep,
 });
@@ -4959,6 +5131,14 @@ static RegisterPrimOp primop_replaceStrings({
       ```
 
       evaluates to `"fabir"`.
+
+      # Time Complexity
+
+      O(n * k * c) where:
+
+      n = length of input string
+      k = number of replacement patterns
+      c = average length of patterns in 'from' list
     )",
     .fun = prim_replaceStrings,
 });
