@@ -337,7 +337,7 @@
         "string-literal": "string-literals.html"
     },
     "language/derivations.html": {
-        "builder-execution": "../store/building.html#builder-execution"
+        "builder-execution": "../store/building.html"
     },
     "installation/installing-binary.html": {
         "linux": "uninstall.html#linux",
