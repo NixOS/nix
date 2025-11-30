@@ -101,7 +101,7 @@ struct curlFileTransfer : public FileTransfer
             , act(*logger,
                   lvlTalkative,
                   actFileTransfer,
-                  fmt("%sing '%s'", request.verb(), request.uri),
+                  fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
                   {request.uri.to_string()},
                   request.parentAct)
             , callback(std::move(callback))
@@ -166,7 +166,7 @@ struct curlFileTransfer : public FileTransfer
                 std::rethrow_exception(ex);
             } catch (nix::Error & e) {
                 /* Add more context to the error message. */
-                e.addTrace({}, "during %s of '%s'", Uncolored(request.verb()), request.uri.to_string());
+                e.addTrace({}, "during %s of '%s'", Uncolored(request.noun()), request.uri.to_string());
             } catch (...) {
                 /* Can't add more context to the error. */
             }
@@ -510,7 +510,7 @@ struct curlFileTransfer : public FileTransfer
 
             debug(
                 "finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
-                request.verb(),
+                request.noun(),
                 request.uri,
                 code,
                 httpStatus,
@@ -610,7 +610,7 @@ struct curlFileTransfer : public FileTransfer
                                                                                        Interrupted,
                                                                                        std::move(response),
                                                                                        "%s of '%s' was interrupted",
-                                                                                       request.verb(),
+                                                                                       request.noun(),
                                                                                        request.uri)
                            : httpStatus != 0
                                ? FileTransferError(
@@ -845,7 +845,7 @@ struct curlFileTransfer : public FileTransfer
             }
 
             for (auto & item : incoming) {
-                debug("starting %s of %s", item->request.verb(), item->request.uri);
+                debug("starting %s of %s", item->request.noun(), item->request.uri);
                 item->init();
                 curl_multi_add_handle(curlm, item->req);
                 item->active = true;

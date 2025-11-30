@@ -169,11 +169,25 @@ struct FileTransferRequest
     }
 
     /**
-     * Returns the verb root for logging purposes.
-     * The returned string is intended to be concatenated with "ing" to form the gerund,
-     * e.g., "download" + "ing" -> "downloading", "upload" + "ing" -> "uploading".
+     * Returns the method description for logging purposes.
      */
-    std::string verb() const
+    std::string verb(bool continuous = false) const
+    {
+        switch (method) {
+        case HttpMethod::Head:
+        case HttpMethod::Get:
+            return continuous ? "downloading" : "download";
+        case HttpMethod::Put:
+        case HttpMethod::Post:
+            assert(data);
+            return continuous ? "uploading" : "upload";
+        case HttpMethod::Delete:
+            return continuous ? "deleting" : "delete";
+        }
+        unreachable();
+    }
+
+    std::string noun() const
     {
         switch (method) {
         case HttpMethod::Head:
@@ -184,7 +198,7 @@ struct FileTransferRequest
             assert(data);
             return "upload";
         case HttpMethod::Delete:
-            return "delet";
+            return "deletion";
         }
         unreachable();
     }
