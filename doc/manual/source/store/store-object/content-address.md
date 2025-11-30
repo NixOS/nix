@@ -9,7 +9,7 @@ In particular, the content-addressing scheme will ensure that the digest of the 
 
 - file system object graph (the root one and its children, if it has any)
 - references
-- [store directory](../store-path.md#store-directory)
+- [store directory path](../store-path.md#store-directory-path)
 - name
 
 of the store object, and not any other information, which would not be an intrinsic property of that store object.
