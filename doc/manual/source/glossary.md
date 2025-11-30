@@ -35,7 +35,7 @@
 
   A derivation can be thought of as a [pure function](https://en.wikipedia.org/wiki/Pure_function) that produces new [store objects][store object] from existing store objects.
 
-  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md#builder-execution).
+  Derivations are implemented as [operating system processes that run in a sandbox](@docroot@/store/building.md).
   This sandbox by default only allows reading from store objects specified as inputs, and only allows writing to designated [outputs][output] to be [captured as store objects](@docroot@/store/building.md#processing-outputs).
 
   A derivation is typically specified as a [derivation expression] in the [Nix language], and [instantiated][instantiate] to a [store derivation].
