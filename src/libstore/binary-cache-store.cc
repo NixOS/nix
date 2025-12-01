@@ -79,8 +79,8 @@ std::optional<std::string> BinaryCacheStore::getNixCacheInfo()
 void BinaryCacheStore::upsertFile(
     const std::string & path, std::string && data, const std::string & mimeType, uint64_t sizeHint)
 {
-    auto source = restartableSourceFromFactory([data = std::move(data)]() { return make_unique<StringSource>(data); });
-    upsertFile(path, *source, mimeType, sizeHint);
+    StringSource source{data};
+    upsertFile(path, source, mimeType, sizeHint);
 }
 
 void BinaryCacheStore::getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept
@@ -140,9 +140,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs, std::function<ValidPathInfo(HashResult)> mkInfo)
 {
-    auto [fdTemp, fnTemp] = createTempFile();
-
-    AutoDelete autoDelete(fnTemp);
+    auto fdTemp = createAnonymousTempFile();
 
     auto now1 = std::chrono::steady_clock::now();
 
@@ -272,19 +270,10 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     /* Atomically write the NAR file. */
     if (repair || !fileExists(narInfo->url)) {
-        auto source = restartableSourceFromFactory([fnTemp]() {
-            struct AutoCloseFDSource : AutoCloseFD, FdSource
-            {
-                AutoCloseFDSource(AutoCloseFD fd)
-                    : AutoCloseFD(std::move(fd))
-                    , FdSource(get())
-                {
-                }
-            };
-            return std::make_unique<AutoCloseFDSource>(toDescriptor(open(fnTemp.c_str(), O_RDONLY)));
-        });
+        FdSource source{fdTemp.get()};
+        source.restart(); /* Seek back to the start of the file. */
         stats.narWrite++;
-        upsertFile(narInfo->url, *source, "application/x-nix-nar", narInfo->fileSize);
+        upsertFile(narInfo->url, source, "application/x-nix-nar", narInfo->fileSize);
     } else
         stats.narWriteAverted++;
 

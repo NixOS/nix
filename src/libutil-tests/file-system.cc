@@ -381,4 +381,37 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 
 #endif
 
+/* ----------------------------------------------------------------------------
+ * createAnonymousTempFile
+ * --------------------------------------------------------------------------*/
+
+TEST(createAnonymousTempFile, works)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "test");
+    lseek(fd.get(), 0, SEEK_SET);
+    FdSource source{fd.get()};
+    EXPECT_EQ(source.drain(), "test");
+    lseek(fd.get(), 0, SEEK_END);
+    writeFull(fd.get(), "test");
+    lseek(fd.get(), 0, SEEK_SET);
+    EXPECT_EQ(source.drain(), "testtest");
+}
+
+/* ----------------------------------------------------------------------------
+ * FdSource
+ * --------------------------------------------------------------------------*/
+
+TEST(FdSource, restartWorks)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "hello world");
+    lseek(fd.get(), 0, SEEK_SET);
+    FdSource source{fd.get()};
+    EXPECT_EQ(source.drain(), "hello world");
+    source.restart();
+    EXPECT_EQ(source.drain(), "hello world");
+    EXPECT_EQ(source.drain(), "");
+}
+
 } // namespace nix
