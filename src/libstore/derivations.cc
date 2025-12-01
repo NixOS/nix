@@ -891,7 +891,12 @@ static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPa
 
 bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs)
 {
-    if (!structuredAttrs.contains("__meta"))
+    auto metaIt = structuredAttrs.find("__meta");
+    if (metaIt == structuredAttrs.end())
+        return false;
+
+    // Validate that __meta is an object
+    if (!metaIt->second.is_object())
         return false;
 
     if (auto it = structuredAttrs.find("requiredSystemFeatures");

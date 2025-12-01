@@ -180,8 +180,10 @@ struct DerivationOptions
      * Metadata excluded from hash computation. Only populated when both
      * `__meta` and `derivation-meta` system feature are present.
      * Otherwise `__meta` remains in structured attributes as a regular attribute.
+     *
+     * Must be a JSON object (not a string, array, or other JSON type).
      */
-    std::optional<nlohmann::json> meta;
+    std::optional<nlohmann::json::object_t> meta;
 
     bool operator==(const DerivationOptions &) const = default;
 
