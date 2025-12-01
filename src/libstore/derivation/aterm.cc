@@ -21,6 +21,106 @@ namespace nix {
 namespace derivation {
 
 /* --------------------------------------------------------------------------
+   Meta extraction / reinjection
+
+   Meta is embedded into structuredAttrs `__meta` for serialisation only.
+
+   `derivationModulo` only sees a cleared out version of the derivation.
+   Meta lives on the `Derivation` template body but is *never* copied into
+   `HashModuloInputs` intermediates (see `derivationModulo`), so the hash-
+   modulo path structurally cannot see it. The public `unparse` and wire
+   `write` reinject `__meta` and the `derivation-meta` requiredSystemFeature
+   back into `structuredAttrs` right before serialisation.
+   -------------------------------------------------------------------------- */
+
+bool hasMetaFeature(const nlohmann::json::object_t & structuredAttrs)
+{
+    auto metaIt = structuredAttrs.find("__meta");
+    if (metaIt == structuredAttrs.end() || !metaIt->second.is_object())
+        return false;
+
+    auto rsfIt = structuredAttrs.find("requiredSystemFeatures");
+    if (rsfIt == structuredAttrs.end() || !rsfIt->second.is_array())
+        return false;
+
+    for (const auto & feature : rsfIt->second)
+        if (feature.is_string() && feature.get<std::string>() == "derivation-meta")
+            return true;
+
+    return false;
+}
+
+template<typename Inputs, typename Out>
+void extractMeta(Derivation<Inputs, Out> & drv, const ExperimentalFeatureSettings & xpSettings)
+{
+    if (!drv.structuredAttrs)
+        return;
+
+    auto & sa = drv.structuredAttrs->structuredAttrs;
+    if (!hasMetaFeature(sa))
+        return;
+
+    // Responsibility of the caller to call it only once, and on a raw derivation.
+    if (drv.meta)
+        panic("extractMeta: 'meta' already set while '__meta' is still present");
+
+    xpSettings.require(Xp::DerivationMeta);
+
+    /* We require `requiredSystemFeatures` to be sorted (and duplicate-free), so
+       that we can splice `derivation-meta` back into the same slot in
+       `unparse`/`write` without storing the original position. This requirement
+       ensures low entropy for everyone involved, and a simpler, more robust
+       implementation. The same check runs on the clean list in `checkInvariants`;
+       here it runs on the encoded list that still contains `derivation-meta`. */
+    auto & requiredSystemFeatures = sa.at("requiredSystemFeatures");
+    checkCanonicalRequiredSystemFeatures(drv.name, requiredSystemFeatures, "when using 'derivation-meta'");
+
+    drv.meta = sa.at("__meta").template get<nlohmann::json::object_t>();
+    sa.erase("__meta");
+
+    auto filtered = nlohmann::json::array();
+    for (const auto & feature : requiredSystemFeatures)
+        if (!(feature.is_string() && feature.template get<std::string>() == "derivation-meta"))
+            filtered.push_back(feature);
+    if (filtered.empty())
+        sa.erase("requiredSystemFeatures");
+    else
+        requiredSystemFeatures = std::move(filtered);
+}
+
+template void extractMeta<FullInputs, Output>(Derivation<FullInputs, Output> &, const ExperimentalFeatureSettings &);
+template void
+extractMeta<StorePathSet, Output>(Derivation<StorePathSet, Output> &, const ExperimentalFeatureSettings &);
+
+/**
+ * Re-insert `__meta` and the `derivation-meta` requiredSystemFeature into a
+ * structuredAttrs object for serialisation into legacy formats: public ATerm
+ * via `unparse` and by the worker protocol via `write`.
+ */
+static nlohmann::json::object_t
+reinjectMetaIntoStructuredAttrs(const nlohmann::json::object_t & sa, const nlohmann::json::object_t & meta)
+{
+    auto out = sa;
+    out["__meta"] = meta;
+
+    auto rsf = nlohmann::json::array();
+    bool inserted = false;
+    if (auto it = out.find("requiredSystemFeatures"); it != out.end() && it->second.is_array()) {
+        for (const auto & feature : it->second) {
+            if (!inserted && feature.get<std::string>() > "derivation-meta") {
+                rsf.push_back("derivation-meta");
+                inserted = true;
+            }
+            rsf.push_back(feature);
+        }
+    }
+    if (!inserted)
+        rsf.push_back("derivation-meta");
+    out["requiredSystemFeatures"] = std::move(rsf);
+    return out;
+}
+
+/* --------------------------------------------------------------------------
    ATerm parsing
    -------------------------------------------------------------------------- */
 
@@ -388,6 +488,7 @@ Full parse(
     }
 
     expect(str, ')');
+    extractMeta(drv, xpSettings);
     return drv;
 }
 
@@ -714,7 +815,24 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
     StructuredAttrs::checkKeyNotInUse(drv.env);
     if (drv.structuredAttrs) {
         StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
+        /* Meta only exists on `Full`; hash-modulo intermediates never
+           carry it (see `derivationModulo`). Reinjecting here means the
+           on-disk ATerm has `__meta` in structuredAttrs, but the hash
+           does not. */
+        if constexpr (std::is_same_v<Inputs, FullInputs>) {
+            if (drv.meta) {
+                auto full = reinjectMetaIntoStructuredAttrs(drv.structuredAttrs->structuredAttrs, *drv.meta);
+                scratch.insert(StructuredAttrs{.structuredAttrs = std::move(full)}.unparse());
+            } else {
+                scratch.insert(drv.structuredAttrs->unparse());
+            }
+        } else {
+            /* Non-`Full` instantiations are hash-modulo intermediates, which
+               `derivationModulo` constructs without meta. Enforce that here, so
+               meta can never be silently dropped from a hash-affecting ATerm. */
+            assert(!drv.meta);
+            scratch.insert(drv.structuredAttrs->unparse());
+        }
         unparseEnv(scratch);
     } else {
         unparseEnv(drv.env);
@@ -819,6 +937,7 @@ static std::optional<Derivation<HashModuloInputs, Out>> derivationModulo(Store &
         .args = std::move(drv.args),
         .env = std::move(drv.env),
         .structuredAttrs = std::move(drv.structuredAttrs),
+        // `.meta`: omit! See derivation-meta documentation.
         .name = std::move(drv.name),
     };
 
@@ -985,6 +1104,7 @@ Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::strin
         drv.env[key] = value;
     }
     drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
+    extractMeta(drv);
 
     return in;
 }
@@ -1030,7 +1150,12 @@ void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
     StructuredAttrs::checkKeyNotInUse(drv.env);
     if (drv.structuredAttrs) {
         StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
+        if (drv.meta) {
+            auto full = reinjectMetaIntoStructuredAttrs(drv.structuredAttrs->structuredAttrs, *drv.meta);
+            scratch.insert(StructuredAttrs{.structuredAttrs = std::move(full)}.unparse());
+        } else {
+            scratch.insert(drv.structuredAttrs->unparse());
+        }
         writeEnv(scratch);
     } else {
         writeEnv(drv.env);

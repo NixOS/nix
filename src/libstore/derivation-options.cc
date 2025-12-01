@@ -369,6 +369,8 @@ StringSet Options<Input>::getRequiredSystemFeatures(const Derivation<Inputs, Out
         res.insert(i);
     if (!type(drv).hasKnownOutputPaths())
         res.insert("ca-derivations");
+    if (drv.meta)
+        res.insert("derivation-meta");
     return res;
 }
 

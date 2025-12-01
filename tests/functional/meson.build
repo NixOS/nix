@@ -131,6 +131,7 @@ suites = [
       'logging.sh',
       'long-socket-path.sh',
       'make-content-addressed.sh',
+      'meta.sh',
       'misc.sh',
       'multiple-outputs-substitute-failure.sh',
       'multiple-outputs.sh',

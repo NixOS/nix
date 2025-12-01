@@ -62,6 +62,12 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     if (!type(*drv).hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
+    // Most likely a user mistake. Require certainty about the intended hashing.
+    if (drv->structuredAttrs && drv->structuredAttrs->structuredAttrs.contains("__meta"))
+        throw Error(
+            "derivation '%s' has '__meta' attribute but does not require 'derivation-meta' system feature",
+            worker.store.printStorePath(drvPath));
+
     for (auto & i : outputsAndOptPaths(*drv, worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);

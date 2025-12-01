@@ -1013,6 +1013,16 @@ public:
         return {};
     }
 
+    /**
+     * Check if the store's protocol supports a given feature.
+     * Local stores always return true; remote stores check the
+     * negotiated feature set.
+     */
+    virtual bool hasProtoFeature(std::string_view feature)
+    {
+        return true;
+    }
+
 protected:
 
     /**
