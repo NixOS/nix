@@ -294,6 +294,10 @@ class AutoDelete
 public:
     AutoDelete();
     AutoDelete(const std::filesystem::path & p, bool recursive = true);
+    AutoDelete(AutoDelete &&) = delete;
+    AutoDelete(const AutoDelete &) = delete;
+    AutoDelete & operator=(AutoDelete &&) = delete;
+    AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
     void cancel();
