@@ -6,7 +6,7 @@
 #include <variant>
 
 #include "nix/util/types.hh"
-#include "nix/util/json-impls.hh"
+#include <nlohmann/json.hpp>
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/worker-settings.hh"
@@ -172,6 +172,15 @@ struct DerivationOptions
      * env: allowSubstitutes
      */
     bool allowSubstitutes = true;
+
+    /**
+     * env: __meta (when using structured attributes with `derivation-meta` feature)
+     *
+     * Metadata excluded from hash computation. Only populated when both
+     * `__meta` and `derivation-meta` system feature are present.
+     * Otherwise `__meta` remains in structured attributes as a regular attribute.
+     */
+    std::optional<nlohmann::json> meta;
 
     bool operator==(const DerivationOptions &) const = default;
 
