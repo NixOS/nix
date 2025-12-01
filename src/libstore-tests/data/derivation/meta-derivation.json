@@ -13,6 +13,11 @@
       "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
     ]
   },
+  "meta": {
+    "description": "A test derivation",
+    "maintainer": "test@example.com",
+    "version": "1.0"
+  },
   "name": "meta-derivation",
   "outputs": {
     "out": {
@@ -20,11 +25,6 @@
     }
   },
   "structuredAttrs": {
-    "__meta": {
-      "description": "A test derivation",
-      "maintainer": "test@example.com",
-      "version": "1.0"
-    },
     "requiredSystemFeatures": [
       "derivation-meta"
     ]
