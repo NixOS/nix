@@ -12,24 +12,14 @@ using namespace unix;
 
 std::atomic<bool> unix::_isInterrupted = false;
 
-namespace unix {
-static thread_local bool interruptThrown = false;
-}
-
 thread_local std::function<bool()> unix::interruptCheck;
-
-void setInterruptThrown()
-{
-    unix::interruptThrown = true;
-}
 
 void unix::_interrupted()
 {
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!interruptThrown && !std::uncaught_exceptions()) {
-        interruptThrown = true;
+    if (!std::uncaught_exceptions()) {
         throw Interrupted("interrupted by the user");
     }
 }
