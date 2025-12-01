@@ -1584,14 +1584,14 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
-static void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
+void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
 {
     res = nlohmann::json::array();
     for (auto & input : inputSrcs)
         res.emplace_back(input);
 }
 
-static void basicDerivationToJson(json & res, const BasicDerivation & d)
+void basicDerivationToJson(json & res, const BasicDerivation & d, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     res = nlohmann::json::object();
 
@@ -1610,44 +1610,36 @@ static void basicDerivationToJson(json & res, const BasicDerivation & d)
     res["args"] = d.args;
     res["env"] = d.env;
 
-    if (d.structuredAttrs)
-        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+    if (d.structuredAttrs) {
+        auto structuredAttrs = d.structuredAttrs->structuredAttrs;
+
+        // Only extract __meta when derivation-meta experimental feature is enabled
+        if (xpSettings.isEnabled(nix::Xp::DerivationMeta)) {
+            if (nix::hasDerivationMetaFeature(structuredAttrs)) {
+                auto metaIt = structuredAttrs.find("__meta");
+                res["meta"] = metaIt->second;
+                structuredAttrs.erase(metaIt);
+            } else {
+                res["meta"] = nullptr;
+            }
+        }
+
+        res["structuredAttrs"] = std::move(structuredAttrs);
+    } else if (xpSettings.isEnabled(nix::Xp::DerivationMeta)) {
+        res["meta"] = nullptr;
+    }
 }
 
 void adl_serializer<BasicDerivation>::to_json(json & res, const BasicDerivation & d)
 {
-    basicDerivationToJson(res, d);
+    basicDerivationToJson(res, d, nix::experimentalFeatureSettings);
 
     inputSrcsToJson(res["inputs"], d.inputSrcs);
 }
 
 void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
-    basicDerivationToJson(res, d);
-
-    {
-        auto & inputsObj = res["inputs"];
-        inputsObj = nlohmann::json::object();
-
-        inputSrcsToJson(inputsObj["srcs"], d.inputSrcs);
-
-        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
-            auto value = nlohmann::json::object();
-            value["outputs"] = inputNode.value;
-            {
-                auto next = nlohmann::json::object();
-                for (auto & [outputId, childNode] : inputNode.childMap)
-                    next[outputId] = doInput(childNode);
-                value["dynamicOutputs"] = std::move(next);
-            }
-            return value;
-        };
-
-        auto & inputDrvsObj = inputsObj["drvs"];
-        inputDrvsObj = nlohmann::json::object();
-        for (auto & [inputDrv, inputNode] : d.inputDrvs.map)
-            inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
-    }
+    nix::derivationToJson(res, d, nix::experimentalFeatureSettings);
 }
 
 static void inputSrcsFromJson(const json & inputSrcsJson, StorePathSet & inputSrcs)
@@ -1693,8 +1685,28 @@ static void basicDerivationFromJson(
         throw;
     }
 
-    if (auto structuredAttrs = get(json, "structuredAttrs"))
-        res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+    if (auto structuredAttrs = get(json, "structuredAttrs")) {
+        auto structuredAttrsObj = getObject(*structuredAttrs);
+
+        // If there's a top-level meta field, require experimental feature and reconstruct __meta
+        if (auto metaPtr = optionalValueAt(json, "meta")) {
+            if (!metaPtr->is_null()) {
+                xpSettings.require(Xp::DerivationMeta);
+                // Check if derivation-meta is in requiredSystemFeatures
+                if (auto it = structuredAttrsObj.find("requiredSystemFeatures");
+                    it != structuredAttrsObj.end() && it->second.is_array()) {
+                    for (const auto & feature : it->second) {
+                        if (feature.is_string() && feature.get<std::string>() == "derivation-meta") {
+                            structuredAttrsObj["__meta"] = *metaPtr;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        res.structuredAttrs = StructuredAttrs{structuredAttrsObj};
+    }
 }
 
 BasicDerivation
@@ -1759,3 +1771,37 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
 }
 
 } // namespace nlohmann
+
+namespace nix {
+
+void derivationToJson(nlohmann::json & res, const Derivation & d, const ExperimentalFeatureSettings & xpSettings)
+{
+    using json = nlohmann::json;
+    nlohmann::basicDerivationToJson(res, d, xpSettings);
+
+    {
+        auto & inputsObj = res["inputs"];
+        inputsObj = json::object();
+
+        nlohmann::inputSrcsToJson(inputsObj["srcs"], d.inputSrcs);
+
+        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> json {
+            auto value = json::object();
+            value["outputs"] = inputNode.value;
+            {
+                auto next = json::object();
+                for (auto & [outputId, childNode] : inputNode.childMap)
+                    next[outputId] = doInput(childNode);
+                value["dynamicOutputs"] = std::move(next);
+            }
+            return value;
+        };
+
+        auto & inputDrvsObj = inputsObj["drvs"];
+        inputDrvsObj = json::object();
+        for (auto & [inputDrv, inputNode] : d.inputDrvs.map)
+            inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
+    }
+}
+
+} // namespace nix
