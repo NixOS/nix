@@ -338,6 +338,12 @@ std::filesystem::path
 createTempDir(const std::filesystem::path & tmpRoot = "", const std::string & prefix = "nix", mode_t mode = 0755);
 
 /**
+ * Create an anonymous readable/writable temporary file, returning a file handle.
+ * On UNIX there resulting file isn't linked to any path on the filesystem.
+ */
+AutoCloseFD createAnonymousTempFile();
+
+/**
  * Create a temporary file, returning a file handle and its path.
  */
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
