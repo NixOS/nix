@@ -474,6 +474,12 @@ Derivation parseDerivation(
 bool isDerivation(std::string_view fileName);
 
 /**
+ * Check if structured attributes indicate derivation-meta feature usage.
+ * Returns true when both `__meta` and `derivation-meta` system feature are present.
+ */
+bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs);
+
+/**
  * Check if the `derivation-meta` feature should be applied to this derivation.
  * Returns true when:
  * - The derivation has structured attributes

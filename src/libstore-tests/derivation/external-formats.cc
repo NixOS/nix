@@ -283,6 +283,57 @@ Derivation makeDynDepDerivation()
 
 INSTANTIATE_TEST_SUITE_P(DynDerivationJSONATerm, DynDerivationJsonAtermTest, ::testing::Values(makeDynDepDerivation()));
 
+struct DerivationMetaJsonAtermTest : DerivationMetaTest,
+                                     JsonCharacterizationTest<Derivation>,
+                                     ::testing::WithParamInterface<Derivation>
+{};
+
+MAKE_TEST_P(DerivationMetaJsonAtermTest);
+
+Derivation makeMetaDerivation()
+{
+    Derivation drv;
+    drv.name = "meta-derivation";
+    drv.inputSrcs = {
+        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+    };
+    drv.platform = "x86_64-linux";
+    drv.builder = "/bin/sh";
+    drv.args = {
+        "-c",
+        "echo hello > $out",
+    };
+    drv.env = StringPairs{
+        {
+            "out",
+            "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation",
+        },
+    };
+    drv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::InputAddressed{
+                .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"},
+            }},
+        },
+    };
+
+    // Add structured attributes with __meta
+    nlohmann::json::object_t structuredAttrs;
+    structuredAttrs["__meta"] = nlohmann::json::object_t{
+        {"description", "A test derivation"},
+        {"version", "1.0"},
+        {"maintainer", "test@example.com"},
+    };
+    structuredAttrs["requiredSystemFeatures"] = nlohmann::json::array({"derivation-meta"});
+
+    drv.structuredAttrs = StructuredAttrs{.structuredAttrs = structuredAttrs};
+
+    return drv;
+}
+
+INSTANTIATE_TEST_SUITE_P(DerivationMetaJSONATerm, DerivationMetaJsonAtermTest, ::testing::Values(makeMetaDerivation()));
+
 #undef MAKE_TEST_P
 
 } // namespace nix
