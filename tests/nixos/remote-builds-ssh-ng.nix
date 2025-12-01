@@ -20,7 +20,7 @@ let
         builder = "''${utils}/bin/sh";
         args = [ "-c" "${
           lib.concatStringsSep "; " [
-            ''if [[ -n $NIX_LOG_FD ]]''
+            "if [[ -n $NIX_LOG_FD ]]"
             ''then echo '@nix {\"action\":\"setPhase\",\"phase\":\"buildPhase\"}' >&''$NIX_LOG_FD''
             "fi"
             "echo Hello"

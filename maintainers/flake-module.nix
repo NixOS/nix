@@ -88,6 +88,13 @@
               ''^tests/functional/lang/eval-fail-path-slash\.nix$''
               ''^tests/functional/lang/eval-fail-toJSON-non-utf-8\.nix$''
               ''^tests/functional/lang/eval-fail-set\.nix$''
+
+              # Language tests, don't churn the formatting of strings
+              ''^tests/functional/lang/eval-fail-fromTOML-overflow\.nix$''
+              ''^tests/functional/lang/eval-fail-fromTOML-underflow\.nix$''
+              ''^tests/functional/lang/eval-fail-bad-string-interpolation-3\.nix$''
+              ''^tests/functional/lang/eval-fail-bad-string-interpolation-4\.nix$''
+              ''^tests/functional/lang/eval-okay-regex-match2\.nix$''
             ];
           };
           clang-format = {
@@ -97,7 +104,7 @@
             excludes = [
               # We don't want to format test data
               # ''tests/(?!nixos/).*\.nix''
-              ''^src/[^/]*-tests/data/.*$''
+              "^src/[^/]*-tests/data/.*$"
 
               # Don't format vendored code
               ''^doc/manual/redirects\.js$''
