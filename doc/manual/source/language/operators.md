@@ -2,7 +2,7 @@
 
 | Name                                   | Syntax                                     | Associativity | Precedence |
 |----------------------------------------|--------------------------------------------|---------------|------------|
-| [Attribute selection]                  | *attrset* `.` *attrpath* \[ `or` *expr* \] | none          | 1          |
+| [Attribute selection]                  | *attrset* `.` *attrpath* \[ `or` *expr* \] | left          | 1          |
 | [Function application]                 | *func* *expr*                              | left          | 2          |
 | [Arithmetic negation][arithmetic]      | `-` *number*                               | none          | 3          |
 | [Has attribute]                        | *attrset* `?` *attrpath*                   | none          | 4          |
