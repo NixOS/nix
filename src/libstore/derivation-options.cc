@@ -378,6 +378,18 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
             getStringSetAttr(env, parsed, "requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
         .preferLocalBuild = getBoolAttr(env, parsed, "preferLocalBuild", defaults.preferLocalBuild),
         .allowSubstitutes = getBoolAttr(env, parsed, "allowSubstitutes", defaults.allowSubstitutes),
+        .meta = [&]() -> std::optional<nlohmann::json> {
+            if (!parsed)
+                return std::nullopt;
+
+            auto & structuredAttrs = parsed->structuredAttrs;
+
+            // Only extract __meta if derivation-meta feature is used
+            if (hasDerivationMetaFeature(structuredAttrs)) {
+                return std::make_optional(structuredAttrs.at("__meta"));
+            }
+            return std::nullopt;
+        }(),
     };
 }
 
@@ -616,6 +628,12 @@ DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDeri
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
+        .meta = [&]() -> std::optional<nlohmann::json> {
+            if (auto * metaPtr = optionalValueAt(json, "meta"))
+                if (auto * nonNullMeta = getNullable(*metaPtr))
+                    return std::make_optional(*nonNullMeta);
+            return std::nullopt;
+        }(),
     };
 }
 
@@ -650,6 +668,10 @@ void adl_serializer<DerivationOptions<SingleDerivedPath>>::to_json(
     json["requiredSystemFeatures"] = o.requiredSystemFeatures;
     json["preferLocalBuild"] = o.preferLocalBuild;
     json["allowSubstitutes"] = o.allowSubstitutes;
+    if (o.meta)
+        json["meta"] = *o.meta;
+    else
+        json["meta"] = nullptr;
 }
 
 OutputChecks<SingleDerivedPath> adl_serializer<OutputChecks<SingleDerivedPath>>::from_json(const json & json_)
