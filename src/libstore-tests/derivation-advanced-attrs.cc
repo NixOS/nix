@@ -179,6 +179,7 @@ static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = 
     .requiredSystemFeatures = {},
     .preferLocalBuild = false,
     .allowSubstitutes = true,
+    .meta = std::nullopt,
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
@@ -269,6 +270,7 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
     .requiredSystemFeatures = {"rainbow", "uid-range"},
     .preferLocalBuild = true,
     .allowSubstitutes = false,
+    .meta = std::nullopt,
 };
 
 TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
@@ -299,6 +301,7 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
     .requiredSystemFeatures = {"rainbow", "uid-range"},
     .preferLocalBuild = true,
     .allowSubstitutes = false,
+    .meta = std::nullopt,
 };
 
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
@@ -319,6 +322,7 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults
     .requiredSystemFeatures = {},
     .preferLocalBuild = false,
     .allowSubstitutes = true,
+    .meta = std::nullopt,
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults)
@@ -437,6 +441,7 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
     .requiredSystemFeatures = {"rainbow", "uid-range"},
     .preferLocalBuild = true,
     .allowSubstitutes = false,
+    .meta = std::nullopt,
 };
 
 TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
@@ -479,6 +484,7 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
     .requiredSystemFeatures = {"rainbow", "uid-range"},
     .preferLocalBuild = true,
     .allowSubstitutes = false,
+    .meta = std::nullopt,
 };
 
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)

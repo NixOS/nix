@@ -891,18 +891,11 @@ static DrvHashModulo pathDerivationModulo(Store & store, const StorePath & drvPa
    don't leak the provenance of fixed outputs, reducing pointless cache
    misses as the build itself won't know this.
  */
-bool usesDerivationMeta(const BasicDerivation & drv)
+bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs)
 {
-    if (!drv.structuredAttrs.has_value())
-        return false;
-
-    auto & structuredAttrs = drv.structuredAttrs->structuredAttrs;
-
-    // Check if __meta is present in structured attrs
     if (!structuredAttrs.contains("__meta"))
         return false;
 
-    // Check if derivation-meta is in requiredSystemFeatures
     if (auto it = structuredAttrs.find("requiredSystemFeatures");
         it != structuredAttrs.end() && it->second.is_array()) {
         for (const auto & feature : it->second) {
@@ -911,8 +904,15 @@ bool usesDerivationMeta(const BasicDerivation & drv)
             }
         }
     }
-
     return false;
+}
+
+bool usesDerivationMeta(const BasicDerivation & drv)
+{
+    if (!drv.structuredAttrs.has_value())
+        return false;
+
+    return hasDerivationMetaFeature(drv.structuredAttrs->structuredAttrs);
 }
 
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
