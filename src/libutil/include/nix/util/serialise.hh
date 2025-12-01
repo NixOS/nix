@@ -105,7 +105,7 @@ struct Source
  * A buffered abstract source. Warning: a BufferedSource should not be
  * used from multiple threads concurrently.
  */
-struct BufferedSource : Source
+struct BufferedSource : virtual Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
     std::unique_ptr<char[]> buffer;
@@ -130,6 +130,14 @@ protected:
      * Underlying read call, to be overridden.
      */
     virtual size_t readUnbuffered(char * data, size_t len) = 0;
+};
+
+/**
+ * Source type that can be restarted.
+ */
+struct RestartableSource : virtual Source
+{
+    virtual void restart() = 0;
 };
 
 /**
@@ -174,7 +182,7 @@ private:
 /**
  * A source that reads data from a file descriptor.
  */
-struct FdSource : BufferedSource
+struct FdSource : BufferedSource, RestartableSource
 {
     Descriptor fd;
     size_t read = 0;
@@ -196,6 +204,7 @@ struct FdSource : BufferedSource
     FdSource & operator=(FdSource && s) = default;
 
     bool good() override;
+    void restart() override;
 
     /**
      * Return true if the buffer is not empty after a non-blocking
@@ -228,14 +237,6 @@ struct StringSink : Sink
     StringSink(std::string && s)
         : s(std::move(s)) {};
     void operator()(std::string_view data) override;
-};
-
-/**
- * Source type that can be restarted.
- */
-struct RestartableSource : Source
-{
-    virtual void restart() = 0;
 };
 
 /**
@@ -315,15 +316,6 @@ public:
         return compressionMethod;
     }
 };
-
-/**
- * Create a restartable Source from a factory function.
- *
- * @param factory Factory function that returns a fresh instance of the Source. Gets
- * called for each source restart.
- * @pre factory must return an equivalent source for each invocation.
- */
-std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory);
 
 /**
  * A sink that writes all incoming data to two other sinks.

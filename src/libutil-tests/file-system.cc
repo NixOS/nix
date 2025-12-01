@@ -398,4 +398,20 @@ TEST(createAnonymousTempFile, works)
     EXPECT_EQ(source.drain(), "testtest");
 }
 
+/* ----------------------------------------------------------------------------
+ * FdSource
+ * --------------------------------------------------------------------------*/
+
+TEST(FdSource, restartWorks)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "hello world");
+    lseek(fd.get(), 0, SEEK_SET);
+    FdSource source{fd.get()};
+    EXPECT_EQ(source.drain(), "hello world");
+    source.restart();
+    EXPECT_EQ(source.drain(), "hello world");
+    EXPECT_EQ(source.drain(), "");
+}
+
 } // namespace nix
