@@ -16,17 +16,15 @@ void printTable(Table & table)
 
     for (auto & i : table) {
         assert(i.size() == nrColumns);
-        Strings::iterator j;
-        size_t column;
-        for (j = i.begin(), column = 0; j != i.end(); ++j, ++column)
+        size_t column = 0;
+        for (auto j = i.begin(); j != i.end(); ++j, ++column)
             if (j->size() > widths[column])
                 widths[column] = j->size();
     }
 
     for (auto & i : table) {
-        Strings::iterator j;
-        size_t column;
-        for (j = i.begin(), column = 0; j != i.end(); ++j, ++column) {
+        size_t column = 0;
+        for (auto j = i.begin(); j != i.end(); ++j, ++column) {
             std::string s = *j;
             replace(s.begin(), s.end(), '\n', ' ');
             std::cout << s;
