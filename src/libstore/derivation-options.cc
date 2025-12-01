@@ -354,7 +354,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
             getStringSetAttr(env, parsed, "requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
         .preferLocalBuild = getBoolAttr(env, parsed, "preferLocalBuild", defaults.preferLocalBuild),
         .allowSubstitutes = getBoolAttr(env, parsed, "allowSubstitutes", defaults.allowSubstitutes),
-        .meta = [&]() -> std::optional<nlohmann::json> {
+        .meta = [&]() -> std::optional<nlohmann::json::object_t> {
             if (!parsed)
                 return std::nullopt;
 
@@ -362,7 +362,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 
             // Only extract __meta if derivation-meta feature is used
             if (hasDerivationMetaFeature(structuredAttrs)) {
-                return std::make_optional(structuredAttrs.at("__meta"));
+                return getObject(structuredAttrs.at("__meta"));
             }
             return std::nullopt;
         }(),
@@ -584,12 +584,7 @@ static DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json 
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
-        .meta = [&]() -> std::optional<nlohmann::json> {
-            if (auto * metaPtr = optionalValueAt(json, "meta"))
-                if (auto * nonNullMeta = getNullable(*metaPtr))
-                    return std::make_optional(*nonNullMeta);
-            return std::nullopt;
-        }(),
+        .meta = valueAt(json, "meta").get<std::optional<nlohmann::json::object_t>>(),
     };
 }
 
@@ -624,10 +619,7 @@ static void derivationOptionsToJson(nlohmann::json & json, const DerivationOptio
     json["requiredSystemFeatures"] = o.requiredSystemFeatures;
     json["preferLocalBuild"] = o.preferLocalBuild;
     json["allowSubstitutes"] = o.allowSubstitutes;
-    if (o.meta)
-        json["meta"] = *o.meta;
-    else
-        json["meta"] = nullptr;
+    json["meta"] = o.meta;
 }
 
 template<typename Inputs>
