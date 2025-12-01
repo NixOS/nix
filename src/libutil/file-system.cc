@@ -730,11 +730,10 @@ Path makeTempPath(const Path & root, const Path & suffix)
 
 void createSymlink(const Path & target, const Path & link)
 {
-    try {
-        std::filesystem::create_symlink(target, link);
-    } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("creating symlink '%1%' -> '%2%'", link, target);
-    }
+    std::error_code ec;
+    std::filesystem::create_symlink(target, link, ec);
+    if (ec)
+        throw SysError(ec.value(), "creating symlink '%1%' -> '%2%'", link, target);
 }
 
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
