@@ -7,7 +7,7 @@
 
 namespace nix {
 
-void printTable(Table & table)
+void printTable(std::ostream & out, Table & table)
 {
     auto nrColumns = table.size() > 0 ? table.front().size() : 0;
 
@@ -27,11 +27,11 @@ void printTable(Table & table)
         for (auto j = i.begin(); j != i.end(); ++j, ++column) {
             std::string s = *j;
             replace(s.begin(), s.end(), '\n', ' ');
-            std::cout << s;
+            out << s;
             if (column < nrColumns - 1)
-                std::cout << std::string(widths[column] - s.size() + 2, ' ');
+                out << std::string(widths[column] - s.size() + 2, ' ');
         }
-        std::cout << std::endl;
+        out << std::endl;
     }
 }
 

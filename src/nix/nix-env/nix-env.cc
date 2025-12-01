@@ -1250,7 +1250,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     }
 
     if (!xmlOutput)
-        printTable(table);
+        printTable(std::cout, table);
 }
 
 static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
