@@ -294,7 +294,7 @@ class AutoDelete
 public:
     AutoDelete();
 
-    AutoDelete(AutoDelete && x)
+    AutoDelete(AutoDelete && x) noexcept
     {
         _path = std::move(x._path);
         del = x.del;
