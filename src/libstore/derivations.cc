@@ -891,6 +891,30 @@ static DrvHashModulo pathDerivationModulo(Store & store, const StorePath & drvPa
    don't leak the provenance of fixed outputs, reducing pointless cache
    misses as the build itself won't know this.
  */
+bool usesDerivationMeta(const BasicDerivation & drv)
+{
+    if (!drv.structuredAttrs.has_value())
+        return false;
+
+    auto & structuredAttrs = drv.structuredAttrs->structuredAttrs;
+
+    // Check if __meta is present in structured attrs
+    if (!structuredAttrs.contains("__meta"))
+        return false;
+
+    // Check if derivation-meta is in requiredSystemFeatures
+    if (auto it = structuredAttrs.find("requiredSystemFeatures");
+        it != structuredAttrs.end() && it->second.is_array()) {
+        for (const auto & feature : it->second) {
+            if (feature.is_string() && feature.get<std::string>() == "derivation-meta") {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
     /* Return a fixed hash for fixed-output derivations. */
@@ -963,7 +987,36 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
     }
 
-    return hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
+    // Filter out derivation metadata for hash computation when the experimental feature is enabled
+    // and the derivation explicitly opts in via the derivation-meta system feature
+    Derivation drvForHash = drv;
+    if (experimentalFeatureSettings.isEnabled(Xp::DerivationMeta) && usesDerivationMeta(drv)) {
+        // Remove __meta from structuredAttrs
+        auto filteredAttrs = drv.structuredAttrs->structuredAttrs;
+        filteredAttrs.erase("__meta");
+
+        // Remove derivation-meta from requiredSystemFeatures
+        if (auto it = filteredAttrs.find("requiredSystemFeatures"); it != filteredAttrs.end()) {
+            if (it->second.is_array()) {
+                auto filtered = nlohmann::json::array();
+                for (const auto & feature : it->second) {
+                    if (feature.is_string() && feature.get<std::string>() != "derivation-meta") {
+                        filtered.push_back(feature);
+                    }
+                }
+                // Remove the attribute entirely if empty, to match derivations without requiredSystemFeatures
+                if (filtered.empty()) {
+                    filteredAttrs.erase("requiredSystemFeatures");
+                } else {
+                    filteredAttrs["requiredSystemFeatures"] = std::move(filtered);
+                }
+            }
+        }
+
+        drvForHash.structuredAttrs = StructuredAttrs{.structuredAttrs = std::move(filteredAttrs)};
+    }
+
+    return hashString(HashAlgorithm::SHA256, drvForHash.unparse(store, maskOutputs, &inputs2));
 }
 
 static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig & store)

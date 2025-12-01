@@ -67,6 +67,61 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
     will have no effect.
 
+  - [`__meta`]{#adv-attr-meta}\
+    > **Warning**
+    >
+    > This attribute is part of an [experimental feature](@docroot@/development/experimental-features.md).
+    >
+    > To use this attribute, you must enable the
+    > [`derivation-meta`][xp-feature-derivation-meta] experimental feature.
+    > For example, in [nix.conf](../command-ref/conf-file.md) you could add:
+    >
+    > ```
+    > extra-experimental-features = derivation-meta
+    > ```
+
+    When using [structured attributes](#adv-attr-structuredAttrs), the `__meta` attribute
+    allows you to attach arbitrary metadata to a derivation without affecting its output paths
+    or triggering rebuilds when the metadata changes.
+
+    This is useful for tooling that needs to associate information with derivations, such as:
+    - Package descriptions and maintainer information
+    - License and homepage metadata
+    - Documentation generation data
+
+    To opt in with your derivations (typically mediated by Nixpkgs rather than written directly):
+
+    1. Set [`__structuredAttrs`](#adv-attr-structuredAttrs) = true
+    2. Add `"derivation-meta"` to [`requiredSystemFeatures`](#adv-attr-requiredSystemFeatures)
+
+    Example:
+
+    ```nix
+    derivation {
+      name = "example";
+      # ... other attributes ...
+      __structuredAttrs = true;
+      requiredSystemFeatures = [ "derivation-meta" ];
+      __meta = {
+        description = "A useful tool";
+        version = "1.0.0";
+        maintainer = "alice@example.com";
+      };
+    }
+    ```
+
+    When these requirements are met, both `__meta` and the `derivation-meta` system feature
+    are filtered from output path computation (see [Hash Modulo](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv)).
+    This means you can enable or disable the feature, or change metadata content, without affecting
+    output paths or invalidating binary caches.
+
+    > **Note**
+    >
+    > While output paths of the derivation itself remain stable when `__meta` changes, the
+    > derivation path (`.drv` file) will differ, as it contains the full derivation including metadata.
+    > Additionally, if expressions reference values from `__meta` (such as `pkg.meta.mainProgram`),
+    > those dependent derivations will, as usual, be affected if those *otherwise "meta"* values change.
+
 ## Output checks
 
 See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
@@ -370,5 +425,7 @@ Here is more information on the `output*` attributes, and what values they may b
 [fixed-output derivation]: @docroot@/glossary.md#gloss-fixed-output-derivation
 [file system object]: @docroot@/store/file-system-object.md
 [store object]: @docroot@/store/store-object.md
+[xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+[xp-feature-derivation-meta]: @docroot@/development/experimental-features.md#xp-feature-derivation-meta
 [xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
 [xp-feature-git-hashing]: @docroot@/development/experimental-features.md#xp-feature-git-hashing
