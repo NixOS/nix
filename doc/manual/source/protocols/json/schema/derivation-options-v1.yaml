@@ -26,7 +26,8 @@ required:
   - requiredSystemFeatures
   - preferLocalBuild
   - allowSubstitutes
-  - meta
+  # Note: `meta` is not in the required list to maintain backward compatibility
+  # with existing JSON that predates the derivation-meta feature
 properties:
   outputChecks:
     type: object
