@@ -16,6 +16,7 @@
 #include "nix/util/xml-writer.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
+#include "nix/util/table.hh"
 #include "nix/util/terminal.hh"
 #include "man-pages.hh"
 
@@ -820,38 +821,6 @@ static bool cmpElemByName(const PackageInfo & a, const PackageInfo & b)
     auto a_name = a.queryName();
     auto b_name = b.queryName();
     return lexicographical_compare(a_name.begin(), a_name.end(), b_name.begin(), b_name.end(), cmpChars);
-}
-
-typedef std::list<Strings> Table;
-
-void printTable(Table & table)
-{
-    auto nrColumns = table.size() > 0 ? table.front().size() : 0;
-
-    std::vector<size_t> widths;
-    widths.resize(nrColumns);
-
-    for (auto & i : table) {
-        assert(i.size() == nrColumns);
-        Strings::iterator j;
-        size_t column;
-        for (j = i.begin(), column = 0; j != i.end(); ++j, ++column)
-            if (j->size() > widths[column])
-                widths[column] = j->size();
-    }
-
-    for (auto & i : table) {
-        Strings::iterator j;
-        size_t column;
-        for (j = i.begin(), column = 0; j != i.end(); ++j, ++column) {
-            std::string s = *j;
-            replace(s.begin(), s.end(), '\n', ' ');
-            cout << s;
-            if (column < nrColumns - 1)
-                cout << std::string(widths[column] - s.size() + 2, ' ');
-        }
-        cout << std::endl;
-    }
 }
 
 /* This function compares the version of an element against the
