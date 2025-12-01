@@ -628,7 +628,11 @@ DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDeri
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
-        .meta = valueAt(json, "meta").get<std::optional<nlohmann::json::object_t>>(),
+        .meta = [&]() -> std::optional<nlohmann::json::object_t> {
+            if (auto * metaPtr = optionalValueAt(json, "meta"))
+                return metaPtr->get<std::optional<nlohmann::json::object_t>>();
+            return std::nullopt;
+        }(),
     };
 }
 

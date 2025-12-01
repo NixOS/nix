@@ -521,4 +521,17 @@ TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, structuredAttrs_all_set, struct
 
 #undef TEST_JSON_OPTIONS
 
+// Test backward compatibility: JSON without 'meta' field should be ingestible
+TEST_F(DerivationAdvancedAttrsTest, DerivationOptions_backward_compat_no_meta)
+{
+    // Read existing JSON and remove the 'meta' field to simulate old format
+    this->readTest("derivation-options/defaults.json", [&](auto encoded) {
+        auto j = json::parse(encoded);
+        j.erase("meta"); // Remove meta field to simulate old JSON
+        auto got = j.template get<DerivationOptions<SingleDerivedPath>>();
+        // Should successfully deserialize with meta = std::nullopt
+        EXPECT_EQ(got.meta, std::nullopt);
+    });
+}
+
 } // namespace nix
