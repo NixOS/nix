@@ -592,6 +592,12 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
 
 /**
+ * Convert a derivation to JSON, with optional experimental feature settings.
+ * This is exposed for testing purposes to allow passing mock experimental feature settings.
+ */
+void derivationToJson(nlohmann::json & res, const Derivation & d, const ExperimentalFeatureSettings & xpSettings);
+
+/**
  * This creates an opaque and almost certainly unique string
  * deterministically from the output name.
  *
