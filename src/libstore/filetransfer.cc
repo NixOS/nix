@@ -152,7 +152,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
-                    fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
+                    fail(FileTransferError(
+                        Interrupted, {}, "%s of '%s' was interrupted", Uncolored(request.noun()), request.uri));
             } catch (...) {
                 ignoreExceptionInDestructor();
             }
