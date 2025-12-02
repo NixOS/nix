@@ -24,12 +24,3 @@ renderers = ["html"]
 command = "jq --from-file ./anchors.jq"
 
 [output.markdown]
-
-[output.linkcheck]
-# no Internet during the build (in the sandbox)
-follow-web-links = false
-
-# mdbook-linkcheck does not understand [foo]{#bar} style links, resulting in
-# excessive "Potential incomplete link" warnings. No other kind of warning was
-# produced at the time of writing.
-warning-policy = "ignore"
