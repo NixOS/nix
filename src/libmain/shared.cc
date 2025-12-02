@@ -321,16 +321,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
 
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
-        try {
-            fun();
-        } catch (...) {
-            /* Subtle: we have to make sure that any `interrupted'
-               condition is discharged before we reach printMsg()
-               below, since otherwise it will throw an (uncaught)
-               exception. */
-            setInterruptThrown();
-            throw;
-        }
+        fun();
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {

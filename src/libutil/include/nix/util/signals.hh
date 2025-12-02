@@ -24,11 +24,6 @@ static inline bool getInterrupted();
 /**
  * @note Does nothing on Windows
  */
-void setInterruptThrown();
-
-/**
- * @note Does nothing on Windows
- */
 static inline bool isInterrupted();
 
 /**
