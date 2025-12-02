@@ -89,7 +89,7 @@ typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
 typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
 
-Hash toHash(const git_oid & oid)
+static Hash toHash(const git_oid & oid)
 {
 #ifdef GIT_EXPERIMENTAL_SHA256
     assert(oid.type == GIT_OID_SHA1);
@@ -108,7 +108,7 @@ static void initLibGit2()
     });
 }
 
-git_oid hashToOID(const Hash & hash)
+static git_oid hashToOID(const Hash & hash)
 {
     git_oid oid;
     if (git_oid_fromstr(&oid, hash.gitRev().c_str()))
@@ -116,7 +116,7 @@ git_oid hashToOID(const Hash & hash)
     return oid;
 }
 
-Object lookupObject(git_repository * repo, const git_oid & oid, git_object_t type = GIT_OBJECT_ANY)
+static Object lookupObject(git_repository * repo, const git_oid & oid, git_object_t type = GIT_OBJECT_ANY)
 {
     Object obj;
     if (git_object_lookup(Setter(obj), repo, &oid, type)) {
@@ -127,7 +127,7 @@ Object lookupObject(git_repository * repo, const git_oid & oid, git_object_t typ
 }
 
 template<typename T>
-T peelObject(git_object * obj, git_object_t type)
+static T peelObject(git_object * obj, git_object_t type)
 {
     T obj2;
     if (git_object_peel((git_object **) (typename T::pointer *) Setter(obj2), obj, type)) {
@@ -138,7 +138,7 @@ T peelObject(git_object * obj, git_object_t type)
 }
 
 template<typename T>
-T dupObject(typename T::pointer obj)
+static T dupObject(typename T::pointer obj)
 {
     T obj2;
     if (git_object_dup((git_object **) (typename T::pointer *) Setter(obj2), (git_object *) obj))
@@ -552,27 +552,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     getAccessor(const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError e) override;
 
     ref<GitFileSystemObjectSink> getFileSystemObjectSink() override;
-
-    static int sidebandProgressCallback(const char * str, int len, void * payload)
-    {
-        auto act = (Activity *) payload;
-        act->result(resFetchStatus, trim(std::string_view(str, len)));
-        return getInterrupted() ? -1 : 0;
-    }
-
-    static int transferProgressCallback(const git_indexer_progress * stats, void * payload)
-    {
-        auto act = (Activity *) payload;
-        act->result(
-            resFetchStatus,
-            fmt("%d/%d objects received, %d/%d deltas indexed, %s",
-                stats->received_objects,
-                stats->total_objects,
-                stats->indexed_deltas,
-                stats->total_deltas,
-                renderSize(stats->received_bytes)));
-        return getInterrupted() ? -1 : 0;
-    }
 
     void fetch(const std::string & url, const std::string & refspec, bool shallow) override
     {
