@@ -24,6 +24,7 @@
 #include <git2/indexer.h>
 #include <git2/object.h>
 #include <git2/odb.h>
+#include <git2/odb_backend.h>
 #include <git2/refs.h>
 #include <git2/remote.h>
 #include <git2/repository.h>
@@ -31,6 +32,7 @@
 #include <git2/status.h>
 #include <git2/submodule.h>
 #include <git2/sys/odb_backend.h>
+#include <git2/sys/repository.h>
 #include <git2/sys/mempack.h>
 #include <git2/tag.h>
 #include <git2/tree.h>
@@ -245,9 +247,15 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      * In-memory object store for efficient batched writing to packfiles.
      * Owned by `repo`.
      */
-    git_odb_backend * mempack_backend;
+    git_odb_backend * mempackBackend = nullptr;
 
-    GitRepoImpl(std::filesystem::path _path, bool create, bool bare)
+    /**
+     * On-disk packfile object store.
+     * Owned by `repo`.
+     */
+    git_odb_backend * packBackend = nullptr;
+
+    GitRepoImpl(std::filesystem::path _path, bool create, bool bare, bool packfilesOnly = false)
         : path(std::move(_path))
         , bare(bare)
     {
@@ -258,15 +266,39 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
         ObjectDb odb;
-        if (git_repository_odb(Setter(odb), repo.get()))
-            throw Error("getting Git object database: %s", git_error_last()->message);
+        if (packfilesOnly) {
+            /* Create a fresh object database because by default the repo also
+               loose object backends. We are not using any of those for the
+               tarball cache, but libgit2 still does a bunch of unnecessary
+               syscalls that always fail with ENOENT. NOTE: We are only creating
+               a libgit2 object here and not modifying the repo. Think of this as
+               enabling the specific backend.
+               */
+
+            if (git_odb_new(Setter(odb)))
+                throw Error("creating Git object database: %s", git_error_last()->message);
+
+            if (git_odb_backend_pack(&packBackend, (path / "objects").string().c_str()))
+                throw Error("creating pack backend: %s", git_error_last()->message);
+
+            if (git_odb_add_backend(odb.get(), packBackend, 1))
+                throw Error("adding pack backend to Git object database: %s", git_error_last()->message);
+        } else {
+            if (git_repository_odb(Setter(odb), repo.get()))
+                throw Error("getting Git object database: %s", git_error_last()->message);
+        }
 
         // mempack_backend will be owned by the repository, so we are not expected to free it ourselves.
-        if (git_mempack_new(&mempack_backend))
+        if (git_mempack_new(&mempackBackend))
             throw Error("creating mempack backend: %s", git_error_last()->message);
 
-        if (git_odb_add_backend(odb.get(), mempack_backend, 999))
+        if (git_odb_add_backend(odb.get(), mempackBackend, 999))
             throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
+
+        if (packfilesOnly) {
+            if (git_repository_set_odb(repo.get(), odb.get()))
+                throw Error("setting Git object database: %s", git_error_last()->message);
+        }
     }
 
     operator git_repository *()
@@ -287,7 +319,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         git_packbuilder_set_threads(packBuilder.get(), 0 /* autodetect */);
 
         packBuilderContext.handleException(
-            "preparing packfile", git_mempack_write_thin_pack(mempack_backend, packBuilder.get()));
+            "preparing packfile", git_mempack_write_thin_pack(mempackBackend, packBuilder.get()));
         checkInterrupt();
         packBuilderContext.handleException("writing packfile", git_packbuilder_write_buf(&buf, packBuilder.get()));
         checkInterrupt();
@@ -320,7 +352,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_indexer_commit(indexer.get(), &stats))
             throw Error("committing git packfile index: %s", git_error_last()->message);
 
-        if (git_mempack_reset(mempack_backend))
+        if (git_mempack_reset(mempackBackend))
             throw Error("resetting git mempack backend: %s", git_error_last()->message);
 
         checkInterrupt();
@@ -680,9 +712,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 };
 
-ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare)
+ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare, bool packfilesOnly)
 {
-    return make_ref<GitRepoImpl>(path, create, bare);
+    return make_ref<GitRepoImpl>(path, create, bare, packfilesOnly);
 }
 
 /**
@@ -1361,7 +1393,7 @@ namespace fetchers {
 ref<GitRepo> Settings::getTarballCache() const
 {
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
-    return GitRepo::openRepo(repoDir, true, true);
+    return GitRepo::openRepo(repoDir, /*create=*/true, /*bare=*/true, /*packfilesOnly=*/true);
 }
 
 } // namespace fetchers
