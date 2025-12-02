@@ -41,6 +41,10 @@ def recursive_replace(data: dict[str, t.Any], book_root: Path, search_path: Path
             return data | dict(
                 sections = [recursive_replace(section, book_root, search_path) for section in sections],
             )
+        case {'items': items}:
+            return data | dict(
+                items = [recursive_replace(item, book_root, search_path) for item in items],
+            )
         case {'Chapter': chapter}:
             path_to_chapter = Path(chapter['path'])
             chapter_content = chapter['content']
