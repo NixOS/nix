@@ -2,9 +2,12 @@
 ///@file
 
 #include <limits>
+#include <set>
 #include <string>
 
 #include "nix/store/store-api.hh"
+#include "nix/util/sync.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 
@@ -153,6 +156,13 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void flushBadConnections();
 
+    /**
+     * Shutdown all connections (both idle and in-use) to break any blocking I/O.
+     * This is called on interrupt to allow graceful termination when the client
+     * disconnects during a long-running operation.
+     */
+    void shutdownConnections();
+
     struct Connection;
 
     ref<Connection> openConnectionWrapper();
@@ -190,6 +200,12 @@ private:
     ref<RemoteFSAccessor> getRemoteFSAccessor(bool requireValidPath = true);
 
     std::atomic_bool failed{false};
+
+    /**
+     * Track all active connection file descriptors (both idle and in-use).
+     * Used by shutdownConnections() to break blocking I/O on interrupt.
+     */
+    Sync<std::set<Descriptor>> connectionFds;
 
     void copyDrvsFromEvalStore(const std::vector<DerivedPath> & paths, std::shared_ptr<Store> evalStore);
 };

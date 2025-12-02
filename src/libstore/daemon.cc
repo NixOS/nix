@@ -9,6 +9,7 @@
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/remote-store.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
@@ -1026,6 +1027,16 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
     ReceiveInterrupts receiveInterrupts;
+
+    /* When interrupted (e.g., SSH client disconnects), shutdown any downstream
+       store connections to break circular waits. This fixes deadlocks where the
+       daemon is waiting for a response from a downstream store while the downstream
+       is waiting for more data from this daemon. */
+    auto shutdownStoreOnInterrupt = createInterruptCallback([&store]() {
+        if (auto remoteStore = dynamic_cast<RemoteStore *>(&*store)) {
+            remoteStore->shutdownConnections();
+        }
+    });
 #endif
 
     /* Exchange the greeting. */
