@@ -160,6 +160,9 @@ let
       pkg-config
     ];
     separateDebugInfo = !stdenv.hostPlatform.isStatic;
+    # needed by separateDebugInfo
+    # SEE: https://github.com/NixOS/nixpkgs/pull/394674/commits/a4d355342976e9e9823fb94f133bc43ebec9da5b
+    __structuredAttrs = finalAttrs.separateDebugInfo;
     hardeningDisable = lib.optional stdenv.hostPlatform.isStatic "pie";
   };
 
