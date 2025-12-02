@@ -54,7 +54,7 @@ scope: {
     nativeBuildInputs = prevAttrs.nativeBuildInputs ++ [ pkgs.buildPackages.bmake ];
     postInstall =
       lib.replaceStrings [ "lowdown.so.1" "lowdown.1.dylib" ] [ "lowdown.so.2" "lowdown.2.dylib" ]
-        prevAttrs.postInstall;
+        (prevAttrs.postInstall or "");
   });
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
