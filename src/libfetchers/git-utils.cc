@@ -1031,6 +1031,11 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     std::vector<PendingDir> pendingDirs;
 
+    /**
+     * Temporary buffer used by createRegularFile for storing small file contents.
+     */
+    std::string regularFileContentsBuffer;
+
     void pushBuilder(std::string name)
     {
         const git_tree_entry * entry;
@@ -1112,41 +1117,83 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         if (!prepareDirs(pathComponents, false))
             return;
 
-        git_writestream * stream = nullptr;
-        if (git_blob_create_from_stream(&stream, *repo, nullptr))
-            throw Error("creating a blob stream object: %s", git_error_last()->message);
+        using WriteStream = std::unique_ptr<::git_writestream, decltype([](::git_writestream * stream) {
+                                                if (stream)
+                                                    stream->free(stream);
+                                            })>;
+
+        /* Maximum file size that gets buffered in memory before flushing to a WriteStream,
+           that's backed by a temporary objects/streamed_git2_* file. We should avoid that
+           for common cases, since creating (and deleting) a temporary file for each blob
+           is insanely expensive. */
+        static constexpr std::size_t maxBufferSize = 1024 * 1024; /* 1 MiB */
 
         struct CRF : CreateRegularFileSink
         {
             const CanonPath & path;
             GitFileSystemObjectSinkImpl & back;
-            git_writestream * stream;
+            WriteStream stream;
+            std::string & contents;
             bool executable = false;
 
-            CRF(const CanonPath & path, GitFileSystemObjectSinkImpl & back, git_writestream * stream)
+            CRF(const CanonPath & path, GitFileSystemObjectSinkImpl & back, std::string & regularFileContentsBuffer)
                 : path(path)
                 , back(back)
-                , stream(stream)
+                , stream(nullptr)
+                , contents(regularFileContentsBuffer)
             {
+                contents.clear();
+            }
+
+            void writeToStream(std::string_view data)
+            {
+                /* Lazily create the stream. */
+                if (!stream) {
+                    ::git_writestream * stream2 = nullptr;
+                    if (git_blob_create_from_stream(&stream2, *back.repo, nullptr))
+                        throw Error("creating a blob stream object: %s", git_error_last()->message);
+                    stream = WriteStream{stream2};
+                    assert(stream);
+                }
+
+                if (stream->write(stream.get(), data.data(), data.size()))
+                    throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
             }
 
             void operator()(std::string_view data) override
             {
-                if (stream->write(stream, data.data(), data.size()))
-                    throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+                /* Already in slow path. Just write to the slow stream. */
+                if (stream) {
+                    writeToStream(data);
+                    return;
+                }
+
+                contents += data;
+                if (contents.size() > maxBufferSize) {
+                    writeToStream(contents); /* Will initialize stream. */
+                    contents.clear();
+                }
             }
 
             void isExecutable() override
             {
                 executable = true;
             }
-        } crf{path, *this, stream};
+        } crf{path, *this, regularFileContentsBuffer};
 
         func(crf);
 
         git_oid oid;
-        if (git_blob_create_from_stream_commit(&oid, stream))
-            throw Error("creating a blob object for tarball member '%s': %s", path, git_error_last()->message);
+        if (crf.stream) {
+            /* Call .release(), since git_blob_create_from_stream_commit
+               acquires ownership and frees the stream. */
+            if (git_blob_create_from_stream_commit(&oid, crf.stream.release()))
+                throw Error("creating a blob object for '%s': %s", path, git_error_last()->message);
+        } else {
+            if (git_blob_create_from_buffer(&oid, *repo, crf.contents.data(), crf.contents.size()))
+                throw Error(
+                    "creating a blob object for '%s' from in-memory buffer: %s", path, git_error_last()->message);
+        }
 
         addToTree(*pathComponents.rbegin(), oid, crf.executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB);
     }
