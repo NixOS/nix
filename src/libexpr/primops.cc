@@ -2807,11 +2807,15 @@ static void addPath(
     const NixStringContext & context)
 {
     try {
-        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs())) {
+        StorePathSet refs;
+
+        if (path.accessor == state.rootFS && state.store->isInStore(path.path.abs()) && !context.empty()) {
             // FIXME: handle CA derivation outputs (where path needs to
             // be rewritten to the actual output).
             auto rewrites = state.realiseContext(context);
             path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
+            auto [storePath, subPath] = state.store->toStorePath(path.path.abs());
+            refs = state.store->queryPathInfo(storePath)->references;
         }
 
         std::unique_ptr<PathFilter> filter;
@@ -2824,18 +2828,27 @@ static void addPath(
         std::optional<StorePath> expectedStorePath;
         if (expectedHash)
             expectedStorePath = state.store->makeFixedOutputPathFromCA(
-                name, ContentAddressWithReferences::fromParts(method, *expectedHash, {}));
+                name, ContentAddressWithReferences::fromParts(method, *expectedHash, {refs}));
 
         if (!expectedHash || !state.store->isValidPath(*expectedStorePath)) {
-            auto dstPath = fetchToStore(
-                state.fetchSettings,
-                *state.store,
-                path.resolveSymlinks(),
-                settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-                name,
-                method,
-                filter.get(),
-                state.repair);
+            // FIXME: support refs in fetchToStore()?
+            auto dstPath = refs.empty() ? fetchToStore(
+                                              state.fetchSettings,
+                                              *state.store,
+                                              path.resolveSymlinks(),
+                                              settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+                                              name,
+                                              method,
+                                              filter.get(),
+                                              state.repair)
+                                        : state.store->addToStore(
+                                              name,
+                                              path.resolveSymlinks(),
+                                              method,
+                                              HashAlgorithm::SHA256,
+                                              refs,
+                                              filter ? *filter.get() : defaultPathFilter,
+                                              state.repair);
             if (expectedHash && expectedStorePath != dstPath)
                 state.error<EvalError>("store path mismatch in (possibly filtered) path added from '%s'", path)
                     .atPos(pos)

@@ -29,6 +29,15 @@ fi
 outPath2=$(nix-build ./import-from-derivation.nix -A addPath --no-out-link)
 [[ "$(cat "$outPath2")" = BLAFOO579 ]]
 
+# Test that applying builtins.path to the result of a derivation propagates all references
+for attr in pathFromDerivation pathFromDerivation2; do
+    outPath3=$(nix eval --raw -f ./import-from-derivation.nix "$attr")
+    refs=$(nix path-info --json "$outPath3" | jq -r '.[].references.[]')
+    [[ $(printf "%s" "$refs" | wc -w) = 2 ]]
+    [[ $refs =~ -step1 ]]
+    [[ $refs =~ -symlink ]]
+done
+
 # Test that IFD works with a chroot store.
 if canUseSandbox; then
 
