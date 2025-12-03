@@ -18,6 +18,10 @@ let
       services.openssh.enable = true;
       virtualisation.writableStore = true;
       nix.settings.sandbox = true;
+      services.openssh.ports = [
+        22
+      ]
+      ++ lib.optional supportsCustomPort 2222;
 
       # Regression test for use of PID namespaces when /proc has
       # filesystems mounted on top of it
@@ -42,6 +46,7 @@ let
 
   supportsBadShell = lib.versionAtLeast config.nodes.client.nix.package.version "2.25pre";
 
+  supportsCustomPort = lib.versionAtLeast config.nodes.client.nix.package.version "2.31.0pre20250806";
 in
 
 {
@@ -74,7 +79,7 @@ in
           nix.distributedBuilds = true;
           nix.buildMachines = [
             {
-              hostName = "builder1";
+              hostName = "builder1" + (lib.optionalString supportsCustomPort ":2222");
               sshUser = "root";
               sshKey = "/root/.ssh/id_ed25519";
               system = "i686-linux";

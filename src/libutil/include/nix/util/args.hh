@@ -51,15 +51,15 @@ public:
     }
 
     /**
-     * @brief Get the [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory) for the
-     * command.
+     * @brief Get the [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory) for
+     * the command.
      *
      * @return Generally the working directory, but in case of a shebang
      *         interpreter, returns the directory of the script.
      *
      * This only returns the correct value after parseCmdline() has run.
      */
-    virtual Path getCommandBaseDir() const;
+    virtual std::filesystem::path getCommandBaseDir() const;
 
 protected:
 
@@ -202,8 +202,12 @@ public:
         Strings labels;
         Handler handler;
         CompleterClosure completer;
+        bool required = false;
 
         std::optional<ExperimentalFeature> experimentalFeature;
+
+        // FIXME: this should be private, but that breaks designated initializers.
+        size_t timesUsed = 0;
     };
 
 protected:
@@ -282,6 +286,8 @@ protected:
     }
 
     StringSet hiddenCategories;
+
+    virtual void checkArgs();
 
     /**
      * Called after all command line flags before the first non-flag
@@ -428,6 +434,8 @@ public:
 protected:
     std::string commandName = "";
     bool aliasUsed = false;
+
+    void checkArgs() override;
 };
 
 Strings argvToStrings(int argc, char ** argv);

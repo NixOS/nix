@@ -193,20 +193,38 @@ struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
 
     std::string dumpCli()
     {
-        auto res = nlohmann::json::object();
+        using nlohmann::json;
+
+        auto res = json::object();
 
         res["args"] = toJSON();
 
-        auto stores = nlohmann::json::object();
-        for (auto & [storeName, implem] : Implementations::registered()) {
-            auto & j = stores[storeName];
-            j["doc"] = implem.doc;
-            j["uri-schemes"] = implem.uriSchemes;
-            j["settings"] = implem.getConfig()->toJSON();
-            j["experimentalFeature"] = implem.experimentalFeature;
+        {
+            auto & stores = res["stores"] = json::object();
+            for (auto & [storeName, implem] : Implementations::registered()) {
+                auto & j = stores[storeName];
+                j["doc"] = implem.doc;
+                j["uri-schemes"] = implem.uriSchemes;
+                j["settings"] = implem.getConfig()->toJSON();
+                j["experimentalFeature"] = implem.experimentalFeature;
+            }
         }
-        res["stores"] = std::move(stores);
-        res["fetchers"] = fetchers::dumpRegisterInputSchemeInfo();
+
+        {
+            auto & fetchers = res["fetchers"] = json::object();
+
+            for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
+                auto & s = fetchers[schemeName] = json::object();
+                s["description"] = scheme->schemeDescription();
+                auto & attrs = s["allowedAttrs"] = json::object();
+                for (auto & [fieldName, field] : scheme->allowedAttrs()) {
+                    auto & f = attrs[fieldName] = json::object();
+                    f["type"] = field.type;
+                    f["required"] = field.required;
+                    f["doc"] = stripIndentation(field.doc);
+                }
+            }
+        };
 
         return res.dump();
     }
@@ -226,8 +244,8 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto mdName = subcommand.empty() ? "nix" : fmt("nix3-%s", concatStringsSep("-", subcommand));
 
-    evalSettings.restrictEval = false;
-    evalSettings.pureEval = false;
+    evalSettings.restrictEval = true;
+    evalSettings.pureEval = true;
     EvalState state({}, openStore("dummy://"), fetchSettings, evalSettings);
 
     auto vGenerateManpage = state.allocValue();
@@ -253,11 +271,11 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     );
 
     auto vDump = state.allocValue();
-    vDump->mkString(toplevel.dumpCli());
+    vDump->mkString(toplevel.dumpCli(), state.mem);
 
     auto vRes = state.allocValue();
-    state.callFunction(*vGenerateManpage, state.getBuiltin("false"), *vRes, noPos);
-    state.callFunction(*vRes, *vDump, *vRes, noPos);
+    Value * args[]{&state.getBuiltin("false"), vDump};
+    state.callFunction(*vGenerateManpage, args, *vRes, noPos);
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
@@ -440,7 +458,7 @@ void mainWrapped(int argc, char ** argv)
             if (!primOp->doc)
                 continue;
             b["args"] = primOp->args;
-            b["doc"] = trim(stripIndentation(primOp->doc));
+            b["doc"] = trim(stripIndentation(*primOp->doc));
             if (primOp->experimentalFeature)
                 b["experimental-feature"] = primOp->experimentalFeature;
             builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
@@ -566,7 +584,9 @@ int main(int argc, char ** argv)
 #ifndef _WIN32
     // Increase the default stack size for the evaluator and for
     // libstdc++'s std::regex.
-    nix::setStackSize(64 * 1024 * 1024);
+    // This used to be 64 MiB, but macOS as deployed on GitHub Actions has a
+    // hard limit slightly under that, so we round it down a bit.
+    nix::setStackSize(60 * 1024 * 1024);
 #endif
 
     return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });

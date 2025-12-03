@@ -119,7 +119,7 @@ This will:
 
 3. Stop the program when the test fails, allowing the user to then issue arbitrary commands to GDB.
 
-### Characterisation testing { #characaterisation-testing-unit }
+### Characterisation testing { #characterisation-testing-unit }
 
 See [functional characterisation testing](#characterisation-testing-functional) for a broader discussion of characterisation testing.
 
@@ -136,6 +136,12 @@ $ _NIX_TEST_ACCEPT=1 meson test nix-store-tests -v
 ```
 will regenerate the "golden master" expected result for the `libnixstore` characterisation tests.
 The characterisation tests will mark themselves "skipped" since they regenerated the expected result instead of actually testing anything.
+
+### JSON Schema testing
+
+In `doc/manual/source/protocols/json/` we have a number of manual pages generated from [JSON Schema](https://json-schema.org/).
+That JSON schema is tested against the JSON file test data used in [characterisation tests](#characterisation-testing-unit ) for JSON (de)serialization, in `src/json-schema-checks`.
+Between the JSON (de)serialization testing, and this testing of the same data against the schema, we make sure that the manual, the implementation, and a machine-readable schema are are all in sync.
 
 ### Unit test support libraries
 

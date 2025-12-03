@@ -26,11 +26,20 @@ public:
     }
 
 protected:
-    LibExprTest()
+    LibExprTest(ref<Store> store, auto && makeEvalSettings)
         : LibStoreTest()
+        , evalSettings(makeEvalSettings(readOnlyMode))
         , state({}, store, fetchSettings, evalSettings, nullptr)
     {
-        evalSettings.nixPath = {};
+    }
+
+    LibExprTest()
+        : LibExprTest(openStore("dummy://"), [](bool & readOnlyMode) {
+            EvalSettings settings{readOnlyMode};
+            settings.nixPath = {};
+            return settings;
+        })
+    {
     }
 
     Value eval(std::string input, bool forceValue = true)
@@ -95,9 +104,10 @@ MATCHER(IsAttrs, "")
 MATCHER_P(IsStringEq, s, fmt("The string is equal to \"%1%\"", s))
 {
     if (arg.type() != nString) {
+        *result_listener << "Expected a string got " << arg.type();
         return false;
     }
-    return std::string_view(arg.c_str()) == s;
+    return arg.string_view() == s;
 }
 
 MATCHER_P(IsIntEq, v, fmt("The string is equal to \"%1%\"", v))

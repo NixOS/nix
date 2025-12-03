@@ -10,18 +10,18 @@
 
 namespace nix::fetchers {
 
-std::shared_ptr<Registry> Registry::read(const Settings & settings, const Path & path, RegistryType type)
+std::shared_ptr<Registry> Registry::read(const Settings & settings, const SourcePath & path, RegistryType type)
 {
     debug("reading registry '%s'", path);
 
-    auto registry = std::make_shared<Registry>(settings, type);
+    auto registry = std::make_shared<Registry>(type);
 
-    if (!pathExists(path))
-        return std::make_shared<Registry>(settings, type);
+    if (!path.pathExists())
+        return std::make_shared<Registry>(type);
 
     try {
 
-        auto json = nlohmann::json::parse(readFile(path));
+        auto json = nlohmann::json::parse(path.readFile());
 
         auto version = json.value("version", 0);
 
@@ -56,7 +56,7 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Path &
     return registry;
 }
 
-void Registry::write(const Path & path)
+void Registry::write(const std::filesystem::path & path)
 {
     nlohmann::json arr;
     for (auto & entry : entries) {
@@ -74,7 +74,7 @@ void Registry::write(const Path & path)
     json["version"] = 2;
     json["flakes"] = std::move(arr);
 
-    createDirs(dirOf(path));
+    createDirs(path.parent_path());
     writeFile(path, json.dump(2));
 }
 
@@ -90,77 +90,90 @@ void Registry::remove(const Input & input)
         entries.end());
 }
 
-static Path getSystemRegistryPath()
+static std::filesystem::path getSystemRegistryPath()
 {
-    return settings.nixConfDir + "/registry.json";
+    return settings.nixConfDir / "registry.json";
 }
 
 static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
 {
-    static auto systemRegistry = Registry::read(settings, getSystemRegistryPath(), Registry::System);
+    static auto systemRegistry = Registry::read(
+        settings,
+        SourcePath{getFSSourceAccessor(), CanonPath{getSystemRegistryPath().string()}}.resolveSymlinks(),
+        Registry::System);
     return systemRegistry;
 }
 
-Path getUserRegistryPath()
+std::filesystem::path getUserRegistryPath()
 {
-    return getConfigDir() + "/registry.json";
+    return getConfigDir() / "registry.json";
 }
 
 std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
 {
-    static auto userRegistry = Registry::read(settings, getUserRegistryPath(), Registry::User);
+    static auto userRegistry = Registry::read(
+        settings,
+        SourcePath{getFSSourceAccessor(), CanonPath{getUserRegistryPath().string()}}.resolveSymlinks(),
+        Registry::User);
     return userRegistry;
 }
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Path & p)
+std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry = Registry::read(settings, p, Registry::Custom);
+    static auto customRegistry = Registry::read(
+        settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
     return customRegistry;
 }
 
-std::shared_ptr<Registry> getFlagRegistry(const Settings & settings)
+std::shared_ptr<Registry> getFlagRegistry()
 {
-    static auto flagRegistry = std::make_shared<Registry>(settings, Registry::Flag);
+    static auto flagRegistry = std::make_shared<Registry>(Registry::Flag);
     return flagRegistry;
 }
 
 void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    getFlagRegistry(*from.settings)->add(from, to, extraAttrs, false);
+    getFlagRegistry()->add(from, to, extraAttrs, false);
 }
 
-static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, ref<Store> store)
+static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
 {
     static auto reg = [&]() {
         auto path = settings.flakeRegistry.get();
         if (path == "") {
-            return std::make_shared<Registry>(settings, Registry::Global); // empty registry
+            return std::make_shared<Registry>(Registry::Global); // empty registry
         }
 
-        if (!isAbsolute(path)) {
-            auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
-            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-                store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
-            path = store->toRealPath(storePath);
-        }
-
-        return Registry::read(settings, path, Registry::Global);
+        return Registry::read(
+            settings,
+            [&] -> SourcePath {
+                if (!isAbsolute(path)) {
+                    auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
+                    if (auto store2 = dynamic_cast<LocalFSStore *>(&store))
+                        store2->addPermRoot(storePath, getCacheDir() + "/flake-registry.json");
+                    return {store.requireStoreObjectAccessor(storePath)};
+                } else {
+                    return SourcePath{getFSSourceAccessor(), CanonPath{path}}.resolveSymlinks();
+                }
+            }(),
+            Registry::Global);
     }();
 
     return reg;
 }
 
-Registries getRegistries(const Settings & settings, ref<Store> store)
+Registries getRegistries(const Settings & settings, Store & store)
 {
     Registries registries;
-    registries.push_back(getFlagRegistry(settings));
+    registries.push_back(getFlagRegistry());
     registries.push_back(getUserRegistry(settings));
     registries.push_back(getSystemRegistry(settings));
     registries.push_back(getGlobalRegistry(settings, store));
     return registries;
 }
 
-std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & _input, UseRegistries useRegistries)
+std::pair<Input, Attrs>
+lookupInRegistries(const Settings & settings, Store & store, const Input & _input, UseRegistries useRegistries)
 {
     Attrs extraAttrs;
     int n = 0;
@@ -175,7 +188,7 @@ restart:
     if (n > 100)
         throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
-    for (auto & registry : getRegistries(*input.settings, store)) {
+    for (auto & registry : getRegistries(settings, store)) {
         if (useRegistries == UseRegistries::Limited
             && !(registry->type == fetchers::Registry::Flag || registry->type == fetchers::Registry::Global))
             continue;

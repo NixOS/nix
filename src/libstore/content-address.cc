@@ -1,6 +1,7 @@
 #include "nix/util/args.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/split.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -300,3 +301,36 @@ Hash ContentAddressWithReferences::getHash() const
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+ContentAddressMethod adl_serializer<ContentAddressMethod>::from_json(const json & json)
+{
+    return ContentAddressMethod::parse(getString(json));
+}
+
+void adl_serializer<ContentAddressMethod>::to_json(json & json, const ContentAddressMethod & m)
+{
+    json = m.render();
+}
+
+ContentAddress adl_serializer<ContentAddress>::from_json(const json & json)
+{
+    auto obj = getObject(json);
+    return {
+        .method = adl_serializer<ContentAddressMethod>::from_json(valueAt(obj, "method")),
+        .hash = valueAt(obj, "hash"),
+    };
+}
+
+void adl_serializer<ContentAddress>::to_json(json & json, const ContentAddress & ca)
+{
+    json = {
+        {"method", ca.method},
+        {"hash", ca.hash},
+    };
+}
+
+} // namespace nlohmann

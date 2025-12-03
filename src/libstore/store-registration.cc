@@ -2,8 +2,14 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
+
+ref<Store> openStore()
+{
+    return openStore(settings.storeUri.get());
+}
 
 ref<Store> openStore(const std::string & uri, const Store::Config::Params & extraParams)
 {

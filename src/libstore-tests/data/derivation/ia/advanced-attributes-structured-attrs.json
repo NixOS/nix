@@ -5,39 +5,41 @@
   ],
   "builder": "/bin/bash",
   "env": {
-    "bin": "/nix/store/33qms3h55wlaspzba3brlzlrm8m2239g-advanced-attributes-structured-attrs-bin",
-    "dev": "/nix/store/wyfgwsdi8rs851wmy1xfzdxy7y5vrg5l-advanced-attributes-structured-attrs-dev",
-    "out": "/nix/store/7cxy4zx1vqc885r4jl2l64pymqbdmhii-advanced-attributes-structured-attrs"
+    "bin": "/nix/store/cnpasdljgkhnwaf78cf3qygcp4qbki1c-advanced-attributes-structured-attrs-bin",
+    "dev": "/nix/store/ijq6mwpa9jbnpnl33qldfqihrr38kprx-advanced-attributes-structured-attrs-dev",
+    "out": "/nix/store/h1vh648d3p088kdimy0r8ngpfx7c3nzw-advanced-attributes-structured-attrs"
   },
-  "inputDrvs": {
-    "/nix/store/afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
+  "inputs": {
+    "drvs": {
+      "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      },
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      }
     },
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
-    }
+    "srcs": [
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
   },
-  "inputSrcs": [
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
-  ],
   "name": "advanced-attributes-structured-attrs",
   "outputs": {
     "bin": {
-      "path": "/nix/store/33qms3h55wlaspzba3brlzlrm8m2239g-advanced-attributes-structured-attrs-bin"
+      "path": "cnpasdljgkhnwaf78cf3qygcp4qbki1c-advanced-attributes-structured-attrs-bin"
     },
     "dev": {
-      "path": "/nix/store/wyfgwsdi8rs851wmy1xfzdxy7y5vrg5l-advanced-attributes-structured-attrs-dev"
+      "path": "ijq6mwpa9jbnpnl33qldfqihrr38kprx-advanced-attributes-structured-attrs-dev"
     },
     "out": {
-      "path": "/nix/store/7cxy4zx1vqc885r4jl2l64pymqbdmhii-advanced-attributes-structured-attrs"
+      "path": "h1vh648d3p088kdimy0r8ngpfx7c3nzw-advanced-attributes-structured-attrs"
     }
   },
   "structuredAttrs": {
@@ -64,7 +66,8 @@
     "outputChecks": {
       "bin": {
         "disallowedReferences": [
-          "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar"
+          "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
+          "dev"
         ],
         "disallowedRequisites": [
           "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"
@@ -79,7 +82,8 @@
           "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"
         ],
         "allowedRequisites": [
-          "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"
+          "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
+          "bin"
         ]
       }
     },
@@ -95,5 +99,6 @@
     ],
     "system": "my-system"
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

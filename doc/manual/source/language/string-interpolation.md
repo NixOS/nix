@@ -6,7 +6,7 @@ Such a construct is called *interpolated string*, and the expression inside is a
 
 [string]: ./types.md#type-string
 [path]: ./types.md#type-path
-[attribute set]: ./types.md#attribute-set
+[attribute set]: ./types.md#type-attrs
 
 > **Syntax**
 >

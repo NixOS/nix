@@ -1,7 +1,11 @@
+# Process JSON schema documentation
+subdir('protocols')
+
 summary_rl_next = custom_target(
   command : [
     bash,
-    '-euo', 'pipefail',
+    '-euo',
+    'pipefail',
     '-c',
     '''
       if [ -e "@INPUT@" ]; then
@@ -12,6 +16,6 @@ summary_rl_next = custom_target(
   input : [
     rl_next_generated,
   ],
-  capture: true,
+  capture : true,
   output : 'SUMMARY-rl-next.md',
 )

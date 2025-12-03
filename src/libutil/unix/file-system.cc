@@ -16,7 +16,7 @@ namespace nix {
 
 Descriptor openDirectory(const std::filesystem::path & path)
 {
-    return open(path.c_str(), O_RDONLY | O_DIRECTORY);
+    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 }
 
 void setWriteTime(

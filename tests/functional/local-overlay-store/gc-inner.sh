@@ -21,24 +21,24 @@ outPath=$(nix-build ../hermetic.nix --no-out-link --arg busybox "$busybox" --arg
 # Set a GC root.
 mkdir -p "$stateB"
 rm -f "$stateB/gcroots/foo"
-ln -sf $outPath "$stateB/gcroots/foo"
+ln -sf "$outPath" "$stateB/gcroots/foo"
 
-[ "$(nix-store -q --roots $outPath)" = "$stateB/gcroots/foo -> $outPath" ]
+[ "$(nix-store -q --roots "$outPath")" = "$stateB/gcroots/foo -> $outPath" ]
 
-nix-store --gc --print-roots | grep $outPath
-nix-store --gc --print-live | grep $outPath
-if nix-store --gc --print-dead | grep -E $outPath$; then false; fi
+nix-store --gc --print-roots | grep "$outPath"
+nix-store --gc --print-live | grep "$outPath"
+if nix-store --gc --print-dead | grep -E "$outPath"$; then false; fi
 
 nix-store --gc --print-dead
 
-expect 1 nix-store --delete $outPath
+expect 1 nix-store --delete "$outPath"
 test -e "$storeBRoot/$outPath"
 
 shopt -s nullglob
-for i in $storeBRoot/*; do
+for i in "$storeBRoot"/*; do
     if [[ $i =~ /trash ]]; then continue; fi # compat with old daemon
-    touch $i.lock
-    touch $i.chroot
+    touch "$i".lock
+    touch "$i".chroot
 done
 
 nix-collect-garbage
@@ -51,7 +51,8 @@ rm "$stateB/gcroots/foo"
 nix-collect-garbage
 
 # Check that the output has been GC'd.
-test ! -e $outPath
+test ! -e "$outPath"
 
 # Check that the store is empty.
+# shellcheck disable=SC2012
 [ "$(ls -1 "$storeBTop" | wc -l)" = "0" ]

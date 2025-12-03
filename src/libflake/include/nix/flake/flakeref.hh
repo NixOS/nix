@@ -2,15 +2,21 @@
 ///@file
 
 #include <regex>
+#include <iosfwd>
+#include <string>
+#include <tuple>
+#include <utility>
 
-#include "nix/util/types.hh"
-#include "nix/fetchers/fetchers.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/fetchers/registry.hh"
 
 namespace nix {
 
 class Store;
+
+namespace fetchers {
+struct Settings;
+} // namespace fetchers
 
 typedef std::string FlakeId;
 
@@ -65,11 +71,14 @@ struct FlakeRef
 
     fetchers::Attrs toAttrs() const;
 
-    FlakeRef resolve(ref<Store> store, fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
+    FlakeRef resolve(
+        const fetchers::Settings & fetchSettings,
+        Store & store,
+        fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
 
     static FlakeRef fromAttrs(const fetchers::Settings & fetchSettings, const fetchers::Attrs & attrs);
 
-    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(ref<Store> store) const;
+    std::pair<ref<SourceAccessor>, FlakeRef> lazyFetch(const fetchers::Settings & fetchSettings, Store & store) const;
 
     /**
      * Canonicalize a flakeref for the purpose of comparing "old" and
@@ -81,34 +90,34 @@ struct FlakeRef
 std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 FlakeRef parseFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir = {},
+    const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
     bool preserveRelativePaths = false);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir = {},
+    const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
     bool preserveRelativePaths = false);
 
 /**
- * @param baseDir Optional [base directory](https://nixos.org/manual/nix/unstable/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir = {},
+    const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true);
 

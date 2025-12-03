@@ -48,6 +48,6 @@
 
 * `nix run` is now stricter in what it accepts: members of the `apps`
   flake output are now required to be apps (as defined in [the
-  manual](https://nixos.org/manual/nix/stable/command-ref/new-cli/nix3-run.html#apps)),
+  manual](https://nix.dev/manual/nix/stable/command-ref/new-cli/nix3-run.html#apps)),
   and members of `packages` or `legacyPackages` must be derivations
   (not apps).

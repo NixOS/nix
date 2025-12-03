@@ -2,8 +2,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/comparator.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/util/json-utils.hh"
 
 #include <optional>
 
@@ -18,59 +17,6 @@ GENERATE_CMP_EXT(, std::strong_ordering, SingleDerivedPathBuilt, *me->drvPath, m
 // Darwin, per header.
 GENERATE_EQUAL(, DerivedPathBuilt ::, DerivedPathBuilt, *me->drvPath, me->outputs);
 GENERATE_ONE_CMP(, bool, DerivedPathBuilt ::, <, DerivedPathBuilt, *me->drvPath, me->outputs);
-
-nlohmann::json DerivedPath::Opaque::toJSON(const StoreDirConfig & store) const
-{
-    return store.printStorePath(path);
-}
-
-nlohmann::json SingleDerivedPath::Built::toJSON(Store & store) const
-{
-    nlohmann::json res;
-    res["drvPath"] = drvPath->toJSON(store);
-    // Fallback for the input-addressed derivation case: We expect to always be
-    // able to print the output paths, so let’s do it
-    // FIXME try-resolve on drvPath
-    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *drvPath));
-    res["output"] = output;
-    auto outputPathIter = outputMap.find(output);
-    if (outputPathIter == outputMap.end())
-        res["outputPath"] = nullptr;
-    else if (std::optional p = outputPathIter->second)
-        res["outputPath"] = store.printStorePath(*p);
-    else
-        res["outputPath"] = nullptr;
-    return res;
-}
-
-nlohmann::json DerivedPath::Built::toJSON(Store & store) const
-{
-    nlohmann::json res;
-    res["drvPath"] = drvPath->toJSON(store);
-    // Fallback for the input-addressed derivation case: We expect to always be
-    // able to print the output paths, so let’s do it
-    // FIXME try-resolve on drvPath
-    const auto outputMap = store.queryPartialDerivationOutputMap(resolveDerivedPath(store, *drvPath));
-    for (const auto & [output, outputPathOpt] : outputMap) {
-        if (!outputs.contains(output))
-            continue;
-        if (outputPathOpt)
-            res["outputs"][output] = store.printStorePath(*outputPathOpt);
-        else
-            res["outputs"][output] = nullptr;
-    }
-    return res;
-}
-
-nlohmann::json SingleDerivedPath::toJSON(Store & store) const
-{
-    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
-}
-
-nlohmann::json DerivedPath::toJSON(Store & store) const
-{
-    return std::visit([&](const auto & buildable) { return buildable.toJSON(store); }, raw());
-}
 
 std::string DerivedPath::Opaque::to_string(const StoreDirConfig & store) const
 {
@@ -139,7 +85,11 @@ void drvRequireExperiment(const SingleDerivedPath & drv, const ExperimentalFeatu
             [&](const SingleDerivedPath::Opaque &) {
                 // plain drv path; no experimental features required.
             },
-            [&](const SingleDerivedPath::Built &) { xpSettings.require(Xp::DynamicDerivations); },
+            [&](const SingleDerivedPath::Built & b) {
+                xpSettings.require(Xp::DynamicDerivations, [&] {
+                    return fmt("building output '%s' of '%s'", b.output, b.drvPath->getBaseStorePath().to_string());
+                });
+            },
         },
         drv.raw());
 }
@@ -273,3 +223,84 @@ const StorePath & DerivedPath::getBaseStorePath() const
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+void adl_serializer<SingleDerivedPath::Opaque>::to_json(json & json, const SingleDerivedPath::Opaque & o)
+{
+    json = o.path;
+}
+
+SingleDerivedPath::Opaque adl_serializer<SingleDerivedPath::Opaque>::from_json(const json & json)
+{
+    return SingleDerivedPath::Opaque{json};
+}
+
+void adl_serializer<SingleDerivedPath::Built>::to_json(json & json, const SingleDerivedPath::Built & sdpb)
+{
+    json = {
+        {"drvPath", *sdpb.drvPath},
+        {"output", sdpb.output},
+    };
+}
+
+void adl_serializer<DerivedPath::Built>::to_json(json & json, const DerivedPath::Built & dbp)
+{
+    json = {
+        {"drvPath", *dbp.drvPath},
+        {"outputs", dbp.outputs},
+    };
+}
+
+SingleDerivedPath::Built
+adl_serializer<SingleDerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
+{
+    auto & json = getObject(json0);
+    auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
+    drvRequireExperiment(*drvPath, xpSettings);
+    return {
+        .drvPath = std::move(drvPath),
+        .output = getString(valueAt(json, "output")),
+    };
+}
+
+DerivedPath::Built
+adl_serializer<DerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
+{
+    auto & json = getObject(json0);
+    auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
+    drvRequireExperiment(*drvPath, xpSettings);
+    return {
+        .drvPath = std::move(drvPath),
+        .outputs = adl_serializer<OutputsSpec>::from_json(valueAt(json, "outputs")),
+    };
+}
+
+void adl_serializer<SingleDerivedPath>::to_json(json & json, const SingleDerivedPath & sdp)
+{
+    std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
+}
+
+void adl_serializer<DerivedPath>::to_json(json & json, const DerivedPath & sdp)
+{
+    std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
+}
+
+SingleDerivedPath
+adl_serializer<SingleDerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
+{
+    if (json.is_string())
+        return static_cast<SingleDerivedPath::Opaque>(json);
+    else
+        return adl_serializer<SingleDerivedPath::Built>::from_json(json, xpSettings);
+}
+
+DerivedPath adl_serializer<DerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
+{
+    if (json.is_string())
+        return static_cast<DerivedPath::Opaque>(json);
+    else
+        return adl_serializer<DerivedPath::Built>::from_json(json, xpSettings);
+}
+
+} // namespace nlohmann

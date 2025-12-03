@@ -11,12 +11,32 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/users.hh"
+#include "nix/store/build/derivation-builder.hh"
 
 #include "nix/store/config.hh"
 
 namespace nix {
 
 typedef enum { smEnabled, smRelaxed, smDisabled } SandboxMode;
+
+template<>
+SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<SandboxMode>::to_string() const;
+
+template<>
+PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<PathsInChroot>::to_string() const;
+
+template<>
+struct BaseSetting<PathsInChroot>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append);
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -57,7 +77,7 @@ public:
 
     Settings();
 
-    unsigned int getDefaultCores() const;
+    static unsigned int getDefaultCores();
 
     Path nixPrefix;
 
@@ -81,7 +101,7 @@ public:
     /**
      * The directory where system configuration files are stored.
      */
-    Path nixConfDir;
+    std::filesystem::path nixConfDir;
 
     /**
      * A list of user configuration files to load.
@@ -169,7 +189,7 @@ public:
         0,
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/store/building.md#builder-execution) of a derivation.
           The `builder` executable can use this variable to control its own maximum amount of parallelism.
 
           <!--
@@ -179,7 +199,7 @@ public:
           -->
           For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
 
-          If set to `0`, nix will detect the number of CPU cores and pass this number via NIX_BUILD_CORES.
+          If set to `0`, nix will detect the number of CPU cores and pass this number via `NIX_BUILD_CORES`.
 
           > **Note**
           >
@@ -272,7 +292,7 @@ public:
 
     Setting<std::string> builders{
         this,
-        "@" + nixConfDir + "/machines",
+        "@" + nixConfDir.string() + "/machines",
         "builders",
         R"(
           A semicolon- or newline-separated list of build machines.
@@ -291,7 +311,7 @@ public:
           Only the first element is required.
           To leave a field at its default, set it to `-`.
 
-          1. The URI of the remote store in the format `ssh://[username@]hostname`.
+          1. The URI of the remote store in the format `ssh://[username@]hostname[:port]`.
 
              > **Example**
              >
@@ -407,7 +427,7 @@ public:
         R"(
           If set to `true`, Nix instructs [remote build machines](#conf-builders) to use their own [`substituters`](#conf-substituters) if available.
 
-          It means that remote build hosts fetches as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
+          It means that remote build hosts fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
           This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
@@ -483,7 +503,7 @@ public:
           by the Nix account, its group should be the group specified here,
           and its mode should be `1775`.
 
-          If the build users group is empty, builds areperformed under
+          If the build users group is empty, builds are performed under
           the uid of the Nix process (that is, the uid of the caller if
           `NIX_REMOTE` is empty, the uid under which the Nix daemon runs if
           `NIX_REMOTE` is `daemon`). Obviously, this should not be used
@@ -692,7 +712,7 @@ public:
         )",
         {"build-use-chroot", "build-use-sandbox"}};
 
-    Setting<PathSet> sandboxPaths{
+    Setting<PathsInChroot> sandboxPaths{
         this,
         {},
         "sandbox-paths",
@@ -827,8 +847,8 @@ public:
           4.  The path to the build's scratch directory. This directory
               exists only if the build was run with `--keep-failed`.
 
-          The stderr and stdout output from the diff hook isn't
-          displayed to the user. Instead, it print to the nix-daemon's log.
+          The stderr and stdout output from the diff hook isn't displayed
+          to the user. Instead, it prints to the nix-daemon's log.
 
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.
@@ -1352,6 +1372,76 @@ public:
           Default is 0, which disables the warning.
           Set it to 1 to warn on all paths.
         )"};
+
+    using ExternalBuilders = std::vector<ExternalBuilder>;
+
+    Setting<ExternalBuilders> externalBuilders{
+        this,
+        {},
+        "external-builders",
+        R"(
+          Helper programs that execute derivations.
+
+          The program is passed a JSON document that describes the build environment as the final argument.
+          The JSON document looks like this:
+
+            {
+              "args": [
+                "-e",
+                "/nix/store/vj1c3wf9…-source-stdenv.sh",
+                "/nix/store/shkw4qm9…-default-builder.sh"
+              ],
+              "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+              "env": {
+                "HOME": "/homeless-shelter",
+                "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+                "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+                …
+              },
+              "inputPaths": [
+                "/nix/store/14dciax3…-glibc-2.32-54-dev",
+                "/nix/store/1azs5s8z…-gettext-0.21",
+                …
+              ],
+              "outputs": {
+                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+              },
+              "realStoreDir": "/nix/store",
+              "storeDir": "/nix/store",
+              "system": "aarch64-linux",
+              "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
+              "tmpDirInSandbox": "/build",
+              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0",
+              "version": 1
+            }
+        )",
+        {},   // aliases
+        true, // document default
+        // NOTE(cole-h): even though we can make the experimental feature required here, the errors
+        // are not as good (it just becomes a warning if you try to use this setting without the
+        // experimental feature)
+        //
+        // With this commented out:
+        //
+        // error: experimental Nix feature 'external-builders' is disabled; add '--extra-experimental-features
+        // external-builders' to enable it
+        //
+        // With this uncommented:
+        //
+        // warning: Ignoring setting 'external-builders' because experimental feature 'external-builders' is not enabled
+        // error: Cannot build '/nix/store/vwsp4qd8…-opentofu-1.10.2.drv'.
+        //        Reason: required system or feature not available
+        //        Required system: 'aarch64-linux' with features {}
+        //        Current system: 'aarch64-darwin' with features {apple-virt, benchmark, big-parallel, nixos-test}
+        // Xp::ExternalBuilders
+    };
+
+    /**
+     * Finds the first external derivation builder that supports this
+     * derivation, or else returns a null pointer.
+     */
+    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 };
 
 // FIXME: don't use a global variable.

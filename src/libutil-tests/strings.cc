@@ -2,6 +2,7 @@
 #include <rapidcheck/gtest.h>
 
 #include "nix/util/strings.hh"
+#include "nix/util/strings-inline.hh"
 #include "nix/util/error.hh"
 
 namespace nix {
@@ -271,113 +272,122 @@ TEST(tokenizeString, tokenizeSepEmpty)
  * splitString
  * --------------------------------------------------------------------------*/
 
-TEST(splitString, empty)
-{
-    Strings expected = {""};
+using SplitStringTestContainerTypes = ::testing::
+    Types<std::vector<std::string>, std::vector<std::string_view>, std::list<std::string>, std::list<std::string_view>>;
 
-    ASSERT_EQ(splitString<Strings>("", " \t\n\r"), expected);
+template<typename T>
+class splitStringTest : public ::testing::Test
+{};
+
+TYPED_TEST_SUITE(splitStringTest, SplitStringTestContainerTypes);
+
+TYPED_TEST(splitStringTest, empty)
+{
+    TypeParam expected = {""};
+
+    EXPECT_EQ(splitString<TypeParam>("", " \t\n\r"), expected);
 }
 
-TEST(splitString, oneSep)
+TYPED_TEST(splitStringTest, oneSep)
 {
-    Strings expected = {"", ""};
+    TypeParam expected = {"", ""};
 
-    ASSERT_EQ(splitString<Strings>(" ", " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(" ", " \t\n\r"), expected);
 }
 
-TEST(splitString, twoSep)
+TYPED_TEST(splitStringTest, twoSep)
 {
-    Strings expected = {"", "", ""};
+    TypeParam expected = {"", "", ""};
 
-    ASSERT_EQ(splitString<Strings>(" \n", " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(" \n", " \t\n\r"), expected);
 }
 
-TEST(splitString, tokenizeSpacesWithSpaces)
+TYPED_TEST(splitStringTest, tokenizeSpacesWithSpaces)
 {
     auto s = "foo bar baz";
-    Strings expected = {"foo", "bar", "baz"};
+    TypeParam expected = {"foo", "bar", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, " \t\n\r"), expected);
 }
 
-TEST(splitString, tokenizeTabsWithDefaults)
+TYPED_TEST(splitStringTest, tokenizeTabsWithDefaults)
 {
     auto s = "foo\tbar\tbaz";
     // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
-    Strings expected = {"foo", "bar", "baz"};
+    TypeParam expected = {"foo", "bar", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, " \t\n\r"), expected);
 }
 
-TEST(splitString, tokenizeTabsSpacesWithDefaults)
+TYPED_TEST(splitStringTest, tokenizeTabsSpacesWithDefaults)
 {
     auto s = "foo\t bar\t baz";
     // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
-    Strings expected = {"foo", "", "bar", "", "baz"};
+    TypeParam expected = {"foo", "", "bar", "", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, " \t\n\r"), expected);
 }
 
-TEST(splitString, tokenizeTabsSpacesNewlineWithDefaults)
+TYPED_TEST(splitStringTest, tokenizeTabsSpacesNewlineWithDefaults)
 {
     auto s = "foo\t\n bar\t\n baz";
     // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
-    Strings expected = {"foo", "", "", "bar", "", "", "baz"};
+    TypeParam expected = {"foo", "", "", "bar", "", "", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, " \t\n\r"), expected);
 }
 
-TEST(splitString, tokenizeTabsSpacesNewlineRetWithDefaults)
+TYPED_TEST(splitStringTest, tokenizeTabsSpacesNewlineRetWithDefaults)
 {
     auto s = "foo\t\n\r bar\t\n\r baz";
     // Using it like this is weird, but shows the difference with tokenizeString, which also has this test
-    Strings expected = {"foo", "", "", "", "bar", "", "", "", "baz"};
+    TypeParam expected = {"foo", "", "", "", "bar", "", "", "", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, " \t\n\r"), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, " \t\n\r"), expected);
 
     auto s2 = "foo \t\n\r bar \t\n\r baz";
-    Strings expected2 = {"foo", "", "", "", "", "bar", "", "", "", "", "baz"};
+    TypeParam expected2 = {"foo", "", "", "", "", "bar", "", "", "", "", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s2, " \t\n\r"), expected2);
+    EXPECT_EQ(splitString<TypeParam>(s2, " \t\n\r"), expected2);
 }
 
-TEST(splitString, tokenizeWithCustomSep)
+TYPED_TEST(splitStringTest, tokenizeWithCustomSep)
 {
     auto s = "foo\n,bar\n,baz\n";
-    Strings expected = {"foo\n", "bar\n", "baz\n"};
+    TypeParam expected = {"foo\n", "bar\n", "baz\n"};
 
-    ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, ","), expected);
 }
 
-TEST(splitString, tokenizeSepAtStart)
+TYPED_TEST(splitStringTest, tokenizeSepAtStart)
 {
     auto s = ",foo,bar,baz";
-    Strings expected = {"", "foo", "bar", "baz"};
+    TypeParam expected = {"", "foo", "bar", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, ","), expected);
 }
 
-TEST(splitString, tokenizeSepAtEnd)
+TYPED_TEST(splitStringTest, tokenizeSepAtEnd)
 {
     auto s = "foo,bar,baz,";
-    Strings expected = {"foo", "bar", "baz", ""};
+    TypeParam expected = {"foo", "bar", "baz", ""};
 
-    ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, ","), expected);
 }
 
-TEST(splitString, tokenizeSepEmpty)
+TYPED_TEST(splitStringTest, tokenizeSepEmpty)
 {
     auto s = "foo,,baz";
-    Strings expected = {"foo", "", "baz"};
+    TypeParam expected = {"foo", "", "baz"};
 
-    ASSERT_EQ(splitString<Strings>(s, ","), expected);
+    EXPECT_EQ(splitString<TypeParam>(s, ","), expected);
 }
 
 // concatStringsSep sep . splitString sep = id   if sep is 1 char
-RC_GTEST_PROP(splitString, recoveredByConcatStringsSep, (const std::string & s))
+RC_GTEST_TYPED_FIXTURE_PROP(splitStringTest, recoveredByConcatStringsSep, (const std::string & s))
 {
-    RC_ASSERT(concatStringsSep("/", splitString<Strings>(s, "/")) == s);
-    RC_ASSERT(concatStringsSep("a", splitString<Strings>(s, "a")) == s);
+    RC_ASSERT(concatStringsSep("/", splitString<TypeParam>(s, "/")) == s);
+    RC_ASSERT(concatStringsSep("a", splitString<TypeParam>(s, "a")) == s);
 }
 
 /* ----------------------------------------------------------------------------
@@ -482,6 +492,65 @@ TEST(shellSplitString, testUnbalancedQuotes)
     ASSERT_THROW(shellSplitString("foo'bar"), Error);
     ASSERT_THROW(shellSplitString("foo\"bar"), Error);
     ASSERT_THROW(shellSplitString("foo\"bar\\\""), Error);
+}
+
+/* ----------------------------------------------------------------------------
+ * optionalBracket
+ * --------------------------------------------------------------------------*/
+
+TEST(optionalBracket, emptyContent)
+{
+    ASSERT_EQ(optionalBracket(" (", "", ")"), "");
+}
+
+TEST(optionalBracket, nonEmptyContent)
+{
+    ASSERT_EQ(optionalBracket(" (", "foo", ")"), " (foo)");
+}
+
+TEST(optionalBracket, emptyPrefixAndSuffix)
+{
+    ASSERT_EQ(optionalBracket("", "foo", ""), "foo");
+}
+
+TEST(optionalBracket, emptyContentEmptyBrackets)
+{
+    ASSERT_EQ(optionalBracket("", "", ""), "");
+}
+
+TEST(optionalBracket, complexBrackets)
+{
+    ASSERT_EQ(optionalBracket(" [[[", "content", "]]]"), " [[[content]]]");
+}
+
+TEST(optionalBracket, onlyPrefix)
+{
+    ASSERT_EQ(optionalBracket("prefix", "content", ""), "prefixcontent");
+}
+
+TEST(optionalBracket, onlySuffix)
+{
+    ASSERT_EQ(optionalBracket("", "content", "suffix"), "contentsuffix");
+}
+
+TEST(optionalBracket, optionalWithValue)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>("foo"), ")"), " (foo)");
+}
+
+TEST(optionalBracket, optionalNullopt)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>(std::nullopt), ")"), "");
+}
+
+TEST(optionalBracket, optionalEmptyString)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string>(""), ")"), "");
+}
+
+TEST(optionalBracket, optionalStringViewWithValue)
+{
+    ASSERT_EQ(optionalBracket(" (", std::optional<std::string_view>("bar"), ")"), " (bar)");
 }
 
 } // namespace nix

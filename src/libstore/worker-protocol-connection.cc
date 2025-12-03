@@ -244,7 +244,7 @@ void WorkerProto::BasicServerConnection::postHandshake(const StoreDirConfig & st
     WorkerProto::write(store, *this, info);
 }
 
-UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
+std::optional<UnkeyedValidPathInfo> WorkerProto::BasicClientConnection::queryPathInfo(
     const StoreDirConfig & store, bool * daemonException, const StorePath & path)
 {
     to << WorkerProto::Op::QueryPathInfo << store.printStorePath(path);
@@ -253,14 +253,14 @@ UnkeyedValidPathInfo WorkerProto::BasicClientConnection::queryPathInfo(
     } catch (Error & e) {
         // Ugly backwards compatibility hack.
         if (e.msg().find("is not valid") != std::string::npos)
-            throw InvalidPath(std::move(e.info()));
+            return std::nullopt;
         throw;
     }
     if (GET_PROTOCOL_MINOR(protoVersion) >= 17) {
         bool valid;
         from >> valid;
         if (!valid)
-            throw InvalidPath("path '%s' is not valid", store.printStorePath(path));
+            return std::nullopt;
     }
     return WorkerProto::Serialise<UnkeyedValidPathInfo>::read(store, *this);
 }
@@ -313,12 +313,4 @@ void WorkerProto::BasicClientConnection::narFromPath(
     fun(from);
 }
 
-void WorkerProto::BasicClientConnection::importPaths(
-    const StoreDirConfig & store, bool * daemonException, Source & source)
-{
-    to << WorkerProto::Op::ImportPaths;
-    processStderr(daemonException, 0, &source);
-    auto importedPaths = WorkerProto::Serialise<StorePathSet>::read(store, *this);
-    assert(importedPaths.size() <= importedPaths.size());
-}
 } // namespace nix

@@ -108,8 +108,13 @@ enum struct ServeProto::Command : uint64_t {
     QueryValidPaths = 1,
     QueryPathInfos = 2,
     DumpStorePath = 3,
+    /**
+     * @note This is no longer used by Nix (as a client), but it is used
+     * by Hydra. We should therefore not remove it until Hydra no longer
+     * uses it either.
+     */
     ImportPaths = 4,
-    ExportPaths = 5,
+    // ExportPaths = 5,
     BuildPaths = 6,
     QueryClosure = 7,
     BuildDerivation = 8,

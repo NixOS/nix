@@ -25,7 +25,20 @@ std::string SSHStoreConfig::doc()
         ;
 }
 
-struct SSHStore : virtual RemoteStore
+StoreReference SSHStoreConfig::getReference() const
+{
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = authority.to_string(),
+            },
+        .params = getQueryParams(),
+    };
+}
+
+struct alignas(8) /* Work around ASAN failures on i686-linux. */
+    SSHStore : virtual RemoteStore
 {
     using Config = SSHStoreConfig;
 
@@ -39,11 +52,6 @@ struct SSHStore : virtual RemoteStore
               // Use SSH master only if using more than 1 connection.
               connections->capacity() > 1))
     {
-    }
-
-    std::string getUri() override
-    {
-        return *Config::uriSchemes().begin() + "://" + host;
     }
 
     // FIXME extend daemon protocol, move implementation to RemoteStore
@@ -65,8 +73,6 @@ protected:
     };
 
     ref<RemoteStore::Connection> openConnection() override;
-
-    std::string host;
 
     std::vector<std::string> extraRemoteProgramArgs;
 
@@ -138,12 +144,17 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        return LocalFSStore::narFromPath(path, sink);
+        return Store::narFromPath(path, sink);
     }
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
     {
         return LocalFSStore::getFSAccessor(requireValidPath);
+    }
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
+    {
+        return LocalFSStore::getFSAccessor(path, requireValidPath);
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override

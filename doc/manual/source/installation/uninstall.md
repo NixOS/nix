@@ -41,6 +41,38 @@ There may also be references to Nix in
 
 which you may remove.
 
+### FreeBSD
+
+1. Stop and remove the Nix daemon service:
+
+   ```console
+   sudo service nix-daemon stop
+   sudo rm -f /usr/local/etc/rc.d/nix-daemon
+   sudo sysrc -x nix_daemon_enable
+   ```
+
+2. Remove files created by Nix:
+
+   ```console
+   sudo rm -rf /etc/nix /usr/local/etc/profile.d/nix.sh /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
+   ```
+
+3. Remove build users and their group:
+
+   ```console
+   for i in $(seq 1 32); do
+     sudo pw userdel nixbld$i
+   done
+   sudo pw groupdel nixbld
+   ```
+
+4. There may also be references to Nix in:
+   - `/usr/local/etc/bashrc`
+   - `/usr/local/etc/zshrc`
+   - Shell configuration files in users' home directories
+
+   which you may remove.
+
 ### macOS
 
 > **Updating to macOS 15 Sequoia**

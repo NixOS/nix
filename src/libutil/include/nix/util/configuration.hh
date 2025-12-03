@@ -73,7 +73,7 @@ public:
      * - res: map to store settings in
      * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
-    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) = 0;
+    virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -160,7 +160,7 @@ public:
 
     void addSetting(AbstractSetting * setting);
 
-    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) override;
+    void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
     void resetOverridden() override;
 
@@ -463,7 +463,20 @@ struct ExperimentalFeatureSettings : Config
      * Require an experimental feature be enabled, throwing an error if it is
      * not.
      */
-    void require(const ExperimentalFeature &) const;
+    void require(const ExperimentalFeature &, std::string reason = "") const;
+
+    /**
+     * Require an experimental feature be enabled, throwing an error if it is
+     * not. The reason is lazily evaluated only if the feature is disabled.
+     */
+    template<typename GetReason>
+        requires std::invocable<GetReason> && std::convertible_to<std::invoke_result_t<GetReason>, std::string>
+    void require(const ExperimentalFeature & feature, GetReason && getReason) const
+    {
+        if (isEnabled(feature))
+            return;
+        require(feature, getReason());
+    }
 
     /**
      * `std::nullopt` pointer means no feature, which means there is nothing that could be

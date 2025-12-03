@@ -111,7 +111,13 @@ clearStore
 
 mv "$cacheDir/nar" "$cacheDir/nar2"
 
-nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result"
+nix-build --substituters "file://$cacheDir" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result" 2>&1 | tee "$TEST_ROOT/log"
+
+# Verify that missing NARs produce warnings, not errors
+# The build should succeed despite the warnings
+grepQuiet "does not exist in binary cache" "$TEST_ROOT/log"
+# Ensure the message is not at error level by checking that the command succeeded
+[ -e "$TEST_ROOT/result" ]
 
 mv "$cacheDir/nar2" "$cacheDir/nar"
 

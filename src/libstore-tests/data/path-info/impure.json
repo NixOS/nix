@@ -1,7 +1,18 @@
 {
-  "ca": "fixed:r:sha256:1lr187v6dck1rjh2j6svpikcfz53wyl3qrlcbb405zlh13x0khhh",
+  "ca": {
+    "hash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "EMIJ+giQ/gLIWoxmPKjno3zHZrxbGymgzGGyZvZBIdM="
+    },
+    "method": "nar"
+  },
   "deriver": "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
-  "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "narHash": {
+    "algorithm": "sha256",
+    "format": "base64",
+    "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+  },
   "narSize": 34878,
   "references": [
     "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
@@ -12,5 +23,6 @@
     "asdf",
     "qwer"
   ],
-  "ultimate": true
+  "ultimate": true,
+  "version": 2
 }

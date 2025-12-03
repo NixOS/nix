@@ -7,42 +7,65 @@
 
 namespace nix {
 
-class Store;
+struct StoreDirConfig;
 
-struct NarInfo : ValidPathInfo
+struct UnkeyedNarInfo : virtual UnkeyedValidPathInfo
 {
     std::string url;
     std::string compression;
     std::optional<Hash> fileHash;
     uint64_t fileSize = 0;
 
+    UnkeyedNarInfo(UnkeyedValidPathInfo info)
+        : UnkeyedValidPathInfo(std::move(info))
+    {
+    }
+
+    bool operator==(const UnkeyedNarInfo &) const = default;
+    // TODO libc++ 16 (used by darwin) missing `std::optional::operator <=>`, can't do yet
+    // auto operator <=>(const NarInfo &) const = default;
+
+    nlohmann::json toJSON(const StoreDirConfig * store, bool includeImpureInfo) const override;
+    static UnkeyedNarInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
+};
+
+/**
+ * Key and the extra NAR fields
+ */
+struct NarInfo : ValidPathInfo, UnkeyedNarInfo
+{
     NarInfo() = delete;
 
-    NarInfo(const Store & store, std::string name, ContentAddressWithReferences ca, Hash narHash)
-        : ValidPathInfo(store, std::move(name), std::move(ca), narHash)
+    NarInfo(ValidPathInfo info)
+        : UnkeyedValidPathInfo{static_cast<UnkeyedValidPathInfo &&>(info)}
+        /* Later copies from `*this` are pointless. The argument is only
+           there so the constructors can also call
+           `UnkeyedValidPathInfo`, but this won't happen since the base
+           class is virtual. Only this counstructor (assuming it is most
+           derived) will initialize that virtual base class. */
+        , ValidPathInfo{info.path, static_cast<const UnkeyedValidPathInfo &>(*this)}
+        , UnkeyedNarInfo{static_cast<const UnkeyedValidPathInfo &>(*this)}
     {
     }
 
     NarInfo(StorePath path, Hash narHash)
-        : ValidPathInfo(std::move(path), narHash)
+        : NarInfo{ValidPathInfo{std::move(path), UnkeyedValidPathInfo(narHash)}}
     {
     }
 
-    NarInfo(const ValidPathInfo & info)
-        : ValidPathInfo(info)
+    static NarInfo
+    makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences ca, Hash narHash)
     {
+        return ValidPathInfo::makeFromCA(store, std::move(name), std::move(ca), narHash);
     }
 
-    NarInfo(const Store & store, const std::string & s, const std::string & whence);
+    NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence);
 
     bool operator==(const NarInfo &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::optional::operator <=>`, can't do yet
-    // auto operator <=>(const NarInfo &) const = default;
 
-    std::string to_string(const Store & store) const;
-
-    nlohmann::json toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const override;
-    static NarInfo fromJSON(const Store & store, const StorePath & path, const nlohmann::json & json);
+    std::string to_string(const StoreDirConfig & store) const;
 };
 
 } // namespace nix
+
+JSON_IMPL(nix::UnkeyedNarInfo)

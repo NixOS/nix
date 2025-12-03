@@ -9,14 +9,14 @@ clearStore
 path=$(nix-build dependencies.nix --no-out-link)
 
 # Test nix-store -l.
-[ "$(nix-store -l $path)" = FOO ]
+[ "$(nix-store -l "$path")" = FOO ]
 
 # Test compressed logs.
 clearStore
-rm -rf $NIX_LOG_DIR
-(! nix-store -l $path)
+rm -rf "$NIX_LOG_DIR"
+(! nix-store -l "$path")
 nix-build dependencies.nix --no-out-link --compress-build-log
-[ "$(nix-store -l $path)" = FOO ]
+[ "$(nix-store -l "$path")" = FOO ]
 
 # test whether empty logs work fine with `nix log`.
 builder="$(realpath "$(mktemp)")"
@@ -40,5 +40,5 @@ if [[ "$NIX_REMOTE" != "daemon" ]]; then
     nix build -vv --file dependencies.nix --no-link --json-log-path "$TEST_ROOT/log.json" 2>&1 | grepQuiet 'building.*dependencies-top.drv'
     jq < "$TEST_ROOT/log.json"
     grep '{"action":"start","fields":\[".*-dependencies-top.drv","",1,1\],"id":.*,"level":3,"parent":0' "$TEST_ROOT/log.json" >&2
-    (( $(grep '{"action":"msg","level":5,"msg":"executing builder .*"}' "$TEST_ROOT/log.json" | wc -l) == 5 ))
+    (( $(grep -c '{"action":"msg","level":5,"msg":"executing builder .*"}' "$TEST_ROOT/log.json" ) == 5 ))
 fi

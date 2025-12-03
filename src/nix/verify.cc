@@ -103,14 +103,14 @@ struct CmdVerify : StorePathsCommand
 
                     auto hash = hashSink.finish();
 
-                    if (hash.first != info->narHash) {
+                    if (hash.hash != info->narHash) {
                         corrupted++;
                         act2.result(resCorruptedPath, store->printStorePath(info->path));
                         printError(
                             "path '%s' was modified! expected hash '%s', got '%s'",
                             store->printStorePath(info->path),
                             info->narHash.to_string(HashFormat::Nix32, true),
-                            hash.first.to_string(HashFormat::Nix32, true));
+                            hash.hash.to_string(HashFormat::Nix32, true));
                     }
                 }
 

@@ -1,6 +1,10 @@
-#include "nix/flake/url-name.hh"
 #include <regex>
-#include <iostream>
+#include <optional>
+#include <string>
+
+#include "nix/flake/url-name.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -27,16 +31,21 @@ std::optional<std::string> getNameFromURL(const ParsedURL & url)
         return match.str(2);
     }
 
+    /* This is not right, because special chars like slashes within the
+       path fragments should be percent encoded, but I don't think any
+       of the regexes above care. */
+    auto path = concatStringsSep("/", url.path);
+
     /* If this is a github/gitlab/sourcehut flake, use the repo name */
-    if (std::regex_match(url.scheme, gitProviderRegex) && std::regex_match(url.path, match, secondPathSegmentRegex))
+    if (std::regex_match(url.scheme, gitProviderRegex) && std::regex_match(path, match, secondPathSegmentRegex))
         return match.str(1);
 
     /* If it is a regular git flake, use the directory name */
-    if (std::regex_match(url.scheme, gitSchemeRegex) && std::regex_match(url.path, match, lastPathSegmentRegex))
+    if (std::regex_match(url.scheme, gitSchemeRegex) && std::regex_match(path, match, lastPathSegmentRegex))
         return match.str(1);
 
     /* If there is no fragment, take the last element of the path */
-    if (std::regex_match(url.path, match, lastPathSegmentRegex))
+    if (std::regex_match(path, match, lastPathSegmentRegex))
         return match.str(1);
 
     /* If even that didn't work, the URL does not contain enough info to determine a useful name */

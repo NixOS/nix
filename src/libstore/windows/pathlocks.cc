@@ -13,10 +13,10 @@ namespace nix {
 
 using namespace nix::windows;
 
-void deleteLockFile(const Path & path, Descriptor desc)
+void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 {
 
-    int exit = DeleteFileA(path.c_str());
+    int exit = DeleteFileW(path.c_str());
     if (exit == 0)
         warn("%s: &s", path, std::to_string(GetLastError()));
 }
@@ -28,17 +28,17 @@ void PathLocks::unlock()
             deleteLockFile(i.second, i.first);
 
         if (CloseHandle(i.first) == -1)
-            printError("error (ignored): cannot close lock file on '%1%'", i.second);
+            printError("error (ignored): cannot close lock file on %1%", i.second);
 
-        debug("lock released on '%1%'", i.second);
+        debug("lock released on %1%", i.second);
     }
 
     fds.clear();
 }
 
-AutoCloseFD openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 {
-    AutoCloseFD desc = CreateFileA(
+    AutoCloseFD desc = CreateFileW(
         path.c_str(),
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -103,14 +103,15 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     }
 }
 
-bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bool wait)
+bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 
     for (auto & path : paths) {
         checkInterrupt();
-        Path lockPath = path + ".lock";
-        debug("locking path '%1%'", path);
+        std::filesystem::path lockPath = path;
+        lockPath += L".lock";
+        debug("locking path %1%", path);
 
         AutoCloseFD fd;
 
@@ -127,13 +128,13 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
                 }
             }
 
-            debug("lock acquired on '%1%'", lockPath);
+            debug("lock acquired on %1%", lockPath);
 
             struct _stat st;
             if (_fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
-                throw SysError("statting lock file '%1%'", lockPath);
+                throw SysError("statting lock file %1%", lockPath);
             if (st.st_size != 0)
-                debug("open lock file '%1%' has become stale", lockPath);
+                debug("open lock file %1% has become stale", lockPath);
             else
                 break;
         }

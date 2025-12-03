@@ -4,6 +4,12 @@
 
 namespace nix {
 
+GlobalConfig::ConfigRegistrations & GlobalConfig::configRegistrations()
+{
+    static GlobalConfig::ConfigRegistrations configRegistrations;
+    return configRegistrations;
+}
+
 bool GlobalConfig::set(const std::string & name, const std::string & value)
 {
     for (auto & config : configRegistrations())
@@ -15,7 +21,7 @@ bool GlobalConfig::set(const std::string & name, const std::string & value)
     return false;
 }
 
-void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
+void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (auto & config : configRegistrations())
         config->getSettings(res, overriddenOnly);

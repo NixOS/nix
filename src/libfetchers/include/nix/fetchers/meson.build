@@ -1,4 +1,4 @@
-include_dirs = [include_directories('../..')]
+include_dirs = [ include_directories('../..') ]
 
 headers = files(
   'attrs.hh',
@@ -11,6 +11,5 @@ headers = files(
   'git-utils.hh',
   'input-cache.hh',
   'registry.hh',
-  'store-path-accessor.hh',
   'tarball.hh',
 )

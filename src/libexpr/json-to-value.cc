@@ -151,7 +151,7 @@ public:
     bool string(string_t & val) override
     {
         forceNoNullByte(val);
-        rs->value(state).mkString(val);
+        rs->value(state).mkString(val, state.mem);
         rs->add();
         return true;
     }

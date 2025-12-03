@@ -1,0 +1,32 @@
+"$schema": "http://json-schema.org/draft-07/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-path-v1.json"
+title: Store Path
+description: |
+  A [store path](@docroot@/store/store-path.md) identifying a store object.
+
+  This schema describes the JSON representation of store paths as used in various Nix JSON APIs.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+  ## Format
+
+  Store paths in JSON are represented as strings containing just the hash and name portion, without the store directory prefix.
+
+  For example: `"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"`
+
+  (If the store dir is `/nix/store`, then this corresponds to the path `/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv`.)
+
+  ## Structure
+
+  The format follows this pattern: `${digest}-${name}`
+
+  - **hash**: Digest rendered in a custom variant of [Base32](https://en.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+  - **name**: The package name and optional version/suffix information
+
+type: string
+pattern: "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+$"
+minLength: 34

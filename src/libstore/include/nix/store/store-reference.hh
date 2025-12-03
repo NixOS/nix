@@ -64,7 +64,29 @@ struct StoreReference
         auto operator<=>(const Specified & rhs) const = default;
     };
 
-    typedef std::variant<Auto, Specified> Variant;
+    /**
+     * Special case for `daemon` to avoid normalization.
+     */
+    struct Daemon : Specified
+    {
+        Daemon()
+            : Specified({.scheme = "unix"})
+        {
+        }
+    };
+
+    /**
+     * Special case for `local` to avoid normalization.
+     */
+    struct Local : Specified
+    {
+        Local()
+            : Specified({.scheme = "local"})
+        {
+        }
+    };
+
+    typedef std::variant<Auto, Specified, Daemon, Local> Variant;
 
     Variant variant;
 
@@ -73,15 +95,25 @@ struct StoreReference
     bool operator==(const StoreReference & rhs) const = default;
 
     /**
-     * Render the whole store reference as a URI, including parameters.
+     * Render the whole store reference as a URI, optionally including parameters.
      */
-    std::string render() const;
+    std::string render(bool withParams = true) const;
+
+    std::string to_string() const
+    {
+        return render();
+    }
 
     /**
      * Parse a URI into a store reference.
      */
     static StoreReference parse(const std::string & uri, const Params & extraParams = Params{});
 };
+
+static inline std::ostream & operator<<(std::ostream & os, const StoreReference & ref)
+{
+    return os << ref.render();
+}
 
 /**
  * Split URI into protocol+hierarchy part and its parameter set.

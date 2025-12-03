@@ -10,6 +10,7 @@
 #include "nix/util/url.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/fetchers/input-cache.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -29,12 +30,12 @@ void emitTreeAttrs(
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.sOutPath));
+    state.mkStorePathString(storePath, attrs.alloc(state.s.outPath));
 
     // FIXME: support arbitrary input attributes.
 
     if (auto narHash = input.getNarHash())
-        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true));
+        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
@@ -42,13 +43,13 @@ void emitTreeAttrs(
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
-            attrs.alloc("rev").mkString(rev->gitRev());
-            attrs.alloc("shortRev").mkString(rev->gitShortRev());
+            attrs.alloc("rev").mkString(rev->gitRev(), state.mem);
+            attrs.alloc("shortRev").mkString(rev->gitShortRev(), state.mem);
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(HashAlgorithm::SHA1);
-            attrs.alloc("rev").mkString(emptyHash.gitRev());
-            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev());
+            attrs.alloc("rev").mkString(emptyHash.gitRev(), state.mem);
+            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev(), state.mem);
         }
 
         if (auto revCount = input.getRevCount())
@@ -58,13 +59,14 @@ void emitTreeAttrs(
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
-        attrs.alloc("dirtyRev").mkString(*dirtyRev);
-        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"));
+        attrs.alloc("dirtyRev").mkString(*dirtyRev, state.mem);
+        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
     }
 
     if (auto lastModified = input.getLastModified()) {
         attrs.alloc("lastModified").mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate").mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")));
+        attrs.alloc("lastModifiedDate")
+            .mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")), state.mem);
     }
 
     v.mkAttrs(attrs);
@@ -81,7 +83,7 @@ struct FetchTreeParams
 static void fetchTree(
     EvalState & state, const PosIdx pos, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
 {
-    fetchers::Input input{state.fetchSettings};
+    fetchers::Input input{};
     NixStringContext context;
     std::optional<std::string> type;
     auto fetcher = params.isFetchGit ? "fetchGit" : "fetchTree";
@@ -95,7 +97,7 @@ static void fetchTree(
 
         fetchers::Attrs attrs;
 
-        if (auto aType = args[0]->attrs()->get(state.sType)) {
+        if (auto aType = args[0]->attrs()->get(state.s.type)) {
             if (type)
                 state.error<EvalError>("unexpected argument 'type'").atPos(pos).debugThrow();
             type = state.forceStringNoCtx(
@@ -106,14 +108,14 @@ static void fetchTree(
         attrs.emplace("type", type.value());
 
         for (auto & attr : *args[0]->attrs()) {
-            if (attr.name == state.sType)
+            if (attr.name == state.s.type)
                 continue;
             state.forceValue(*attr.value, attr.pos);
             if (attr.value->type() == nPath || attr.value->type() == nString) {
                 auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(
                     state.symbols[attr.name],
-                    params.isFetchGit && state.symbols[attr.name] == "url" ? fixGitURL(s) : s);
+                    params.isFetchGit && state.symbols[attr.name] == "url" ? fixGitURL(s).to_string() : s);
             } else if (attr.value->type() == nBool)
                 attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
             else if (attr.value->type() == nInt) {
@@ -175,7 +177,7 @@ static void fetchTree(
         if (params.isFetchGit) {
             fetchers::Attrs attrs;
             attrs.emplace("type", "git");
-            attrs.emplace("url", fixGitURL(url));
+            attrs.emplace("url", fixGitURL(url).to_string());
             if (!attrs.contains("exportIgnore")
                 && (!attrs.contains("submodules") || !*fetchers::maybeGetBoolAttr(attrs, "submodules"))) {
                 attrs.emplace("exportIgnore", Explicit<bool>{true});
@@ -193,13 +195,13 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchSettings, *state.store, input, fetchers::UseRegistries::Limited).first;
 
-    if (state.settings.pureEval && !input.isLocked()) {
+    if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
             warn(
-                "Input '%s' is unlocked (e.g. lacks a Git revision) but does have a NAR hash. "
-                "This is deprecated since such inputs are verifiable but may not be reproducible.",
+                "Input '%s' is unlocked (e.g. lacks a Git revision) but is checked by NAR hash. "
+                "This is not reproducible and will break after garbage collection or when shared.",
                 input.to_string());
         else
             state
@@ -218,11 +220,12 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto [storePath, input2] = input.fetchToStore(state.store);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
 
-    state.allowPath(storePath);
+    auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, input2, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -233,229 +236,127 @@ static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, V
 static RegisterPrimOp primop_fetchTree({
     .name = "fetchTree",
     .args = {"input"},
-    .doc = R"(
-      Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
+    .doc = []() -> std::string {
+        std::string doc = stripIndentation(R"(
+          Fetch a file system tree or a plain file using one of the supported backends and return an attribute set with:
 
-      - the resulting fixed-output [store path](@docroot@/store/store-path.md)
-      - the corresponding [NAR](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) hash
-      - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
+          - the resulting fixed-output [store path](@docroot@/store/store-path.md)
+          - the corresponding [NAR](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) hash
+          - backend-specific metadata (currently not documented). <!-- TODO: document output attributes -->
 
-      *input* must be an attribute set with the following attributes:
+          *input* must be an attribute set with the following attributes:
 
-      - `type` (String, required)
+          - `type` (String, required)
 
-        One of the [supported source types](#source-types).
-        This determines other required and allowed input attributes.
+            One of the [supported source types](#source-types).
+            This determines other required and allowed input attributes.
 
-      - `narHash` (String, optional)
+          - `narHash` (String, optional)
 
-        The `narHash` parameter can be used to substitute the source of the tree.
-        It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
-        If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
+            The `narHash` parameter can be used to substitute the source of the tree.
+            It also allows for verification of tree contents that may not be provided by the underlying transfer mechanism.
+            If `narHash` is set, the source is first looked up is the Nix store and [substituters](@docroot@/command-ref/conf-file.md#conf-substituters), and only fetched if not available.
 
-      A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
-      That is, `fetchTree` is idempotent.
+          A subset of the output attributes of `fetchTree` can be re-used for subsequent calls to `fetchTree` to produce the same result again.
+          That is, `fetchTree` is idempotent.
 
-      Downloads are cached in `$XDG_CACHE_HOME/nix`.
-      The remote source is fetched from the network if both are true:
-      - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
+          Downloads are cached in `$XDG_CACHE_HOME/nix`.
+          The remote source is fetched from the network if both are true:
+          - A NAR hash is supplied and the corresponding store path is not [valid](@docroot@/glossary.md#gloss-validity), that is, not available in the store
 
-        > **Note**
-        >
-        > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
-
-      - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
-
-      ## Source types
-
-      The following source types and associated input attributes are supported.
-
-      <!-- TODO: It would be soooo much more predictable to work with (and
-      document) if `fetchTree` was a curried call with the first parameter for
-      `type` or an attribute like `builtins.fetchTree.git`! -->
-
-      - `"file"`
-
-        Place a plain file into the Nix store.
-        This is similar to [`builtins.fetchurl`](@docroot@/language/builtins.md#builtins-fetchurl)
-
-        - `url` (String, required)
-
-          Supported protocols:
-
-          - `https`
-
-            > **Example**
+            > **Note**
             >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "https://example.com/index.html";
-            > }
-            > ```
+            > [Substituters](@docroot@/command-ref/conf-file.md#conf-substituters) are not used in fetching.
 
-          - `http`
+          - There is no cache entry or the cache entry is older than [`tarball-ttl`](@docroot@/command-ref/conf-file.md#conf-tarball-ttl)
 
-            Insecure HTTP transfer for legacy sources.
+          ## Source types
 
-            > **Warning**
-            >
-            > HTTP performs no encryption or authentication.
-            > Use a `narHash` known in advance to ensure the output has expected contents.
+          The following source types and associated input attributes are supported.
 
-          - `file`
+          <!-- TODO: It would be soooo much more predictable to work with (and
+          document) if `fetchTree` was a curried call with the first parameter for
+          `type` or an attribute like `builtins.fetchTree.git`! -->
+        )");
 
-            A file on the local file system.
+        auto indentString = [](std::string const & str, std::string const & indent) {
+            std::string result;
+            std::istringstream stream(str);
+            std::string line;
+            bool first = true;
+            while (std::getline(stream, line)) {
+                if (!first)
+                    result += "\n";
+                result += indent + line;
+                first = false;
+            }
+            return result;
+        };
 
-            > **Example**
-            >
-            > ```nix
-            > fetchTree {
-            >   type = "file";
-            >   url = "file:///home/eelco/nix/README.md";
-            > }
-            > ```
+        for (const auto & [schemeName, scheme] : fetchers::getAllInputSchemes()) {
+            doc += "\n- `" + quoteString(schemeName, '"') + "`\n\n";
+            doc += indentString(scheme->schemeDescription(), "  ");
+            if (!doc.empty() && doc.back() != '\n')
+                doc += "\n";
 
-      - `"tarball"`
+            for (const auto & [attrName, attribute] : scheme->allowedAttrs()) {
+                doc += "\n  - `" + attrName + "` (" + attribute.type + ", "
+                       + (attribute.required ? "required" : "optional") + ")\n\n";
+                doc += indentString(stripIndentation(attribute.doc), "    ");
+                if (!doc.empty() && doc.back() != '\n')
+                    doc += "\n";
+            }
+        }
 
-        Download a tar archive and extract it into the Nix store.
-        This has the same underlying implementation as [`builtins.fetchTarball`](@docroot@/language/builtins.md#builtins-fetchTarball)
+        doc += "\n" + stripIndentation(R"(
+          The following input types are still subject to change:
 
-        - `url` (String, required)
+          - `"path"`
+          - `"github"`
+          - `"gitlab"`
+          - `"sourcehut"`
+          - `"mercurial"`
 
-           > **Example**
-           >
-           > ```nix
-           > fetchTree {
-           >   type = "tarball";
-           >   url = "https://github.com/NixOS/nixpkgs/tarball/nixpkgs-23.11";
-           > }
-           > ```
-
-      - `"git"`
-
-        Fetch a Git tree and copy it to the Nix store.
-        This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
-
-        - `url` (String, required)
-
-          The URL formats supported are the same as for Git itself.
+         *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
+         The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
 
           > **Example**
           >
+          > Fetch a GitHub repository using the attribute set representation:
+          >
           > ```nix
-          > fetchTree {
-          >   type = "git";
-          >   url = "git@github.com:NixOS/nixpkgs.git";
+          > builtins.fetchTree {
+          >   type = "github";
+          >   owner = "NixOS";
+          >   repo = "nixpkgs";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          > }
+          > ```
+          >
+          > This evaluates to the following attribute set:
+          >
+          > ```nix
+          > {
+          >   lastModified = 1686503798;
+          >   lastModifiedDate = "20230611171638";
+          >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
+          >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
+          >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
+          >   shortRev = "ae2e6b3";
           > }
           > ```
 
-          > **Note**
+          > **Example**
           >
-          > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but use the *current file contents* of the Git working directory.
+          > Fetch the same GitHub repository using the URL-like syntax:
+          >
+          >   ```nix
+          >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
+          >   ```
+        )");
 
-        - `ref` (String, optional)
-
-          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
-
-          A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
-
-          Default: `"HEAD"`
-
-        - `rev` (String, optional)
-
-          A Git revision; a commit hash.
-
-          Default: the tip of `ref`
-
-        - `shallow` (Bool, optional)
-
-          Make a shallow clone when fetching the Git tree.
-          When this is enabled, the options `ref` and `allRefs` have no effect anymore.
-
-          Default: `true`
-
-        - `submodules` (Bool, optional)
-
-          Also fetch submodules if available.
-
-          Default: `false`
-
-        - `lfs` (Bool, optional)
-
-          Fetch any [Git LFS](https://git-lfs.com/) files.
-
-          Default: `false`
-
-        - `allRefs` (Bool, optional)
-
-          By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
-
-          Whether to fetch all references (eg. branches and tags) of the repository.
-          With this argument being true, it's possible to load a `rev` from *any* `ref`.
-          (Without setting this option, only `rev`s from the specified `ref` are supported).
-
-          Default: `false`
-
-        - `lastModified` (Integer, optional)
-
-          Unix timestamp of the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-        - `revCount` (Integer, optional)
-
-          Number of revisions in the history of the Git repository before the fetched commit.
-
-          If set, pass through the value to the output attribute set.
-          Otherwise, generated from the fetched Git tree.
-
-      The following input types are still subject to change:
-
-      - `"path"`
-      - `"github"`
-      - `"gitlab"`
-      - `"sourcehut"`
-      - `"mercurial"`
-
-     *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-     The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
-
-      > **Example**
-      >
-      > Fetch a GitHub repository using the attribute set representation:
-      >
-      > ```nix
-      > builtins.fetchTree {
-      >   type = "github";
-      >   owner = "NixOS";
-      >   repo = "nixpkgs";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      > }
-      > ```
-      >
-      > This evaluates to the following attribute set:
-      >
-      > ```nix
-      > {
-      >   lastModified = 1686503798;
-      >   lastModifiedDate = "20230611171638";
-      >   narHash = "sha256-rA9RqKP9OlBrgGCPvfd5HVAXDOy8k2SmPtB/ijShNXc=";
-      >   outPath = "/nix/store/l5m6qlvfs9sdw14ja3qbzpglcjlb6j1x-source";
-      >   rev = "ae2e6b3958682513d28f7d633734571fb18285dd";
-      >   shortRev = "ae2e6b3";
-      > }
-      > ```
-
-      > **Example**
-      >
-      > Fetch the same GitHub repository using the URL-like syntax:
-      >
-      >   ```nix
-      >   builtins.fetchTree "github:NixOS/nixpkgs/ae2e6b3958682513d28f7d633734571fb18285dd"
-      >   ```
-    )",
+        return doc;
+    }(),
     .fun = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
 });
@@ -561,25 +462,37 @@ static void fetch(
                 .hash = *expectedHash,
                 .references = {}});
 
-        if (state.store->isValidPath(expectedPath)) {
+        // Try to get the path from the local store or substituters
+        try {
+            state.store->ensurePath(expectedPath);
+            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;
+        } catch (Error & e) {
+            debug(
+                "substitution of '%s' failed, will try to download: %s",
+                state.store->printStorePath(expectedPath),
+                e.what());
+            // Fall through to download
         }
     }
 
-    // TODO: fetching may fail, yet the path may be substitutable.
-    //       https://github.com/NixOS/nix/issues/4313
+    // Download the file/tarball if substitution failed or no hash was provided
     auto storePath = unpack ? fetchToStore(
                                   state.fetchSettings,
                                   *state.store,
-                                  fetchers::downloadTarball(state.store, state.fetchSettings, *url),
+                                  fetchers::downloadTarball(*state.store, state.fetchSettings, *url),
                                   FetchMode::Copy,
                                   name)
-                            : fetchers::downloadFile(state.store, state.fetchSettings, *url, name).storePath;
+                            : fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
 
     if (expectedHash) {
         auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
-                           : hashFile(HashAlgorithm::SHA256, state.store->toRealPath(storePath));
+                           : hashPath(
+                                 {state.store->requireStoreObjectAccessor(storePath)},
+                                 FileSerialisationMethod::Flat,
+                                 HashAlgorithm::SHA256)
+                                 .hash;
         if (hash != *expectedHash) {
             state
                 .error<EvalError>(

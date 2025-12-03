@@ -17,19 +17,32 @@ private:
 
     std::shared_ptr<T> p;
 
-public:
-    explicit ref(const std::shared_ptr<T> & p)
-        : p(p)
+    void assertNonNull()
     {
         if (!p)
             throw std::invalid_argument("null pointer cast to ref");
     }
 
+public:
+
+    using element_type = T;
+
+    explicit ref(const std::shared_ptr<T> & p)
+        : p(p)
+    {
+        assertNonNull();
+    }
+
+    explicit ref(std::shared_ptr<T> && p)
+        : p(std::move(p))
+    {
+        assertNonNull();
+    }
+
     explicit ref(T * p)
         : p(p)
     {
-        if (!p)
-            throw std::invalid_argument("null pointer cast to ref");
+        assertNonNull();
     }
 
     T * operator->() const
@@ -42,14 +55,22 @@ public:
         return *p;
     }
 
-    operator std::shared_ptr<T>() const
+    std::shared_ptr<T> get_ptr() const &
     {
         return p;
     }
 
-    std::shared_ptr<T> get_ptr() const
+    std::shared_ptr<T> get_ptr() &&
     {
-        return p;
+        return std::move(p);
+    }
+
+    /**
+     * Convenience to avoid explicit `get_ptr()` call in some cases.
+     */
+    operator std::shared_ptr<T>(this auto && self)
+    {
+        return std::forward<decltype(self)>(self).get_ptr();
     }
 
     template<typename T2>

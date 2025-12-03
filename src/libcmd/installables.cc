@@ -132,7 +132,7 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             lockFlags.inputOverrides.insert_or_assign(
                 flake::parseInputAttrPath(inputAttrPath),
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()), true));
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -173,15 +173,21 @@ MixFlakeOptions::MixFlakeOptions()
             auto flake = flake::lockFlake(
                 flakeSettings,
                 *evalState,
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir())),
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string()),
                 {.writeLockFile = false});
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
                 if (auto input3 = std::dynamic_pointer_cast<const flake::LockedNode>(input2)) {
+                    fetchers::Attrs extraAttrs;
+
+                    if (!input3->lockedRef.subdir.empty()) {
+                        extraAttrs["dir"] = input3->lockedRef.subdir;
+                    }
+
                     overrideRegistry(
                         fetchers::Input::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", inputName}}),
                         input3->lockedRef.input,
-                        {});
+                        extraAttrs);
                 }
             }
         }},
@@ -257,7 +263,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, *file)));
+            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, file->string())));
 
             Value root;
             state->eval(e, root);
@@ -336,8 +342,7 @@ void completeFlakeRefWithFragment(
                 parseFlakeRef(fetchSettings, expandTilde(flakeRefS), std::filesystem::current_path().string());
 
             auto evalCache = openEvalCache(
-                *evalState,
-                std::make_shared<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
+                *evalState, make_ref<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
 
             auto root = evalCache->getRoot();
 
@@ -404,7 +409,7 @@ void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::strin
     Args::completeDir(completions, 0, prefix);
 
     /* Look for registry entries that match the prefix. */
-    for (auto & registry : fetchers::getRegistries(fetchSettings, store)) {
+    for (auto & registry : fetchers::getRegistries(fetchSettings, *store)) {
         for (auto & entry : registry->entries) {
             auto from = entry.from.to_string();
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
@@ -437,42 +442,6 @@ static StorePath getDeriver(ref<Store> store, const Installable & i, const Store
     return *derivers.begin();
 }
 
-ref<eval_cache::EvalCache> openEvalCache(EvalState & state, std::shared_ptr<flake::LockedFlake> lockedFlake)
-{
-    auto fingerprint = evalSettings.useEvalCache && evalSettings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
-                           : std::nullopt;
-    auto rootLoader = [&state, lockedFlake]() {
-        /* For testing whether the evaluation cache is
-           complete. */
-        if (getEnv("NIX_ALLOW_EVAL").value_or("1") == "0")
-            throw Error("not everything is cached, but evaluation is not allowed");
-
-        auto vFlake = state.allocValue();
-        flake::callFlake(state, *lockedFlake, *vFlake);
-
-        state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
-
-        auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
-        assert(aOutputs);
-
-        return aOutputs->value;
-    };
-
-    if (fingerprint) {
-        auto search = state.evalCaches.find(fingerprint.value());
-        if (search == state.evalCaches.end()) {
-            search =
-                state.evalCaches
-                    .emplace(fingerprint.value(), make_ref<nix::eval_cache::EvalCache>(fingerprint, state, rootLoader))
-                    .first;
-        }
-        return search->second;
-    } else {
-        return make_ref<nix::eval_cache::EvalCache>(std::nullopt, state, rootLoader);
-    }
-}
-
 Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<std::string> ss)
 {
     Installables result;
@@ -496,10 +465,10 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
             state->eval(e, *vFile);
         } else if (file) {
             auto dir = absPath(getCommandBaseDir());
-            state->evalFile(lookupFileArg(*state, *file, &dir), *vFile);
+            state->evalFile(lookupFileArg(*state, file->string(), &dir), *vFile);
         } else {
-            Path dir = absPath(getCommandBaseDir());
-            auto e = state->parseExprFromString(*expr, state->rootPath(dir));
+            auto dir = absPath(getCommandBaseDir());
+            auto e = state->parseExprFromString(*expr, state->rootPath(dir.string()));
             state->eval(e, *vFile);
         }
 
@@ -598,28 +567,28 @@ std::vector<BuiltPathWithResult> Installable::build(
 
 static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const Store & store)
 {
-    std::vector<KeyedBuildResult> failed;
+    std::vector<std::pair<const KeyedBuildResult *, const KeyedBuildResult::Failure *>> failed;
     for (auto & buildResult : buildResults) {
-        if (!buildResult.success()) {
-            failed.push_back(buildResult);
+        if (auto * failure = buildResult.tryGetFailure()) {
+            failed.push_back({&buildResult, failure});
         }
     }
 
     auto failedResult = failed.begin();
     if (failedResult != failed.end()) {
         if (failed.size() == 1) {
-            failedResult->rethrow();
+            failedResult->second->rethrow();
         } else {
             StringSet failedPaths;
             for (; failedResult != failed.end(); failedResult++) {
-                if (!failedResult->errorMsg.empty()) {
+                if (!failedResult->second->errorMsg.empty()) {
                     logError(
                         ErrorInfo{
                             .level = lvlError,
-                            .msg = failedResult->errorMsg,
+                            .msg = failedResult->second->errorMsg,
                         });
                 }
-                failedPaths.insert(failedResult->path.to_string(store));
+                failedPaths.insert(failedResult->first->path.to_string(store));
             }
             throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
         }
@@ -689,12 +658,14 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
         throwBuildErrors(buildResults, *store);
         for (auto & buildResult : buildResults) {
+            // If we didn't throw, they must all be sucesses
+            auto & success = std::get<nix::BuildResult::Success>(buildResult.inner);
             for (auto & aux : backmap[buildResult.path]) {
                 std::visit(
                     overloaded{
                         [&](const DerivedPath::Built & bfd) {
                             std::map<std::string, StorePath> outputs;
-                            for (auto & [outputName, realisation] : buildResult.builtOutputs)
+                            for (auto & [outputName, realisation] : success.builtOutputs)
                                 outputs.emplace(outputName, realisation.outPath);
                             res.push_back(
                                 {aux.installable,
@@ -830,7 +801,8 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
     for (const auto & i : rawInstallables)
-        res.push_back(parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir())).first);
+        res.push_back(
+            parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir()).string()).first);
     return res;
 }
 
@@ -849,7 +821,8 @@ void RawInstallablesCommand::run(ref<Store> store)
 
 std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
 {
-    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir())).first};
+    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir()).string())
+                .first};
 }
 
 void InstallablesCommand::run(ref<Store> store, std::vector<std::string> && rawInstallables)

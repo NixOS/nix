@@ -22,6 +22,7 @@
 #include <list>
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -191,13 +192,27 @@ public:
         err.traces.push_front(trace);
     }
 
+    /**
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
+     * @param fs Format string, see `HintFmt`
+     * @param args... Format string arguments.
+     */
     template<typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && e, std::string_view fs, const Args &... args)
+    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, const Args &... args)
     {
-        addTrace(std::move(e), HintFmt(std::string(fs), args...));
+        addTrace(std::move(pos), HintFmt(std::string(fs), args...));
     }
 
-    void addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePrint print = TracePrint::Default);
+    /**
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
+     * @param hint Formatted error message
+     * @param print Optional, whether to always print (used by `addErrorContext`)
+     */
+    void addTrace(std::shared_ptr<const Pos> && pos, HintFmt hint, TracePrint print = TracePrint::Default);
 
     bool hasTrace() const
     {
@@ -299,23 +314,16 @@ using NativeSysError =
 void throwExceptionSelfCheck();
 
 /**
- * Print a message and abort().
+ * Print a message and std::terminate().
  */
 [[noreturn]]
 void panic(std::string_view msg);
 
 /**
- * Print a basic error message with source position and abort().
- * Use the unreachable() macro to call this.
- */
-[[noreturn]]
-void panic(const char * file, int line, const char * func);
-
-/**
- * Print a basic error message with source position and abort().
+ * Print a basic error message with source position and std::terminate().
  *
  * @note: This assumes that the logger is operational
  */
-#define unreachable() (::nix::panic(__FILE__, __LINE__, __func__))
+[[gnu::noinline, gnu::cold, noreturn]] void unreachable(std::source_location loc = std::source_location::current());
 
 } // namespace nix

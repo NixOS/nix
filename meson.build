@@ -8,7 +8,6 @@ project(
   subproject_dir : 'src',
   default_options : [
     'localstatedir=/nix/var',
-    # hack for trailing newline
   ],
   meson_version : '>= 1.1',
 )
@@ -29,7 +28,7 @@ subproject('nix')
 if get_option('doc-gen')
   subproject('internal-api-docs')
   subproject('external-api-docs')
-  if not meson.is_cross_build()
+  if meson.can_run_host_binaries()
     subproject('nix-manual')
   endif
 endif
@@ -42,8 +41,10 @@ subproject('libexpr-c')
 subproject('libflake-c')
 subproject('libmain-c')
 
+asan_enabled = 'address' in get_option('b_sanitize')
+
 # Language Bindings
-if get_option('bindings') and not meson.is_cross_build()
+if get_option('bindings') and not meson.is_cross_build() and not asan_enabled
   subproject('perl')
 endif
 
@@ -59,3 +60,9 @@ if get_option('unit-tests')
   subproject('libflake-tests')
 endif
 subproject('nix-functional-tests')
+if get_option('json-schema-checks')
+  subproject('json-schema-checks')
+endif
+if get_option('kaitai-struct-checks')
+  subproject('kaitai-struct-checks')
+endif

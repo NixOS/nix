@@ -1,0 +1,90 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-v1.json"
+title: Store
+description: |
+  Experimental JSON representation of a Nix [Store](@docroot@/store/index.md).
+
+  This schema describes the JSON serialization of a Nix store.
+  We use it for (de)serializing in-memory "dummy stores" used for testing, but in principle the data represented in this schema could live in any type of store.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - config
+  - contents
+  - derivations
+  - buildTrace
+properties:
+  config:
+    "$ref": "#/$defs/storeConfig"
+
+  contents:
+    type: object
+    title: Store Objects
+    description: |
+      Map of [store path](@docroot@/store/store-path.md) base names to [store objects](@docroot@/store/store-object.md).
+    patternProperties:
+      "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+$":
+        type: object
+        title: Store Object
+        required:
+          - info
+          - contents
+        properties:
+          info:
+            "$ref": "./store-object-info-v2.yaml#/$defs/impure"
+            title: Store Object Info
+            description: |
+              Metadata about the [store object](@docroot@/store/store-object.md) including hash, size, references, etc.
+          contents:
+            "$ref": "./file-system-object-v1.yaml"
+            title: File System Object Contents
+            description: |
+              The actual [file system object](@docroot@/store/file-system-object.md) contents of this store path.
+        additionalProperties: false
+    additionalProperties: false
+
+  derivations:
+    type: object
+    title: Derivations
+    description: |
+      Map of [store path](@docroot@/store/store-path.md) base names (always ending in `.drv`) to [derivations](@docroot@/store/derivation/index.md).
+    patternProperties:
+      "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
+        "$ref": "./derivation-v4.yaml"
+    additionalProperties: false
+
+  buildTrace:
+    type: object
+    title: Build Trace
+    description: |
+      Map of output hashes (base64 SHA256) to maps of output names to realisations.
+      Records which outputs have been built and their realisations.
+      See [Build Trace](@docroot@/store/build-trace.md) for more details.
+    patternProperties:
+      "^[A-Za-z0-9+/]{43}=$":
+        type: object
+        additionalProperties:
+          "$ref": "./build-trace-entry-v1.yaml#/$defs/value"
+    additionalProperties: false
+
+"$defs":
+  storeConfig:
+    title: Store Configuration
+    description: |
+      Configuration for the store, including the store directory path.
+    type: object
+    required:
+      - store
+    properties:
+      store:
+        type: string
+        title: Store Directory
+        description: |
+          The store directory path (e.g., `/nix/store`).
+    additionalProperties: false

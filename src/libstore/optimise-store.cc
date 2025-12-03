@@ -160,7 +160,7 @@ void LocalStore::optimisePath_(
             {make_ref<PosixSourceAccessor>(), CanonPath(path)},
             FileSerialisationMethod::NixArchive,
             HashAlgorithm::SHA256)
-            .first;
+            .hash;
     });
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
@@ -172,10 +172,10 @@ void LocalStore::optimisePath_(
         auto stLink = lstat(linkPath.string());
         if (st.st_size != stLink.st_size || (repair && hash != ({
                                                            hashPath(
-                                                               PosixSourceAccessor::createAtRoot(linkPath),
+                                                               makeFSSourceAccessor(linkPath),
                                                                FileSerialisationMethod::NixArchive,
                                                                HashAlgorithm::SHA256)
-                                                               .first;
+                                                               .hash;
                                                        }))) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", linkPath);
@@ -202,7 +202,7 @@ void LocalStore::optimisePath_(
                    full.  When that happens, it's fine to ignore it: we
                    just effectively disable deduplication of this
                    file.  */
-                printInfo("cannot link '%s' to '%s': %s", linkPath, path, strerror(errno));
+                printInfo("cannot link %s to '%s': %s", linkPath, path, strerror(errno));
                 return;
             }
 
@@ -216,11 +216,11 @@ void LocalStore::optimisePath_(
     auto stLink = lstat(linkPath.string());
 
     if (st.st_ino == stLink.st_ino) {
-        debug("'%1%' is already linked to '%2%'", path, linkPath);
+        debug("'%1%' is already linked to %2%", path, linkPath);
         return;
     }
 
-    printMsg(lvlTalkative, "linking '%1%' to '%2%'", path, linkPath);
+    printMsg(lvlTalkative, "linking '%1%' to %2%", path, linkPath);
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -234,7 +234,7 @@ void LocalStore::optimisePath_(
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", config->realStoreDir, getpid(), rand());
+    std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
@@ -245,7 +245,7 @@ void LocalStore::optimisePath_(
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo("'%1%' has maximum number of links", linkPath);
+                printInfo("%1% has maximum number of links", linkPath);
             return;
         }
         throw;
@@ -255,14 +255,18 @@ void LocalStore::optimisePath_(
     try {
         std::filesystem::rename(tempLink, path);
     } catch (std::filesystem::filesystem_error & e) {
-        std::filesystem::remove(tempLink);
-        printError("unable to unlink '%1%'", tempLink);
+        {
+            std::error_code ec;
+            remove(tempLink, ec); /* Clean up after ourselves. */
+            if (ec)
+                printError("unable to unlink %1%: %2%", tempLink, ec.message());
+        }
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
                decreasing it again.) */
-            debug("'%s' has reached maximum number of links", linkPath);
+            debug("%s has reached maximum number of links", linkPath);
             return;
         }
         throw;
@@ -312,7 +316,7 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printInfo("%s freed by hard-linking %d files", showBytes(stats.bytesFreed), stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files", renderSize(stats.bytesFreed), stats.filesLinked);
 }
 
 void LocalStore::optimisePath(const Path & path, RepairFlag repair)

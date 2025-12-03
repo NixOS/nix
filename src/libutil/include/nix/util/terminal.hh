@@ -4,7 +4,15 @@
 #include <limits>
 #include <string>
 
+#include "nix/util/file-descriptor.hh"
+
 namespace nix {
+
+/**
+ * Determine whether \param fd is a terminal.
+ */
+bool isTTY(Descriptor fd);
+
 /**
  * Determine whether ANSI escape sequences are appropriate for the
  * present output.
@@ -35,5 +43,13 @@ void updateWindowSize();
  * by `updateWindowSize()`.
  */
 std::pair<unsigned short, unsigned short> getWindowSize();
+
+/**
+ * Get the slave name of a pseudoterminal in a thread-safe manner.
+ *
+ * @param fd The file descriptor of the pseudoterminal master
+ * @return The slave device name as a string
+ */
+std::string getPtsName(int fd);
 
 } // namespace nix

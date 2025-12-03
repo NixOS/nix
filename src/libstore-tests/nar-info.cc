@@ -23,7 +23,7 @@ class NarInfoTest : public CharacterizationTest, public LibStoreTest
 
 static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
 {
-    NarInfo info = ValidPathInfo{
+    auto info = NarInfo::makeFromCA(
         store,
         "foo",
         FixedOutputInfo{
@@ -41,8 +41,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
                     .self = true,
                 },
         },
-        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
-    };
+        Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="));
     info.narSize = 34878;
     if (includeImpureInfo) {
         info.deriver = StorePath{
@@ -60,24 +59,24 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
     return info;
 }
 
-#define JSON_TEST(STEM, PURE)                                                                          \
-    TEST_F(NarInfoTest, NarInfo_##STEM##_from_json)                                                    \
-    {                                                                                                  \
-        readTest(#STEM, [&](const auto & encoded_) {                                                   \
-            auto encoded = json::parse(encoded_);                                                      \
-            auto expected = makeNarInfo(*store, PURE);                                                 \
-            NarInfo got = NarInfo::fromJSON(*store, expected.path, encoded);                           \
-            ASSERT_EQ(got, expected);                                                                  \
-        });                                                                                            \
-    }                                                                                                  \
-                                                                                                       \
-    TEST_F(NarInfoTest, NarInfo_##STEM##_to_json)                                                      \
-    {                                                                                                  \
-        writeTest(                                                                                     \
-            #STEM,                                                                                     \
-            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(*store, PURE, HashFormat::SRI); }, \
-            [](const auto & file) { return json::parse(readFile(file)); },                             \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });  \
+#define JSON_TEST(STEM, PURE)                                                                         \
+    TEST_F(NarInfoTest, NarInfo_##STEM##_from_json)                                                   \
+    {                                                                                                 \
+        readTest(#STEM, [&](const auto & encoded_) {                                                  \
+            auto encoded = json::parse(encoded_);                                                     \
+            auto expected = makeNarInfo(*store, PURE);                                                \
+            auto got = UnkeyedNarInfo::fromJSON(&*store, encoded);                                    \
+            ASSERT_EQ(got, expected);                                                                 \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_F(NarInfoTest, NarInfo_##STEM##_to_json)                                                     \
+    {                                                                                                 \
+        writeTest(                                                                                    \
+            #STEM,                                                                                    \
+            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(&*store, PURE); },                \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
     }
 
 JSON_TEST(pure, false)

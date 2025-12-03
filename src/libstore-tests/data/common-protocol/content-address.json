@@ -1,0 +1,26 @@
+[
+  {
+    "hash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "+Xc9Ll6mcPltwaewrk/BAQ56Y3G5T//wzhKUc0zrYu0="
+    },
+    "method": "text"
+  },
+  {
+    "hash": {
+      "algorithm": "sha1",
+      "format": "base64",
+      "hash": "gGemBoenViNZM3hiwqns/Fgzqwo="
+    },
+    "method": "flat"
+  },
+  {
+    "hash": {
+      "algorithm": "sha256",
+      "format": "base64",
+      "hash": "EMIJ+giQ/gLIWoxmPKjno3zHZrxbGymgzGGyZvZBIdM="
+    },
+    "method": "nar"
+  }
+]

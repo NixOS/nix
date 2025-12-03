@@ -8,15 +8,17 @@
     "dev": "/nix/store/8bazivnbipbyi569623skw5zm91z6kc2-advanced-attributes-structured-attrs-defaults-dev",
     "out": "/nix/store/f8f8nvnx32bxvyxyx2ff7akbvwhwd9dw-advanced-attributes-structured-attrs-defaults"
   },
-  "inputDrvs": {},
-  "inputSrcs": [],
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
   "name": "advanced-attributes-structured-attrs-defaults",
   "outputs": {
     "dev": {
-      "path": "/nix/store/8bazivnbipbyi569623skw5zm91z6kc2-advanced-attributes-structured-attrs-defaults-dev"
+      "path": "8bazivnbipbyi569623skw5zm91z6kc2-advanced-attributes-structured-attrs-defaults-dev"
     },
     "out": {
-      "path": "/nix/store/f8f8nvnx32bxvyxyx2ff7akbvwhwd9dw-advanced-attributes-structured-attrs-defaults"
+      "path": "f8f8nvnx32bxvyxyx2ff7akbvwhwd9dw-advanced-attributes-structured-attrs-defaults"
     }
   },
   "structuredAttrs": {
@@ -28,5 +30,6 @@
     ],
     "system": "my-system"
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

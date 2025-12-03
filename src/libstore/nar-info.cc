@@ -6,8 +6,10 @@
 
 namespace nix {
 
-NarInfo::NarInfo(const Store & store, const std::string & s, const std::string & whence)
-    : ValidPathInfo(StorePath(StorePath::dummy), Hash(Hash::dummy)) // FIXME: hack
+NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
+    : UnkeyedValidPathInfo(Hash::dummy)                                                 // FIXME: hack
+    , ValidPathInfo(StorePath::dummy, static_cast<const UnkeyedValidPathInfo &>(*this)) // FIXME: hack
+    , UnkeyedNarInfo(static_cast<const UnkeyedValidPathInfo &>(*this))
 {
     unsigned line = 1;
 
@@ -102,7 +104,7 @@ NarInfo::NarInfo(const Store & store, const std::string & s, const std::string &
     }
 }
 
-std::string NarInfo::to_string(const Store & store) const
+std::string NarInfo::to_string(const StoreDirConfig & store) const
 {
     std::string res;
     res += "StorePath: " + store.printStorePath(path) + "\n";
@@ -130,11 +132,11 @@ std::string NarInfo::to_string(const Store & store) const
     return res;
 }
 
-nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const
+nlohmann::json UnkeyedNarInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo) const
 {
     using nlohmann::json;
 
-    auto jsonObject = ValidPathInfo::toJSON(store, includeImpureInfo, hashFormat);
+    auto jsonObject = UnkeyedValidPathInfo::toJSON(store, includeImpureInfo);
 
     if (includeImpureInfo) {
         if (!url.empty())
@@ -142,7 +144,7 @@ nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, Hash
         if (!compression.empty())
             jsonObject["compression"] = compression;
         if (fileHash)
-            jsonObject["downloadHash"] = fileHash->to_string(hashFormat, true);
+            jsonObject["downloadHash"] = *fileHash;
         if (fileSize)
             jsonObject["downloadSize"] = fileSize;
     }
@@ -150,28 +152,43 @@ nlohmann::json NarInfo::toJSON(const Store & store, bool includeImpureInfo, Hash
     return jsonObject;
 }
 
-NarInfo NarInfo::fromJSON(const Store & store, const StorePath & path, const nlohmann::json & json)
+UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & json)
 {
     using nlohmann::detail::value_t;
 
-    NarInfo res{ValidPathInfo{
-        path,
-        UnkeyedValidPathInfo::fromJSON(store, json),
-    }};
+    UnkeyedNarInfo res{UnkeyedValidPathInfo::fromJSON(store, json)};
 
-    if (json.contains("url"))
-        res.url = getString(valueAt(json, "url"));
+    auto & obj = getObject(json);
 
-    if (json.contains("compression"))
-        res.compression = getString(valueAt(json, "compression"));
+    if (auto * url = get(obj, "url"))
+        res.url = getString(*url);
 
-    if (json.contains("downloadHash"))
-        res.fileHash = Hash::parseAny(getString(valueAt(json, "downloadHash")), std::nullopt);
+    if (auto * compression = get(obj, "compression"))
+        res.compression = getString(*compression);
 
-    if (json.contains("downloadSize"))
-        res.fileSize = getUnsigned(valueAt(json, "downloadSize"));
+    if (auto * downloadHash = get(obj, "downloadHash"))
+        res.fileHash = *downloadHash;
+
+    if (auto * downloadSize = get(obj, "downloadSize"))
+        res.fileSize = getUnsigned(*downloadSize);
 
     return res;
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+UnkeyedNarInfo adl_serializer<UnkeyedNarInfo>::from_json(const json & json)
+{
+    return UnkeyedNarInfo::fromJSON(nullptr, json);
+}
+
+void adl_serializer<UnkeyedNarInfo>::to_json(json & json, const UnkeyedNarInfo & c)
+{
+    json = c.toJSON(nullptr, true);
+}
+
+} // namespace nlohmann

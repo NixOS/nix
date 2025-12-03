@@ -46,7 +46,7 @@ The team meets twice a week (times are denoted in the [Europe/Amsterdam](https:/
        - mark it as draft if it is blocked on the contributor
        - escalate it back to the team by moving it to To discuss, and leaving a comment as to why the issue needs to be discussed again.
 
-- Work meeting: Mondays 14:00-16:00 Europe/Amsterdam see [calendar](https://calendar.google.com/calendar/u/0/embed?src=b9o52fobqjak8oq8lfkhg3t0qg@group.calendar.google.com).
+- Work meeting: Mondays 18:00-20:00 Europe/Amsterdam; see [calendar](https://calendar.google.com/calendar/u/0/embed?src=b9o52fobqjak8oq8lfkhg3t0qg@group.calendar.google.com).
 
   1. Code review on pull requests from [In review](#in-review).
   2. Other chores and tasks.

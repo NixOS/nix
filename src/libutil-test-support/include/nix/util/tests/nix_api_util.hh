@@ -54,4 +54,12 @@ protected:
 #define assert_ctx_err() assert_ctx_err(__FILE__, __LINE__)
 };
 
+static inline auto createOwnedNixContext()
+{
+    return std::unique_ptr<nix_c_context, decltype([](nix_c_context * ctx) {
+                               if (ctx)
+                                   nix_c_context_free(ctx);
+                           })>(nix_c_context_create(), {});
+}
+
 } // namespace nixC

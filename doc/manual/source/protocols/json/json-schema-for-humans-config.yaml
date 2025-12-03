@@ -1,0 +1,17 @@
+# Configuration file for json-schema-for-humans
+#
+# https://github.com/coveooss/json-schema-for-humans/blob/main/docs/examples/examples_md_default/Configuration.md
+
+template_name: md
+show_toc: true
+# impure timestamp and distracting
+with_footer: false
+recursive_detection_depth: 3
+show_breadcrumbs: false
+description_is_markdown: true
+template_md_options:
+  properties_table_columns:
+    - Property
+    - Type
+    - Pattern
+    - Title/Description

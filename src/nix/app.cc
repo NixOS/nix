@@ -103,11 +103,11 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
 
     else if (type == "derivation") {
         auto drvPath = cursor->forceDerivation();
-        auto outPath = cursor->getAttr(state.sOutPath)->getString();
-        auto outputName = cursor->getAttr(state.sOutputName)->getString();
-        auto name = cursor->getAttr(state.sName)->getString();
+        auto outPath = cursor->getAttr(state.s.outPath)->getString();
+        auto outputName = cursor->getAttr(state.s.outputName)->getString();
+        auto name = cursor->getAttr(state.s.name)->getString();
         auto aPname = cursor->maybeGetAttr("pname");
-        auto aMeta = cursor->maybeGetAttr(state.sMeta);
+        auto aMeta = cursor->maybeGetAttr(state.s.meta);
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
         auto mainProgram = aMainProgram ? aMainProgram->getString() : aPname ? aPname->getString() : DrvName(name).name;
         auto program = outPath + "/bin/" + mainProgram;
@@ -140,9 +140,9 @@ App UnresolvedApp::resolve(ref<Store> evalStore, ref<Store> store)
     auto res = unresolved;
 
     auto builtContext = build(evalStore, store);
-    res.program = resolveString(*store, unresolved.program, builtContext);
-    if (!store->isInStore(res.program))
-        throw Error("app program '%s' is not in the Nix store", res.program);
+    res.program = resolveString(*store, unresolved.program.string(), builtContext);
+    if (!store->isInStore(res.program.string()))
+        throw Error("app program '%s' is not in the Nix store", res.program.string());
 
     return res;
 }

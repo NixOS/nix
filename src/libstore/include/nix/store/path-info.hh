@@ -12,6 +12,7 @@
 namespace nix {
 
 class Store;
+struct StoreDirConfig;
 
 struct SubstitutablePathInfo
 {
@@ -116,11 +117,11 @@ struct UnkeyedValidPathInfo
      * @param includeImpureInfo If true, variable elements such as the
      * registration time are included.
      */
-    virtual nlohmann::json toJSON(const Store & store, bool includeImpureInfo, HashFormat hashFormat) const;
-    static UnkeyedValidPathInfo fromJSON(const Store & store, const nlohmann::json & json);
+    virtual nlohmann::json toJSON(const StoreDirConfig * store, bool includeImpureInfo) const;
+    static UnkeyedValidPathInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
 };
 
-struct ValidPathInfo : UnkeyedValidPathInfo
+struct ValidPathInfo : virtual UnkeyedValidPathInfo
 {
     StorePath path;
 
@@ -135,7 +136,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo
      * speaking superfluous, but might prevent endless/excessive data
      * attacks.
      */
-    std::string fingerprint(const Store & store) const;
+    std::string fingerprint(const StoreDirConfig & store) const;
 
     void sign(const Store & store, const Signer & signer);
     void sign(const Store & store, const std::vector<std::unique_ptr<Signer>> & signers);
@@ -150,7 +151,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo
     /**
      * @return true iff the path is verifiably content-addressed.
      */
-    bool isContentAddressed(const Store & store) const;
+    bool isContentAddressed(const StoreDirConfig & store) const;
 
     static const size_t maxSigs = std::numeric_limits<size_t>::max();
 
@@ -159,12 +160,12 @@ struct ValidPathInfo : UnkeyedValidPathInfo
      * produced by one of the specified keys, or maxSigs if the path
      * is content-addressed.
      */
-    size_t checkSignatures(const Store & store, const PublicKeys & publicKeys) const;
+    size_t checkSignatures(const StoreDirConfig & store, const PublicKeys & publicKeys) const;
 
     /**
      * Verify a single signature.
      */
-    bool checkSignature(const Store & store, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const;
 
     /**
      * References as store path basenames, including a self reference if it has one.
@@ -173,12 +174,17 @@ struct ValidPathInfo : UnkeyedValidPathInfo
 
     ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info)
         : UnkeyedValidPathInfo(info)
-        , path(std::move(path)) {};
-    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info)
-        : UnkeyedValidPathInfo(info)
-        , path(path) {};
+        , path(std::move(path))
+    {
+    }
 
-    ValidPathInfo(const Store & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+    ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info)
+        : ValidPathInfo(StorePath{path}, std::move(info))
+    {
+    }
+
+    static ValidPathInfo
+    makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
 };
 
 static_assert(std::is_move_assignable_v<ValidPathInfo>);
@@ -189,3 +195,6 @@ static_assert(std::is_move_constructible_v<ValidPathInfo>);
 using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 } // namespace nix
+
+JSON_IMPL(nix::UnkeyedValidPathInfo)
+JSON_IMPL(nix::ValidPathInfo)

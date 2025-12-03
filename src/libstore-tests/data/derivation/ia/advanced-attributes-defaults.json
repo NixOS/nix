@@ -10,13 +10,16 @@
     "out": "/nix/store/1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults",
     "system": "my-system"
   },
-  "inputDrvs": {},
-  "inputSrcs": [],
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
   "name": "advanced-attributes-defaults",
   "outputs": {
     "out": {
-      "path": "/nix/store/1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults"
+      "path": "1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

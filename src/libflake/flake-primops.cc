@@ -1,8 +1,34 @@
+#include <stdint.h>
+#include <functional>
+#include <map>
+#include <optional>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "nix/flake/flake-primops.hh"
 #include "nix/expr/eval.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/flake/settings.hh"
+#include "nix/expr/attr-set.hh"
+#include "nix/expr/eval-error.hh"
+#include "nix/expr/eval-inline.hh"
+#include "nix/expr/eval-settings.hh"
+#include "nix/expr/symbol-table.hh"
+#include "nix/expr/value.hh"
+#include "nix/fetchers/attrs.hh"
+#include "nix/fetchers/fetchers.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/error.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/pos-idx.hh"
+#include "nix/util/pos-table.hh"
+#include "nix/util/source-path.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix::flake::primops {
 
@@ -12,7 +38,7 @@ PrimOp getFlake(const Settings & settings)
         std::string flakeRefS(
             state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
         auto flakeRef = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
-        if (state.settings.pureEval && !flakeRef.input.isLocked())
+        if (state.settings.pureEval && !flakeRef.input.isLocked(state.fetchSettings))
             throw Error(
                 "cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)",
                 flakeRefS,
@@ -67,7 +93,7 @@ static void prim_parseFlakeRef(EvalState & state, const PosIdx pos, Value ** arg
         auto & vv = binds.alloc(s);
         std::visit(
             overloaded{
-                [&vv](const std::string & value) { vv.mkString(value); },
+                [&vv, &state](const std::string & value) { vv.mkString(value, state.mem); },
                 [&vv](const uint64_t & value) { vv.mkInt(value); },
                 [&vv](const Explicit<bool> & value) { vv.mkBool(value.t); }},
             value);
@@ -130,7 +156,7 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** 
         }
     }
     auto flakeRef = FlakeRef::fromAttrs(state.fetchSettings, attrs);
-    v.mkString(flakeRef.to_string());
+    v.mkString(flakeRef.to_string(), state.mem);
 }
 
 nix::PrimOp flakeRefToString({

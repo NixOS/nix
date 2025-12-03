@@ -1,0 +1,27 @@
+[
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": false,
+    "path": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-xxx",
+    "startTime": 0,
+    "status": "OutputRejected",
+    "stopTime": 0,
+    "success": false,
+    "timesBuilt": 0
+  },
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": true,
+    "path": {
+      "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+      "outputs": [
+        "out"
+      ]
+    },
+    "startTime": 30,
+    "status": "NotDeterministic",
+    "stopTime": 50,
+    "success": false,
+    "timesBuilt": 3
+  }
+]

@@ -58,8 +58,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 {
     size_t debugTraceIndex;
 
-    // Arguments passed to :load, saved so they can be reloaded with :reload
-    Strings loadedFiles;
+    std::list<std::filesystem::path> loadedFiles;
     // Arguments passed to :load-flake, saved so they can be reloaded with :reload
     Strings loadedFlakes;
     std::function<AnnotatedValues()> getValues;
@@ -73,7 +72,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     RunNix * runNixPtr;
 
-    void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {});
+    void runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input = {});
 
     std::unique_ptr<ReplInteracter> interacter;
 
@@ -92,7 +91,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     StorePath getDerivationPath(Value & v);
     ProcessLineResult processLine(std::string line);
 
-    void loadFile(const Path & path);
+    void loadFile(const std::filesystem::path & path);
     void loadFlake(const std::string & flakeRef);
     void loadFiles();
     void loadFlakes();
@@ -539,7 +538,9 @@ ProcessLineResult NixRepl::processLine(std::string line)
         Value v;
         evalString(arg, v);
         StorePath drvPath = getDerivationPath(v);
-        Path drvPathRaw = state->store->printStorePath(drvPath);
+        // N.B. This need not be a local / native file path. For
+        // example, we might be using an SSH store to a different OS.
+        std::string drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
             state->store->buildPaths({
@@ -574,14 +575,15 @@ ProcessLineResult NixRepl::processLine(std::string line)
             for (auto & sub : subs) {
                 auto * logSubP = dynamic_cast<LogStore *>(&*sub);
                 if (!logSubP) {
-                    printInfo("Skipped '%s' which does not support retrieving build logs", sub->getUri());
+                    printInfo(
+                        "Skipped '%s' which does not support retrieving build logs", sub->config.getHumanReadableURI());
                     continue;
                 }
                 auto & logSub = *logSubP;
 
                 auto log = logSub.getBuildLog(drvPath);
                 if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.getUri());
+                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.config.getHumanReadableURI());
                     logger->writeToStdout(*log);
                     foundLog = true;
                     break;
@@ -668,7 +670,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 ss << "No documentation found.\n\n";
             }
 
-            auto markdown = toView(ss);
+            auto markdown = ss.view();
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
 
         } else
@@ -711,12 +713,12 @@ ProcessLineResult NixRepl::processLine(std::string line)
     return ProcessLineResult::PromptAgain;
 }
 
-void NixRepl::loadFile(const Path & path)
+void NixRepl::loadFile(const std::filesystem::path & path)
 {
     loadedFiles.remove(path);
     loadedFiles.push_back(path);
     Value v, v2;
-    state->evalFile(lookupFileArg(*state, path), v);
+    state->evalFile(lookupFileArg(*state, path.string()), v);
     state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
 }
@@ -737,8 +739,8 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     }
 
     auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
-    if (evalSettings.pureEval && !flakeRef.input.isLocked())
-        throw Error("cannot use ':load-flake' on locked flake reference '%s' (use --impure to override)", flakeRefS);
+    if (evalSettings.pureEval && !flakeRef.input.isLocked(fetchSettings))
+        throw Error("cannot use ':load-flake' on unlocked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
 
@@ -759,7 +761,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
 
 void NixRepl::initEnv()
 {
-    env = &state->allocEnv(envSize);
+    env = &state->mem.allocEnv(envSize);
     env->up = &state->baseEnv;
     displ = 0;
     staticEnv->vars.clear();
@@ -789,7 +791,7 @@ void NixRepl::reloadFilesAndFlakes()
 
 void NixRepl::loadFiles()
 {
-    Strings old = loadedFiles;
+    decltype(loadedFiles) old = loadedFiles;
     loadedFiles.clear();
 
     for (auto & i : old) {
@@ -868,14 +870,8 @@ void NixRepl::addVarToScope(const Symbol name, Value & v)
 
 Expr * NixRepl::parseString(std::string s)
 {
-    return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
-}
-
-void NixRepl::evalString(std::string s, Value & v)
-{
-    Expr * e;
     try {
-        e = parseString(s);
+        return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
     } catch (ParseError & e) {
         if (e.msg().find("unexpected end of file") != std::string::npos)
             // For parse errors on incomplete input, we continue waiting for the next line of
@@ -884,11 +880,16 @@ void NixRepl::evalString(std::string s, Value & v)
         else
             throw;
     }
+}
+
+void NixRepl::evalString(std::string s, Value & v)
+{
+    Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));
 }
 
-void NixRepl::runNix(Path program, const Strings & args, const std::optional<std::string> & input)
+void NixRepl::runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input)
 {
     if (runNixPtr)
         (*runNixPtr)(program, args, input);
@@ -915,6 +916,7 @@ ReplExitStatus AbstractNixRepl::runSimple(ref<EvalState> evalState, const ValMap
         return values;
     };
     LookupPath lookupPath = {};
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
     auto repl = std::make_unique<NixRepl>(
         lookupPath,
         openStore(),

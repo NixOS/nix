@@ -5,24 +5,25 @@
 
 namespace nix::fetchers {
 
-InputCache::CachedResult
-InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegistries useRegistries)
+InputCache::CachedResult InputCache::getAccessor(
+    const Settings & settings, Store & store, const Input & originalInput, UseRegistries useRegistries)
 {
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
 
     if (!fetched) {
         if (originalInput.isDirect()) {
-            auto [accessor, lockedInput] = originalInput.getAccessor(store);
+            auto [accessor, lockedInput] = originalInput.getAccessor(settings, store);
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
             if (useRegistries != UseRegistries::No) {
-                auto [res, extraAttrs] = lookupInRegistries(store, originalInput, useRegistries);
+                auto [res, extraAttrs] = lookupInRegistries(settings, store, originalInput, useRegistries);
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);
                 if (!fetched) {
-                    auto [accessor, lockedInput] = resolvedInput.getAccessor(store);
-                    fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
+                    auto [accessor, lockedInput] = resolvedInput.getAccessor(settings, store);
+                    fetched.emplace(
+                        CachedInput{.lockedInput = lockedInput, .accessor = accessor, .extraAttrs = extraAttrs});
                 }
                 upsert(resolvedInput, *fetched);
             } else {
@@ -36,7 +37,7 @@ InputCache::getAccessor(ref<Store> store, const Input & originalInput, UseRegist
 
     debug("got tree '%s' from '%s'", fetched->accessor, fetched->lockedInput.to_string());
 
-    return {fetched->accessor, resolvedInput, fetched->lockedInput};
+    return {fetched->accessor, resolvedInput, fetched->lockedInput, fetched->extraAttrs};
 }
 
 struct InputCacheImpl : InputCache

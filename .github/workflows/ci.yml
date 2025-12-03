@@ -2,7 +2,21 @@ name: "CI"
 
 on:
   pull_request:
+  merge_group:
   push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      dogfood:
+        description: 'Use dogfood Nix build'
+        required: false
+        default: true
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions: read-all
 
@@ -10,18 +24,43 @@ jobs:
   eval:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
       with:
-        dogfood: true
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        use_cache: false
     - run: nix flake show --all-systems --json
 
+  pre-commit-checks:
+    name: pre-commit checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+          extra_nix_config: experimental-features = nix-command flakes
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - run: ./ci/gha/tests/pre-commit-checks
+
+  basic-checks:
+    name: aggregate basic checks
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    needs: [pre-commit-checks, eval]
+    steps:
+      - name: Exit with any errors
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          exit 1
+
   tests:
+    needs: basic-checks
     strategy:
       fail-fast: false
       matrix:
@@ -29,36 +68,74 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
+            instrumented: false
+            primary: true
+            stdenv: stdenv
           - scenario: on macos
             runs-on: macos-14
             os: darwin
+            instrumented: false
+            primary: true
+            stdenv: stdenv
+          - scenario: on ubuntu (with sanitizers / coverage)
+            runs-on: ubuntu-24.04
+            os: linux
+            instrumented: true
+            primary: false
+            stdenv: clangStdenv
     name: tests ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        dogfood: true
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         # The sandbox would otherwise be disabled by default on Darwin
-        extra_nix_config: |
-          sandbox = true
-          max-jobs = 1
-    - uses: DeterminateSystems/magic-nix-cache-action@main
+        extra_nix_config: "sandbox = true"
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       if: matrix.os == 'linux'
-    - run: scripts/build-checks
-    - run: scripts/prepare-installer-for-github-actions
+    - name: Run component tests
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix componentTests -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}"
+    - name: Run VM tests
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix vmTests -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}"
+      if: ${{ matrix.os == 'linux' }}
+    - name: Run flake checks and prepare the installer tarball
+      run: |
+        ci/gha/tests/build-checks
+        ci/gha/tests/prepare-installer-for-github-actions
+      if: ${{ matrix.primary }}
+    - name: Collect code coverage
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix codeCoverage.coverageReports -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}" \
+          --out-link coverage-reports
+        cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
+      if: ${{ matrix.instrumented }}
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v5
+      with:
+        name: coverage-reports
+        path: coverage-reports/
+      if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: installer-${{matrix.os}}
         path: out/*
+      if: ${{ matrix.primary }}
 
   installer_test:
     needs: [tests]
@@ -69,25 +146,46 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
+            experimental-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
+            experimental-installer: false
+          - scenario: on ubuntu (experimental)
+            runs-on: ubuntu-24.04
+            os: linux
+            experimental-installer: true
+          - scenario: on macos (experimental)
+            runs-on: macos-14
+            os: darwin
+            experimental-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Download installer tarball
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: installer-${{matrix.os}}
         path: out
-    - name: Serving installer
-      id: serving_installer
-      run: ./scripts/serve-installer-for-github-actions
-    - uses: cachix/install-nix-action@v31
+    - name: Looking up the installer tarball URL
+      id: installer-tarball-url
+      run: |
+        echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
+        TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
+        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
+    - uses: cachix/install-nix-action@0b0e072294b088b73964f1d72dfdac0951439dbd # v31.8.4
+      if: ${{ !matrix.experimental-installer }}
       with:
-        install_url: 'http://localhost:8126/install'
-        install_options: "--tarball-url-prefix http://localhost:8126/"
+        install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
+        install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
+    - uses: ./.github/actions/install-nix-action
+      if: ${{ matrix.experimental-installer }}
+      with:
+        dogfood: false
+        experimental-installer: true
+        tarball_url: ${{ steps.installer-tarball-url.outputs.tarball-path }}
+        github_token: ${{ secrets.GITHUB_TOKEN }}
     - run: sudo apt install fish zsh
       if: matrix.os == 'linux'
     - run: brew install fish
@@ -106,20 +204,20 @@ jobs:
   check_secrets:
     permissions:
       contents: none
-    name: Check Docker secrets present for installer tests
+    name: Check presence of secrets
     runs-on: ubuntu-24.04
     outputs:
       docker: ${{ steps.secret.outputs.docker }}
     steps:
-      - name: Check for secrets
+      - name: Check for DockerHub secrets
         id: secret
         env:
           _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
+          echo "docker=${{ env._DOCKER_SECRETS != '' }}" >> $GITHUB_OUTPUT
 
   docker_push_image:
-    needs: [tests, vm_tests, check_secrets]
+    needs: [tests, check_secrets]
     permissions:
       contents: read
       packages: write
@@ -129,21 +227,16 @@ jobs:
       github.ref_name == 'master'
     runs-on: ubuntu-24.04
     steps:
-    - name: Check for secrets
-      id: secret
-      env:
-        _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-      run: |
-        echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
+    - uses: ./.github/actions/install-nix-action
       with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: DeterminateSystems/magic-nix-cache-action@main
-    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
+        dogfood: false
+        extra_nix_config: |
+          experimental-features = flakes nix-command
+    - run: echo NIX_VERSION="$(nix eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
+    - run: nix build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
     - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
@@ -178,46 +271,48 @@ jobs:
         docker tag nix:$NIX_VERSION $IMAGE_ID:master
         docker push $IMAGE_ID:master
 
-  vm_tests:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/install-nix-action
-        with:
-          dogfood: true
-          extra_nix_config:
-            experimental-features = nix-command flakes
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: |
-          nix build -L \
-            .#hydraJobs.tests.functional_user \
-            .#hydraJobs.tests.githubFlakes \
-            .#hydraJobs.tests.nix-docker \
-            .#hydraJobs.tests.tarballFlakes \
-            ;
-
   flake_regressions:
-    needs: vm_tests
+    needs: tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Checkout flake-regressions
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: true
+          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
+
+  profile_build:
+    needs: tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    if: >-
+      github.event_name == 'push' &&
+      github.ref_name == 'master'
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        extra_nix_config: |
+          experimental-features = flakes nix-command ca-derivations impure-derivations
+          max-jobs = 1
+    - run: |
+        nix build -L --file ./ci/gha/profile-build buildTimeReport --out-link build-time-report.md
+        cat build-time-report.md >> $GITHUB_STEP_SUMMARY

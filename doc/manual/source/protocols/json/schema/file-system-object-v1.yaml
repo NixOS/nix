@@ -1,0 +1,71 @@
+"$schema": http://json-schema.org/draft-04/schema#
+"$id": https://nix.dev/manual/nix/latest/protocols/json/schema/file-system-object-v1.json
+title: File System Object
+description: |
+  This schema describes the JSON representation of Nix's [File System Object](@docroot@/store/file-system-object.md).
+
+  The schema is recursive because file system objects contain other file system objects.
+type: object
+required: ["type"]
+properties:
+  type:
+    type: string
+    enum: ["regular", "symlink", "directory"]
+
+# Enforce conditional structure based on `type`
+anyOf:
+  - $ref: "#/$defs/regular"
+    required: ["type", "contents"]
+
+  - $ref: "#/$defs/directory"
+    required: ["type", "entries"]
+
+  - $ref: "#/$defs/symlink"
+    required: ["type", "target"]
+
+"$defs":
+  regular:
+    title: Regular File
+    description: |
+      See [Regular File](@docroot@/store/file-system-object.md#regular) in the manual for details.
+    required: ["contents"]
+    properties:
+      type:
+        const: "regular"
+      contents:
+        type: string
+        description: File contents
+      executable:
+        type: boolean
+        description: Whether the file is executable.
+        default: false
+    additionalProperties: false
+
+  directory:
+    title: Directory
+    description: |
+      See [Directory](@docroot@/store/file-system-object.md#directory) in the manual for details.
+    required: ["entries"]
+    properties:
+      type:
+        const: "directory"
+      entries:
+        type: object
+        description: |
+          Map of names to nested file system objects (for type=directory)
+        additionalProperties:
+          $ref: "#"
+    additionalProperties: false
+
+  symlink:
+    title: Symbolic Link
+    description: |
+      See [Symbolic Link](@docroot@/store/file-system-object.md#symlink) in the manual for details.
+    required: ["target"]
+    properties:
+      type:
+        const: "symlink"
+      target:
+        type: string
+        description: Target path of the symlink.
+    additionalProperties: false

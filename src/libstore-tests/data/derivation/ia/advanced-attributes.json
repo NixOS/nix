@@ -11,42 +11,45 @@
     "__sandboxProfile": "sandcastle",
     "allowSubstitutes": "",
     "allowedReferences": "/nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo",
-    "allowedRequisites": "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev",
+    "allowedRequisites": "/nix/store/z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev bin",
     "builder": "/bin/bash",
-    "disallowedReferences": "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar",
+    "disallowedReferences": "/nix/store/r5cff30838majxk5mp3ip2diffi8vpaj-bar dev",
     "disallowedRequisites": "/nix/store/9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev",
     "exportReferencesGraph": "refs1 /nix/store/p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo refs2 /nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv",
     "impureEnvVars": "UNICORN",
     "name": "advanced-attributes",
-    "out": "/nix/store/wyhpwd748pns4k7svh48wdrc8kvjk0ra-advanced-attributes",
+    "out": "/nix/store/ymqmybkq5j4nd1xplw6ccdpbjnfi017v-advanced-attributes",
     "preferLocalBuild": "1",
     "requiredSystemFeatures": "rainbow uid-range",
     "system": "my-system"
   },
-  "inputDrvs": {
-    "/nix/store/afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
+  "inputs": {
+    "drvs": {
+      "afc3vbjbzql750v2lp8gxgaxsajphzih-foo.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      },
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      }
     },
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv": {
-      "dynamicOutputs": {},
-      "outputs": [
-        "dev",
-        "out"
-      ]
-    }
+    "srcs": [
+      "vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
+    ]
   },
-  "inputSrcs": [
-    "/nix/store/vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"
-  ],
   "name": "advanced-attributes",
   "outputs": {
     "out": {
-      "path": "/nix/store/wyhpwd748pns4k7svh48wdrc8kvjk0ra-advanced-attributes"
+      "path": "ymqmybkq5j4nd1xplw6ccdpbjnfi017v-advanced-attributes"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

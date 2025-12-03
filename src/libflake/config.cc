@@ -1,18 +1,39 @@
+#include <nlohmann/json.hpp>
+#include <assert.h>
+#include <stdint.h>
+#include <nlohmann/json_fwd.hpp>
+#include <cctype>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+#include <format>
+
 #include "nix/util/users.hh"
 #include "nix/util/config-global.hh"
 #include "nix/flake/settings.hh"
 #include "nix/flake/flake.hh"
-
-#include <nlohmann/json.hpp>
+#include "nix/util/ansicolor.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+#include "nix/util/util.hh"
 
 namespace nix::flake {
 
 // setting name -> setting value -> allow or ignore.
 typedef std::map<std::string, std::map<std::string, bool>> TrustedList;
 
-Path trustedListPath()
+std::filesystem::path trustedListPath()
 {
-    return getDataDir() + "/trusted-settings.json";
+    return getDataDir() / "trusted-settings.json";
 }
 
 static TrustedList readTrustedList()
@@ -27,7 +48,7 @@ static TrustedList readTrustedList()
 static void writeTrustedList(const TrustedList & trustedList)
 {
     auto path = trustedListPath();
-    createDirs(dirOf(path));
+    createDirs(path.parent_path());
     writeFile(path, nlohmann::json(trustedList).dump());
 }
 

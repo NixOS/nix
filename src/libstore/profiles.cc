@@ -1,5 +1,6 @@
 #include "nix/store/profiles.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
@@ -30,12 +31,12 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
         return {};
 }
 
-std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path profile)
+std::pair<Generations, std::optional<GenerationNumber>> findGenerations(std::filesystem::path profile)
 {
     Generations gens;
 
-    std::filesystem::path profileDir = dirOf(profile);
-    auto profileName = std::string(baseNameOf(profile));
+    std::filesystem::path profileDir = profile.parent_path();
+    auto profileName = profile.filename().string();
 
     for (auto & i : DirectoryIterator{profileDir}) {
         checkInterrupt();
@@ -47,18 +48,20 @@ std::pair<Generations, std::optional<GenerationNumber>> findGenerations(Path pro
 
     gens.sort([](const Generation & a, const Generation & b) { return a.number < b.number; });
 
-    return {gens, pathExists(profile) ? parseName(profileName, readLink(profile)) : std::nullopt};
+    return {gens, pathExists(profile) ? parseName(profileName, readLink(profile).string()) : std::nullopt};
 }
 
 /**
  * Create a generation name that can be parsed by `parseName()`.
  */
-static Path makeName(const Path & profile, GenerationNumber num)
+static std::filesystem::path makeName(const std::filesystem::path & profile, GenerationNumber num)
 {
-    return fmt("%s-%s-link", profile, num);
+    /* NB std::filesystem::path when put in format strings is
+       quoted automatically. */
+    return fmt("%s-%s-link", profile.string(), num);
 }
 
-Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath)
+std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::path profile, StorePath outPath)
 {
     /* The new generation number should be higher than old the
        previous ones. */
@@ -89,21 +92,24 @@ Path createGeneration(LocalFSStore & store, Path profile, StorePath outPath)
        to the permanent roots (of which the GC would have a stale
        view).  If we didn't do it this way, the GC might remove the
        user environment etc. we've just built. */
-    Path generation = makeName(profile, num + 1);
-    store.addPermRoot(outPath, generation);
+    auto generation = makeName(profile, num + 1);
+    store.addPermRoot(outPath, generation.string());
 
     return generation;
 }
 
-static void removeFile(const Path & path)
+static void removeFile(const std::filesystem::path & path)
 {
-    if (remove(path.c_str()) == -1)
-        throw SysError("cannot unlink '%1%'", path);
+    try {
+        std::filesystem::remove(path);
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SysError("removing file '%1%'", path);
+    }
 }
 
-void deleteGeneration(const Path & profile, GenerationNumber gen)
+void deleteGeneration(const std::filesystem::path & profile, GenerationNumber gen)
 {
-    Path generation = makeName(profile, gen);
+    std::filesystem::path generation = makeName(profile, gen);
     removeFile(generation);
 }
 
@@ -116,7 +122,7 @@ void deleteGeneration(const Path & profile, GenerationNumber gen)
  *
  *  - We only actually delete if `dryRun` is false.
  */
-static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool dryRun)
+static void deleteGeneration2(const std::filesystem::path & profile, GenerationNumber gen, bool dryRun)
 {
     if (dryRun)
         notice("would remove profile version %1%", gen);
@@ -126,7 +132,8 @@ static void deleteGeneration2(const Path & profile, GenerationNumber gen, bool d
     }
 }
 
-void deleteGenerations(const Path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
+void deleteGenerations(
+    const std::filesystem::path & profile, const std::set<GenerationNumber> & gensToDelete, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -152,7 +159,7 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
         ;
 }
 
-void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun)
+void deleteGenerationsGreaterThan(const std::filesystem::path & profile, GenerationNumber max, bool dryRun)
 {
     if (max == 0)
         throw Error("Must keep at least one generation, otherwise the current one would be deleted");
@@ -177,7 +184,7 @@ void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bo
         deleteGeneration2(profile, i->number, dryRun);
 }
 
-void deleteOldGenerations(const Path & profile, bool dryRun)
+void deleteOldGenerations(const std::filesystem::path & profile, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -189,7 +196,7 @@ void deleteOldGenerations(const Path & profile, bool dryRun)
             deleteGeneration2(profile, i.number, dryRun);
 }
 
-void deleteGenerationsOlderThan(const Path & profile, time_t t, bool dryRun)
+void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -237,16 +244,16 @@ time_t parseOlderThanTimeSpec(std::string_view timeSpec)
     return curTime - *days * 24 * 3600;
 }
 
-void switchLink(Path link, Path target)
+void switchLink(std::filesystem::path link, std::filesystem::path target)
 {
     /* Hacky. */
-    if (dirOf(target) == dirOf(link))
-        target = baseNameOf(target);
+    if (target.parent_path() == link.parent_path())
+        target = target.filename();
 
     replaceSymlink(target, link);
 }
 
-void switchGeneration(const Path & profile, std::optional<GenerationNumber> dstGen, bool dryRun)
+void switchGeneration(const std::filesystem::path & profile, std::optional<GenerationNumber> dstGen, bool dryRun)
 {
     PathLocks lock;
     lockProfile(lock, profile);
@@ -273,44 +280,47 @@ void switchGeneration(const Path & profile, std::optional<GenerationNumber> dstG
     switchLink(profile, dst->path);
 }
 
-void lockProfile(PathLocks & lock, const Path & profile)
+void lockProfile(PathLocks & lock, const std::filesystem::path & profile)
 {
     lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
     lock.setDeletion(true);
 }
 
-std::string optimisticLockProfile(const Path & profile)
+std::string optimisticLockProfile(const std::filesystem::path & profile)
 {
-    return pathExists(profile) ? readLink(profile) : "";
+    return pathExists(profile) ? readLink(profile).string() : "";
 }
 
-Path profilesDir()
+std::filesystem::path profilesDir()
 {
-    auto profileRoot = isRootUser() ? rootProfilesDir() : createNixStateDir() + "/profiles";
+    auto profileRoot = isRootUser() ? rootProfilesDir() : std::filesystem::path{createNixStateDir()} / "profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-Path rootProfilesDir()
+std::filesystem::path rootProfilesDir()
 {
-    return settings.nixStateDir + "/profiles/per-user/root";
+    return std::filesystem::path{settings.nixStateDir} / "profiles/per-user/root";
 }
 
-Path getDefaultProfile()
+std::filesystem::path getDefaultProfile()
 {
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    std::filesystem::path profileLink = settings.useXDGBaseDirectories
+                                            ? std::filesystem::path{createNixStateDir()} / "profile"
+                                            : std::filesystem::path{getHome()} / ".nix-profile";
     try {
-        auto profile = profilesDir() + "/profile";
+        auto profile = profilesDir() / "profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
         // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
-        Path globalProfileLink = settings.nixStateDir + "/profiles/default";
+        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles" / "default";
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
-        return absPath(readLink(profileLink), dirOf(profileLink));
+        auto linkDir = profileLink.parent_path();
+        return absPath(readLink(profileLink), &linkDir);
     } catch (Error &) {
         return profileLink;
     } catch (std::filesystem::filesystem_error &) {
@@ -318,14 +328,14 @@ Path getDefaultProfile()
     }
 }
 
-Path defaultChannelsDir()
+std::filesystem::path defaultChannelsDir()
 {
-    return profilesDir() + "/channels";
+    return profilesDir() / "channels";
 }
 
-Path rootChannelsDir()
+std::filesystem::path rootChannelsDir()
 {
-    return rootProfilesDir() + "/channels";
+    return rootProfilesDir() / "channels";
 }
 
 } // namespace nix

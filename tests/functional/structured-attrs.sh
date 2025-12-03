@@ -2,9 +2,8 @@
 
 source common.sh
 
-# 27ce722638 required some incompatible changes to the nix file, so skip this
-# tests for the older versions
-requireDaemonNewerThan "2.4pre20210712"
+# https://github.com/NixOS/nix/pull/14189
+requireDaemonNewerThan "2.33"
 
 clearStoreIfPossible
 
@@ -50,4 +49,4 @@ expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "
 
 # Check it works with the expected structured attrs
 hacky=$(nix-instantiate --expr "$hackyExpr")
-nix derivation show "$hacky" | jq --exit-status '."'"$hacky"'".structuredAttrs | . == {"a": 1}'
+nix derivation show "$hacky" | jq --exit-status '."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'

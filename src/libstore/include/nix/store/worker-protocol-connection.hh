@@ -109,7 +109,8 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
         const StorePathSet & paths,
         SubstituteFlag maybeSubstitute);
 
-    UnkeyedValidPathInfo queryPathInfo(const StoreDirConfig & store, bool * daemonException, const StorePath & path);
+    std::optional<UnkeyedValidPathInfo>
+    queryPathInfo(const StoreDirConfig & store, bool * daemonException, const StorePath & path);
 
     void putBuildDerivationRequest(
         const StoreDirConfig & store,
@@ -129,8 +130,6 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
         bool * daemonException,
         const StorePath & path,
         std::function<void(Source &)> fun);
-
-    void importPaths(const StoreDirConfig & store, bool * daemonException, Source & source);
 };
 
 struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection

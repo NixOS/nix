@@ -12,12 +12,14 @@
 
   rapidcheck,
   gtest,
+  gbenchmark,
   runCommand,
 
   # Configuration Options
 
   version,
   filesetToSource,
+  withBenchmarks ? false,
 }:
 
 let
@@ -35,25 +37,25 @@ mkMesonExecutable (finalAttrs: {
     ../../.version
     ./.version
     ./meson.build
-    # ./meson.options
+    ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
 
-  # Hack for sake of the dev shell
-  passthru.externalBuildInputs = [
+  buildInputs = [
     sqlite
     rapidcheck
     gtest
-  ];
-
-  buildInputs = finalAttrs.passthru.externalBuildInputs ++ [
     nix-store
     nix-store-c
     nix-store-test-support
+  ]
+  ++ lib.optionals withBenchmarks [
+    gbenchmark
   ];
 
   mesonFlags = [
+    (lib.mesonBool "benchmarks" withBenchmarks)
   ];
 
   passthru = {
@@ -75,12 +77,19 @@ mkMesonExecutable (finalAttrs: {
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
             buildInputs = [ writableTmpDirAsHomeHook ];
           }
-          (''
-            export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
-            export NIX_REMOTE=$HOME/store
-            ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
-            touch $out
-          '');
+          (
+            ''
+              export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
+              export NIX_REMOTE=$HOME/store
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+            ''
+            + lib.optionalString withBenchmarks ''
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-store-benchmarks"}
+            ''
+            + ''
+              touch $out
+            ''
+          );
     };
   };
 

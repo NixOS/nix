@@ -68,7 +68,7 @@ struct CmdRegistryList : StoreCommand
     {
         using namespace fetchers;
 
-        auto registries = getRegistries(fetchSettings, store);
+        auto registries = getRegistries(fetchSettings, *store);
 
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
@@ -189,15 +189,50 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         auto registry = getRegistry();
         auto ref = parseFlakeRef(fetchSettings, url);
         auto lockedRef = parseFlakeRef(fetchSettings, locked);
-        registry->remove(ref.input);
-        auto resolved = lockedRef.resolve(store).input.getAccessor(store).second;
-        if (!resolved.isLocked())
+        auto resolvedInput = lockedRef.resolve(fetchSettings, *store).input;
+        auto resolved = resolvedInput.getAccessor(fetchSettings, *store).second;
+        if (!resolved.isLocked(fetchSettings))
             warn("flake '%s' is not locked", resolved.to_string());
         fetchers::Attrs extraAttrs;
         if (ref.subdir != "")
             extraAttrs["dir"] = ref.subdir;
+        registry->remove(ref.input);
         registry->add(ref.input, resolved, extraAttrs, true);
         registry->write(getRegistryPath());
+    }
+};
+
+struct CmdRegistryResolve : StoreCommand
+{
+    std::vector<std::string> urls;
+
+    std::string description() override
+    {
+        return "resolve flake references using the registry";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "registry-resolve.md"
+            ;
+    }
+
+    CmdRegistryResolve()
+    {
+        expectArgs({
+            .label = "flake-refs",
+            .handler = {&urls},
+        });
+    }
+
+    void run(nix::ref<nix::Store> store) override
+    {
+        for (auto & url : urls) {
+            auto ref = parseFlakeRef(fetchSettings, url);
+            auto resolved = ref.resolve(fetchSettings, *store);
+            logger->cout("%s", resolved.to_string());
+        }
     }
 };
 
@@ -211,6 +246,7 @@ struct CmdRegistry : NixMultiCommand
                   {"add", []() { return make_ref<CmdRegistryAdd>(); }},
                   {"remove", []() { return make_ref<CmdRegistryRemove>(); }},
                   {"pin", []() { return make_ref<CmdRegistryPin>(); }},
+                  {"resolve", []() { return make_ref<CmdRegistryResolve>(); }},
               })
     {
     }

@@ -1,0 +1,20 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "Wrong InputAddressed path throws error",
+    "out": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "bad-path",
+  "outputs": {
+    "out": {
+      "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

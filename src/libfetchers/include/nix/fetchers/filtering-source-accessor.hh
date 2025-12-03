@@ -2,7 +2,7 @@
 
 #include "nix/util/source-path.hh"
 
-#include <unordered_set>
+#include <boost/unordered/unordered_flat_set_fwd.hpp>
 
 namespace nix {
 
@@ -36,7 +36,11 @@ struct FilteringSourceAccessor : SourceAccessor
 
     std::string readFile(const CanonPath & path) override;
 
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
+
     bool pathExists(const CanonPath & path) override;
+
+    Stat lstat(const CanonPath & path) override;
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
@@ -45,6 +49,8 @@ struct FilteringSourceAccessor : SourceAccessor
     std::string readLink(const CanonPath & path) override;
 
     std::string showPath(const CanonPath & path) override;
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override;
 
     /**
      * Call `makeNotAllowedError` to throw a `RestrictedPathError`
@@ -72,7 +78,7 @@ struct AllowListSourceAccessor : public FilteringSourceAccessor
     static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
         std::set<CanonPath> && allowedPrefixes,
-        std::unordered_set<CanonPath> && allowedPaths,
+        boost::unordered_flat_set<CanonPath> && allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringSourceAccessor::FilteringSourceAccessor;

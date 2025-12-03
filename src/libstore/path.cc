@@ -1,4 +1,7 @@
+#include <nlohmann/json.hpp>
+
 #include "nix/store/store-dir-config.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
@@ -74,58 +77,20 @@ StorePath StorePath::random(std::string_view name)
     return StorePath(Hash::random(HashAlgorithm::SHA1), name);
 }
 
-StorePath MixStoreDirMethods::parseStorePath(std::string_view path) const
-{
-    // On Windows, `/nix/store` is not a canonical path. More broadly it
-    // is unclear whether this function should be using the native
-    // notion of a canonical path at all. For example, it makes to
-    // support remote stores whose store dir is a non-native path (e.g.
-    // Windows <-> Unix ssh-ing).
-    auto p =
-#ifdef _WIN32
-        path
-#else
-        canonPath(std::string(path))
-#endif
-        ;
-    if (dirOf(p) != storeDir)
-        throw BadStorePath("path '%s' is not in the Nix store", p);
-    return StorePath(baseNameOf(p));
-}
-
-std::optional<StorePath> MixStoreDirMethods::maybeParseStorePath(std::string_view path) const
-{
-    try {
-        return parseStorePath(path);
-    } catch (Error &) {
-        return {};
-    }
-}
-
-bool MixStoreDirMethods::isStorePath(std::string_view path) const
-{
-    return (bool) maybeParseStorePath(path);
-}
-
-StorePathSet MixStoreDirMethods::parseStorePathSet(const PathSet & paths) const
-{
-    StorePathSet res;
-    for (auto & i : paths)
-        res.insert(parseStorePath(i));
-    return res;
-}
-
-std::string MixStoreDirMethods::printStorePath(const StorePath & path) const
-{
-    return (storeDir + "/").append(path.to_string());
-}
-
-PathSet MixStoreDirMethods::printStorePathSet(const StorePathSet & paths) const
-{
-    PathSet res;
-    for (auto & i : paths)
-        res.insert(printStorePath(i));
-    return res;
-}
-
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+StorePath adl_serializer<StorePath>::from_json(const json & json)
+{
+    return StorePath{getString(json)};
+}
+
+void adl_serializer<StorePath>::to_json(json & json, const StorePath & storePath)
+{
+    json = storePath.to_string();
+}
+
+} // namespace nlohmann

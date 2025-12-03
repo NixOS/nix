@@ -1,0 +1,41 @@
+{
+  "args": [
+    "bar",
+    "baz"
+  ],
+  "builder": "foo",
+  "env": {
+    "BIG_BAD": "WOLF"
+  },
+  "inputs": {
+    "drvs": {
+      "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv": {
+        "dynamicOutputs": {
+          "cat": {
+            "dynamicOutputs": {},
+            "outputs": [
+              "kitten"
+            ]
+          },
+          "goose": {
+            "dynamicOutputs": {},
+            "outputs": [
+              "gosling"
+            ]
+          }
+        },
+        "outputs": [
+          "cat",
+          "dog"
+        ]
+      }
+    },
+    "srcs": [
+      "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
+    ]
+  },
+  "name": "dyn-dep-derivation",
+  "outputs": {},
+  "system": "wasm-sel4",
+  "version": 4
+}

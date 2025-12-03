@@ -1,0 +1,27 @@
+{
+  "args": [],
+  "builder": "/bin/sh",
+  "env": {
+    "__doc": "InputAddressed throws when should be deferred",
+    "out": ""
+  },
+  "inputs": {
+    "drvs": {
+      "lg4c4b8r9hlczwprl6kgnzfd9mc1xmkk-dependency.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "depends-on-drv",
+  "outputs": {
+    "out": {
+      "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

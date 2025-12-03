@@ -71,7 +71,7 @@ function characterisationTestExit() {
             echo >&2 ''
             echo >&2 'You can rerun this test with:'
             echo >&2 ''
-            echo >&2 "    _NIX_TEST_ACCEPT=1 meson test ${TEST_NAME}"
+            echo >&2 "    _NIX_TEST_ACCEPT=1 meson test --suite ${TEST_SUITE_NAME} ${TEST_NAME}"
             echo >&2 ''
             echo >&2 'to regenerate the files containing the expected output,'
             echo >&2 'and then view the git diff to decide whether a change is'

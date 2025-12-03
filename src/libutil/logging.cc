@@ -121,7 +121,7 @@ public:
         std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
 
-        log(ei.level, toView(oss));
+        log(ei.level, oss.view());
     }
 
     void startActivity(
@@ -367,10 +367,10 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
 
 void applyJSONLogger()
 {
-    if (!loggerSettings.jsonLogPath.get().empty()) {
+    if (auto & opt = loggerSettings.jsonLogPath.get()) {
         try {
             std::vector<std::unique_ptr<Logger>> loggers;
-            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            loggers.push_back(makeJSONLogger(*opt, false));
             try {
                 logger = makeTeeLogger(std::move(logger), std::move(loggers));
             } catch (...) {

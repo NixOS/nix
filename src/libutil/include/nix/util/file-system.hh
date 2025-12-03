@@ -55,7 +55,8 @@ inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool re
     return absPath(PathView{path}, dir, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
+std::filesystem::path
+absPath(const std::filesystem::path & path, const std::filesystem::path * dir = nullptr, bool resolveSymlinks = false);
 
 /**
  * Canonicalise a path by removing all `.` or `..` components and
@@ -151,6 +152,12 @@ bool pathAccessible(const std::filesystem::path & path);
  * `std::filesystem::read_symlink`.
  */
 Path readLink(const Path & path);
+
+/**
+ * Read the contents (target) of a symbolic link.  The result is not
+ * in any way canonicalised.
+ */
+std::filesystem::path readLink(const std::filesystem::path & path);
 
 /**
  * Open a `Descriptor` with read-only access to the given directory.
@@ -286,7 +293,19 @@ class AutoDelete
     bool recursive;
 public:
     AutoDelete();
+
+    AutoDelete(AutoDelete && x) noexcept
+    {
+        _path = std::move(x._path);
+        del = x.del;
+        recursive = x.recursive;
+        x.del = false;
+    }
+
     AutoDelete(const std::filesystem::path & p, bool recursive = true);
+    AutoDelete(const AutoDelete &) = delete;
+    AutoDelete & operator=(AutoDelete &&) = delete;
+    AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
     void cancel();
@@ -327,7 +346,14 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", mode_t mode = 0755);
+std::filesystem::path
+createTempDir(const std::filesystem::path & tmpRoot = "", const std::string & prefix = "nix", mode_t mode = 0755);
+
+/**
+ * Create an anonymous readable/writable temporary file, returning a file handle.
+ * On UNIX there resulting file isn't linked to any path on the filesystem.
+ */
+AutoCloseFD createAnonymousTempFile();
 
 /**
  * Create a temporary file, returning a file handle and its path.
@@ -337,7 +363,7 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 /**
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
  */
-Path defaultTempDir();
+std::filesystem::path defaultTempDir();
 
 /**
  * Interpret `exe` as a location in the ambient file system and return
@@ -351,7 +377,7 @@ bool isExecutableFileAmbient(const std::filesystem::path & exe);
  * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
  * path nested in a directory, provide a suffix starting with `/`.
  */
-Path makeTempPath(const Path & root, const Path & suffix = ".tmp");
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
 
 /**
  * Used in various places.

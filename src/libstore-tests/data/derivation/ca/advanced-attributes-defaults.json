@@ -12,8 +12,10 @@
     "outputHashMode": "recursive",
     "system": "my-system"
   },
-  "inputDrvs": {},
-  "inputSrcs": [],
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
   "name": "advanced-attributes-defaults",
   "outputs": {
     "out": {
@@ -21,5 +23,6 @@
       "method": "nar"
     }
   },
-  "system": "my-system"
+  "system": "my-system",
+  "version": 4
 }

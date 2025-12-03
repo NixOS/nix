@@ -1,7 +1,7 @@
 suites += {
-  'name': 'flakes',
-  'deps': [],
-  'tests': [
+  'name' : 'flakes',
+  'deps' : [],
+  'tests' : [
     'flakes.sh',
     'registry-pin.sh',
     'develop.sh',
@@ -36,5 +36,5 @@ suites += {
     'old-lockfiles.sh',
     'trace-ifd.sh',
   ],
-  'workdir': meson.current_source_dir(),
+  'workdir' : meson.current_source_dir(),
 }

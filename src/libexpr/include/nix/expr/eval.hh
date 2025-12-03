@@ -16,9 +16,13 @@
 #include "nix/expr/search-path.hh"
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
+#include "nix/expr/counter.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
 #include <map>
 #include <optional>
@@ -38,6 +42,7 @@ class Store;
 namespace fetchers {
 struct Settings;
 struct InputCache;
+struct Input;
 } // namespace fetchers
 struct EvalSettings;
 class EvalState;
@@ -45,6 +50,7 @@ class StorePath;
 struct SingleDerivedPath;
 enum RepairFlag : bool;
 struct MemorySourceAccessor;
+struct MountedSourceAccessor;
 
 namespace eval_cache {
 class EvalCache;
@@ -102,7 +108,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    std::optional<std::string> doc;
 
     /**
      * Add a trace item, while calling the `<name>` builtin.
@@ -162,7 +168,7 @@ typedef std::
     map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *>>>
         ValMap;
 
-typedef std::unordered_map<PosIdx, DocComment> DocCommentMap;
+typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 struct Env
 {
@@ -185,7 +191,7 @@ std::ostream & operator<<(std::ostream & os, const ValueType t);
 
 struct RegexCache;
 
-std::shared_ptr<RegexCache> makeRegexCache();
+ref<RegexCache> makeRegexCache();
 
 struct DebugTrace
 {
@@ -213,22 +219,165 @@ struct DebugTrace
     }
 };
 
+struct StaticEvalSymbols
+{
+    Symbol with, outPath, drvPath, type, meta, name, value, system, overrides, outputs, outputName, ignoreNulls, file,
+        line, column, functor, toString, right, wrong, structuredAttrs, json, allowedReferences, allowedRequisites,
+        disallowedReferences, disallowedRequisites, maxSize, maxClosureSize, builder, args, contentAddressed, impure,
+        outputHash, outputHashAlgo, outputHashMode, recurseForDerivations, description, self, epsilon, startSet,
+        operator_, key, path, prefix, outputSpecified;
+
+    Expr::AstSymbols exprSymbols;
+
+    static constexpr auto preallocate()
+    {
+        StaticSymbolTable alloc;
+
+        StaticEvalSymbols staticSymbols = {
+            .with = alloc.create("<with>"),
+            .outPath = alloc.create("outPath"),
+            .drvPath = alloc.create("drvPath"),
+            .type = alloc.create("type"),
+            .meta = alloc.create("meta"),
+            .name = alloc.create("name"),
+            .value = alloc.create("value"),
+            .system = alloc.create("system"),
+            .overrides = alloc.create("__overrides"),
+            .outputs = alloc.create("outputs"),
+            .outputName = alloc.create("outputName"),
+            .ignoreNulls = alloc.create("__ignoreNulls"),
+            .file = alloc.create("file"),
+            .line = alloc.create("line"),
+            .column = alloc.create("column"),
+            .functor = alloc.create("__functor"),
+            .toString = alloc.create("__toString"),
+            .right = alloc.create("right"),
+            .wrong = alloc.create("wrong"),
+            .structuredAttrs = alloc.create("__structuredAttrs"),
+            .json = alloc.create("__json"),
+            .allowedReferences = alloc.create("allowedReferences"),
+            .allowedRequisites = alloc.create("allowedRequisites"),
+            .disallowedReferences = alloc.create("disallowedReferences"),
+            .disallowedRequisites = alloc.create("disallowedRequisites"),
+            .maxSize = alloc.create("maxSize"),
+            .maxClosureSize = alloc.create("maxClosureSize"),
+            .builder = alloc.create("builder"),
+            .args = alloc.create("args"),
+            .contentAddressed = alloc.create("__contentAddressed"),
+            .impure = alloc.create("__impure"),
+            .outputHash = alloc.create("outputHash"),
+            .outputHashAlgo = alloc.create("outputHashAlgo"),
+            .outputHashMode = alloc.create("outputHashMode"),
+            .recurseForDerivations = alloc.create("recurseForDerivations"),
+            .description = alloc.create("description"),
+            .self = alloc.create("self"),
+            .epsilon = alloc.create(""),
+            .startSet = alloc.create("startSet"),
+            .operator_ = alloc.create("operator"),
+            .key = alloc.create("key"),
+            .path = alloc.create("path"),
+            .prefix = alloc.create("prefix"),
+            .outputSpecified = alloc.create("outputSpecified"),
+            .exprSymbols = {
+                .sub = alloc.create("__sub"),
+                .lessThan = alloc.create("__lessThan"),
+                .mul = alloc.create("__mul"),
+                .div = alloc.create("__div"),
+                .or_ = alloc.create("or"),
+                .findFile = alloc.create("__findFile"),
+                .nixPath = alloc.create("__nixPath"),
+                .body = alloc.create("body"),
+            }};
+
+        return std::pair{staticSymbols, alloc};
+    }
+
+    static consteval StaticEvalSymbols create()
+    {
+        return preallocate().first;
+    }
+
+    static constexpr StaticSymbolTable staticSymbolTable()
+    {
+        return preallocate().second;
+    }
+};
+
+class EvalMemory
+{
+#if NIX_USE_BOEHMGC
+    /**
+     * Allocation cache for GC'd Value objects.
+     */
+    std::shared_ptr<void *> valueAllocCache;
+
+    /**
+     * Allocation cache for size-1 Env objects.
+     */
+    std::shared_ptr<void *> env1AllocCache;
+#endif
+
+public:
+    struct Statistics
+    {
+        Counter nrEnvs;
+        Counter nrValuesInEnvs;
+        Counter nrValues;
+        Counter nrAttrsets;
+        Counter nrAttrsInAttrsets;
+        Counter nrListElems;
+    };
+
+    EvalMemory();
+
+    EvalMemory(const EvalMemory &) = delete;
+    EvalMemory(EvalMemory &&) = delete;
+    EvalMemory & operator=(const EvalMemory &) = delete;
+    EvalMemory & operator=(EvalMemory &&) = delete;
+
+    inline void * allocBytes(size_t n);
+    inline Value * allocValue();
+    inline Env & allocEnv(size_t size);
+
+    Bindings * allocBindings(size_t capacity);
+
+    BindingsBuilder buildBindings(SymbolTable & symbols, size_t capacity)
+    {
+        return BindingsBuilder(*this, symbols, allocBindings(capacity), capacity);
+    }
+
+    ListBuilder buildList(size_t size)
+    {
+        stats.nrListElems += size;
+        return ListBuilder(*this, size);
+    }
+
+    const Statistics & getStats() const &
+    {
+        return stats;
+    }
+
+    /**
+     * Storage for the AST nodes
+     */
+    Exprs exprs;
+
+private:
+    Statistics stats;
+};
+
 class EvalState : public std::enable_shared_from_this<EvalState>
 {
 public:
+    static constexpr StaticEvalSymbols s = StaticEvalSymbols::create();
+
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
+
     SymbolTable symbols;
     PosTable positions;
 
-    const Symbol sWith, sOutPath, sDrvPath, sType, sMeta, sName, sValue, sSystem, sOverrides, sOutputs, sOutputName,
-        sIgnoreNulls, sFile, sLine, sColumn, sFunctor, sToString, sRight, sWrong, sStructuredAttrs, sJson,
-        sAllowedReferences, sAllowedRequisites, sDisallowedReferences, sDisallowedRequisites, sMaxSize, sMaxClosureSize,
-        sBuilder, sArgs, sContentAddressed, sImpure, sOutputHash, sOutputHashAlgo, sOutputHashMode,
-        sRecurseForDerivations, sDescription, sSelf, sEpsilon, sStartSet, sOperator, sKey, sPath, sPrefix,
-        sOutputSpecified;
-
-    const Expr::AstSymbols exprSymbols;
+    EvalMemory mem;
 
     /**
      * If set, force copying files to the Nix store even if they
@@ -236,47 +385,10 @@ public:
      */
     RepairFlag repair;
 
-    Bindings emptyBindings;
-
-    /**
-     * Empty list constant.
-     */
-    Value vEmptyList;
-
-    /**
-     * `null` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vNull;
-
-    /**
-     * `true` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vTrue;
-
-    /**
-     * `true` constant.
-     *
-     * This is _not_ a singleton. Pointer equality is _not_ sufficient.
-     */
-    Value vFalse;
-
-    /** `"regular"` */
-    Value vStringRegular;
-    /** `"directory"` */
-    Value vStringDirectory;
-    /** `"symlink"` */
-    Value vStringSymlink;
-    /** `"unknown"` */
-    Value vStringUnknown;
-
     /**
      * The accessor corresponding to `store`.
      */
-    const ref<SourceAccessor> storeFS;
+    const ref<MountedSourceAccessor> storeFS;
 
     /**
      * The accessor for the root filesystem.
@@ -308,7 +420,7 @@ public:
 
     RootValue vImportedDrvToDerivation = nullptr;
 
-    ref<fetchers::InputCache> inputCache;
+    const ref<fetchers::InputCache> inputCache;
 
     /**
      * Debugger
@@ -318,7 +430,7 @@ public:
     bool inDebugger = false;
     int trylevel;
     std::list<DebugTrace> debugTraces;
-    std::map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
+    boost::unordered_flat_map<const Expr *, const std::shared_ptr<const StaticEnv>> exprEnvs;
 
     const std::shared_ptr<const StaticEnv> getStaticEnv(const Expr & expr) const
     {
@@ -361,68 +473,66 @@ private:
 
     /* Cache for calls to addToStore(); maps source paths to the store
        paths. */
-    Sync<std::unordered_map<SourcePath, StorePath>> srcToStore;
+    const ref<boost::concurrent_flat_map<SourcePath, StorePath>> srcToStore;
 
     /**
-     * A cache from path names to parse trees.
+     * A cache that maps paths to "resolved" paths for importing Nix
+     * expressions, i.e. `/foo` to `/foo/default.nix`.
      */
-    typedef std::unordered_map<
-        SourcePath,
-        Expr *,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Expr *>>>
-        FileParseCache;
-    FileParseCache fileParseCache;
+    const ref<boost::concurrent_flat_map<SourcePath, SourcePath>> importResolutionCache;
 
     /**
-     * A cache from path names to values.
+     * A cache from resolved paths to values.
      */
-    typedef std::unordered_map<
+    const ref<boost::concurrent_flat_map<
         SourcePath,
-        Value,
+        Value *,
         std::hash<SourcePath>,
         std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value>>>
-        FileEvalCache;
-    FileEvalCache fileEvalCache;
+        traceable_allocator<std::pair<const SourcePath, Value *>>>>
+        fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    std::unordered_map<SourcePath, DocCommentMap> positionToDocComment;
+    boost::unordered_flat_map<SourcePath, DocCommentMap> positionToDocComment;
 
     LookupPath lookupPath;
 
-    std::map<std::string, std::optional<SourcePath>> lookupPathResolved;
+    boost::unordered_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>
+        lookupPathResolved;
 
     /**
      * Cache used by prim_match().
      */
-    std::shared_ptr<RegexCache> regexCache;
-
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
+    const ref<RegexCache> regexCache;
 
 public:
 
+    /**
+     * @param lookupPath     Only used during construction.
+     * @param store          The store to use for instantiation
+     * @param fetchSettings  Must outlive the lifetime of this EvalState!
+     * @param settings       Must outlive the lifetime of this EvalState!
+     * @param buildStore     The store to use for builds ("import from derivation", C API `nix_string_realise`)
+     */
     EvalState(
-        const LookupPath & _lookupPath,
+        const LookupPath & lookupPath,
         ref<Store> store,
         const fetchers::Settings & fetchSettings,
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
+
+    /**
+     * A wrapper around EvalMemory::allocValue() to avoid code churn when it
+     * was introduced.
+     */
+    inline Value * allocValue()
+    {
+        return mem.allocValue();
+    }
 
     LookupPath getLookupPath()
     {
@@ -451,8 +561,11 @@ public:
 
     /**
      * Allow access to a path.
+     *
+     * Only for restrict eval: pure eval just whitelist store paths,
+     * never arbitrary paths.
      */
-    void allowPath(const Path & path);
+    void allowPathLegacy(const Path & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to
@@ -473,15 +586,21 @@ public:
     void checkURI(const std::string & uri);
 
     /**
+     * Mount an input on the Nix store.
+     */
+    StorePath mountInput(fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor);
+
+    /**
      * Parse a Nix expression from the specified file.
      */
     Expr * parseExprFromFile(const SourcePath & path);
-    Expr * parseExprFromFile(const SourcePath & path, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr * parseExprFromFile(const SourcePath & path, const std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
      * Parse a Nix expression from the specified string.
      */
-    Expr * parseExprFromString(std::string s, const SourcePath & basePath, std::shared_ptr<StaticEnv> & staticEnv);
+    Expr *
+    parseExprFromString(std::string s, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const SourcePath & basePath);
 
     Expr * parseStdin();
@@ -570,7 +689,7 @@ public:
     /**
      * Get attribute from an attribute set and throw an error if it doesn't exist.
      */
-    Bindings::const_iterator getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
+    const Attr * getAttr(Symbol attrSym, const Bindings * attrSet, std::string_view errorCtx);
 
     template<typename... Args>
     [[gnu::noinline]]
@@ -650,7 +769,7 @@ public:
 
 #if NIX_USE_BOEHMGC
     /** A GC root for the baseEnv reference. */
-    std::shared_ptr<Env *> baseEnvP;
+    const std::shared_ptr<Env *> baseEnvP;
 #endif
 
 public:
@@ -664,16 +783,16 @@ public:
     /**
      * The same, but used during parsing to resolve variables.
      */
-    std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
+    const std::shared_ptr<StaticEnv> staticBaseEnv; // !!! should be private
 
     /**
      * Internal primops not exposed to the user.
      */
-    std::unordered_map<
+    boost::unordered_flat_map<
         std::string,
         Value *,
-        std::hash<std::string>,
-        std::equal_to<std::string>,
+        StringViewHash,
+        std::equal_to<>,
         traceable_allocator<std::pair<const std::string, Value *>>>
         internalPrimOps;
 
@@ -746,7 +865,7 @@ private:
         size_t length,
         Pos::Origin origin,
         const SourcePath & basePath,
-        std::shared_ptr<StaticEnv> & staticEnv);
+        const std::shared_ptr<StaticEnv> & staticEnv);
 
     /**
      * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run
@@ -792,22 +911,14 @@ public:
      */
     void autoCallFunction(const Bindings & args, Value & fun, Value & res);
 
-    /**
-     * Allocation primitives.
-     */
-    inline Value * allocValue();
-    inline Env & allocEnv(size_t size);
-
-    Bindings * allocBindings(size_t capacity);
-
     BindingsBuilder buildBindings(size_t capacity)
     {
-        return BindingsBuilder(*this, allocBindings(capacity));
+        return mem.buildBindings(symbols, capacity);
     }
 
     ListBuilder buildList(size_t size)
     {
-        return ListBuilder(*this, size);
+        return mem.buildList(size);
     }
 
     /**
@@ -924,26 +1035,20 @@ private:
      */
     std::string mkSingleDerivedPathStringRaw(const SingleDerivedPath & p);
 
-    unsigned long nrEnvs = 0;
-    unsigned long nrValuesInEnvs = 0;
-    unsigned long nrValues = 0;
-    unsigned long nrListElems = 0;
-    unsigned long nrLookups = 0;
-    unsigned long nrAttrsets = 0;
-    unsigned long nrAttrsInAttrsets = 0;
-    unsigned long nrAvoided = 0;
-    unsigned long nrOpUpdates = 0;
-    unsigned long nrOpUpdateValuesCopied = 0;
-    unsigned long nrListConcats = 0;
-    unsigned long nrPrimOpCalls = 0;
-    unsigned long nrFunctionCalls = 0;
+    Counter nrLookups;
+    Counter nrAvoided;
+    Counter nrOpUpdates;
+    Counter nrOpUpdateValuesCopied;
+    Counter nrListConcats;
+    Counter nrPrimOpCalls;
+    Counter nrFunctionCalls;
 
     bool countCalls;
 
-    typedef std::map<std::string, size_t> PrimOpCalls;
+    typedef boost::unordered_flat_map<std::string, size_t, StringViewHash, std::equal_to<>> PrimOpCalls;
     PrimOpCalls primOpCalls;
 
-    typedef std::map<ExprLambda *, size_t> FunctionCalls;
+    typedef boost::unordered_flat_map<ExprLambda *, size_t> FunctionCalls;
     FunctionCalls functionCalls;
 
     /** Evaluation/call profiler. */
@@ -951,7 +1056,7 @@ private:
 
     void incrFunctionCall(ExprLambda * fun);
 
-    typedef std::map<PosIdx, size_t> AttrSelects;
+    typedef boost::unordered_flat_map<PosIdx, size_t, std::hash<PosIdx>> AttrSelects;
     AttrSelects attrSelects;
 
     friend struct ExprOpUpdate;

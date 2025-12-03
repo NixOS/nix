@@ -185,7 +185,7 @@ FrameInfo SampleStack::getPrimOpFrameInfo(const PrimOp & primOp, std::span<Value
                 /* Error context strings don't actually matter, since we ignore all eval errors. */
                 state.forceAttrs(*args[0], pos, "");
                 auto attrs = args[0]->attrs();
-                auto nameAttr = state.getAttr(state.sName, attrs, "");
+                auto nameAttr = state.getAttr(state.s.name, attrs, "");
                 auto drvName = std::string(state.forceStringNoCtx(*nameAttr->value, pos, ""));
                 return DerivationStrictFrameInfo{.callPos = pos, .drvName = std::move(drvName)};
             } catch (...) {
@@ -211,7 +211,7 @@ FrameInfo SampleStack::getFrameInfoFromValueAndPos(const Value & v, std::span<Va
         /* Resolve primOp eagerly. Must not hold on to a reference to a Value. */
         return PrimOpFrameInfo{.expr = v.primOpAppPrimOp(), .callPos = pos};
     else if (state.isFunctor(v)) {
-        const auto functor = v.attrs()->get(state.sFunctor);
+        const auto functor = v.attrs()->get(state.s.functor);
         if (auto pos_ = posCache.lookup(pos); std::holds_alternative<std::monostate>(pos_.origin))
             /* HACK: In case callsite position is unresolved. */
             return FunctorFrameInfo{.pos = functor->pos};
@@ -324,7 +324,7 @@ void SampleStack::saveProfile()
             std::visit([&](auto && info) { info.symbolize(state, os, posCache); }, pos);
         }
         os << " " << count;
-        writeLine(profileFd.get(), std::move(os).str());
+        writeLine(profileFd.get(), os.str());
         /* Clear ostringstream. */
         os.str("");
         os.clear();

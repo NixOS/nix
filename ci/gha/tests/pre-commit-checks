@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+system=$(nix eval --raw --impure --expr builtins.currentSystem)
+
+echo "::group::Running pre-commit checks"
+
+if nix build ".#checks.$system.pre-commit" -L; then
+    echo "::endgroup::"
+    exit 0
+fi
+
+echo "::error ::Changes do not pass pre-commit checks"
+
+cat <<EOF
+The code isn't formatted or doesn't pass lints. You can run pre-commit locally with:
+
+    nix develop -c ./maintainers/format.sh
+EOF
+
+echo "::endgroup::"
+
+exit 1

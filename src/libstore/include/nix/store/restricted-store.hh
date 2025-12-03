@@ -1,9 +1,12 @@
 #pragma once
 ///@file
 
-#include "nix/store/local-store.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
+
+class LocalStore;
+struct LocalStoreConfig;
 
 /**
  * A restricted store has a pointer to one of these, which manages the
@@ -49,12 +52,26 @@ struct RestrictionContext
      * Add 'path' to the set of paths that may be referenced by the
      * outputs, and make it appear in the sandbox.
      */
-    virtual void addDependency(const StorePath & path) = 0;
+    void addDependency(const StorePath & path)
+    {
+        if (isAllowed(path))
+            return;
+        addDependencyImpl(path);
+    }
+
+protected:
+
+    /**
+     * This is the underlying implementation to be defined. The caller
+     * will ensure that this is only called on newly added dependencies,
+     * and that idempotent calls are a no-op.
+     */
+    virtual void addDependencyImpl(const StorePath & path) = 0;
 };
 
 /**
  * Create a shared pointer to a restricted store.
  */
-ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context);
+ref<Store> makeRestrictedStore(ref<LocalStoreConfig> config, ref<LocalStore> next, RestrictionContext & context);
 
 } // namespace nix

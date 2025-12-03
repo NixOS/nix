@@ -1,15 +1,17 @@
+#include <gtest/gtest.h>
+#include <filesystem>
+#include <string>
+
 #include "nix/util/file-system.hh"
 #include "nix_api_store.h"
 #include "nix_api_util.h"
 #include "nix_api_expr.h"
 #include "nix_api_value.h"
 #include "nix_api_flake.h"
-
-#include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
-
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include "nix/store/tests/nix_api_store.hh"
+#include "nix/util/tests/nix_api_util.hh"
+#include "nix_api_fetchers.h"
 
 namespace nixC {
 
@@ -84,7 +86,7 @@ TEST_F(nix_api_store_test, nix_api_load_flake)
     auto tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, true);
 
-    nix::writeFile(tmpDir + "/flake.nix", R"(
+    nix::writeFile(tmpDir / "flake.nix", R"(
         {
             outputs = { ... }: {
                 hello = "potato";
@@ -119,7 +121,8 @@ TEST_F(nix_api_store_test, nix_api_load_flake)
     assert_ctx_ok();
     ASSERT_NE(nullptr, parseFlags);
 
-    auto r0 = nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.size());
+    auto r0 =
+        nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.string().size());
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, r0);
 
@@ -175,8 +178,8 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
     auto tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, true);
 
-    nix::createDirs(tmpDir + "/b");
-    nix::writeFile(tmpDir + "/b/flake.nix", R"(
+    nix::createDirs(tmpDir / "b");
+    nix::writeFile(tmpDir / "b" / "flake.nix", R"(
         {
             outputs = { ... }: {
                 hello = "BOB";
@@ -184,18 +187,18 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
         }
     )");
 
-    nix::createDirs(tmpDir + "/a");
-    nix::writeFile(tmpDir + "/a/flake.nix", R"(
+    nix::createDirs(tmpDir / "a");
+    nix::writeFile(tmpDir / "a" / "flake.nix", R"(
         {
-            inputs.b.url = ")" + tmpDir + R"(/b";
+            inputs.b.url = ")" + tmpDir.string() + R"(/b";
             outputs = { b, ... }: {
                 hello = b.hello;
             };
         }
     )");
 
-    nix::createDirs(tmpDir + "/c");
-    nix::writeFile(tmpDir + "/c/flake.nix", R"(
+    nix::createDirs(tmpDir / "c");
+    nix::writeFile(tmpDir / "c" / "flake.nix", R"(
         {
             outputs = { ... }: {
                 hello = "Claire";
@@ -228,7 +231,8 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
     assert_ctx_ok();
     ASSERT_NE(nullptr, parseFlags);
 
-    auto r0 = nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.size());
+    auto r0 =
+        nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.string().size());
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, r0);
 

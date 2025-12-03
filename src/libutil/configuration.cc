@@ -85,7 +85,7 @@ void AbstractConfig::reapplyUnknownSettings()
         set(s.first, s.second);
 }
 
-void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly)
+void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (const auto & opt : _settings)
         if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
@@ -331,9 +331,24 @@ void BaseSetting<bool>::convertToArg(Args & args, const std::string & category)
 }
 
 template<>
+std::list<std::filesystem::path> BaseSetting<std::list<std::filesystem::path>>::parse(const std::string & str) const
+{
+    auto tokens = tokenizeString<std::list<std::string>>(str);
+    return {tokens.begin(), tokens.end()};
+}
+
+template<>
 Strings BaseSetting<Strings>::parse(const std::string & str) const
 {
     return tokenizeString<Strings>(str);
+}
+
+template<>
+void BaseSetting<std::list<std::filesystem::path>>::appendOrSet(std::list<std::filesystem::path> newValue, bool append)
+{
+    if (!append)
+        value.clear();
+    value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
 
 template<>
@@ -342,6 +357,14 @@ void BaseSetting<Strings>::appendOrSet(Strings newValue, bool append)
     if (!append)
         value.clear();
     value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+}
+
+template<>
+std::string BaseSetting<std::list<std::filesystem::path>>::to_string() const
+{
+    return concatStringsSep(" ", value | std::views::transform([](const auto & p) {
+                                     return p.string();
+                                 }) | std::ranges::to<std::list<std::string>>());
 }
 
 template<>
@@ -433,6 +456,42 @@ std::string BaseSetting<StringMap>::to_string() const
         [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
+static Path parsePath(const AbstractSetting & s, const std::string & str)
+{
+    if (str == "")
+        throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
+    else
+        return canonPath(str);
+}
+
+template<>
+std::filesystem::path BaseSetting<std::filesystem::path>::parse(const std::string & str) const
+{
+    return parsePath(*this, str);
+}
+
+template<>
+std::string BaseSetting<std::filesystem::path>::to_string() const
+{
+    return value.string();
+}
+
+template<>
+std::optional<std::filesystem::path>
+BaseSetting<std::optional<std::filesystem::path>>::parse(const std::string & str) const
+{
+    if (str == "")
+        return std::nullopt;
+    else
+        return parsePath(*this, str);
+}
+
+template<>
+std::string BaseSetting<std::optional<std::filesystem::path>>::to_string() const
+{
+    return value ? value->string() : "";
+}
+
 template class BaseSetting<int>;
 template class BaseSetting<unsigned int>;
 template class BaseSetting<long>;
@@ -441,18 +500,13 @@ template class BaseSetting<long long>;
 template class BaseSetting<unsigned long long>;
 template class BaseSetting<bool>;
 template class BaseSetting<std::string>;
+template class BaseSetting<std::list<std::filesystem::path>>;
 template class BaseSetting<Strings>;
 template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
-
-static Path parsePath(const AbstractSetting & s, const std::string & str)
-{
-    if (str == "")
-        throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
-    else
-        return canonPath(str);
-}
+template class BaseSetting<std::filesystem::path>;
+template class BaseSetting<std::optional<std::filesystem::path>>;
 
 PathSetting::PathSetting(
     Config * options,
@@ -500,10 +554,10 @@ bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature)
     return std::find(f.begin(), f.end(), feature) != f.end();
 }
 
-void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature) const
+void ExperimentalFeatureSettings::require(const ExperimentalFeature & feature, std::string reason) const
 {
     if (!isEnabled(feature))
-        throw MissingExperimentalFeature(feature);
+        throw MissingExperimentalFeature(feature, std::move(reason));
 }
 
 bool ExperimentalFeatureSettings::isEnabled(const std::optional<ExperimentalFeature> & feature) const

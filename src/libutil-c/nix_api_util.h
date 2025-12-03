@@ -53,7 +53,7 @@ extern "C" {
  * - NIX_OK: No error occurred (0)
  * - NIX_ERR_UNKNOWN: An unknown error occurred (-1)
  * - NIX_ERR_OVERFLOW: An overflow error occurred (-2)
- * - NIX_ERR_KEY: A key error occurred (-3)
+ * - NIX_ERR_KEY: A key/index access error occurred in C API functions (-3)
  * - NIX_ERR_NIX_ERROR: A generic Nix error occurred (-4)
  */
 enum nix_err {
@@ -83,10 +83,21 @@ enum nix_err {
     NIX_ERR_OVERFLOW = -2,
 
     /**
-     * @brief A key error occurred.
+     * @brief A key/index access error occurred in C API functions.
      *
-     * This error code is returned when a key error occurred during the function
-     * execution.
+     * This error code is returned when accessing a key, index, or identifier that
+     * does not exist in C API functions. Common scenarios include:
+     * - Setting keys that don't exist (nix_setting_get, nix_setting_set)
+     * - List indices that are out of bounds (nix_get_list_byidx*)
+     * - Attribute names that don't exist (nix_get_attr_byname*)
+     * - Attribute indices that are out of bounds (nix_get_attr_byidx*, nix_get_attr_name_byidx)
+     *
+     * This error typically indicates incorrect usage or assumptions about data structure
+     * contents, rather than internal Nix evaluation errors.
+     *
+     * @note This error code should ONLY be returned by C API functions themselves,
+     * not by underlying Nix evaluation. For example, evaluating `{}.foo` in Nix
+     * will throw a normal error (NIX_ERR_NIX_ERROR), not NIX_ERR_KEY.
      */
     NIX_ERR_KEY = -3,
 
@@ -101,6 +112,24 @@ enum nix_err {
 };
 
 typedef enum nix_err nix_err;
+
+/**
+ * @brief Verbosity level
+ *
+ * @note This should be kept in sync with the C++ implementation (nix::Verbosity)
+ */
+enum nix_verbosity {
+    NIX_LVL_ERROR = 0,
+    NIX_LVL_WARN,
+    NIX_LVL_NOTICE,
+    NIX_LVL_INFO,
+    NIX_LVL_TALKATIVE,
+    NIX_LVL_CHATTY,
+    NIX_LVL_DEBUG,
+    NIX_LVL_VOMIT,
+};
+
+typedef enum nix_verbosity nix_verbosity;
 
 /**
  * @brief This object stores error state.
@@ -125,6 +154,8 @@ typedef struct nix_c_context nix_c_context;
 
 /**
  * @brief Called to get the value of a string owned by Nix.
+ *
+ * The `start` data is borrowed and the function must not assume that the buffer persists after it returns.
  *
  * @param[in] start the string to copy.
  * @param[in] n the string length.
@@ -315,6 +346,14 @@ nix_err nix_set_err_msg(nix_c_context * context, nix_err err, const char * msg);
  * This failure can be avoided by clearing the error message after handling it.
  */
 void nix_clear_err(nix_c_context * context);
+
+/**
+ * @brief Sets the verbosity level
+ *
+ * @param[out] context Optional, additional error context.
+ * @param[in] level Verbosity level
+ */
+nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level);
 
 /**
  *  @}

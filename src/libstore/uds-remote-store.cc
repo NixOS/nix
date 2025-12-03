@@ -2,6 +2,7 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -54,15 +55,24 @@ UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
 {
 }
 
-std::string UDSRemoteStore::getUri()
+StoreReference UDSRemoteStoreConfig::getReference() const
 {
-    return config->path == settings.nixDaemonSocketFile
-               ? // FIXME: Not clear why we return daemon here and not default
-                 // to settings.nixDaemonSocketFile
-                 //
-                 // unix:// with no path also works. Change what we return?
-               "daemon"
-               : std::string(*Config::uriSchemes().begin()) + "://" + config->path;
+    /* We specifically return "daemon" here instead of "unix://" or "unix://${path}"
+     * to be more compatible with older versions of nix. Some tooling out there
+     * tries hard to parse store references and it might not be able to handle "unix://". */
+    if (path == settings.nixDaemonSocketFile)
+        return {
+            .variant = StoreReference::Daemon{},
+            .params = getQueryParams(),
+        };
+    return {
+        .variant =
+            StoreReference::Specified{
+                .scheme = *uriSchemes().begin(),
+                .authority = path,
+            },
+        .params = getQueryParams(),
+    };
 }
 
 void UDSRemoteStore::Connection::closeWrite()

@@ -1,9 +1,6 @@
 #include "nix_api_store.h"
-#include "nix_api_store_internal.h"
 #include "nix_api_util.h"
-#include "nix_api_util_internal.h"
 #include "nix_api_expr.h"
-#include "nix_api_expr_internal.h"
 #include "nix_api_value.h"
 #include "nix_api_external.h"
 
@@ -39,7 +36,7 @@ private:
         std::string type_string = "nix-external<MyExternalValueDesc( ";
         type_string += std::to_string(obj->_x);
         type_string += " )>";
-        res->str = &*type_string.begin();
+        nix_set_string_return(res, &*type_string.begin());
     }
 };
 

@@ -19,7 +19,16 @@ struct AbstractNixRepl
 
     typedef std::vector<std::pair<Value *, std::string>> AnnotatedValues;
 
-    using RunNix = void(Path program, const Strings & args, const std::optional<std::string> & input);
+    /**
+     * Run a nix executable
+     *
+     * @todo this is a layer violation
+     *
+     * @param programName Name of the command, e.g. `nix` or `nix-env`.
+     * @param args aguments to the command.
+     */
+    using RunNix =
+        void(const std::string & programName, const Strings & args, const std::optional<std::string> & input);
 
     /**
      * @param runNix Function to run the nix CLI to support various

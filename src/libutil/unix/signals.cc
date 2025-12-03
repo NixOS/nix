@@ -12,24 +12,14 @@ using namespace unix;
 
 std::atomic<bool> unix::_isInterrupted = false;
 
-namespace unix {
-static thread_local bool interruptThrown = false;
-}
-
 thread_local std::function<bool()> unix::interruptCheck;
-
-void setInterruptThrown()
-{
-    unix::interruptThrown = true;
-}
 
 void unix::_interrupted()
 {
     /* Block user interrupts while an exception is being handled.
        Throwing an exception while another exception is being handled
        kills the program! */
-    if (!interruptThrown && !std::uncaught_exceptions()) {
-        interruptThrown = true;
+    if (!std::uncaught_exceptions()) {
         throw Interrupted("interrupted by the user");
     }
 }
@@ -98,26 +88,6 @@ void unix::triggerInterrupt()
 
 static sigset_t savedSignalMask;
 static bool savedSignalMaskIsSet = false;
-
-void unix::setChildSignalMask(sigset_t * sigs)
-{
-    assert(sigs); // C style function, but think of sigs as a reference
-
-#if (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 1) || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE) \
-    || (defined(_POSIX_SOURCE) && _POSIX_SOURCE)
-    sigemptyset(&savedSignalMask);
-    // There's no "assign" or "copy" function, so we rely on (math) idempotence
-    // of the or operator: a or a = a.
-    sigorset(&savedSignalMask, sigs, sigs);
-#else
-    // Without sigorset, our best bet is to assume that sigset_t is a type that
-    // can be assigned directly, such as is the case for a sigset_t defined as
-    // an integer type.
-    savedSignalMask = *sigs;
-#endif
-
-    savedSignalMaskIsSet = true;
-}
 
 void unix::saveSignalMask()
 {

@@ -1,0 +1,136 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/build-result-v1.json"
+title: Build Result
+description: |
+  This schema describes the JSON representation of Nix's `BuildResult` type, which represents the result of building a derivation or substituting store paths.
+
+  Build results can represent either successful builds (with built outputs) or various types of failures.
+
+oneOf:
+  - "$ref": "#/$defs/success"
+  - "$ref": "#/$defs/failure"
+type: object
+required:
+  - success
+  - status
+properties:
+  timesBuilt:
+    type: integer
+    minimum: 0
+    title: Times built
+    description: |
+      How many times this build was performed.
+
+  startTime:
+    type: integer
+    minimum: 0
+    title: Start time
+    description: |
+      The start time of the build (or one of the rounds, if it was repeated), as a Unix timestamp.
+
+  stopTime:
+    type: integer
+    minimum: 0
+    title: Stop time
+    description: |
+      The stop time of the build (or one of the rounds, if it was repeated), as a Unix timestamp.
+
+  cpuUser:
+    type: integer
+    minimum: 0
+    title: User CPU time
+    description: |
+      User CPU time the build took, in microseconds.
+
+  cpuSystem:
+    type: integer
+    minimum: 0
+    title: System CPU time
+    description: |
+      System CPU time the build took, in microseconds.
+
+"$defs":
+  success:
+    type: object
+    title: Successful Build Result
+    description: |
+      Represents a successful build with built outputs.
+    required:
+      - success
+      - status
+      - builtOutputs
+    properties:
+      success:
+        const: true
+        title: Success indicator
+        description: |
+          Always true for successful build results.
+
+      status:
+        type: string
+        title: Success status
+        description: |
+          Status string for successful builds.
+        enum:
+          - "Built"
+          - "Substituted"
+          - "AlreadyValid"
+          - "ResolvesToAlreadyValid"
+
+      builtOutputs:
+        type: object
+        title: Built outputs
+        description: |
+          A mapping from output names to their build trace entries.
+        additionalProperties:
+          "$ref": "build-trace-entry-v1.yaml"
+
+  failure:
+    type: object
+    title: Failed Build Result
+    description: |
+      Represents a failed build with error information.
+    required:
+      - success
+      - status
+      - errorMsg
+    properties:
+      success:
+        const: false
+        title: Success indicator
+        description: |
+          Always false for failed build results.
+
+      status:
+        type: string
+        title: Failure status
+        description: |
+          Status string for failed builds.
+        enum:
+          - "PermanentFailure"
+          - "InputRejected"
+          - "OutputRejected"
+          - "TransientFailure"
+          - "CachedFailure"
+          - "TimedOut"
+          - "MiscFailure"
+          - "DependencyFailed"
+          - "LogLimitExceeded"
+          - "NotDeterministic"
+          - "NoSubstituters"
+          - "HashMismatch"
+
+      errorMsg:
+        type: string
+        title: Error message
+        description: |
+          Information about the error if the build failed.
+
+      isNonDeterministic:
+        type: boolean
+        title: Non-deterministic flag
+        description: |
+          If timesBuilt > 1, whether some builds did not produce the same result.
+
+          Note that 'isNonDeterministic = false' does not mean the build is deterministic,
+          just that we don't have evidence of non-determinism.

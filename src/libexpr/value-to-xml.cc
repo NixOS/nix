@@ -82,7 +82,7 @@ static void printValueAsXML(
     case nString:
         /* !!! show the context? */
         copyContext(v, context);
-        doc.writeEmptyElement("string", singletonAttrs("value", v.c_str()));
+        doc.writeEmptyElement("string", singletonAttrs("value", v.string_view()));
         break;
 
     case nPath:
@@ -98,18 +98,18 @@ static void printValueAsXML(
             XMLAttrs xmlAttrs;
 
             Path drvPath;
-            if (auto a = v.attrs()->get(state.sDrvPath)) {
+            if (auto a = v.attrs()->get(state.s.drvPath)) {
                 if (strict)
                     state.forceValue(*a->value, a->pos);
                 if (a->value->type() == nString)
-                    xmlAttrs["drvPath"] = drvPath = a->value->c_str();
+                    xmlAttrs["drvPath"] = drvPath = a->value->string_view();
             }
 
-            if (auto a = v.attrs()->get(state.sOutPath)) {
+            if (auto a = v.attrs()->get(state.s.outPath)) {
                 if (strict)
                     state.forceValue(*a->value, a->pos);
                 if (a->value->type() == nString)
-                    xmlAttrs["outPath"] = a->value->c_str();
+                    xmlAttrs["outPath"] = a->value->string_view();
             }
 
             XMLOpenElement _(doc, "derivation", xmlAttrs);
@@ -145,14 +145,14 @@ static void printValueAsXML(
             posToXML(state, xmlAttrs, state.positions[v.lambda().fun->pos]);
         XMLOpenElement _(doc, "function", xmlAttrs);
 
-        if (v.lambda().fun->hasFormals()) {
+        if (auto formals = v.lambda().fun->getFormals()) {
             XMLAttrs attrs;
             if (v.lambda().fun->arg)
                 attrs["name"] = state.symbols[v.lambda().fun->arg];
-            if (v.lambda().fun->formals->ellipsis)
+            if (formals->ellipsis)
                 attrs["ellipsis"] = "1";
             XMLOpenElement _(doc, "attrspat", attrs);
-            for (auto & i : v.lambda().fun->formals->lexicographicOrder(state.symbols))
+            for (auto & i : formals->lexicographicOrder(state.symbols))
                 doc.writeEmptyElement("attr", singletonAttrs("name", state.symbols[i.name]));
         } else
             doc.writeEmptyElement("varpat", singletonAttrs("name", state.symbols[v.lambda().fun->arg]));

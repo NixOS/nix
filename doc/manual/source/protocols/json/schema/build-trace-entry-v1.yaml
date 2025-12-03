@@ -1,0 +1,100 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/build-trace-entry-v1.json"
+title: Build Trace Entry
+description: |
+  A record of a successful build outcome for a specific derivation output.
+
+  This schema describes the JSON representation of a [build trace entry](@docroot@/store/build-trace.md).
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-ca-derivations)
+  > and subject to change.
+required:
+  - id
+  - outPath
+  - dependentRealisations
+  - signatures
+allOf:
+  - "$ref": "#/$defs/key"
+  - "$ref": "#/$defs/value"
+properties:
+  id: {}
+  outPath: {}
+  dependentRealisations: {}
+  signatures: {}
+additionalProperties: false
+
+"$defs":
+  key:
+    title: Build Trace Key
+    description: |
+      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      This is the "key" part, refering to a derivation and output.
+    type: object
+    required:
+      - id
+    properties:
+      id:
+        type: string
+        title: Derivation Output ID
+        pattern: "^sha256:[0-9a-f]{64}![a-zA-Z_][a-zA-Z0-9_-]*$"
+        description: |
+          Unique identifier for the derivation output that was built.
+
+          Format: `{hash-quotient-drv}!{output-name}`
+
+          - **hash-quotient-drv**: SHA-256 [hash of the quotient derivation](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv).
+            Begins with `sha256:`.
+
+          - **output-name**: Name of the specific output (e.g., "out", "dev", "doc")
+
+          Example: `"sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad!foo"`
+
+  value:
+    title: Build Trace Value
+    description: |
+      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      This is the "value" part, describing an output.
+    type: object
+    required:
+      - outPath
+      - dependentRealisations
+      - signatures
+    properties:
+      outPath:
+        "$ref": "store-path-v1.yaml"
+        title: Output Store Path
+        description: |
+          The path to the store object that resulted from building this derivation for the given output name.
+
+      dependentRealisations:
+        type: object
+        title: Underlying Base Build Trace
+        description: |
+          This is for [*derived*](@docroot@/store/build-trace.md#derived) build trace entries to ensure coherence.
+
+          Keys are derivation output IDs (same format as the main `id` field).
+          Values are the store paths that those dependencies resolved to.
+
+          As described in the linked section on derived build trace traces, derived build trace entries must be kept in addition and not instead of the underlying base build entries.
+          This is the set of base build trace entries that this derived build trace is derived from.
+          (The set is also a map since this miniature base build trace must be coherent, mapping each key to a single value.)
+
+        patternProperties:
+          "^sha256:[0-9a-f]{64}![a-zA-Z_][a-zA-Z0-9_-]*$":
+            "$ref": "store-path-v1.yaml"
+            title: Dependent Store Path
+            description: Store path that this dependency resolved to during the build
+        additionalProperties: false
+
+      signatures:
+        type: array
+        title: Build Signatures
+        description: |
+          A set of cryptographic signatures attesting to the authenticity of this build trace entry.
+        items:
+          type: string
+          title: Signature
+          description: A single cryptographic signature

@@ -11,6 +11,12 @@
 
 #include <sys/types.h>
 
+namespace nix {
+
+struct GitRepo;
+
+}
+
 namespace nix::fetchers {
 
 struct Cache;
@@ -124,6 +130,8 @@ struct Settings : public Config
         Xp::Flakes};
 
     ref<Cache> getCache() const;
+
+    ref<GitRepo> getTarballCache() const;
 
 private:
     mutable Sync<std::shared_ptr<Cache>> _cache;

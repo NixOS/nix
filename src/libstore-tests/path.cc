@@ -7,7 +7,7 @@
 #include "nix/store/path-regex.hh"
 #include "nix/store/store-api.hh"
 
-#include "nix/util/tests/hash.hh"
+#include "nix/util/tests/json-characterization.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/store/tests/path.hh"
 
@@ -16,8 +16,17 @@ namespace nix {
 #define STORE_DIR "/nix/store/"
 #define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
 
-class StorePathTest : public LibStoreTest
-{};
+class StorePathTest : public virtual CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "store-path";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
 
 static std::regex nameRegex{std::string{nameRegexStr}};
 
@@ -133,5 +142,37 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
 }
 
 #endif
+
+/* ----------------------------------------------------------------------------
+ * JSON
+ * --------------------------------------------------------------------------*/
+
+using nlohmann::json;
+
+struct StorePathJsonTest : StorePathTest,
+                           JsonCharacterizationTest<StorePath>,
+                           ::testing::WithParamInterface<std::pair<std::string_view, StorePath>>
+{};
+
+TEST_P(StorePathJsonTest, from_json)
+{
+    auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(StorePathJsonTest, to_json)
+{
+    auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    StorePathJSON,
+    StorePathJsonTest,
+    ::testing::Values(
+        std::pair{
+            "simple",
+            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+        }));
 
 } // namespace nix

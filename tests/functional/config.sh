@@ -62,7 +62,7 @@ prev=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 export NIX_CONFIG="cores = 4242"$'\n'"experimental-features = nix-command flakes"
 exp_cores=$(nix config show | grep '^cores' | cut -d '=' -f 2 | xargs)
 exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2 | xargs)
-[[ $prev != $exp_cores ]]
+[[ $prev != "$exp_cores" ]]
 [[ $exp_cores == "4242" ]]
 # flakes implies fetch-tree
 [[ $exp_features == "fetch-tree flakes nix-command" ]]
@@ -70,7 +70,7 @@ exp_features=$(nix config show | grep '^experimental-features' | cut -d '=' -f 2
 # Test that it's possible to retrieve a single setting's value
 val=$(nix config show | grep '^warn-dirty' | cut -d '=' -f  2 | xargs)
 val2=$(nix config show warn-dirty)
-[[ $val == $val2 ]]
+[[ $val == "$val2" ]]
 
 # Test unit prefixes.
 [[ $(nix config show --min-free 64K min-free) = 65536 ]]

@@ -1,4 +1,5 @@
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 namespace nix {
 // Testing of trivial expressions
@@ -75,11 +76,11 @@ TEST_F(TrivialExpressionTest, updateAttrs)
 {
     auto v = eval("{ a = 1; } // { b = 2; a = 3; }");
     ASSERT_THAT(v, IsAttrsOfSize(2));
-    auto a = v.attrs()->find(createSymbol("a"));
+    auto a = v.attrs()->get(createSymbol("a"));
     ASSERT_NE(a, nullptr);
     ASSERT_THAT(*a->value, IsIntEq(3));
 
-    auto b = v.attrs()->find(createSymbol("b"));
+    auto b = v.attrs()->get(createSymbol("b"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsIntEq(2));
 }
@@ -160,7 +161,8 @@ TEST_F(TrivialExpressionTest, assertPassed)
     ASSERT_THAT(v, IsIntEq(123));
 }
 
-class AttrSetMergeTrvialExpressionTest : public TrivialExpressionTest, public testing::WithParamInterface<const char *>
+class AttrSetMergeTrvialExpressionTest : public TrivialExpressionTest,
+                                         public ::testing::WithParamInterface<const char *>
 {};
 
 TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
@@ -176,7 +178,7 @@ TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
     auto v = eval(expr);
     ASSERT_THAT(v, IsAttrsOfSize(1));
 
-    auto a = v.attrs()->find(createSymbol("a"));
+    auto a = v.attrs()->get(createSymbol("a"));
     ASSERT_NE(a, nullptr);
 
     ASSERT_THAT(*a->value, IsThunk());
@@ -184,11 +186,11 @@ TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
 
     ASSERT_THAT(*a->value, IsAttrsOfSize(2));
 
-    auto b = a->value->attrs()->find(createSymbol("b"));
+    auto b = a->value->attrs()->get(createSymbol("b"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsIntEq(1));
 
-    auto c = a->value->attrs()->find(createSymbol("c"));
+    auto c = a->value->attrs()->get(createSymbol("c"));
     ASSERT_NE(c, nullptr);
     ASSERT_THAT(*c->value, IsIntEq(2));
 }
@@ -196,7 +198,7 @@ TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
 INSTANTIATE_TEST_SUITE_P(
     attrsetMergeLazy,
     AttrSetMergeTrvialExpressionTest,
-    testing::Values("{ a.b = 1; a.c = 2; }", "{ a = { b = 1; }; a = { c = 2; }; }"));
+    ::testing::Values("{ a.b = 1; a.c = 2; }", "{ a = { b = 1; }; a = { c = 2; }; }"));
 
 // The following macros ultimately define 48 tests (16 variations on three
 // templates). Each template tests an expression that can be written in 2^4
@@ -330,7 +332,7 @@ TEST_F(TrivialExpressionTest, bindOr)
 {
     auto v = eval("{ or = 1; }");
     ASSERT_THAT(v, IsAttrsOfSize(1));
-    auto b = v.attrs()->find(createSymbol("or"));
+    auto b = v.attrs()->get(createSymbol("or"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsIntEq(1));
 }
@@ -339,4 +341,18 @@ TEST_F(TrivialExpressionTest, orCantBeUsed)
 {
     ASSERT_THROW(eval("let or = 1; in or"), Error);
 }
+
+TEST_F(TrivialExpressionTest, tooManyFormals)
+{
+    std::string expr = "let f = { ";
+    for (uint32_t i = 0; i <= std::numeric_limits<uint16_t>::max(); ++i) {
+        expr += fmt("arg%d, ", i);
+    }
+    expr += " }: 0 in; f {}";
+    ASSERT_THAT(
+        [&]() { eval(expr); },
+        ::testing::ThrowsMessage<Error>(::nix::testing::HasSubstrIgnoreANSIMatcher(
+            "too many formal arguments, implementation supports at most 65535")));
+}
+
 } /* namespace nix */

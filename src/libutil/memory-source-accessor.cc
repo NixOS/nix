@@ -1,10 +1,26 @@
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/json-utils.hh"
 
 namespace nix {
 
 MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, std::optional<File> create)
 {
-    File * cur = &root;
+    bool hasRoot = root.has_value();
+
+    // Special handling of root directory.
+    if (path.isRoot() && !hasRoot) {
+        if (create) {
+            root = std::move(*create);
+            return &root.value();
+        }
+        return nullptr;
+    }
+
+    // Root does not exist.
+    if (!hasRoot)
+        return nullptr;
+
+    File * cur = &root.value();
 
     bool newF = false;
 
@@ -14,13 +30,13 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
             return nullptr;
         auto & curDir = *curDirP;
 
-        auto i = curDir.contents.find(name);
-        if (i == curDir.contents.end()) {
+        auto i = curDir.entries.find(name);
+        if (i == curDir.entries.end()) {
             if (!create)
                 return nullptr;
             else {
                 newF = true;
-                i = curDir.contents.insert(
+                i = curDir.entries.insert(
                     i,
                     {
                         std::string{name},
@@ -53,25 +69,26 @@ bool MemorySourceAccessor::pathExists(const CanonPath & path)
     return open(path, std::nullopt);
 }
 
-MemorySourceAccessor::Stat MemorySourceAccessor::File::lstat() const
+template<>
+SourceAccessor::Stat MemorySourceAccessor::File::lstat() const
 {
     return std::visit(
         overloaded{
             [](const Regular & r) {
-                return Stat{
-                    .type = tRegular,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tRegular,
                     .fileSize = r.contents.size(),
                     .isExecutable = r.executable,
                 };
             },
             [](const Directory &) {
-                return Stat{
-                    .type = tDirectory,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tDirectory,
                 };
             },
             [](const Symlink &) {
-                return Stat{
-                    .type = tSymlink,
+                return SourceAccessor::Stat{
+                    .type = SourceAccessor::tSymlink,
                 };
             },
         },
@@ -91,7 +108,7 @@ MemorySourceAccessor::DirEntries MemorySourceAccessor::readDirectory(const Canon
         throw Error("file '%s' does not exist", path);
     if (auto * d = std::get_if<File::Directory>(&f->raw)) {
         DirEntries res;
-        for (auto & [name, file] : d->contents)
+        for (auto & [name, file] : d->entries)
             res.insert_or_assign(name, file.lstat().type);
         return res;
     } else
@@ -112,6 +129,10 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
 
 SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents)
 {
+    // Create root directory automatically if necessary as a convenience.
+    if (!root && !path.isRoot())
+        open(CanonPath::root, File::Directory{});
+
     auto * f = open(path, File{File::Regular{}});
     if (!f)
         throw Error("file '%s' cannot be made because some parent file is not a directory", path);
@@ -189,11 +210,16 @@ void MemorySink::createSymlink(const CanonPath & path, const std::string & targe
 
 ref<SourceAccessor> makeEmptySourceAccessor()
 {
-    static auto empty = make_ref<MemorySourceAccessor>().cast<SourceAccessor>();
-    /* Don't forget to clear the display prefix, as the default constructed
-       SourceAccessor has the «unknown» prefix. Since this accessor is supposed
-       to mimic an empty root directory the prefix needs to be empty. */
-    empty->setPathDisplay("");
+    static auto empty = []() {
+        auto empty = make_ref<MemorySourceAccessor>();
+        MemorySink sink{*empty};
+        sink.createDirectory(CanonPath::root);
+        /* Don't forget to clear the display prefix, as the default constructed
+           SourceAccessor has the «unknown» prefix. Since this accessor is supposed
+           to mimic an empty root directory the prefix needs to be empty. */
+        empty->setPathDisplay("");
+        return empty.cast<SourceAccessor>();
+    }();
     return empty;
 }
 

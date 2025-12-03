@@ -6,6 +6,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -18,14 +19,13 @@ public:
     }
 
 protected:
+    LibStoreTest(ref<Store> store)
+        : store(std::move(store))
+    {
+    }
+
     LibStoreTest()
-        : store(openStore({
-              .variant =
-                  StoreReference::Specified{
-                      .scheme = "dummy",
-                  },
-              .params = {},
-          }))
+        : LibStoreTest(openStore("dummy://"))
     {
     }
 

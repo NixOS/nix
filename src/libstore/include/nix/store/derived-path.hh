@@ -5,6 +5,7 @@
 #include "nix/store/outputs-spec.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/json-impls.hh"
 
 #include <variant>
 
@@ -13,9 +14,6 @@
 namespace nix {
 
 struct StoreDirConfig;
-
-// TODO stop needing this, `toJSON` below should be pure
-class Store;
 
 /**
  * An opaque derived path.
@@ -30,7 +28,6 @@ struct DerivedPathOpaque
 
     std::string to_string(const StoreDirConfig & store) const;
     static DerivedPathOpaque parse(const StoreDirConfig & store, std::string_view);
-    nlohmann::json toJSON(const StoreDirConfig & store) const;
 
     bool operator==(const DerivedPathOpaque &) const = default;
     auto operator<=>(const DerivedPathOpaque &) const = default;
@@ -80,7 +77,6 @@ struct SingleDerivedPathBuilt
         ref<const SingleDerivedPath> drvPath,
         OutputNameView outputs,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
 
     bool operator==(const SingleDerivedPathBuilt &) const noexcept;
     std::strong_ordering operator<=>(const SingleDerivedPathBuilt &) const noexcept;
@@ -153,7 +149,6 @@ struct SingleDerivedPath : _SingleDerivedPathRaw
         const StoreDirConfig & store,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
 };
 
 static inline ref<SingleDerivedPath> makeConstantStorePathRef(StorePath drvPath)
@@ -208,7 +203,6 @@ struct DerivedPathBuilt
         ref<const SingleDerivedPath>,
         std::string_view,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-    nlohmann::json toJSON(Store & store) const;
 
     bool operator==(const DerivedPathBuilt &) const noexcept;
     // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
@@ -287,8 +281,6 @@ struct DerivedPath : _DerivedPathRaw
      * Convert a `SingleDerivedPath` to a `DerivedPath`.
      */
     static DerivedPath fromSingle(const SingleDerivedPath &);
-
-    nlohmann::json toJSON(Store & store) const;
 };
 
 typedef std::vector<DerivedPath> DerivedPaths;
@@ -305,3 +297,9 @@ typedef std::vector<DerivedPath> DerivedPaths;
 void drvRequireExperiment(
     const SingleDerivedPath & drv, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 } // namespace nix
+
+JSON_IMPL(nix::SingleDerivedPath::Opaque)
+JSON_IMPL_WITH_XP_FEATURES(nix::SingleDerivedPath::Built)
+JSON_IMPL_WITH_XP_FEATURES(nix::SingleDerivedPath)
+JSON_IMPL_WITH_XP_FEATURES(nix::DerivedPath::Built)
+JSON_IMPL_WITH_XP_FEATURES(nix::DerivedPath)

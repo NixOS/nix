@@ -4,67 +4,108 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/util.hh"
 #include "nix/util/exec.hh"
+#include "nix/util/base-n.hh"
 
 namespace nix {
 
 static std::string parsePublicHostKey(std::string_view host, std::string_view sshPublicHostKey)
 {
     try {
-        return base64Decode(sshPublicHostKey);
+        return base64::decode(sshPublicHostKey);
     } catch (Error & e) {
         e.addTrace({}, "while decoding ssh public host key for host '%s'", host);
         throw;
     }
 }
 
+class InvalidSSHAuthority : public Error
+{
+public:
+    InvalidSSHAuthority(const ParsedURL::Authority & authority, std::string_view reason)
+        : Error("invalid SSH authority: '%s': %s", authority.to_string(), reason)
+    {
+    }
+};
+
+/**
+ * Checks if the hostname/username are valid for use with ssh.
+ *
+ * @todo Enforce this better. Probably this needs to reimplement the same logic as in
+ * https://github.com/openssh/openssh-portable/blob/6ebd472c391a73574abe02771712d407c48e130d/ssh.c#L648-L681
+ */
+static void checkValidAuthority(const ParsedURL::Authority & authority)
+{
+    if (const auto & user = authority.user) {
+        if (user->empty())
+            throw InvalidSSHAuthority(authority, "user name must not be empty");
+        if (user->starts_with("-"))
+            throw InvalidSSHAuthority(authority, fmt("user name '%s' must not start with '-'", *user));
+    }
+
+    {
+        std::string_view host = authority.host;
+        if (host.empty())
+            throw InvalidSSHAuthority(authority, "host name must not be empty");
+        if (host.starts_with("-"))
+            throw InvalidSSHAuthority(authority, fmt("host name '%s' must not start with '-'", host));
+    }
+}
+
+Strings getNixSshOpts()
+{
+    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
+
+    try {
+        return shellSplitString(sshOpts);
+    } catch (Error & e) {
+        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
+        throw;
+    }
+}
+
 SSHMaster::SSHMaster(
-    std::string_view host,
+    const ParsedURL::Authority & authority,
     std::string_view keyFile,
     std::string_view sshPublicHostKey,
     bool useMaster,
     bool compress,
     Descriptor logFD)
-    : host(host)
-    , fakeSSH(host == "localhost")
+    : authority(authority)
+    , hostnameAndUser([authority]() {
+        std::ostringstream oss;
+        if (authority.user)
+            oss << *authority.user << "@";
+        oss << authority.host;
+        return std::move(oss).str();
+    }())
+    , fakeSSH(authority.to_string() == "localhost")
     , keyFile(keyFile)
-    , sshPublicHostKey(parsePublicHostKey(host, sshPublicHostKey))
+    , sshPublicHostKey(parsePublicHostKey(authority.host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
     , logFD(logFD)
+    , tmpDir(make_ref<AutoDelete>(createTempDir("", "nix", 0700)))
 {
-    if (host == "" || hasPrefix(host, "-"))
-        throw Error("invalid SSH host name '%s'", host);
-
-    auto state(state_.lock());
-    state->tmpDir = std::make_unique<AutoDelete>(createTempDir("", "nix", 0700));
+    checkValidAuthority(authority);
 }
 
 void SSHMaster::addCommonSSHOpts(Strings & args)
 {
-    auto state(state_.lock());
-
-    std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
-
-    try {
-        std::list<std::string> opts = shellSplitString(sshOpts);
-        for (auto & i : opts)
-            args.push_back(i);
-    } catch (Error & e) {
-        e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
-        throw;
-    }
+    auto sshArgs = getNixSshOpts();
+    args.insert(args.end(), sshArgs.begin(), sshArgs.end());
 
     if (!keyFile.empty())
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
-        std::filesystem::path fileName = state->tmpDir->path() / "host-key";
-        auto p = host.rfind("@");
-        std::string thost = p != std::string::npos ? std::string(host, p + 1) : host;
-        writeFile(fileName.string(), thost + " " + sshPublicHostKey + "\n");
+        std::filesystem::path fileName = tmpDir->path() / "host-key";
+        writeFile(fileName.string(), authority.host + " " + sshPublicHostKey + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
     }
     if (compress)
         args.push_back("-C");
+
+    if (authority.port)
+        args.push_back(fmt("-p%d", *authority.port));
 
     // We use this to make ssh signal back to us that the connection is established.
     // It really does run locally; see createSSHEnv which sets up SHELL to make
@@ -76,7 +117,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
 
 bool SSHMaster::isMasterRunning()
 {
-    Strings args = {"-O", "check", host};
+    Strings args = {"-O", "check", hostnameAndUser};
     addCommonSSHOpts(args);
 
     auto res = runProgram(RunOptions{.program = "ssh", .args = args, .mergeStderrToStdout = true});
@@ -141,7 +182,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
             Strings args;
 
             if (!fakeSSH) {
-                args = {"ssh", host.c_str(), "-x"};
+                args = {"ssh", hostnameAndUser.c_str(), "-x"};
                 addCommonSSHOpts(args);
                 if (socketPath != "")
                     args.insert(args.end(), {"-S", socketPath});
@@ -174,7 +215,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 
         if (reply != "started") {
             printTalkative("SSH stdout first line: %s", reply);
-            throw Error("failed to start SSH connection to '%s'", host);
+            throw Error("failed to start SSH connection to '%s'", authority.host);
         }
     }
 
@@ -197,7 +238,7 @@ Path SSHMaster::startMaster()
     if (state->sshMaster != INVALID_DESCRIPTOR)
         return state->socketPath;
 
-    state->socketPath = (Path) *state->tmpDir + "/ssh.sock";
+    state->socketPath = (Path) *tmpDir + "/ssh.sock";
 
     Pipe out;
     out.create();
@@ -219,7 +260,7 @@ Path SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            Strings args = {"ssh", host.c_str(), "-M", "-N", "-S", state->socketPath};
+            Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
             addCommonSSHOpts(args);
@@ -240,7 +281,7 @@ Path SSHMaster::startMaster()
 
     if (reply != "started") {
         printTalkative("SSH master stdout first line: %s", reply);
-        throw Error("failed to start SSH master connection to '%s'", host);
+        throw Error("failed to start SSH master connection to '%s'", authority.host);
     }
 
     return state->socketPath;

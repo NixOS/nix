@@ -6,7 +6,7 @@
 >
 > A rendered store path
 
-Nix implements references to [store objects](./index.md#store-object) as *store paths*.
+Nix implements references to [store objects](./store-object.md) as *store paths*.
 
 Think of a store path as an [opaque], [unique identifier]:
 The only way to obtain store path is by adding or building store objects.

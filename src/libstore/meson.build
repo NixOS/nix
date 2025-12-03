@@ -1,7 +1,9 @@
-project('nix-store', 'cpp',
+project(
+  'nix-store',
+  'cpp',
   version : files('.version'),
   default_options : [
-    'cpp_std=c++2a',
+    'cpp_std=c++23',
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
@@ -21,35 +23,40 @@ configdata_priv = configuration_data()
 # TODO rename, because it will conflict with downstream projects
 configdata_priv.set_quoted('PACKAGE_VERSION', meson.project_version())
 
+subdir('nix-meson-build-support/default-system-cpu')
+
 # Used in public header.
 configdata_pub.set_quoted(
   'NIX_LOCAL_SYSTEM',
-  host_machine.cpu_family() + '-' + host_machine.system(),
-  description :
-    'This is the system name Nix expects for local running instance of Nix.\n\n'
+  nix_system_cpu + '-' + host_machine.system(),
+  description : 'This is the system name Nix expects for local running instance of Nix.\n\n'
     + 'See the "system" setting for additional details',
 )
 
-deps_private_maybe_subproject = [
-]
+deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
   dependency('nix-util'),
 ]
 subdir('nix-meson-build-support/subprojects')
 
-run_command('ln', '-s',
+run_command(
+  'ln',
+  '-s',
   meson.project_build_root() / '__nothing_link_target',
   meson.project_build_root() / '__nothing_symlink',
   # native doesn't allow dangling symlinks, which the tests require
-  env : { 'MSYS' : 'winsymlinks:lnk' },
+  env : {'MSYS' : 'winsymlinks:lnk'},
   check : true,
 )
-can_link_symlink = run_command('ln',
+can_link_symlink = run_command(
+  'ln',
   meson.project_build_root() / '__nothing_symlink',
   meson.project_build_root() / '__nothing_hardlink',
   check : false,
 ).returncode() == 0
-run_command('rm', '-f',
+run_command(
+  'rm',
+  '-f',
   meson.project_build_root() / '__nothing_symlink',
   meson.project_build_root() / '__nothing_hardlink',
   check : true,
@@ -82,26 +89,42 @@ configdata_pub.set(
 
 if host_machine.system() == 'darwin'
   sandbox = cxx.find_library('sandbox')
-  deps_other += [sandbox]
+  deps_other += [ sandbox ]
 endif
 
 if host_machine.system() == 'windows'
   wsock32 = cxx.find_library('wsock32')
-  deps_other += [wsock32]
+  deps_other += [ wsock32 ]
 endif
 
 subdir('nix-meson-build-support/libatomic')
 
 boost = dependency(
   'boost',
-  modules : ['container', 'regex'],
-  include_type: 'system',
+  modules : [
+    'container',
+    # Shouldn't list, because can header-only, and Meson currently looks for libs
+    #'regex',
+    'url',
+  ],
+  include_type : 'system',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately, so we
 # put in `deps_other`.
 deps_other += boost
 
-curl = dependency('libcurl', 'curl')
+curl = dependency('libcurl', 'curl', version : '>= 7.75.0')
+if curl.version().version_compare('>=8.16.0') and curl.version().version_compare(
+  '<8.17.0',
+)
+  # Out of precaution, avoid building with libcurl version that suffer from https://github.com/curl/curl/issues/19334.
+  error(
+    'curl @0@ has issues with write pausing, please use libcurl < 8.16 or >= 8.17, see https://github.com/curl/curl/issues/19334'.format(
+      curl.version(),
+    ),
+  )
+endif
+
 deps_private += curl
 
 # seccomp only makes sense on Linux
@@ -110,9 +133,16 @@ seccomp_required = get_option('seccomp-sandboxing')
 if not is_linux and seccomp_required.enabled()
   warning('Force-enabling seccomp on non-Linux does not make sense')
 endif
-seccomp = dependency('libseccomp', 'seccomp', required : seccomp_required, version : '>=2.5.5')
+seccomp = dependency(
+  'libseccomp',
+  'seccomp',
+  required : seccomp_required,
+  version : '>=2.5.5',
+)
 if is_linux and not seccomp.found()
-  warning('Sandbox security is reduced because libseccomp has not been found! Please provide libseccomp if it supports your CPU architecture.')
+  warning(
+    'Sandbox security is reduced because libseccomp has not been found! Please provide libseccomp if it supports your CPU architecture.',
+  )
 endif
 configdata_priv.set('HAVE_SECCOMP', seccomp.found().to_int())
 deps_private += seccomp
@@ -123,27 +153,16 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
-# AWS C++ SDK has bad pkg-config. See
-# https://github.com/aws/aws-sdk-cpp/issues/2673 for details.
-aws_s3 = dependency('aws-cpp-sdk-s3', required : false)
-# The S3 store definitions in the header will be hidden based on this variables.
-configdata_pub.set('NIX_WITH_S3_SUPPORT', aws_s3.found().to_int())
-if aws_s3.found()
-  aws_s3 = declare_dependency(
-    include_directories: include_directories(aws_s3.get_variable('includedir')),
-    link_args: [
-      '-L' + aws_s3.get_variable('libdir'),
-      '-laws-cpp-sdk-transfer',
-      '-laws-cpp-sdk-s3',
-      '-laws-cpp-sdk-identity-management',
-      '-laws-cpp-sdk-cognito-identity',
-      '-laws-cpp-sdk-sts',
-      '-laws-cpp-sdk-core',
-      '-laws-crt-cpp',
-    ],
-  ).as_system('system')
+s3_aws_auth = get_option('s3-aws-auth')
+aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
+
+if s3_aws_auth.enabled()
+  deps_other += aws_crt_cpp
+  aws_c_common = cxx.find_library('aws-c-common', required : true)
+  deps_other += aws_c_common
 endif
-deps_other += aws_s3
+
+configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
 
 subdir('nix-meson-build-support/generate-header')
 
@@ -157,7 +176,10 @@ endforeach
 
 busybox = find_program(get_option('sandbox-shell'), required : false)
 
-configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', get_option('embedded-sandbox-shell').to_int())
+configdata_priv.set(
+  'HAVE_EMBEDDED_SANDBOX_SHELL',
+  get_option('embedded-sandbox-shell').to_int(),
+)
 
 if get_option('embedded-sandbox-shell')
   configdata_priv.set_quoted('SANDBOX_SHELL', '__embedded_sandbox_shell__')
@@ -169,12 +191,7 @@ if get_option('embedded-sandbox-shell')
   hexdump = find_program('hexdump', native : true)
   embedded_sandbox_shell_gen = custom_target(
     'embedded-sandbox-shell.gen.hh',
-    command : [
-      hexdump,
-      '-v',
-      '-e',
-      '1/1 "0x%x," "\n"'
-    ],
+    command : [ hexdump, '-v', '-e', '1/1 "0x%x," "\n"' ],
     input : busybox.full_path(),
     output : 'embedded-sandbox-shell.gen.hh',
     capture : true,
@@ -226,21 +243,20 @@ endif
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
-configdata_priv.set_quoted('NIX_PREFIX',    prefix)
+configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_DATA_DIR',  datadir)
+configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
-configdata_priv.set_quoted('NIX_LOG_DIR',   log_dir)
-configdata_priv.set_quoted('NIX_CONF_DIR',  sysconfdir / 'nix')
-configdata_priv.set_quoted('NIX_MAN_DIR',   mandir)
+configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
+configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
+configdata_priv.set_quoted('NIX_MAN_DIR', mandir)
 
 lsof = find_program('lsof', required : false)
 configdata_priv.set_quoted(
   'LSOF',
-  lsof.found()
-    ? lsof.full_path()
-    # Just look up on the PATH
-    : 'lsof',
+  lsof.found() ? lsof.full_path()
+  # Just look up on the PATH
+: 'lsof',
 )
 
 config_priv_h = configure_file(
@@ -253,8 +269,12 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
-  'build/derivation-goal.cc',
+  'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
+  'build/derivation-check.cc',
+  'build/derivation-env-desugar.cc',
+  'build/derivation-goal.cc',
+  'build/derivation-resolution-goal.cc',
   'build/derivation-trampoline-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
@@ -268,8 +288,8 @@ sources = files(
   'common-ssh-store-config.cc',
   'content-address.cc',
   'daemon.cc',
-  'derivations.cc',
   'derivation-options.cc',
+  'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
@@ -291,7 +311,6 @@ sources = files(
   'make-content-addressed.cc',
   'misc.cc',
   'names.cc',
-  'nar-accessor.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
   'optimise-store.cc',
@@ -305,10 +324,12 @@ sources = files(
   'posix-fs-canonicalise.cc',
   'profiles.cc',
   'realisation.cc',
+  'references.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
   'restricted-store.cc',
   's3-binary-cache-store.cc',
+  's3-url.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',
@@ -316,12 +337,17 @@ sources = files(
   'ssh.cc',
   'store-api.cc',
   'store-dir-config.cc',
-  'store-registration.cc',
   'store-reference.cc',
+  'store-registration.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',
   'worker-protocol.cc',
 )
+
+# AWS credentials code requires AWS CRT, so only compile when enabled
+if s3_aws_auth.enabled()
+  sources += files('aws-creds.cc')
+endif
 
 subdir('include/nix/store')
 
@@ -343,11 +369,13 @@ this_library = library(
   generated_headers,
   sources,
   config_priv_h,
+  soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args: linker_export_flags,
+  link_args : linker_export_flags,
   prelink : true, # For C++ static initializers
   install : true,
+  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
 install_headers(headers, subdir : 'nix/store', preserve_path : true)

@@ -26,8 +26,10 @@ if [ -z "$HOME" ]; then
     exit 1
 fi
 
+OS="$(uname -s)"
+
 # macOS support for 10.12.6 or higher
-if [ "$(uname -s)" = "Darwin" ]; then
+if [ "$OS" = "Darwin" ]; then
     IFS='.' read -r macos_major macos_minor macos_patch << EOF
 $(sw_vers -productVersion)
 EOF
@@ -39,11 +41,11 @@ EOF
 fi
 
 # Determine if we could use the multi-user installer or not
-if [ "$(uname -s)" = "Linux" ]; then
-    echo "Note: a multi-user installation is possible. See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
+if [ "$OS" = "Linux" ] || [ "$OS" = "FreeBSD" ]; then
+    echo "Note: a multi-user installation is possible. See https://nix.dev/manual/nix/stable/installation/installing-binary.html#multi-user-installation" >&2
 fi
 
-case "$(uname -s)" in
+case "$OS" in
     "Darwin")
         INSTALL_MODE=daemon;;
     *)
@@ -60,7 +62,7 @@ while [ $# -gt 0 ]; do
             ACTION=install
             ;;
         --no-daemon)
-            if [ "$(uname -s)" = "Darwin" ]; then
+            if [ "$OS" = "Darwin" ]; then
                 printf '\e[1;31mError: --no-daemon installs are no-longer supported on Darwin/macOS!\e[0m\n' >&2
                 exit 1
             fi
@@ -96,7 +98,7 @@ while [ $# -gt 0 ]; do
                 echo "              providing multi-user support and better isolation for local builds."
                 echo "              Both for security and reproducibility, this method is recommended if"
                 echo "              supported on your platform."
-                echo "              See https://nixos.org/manual/nix/stable/installation/installing-binary.html#multi-user-installation"
+                echo "              See https://nix.dev/manual/nix/stable/installation/installing-binary.html#multi-user-installation"
                 echo ""
                 echo " --no-daemon: Simple, single-user installation that does not require root and is"
                 echo "              trivial to uninstall."
@@ -123,6 +125,13 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "$INSTALL_MODE" = "daemon" ]; then
+    # Check for bash on systems that don't have it by default
+    if [ "$OS" = "FreeBSD" ] && ! command -v bash >/dev/null 2>&1; then
+        printf '\e[1;31mError: bash is required for multi-user installation but was not found.\e[0m\n' >&2
+        printf 'Please install bash first:\n' >&2
+        printf '  pkg install bash\n' >&2
+        exit 1
+    fi
     printf '\e[1;31mSwitching to the Multi-user Installer\e[0m\n'
     exec "$self/install-multi-user" $ACTION
     exit 0
@@ -144,7 +153,7 @@ if ! [ -e "$dest" ]; then
 fi
 
 if ! [ -w "$dest" ]; then
-    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nixos.org/manual/nix/stable/installation/multi-user.html. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
+    echo "$0: directory $dest exists, but is not writable by you. This could indicate that another user has already performed a single-user installation of Nix on this system. If you wish to enable multi-user support see https://nix.dev/manual/nix/stable/installation/multi-user.html. If you wish to continue with a single-user install for $USER please run 'chown -R $USER $dest' as root." >&2
     exit 1
 fi
 
@@ -167,7 +176,7 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        if [ "$(uname -s)" = "Darwin" ]; then
+        if [ "$OS" = "Darwin" ] || [ "$OS" = "FreeBSD" ]; then
             cp -RPp "$self/store/$i" "$i_tmp"
         else
             cp -RP --preserve=ownership,timestamps "$self/store/$i" "$i_tmp"
@@ -204,7 +213,7 @@ fi
 # Subscribe the user to the Nixpkgs channel and fetch it.
 if [ -z "$NIX_INSTALLER_NO_CHANNEL_ADD" ]; then
     if ! "$nix/bin/nix-channel" --list | grep -q "^nixpkgs "; then
-        "$nix/bin/nix-channel" --add https://nixos.org/channels/nixpkgs-unstable
+        "$nix/bin/nix-channel" --add https://channels.nixos.org/nixpkgs-unstable
     fi
     if [ -z "$_NIX_INSTALLER_TEST" ]; then
         if ! "$nix/bin/nix-channel" --update nixpkgs; then
