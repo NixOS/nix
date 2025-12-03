@@ -108,4 +108,27 @@ rec {
     };
     requiredSystemFeatures = [ "derivation-meta" ];
   };
+
+  # Test that __meta doesn't leak into the builder
+  # This derivation will fail if __meta is present in the builder environment
+  metaNotInBuilder = mkDerivation {
+    name = "meta-no-leak-test";
+    __structuredAttrs = true;
+    buildCommand = ''
+      # Read the .attrs.json file that contains structured attributes
+      if grep -q '"__meta"' .attrs.json; then
+        echo "ERROR: __meta leaked into builder!" >&2
+        echo "Contents of .attrs.json:" >&2
+        cat .attrs.json >&2
+        exit 1
+      fi
+      echo "OK: __meta not present in builder" > "''${outputs[out]}"
+    '';
+    __meta = {
+      description = "This should not leak to builder";
+      version = "1.0";
+      maintainer = "test";
+    };
+    requiredSystemFeatures = [ "derivation-meta" ];
+  };
 }
