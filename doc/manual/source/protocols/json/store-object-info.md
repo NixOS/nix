@@ -29,13 +29,13 @@
 ### NAR info (minimal)
 
 ```json
-{{#include schema/nar-info-v1/pure.json}}
+{{#include schema/nar-info-v2/pure.json}}
 ```
 
 ### NAR info (with binary cache fields)
 
 ```json
-{{#include schema/nar-info-v1/impure.json}}
+{{#include schema/nar-info-v2/impure.json}}
 ```
 
 <!-- need to convert YAML to JSON first

@@ -13,7 +13,7 @@ baz=$(nix store add-file "$TEST_ROOT"/baz)
 nix-store --delete "$baz"
 
 diff --unified --color=always \
-    <(nix path-info --json "$foo" "$bar" "$baz" |
+    <(nix path-info --json --json-format 2 "$foo" "$bar" "$baz" |
         jq --sort-keys 'map_values(.narHash)') \
     <(jq --sort-keys <<-EOF
         {
@@ -31,3 +31,9 @@ diff --unified --color=always \
         }
 EOF
     )
+
+# Test that storeDir is returned in the JSON output
+nix path-info --json --json-format 2 "$foo" | jq -e \
+    --arg foo "$foo" \
+    --arg storeDir "${NIX_STORE_DIR:-/nix/store}" \
+    '.[$foo].storeDir == $storeDir'

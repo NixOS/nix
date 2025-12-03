@@ -6,13 +6,29 @@ issues: []
 
 JSON formats for store path info and derivations have been updated with new versions and structured fields.
 
-## Store Path Info JSON (Version 2)
+## Store Path Info JSON
 
-The store path info JSON format has been updated from version 1 to version 2:
+`nix path-info --json` now requires a `--json-format` flag to specify the output format version.
+Using `--json` without `--json-format` is deprecated and will become an error in a future release.
+For now, it defaults to version 1 with a warning, for a smoother migration.
 
-- **Added `version` field**:
+### Version 1 (`--json-format 1`)
 
-  All store path info JSON now includes `"version": 2`.
+This is the legacy format, preserved for backwards compatibility:
+
+- String-based hash values (e.g., `"narHash": "sha256:FePFYIlM..."`)
+- String-based content addresses (e.g., `"ca": "fixed:r:sha256:1abc..."`)
+- Full store paths in references (e.g., `"/nix/store/abc...-foo"`)
+- Now includes `"storeDir"` field at the top level
+
+### Version 2 (`--json-format 2`)
+
+The new structured format with the following changes:
+
+- **Store path base names in references**:
+
+  References use store path base names (e.g., `"abc...-foo"`) instead of full paths.
+  Combined with `storeDir`, the full path can be reconstructed.
 
 - **Structured `ca` field**:
 
@@ -33,7 +49,16 @@ The store path info JSON format has been updated from version 1 to version 2:
 
 Nix currently only produces, and doesn't consume this format.
 
-**Affected command**: `nix path-info --json`
+Additionally the following field is added to both formats.
+(The `version` tracks breaking changes, and adding fields to outputted JSON is not a breaking change.)
+
+- **`version` field**:
+
+  All store path info JSON now includes `"version": <1|2>`.
+
+- **`storeDir` field**:
+
+  Top-level `"storeDir"` field contains the store directory path (e.g., `"/nix/store"`).
 
 ## Derivation JSON (Version 4)
 

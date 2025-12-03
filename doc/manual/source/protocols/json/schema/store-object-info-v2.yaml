@@ -63,7 +63,7 @@ $defs:
           - Version 2: Use structured JSON type for `ca`
 
       path:
-        type: string
+        "$ref": "./store-path-v1.yaml"
         title: Store Path
         description: |
           [Store path](@docroot@/store/store-path.md) to the given store object.
@@ -89,7 +89,7 @@ $defs:
         description: |
           An array of [store paths](@docroot@/store/store-path.md), possibly including this one.
         items:
-          type: string
+          "$ref": "./store-path-v1.yaml"
 
       ca:
         oneOf:
@@ -128,7 +128,9 @@ $defs:
       references: { $ref: "#/$defs/base/properties/references" }
       ca: { $ref: "#/$defs/base/properties/ca" }
       deriver:
-        type: ["string", "null"]
+        oneOf:
+          - "$ref": "./store-path-v1.yaml"
+          - type: "null"
         title: Deriver
         description: |
           If known, the path to the [store derivation](@docroot@/glossary.md#gloss-store-derivation) from which this store object was produced.

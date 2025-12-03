@@ -25,7 +25,8 @@ struct UnkeyedNarInfo : virtual UnkeyedValidPathInfo
     // TODO libc++ 16 (used by darwin) missing `std::optional::operator <=>`, can't do yet
     // auto operator <=>(const NarInfo &) const = default;
 
-    nlohmann::json toJSON(const StoreDirConfig * store, bool includeImpureInfo) const override;
+    nlohmann::json
+    toJSON(const StoreDirConfig * store, bool includeImpureInfo, PathInfoJsonFormat format) const override;
     static UnkeyedNarInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
 };
 
