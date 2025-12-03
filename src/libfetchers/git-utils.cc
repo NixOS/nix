@@ -1068,6 +1068,13 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
      */
     std::string regularFileContentsBuffer;
 
+    /**
+     * If repo has a non-null packBackend, this has a copy of the refresh function
+     * from the backend virtual table. This is needed to restore it after we've flushed
+     * the sink. We modify it to avoid unnecessary I/O on non-existent oids.
+     */
+    decltype(::git_odb_backend::refresh) packfileOdbRefresh = nullptr;
+
     void pushBuilder(std::string name)
     {
         const git_tree_entry * entry;
@@ -1093,6 +1100,29 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
         : repo(repo)
     {
+        /* Monkey-patching the pack backend to only read the pack directory
+           once. Otherwise it will do a readdir for each added oid when it's
+           not found and that translates to ~6 syscalls. Since we are never
+           writing pack files until flushing we can force the odb backend to
+           read the directory just once. It's very convenient that the vtable is
+           semi-public interface and is up for grabs.
+
+           This is purely an optimization for our use-case with a tarball cache.
+           libgit2 calls refresh() if the backend provides it when an oid isn't found.
+           We are only writing objects to a mempack (it has higher priority) and there isn't
+           a realistic use-case where a previously missing object would appear from thin air
+           on the disk (unless another process happens to be unpacking a similar tarball to
+           the cache at the same time, but that's a very unrealistic scenario).
+           */
+        if (auto * backend = repo->packBackend) {
+            if (backend->refresh(backend)) /* Refresh just once manually. */
+                throw Error("refreshing packfiles: %s", git_error_last()->message);
+            /* Save the function pointer to restore it later in flush() and
+               unset it in the vtable. libgit2 does nothing if it's a nullptr:
+               https://github.com/libgit2/libgit2/blob/58d9363f02f1fa39e46d49b604f27008e75b72f2/src/libgit2/odb.c#L1922
+             */
+            packfileOdbRefresh = std::exchange(backend->refresh, nullptr);
+        }
         pushBuilder("");
     }
 
@@ -1308,6 +1338,11 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         updateBuilders({});
 
         auto [oid, _name] = popBuilder();
+
+        if (auto * backend = repo->packBackend) {
+            /* We are done writing blobs, can restore refresh functionality. */
+            backend->refresh = packfileOdbRefresh;
+        }
 
         repo->flush();
 
