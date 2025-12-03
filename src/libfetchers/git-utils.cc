@@ -212,7 +212,7 @@ static void initRepoAtomically(std::filesystem::path & path, bool bare)
     AutoDelete delTmpDir(tmpDir, true);
     Repository tmpRepo;
 
-    if (git_repository_init(Setter(tmpRepo), tmpDir.c_str(), bare))
+    if (git_repository_init(Setter(tmpRepo), tmpDir.string().c_str(), bare))
         throw Error("creating Git repository %s: %s", path, git_error_last()->message);
     try {
         std::filesystem::rename(tmpDir, path);

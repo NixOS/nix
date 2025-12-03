@@ -90,7 +90,7 @@ std::string expandTilde(std::string_view path)
     // TODO: expand ~user ?
     auto tilde = path.substr(0, 2);
     if (tilde == "~/" || tilde == "~")
-        return getHome() + std::string(path.substr(1));
+        return getHome().string() + std::string(path.substr(1));
     else
         return std::string(path);
 }

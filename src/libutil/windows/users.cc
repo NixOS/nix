@@ -40,7 +40,7 @@ std::filesystem::path getHome()
     static std::filesystem::path homeDir = []() {
         std::filesystem::path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
         assert(!homeDir.empty());
-        return canonPath(homeDir);
+        return canonPath(homeDir.string());
     }();
     return homeDir;
 }
