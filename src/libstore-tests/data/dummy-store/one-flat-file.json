@@ -14,16 +14,16 @@
         "ca": {
           "hash": {
             "algorithm": "sha256",
-            "format": "base64",
-            "hash": "f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU="
+            "format": "base16",
+            "hash": "7f579dbae488602d41a1f5c0d6dc9c17bf408b635230942d504af1e43c4b6125"
           },
           "method": "nar"
         },
         "deriver": null,
         "narHash": {
           "algorithm": "sha256",
-          "format": "base64",
-          "hash": "f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU="
+          "format": "base16",
+          "hash": "7f579dbae488602d41a1f5c0d6dc9c17bf408b635230942d504af1e43c4b6125"
         },
         "narSize": 120,
         "references": [],

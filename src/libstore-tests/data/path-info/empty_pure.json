@@ -2,8 +2,8 @@
   "ca": null,
   "narHash": {
     "algorithm": "sha256",
-    "format": "base64",
-    "hash": "FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="
+    "format": "base16",
+    "hash": "15e3c560894cbb27085cf65b5a2ecb18488c999497f4531b6907a7581ce6d527"
   },
   "narSize": 0,
   "references": [],

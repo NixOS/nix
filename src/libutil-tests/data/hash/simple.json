@@ -1,5 +1,5 @@
 {
   "algorithm": "sha256",
-  "format": "base64",
-  "hash": "8OTC92xYkW7CWPJGhRvqCR0U1CR6L8PhhpRGGxgW4Ts="
+  "format": "base16",
+  "hash": "f0e4c2f76c58916ec258f246851bea091d14d4247a2fc3e18694461b1816e13b"
 }

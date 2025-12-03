@@ -1,8 +1,8 @@
 {
   "hash": {
     "algorithm": "sha256",
-    "format": "base64",
-    "hash": "9vLqj0XYoFfJVmoz+ZR02i5camYE1zYSFlDicwxvsKM="
+    "format": "base16",
+    "hash": "f6f2ea8f45d8a057c9566a33f99474da2e5c6a6604d736121650e2730c6fb0a3"
   },
   "method": "nar"
 }
