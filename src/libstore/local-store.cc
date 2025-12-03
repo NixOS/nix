@@ -722,8 +722,7 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, boo
         }
     }
 
-    pathInfoCache->lock()->upsert(
-        std::string(info.path.to_string()), PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
+    pathInfoCache->lock()->upsert(info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
 
     return id;
 }
@@ -1021,7 +1020,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
 
-    pathInfoCache->lock()->erase(std::string(path.to_string()));
+    pathInfoCache->lock()->erase(path);
 }
 
 const PublicKeys & LocalStore::getPublicKeys()

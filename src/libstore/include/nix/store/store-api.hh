@@ -310,7 +310,7 @@ protected:
 
     // Note: this is a `ref` to avoid false sharing with immutable
     // bits of `Store`.
-    ref<SharedSync<LRUCache<std::string, PathInfoCacheValue>>> pathInfoCache;
+    ref<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
