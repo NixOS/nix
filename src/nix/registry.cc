@@ -43,7 +43,7 @@ public:
     Path getRegistryPath()
     {
         if (registry_path.empty()) {
-            return fetchers::getUserRegistryPath();
+            return fetchers::getUserRegistryPath().string();
         } else {
             return registry_path;
         }

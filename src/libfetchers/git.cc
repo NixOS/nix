@@ -61,7 +61,7 @@ std::optional<std::string> readHead(const std::filesystem::path & path)
         RunOptions{
             .program = "git",
             // FIXME: use 'HEAD' to avoid returning all refs
-            .args = {"ls-remote", "--symref", path},
+            .args = {"ls-remote", "--symref", path.string()},
             .isInteractive = true,
         });
     if (status != 0)
@@ -88,7 +88,7 @@ bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::str
 {
     std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
     try {
-        runProgram("git", true, {"-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
+        runProgram("git", true, {"-C", cacheDir.string(), "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
     } catch (ExecError & e) {
         if (
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -115,7 +115,7 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
     time_t now = time(0);
     struct stat st;
     std::optional<std::string> cachedRef;
-    if (stat(headRefFile.c_str(), &st) == 0) {
+    if (stat(headRefFile.string().c_str(), &st) == 0) {
         cachedRef = readHead(cacheDir);
         if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
@@ -450,7 +450,7 @@ struct GitInputScheme : InputScheme
         if (input.getRev())
             throw UnimplementedError("cloning a specific revision is not implemented");
 
-        args.push_back(destDir);
+        args.push_back(destDir.string());
 
         runProgram("git", true, args, {}, true);
     }

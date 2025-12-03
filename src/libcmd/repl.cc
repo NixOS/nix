@@ -142,7 +142,7 @@ NixRepl::NixRepl(
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv))
     , runNixPtr{runNix}
-    , interacter(make_unique<ReadlineLikeInteracter>(getDataDir() + "/repl-history"))
+    , interacter(make_unique<ReadlineLikeInteracter>((getDataDir() / "repl-history").string()))
 {
 }
 

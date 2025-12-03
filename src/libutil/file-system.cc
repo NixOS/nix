@@ -687,7 +687,7 @@ std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const
         checkInterrupt();
         std::filesystem::path tmpDir = makeTempPath(tmpRoot, prefix);
         if (mkdir(
-                tmpDir.c_str()
+                tmpDir.string().c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
                     ,
                 mode
@@ -734,7 +734,7 @@ AutoCloseFD createAnonymousTempFile()
 
 std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
 {
-    Path tmpl(defaultTempDir() + "/" + prefix + ".XXXXXX");
+    Path tmpl(defaultTempDir().string() + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
     // FIXME: Windows should use FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE

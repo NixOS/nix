@@ -206,8 +206,9 @@ void FdSource::restart()
     if (!isSeekable)
         throw Error("can't seek to the start of a file");
     buffer.reset();
-    read = bufPosOut = bufPosOut = 0;
-    if (lseek(fd, 0, SEEK_SET) == -1)
+    read = bufPosIn = bufPosOut = 0;
+    int fd_ = fromDescriptorReadOnly(fd);
+    if (lseek(fd_, 0, SEEK_SET) == -1)
         throw SysError("seeking to the start of a file");
 }
 

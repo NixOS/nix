@@ -281,27 +281,28 @@ struct MercurialInputScheme : InputScheme
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
         if (!(input.getRev() && pathExists(cacheDir)
-              && runProgram(hgOptions({"log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1"}))
+              && runProgram(
+                     hgOptions({"log", "-R", cacheDir.string(), "-r", input.getRev()->gitRev(), "--template", "1"}))
                          .second
                      == "1")) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {
-                    runHg({"pull", "-R", cacheDir, "--", actualUrl});
+                    runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
                 } catch (ExecError & e) {
                     auto transJournal = cacheDir / ".hg" / "store" / "journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runHg({"recover", "-R", cacheDir});
-                        runHg({"pull", "-R", cacheDir, "--", actualUrl});
+                        runHg({"recover", "-R", cacheDir.string()});
+                        runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
                     } else {
                         throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {
                 createDirs(dirOf(cacheDir.string()));
-                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir});
+                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir.string()});
             }
         }
 
@@ -309,7 +310,7 @@ struct MercurialInputScheme : InputScheme
         auto tokens = tokenizeString<std::vector<std::string>>(runHg(
             {"log",
              "-R",
-             cacheDir,
+             cacheDir.string(),
              "-r",
              input.getRev() ? input.getRev()->gitRev() : *input.getRef(),
              "--template",
@@ -329,7 +330,7 @@ struct MercurialInputScheme : InputScheme
         std::filesystem::path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
-        runHg({"archive", "-R", cacheDir, "-r", rev.gitRev(), tmpDir});
+        runHg({"archive", "-R", cacheDir.string(), "-r", rev.gitRev(), tmpDir.string()});
 
         deletePath(tmpDir / ".hg_archival.txt");
 

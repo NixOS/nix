@@ -1261,7 +1261,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
         throw UsageError("exactly one argument expected");
 
     Path profile = absPath(opArgs.front());
-    Path profileLink = settings.useXDGBaseDirectories ? createNixStateDir() + "/profile" : getHome() + "/.nix-profile";
+    auto profileLink = settings.useXDGBaseDirectories ? createNixStateDir() / "profile" : getHome() / ".nix-profile";
 
     switchLink(profileLink, profile);
 }
