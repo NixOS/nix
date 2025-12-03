@@ -79,4 +79,9 @@ clearStore
 nix-build meta.nix -A metaDiff1
 echo "Valid derivation built successfully"
 
+# Test that __meta doesn't leak into the builder
+echo "Testing that __meta doesn't leak into builder..."
+nix-build meta.nix -A metaNotInBuilder
+echo "__meta correctly filtered from builder environment"
+
 echo "All meta tests passed!"
