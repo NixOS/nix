@@ -4,6 +4,7 @@
 #include <set>
 #include <future>
 #include "nix/util/sync.hh"
+#include "nix/util/thread-pool.hh"
 
 using std::set;
 
@@ -17,57 +18,32 @@ void computeClosure(const set<T> startElts, set<T> & res, GetEdgesAsync<T> getEd
 {
     struct State
     {
-        size_t pending;
         set<T> & res;
-        std::exception_ptr exc;
     };
 
-    Sync<State> state_(State{0, res, 0});
+    Sync<State> state_(State{res});
 
-    std::condition_variable done;
+    ThreadPool pool(0);
 
     auto enqueue = [&](this auto & enqueue, const T & current) -> void {
         {
             auto state(state_.lock());
-            if (state->exc)
-                return;
             if (!state->res.insert(current).second)
                 return;
-            state->pending++;
         }
-
-        getEdgesAsync(current, [&](std::promise<set<T>> & prom) {
-            try {
+        pool.enqueue([&, current] {
+            getEdgesAsync(current, [&](std::promise<set<T>> & prom) {
                 auto children = prom.get_future().get();
                 for (auto & child : children)
                     enqueue(child);
-                {
-                    auto state(state_.lock());
-                    assert(state->pending);
-                    if (!--state->pending)
-                        done.notify_one();
-                }
-            } catch (...) {
-                auto state(state_.lock());
-                if (!state->exc)
-                    state->exc = std::current_exception();
-                assert(state->pending);
-                if (!--state->pending)
-                    done.notify_one();
-            };
+            });
         });
     };
 
     for (auto & startElt : startElts)
         enqueue(startElt);
 
-    {
-        auto state(state_.lock());
-        while (state->pending)
-            state.wait(done);
-        if (state->exc)
-            std::rethrow_exception(state->exc);
-    }
+    pool.process();
 }
 
 } // namespace nix
