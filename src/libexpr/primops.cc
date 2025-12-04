@@ -317,10 +317,51 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
 }
 
 static RegisterPrimOp primop_scopedImport(
-    PrimOp{
-        .name = "scopedImport", .arity = 2, .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
-            import(state, pos, *args[1], args[0], v);
-        }});
+    {.name = "scopedImport",
+     .args = {"scope", "path"},
+     .doc = R"(
+      Load, parse, and return the Nix expression in the file *path*, with the attributes from *scope* available as variables in the lexical scope of the imported file.
+
+      This function is similar to [`import`](#builtins-import), but allows you to provide additional variables that will be available in the scope of the imported expression.
+      The *scope* argument must be an attribute set; each attribute becomes a variable available in the imported file.
+      Built-in functions and values remain accessible unless shadowed by *scope* attributes.
+
+      > **Note**
+      >
+      > Variables from *scope* shadow built-ins with the same name, allowing you to override built-ins for the imported expression.
+
+      > **Note**
+      >
+      > Unlike [`import`](#builtins-import), `scopedImport` does not memoize evaluation results.
+      > While the parsing result may be reused, each call produces a distinct value.
+      > This is observable through performance and side effects such as [`builtins.trace`](#builtins-trace).
+
+      The *path* argument must meet the same criteria as an [interpolated expression](@docroot@/language/string-interpolation.md#interpolated-expression).
+
+      If *path* is a directory, the file `default.nix` in that directory is used if it exists.
+
+      > **Example**
+      >
+      > Create a file `greet.nix`:
+      >
+      > ```nix
+      > # greet.nix
+      > "${greeting}, ${name}!"
+      > ```
+      >
+      > Import it with additional variables in scope:
+      >
+      > ```nix
+      > scopedImport { greeting = "Hello"; name = "World"; } ./greet.nix
+      > ```
+      >
+      >     "Hello, World!"
+
+      Evaluation aborts if the file doesn't exist or contains an invalid Nix expression.
+    )",
+     .fun = [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
+         import(state, pos, *args[1], args[0], v);
+     }});
 
 static RegisterPrimOp primop_import(
     {.name = "import",
