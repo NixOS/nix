@@ -8,7 +8,7 @@
     "method": "nar"
   },
   "compression": "xz",
-  "deriver": "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+  "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
   "downloadHash": {
     "algorithm": "sha256",
     "format": "base16",
@@ -22,8 +22,8 @@
   },
   "narSize": 34878,
   "references": [
-    "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
-    "/nix/store/n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
+    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+    "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
   ],
   "registrationTime": 23423,
   "signatures": [

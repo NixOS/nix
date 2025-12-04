@@ -14,7 +14,7 @@ nix-build fixed.nix -A bad --no-out-link && fail "should fail"
 # Building with the bad hash should produce the "good" output path as
 # a side-effect.
 [[ -e $path ]]
-nix path-info --json "$path" | jq -e \
+nix path-info --json --json-format 2 "$path" | jq -e \
     '.[].ca == {
         method: "flat",
         hash: {
