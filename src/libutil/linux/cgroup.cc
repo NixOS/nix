@@ -49,6 +49,33 @@ StringMap getCgroups(const Path & cgroupFile)
     return cgroups;
 }
 
+CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
+{
+    CgroupStats stats;
+
+    auto cpustatPath = cgroup / "cpu.stat";
+
+    if (pathExists(cpustatPath)) {
+        for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
+            std::string_view userPrefix = "user_usec ";
+            if (hasPrefix(line, userPrefix)) {
+                auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
+                if (n)
+                    stats.cpuUser = std::chrono::microseconds(*n);
+            }
+
+            std::string_view systemPrefix = "system_usec ";
+            if (hasPrefix(line, systemPrefix)) {
+                auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
+                if (n)
+                    stats.cpuSystem = std::chrono::microseconds(*n);
+            }
+        }
+    }
+
+    return stats;
+}
+
 static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
 {
     if (!pathExists(cgroup))
@@ -114,28 +141,8 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     }
 
     CgroupStats stats;
-
-    if (returnStats) {
-        auto cpustatPath = cgroup / "cpu.stat";
-
-        if (pathExists(cpustatPath)) {
-            for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
-                std::string_view userPrefix = "user_usec ";
-                if (hasPrefix(line, userPrefix)) {
-                    auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
-                    if (n)
-                        stats.cpuUser = std::chrono::microseconds(*n);
-                }
-
-                std::string_view systemPrefix = "system_usec ";
-                if (hasPrefix(line, systemPrefix)) {
-                    auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
-                    if (n)
-                        stats.cpuSystem = std::chrono::microseconds(*n);
-                }
-            }
-        }
-    }
+    if (returnStats)
+        stats = getCgroupStats(cgroup);
 
     if (rmdir(cgroup.c_str()) == -1)
         throw SysError("deleting cgroup %s", cgroup);
