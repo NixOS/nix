@@ -197,6 +197,11 @@ std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
 std::string_view printHashFormat(HashFormat hashFormat);
 
 /**
+ * User-friendly display of hash format (e.g., "base-64" instead of "base64").
+ */
+std::string_view printHashFormatDisplay(HashFormat hashFormat);
+
+/**
  * Parse a string representing a hash algorithm.
  */
 HashAlgorithm

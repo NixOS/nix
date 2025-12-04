@@ -447,9 +447,9 @@ HashFormat parseHashFormat(std::string_view hashFormatName)
     throw UsageError("unknown hash format '%1%', expect 'base16', 'base32', 'base64', or 'sri'", hashFormatName);
 }
 
-std::string_view printHashFormat(HashFormat HashFormat)
+std::string_view printHashFormat(HashFormat hashFormat)
 {
-    switch (HashFormat) {
+    switch (hashFormat) {
     case HashFormat::Base64:
         return "base64";
     case HashFormat::Nix32:
@@ -461,6 +461,22 @@ std::string_view printHashFormat(HashFormat HashFormat)
     default:
         // illegal hash base enum value internally, as opposed to external input
         // which should be validated with nice error message.
+        assert(false);
+    }
+}
+
+std::string_view printHashFormatDisplay(HashFormat hashFormat)
+{
+    switch (hashFormat) {
+    case HashFormat::Base64:
+        return "base-64";
+    case HashFormat::Nix32:
+        return "Nix base-32";
+    case HashFormat::Base16:
+        return "base-16";
+    case HashFormat::SRI:
+        return "SRI";
+    default:
         assert(false);
     }
 }
