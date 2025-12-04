@@ -11,6 +11,7 @@
     "references": [],
     "registrationTime": 23423,
     "signatures": [],
+    "storeDir": "/nix/store",
     "ultimate": false,
     "version": 2
   },
@@ -28,6 +29,7 @@
     ],
     "registrationTime": 23423,
     "signatures": [],
+    "storeDir": "/nix/store",
     "ultimate": false,
     "version": 2
   }

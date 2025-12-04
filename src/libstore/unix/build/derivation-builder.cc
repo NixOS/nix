@@ -1686,7 +1686,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         {getFSSourceAccessor(), CanonPath(actualPath)},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
-                    ValidPathInfo newInfo0{requiredFinalPath, narHashAndSize.hash};
+                    ValidPathInfo newInfo0{requiredFinalPath, {store, narHashAndSize.hash}};
                     newInfo0.narSize = narHashAndSize.numBytesDigested;
                     auto refs = rewriteRefs();
                     newInfo0.references = std::move(refs.others);

@@ -7,5 +7,6 @@
   },
   "narSize": 0,
   "references": [],
+  "storeDir": "/nix/store",
   "version": 2
 }

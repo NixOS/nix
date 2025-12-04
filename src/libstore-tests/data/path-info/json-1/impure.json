@@ -12,6 +12,7 @@
     "asdf",
     "qwer"
   ],
+  "storeDir": "/nix/store",
   "ultimate": true,
   "version": 1
 }
