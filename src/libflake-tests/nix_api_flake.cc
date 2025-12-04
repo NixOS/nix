@@ -121,8 +121,8 @@ TEST_F(nix_api_store_test, nix_api_load_flake)
     assert_ctx_ok();
     ASSERT_NE(nullptr, parseFlags);
 
-    auto r0 =
-        nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.string().size());
+    auto r0 = nix_flake_reference_parse_flags_set_base_directory(
+        ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, r0);
 
@@ -231,8 +231,8 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
     assert_ctx_ok();
     ASSERT_NE(nullptr, parseFlags);
 
-    auto r0 =
-        nix_flake_reference_parse_flags_set_base_directory(ctx, parseFlags, tmpDir.c_str(), tmpDir.string().size());
+    auto r0 = nix_flake_reference_parse_flags_set_base_directory(
+        ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, r0);
 

@@ -49,7 +49,7 @@ TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 
     auto pathStr = nix_get_path_string(ctx, value);
     assert_ctx_ok();
-    ASSERT_EQ(0, strcmp(pathStr, nixpkgs.c_str()));
+    ASSERT_EQ(0, strcmp(pathStr, nixpkgs.string().c_str()));
 
     nix_gc_decref(nullptr, value);
 }
