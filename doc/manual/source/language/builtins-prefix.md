@@ -23,7 +23,7 @@ Some built-ins are also exposed directly in the global scope:
 - [`null`](#builtins-null)
 - [`placeholder`](#builtins-placeholder)
 - [`removeAttrs`](#builtins-removeAttrs)
-- `scopedImport`
+- [`scopedImport`](#builtins-scopedImport)
 - [`throw`](#builtins-throw)
 - [`toString`](#builtins-toString)
 - [`true`](#builtins-true)
