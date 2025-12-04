@@ -18,16 +18,30 @@ This is the legacy format, preserved for backwards compatibility:
 
 - String-based hash values (e.g., `"narHash": "sha256:FePFYIlM..."`)
 - String-based content addresses (e.g., `"ca": "fixed:r:sha256:1abc..."`)
-- Full store paths in references (e.g., `"/nix/store/abc...-foo"`)
+- Full store paths for map keys and references (e.g., `"/nix/store/abc...-foo"`)
 - Now includes `"storeDir"` field at the top level
 
 ### Version 2 (`--json-format 2`)
 
-The new structured format with the following changes:
+The new structured format follows the [JSON guidelines](@docroot@/development/json-guideline.md) with the following changes:
 
-- **Store path base names in references**:
+- **Nested structure with top-level metadata**:
 
-  References use store path base names (e.g., `"abc...-foo"`) instead of full paths.
+  The output is now wrapped in an object with `version`, `storeDir`, and `info` fields:
+
+  ```json
+  {
+    "version": 2,
+    "storeDir": "/nix/store",
+    "info": { ... }
+  }
+  ```
+
+  The map from store bath base names to store object info is nested under the `info` field.
+
+- **Store path base names instead of full paths**:
+
+  Map keys and references use store path base names (e.g., `"abc...-foo"`) instead of full absolute store paths.
   Combined with `storeDir`, the full path can be reconstructed.
 
 - **Structured `ca` field**:

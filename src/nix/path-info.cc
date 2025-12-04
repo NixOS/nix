@@ -41,10 +41,14 @@ pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool showClosureS
 {
     json::object_t jsonAllObjects = json::object();
 
+    auto makeKey = [&](const StorePath & path) {
+        return format == PathInfoJsonFormat::V1 ? store.printStorePath(path) : std::string(path.to_string());
+    };
+
     for (auto & storePath : storePaths) {
         json jsonObject;
 
-        std::string key = store.printStorePath(storePath);
+        std::string key = makeKey(storePath);
 
         try {
             auto info = store.queryPathInfo(storePath);
@@ -52,7 +56,7 @@ pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool showClosureS
             // `storePath` has the representation `<hash>-x` rather than
             // `<hash>-<name>` in case of binary-cache stores & `--all` because we don't
             // know the name yet until we've read the NAR info.
-            key = store.printStorePath(info->path);
+            key = makeKey(info->path);
 
             jsonObject = info->toJSON(format == PathInfoJsonFormat::V1 ? &store : nullptr, true, format);
 
@@ -87,7 +91,16 @@ pathInfoToJSON(Store & store, const StorePathSet & storePaths, bool showClosureS
 
         jsonAllObjects[key] = std::move(jsonObject);
     }
-    return jsonAllObjects;
+
+    if (format == PathInfoJsonFormat::V1) {
+        return jsonAllObjects;
+    } else {
+        return {
+            {"version", format},
+            {"storeDir", store.storeDir},
+            {"info", std::move(jsonAllObjects)},
+        };
+    }
 }
 
 struct CmdPathInfo : StorePathsCommand, MixJSON
