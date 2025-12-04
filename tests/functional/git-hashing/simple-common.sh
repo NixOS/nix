@@ -50,7 +50,7 @@ try2 () {
     nix path-info --json --json-format 2 "$path" | jq -e \
         --arg algo "$hashAlgo" \
         --arg hash "$hashFromGit" \
-        '.[].ca == {
+        '.info.[].ca == {
             method: "git",
             hash: {
                 algorithm: $algo,

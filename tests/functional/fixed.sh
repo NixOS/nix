@@ -15,7 +15,7 @@ nix-build fixed.nix -A bad --no-out-link && fail "should fail"
 # a side-effect.
 [[ -e $path ]]
 nix path-info --json --json-format 2 "$path" | jq -e \
-    '.[].ca == {
+    '.info.[].ca == {
         method: "flat",
         hash: {
             algorithm: "md5",
