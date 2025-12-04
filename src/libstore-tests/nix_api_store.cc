@@ -212,9 +212,9 @@ TEST_F(nix_api_store_test, nix_store_real_path)
 TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 {
     auto tmp = nix::createTempDir();
-    std::string storeRoot = tmp / "store";
-    std::string stateDir = tmp / "state";
-    std::string logDir = tmp / "log";
+    auto storeRoot = (tmp / "store").string();
+    auto stateDir = (tmp / "state").string();
+    auto logDir = (tmp / "log").string();
     const char * rootkv[] = {"root", storeRoot.c_str()};
     const char * statekv[] = {"state", stateDir.c_str()};
     const char * logkv[] = {"log", logDir.c_str()};

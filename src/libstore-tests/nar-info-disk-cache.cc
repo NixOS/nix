@@ -14,9 +14,9 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     int prio = 12345;
     bool wantMassQuery = true;
 
-    Path tmpDir = createTempDir();
+    auto tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir);
-    Path dbPath(tmpDir + "/test-narinfo-disk-cache.sqlite");
+    auto dbPath(tmpDir / "test-narinfo-disk-cache.sqlite");
 
     int savedId;
     int barId;
@@ -24,7 +24,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     SQLiteStmt getIds;
 
     {
-        auto cache = getTestNarInfoDiskCache(dbPath);
+        auto cache = getTestNarInfoDiskCache(dbPath.string());
 
         // Set up "background noise" and check that different caches receive different ids
         {
@@ -73,7 +73,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     {
         // We can't clear the in-memory cache, so we use a new cache object. This is
         // more realistic anyway.
-        auto cache2 = getTestNarInfoDiskCache(dbPath);
+        auto cache2 = getTestNarInfoDiskCache(dbPath.string());
 
         {
             auto r = cache2->upToDateCacheExists("http://foo");

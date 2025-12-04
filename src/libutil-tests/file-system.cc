@@ -307,10 +307,10 @@ TEST(DirectoryIterator, works)
     auto tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, true);
 
-    nix::writeFile(tmpDir + "/somefile", "");
+    nix::writeFile(tmpDir / "somefile", "");
 
     for (auto path : DirectoryIterator(tmpDir)) {
-        ASSERT_EQ(path.path().string(), tmpDir + "/somefile");
+        ASSERT_EQ(path.path(), tmpDir / "somefile");
     }
 }
 
@@ -388,13 +388,14 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 TEST(createAnonymousTempFile, works)
 {
     auto fd = createAnonymousTempFile();
+    auto fd_ = fromDescriptorReadOnly(fd.get());
     writeFull(fd.get(), "test");
-    lseek(fd.get(), 0, SEEK_SET);
+    lseek(fd_, 0, SEEK_SET);
     FdSource source{fd.get()};
     EXPECT_EQ(source.drain(), "test");
-    lseek(fd.get(), 0, SEEK_END);
+    lseek(fd_, 0, SEEK_END);
     writeFull(fd.get(), "test");
-    lseek(fd.get(), 0, SEEK_SET);
+    lseek(fd_, 0, SEEK_SET);
     EXPECT_EQ(source.drain(), "testtest");
 }
 
@@ -405,8 +406,9 @@ TEST(createAnonymousTempFile, works)
 TEST(FdSource, restartWorks)
 {
     auto fd = createAnonymousTempFile();
+    auto fd_ = fromDescriptorReadOnly(fd.get());
     writeFull(fd.get(), "hello world");
-    lseek(fd.get(), 0, SEEK_SET);
+    lseek(fd_, 0, SEEK_SET);
     FdSource source{fd.get()};
     EXPECT_EQ(source.drain(), "hello world");
     source.restart();
