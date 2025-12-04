@@ -435,8 +435,8 @@ Sink & operator<<(Sink & sink, const StringSet & s)
 Sink & operator<<(Sink & sink, const Error & ex)
 {
     auto & info = ex.info();
-    sink << "Error" << info.level << "Error" // removed
-         << info.msg.str() << 0              // FIXME: info.errPos
+    sink << "Error" << static_cast<uint64_t>(info.level) << "Error" // removed
+         << info.msg.str() << 0                                     // FIXME: info.errPos
          << info.traces.size();
     for (auto & trace : info.traces) {
         sink << 0; // FIXME: trace.pos

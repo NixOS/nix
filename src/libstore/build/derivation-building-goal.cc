@@ -269,7 +269,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
         act = std::make_unique<Activity>(
             *logger,
-            lvlInfo,
+            Verbosity::Info,
             actBuild,
             msg,
             Logger::Fields{
@@ -328,7 +328,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         if (!outputLocks.lockPaths(lockFiles, "", false)) {
             Activity act(
-                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+                *logger,
+                Verbosity::Warn,
+                actBuildWaiting,
+                fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
 
             /* Wait then try locking again, repeat until success (returned
                boolean is true). */
@@ -386,7 +389,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 if (!actLock)
                     actLock = std::make_unique<Activity>(
                         *logger,
-                        lvlWarn,
+                        Verbosity::Warn,
                         actBuildWaiting,
                         fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
                 outputLocks.unlock();
@@ -649,7 +652,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
-                    lvlWarn,
+                    Verbosity::Warn,
                     actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
             co_await waitForAWhile();
@@ -738,7 +741,7 @@ static void runPostBuildHook(
 
     Activity act(
         logger,
-        lvlTalkative,
+        Verbosity::Talkative,
         actPostBuildHook,
         fmt("running post-build-hook '%s'", settings.postBuildHook),
         Logger::Fields{store.printStorePath(drvPath)});

@@ -155,7 +155,7 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << static_cast<uint64_t>(lvl) << type << s << fields << parent;
         enqueueMsg(buf.s);
     }
 
@@ -776,7 +776,7 @@ static void performOp(
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(conn.from);
+        clientSettings.verboseBuild = Verbosity::Error == (Verbosity) readInt(conn.from);
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);
@@ -1056,7 +1056,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 
     Finally finally([&]() {
         setInterrupted(false);
-        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
+        printMsgUsing(prevLogger, Verbosity::Debug, "%d operations", opCount);
     });
 
     conn.postHandshake(
@@ -1087,7 +1087,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
                 break;
             }
 
-            printMsgUsing(prevLogger, lvlDebug, "received daemon op %d", op);
+            printMsgUsing(prevLogger, Verbosity::Debug, "received daemon op %d", op);
 
             opCount++;
 

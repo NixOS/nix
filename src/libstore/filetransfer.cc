@@ -99,7 +99,7 @@ struct curlFileTransfer : public FileTransfer
             : fileTransfer(fileTransfer)
             , request(request)
             , act(*logger,
-                  lvlTalkative,
+                  Verbosity::Talkative,
                   actFileTransfer,
                   fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
                   {request.uri.to_string()},
@@ -235,7 +235,7 @@ struct curlFileTransfer : public FileTransfer
         try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
+            printMsg(Verbosity::Vomit, "got header for '%s': %s", request.uri, trim(line));
 
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
@@ -396,7 +396,7 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
-            if (verbosity >= lvlVomit) {
+            if (verbosity >= Verbosity::Vomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
             }

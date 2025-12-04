@@ -180,7 +180,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(
-        lvlTalkative,
+        Verbosity::Talkative,
         "copying path '%1%' (%2% bytes, compressed %3$.1f%% in %4% ms) to binary cache",
         printStorePath(narInfo->path),
         info.narSize,
@@ -234,7 +234,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 if (fileExists(key))
                     return;
 
-                printMsg(lvlTalkative, "creating debuginfo link from '%s' to '%s'", key, target);
+                printMsg(Verbosity::Talkative, "creating debuginfo link from '%s' to '%s'", key, target);
 
                 upsertFile(key, json.dump(), "application/json");
             };
@@ -439,7 +439,7 @@ void BinaryCacheStore::queryPathInfoUncached(
     auto storePathS = printStorePath(storePath);
     auto act = std::make_shared<Activity>(
         *logger,
-        lvlTalkative,
+        Verbosity::Talkative,
         actQueryPathInfo,
         fmt("querying info about '%s' on '%s'", storePathS, uri),
         Logger::Fields{storePathS, uri});

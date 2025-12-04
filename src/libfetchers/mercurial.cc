@@ -285,7 +285,8 @@ struct MercurialInputScheme : InputScheme
                      hgOptions({"log", "-R", cacheDir.string(), "-r", input.getRev()->gitRev(), "--template", "1"}))
                          .second
                      == "1")) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
+            Activity act(
+                *logger, Verbosity::Talkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {

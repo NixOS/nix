@@ -178,7 +178,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                     nrFailed++;
                     if (!settings.keepGoing)
                         throw e;
-                    printMsg(lvlError, "could not copy %s: %s", printStorePath(path), e.what());
+                    printMsg(Verbosity::Error, "could not copy %s: %s", printStorePath(path), e.what());
                     showProgress();
                     return;
                 }
@@ -861,7 +861,7 @@ void copyStorePath(
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
         *logger,
-        lvlInfo,
+        Verbosity::Info,
         actCopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
         {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
@@ -973,7 +973,7 @@ std::map<StorePath, StorePath> copyPaths(
         if (!valid.count(path))
             missing.insert(path);
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(*logger, Verbosity::Info, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
@@ -1022,7 +1022,7 @@ std::map<StorePath, StorePath> copyPaths(
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
                 *logger,
-                lvlInfo,
+                Verbosity::Info,
                 actCopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),
                 {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});

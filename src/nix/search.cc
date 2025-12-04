@@ -96,7 +96,8 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         visit = [&](eval_cache::AttrCursor & cursor, const std::vector<Symbol> & attrPath, bool initialRecurse) {
             auto attrPathS = state->symbols.resolve(attrPath);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(
+                *logger, Verbosity::Info, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
             try {
                 auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {

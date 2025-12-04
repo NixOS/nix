@@ -969,7 +969,7 @@ static RegisterPrimOp primop_break(
          if (state.canDebug()) {
              auto error = Error(
                  ErrorInfo{
-                     .level = lvlInfo,
+                     .level = Verbosity::Info,
                      .msg = HintFmt("breakpoint reached"),
                      .pos = state.positions[pos],
                  });
@@ -1319,7 +1319,7 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
         BaseError msg(std::string{msgStr});
         msg.atPos(state.positions[pos]);
         auto info = msg.info();
-        info.level = lvlWarn;
+        info.level = Verbosity::Warn;
         info.isFromExpr = true;
         logWarning(info);
     }
@@ -1822,7 +1822,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
     auto drvPath = writeDerivation(*state.store, drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
-    printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
+    printMsg(Verbosity::Chatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);
 
     /* Optimisation, but required in read-only mode! because in that
        case we don't actually write store derivations, so we can't

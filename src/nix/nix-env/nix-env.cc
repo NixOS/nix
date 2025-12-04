@@ -914,7 +914,10 @@ queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath
                 }
             }
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
+            printMsg(
+                Verbosity::Talkative,
+                "skipping derivation named '%1%' which gives an assertion failure",
+                i.queryName());
         } catch (Error & e) {
             e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;
@@ -1028,7 +1031,9 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 paths.insert(i.queryOutPath());
             } catch (AssertionError & e) {
                 printMsg(
-                    lvlTalkative, "skipping derivation named '%s' which gives an assertion failure", i.queryName());
+                    Verbosity::Talkative,
+                    "skipping derivation named '%s' which gives an assertion failure",
+                    i.queryName());
                 i.setFailed();
             }
         validPaths = store.queryValidPaths(paths);
@@ -1055,7 +1060,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (i.hasFailed())
                 continue;
 
-            // Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
+            // Activity act(*logger, Verbosity::Debug, "outputting query result '%1%'", i.attrPath);
 
             if (globals.prebuiltOnly && !validPaths.count(i.queryOutPath())
                 && !substitutablePaths.count(i.queryOutPath()))
@@ -1242,7 +1247,10 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             cout.flush();
 
         } catch (AssertionError & e) {
-            printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
+            printMsg(
+                Verbosity::Talkative,
+                "skipping derivation named '%1%' which gives an assertion failure",
+                i.queryName());
         } catch (Error & e) {
             e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
             throw;

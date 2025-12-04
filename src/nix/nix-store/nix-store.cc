@@ -838,7 +838,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs) {
         auto path = store->followLinksToStorePath(i);
-        printMsg(lvlTalkative, "checking path '%s'...", store->printStorePath(path));
+        printMsg(Verbosity::Talkative, "checking path '%s'...", store->printStorePath(path));
         auto info = store->queryPathInfo(path);
         HashSink sink(info->narHash.algo);
         store->narFromPath(path, sink);
@@ -908,7 +908,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     auto getBuildSettings = [&]() {
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
-        verbosity = lvlError;
+        verbosity = Verbosity::Error;
         settings.keepLog = false;
         settings.useSubstitutes = false;
 
