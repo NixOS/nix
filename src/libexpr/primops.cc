@@ -4596,7 +4596,7 @@ static void prim_convertHash(EvalState & state, const PosIdx pos, Value ** args,
     HashFormat hf = parseHashFormat(
         state.forceStringNoCtx(*iteratorToHashFormat->value, pos, "while evaluating the attribute 'toHashFormat'"));
 
-    v.mkString(Hash::parseAny(hash, ha).to_string(hf, hf == HashFormat::SRI), state.mem);
+    v.mkString(Hash::parseAny(hash, ha).to_string(hf, std::holds_alternative<HashFormatSRI>(hf.raw)), state.mem);
 }
 
 static RegisterPrimOp primop_convertHash({

@@ -107,4 +107,26 @@ INSTANTIATE_TEST_SUITE_P(
         Base64TrailingParseCase{
             "7g91TBvYoYQorRTqo+rYD/i5YnWvUBLnqDhPHxBJDaBW7smuPMeRp6E6JOFuVN9bzN0QnH1ToUU0u9c2CjALEQ== cheesecake"}));
 
+/* ----------------------------------------------------------------------------
+ * parseBase, parseBaseOpt, printBase
+ * --------------------------------------------------------------------------*/
+
+TEST(base, testRoundTripPrintParse)
+{
+    for (const Base base : {Base::Base64, Base::Nix32, Base::Base16}) {
+        ASSERT_EQ(parseBase(printBase(base)), base);
+        ASSERT_EQ(*parseBaseOpt(printBase(base)), base);
+    }
+}
+
+TEST(base, testParseBaseOptReturnsNullopt)
+{
+    ASSERT_EQ(parseBaseOpt("sha0042"), std::nullopt);
+}
+
+TEST(base, testParseBaseThrowsOnInvalid)
+{
+    ASSERT_THROW(parseBase("invalid"), UsageError);
+}
+
 } // namespace nix
