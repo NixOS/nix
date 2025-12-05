@@ -59,7 +59,8 @@ The new structured format follows the [JSON guidelines](@docroot@/development/js
   - Old: `"narHash": "sha256:FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="`
   - New: `"narHash": {"algorithm": "sha256", "format": "base16", "hash": "15e3c5608946..."}`
   - Same structure applies to `downloadHash` in NAR info contexts
-  - The `format` field is always `"base16"` (hexadecimal)
+
+  See `nix hash convert`'s new support for the JSON format for details on this format, and how to convert between it and other hash formats.
 
 Nix currently only produces, and doesn't consume this format.
 

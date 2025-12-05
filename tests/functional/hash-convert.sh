@@ -109,3 +109,66 @@ try3 sha512 "204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596f
 # Test SRI hashes that lack trailing '=' characters. These are incorrect but we need to support them for backward compatibility.
 [[ $(nix hash convert --from sri "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0") = sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ]]
 [[ $(nix hash convert --from sri "sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ") = sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ== ]]
+
+#
+# Test JSON format (json-base16)
+#
+
+sha256_json='{
+    "format": "base16",
+    "algorithm": "sha256",
+    "hash": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+}'
+
+sha512_json='{
+    "format": "base16",
+    "algorithm": "sha512",
+    "hash": "204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445"
+}'
+
+sha1_json='{
+    "format": "base16",
+    "algorithm": "sha1",
+    "hash": "800d59cfcd3c05e900cb4e214be48f6b886a08df"
+}'
+
+# Basic conversion to JSON format
+nix hash convert --to json-base16 "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=" \
+    | jq -e --argjson expected "$sha256_json" '. == $expected'
+
+# JSON to SRI (default output)
+[[ $(nix hash convert --from json-base16 "$sha256_json") = sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ]]
+
+# JSON to JSON (round-trip)
+for json in "$sha256_json" "$sha512_json" "$sha1_json"; do
+    nix hash convert --from json-base16 --to json-base16 "$json" \
+        | jq -e --argjson expected "$json" '. == $expected'
+done
+
+# JSON input for sha512
+[[ $(nix hash convert --from json-base16 "$sha512_json") = sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ== ]]
+
+# JSON input for sha1
+[[ $(nix hash convert --from json-base16 "$sha1_json") = sha1-gA1Zz808BekAy04hS+SPa4hqCN8= ]]
+
+# JSON auto-detection (without --from)
+[[ $(nix hash convert "$sha256_json") = sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ]]
+
+# JSON with --hash-algo validation (matching)
+[[ $(nix hash convert --hash-algo sha256 "$sha256_json") = sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0= ]]
+
+# JSON with --hash-algo validation (mismatched, should fail)
+expectStderr 1 nix hash convert --hash-algo sha512 "$sha256_json" \
+    | grepQuiet "should have type 'sha512'"
+
+# Asserting --from json-base16 with non-JSON input fails
+expectStderr 1 nix hash convert --from json-base16 "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=" \
+    | grepQuiet "'sri', but '--from json-base16'"
+
+# Asserting --from with wrong format fails (JSON input with --from sri)
+expectStderr 1 nix hash convert --from sri "$sha256_json" \
+    | grepQuiet "'json-base16', but '--from sri'"
+
+# Asserting --from base16 with JSON input fails
+expectStderr 1 nix hash convert --hash-algo sha256 --from base16 "$sha256_json" \
+    | grepQuiet "'json-base16', but '--from base16'"

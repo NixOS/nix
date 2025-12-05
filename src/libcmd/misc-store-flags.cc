@@ -1,4 +1,61 @@
 #include "nix/cmd/misc-store-flags.hh"
+#include "nix/util/json-utils.hh"
+
+namespace nix {
+
+constexpr static std::string_view jsonFormatName = "json-base16";
+
+OutputHashFormat OutputHashFormat::parse(std::string_view s)
+{
+    if (s == jsonFormatName) {
+        return OutputHashFormat::JSON;
+    }
+    return parseHashFormat(s);
+}
+
+std::string_view OutputHashFormat::print() const
+{
+    return std::visit(
+        overloaded{
+            [](const HashFormat & hf) -> std::string_view { return printHashFormat(hf); },
+            [](const OutputFormatJSON &) -> std::string_view { return jsonFormatName; },
+        },
+        raw);
+}
+
+std::pair<Hash, OutputHashFormat>
+OutputHashFormat::parseAnyReturningFormat(std::string_view s, std::optional<HashAlgorithm> optAlgo)
+{
+    /* Try parsing as JSON first. If it is valid JSON, it must also be
+       in the right format. Otherwise, parse string formats. */
+    std::optional<nlohmann::json> jsonOpt;
+    try {
+        jsonOpt = nlohmann::json::parse(s);
+    } catch (nlohmann::json::parse_error &) {
+    }
+
+    if (jsonOpt) {
+        auto hash = jsonOpt->get<Hash>();
+        if (optAlgo && hash.algo != *optAlgo)
+            throw BadHash("hash '%s' should have type '%s'", s, printHashAlgo(*optAlgo));
+        return {hash, OutputHashFormat::JSON};
+    }
+
+    auto [hash, format] = Hash::parseAnyReturningFormat(s, optAlgo);
+    return {hash, format};
+}
+
+void printHash(const Hash & h, const OutputHashFormat & format, MixPrintJSON & printer)
+{
+    std::visit(
+        overloaded{
+            [&](const HashFormat & hf) { logger->cout(h.to_string(hf, hf == HashFormat::SRI)); },
+            [&](const OutputFormatJSON &) { printer.printJSON(nlohmann::json(h)); },
+        },
+        format.raw);
+}
+
+} // namespace nix
 
 namespace nix::flag {
 
@@ -9,27 +66,31 @@ static void hashFormatCompleter(AddCompletions & completions, size_t index, std:
             completions.add(format);
         }
     }
+    auto jsonName = OutputHashFormat(OutputHashFormat::JSON).print();
+    if (hasPrefix(jsonName, prefix)) {
+        completions.add(std::string{jsonName});
+    }
 }
 
-Args::Flag hashFormatWithDefault(std::string && longName, HashFormat * hf)
+Args::Flag hashFormatWithDefault(std::string && longName, OutputHashFormat * hf)
 {
     assert(*hf == nix::HashFormat::SRI);
     return Args::Flag{
         .longName = std::move(longName),
-        .description = "Hash format (`base16`, `nix32`, `base64`, `sri`). Default: `sri`.",
+        .description = "Hash format (`base16`, `nix32`, `base64`, `sri`, `json-base16`). Default: `sri`.",
         .labels = {"hash-format"},
-        .handler = {[hf](std::string s) { *hf = parseHashFormat(s); }},
+        .handler = {[hf](std::string s) { *hf = OutputHashFormat::parse(s); }},
         .completer = hashFormatCompleter,
     };
 }
 
-Args::Flag hashFormatOpt(std::string && longName, std::optional<HashFormat> * ohf)
+Args::Flag hashFormatOpt(std::string && longName, std::optional<OutputHashFormat> * ohf)
 {
     return Args::Flag{
         .longName = std::move(longName),
-        .description = "Hash format (`base16`, `nix32`, `base64`, `sri`).",
+        .description = "Hash format (`base16`, `nix32`, `base64`, `sri`, `json-base16`).",
         .labels = {"hash-format"},
-        .handler = {[ohf](std::string s) { *ohf = std::optional<HashFormat>{parseHashFormat(s)}; }},
+        .handler = {[ohf](std::string s) { *ohf = std::optional<OutputHashFormat>{OutputHashFormat::parse(s)}; }},
         .completer = hashFormatCompleter,
     };
 }

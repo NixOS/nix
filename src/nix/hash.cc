@@ -17,10 +17,10 @@ using namespace nix;
  *
  * Deprecation Issue: https://github.com/NixOS/nix/issues/8876
  */
-struct CmdHashBase : Command
+struct CmdHashBase : Command, MixPrintJSON
 {
     FileIngestionMethod mode;
-    HashFormat hashFormat = HashFormat::SRI;
+    OutputHashFormat hashFormat = HashFormat::SRI;
     bool truncate = false;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
     std::vector<std::string> paths;
@@ -37,25 +37,25 @@ struct CmdHashBase : Command
         addFlag({
             .longName = "sri",
             .description = "Print the hash in SRI format.",
-            .handler = {&hashFormat, HashFormat::SRI},
+            .handler = {&hashFormat, OutputHashFormat{HashFormat::SRI}},
         });
 
         addFlag({
             .longName = "base64",
             .description = "Print the hash in base-64 format.",
-            .handler = {&hashFormat, HashFormat::Base64},
+            .handler = {&hashFormat, OutputHashFormat{HashFormat::Base64}},
         });
 
         addFlag({
             .longName = "base32",
             .description = "Print the hash in base-32 (Nix-specific) format.",
-            .handler = {&hashFormat, HashFormat::Nix32},
+            .handler = {&hashFormat, OutputHashFormat{HashFormat::Nix32}},
         });
 
         addFlag({
             .longName = "base16",
             .description = "Print the hash in base-16 format.",
-            .handler = {&hashFormat, HashFormat::Base16},
+            .handler = {&hashFormat, OutputHashFormat{HashFormat::Base16}},
         });
 
         addFlag(flag::hashAlgo("type", &hashAlgo));
@@ -129,7 +129,7 @@ struct CmdHashBase : Command
 
             if (truncate && h.hashSize > 20)
                 h = compressHash(h, 20);
-            logger->cout(h.to_string(hashFormat, hashFormat == HashFormat::SRI));
+            printHash(h, hashFormat, *this);
         }
     }
 };
@@ -209,15 +209,14 @@ struct CmdToBase : Command
 /**
  * `nix hash convert`
  */
-struct CmdHashConvert : Command
+struct CmdHashConvert : Command, MixPrintJSON
 {
-    std::optional<HashFormat> from;
-    HashFormat to;
+    std::optional<OutputHashFormat> from;
+    OutputHashFormat to = HashFormat::SRI;
     std::optional<HashAlgorithm> algo;
     std::vector<std::string> hashStrings;
 
     CmdHashConvert()
-        : to(HashFormat::SRI)
     {
         addFlag(flag::hashFormatOpt("from", &from));
         addFlag(flag::hashFormatWithDefault("to", &to));
@@ -248,15 +247,15 @@ struct CmdHashConvert : Command
     void run() override
     {
         for (const auto & s : hashStrings) {
-            auto [h, parsedFormat] = Hash::parseAnyReturningFormat(s, algo);
+            auto [h, parsedFormat] = OutputHashFormat::parseAnyReturningFormat(s, algo);
             if (from && *from != parsedFormat) {
                 throw BadHash(
                     "input hash '%s' has format '%s', but '--from %s' was specified",
                     s,
-                    printHashFormat(parsedFormat),
-                    printHashFormat(*from));
+                    parsedFormat.print(),
+                    from->print());
             }
-            logger->cout(h.to_string(to, to == HashFormat::SRI));
+            printHash(h, to, *this);
         }
     }
 };

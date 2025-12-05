@@ -33,6 +33,28 @@ R""(
   sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=
   ```
 
+* Convert a hash to the `json-base16` format:
+
+  ```console
+  $ nix hash convert --to json-base16 "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="
+  {
+    "algorithm":"sha256",
+    "format":"base16",
+    "hash":"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  }
+  ```
+
+* Convert a hash from the `json-base16` format:
+
+  ```console
+  $ nix hash convert --from json-base16 '{
+    "format": "base16",
+    "algorithm": "sha256",
+    "hash": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  }'
+  sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=
+  ```
+
 # Description
 
 `nix hash convert` converts hashes from one encoding to another.
