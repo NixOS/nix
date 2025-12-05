@@ -10,9 +10,6 @@ lockFileStr:
 # unlocked trees.
 overrides:
 
-# This is `prim_fetchFinalTree`.
-fetchTreeFinal:
-
 let
   inherit (builtins) mapAttrs;
 
@@ -52,7 +49,7 @@ let
         else
           # FIXME: remove obsolete node.info.
           # Note: lock file entries are always final.
-          fetchTreeFinal (node.info or { } // removeAttrs node.locked [ "dir" ]);
+          builtins.fetchFinalTree (node.info or { } // removeAttrs node.locked [ "dir" ]);
 
       subdir = overrides.${key}.dir or node.locked.dir or "";
 
