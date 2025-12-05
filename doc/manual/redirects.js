@@ -347,7 +347,7 @@ const redirects = {
     "string-literal": "string-literals.html",
   },
   "language/derivations.md": {
-    "builder-execution": "store/drv/building.md#builder-execution",
+    "builder-execution": "store/drv/building.md",
   },
   "installation/installing-binary.html": {
     "linux": "uninstall.html#linux",
