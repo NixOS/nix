@@ -16,9 +16,7 @@ namespace nix {
 
 using namespace nlohmann;
 
-class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>,
-                                    public JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>,
-                                    public LibStoreTest
+class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>, public LibStoreTest
 {
 protected:
     std::filesystem::path unitTestData = getUnitTestData() / "derivation" / "ia";
@@ -496,16 +494,16 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         {"rainbow", "uid-range", "ca-derivations"});
 };
 
-#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                                               \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                                    \
-    {                                                                                        \
-        this->JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>::readJsonTest(  \
-            #VAR, advancedAttributes_##VAR2);                                                \
-    }                                                                                        \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                                      \
-    {                                                                                        \
-        this->JsonCharacterizationTest<DerivationOptions<SingleDerivedPath>>::writeJsonTest( \
-            #VAR, advancedAttributes_##VAR2);                                                \
+#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                             \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                  \
+    {                                                                      \
+        nix::readJsonTest<DerivationOptions<SingleDerivedPath>>(           \
+            *this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+    }                                                                      \
+    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                    \
+    {                                                                      \
+        nix::readJsonTest<DerivationOptions<SingleDerivedPath>>(           \
+            *this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
     }
 
 TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, defaults, defaults)
