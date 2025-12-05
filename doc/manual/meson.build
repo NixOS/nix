@@ -57,6 +57,24 @@ generate_manual_deps = files(
   'generate-deps.py',
 )
 
+# Generate redirects.js from template and JSON data
+redirects_js = custom_target(
+  'redirects.js',
+  command : [
+    python,
+    '@INPUT0@',
+    '@INPUT1@',
+    '@INPUT2@',
+    '@OUTPUT@',
+  ],
+  input : [
+    'generate-redirects.py',
+    'redirects.js.in',
+    'redirects.json',
+  ],
+  output : 'redirects.js',
+)
+
 # Generates types
 subdir('source/store')
 # Generates builtins.md and builtin-constants.md.
@@ -109,6 +127,7 @@ manual = custom_target(
     'book.toml.in',
     'anchors.jq',
     'custom.css',
+    redirects_js,
     nix3_cli_files,
     experimental_features_shortlist_md,
     experimental_feature_descriptions_md,
