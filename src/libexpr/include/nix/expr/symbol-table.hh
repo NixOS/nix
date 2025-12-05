@@ -290,7 +290,7 @@ public:
         return Symbol(*symbols.insert(SymbolStr::Key{store, s, buffer}).first);
     }
 
-    std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
+    std::vector<SymbolStr> resolve(const std::span<const Symbol> & symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());
