@@ -418,7 +418,7 @@ struct CmdFlakeCheck : FlakeCommand
             return std::nullopt;
         };
 
-        std::map<DerivedPath, std::vector<AttrPath>> attrPathsByDrv;
+        std::map<DerivedPath, std::vector<AttrSelectionPath>> attrPathsByDrv;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -618,7 +618,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         };
 
                                         // Build and store the attribute path for error reporting
-                                        AttrPath attrPath;
+                                        AttrSelectionPath attrPath;
                                         attrPath.push_back(AttrName(state->symbols.create(name)));
                                         attrPath.push_back(AttrName(attr.name));
                                         attrPath.push_back(AttrName(attr2.name));
@@ -820,7 +820,7 @@ struct CmdFlakeCheck : FlakeCommand
                     auto it = attrPathsByDrv.find(result.path);
                     if (it != attrPathsByDrv.end() && !it->second.empty()) {
                         for (auto & attrPath : it->second) {
-                            auto attrPathStr = showAttrPath(state->symbols, attrPath);
+                            auto attrPathStr = showAttrSelectionPath(state->symbols, attrPath);
                             reportError(Error(
                                 "failed to build attribute '%s', build of '%s' failed: %s",
                                 attrPathStr,

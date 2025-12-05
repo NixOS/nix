@@ -1368,7 +1368,7 @@ void ExprVar::eval(EvalState & state, Env & env, Value & v)
     v = *v2;
 }
 
-static std::string showAttrPath(EvalState & state, Env & env, std::span<const AttrName> attrPath)
+static std::string showAttrSelectionPath(EvalState & state, Env & env, std::span<const AttrName> attrPath)
 {
     std::ostringstream out;
     bool first = true;
@@ -1404,7 +1404,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                                          env,
                                          getPos(),
                                          "while evaluating the attribute '%1%'",
-                                         showAttrPath(state, env, getAttrPath()))
+                                         showAttrSelectionPath(state, env, getAttrPath()))
                                    : nullptr;
 
         for (auto & i : getAttrPath()) {
@@ -1445,7 +1445,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             auto origin = std::get_if<SourcePath>(&pos2r.origin);
             if (!(origin && *origin == state.derivationInternal))
                 state.addErrorTrace(
-                    e, pos2, "while evaluating the attribute '%1%'", showAttrPath(state, env, getAttrPath()));
+                    e, pos2, "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
         }
         throw;
     }

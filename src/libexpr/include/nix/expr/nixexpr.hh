@@ -87,9 +87,9 @@ struct AttrName
 
 static_assert(std::is_trivially_copy_constructible_v<AttrName>);
 
-typedef std::vector<AttrName> AttrPath;
+typedef std::vector<AttrName> AttrSelectionPath;
 
-std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
+std::string showAttrSelectionPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
 
