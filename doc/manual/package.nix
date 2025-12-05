@@ -1,6 +1,8 @@
 {
   lib,
+  callPackage,
   mkMesonDerivation,
+  runCommand,
 
   meson,
   ninja,
@@ -95,22 +97,34 @@ mkMesonDerivation (finalAttrs: {
   */
   passthru.site = finalAttrs.finalPackage + "/share/doc/nix/manual";
 
-  passthru.tests = {
-    # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
-    linkcheck = testers.lycheeLinkCheck {
-      inherit (finalAttrs.finalPackage) site;
-      extraConfig = {
-        exclude = [
-          # Exclude auto-generated JSON schema documentation which has
-          # auto-generated fragment IDs that don't match the link references
-          ".*/protocols/json/.*\\.html"
-          # Exclude undocumented builtins
-          ".*/language/builtins\\.html#builtins-addErrorContext"
-          ".*/language/builtins\\.html#builtins-appendContext"
-        ];
+  passthru.tests =
+    let
+      redirect-targets = callPackage ./redirect-targets-html.nix { };
+    in
+    {
+      # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+      linkcheck = testers.lycheeLinkCheck {
+        site =
+          let
+            plain = finalAttrs.finalPackage.site;
+          in
+          runCommand "nix-manual-with-redirect-targets" { } ''
+            cp -r ${plain} $out
+            chmod -R u+w $out
+            cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
+          '';
+        extraConfig = {
+          exclude = [
+            # Exclude auto-generated JSON schema documentation which has
+            # auto-generated fragment IDs that don't match the link references
+            ".*/protocols/json/.*\\.html"
+            # Exclude undocumented builtins
+            ".*/language/builtins\\.html#builtins-addErrorContext"
+            ".*/language/builtins\\.html#builtins-appendContext"
+          ];
+        };
       };
     };
-  };
 
   meta = {
     platforms = lib.platforms.all;
