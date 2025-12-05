@@ -355,9 +355,9 @@ void completeFlakeRefWithFragment(
             attrPathPrefixes.push_back("");
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
-                auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
+                auto attrPathPrefix = AttrPath::parse(*evalState, attrPathPrefixS);
                 auto attrPathS = attrPathPrefixS + std::string(fragment);
-                auto attrPath = parseAttrPath(*evalState, attrPathS);
+                auto attrPath = AttrPath::parse(*evalState, attrPathS);
 
                 std::string lastAttr;
                 if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
@@ -375,9 +375,7 @@ void completeFlakeRefWithFragment(
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
                         // FIXME: handle names with dots
-                        completions.add(
-                            flakeRefS + "#" + prefixRoot
-                            + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
+                        completions.add(flakeRefS + "#" + prefixRoot + attrPath2.to_string(*evalState));
                     }
                 }
             }
@@ -386,7 +384,7 @@ void completeFlakeRefWithFragment(
                attrpaths. */
             if (fragment.empty()) {
                 for (auto & attrPath : defaultFlakeAttrPaths) {
-                    auto attr = root->findAlongAttrPath(parseAttrPath(*evalState, attrPath));
+                    auto attr = root->findAlongAttrPath(AttrPath::parse(*evalState, attrPath));
                     if (!attr)
                         continue;
                     completions.add(flakeRefS + "#" + prefixRoot);

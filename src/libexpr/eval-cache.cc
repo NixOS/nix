@@ -364,7 +364,7 @@ void AttrCursor::fetchCachedValue()
         throw CachedEvalError(parent->first, parent->second);
 }
 
-std::vector<Symbol> AttrCursor::getAttrPath() const
+AttrPath AttrCursor::getAttrPath() const
 {
     if (parent) {
         auto attrPath = parent->first->getAttrPath();
@@ -374,7 +374,7 @@ std::vector<Symbol> AttrCursor::getAttrPath() const
         return {};
 }
 
-std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
+AttrPath AttrCursor::getAttrPath(Symbol name) const
 {
     auto attrPath = getAttrPath();
     attrPath.push_back(name);
@@ -383,12 +383,12 @@ std::vector<Symbol> AttrCursor::getAttrPath(Symbol name) const
 
 std::string AttrCursor::getAttrPathStr() const
 {
-    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath()));
+    return getAttrPath().to_string(root->state);
 }
 
 std::string AttrCursor::getAttrPathStr(Symbol name) const
 {
-    return dropEmptyInitThenConcatStringsSep(".", root->state.symbols.resolve(getAttrPath(name)));
+    return getAttrPath(name).to_string(root->state);
 }
 
 Value & AttrCursor::forceValue()
@@ -511,7 +511,7 @@ ref<AttrCursor> AttrCursor::getAttr(std::string_view name)
     return getAttr(root->state.symbols.create(name));
 }
 
-OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const std::vector<Symbol> & attrPath)
+OrSuggestions<ref<AttrCursor>> AttrCursor::findAlongAttrPath(const AttrPath & attrPath)
 {
     auto res = shared_from_this();
     for (auto & attr : attrPath) {

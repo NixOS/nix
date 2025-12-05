@@ -618,10 +618,7 @@ struct CmdFlakeCheck : FlakeCommand
                                         };
 
                                         // Build and store the attribute path for error reporting
-                                        AttrPath attrPath;
-                                        attrPath.push_back(AttrName(state->symbols.create(name)));
-                                        attrPath.push_back(AttrName(attr.name));
-                                        attrPath.push_back(AttrName(attr2.name));
+                                        AttrPath attrPath{state->symbols.create(name), attr.name, attr2.name};
                                         attrPathsByDrv[path].push_back(std::move(attrPath));
                                     }
                                 }
@@ -820,10 +817,9 @@ struct CmdFlakeCheck : FlakeCommand
                     auto it = attrPathsByDrv.find(result.path);
                     if (it != attrPathsByDrv.end() && !it->second.empty()) {
                         for (auto & attrPath : it->second) {
-                            auto attrPathStr = showAttrPath(state->symbols, attrPath);
                             reportError(Error(
                                 "failed to build attribute '%s', build of '%s' failed: %s",
-                                attrPathStr,
+                                attrPath.to_string(*state),
                                 result.path.to_string(*store),
                                 failure->errorMsg));
                         }
@@ -1172,7 +1168,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = make_ref<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        std::function<bool(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const Symbol & attr)>
+        std::function<bool(eval_cache::AttrCursor & visitor, const AttrPath & attrPath, const Symbol & attr)>
             hasContent;
 
         // For frameworks it's important that structures are as lazy as possible
@@ -1181,11 +1177,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         // to emit more attributes than strictly (sic) necessary.
         // However, these attributes with empty values are not useful to the user
         // so we omit them.
-        hasContent =
-            [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const Symbol & attr) -> bool {
+        hasContent = [&](eval_cache::AttrCursor & visitor, const AttrPath & attrPath, const Symbol & attr) -> bool {
             auto attrPath2(attrPath);
             attrPath2.push_back(attr);
-            auto attrPathS = state->symbols.resolve(attrPath2);
+            auto attrPathS = attrPath2.resolve(*state);
             const auto & attrName = state->symbols[attr];
 
             auto visitor2 = visitor.getAttr(attrName);
@@ -1225,20 +1220,20 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         std::function<nlohmann::json(
             eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
+            const AttrPath & attrPath,
             const std::string & headerPrefix,
             const std::string & nextPrefix)>
             visit;
 
         visit = [&](eval_cache::AttrCursor & visitor,
-                    const std::vector<Symbol> & attrPath,
+                    const AttrPath & attrPath,
                     const std::string & headerPrefix,
                     const std::string & nextPrefix) -> nlohmann::json {
             auto j = nlohmann::json::object();
 
-            auto attrPathS = state->symbols.resolve(attrPath);
+            auto attrPathS = attrPath.resolve(*state);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPath.to_string(*state)));
 
             try {
                 auto recurse = [&]() {
@@ -1317,8 +1312,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)",
                                     headerPrefix));
                         else {
-                            logger->warn(
-                                fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", attrPath.to_string(*state)));
                         }
                     } else {
                         try {
@@ -1335,8 +1329,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                         headerPrefix));
                             } else {
                                 logger->warn(
-                                    fmt("%s omitted due to use of import from derivation",
-                                        concatStringsSep(".", attrPathS)));
+                                    fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                             }
                         }
                     }
@@ -1354,8 +1347,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL,
                                     headerPrefix));
                         } else {
-                            logger->warn(fmt(
-                                "%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            logger->warn(
+                                fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                         }
                     }
                 }
@@ -1368,7 +1361,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->cout(fmt(
                                 "%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--legacy' to show)", attrPath.to_string(*state)));
                         }
                     } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         if (!json)
@@ -1376,8 +1369,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)",
                                     headerPrefix));
                         else {
-                            logger->warn(
-                                fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", attrPath.to_string(*state)));
                         }
                     } else {
                         try {
@@ -1393,8 +1385,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                         headerPrefix));
                             } else {
                                 logger->warn(
-                                    fmt("%s omitted due to use of import from derivation",
-                                        concatStringsSep(".", attrPathS)));
+                                    fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                             }
                         }
                     }

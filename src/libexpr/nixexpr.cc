@@ -57,7 +57,7 @@ void ExprSelect::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "(";
     e->show(symbols, str);
-    str << ")." << showAttrPath(symbols, getAttrPath());
+    str << ")." << showAttrSelectionPath(symbols, getAttrPath());
     if (def) {
         str << " or (";
         def->show(symbols, str);
@@ -69,7 +69,7 @@ void ExprOpHasAttr::show(const SymbolTable & symbols, std::ostream & str) const
 {
     str << "((";
     e->show(symbols, str);
-    str << ") ? " << showAttrPath(symbols, attrPath) << ")";
+    str << ") ? " << showAttrSelectionPath(symbols, attrPath) << ")";
 }
 
 void ExprAttrs::showBindings(const SymbolTable & symbols, std::ostream & str) const
@@ -261,7 +261,7 @@ void ExprPos::show(const SymbolTable & symbols, std::ostream & str) const
     str << "__curPos";
 }
 
-std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath)
+std::string showAttrSelectionPath(const SymbolTable & symbols, std::span<const AttrName> attrPath)
 {
     std::ostringstream out;
     bool first = true;

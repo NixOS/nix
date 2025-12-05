@@ -163,20 +163,25 @@ struct ParserState
     static constexpr Expr::AstSymbols s = StaticEvalSymbols::create().exprSymbols;
     const EvalSettings & settings;
 
-    void dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos);
+    void dupAttr(const AttrSelectionPath & attrPath, const PosIdx pos, const PosIdx prevPos);
     void dupAttr(Symbol attr, const PosIdx pos, const PosIdx prevPos);
     void addAttr(
-        ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc);
-    void addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
+        ExprAttrs * attrs,
+        AttrSelectionPath && attrPath,
+        const ParserLocation & loc,
+        Expr * e,
+        const ParserLocation & exprLoc);
+    void addAttr(ExprAttrs * attrs, AttrSelectionPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
     void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es);
     PosIdx at(const ParserLocation & loc);
 };
 
-inline void ParserState::dupAttr(const AttrPath & attrPath, const PosIdx pos, const PosIdx prevPos)
+inline void ParserState::dupAttr(const AttrSelectionPath & attrPath, const PosIdx pos, const PosIdx prevPos)
 {
     throw ParseError(
-        {.msg = HintFmt("attribute '%1%' already defined at %2%", showAttrPath(symbols, attrPath), positions[prevPos]),
+        {.msg = HintFmt(
+             "attribute '%1%' already defined at %2%", showAttrSelectionPath(symbols, attrPath), positions[prevPos]),
          .pos = positions[pos]});
 }
 
@@ -188,9 +193,13 @@ inline void ParserState::dupAttr(Symbol attr, const PosIdx pos, const PosIdx pre
 }
 
 inline void ParserState::addAttr(
-    ExprAttrs * attrs, AttrPath && attrPath, const ParserLocation & loc, Expr * e, const ParserLocation & exprLoc)
+    ExprAttrs * attrs,
+    AttrSelectionPath && attrPath,
+    const ParserLocation & loc,
+    Expr * e,
+    const ParserLocation & exprLoc)
 {
-    AttrPath::iterator i;
+    AttrSelectionPath::iterator i;
     // All attrpaths have at least one attr
     assert(!attrPath.empty());
     auto pos = at(loc);
@@ -236,7 +245,7 @@ inline void ParserState::addAttr(
  * symbol as its last element.
  */
 inline void
-ParserState::addAttr(ExprAttrs * attrs, AttrPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def)
+ParserState::addAttr(ExprAttrs * attrs, AttrSelectionPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def)
 {
     ExprAttrs::AttrDefs::iterator j = attrs->attrs->find(symbol);
     if (j != attrs->attrs->end()) {
