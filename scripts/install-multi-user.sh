@@ -112,6 +112,14 @@ is_os_freebsd() {
     fi
 }
 
+is_cp_busybox() {
+    if [ "$(cp --help 2>&1 | awk '{print $1; exit}')" = "BusyBox" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contact_us() {
     echo "You can open an issue at"
     echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
@@ -855,7 +863,7 @@ install_from_extracted_nix() {
     (
         cd "$EXTRACTED_NIX_PATH"
 
-        if is_os_darwin || is_os_freebsd; then
+        if is_os_darwin || is_os_freebsd || is_cp_busybox; then
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
                   cp -RPp ./store/* "$NIX_ROOT/store/"
         else
