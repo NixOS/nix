@@ -12,10 +12,7 @@ stdenv.mkDerivation {
 
   src = lib.fileset.toSource {
     root = ./.;
-    fileset = lib.fileset.unions [
-      ./source/_redirects
-      ./redirects.json
-    ];
+    fileset = ./redirects.json;
   };
 
   nativeBuildInputs = [ jq ];
@@ -28,22 +25,6 @@ stdenv.mkDerivation {
       echo '<html><head><title>Nix Manual Redirect Targets</title></head><body>'
       echo '<h1>Redirect Targets to Check</h1>'
       echo '<p>This document contains all redirect targets from the Nix manual.</p>'
-
-      echo '<h2>Server-side redirects (from _redirects)</h2>'
-      echo '<ul>'
-
-      # Extract targets from _redirects file (second field, skip comments and empty lines)
-      grep -v '^#' source/_redirects | grep -v '^$' | while read -r source target code; do
-        # Handle splat patterns by converting to a concrete example
-        if [[ "$target" == *":splat"* ]]; then
-          target="''${target//:splat/example}"
-        fi
-        # Remove leading slash for relative path
-        target="''${target#/}"
-        echo "<li><a href=\"$target\">$target</a> (from $source)</li>"
-      done
-
-      echo '</ul>'
 
       echo '<h2>Client-side redirects (from redirects.json)</h2>'
       echo '<ul>'
