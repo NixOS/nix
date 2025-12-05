@@ -454,11 +454,9 @@ std::string S3BinaryCacheStoreConfig::getHumanReadableURI() const
 
 std::string S3BinaryCacheStoreConfig::doc()
 {
-    return R"(
-        **Store URL format**: `s3://bucket-name`
-
-        This store allows reading and writing a binary cache stored in an AWS S3 bucket.
-    )";
+    return
+#include "s3-binary-cache-store.md"
+        ;
 }
 
 ref<Store> S3BinaryCacheStoreConfig::openStore() const
