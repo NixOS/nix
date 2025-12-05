@@ -15,7 +15,7 @@ In the development shell, set the `mesonBuildType` environment variable to `debu
 Then, proceed to build Nix as described in [Building Nix](./building.md).
 This will build Nix with debug symbols, which are essential for effective debugging.
 
-It is also possible to build without debugging for faster build:
+It is also possible to build without optimization for faster build:
 
 ```console
 [nix-shell]$ NIX_HARDENING_ENABLE=$(printLines $NIX_HARDENING_ENABLE | grep -v fortify)

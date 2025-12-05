@@ -1,0 +1,69 @@
+{
+  "additionalSandboxProfile": "sandcastle",
+  "allowLocalNetworking": true,
+  "allowSubstitutes": false,
+  "exportReferencesGraph": {
+    "refs1": [
+      {
+        "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+        "output": "out"
+      }
+    ],
+    "refs2": [
+      "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
+    ]
+  },
+  "impureEnvVars": [
+    "UNICORN"
+  ],
+  "impureHostDeps": [
+    "/usr/bin/ditto"
+  ],
+  "noChroot": true,
+  "outputChecks": {
+    "forAllOutputs": {
+      "allowedReferences": [
+        {
+          "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+          "output": "out"
+        }
+      ],
+      "allowedRequisites": [
+        {
+          "drvPath": "self",
+          "output": "bin"
+        },
+        {
+          "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+          "output": "dev"
+        }
+      ],
+      "disallowedReferences": [
+        {
+          "drvPath": "self",
+          "output": "dev"
+        },
+        {
+          "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+          "output": "out"
+        }
+      ],
+      "disallowedRequisites": [
+        {
+          "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+          "output": "dev"
+        }
+      ],
+      "ignoreSelfRefs": true,
+      "maxClosureSize": null,
+      "maxSize": null
+    }
+  },
+  "passAsFile": [],
+  "preferLocalBuild": true,
+  "requiredSystemFeatures": [
+    "rainbow",
+    "uid-range"
+  ],
+  "unsafeDiscardReferences": {}
+}

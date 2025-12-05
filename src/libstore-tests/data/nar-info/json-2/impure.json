@@ -1,0 +1,36 @@
+{
+  "ca": {
+    "hash": {
+      "algorithm": "sha256",
+      "format": "base16",
+      "hash": "10c209fa0890fe02c85a8c663ca8e7a37cc766bc5b1b29a0cc61b266f64121d3"
+    },
+    "method": "nar"
+  },
+  "compression": "xz",
+  "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+  "downloadHash": {
+    "algorithm": "sha256",
+    "format": "base16",
+    "hash": "15e3c560894cbb27085cf65b5a2ecb18488c999497f4531b6907a7581ce6d527"
+  },
+  "downloadSize": 4029176,
+  "narHash": {
+    "algorithm": "sha256",
+    "format": "base16",
+    "hash": "15e3c560894cbb27085cf65b5a2ecb18488c999497f4531b6907a7581ce6d527"
+  },
+  "narSize": 34878,
+  "references": [
+    "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+    "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
+  ],
+  "registrationTime": 23423,
+  "signatures": [
+    "asdf",
+    "qwer"
+  ],
+  "ultimate": true,
+  "url": "nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz",
+  "version": 2
+}

@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <filesystem>
+
 #include "nix/util/types.hh"
 
 #ifndef _WIN32
@@ -15,43 +17,43 @@ std::string getUserName();
 /**
  * @return the given user's home directory from /etc/passwd.
  */
-Path getHomeOf(uid_t userId);
+std::filesystem::path getHomeOf(uid_t userId);
 #endif
 
 /**
  * @return $HOME or the user's home directory from /etc/passwd.
  */
-Path getHome();
+std::filesystem::path getHome();
 
 /**
  * @return $NIX_CACHE_HOME or $XDG_CACHE_HOME/nix or $HOME/.cache/nix.
  */
-Path getCacheDir();
+std::filesystem::path getCacheDir();
 
 /**
  * @return $NIX_CONFIG_HOME or $XDG_CONFIG_HOME/nix or $HOME/.config/nix.
  */
-Path getConfigDir();
+std::filesystem::path getConfigDir();
 
 /**
  * @return the directories to search for user configuration files
  */
-std::vector<Path> getConfigDirs();
+std::vector<std::filesystem::path> getConfigDirs();
 
 /**
  * @return $NIX_DATA_HOME or $XDG_DATA_HOME/nix or $HOME/.local/share/nix.
  */
-Path getDataDir();
+std::filesystem::path getDataDir();
 
 /**
  * @return $NIX_STATE_HOME or $XDG_STATE_HOME/nix or $HOME/.local/state/nix.
  */
-Path getStateDir();
+std::filesystem::path getStateDir();
 
 /**
  * Create the Nix state directory and return the path to it.
  */
-Path createNixStateDir();
+std::filesystem::path createNixStateDir();
 
 /**
  * Perform tilde expansion on a path, replacing tilde with the user's

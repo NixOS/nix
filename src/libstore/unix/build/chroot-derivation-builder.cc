@@ -58,7 +58,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        auto chrootParentDir = store.Store::toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = store.toRealPath(drvPath) + ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */
@@ -171,7 +171,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
                     continue;
                 if (buildMode != bmCheck && status.known->isValid())
                     continue;
-                auto p = store.Store::toRealPath(status.known->path);
+                auto p = store.toRealPath(status.known->path);
                 if (pathExists(chrootRootDir + p))
                     std::filesystem::rename((chrootRootDir + p), p);
             }
@@ -185,7 +185,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         debug("materialising '%s' in the sandbox", store.printStorePath(path));
 
-        Path source = store.Store::toRealPath(path);
+        Path source = store.toRealPath(path);
         Path target = chrootRootDir + store.printStorePath(path);
 
         if (pathExists(target)) {

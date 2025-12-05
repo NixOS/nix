@@ -135,7 +135,7 @@ struct LockedFlake
      */
     std::map<ref<Node>, SourcePath> nodePaths;
 
-    std::optional<Fingerprint> getFingerprint(ref<Store> store, const fetchers::Settings & fetchSettings) const;
+    std::optional<Fingerprint> getFingerprint(Store & store, const fetchers::Settings & fetchSettings) const;
 };
 
 struct LockFlags
@@ -200,7 +200,7 @@ struct LockFlags
     /**
      * The path to a lock file to write to instead of the `flake.lock` file in the top-level flake
      */
-    std::optional<Path> outputLockFilePath;
+    std::optional<std::filesystem::path> outputLockFilePath;
 
     /**
      * Flake inputs to be overridden.

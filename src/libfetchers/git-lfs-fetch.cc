@@ -209,7 +209,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     auto url = api.endpoint + "/objects/batch";
     const auto & authHeader = api.authHeader;
     FileTransferRequest request(parseURL(url));
-    request.method = HttpMethod::POST;
+    request.method = HttpMethod::Post;
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
@@ -219,7 +219,9 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     nlohmann::json oidList = pointerToPayload(pointers);
     nlohmann::json data = {{"operation", "download"}};
     data["objects"] = oidList;
-    request.data = data.dump();
+    auto payload = data.dump();
+    StringSource source{payload};
+    request.data = {source};
 
     FileTransferResult result = getFileTransfer()->upload(request);
     auto responseString = result.data;
@@ -266,10 +268,10 @@ void Fetch::fetch(
         return;
     }
 
-    Path cacheDir = getCacheDir() + "/git-lfs";
+    std::filesystem::path cacheDir = getCacheDir() / "git-lfs";
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
-    Path cachePath = cacheDir + "/" + key;
+    std::filesystem::path cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
         sink(readFile(cachePath));
@@ -300,8 +302,8 @@ void Fetch::fetch(
         downloadToSink(ourl, authHeader, sink, sha256, size);
 
         debug("creating cache entry %s -> %s", key, cachePath);
-        if (!pathExists(dirOf(cachePath)))
-            createDirs(dirOf(cachePath));
+        if (!pathExists(cachePath.parent_path()))
+            createDirs(cachePath.parent_path());
         writeFile(cachePath, sink.s);
 
         debug("%s fetched with git-lfs", pointerFilePath);

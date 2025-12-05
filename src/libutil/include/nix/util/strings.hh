@@ -166,4 +166,10 @@ public:
     }
 };
 
+/**
+ * Check that the string does not contain any NUL bytes and return c_str().
+ * @throws Error if str contains '\0' bytes.
+ */
+const char * requireCString(const std::string & str);
+
 } // namespace nix

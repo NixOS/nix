@@ -187,7 +187,7 @@ Currently the `type` attribute can be one of the following:
   * `nixpkgs/nixos-unstable/a3a3dda3bacf61e8a39258a0ed9c924eeca8e293`
   * `sub/dir` (if a flake named `sub` is in the registry)
 
-* <a name="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
+* <a id="path-fetcher"></a>`path`: arbitrary local directories. The required attribute `path`
   specifies the path of the flake. The URL form is
 
   ```

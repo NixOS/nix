@@ -21,13 +21,19 @@ schema_dir = meson.current_source_dir() / 'schema'
 # Get all example files
 schemas = [
   {
+    'stem' : 'file-system-object',
+    'schema' : schema_dir / 'file-system-object-v1.yaml',
+    'files' : [
+      'simple.json',
+      'complex.json',
+    ],
+  },
+  {
     'stem' : 'hash',
     'schema' : schema_dir / 'hash-v1.yaml',
     'files' : [
-      'sha256-base64.json',
       'sha256-base16.json',
-      'sha256-nix32.json',
-      'blake3-base64.json',
+      'blake3-base16.json',
     ],
   },
   {
@@ -46,34 +52,173 @@ schemas = [
     ],
   },
   {
-    'stem' : 'derivation',
-    'schema' : schema_dir / 'derivation-v3.yaml',
-    'files' : [
-      'dyn-dep-derivation.json',
-      'simple-derivation.json',
-    ],
-  },
-  # # Not sure how to make subschema work
-  # {
-  #   'stem': 'derivation',
-  #   'schema': schema_dir / 'derivation-v3.yaml#output',
-  #   'files' : [
-  #     'output-caFixedFlat.json',
-  #     'output-caFixedNAR.json',
-  #     'output-caFixedText.json',
-  #     'output-caFloating.json',
-  #     'output-deferred.json',
-  #     'output-impure.json',
-  #     'output-inputAddressed.json',
-  #   ],
-  # },
-  {
     'stem' : 'deriving-path',
     'schema' : schema_dir / 'deriving-path-v1.yaml',
     'files' : [
       'single_opaque.json',
       'single_built.json',
       'single_built_built.json',
+    ],
+  },
+  {
+    'stem' : 'build-trace-entry',
+    'schema' : schema_dir / 'build-trace-entry-v1.yaml',
+    'files' : [
+      'simple.json',
+      'with-dependent-realisations.json',
+      'with-signature.json',
+    ],
+  },
+  {
+    'stem' : 'derivation-options',
+    'schema' : schema_dir / 'derivation-options-v1.yaml',
+    'files' : [
+      'ia' / 'defaults.json',
+      'ia' / 'all_set.json',
+      'ia' / 'structuredAttrs_defaults.json',
+      'ia' / 'structuredAttrs_all_set.json',
+      'ca' / 'all_set.json',
+      'ca' / 'structuredAttrs_all_set.json',
+    ],
+  },
+]
+
+# Derivation and Derivation output
+schemas += [
+  # Match overall
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml',
+    'files' : [
+      'dyn-dep-derivation.json',
+      'simple-derivation.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/overall',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+      'output-caFloating.json',
+      'output-deferred.json',
+      'output-impure.json',
+      'output-inputAddressed.json',
+    ],
+  },
+  # Match exact variant
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/inputAddressed',
+    'files' : [
+      'output-inputAddressed.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFixed',
+    'files' : [
+      'output-caFixedFlat.json',
+      'output-caFixedNAR.json',
+      'output-caFixedText.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/caFloating',
+    'files' : [
+      'output-caFloating.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/deferred',
+    'files' : [
+      'output-deferred.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-v4.yaml#/$defs/output/impure',
+    'files' : [
+      'output-impure.json',
+    ],
+  },
+]
+
+# Store object info
+schemas += [
+  # Match overall
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
+    'files' : [
+      'json-2' / 'pure.json',
+      'json-2' / 'impure.json',
+      'json-2' / 'empty_pure.json',
+      'json-2' / 'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml',
+    'files' : [
+      'json-2' / 'pure.json',
+      'json-2' / 'impure.json',
+    ],
+  },
+  {
+    'stem' : 'build-result',
+    'schema' : schema_dir / 'build-result-v1.yaml',
+    'files' : [
+      'success.json',
+      'output-rejected.json',
+      'not-deterministic.json',
+    ],
+  },
+  # Match exact variant
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
+    'files' : [
+      'json-2' / 'pure.json',
+      'json-2' / 'empty_pure.json',
+    ],
+  },
+  {
+    'stem' : 'store-object-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/impure',
+    'files' : [
+      'json-2' / 'impure.json',
+      'json-2' / 'empty_impure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/base',
+    'files' : [
+      'json-2' / 'pure.json',
+    ],
+  },
+  {
+    'stem' : 'nar-info',
+    'schema' : schema_dir / 'store-object-info-v2.yaml#/$defs/narInfo',
+    'files' : [
+      'json-2' / 'impure.json',
+    ],
+  },
+]
+
+# Dummy store
+schemas += [
+  {
+    'stem' : 'store',
+    'schema' : schema_dir / 'store-v1.yaml',
+    'files' : [
+      'empty.json',
+      'one-flat-file.json',
+      'one-derivation.json',
     ],
   },
 ]

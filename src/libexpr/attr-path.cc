@@ -1,5 +1,6 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
 
@@ -30,12 +31,22 @@ static Strings parseAttrPath(std::string_view s)
     return res;
 }
 
-std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s)
+AttrPath AttrPath::parse(EvalState & state, std::string_view s)
 {
-    std::vector<Symbol> res;
+    AttrPath res;
     for (auto & a : parseAttrPath(s))
         res.push_back(state.symbols.create(a));
     return res;
+}
+
+std::string AttrPath::to_string(EvalState & state) const
+{
+    return dropEmptyInitThenConcatStringsSep(".", state.symbols.resolve({*this}));
+}
+
+std::vector<SymbolStr> AttrPath::resolve(EvalState & state) const
+{
+    return state.symbols.resolve({*this});
 }
 
 std::pair<Value *, PosIdx>

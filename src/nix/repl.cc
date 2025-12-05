@@ -11,7 +11,7 @@
 
 namespace nix {
 
-void runNix(Path program, const Strings & args, const std::optional<std::string> & input = {})
+void runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input = {})
 {
     auto subprocessEnv = getEnv();
     subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();

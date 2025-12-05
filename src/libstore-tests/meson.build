@@ -54,10 +54,12 @@ deps_private += gtest
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
   'derivation-advanced-attrs.cc',
-  'derivation.cc',
+  'derivation/external-formats.cc',
+  'derivation/invariants.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',

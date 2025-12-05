@@ -32,7 +32,7 @@ standard input.
 
 - `--add-root` *path*
 
-  See the [corresponding option](nix-store.md) in `nix-store`.
+  See the [corresponding option](./nix-store.md) in `nix-store`.
 
 - `--parse`
 

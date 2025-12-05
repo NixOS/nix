@@ -234,10 +234,6 @@ struct DerivedPath : _DerivedPathRaw
         return static_cast<const Raw &>(*this);
     }
 
-    bool operator==(const DerivedPath &) const = default;
-    // TODO libc++ 16 (used by darwin) missing `std::set::operator <=>`, can't do yet.
-    // auto operator <=> (const DerivedPath &) const = default;
-
     /**
      * Get the store path this is ultimately derived from (by realising
      * and projecting outputs).

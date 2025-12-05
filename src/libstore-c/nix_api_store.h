@@ -12,6 +12,8 @@
  */
 
 #include "nix_api_util.h"
+#include "nix_api_store/store_path.h"
+#include "nix_api_store/derivation.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -21,10 +23,6 @@ extern "C" {
 
 /** @brief Reference to a Nix store */
 typedef struct Store Store;
-/** @brief Nix store path */
-typedef struct StorePath StorePath;
-/** @brief Nix Derivation */
-typedef struct nix_derivation nix_derivation;
 
 /**
  * @brief Initializes the Nix store library
@@ -108,7 +106,7 @@ nix_err
 nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_callback callback, void * user_data);
 
 /**
- * @brief Parse a Nix store path into a StorePath
+ * @brief Parse a Nix store path that includes the store dir into a StorePath
  *
  * @note Don't forget to free this path using nix_store_path_free()!
  * @param[out] context Optional, stores error information
@@ -117,30 +115,6 @@ nix_store_get_storedir(nix_c_context * context, Store * store, nix_get_string_ca
  * @return owned store path, NULL on error
  */
 StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const char * path);
-
-/**
- * @brief Get the path name (e.g. "name" in /nix/store/...-name)
- *
- * @param[in] store_path the path to get the name from
- * @param[in] callback called with the name
- * @param[in] user_data arbitrary data, passed to the callback when it's called.
- */
-void nix_store_path_name(const StorePath * store_path, nix_get_string_callback callback, void * user_data);
-
-/**
- * @brief Copy a StorePath
- *
- * @param[in] p the path to copy
- * @return a new StorePath
- */
-StorePath * nix_store_path_clone(const StorePath * p);
-
-/** @brief Deallocate a StorePath
- *
- * Does not fail.
- * @param[in] p the path to free
- */
-void nix_store_path_free(StorePath * p);
 
 /**
  * @brief Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in
@@ -214,9 +188,16 @@ nix_store_get_version(nix_c_context * context, Store * store, nix_get_string_cal
 /**
  * @brief Create a `nix_derivation` from a JSON representation of that derivation.
  *
+ * @note Unlike `nix_derivation_to_json`, this needs a `Store`. This is because
+ * over time we expect the internal representation of derivations in Nix to
+ * differ from accepted derivation formats. The store argument is here to help
+ * any logic needed to convert from JSON to the internal representation, in
+ * excess of just parsing.
+ *
  * @param[out] context Optional, stores error information.
  * @param[in] store nix store reference.
  * @param[in] json JSON of the derivation as a string.
+ * @return A new derivation, or NULL on error. Free with `nix_derivation_free` when done using the `nix_derivation`.
  */
 nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store, const char * json);
 
@@ -228,14 +209,6 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
  * @param[in] derivation nix_derivation to insert into the given store.
  */
 StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation);
-
-/**
- * @brief Deallocate a `nix_derivation`
- *
- * Does not fail.
- * @param[in] drv the derivation to free
- */
-void nix_derivation_free(nix_derivation * drv);
 
 /**
  * @brief Copy the closure of `path` from `srcStore` to `dstStore`.
@@ -275,6 +248,16 @@ nix_err nix_store_get_fs_closure(
     bool include_derivers,
     void * userdata,
     void (*callback)(nix_c_context * context, void * userdata, const StorePath * store_path));
+
+/**
+ * @brief Returns the derivation associated with the store path
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store The nix store
+ * @param[in] path The nix store path
+ * @return A new derivation, or NULL on error. Free with `nix_derivation_free` when done using the `nix_derivation`.
+ */
+nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * store, const StorePath * path);
 
 // cffi end
 #ifdef __cplusplus

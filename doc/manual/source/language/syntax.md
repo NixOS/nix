@@ -51,7 +51,7 @@ See [String literals](string-literals.md).
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
-  [interpolated into other expressions]: ./string-interpolation.md#interpolated-expressions
+  [interpolated into other expressions]: ./string-interpolation.md#interpolated-expression
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 
@@ -235,7 +235,7 @@ of object-oriented programming, for example.
 
 ## Recursive sets
 
-Recursive sets are like normal [attribute sets](./types.md#attribute-set), but the attributes can refer to each other.
+Recursive sets are like normal [attribute sets](./types.md#type-attrs), but the attributes can refer to each other.
 
 > *rec-attrset* = `rec {` [ *name* `=` *expr* `;` `]`... `}`
 
@@ -287,7 +287,7 @@ This evaluates to `"foobar"`.
 
 ## Inheriting attributes
 
-When defining an [attribute set](./types.md#attribute-set) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
+When defining an [attribute set](./types.md#type-attrs) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
 This can be shortened using the `inherit` keyword.
 
 Example:

@@ -4,7 +4,6 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
-#include "nix/util/compression.hh"
 
 namespace nix {
 
@@ -121,7 +120,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
 
     try {
         FileTransferRequest request(makeRequest(path));
-        request.method = HttpMethod::HEAD;
+        request.method = HttpMethod::Head;
         getFileTransfer()->download(request);
         return true;
     } catch (FileTransferError & e) {
@@ -134,30 +133,42 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
     }
 }
 
-void HttpBinaryCacheStore::upsertFile(
-    const std::string & path,
-    std::shared_ptr<std::basic_iostream<char>> istream,
-    const std::string & mimeType,
-    uint64_t sizeHint)
+void HttpBinaryCacheStore::upload(
+    std::string_view path,
+    RestartableSource & source,
+    uint64_t sizeHint,
+    std::string_view mimeType,
+    std::optional<Headers> headers)
 {
     auto req = makeRequest(path);
+    req.method = HttpMethod::Put;
 
-    auto data = StreamToSourceAdapter(istream).drain();
-
-    auto compressionMethod = getCompressionMethod(path);
-
-    if (compressionMethod) {
-        data = compress(*compressionMethod, data);
-        req.headers.emplace_back("Content-Encoding", *compressionMethod);
+    if (headers) {
+        req.headers.reserve(req.headers.size() + headers->size());
+        std::ranges::move(std::move(*headers), std::back_inserter(req.headers));
     }
 
-    req.data = std::move(data);
+    req.data = {sizeHint, source};
     req.mimeType = mimeType;
 
+    getFileTransfer()->upload(req);
+}
+
+void HttpBinaryCacheStore::upsertFile(
+    const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
+{
     try {
-        getFileTransfer()->upload(req);
+        if (auto compressionMethod = getCompressionMethod(path)) {
+            CompressedSource compressed(source, *compressionMethod);
+            Headers headers = {{"Content-Encoding", *compressionMethod}};
+            upload(path, compressed, compressed.size(), mimeType, std::move(headers));
+        } else {
+            upload(path, source, sizeHint, mimeType, std::nullopt);
+        }
     } catch (FileTransferError & e) {
-        throw UploadToHTTP("while uploading to HTTP binary cache at '%s': %s", config->cacheUri.to_string(), e.msg());
+        UploadToHTTP err(e.message());
+        err.addTrace({}, "while uploading to HTTP binary cache at '%s'", config->cacheUri.to_string());
+        throw err;
     }
 }
 

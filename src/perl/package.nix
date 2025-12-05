@@ -45,11 +45,6 @@ perl.pkgs.toPerlModule (
 
     buildInputs = [
       nix-store
-    ]
-    ++ finalAttrs.passthru.externalBuildInputs;
-
-    # Hack for sake of the dev shell
-    passthru.externalBuildInputs = [
       bzip2
       libsodium
     ];
@@ -79,5 +74,9 @@ perl.pkgs.toPerlModule (
     ];
 
     strictDeps = false;
+
+    meta = {
+      platforms = lib.platforms.unix;
+    };
   })
 )

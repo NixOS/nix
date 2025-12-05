@@ -64,16 +64,17 @@ std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-FlakeRef FlakeRef::resolve(ref<Store> store, fetchers::UseRegistries useRegistries) const
+FlakeRef
+FlakeRef::resolve(const fetchers::Settings & fetchSettings, Store & store, fetchers::UseRegistries useRegistries) const
 {
-    auto [input2, extraAttrs] = lookupInRegistries(store, input, useRegistries);
+    auto [input2, extraAttrs] = lookupInRegistries(fetchSettings, store, input, useRegistries);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 
 FlakeRef parseFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir,
+    const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
     bool preserveRelativePaths)
@@ -100,7 +101,7 @@ fromParsedURL(const fetchers::Settings & fetchSettings, ParsedURL && parsedURL, 
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir,
+    const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
     bool preserveRelativePaths)
@@ -109,7 +110,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 
     std::smatch match;
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
-    assert(succeeds);
+    if (!succeeds)
+        throw Error("invalid flakeref '%s'", url);
     auto path = match[1].str();
     auto query = decodeQuery(match[3].str(), /*lenient=*/true);
     auto fragment = percentDecode(match[5].str());
@@ -119,7 +121,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
            to 'baseDir'). If so, search upward to the root of the
            repo (i.e. the directory containing .git). */
 
-        path = absPath(path, baseDir, true);
+        path = absPath(path, baseDir->string(), true);
 
         if (isFlake) {
 
@@ -241,7 +243,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
 std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir,
+    const std::optional<std::filesystem::path> & baseDir,
     bool isFlake)
 {
     try {
@@ -250,7 +252,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
             /* Here we know that the path must not contain encoded '/' or NUL bytes. */
             auto path = renderUrlPathEnsureLegal(parsed.path);
             if (!isAbsolute(path))
-                parsed.path = splitString<std::vector<std::string>>(absPath(path, *baseDir), "/");
+                parsed.path = splitString<std::vector<std::string>>(absPath(path, baseDir->string()), "/");
         }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
@@ -261,7 +263,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir,
+    const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
     bool preserveRelativePaths)
@@ -286,9 +288,10 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Settings & fetchSettings, const fet
         fetchers::maybeGetStrAttr(attrs, "dir").value_or(""));
 }
 
-std::pair<ref<SourceAccessor>, FlakeRef> FlakeRef::lazyFetch(ref<Store> store) const
+std::pair<ref<SourceAccessor>, FlakeRef>
+FlakeRef::lazyFetch(const fetchers::Settings & fetchSettings, Store & store) const
 {
-    auto [accessor, lockedInput] = input.getAccessor(store);
+    auto [accessor, lockedInput] = input.getAccessor(fetchSettings, store);
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};
 }
 
@@ -344,7 +347,7 @@ FlakeRef FlakeRef::canonicalize() const
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
     const std::string & url,
-    const std::optional<Path> & baseDir,
+    const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake)
 {

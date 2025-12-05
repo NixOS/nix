@@ -24,7 +24,7 @@ jobs:
   eval:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -40,7 +40,7 @@ jobs:
     name: pre-commit checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/install-nix-action
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -87,7 +87,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -125,13 +125,13 @@ jobs:
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: coverage-reports
         path: coverage-reports/
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: installer-${{matrix.os}}
         path: out/*
@@ -162,9 +162,9 @@ jobs:
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Download installer tarball
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: installer-${{matrix.os}}
         path: out
@@ -174,7 +174,7 @@ jobs:
         echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
         TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
         echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31.5.1
+    - uses: cachix/install-nix-action@0b0e072294b088b73964f1d72dfdac0951439dbd # v31.8.4
       if: ${{ !matrix.experimental-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
@@ -227,7 +227,7 @@ jobs:
       github.ref_name == 'master'
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -276,14 +276,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout flake-regressions
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
@@ -303,7 +303,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref_name == 'master'
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action

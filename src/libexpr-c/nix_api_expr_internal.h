@@ -39,7 +39,13 @@ struct ListBuilder
 
 struct nix_value
 {
-    nix::Value value;
+    nix::Value * value;
+    /**
+     * As we move to a managed heap, we need EvalMemory in more places. Ideally, we would take in EvalState or
+     * EvalMemory as an argument when we need it, but we don't want to make changes to the stable C api, so we stuff it
+     * into the nix_value that will get passed in to the relevant functions.
+     */
+    nix::EvalMemory * mem;
 };
 
 struct nix_string_return

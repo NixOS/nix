@@ -24,11 +24,9 @@ void computeClosure(const set<T> startElts, set<T> & res, GetEdgesAsync<T> getEd
 
     Sync<State> state_(State{0, res, 0});
 
-    std::function<void(const T &)> enqueue;
-
     std::condition_variable done;
 
-    enqueue = [&](const T & current) -> void {
+    auto enqueue = [&](this auto & enqueue, const T & current) -> void {
         {
             auto state(state_.lock());
             if (state->exc)

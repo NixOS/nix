@@ -8,7 +8,8 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/json-impls.hh"
-#include "nix/store/path.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/store/downstream-placeholder.hh"
 
 namespace nix {
 
@@ -16,6 +17,9 @@ class Store;
 struct StoreDirConfig;
 struct BasicDerivation;
 struct StructuredAttrs;
+
+template<typename V>
+struct DerivedPathMap;
 
 /**
  * This represents all the special options on a `Derivation`.
@@ -34,6 +38,7 @@ struct StructuredAttrs;
  * separately. That would be nice to separate concerns, and not make any
  * environment variable names magical.
  */
+template<typename Input>
 struct DerivationOptions
 {
     struct OutputChecks
@@ -41,13 +46,15 @@ struct DerivationOptions
         bool ignoreSelfRefs = false;
         std::optional<uint64_t> maxSize, maxClosureSize;
 
+        using DrvRef = nix::DrvRef<Input>;
+
         /**
          * env: allowedReferences
          *
          * A value of `nullopt` indicates that the check is skipped.
          * This means that all references are allowed.
          */
-        std::optional<StringSet> allowedReferences;
+        std::optional<std::set<DrvRef>> allowedReferences;
 
         /**
          * env: disallowedReferences
@@ -55,21 +62,21 @@ struct DerivationOptions
          * No needed for `std::optional`, because skipping the check is
          * the same as disallowing the references.
          */
-        StringSet disallowedReferences;
+        std::set<DrvRef> disallowedReferences;
 
         /**
          * env: allowedRequisites
          *
          * See `allowedReferences`
          */
-        std::optional<StringSet> allowedRequisites;
+        std::optional<std::set<DrvRef>> allowedRequisites;
 
         /**
          * env: disallowedRequisites
          *
          * See `disallowedReferences`
          */
-        StringSet disallowedRequisites;
+        std::set<DrvRef> disallowedRequisites;
 
         bool operator==(const OutputChecks &) const = default;
     };
@@ -116,23 +123,7 @@ struct DerivationOptions
      * attributes give to the builder. The set of paths in the original JSON
      * is replaced with a list of `PathInfo` in JSON format.
      */
-    std::map<std::string, StringSet> exportReferencesGraph;
-
-    /**
-     * Once a derivations is resolved, the strings in in
-     * `exportReferencesGraph` should all be store paths (with possible
-     * suffix paths, but those are discarded).
-     *
-     * @return The parsed path set for for each key in the map.
-     *
-     * @todo Ideally, `exportReferencesGraph` would just store
-     * `StorePath`s for this, but we can't just do that, because for CA
-     * derivations they is actually in general `DerivedPath`s (via
-     * placeholder strings) until the derivation is resolved and exact
-     * inputs store paths are known. We can use better types for that
-     * too, but that is a longer project.
-     */
-    std::map<std::string, StorePathSet> getParsedExportReferencesGraph(const StoreDirConfig & store) const;
+    std::map<std::string, std::set<Input>> exportReferencesGraph;
 
     /**
      * env: __sandboxProfile
@@ -186,18 +177,6 @@ struct DerivationOptions
     bool operator==(const DerivationOptions &) const = default;
 
     /**
-     * Parse this information from its legacy encoding as part of the
-     * environment. This should not be used with nice greenfield formats
-     * (e.g. JSON) but is necessary for supporting old formats (e.g.
-     * ATerm).
-     */
-    static DerivationOptions
-    fromStructuredAttrs(const StringMap & env, const StructuredAttrs * parsed, bool shouldWarn = true);
-
-    static DerivationOptions
-    fromStructuredAttrs(const StringMap & env, const std::optional<StructuredAttrs> & parsed, bool shouldWarn = true);
-
-    /**
      * @param drv Must be the same derivation we parsed this from. In
      * the future we'll flip things around so a `BasicDerivation` has
      * `DerivationOptions` instead.
@@ -222,7 +201,49 @@ struct DerivationOptions
     bool useUidRange(const BasicDerivation & drv) const;
 };
 
+extern template struct DerivationOptions<StorePath>;
+extern template struct DerivationOptions<SingleDerivedPath>;
+
+struct DerivationOutput;
+
+/**
+ * Parse this information from its legacy encoding as part of the
+ * environment. This should not be used with nice greenfield formats
+ * (e.g. JSON) but is necessary for supporting old formats (e.g.
+ * ATerm).
+ */
+DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
+    const StoreDirConfig & store,
+    const DerivedPathMap<StringSet> & inputDrvs,
+    const StringMap & env,
+    const StructuredAttrs * parsed,
+    bool shouldWarn = true,
+    const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
+
+DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
+    const StoreDirConfig & store,
+    const StringMap & env,
+    const StructuredAttrs * parsed,
+    bool shouldWarn = true,
+    const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
+
+/**
+ * This is the counterpart of `Derivation::tryResolve`. In particular,
+ * it takes the same sort of callback, which is used to reolve
+ * non-constant deriving paths.
+ *
+ * We need this function when resolving a derivation, and we will use
+ * this as part of that if/when `Derivation` includes
+ * `DerivationOptions`
+ */
+std::optional<DerivationOptions<StorePath>> tryResolve(
+    const DerivationOptions<SingleDerivedPath> & drvOptions,
+    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+        queryResolutionChain);
+
 }; // namespace nix
 
-JSON_IMPL(DerivationOptions);
-JSON_IMPL(DerivationOptions::OutputChecks)
+JSON_IMPL(nix::DerivationOptions<nix::StorePath>);
+JSON_IMPL(nix::DerivationOptions<nix::SingleDerivedPath>);
+JSON_IMPL(nix::DerivationOptions<nix::StorePath>::OutputChecks)
+JSON_IMPL(nix::DerivationOptions<nix::SingleDerivedPath>::OutputChecks)

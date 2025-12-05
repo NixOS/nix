@@ -410,17 +410,18 @@ static void main_nix_build(int argc, char ** argv)
         Value vRoot;
         state->eval(e, vRoot);
 
-        std::function<bool(const Value & v)> takesNixShellAttr;
-        takesNixShellAttr = [&](const Value & v) {
+        auto takesNixShellAttr = [&](const Value & v) {
             if (!isNixShell) {
                 return false;
             }
             bool add = false;
-            if (v.type() == nFunction && v.lambda().fun->hasFormals()) {
-                for (auto & i : v.lambda().fun->formals->formals) {
-                    if (state->symbols[i.name] == "inNixShell") {
-                        add = true;
-                        break;
+            if (v.type() == nFunction) {
+                if (auto formals = v.lambda().fun->getFormals()) {
+                    for (auto & i : formals->formals) {
+                        if (state->symbols[i.name] == "inNixShell") {
+                            add = true;
+                            break;
+                        }
                     }
                 }
             }
@@ -490,10 +491,9 @@ static void main_nix_build(int argc, char ** argv)
             }
         }
 
-        std::function<void(ref<SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)> accumDerivedPath;
-
-        accumDerivedPath = [&](ref<SingleDerivedPath> inputDrv,
-                               const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+        auto accumDerivedPath = [&](this auto & self,
+                                    ref<SingleDerivedPath> inputDrv,
+                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
             if (!inputNode.value.empty())
                 pathsToBuild.push_back(
                     DerivedPath::Built{
@@ -501,8 +501,7 @@ static void main_nix_build(int argc, char ** argv)
                         .outputs = OutputsSpec::Names{inputNode.value},
                     });
             for (const auto & [outputName, childNode] : inputNode.childMap)
-                accumDerivedPath(
-                    make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
+                self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
         };
 
         // Build or fetch all dependencies of the derivation.
@@ -555,9 +554,9 @@ static void main_nix_build(int argc, char ** argv)
         env["NIX_STORE"] = store->storeDir;
         env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
 
-        DerivationOptions drvOptions;
+        DerivationOptions<StorePath> drvOptions;
         try {
-            drvOptions = DerivationOptions::fromStructuredAttrs(drv.env, drv.structuredAttrs);
+            drvOptions = derivationOptionsFromStructuredAttrs(*store, drv.env, get(drv.structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
             throw;

@@ -8,6 +8,18 @@
 
 namespace nix {
 
+PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
+{
+    switch (version) {
+    case 1:
+        return PathInfoJsonFormat::V1;
+    case 2:
+        return PathInfoJsonFormat::V2;
+    default:
+        throw Error("unsupported path info JSON format version %d; supported versions are 1 and 2", version);
+    }
+}
+
 GENERATE_CMP_EXT(
     ,
     std::weak_ordering,
@@ -150,27 +162,44 @@ ValidPathInfo ValidPathInfo::makeFromCA(
 }
 
 nlohmann::json
-UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const
+UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo, PathInfoJsonFormat format) const
 {
     using nlohmann::json;
 
+    if (format == PathInfoJsonFormat::V1)
+        assert(store);
+
     auto jsonObject = json::object();
 
-    jsonObject["narHash"] = narHash.to_string(hashFormat, true);
+    jsonObject["version"] = format;
+
+    jsonObject["narHash"] = format == PathInfoJsonFormat::V1
+                                ? static_cast<json>(narHash.to_string(HashFormat::SRI, true))
+                                : static_cast<json>(narHash);
+
     jsonObject["narSize"] = narSize;
 
     {
         auto & jsonRefs = jsonObject["references"] = json::array();
         for (auto & ref : references)
-            jsonRefs.emplace_back(store.printStorePath(ref));
+            jsonRefs.emplace_back(
+                format == PathInfoJsonFormat::V1 ? static_cast<json>(store->printStorePath(ref))
+                                                 : static_cast<json>(ref));
     }
 
-    jsonObject["ca"] = ca ? (std::optional{renderContentAddress(*ca)}) : std::nullopt;
+    if (format == PathInfoJsonFormat::V1)
+        jsonObject["ca"] = ca ? static_cast<json>(renderContentAddress(*ca)) : static_cast<json>(nullptr);
+    else
+        jsonObject["ca"] = ca;
 
     if (includeImpureInfo) {
-        jsonObject["deriver"] = deriver ? (std::optional{store.printStorePath(*deriver)}) : std::nullopt;
-
-        jsonObject["registrationTime"] = registrationTime ? (std::optional{registrationTime}) : std::nullopt;
+        if (format == PathInfoJsonFormat::V1) {
+            jsonObject["deriver"] =
+                deriver ? static_cast<json>(store->printStorePath(*deriver)) : static_cast<json>(nullptr);
+        } else {
+            jsonObject["deriver"] = deriver;
+        }
+        jsonObject["registrationTime"] = registrationTime ? std::optional{registrationTime} : std::nullopt;
 
         jsonObject["ultimate"] = ultimate;
 
@@ -182,46 +211,113 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig & store, bool includeImpureInf
     return jsonObject;
 }
 
-UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig & store, const nlohmann::json & _json)
+UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & _json)
 {
     UnkeyedValidPathInfo res{
         Hash(Hash::dummy),
     };
 
     auto & json = getObject(_json);
-    res.narHash = Hash::parseAny(getString(valueAt(json, "narHash")), std::nullopt);
+
+    PathInfoJsonFormat format = PathInfoJsonFormat::V1;
+    if (auto * version = optionalValueAt(json, "version"))
+        format = *version;
+
+    if (format == PathInfoJsonFormat::V1)
+        assert(store);
+
+    if (format == PathInfoJsonFormat::V1)
+        res.narHash = Hash::parseSRI(getString(valueAt(json, "narHash")));
+    else
+        res.narHash = valueAt(json, "narHash");
+
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 
     try {
-        auto references = getStringList(valueAt(json, "references"));
+        auto & references = getArray(valueAt(json, "references"));
         for (auto & input : references)
-            res.references.insert(store.parseStorePath(static_cast<const std::string &>(input)));
+            res.references.insert(
+                format == PathInfoJsonFormat::V1 ? store->parseStorePath(getString(input))
+                                                 : static_cast<StorePath>(input));
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'references'");
         throw;
     }
 
-    // New format as this as nullable but mandatory field; handling
-    // missing is for back-compat.
-    if (json.contains("ca"))
-        if (auto * rawCa = getNullable(valueAt(json, "ca")))
-            res.ca = ContentAddress::parse(getString(*rawCa));
+    try {
+        if (format == PathInfoJsonFormat::V1) {
+            if (auto * rawCa = getNullable(valueAt(json, "ca")))
+                res.ca = ContentAddress::parse(getString(*rawCa));
+        } else {
+            res.ca = ptrToOwned<ContentAddress>(getNullable(valueAt(json, "ca")));
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'ca'");
+        throw;
+    }
 
-    if (json.contains("deriver"))
-        if (auto * rawDeriver = getNullable(valueAt(json, "deriver")))
-            res.deriver = store.parseStorePath(getString(*rawDeriver));
+    if (auto * rawDeriver0 = optionalValueAt(json, "deriver")) {
+        if (format == PathInfoJsonFormat::V1) {
+            if (auto * rawDeriver = getNullable(*rawDeriver0))
+                res.deriver = store->parseStorePath(getString(*rawDeriver));
+        } else {
+            res.deriver = ptrToOwned<StorePath>(getNullable(*rawDeriver0));
+        }
+    }
 
-    if (json.contains("registrationTime"))
-        if (auto * rawRegistrationTime = getNullable(valueAt(json, "registrationTime")))
+    if (auto * rawRegistrationTime0 = optionalValueAt(json, "registrationTime"))
+        if (auto * rawRegistrationTime = getNullable(*rawRegistrationTime0))
             res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
 
-    if (json.contains("ultimate"))
-        res.ultimate = getBoolean(valueAt(json, "ultimate"));
+    if (auto * rawUltimate = optionalValueAt(json, "ultimate"))
+        res.ultimate = getBoolean(*rawUltimate);
 
-    if (json.contains("signatures"))
-        res.sigs = getStringSet(valueAt(json, "signatures"));
+    if (auto * rawSignatures = optionalValueAt(json, "signatures"))
+        res.sigs = getStringSet(*rawSignatures);
 
     return res;
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+PathInfoJsonFormat adl_serializer<PathInfoJsonFormat>::from_json(const json & json)
+{
+    return parsePathInfoJsonFormat(getUnsigned(json));
+}
+
+void adl_serializer<PathInfoJsonFormat>::to_json(json & json, const PathInfoJsonFormat & format)
+{
+    json = static_cast<int>(format);
+}
+
+UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json & json)
+{
+    return UnkeyedValidPathInfo::fromJSON(nullptr, json);
+}
+
+void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
+{
+    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V2);
+}
+
+ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)
+{
+    auto json = getObject(json0);
+
+    return ValidPathInfo{
+        valueAt(json, "path"),
+        adl_serializer<UnkeyedValidPathInfo>::from_json(json0),
+    };
+}
+
+void adl_serializer<ValidPathInfo>::to_json(json & json, const ValidPathInfo & v)
+{
+    adl_serializer<UnkeyedValidPathInfo>::to_json(json, v);
+    json["path"] = v.path;
+}
+
+} // namespace nlohmann

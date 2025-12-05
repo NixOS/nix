@@ -227,11 +227,13 @@ const static std::string getEnvSh =
 #include "get-env.sh.gen.hh"
     ;
 
-/* Given an existing derivation, return the shell environment as
-   initialised by stdenv's setup script. We do this by building a
-   modified derivation with the same dependencies and nearly the same
-   initial environment variables, that just writes the resulting
-   environment to a file and exits. */
+/**
+ * Given an existing derivation, return the shell environment as
+ * initialised by stdenv's setup script. We do this by building a
+ * modified derivation with the same dependencies and nearly the same
+ * initial environment variables, that just writes the resulting
+ * environment to a file and exits.
+ */
 static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore, const StorePath & drvPath)
 {
     auto drv = evalStore->derivationFromPath(drvPath);
@@ -270,26 +272,24 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{}, drv.env[output.first] = hashPlaceholder(output.first);
-        }
-    } else {
-        for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{};
-            drv.env[output.first] = "";
-        }
-        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
-
-        for (auto & output : drv.outputs) {
-            Hash h = hashesModulo.hashes.at(output.first);
-            auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = DerivationOutput::InputAddressed{
-                .path = outPath,
-            };
-            drv.env[output.first] = store->printStorePath(outPath);
-        }
+    for (auto & [outputName, output] : drv.outputs) {
+        std::visit(
+            overloaded{
+                [&](const DerivationOutput::InputAddressed &) {
+                    output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = "";
+                },
+                [&](const DerivationOutput::CAFixed &) {
+                    output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = "";
+                },
+                [&](const auto &) {
+                    // Do nothing for other types (CAFloating, Deferred, Impure)
+                },
+            },
+            output.raw);
     }
+    drv.fillInOutputPaths(*evalStore);
 
     auto shellDrvPath = writeDerivation(*evalStore, drv);
 
@@ -302,6 +302,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         bmNormal,
         evalStore);
 
+    // `get-env.sh` will write its JSON output to an arbitrary output
+    // path, so return the first non-empty output path.
     for (auto & [_0, optPath] : evalStore->queryPartialDerivationOutputMap(shellDrvPath)) {
         assert(optPath);
         auto accessor = evalStore->requireStoreObjectAccessor(*optPath);
@@ -495,19 +497,18 @@ struct Common : InstallableCommand, MixProfile
         }
     }
 
-    std::pair<BuildEnvironment, std::string> getBuildEnvironment(ref<Store> store, ref<Installable> installable)
+    std::pair<BuildEnvironment, StorePath> getBuildEnvironment(ref<Store> store, ref<Installable> installable)
     {
         auto shellOutPath = getShellOutPath(store, installable);
 
-        auto strPath = store->printStorePath(shellOutPath);
-
         updateProfile(shellOutPath);
 
-        debug("reading environment file '%s'", strPath);
+        debug("reading environment file '%s'", store->printStorePath(shellOutPath));
 
         return {
             BuildEnvironment::parseJSON(store->requireStoreObjectAccessor(shellOutPath)->readFile(CanonPath::root)),
-            strPath};
+            shellOutPath,
+        };
     }
 };
 
@@ -634,7 +635,7 @@ struct CmdDevelop : Common, MixEnvironment
 
         setEnviron();
         // prevent garbage collection until shell exits
-        setEnv("NIX_GCROOT", gcroot.c_str());
+        setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
 
         Path shell = "bash";
         bool foundInteractive = false;

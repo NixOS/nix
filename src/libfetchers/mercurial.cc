@@ -68,16 +68,41 @@ struct MercurialInputScheme : InputScheme
         return "hg";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
     {
-        return {
-            "url",
-            "ref",
-            "rev",
-            "revCount",
-            "narHash",
-            "name",
+        // TODO
+        return "";
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "url",
+                {},
+            },
+            {
+                "ref",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "revCount",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "name",
+                {},
+            },
         };
+        return attrs;
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
@@ -89,7 +114,7 @@ struct MercurialInputScheme : InputScheme
                 throw BadURL("invalid Mercurial branch/tag name '%s'", *ref);
         }
 
-        Input input{settings};
+        Input input{};
         input.attrs = attrs;
         return input;
     }
@@ -154,7 +179,7 @@ struct MercurialInputScheme : InputScheme
         return {isLocal, isLocal ? renderUrlPathEnsureLegal(url.path) : url.to_string()};
     }
 
-    StorePath fetchToStore(ref<Store> store, Input & input) const
+    StorePath fetchToStore(const Settings & settings, Store & store, Input & input) const
     {
         auto origRev = input.getRev();
 
@@ -176,10 +201,10 @@ struct MercurialInputScheme : InputScheme
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
-                if (!input.settings->allowDirty)
+                if (!settings.allowDirty)
                     throw Error("Mercurial tree '%s' is unclean", actualUrl);
 
-                if (input.settings->warnDirty)
+                if (settings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({"branch", "-R", actualUrl})));
@@ -188,11 +213,11 @@ struct MercurialInputScheme : InputScheme
                     runHg({"status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0"}),
                     "\0"s);
 
-                Path actualPath(absPath(actualUrl));
+                std::filesystem::path actualPath(absPath(actualUrl));
 
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualPath));
-                    std::string file(p, actualPath.size() + 1);
+                    assert(hasPrefix(p, actualPath.string()));
+                    std::string file(p, actualPath.string().size() + 1);
 
                     auto st = lstat(p);
 
@@ -205,9 +230,9 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store->addToStore(
+                auto storePath = store.addToStore(
                     input.getName(),
-                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(actualPath.string())},
                     ContentAddressMethod::Raw::NixArchive,
                     HashAlgorithm::SHA256,
                     {},
@@ -226,7 +251,7 @@ struct MercurialInputScheme : InputScheme
                     "Hash '%s' is not supported by Mercurial. Only sha1 is supported.",
                     rev.to_string(HashFormat::Base16, true));
 
-            return Cache::Key{"hgRev", {{"store", store->storeDir}, {"name", name}, {"rev", input.getRev()->gitRev()}}};
+            return Cache::Key{"hgRev", {{"store", store.storeDir}, {"name", name}, {"rev", input.getRev()->gitRev()}}};
         };
 
         auto makeResult = [&](const Attrs & infoAttrs, const StorePath & storePath) -> StorePath {
@@ -240,45 +265,44 @@ struct MercurialInputScheme : InputScheme
         Cache::Key refToRevKey{"hgRefToRev", {{"url", actualUrl}, {"ref", *input.getRef()}}};
 
         if (!input.getRev()) {
-            if (auto res = input.settings->getCache()->lookupWithTTL(refToRevKey))
+            if (auto res = settings.getCache()->lookupWithTTL(refToRevKey))
                 input.attrs.insert_or_assign("rev", getRevAttr(*res, "rev").gitRev());
         }
 
         /* If we have a rev, check if we have a cached store path. */
         if (auto rev = input.getRev()) {
-            if (auto res = input.settings->getCache()->lookupStorePath(revInfoKey(*rev), *store))
+            if (auto res = settings.getCache()->lookupStorePath(revInfoKey(*rev), store))
                 return makeResult(res->value, res->storePath);
         }
 
-        Path cacheDir =
-            fmt("%s/hg/%s",
-                getCacheDir(),
-                hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false));
+        std::filesystem::path cacheDir =
+            getCacheDir() / "hg" / hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false);
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
         if (!(input.getRev() && pathExists(cacheDir)
-              && runProgram(hgOptions({"log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1"}))
+              && runProgram(
+                     hgOptions({"log", "-R", cacheDir.string(), "-r", input.getRev()->gitRev(), "--template", "1"}))
                          .second
                      == "1")) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {
-                    runHg({"pull", "-R", cacheDir, "--", actualUrl});
+                    runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
                 } catch (ExecError & e) {
-                    auto transJournal = cacheDir + "/.hg/store/journal";
+                    auto transJournal = cacheDir / ".hg" / "store" / "journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runHg({"recover", "-R", cacheDir});
-                        runHg({"pull", "-R", cacheDir, "--", actualUrl});
+                        runHg({"recover", "-R", cacheDir.string()});
+                        runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
                     } else {
                         throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {
-                createDirs(dirOf(cacheDir));
-                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir});
+                createDirs(dirOf(cacheDir.string()));
+                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir.string()});
             }
         }
 
@@ -286,7 +310,7 @@ struct MercurialInputScheme : InputScheme
         auto tokens = tokenizeString<std::vector<std::string>>(runHg(
             {"log",
              "-R",
-             cacheDir,
+             cacheDir.string(),
              "-r",
              input.getRev() ? input.getRev()->gitRev() : *input.getRef(),
              "--template",
@@ -300,48 +324,49 @@ struct MercurialInputScheme : InputScheme
 
         /* Now that we have the rev, check the cache again for a
            cached store path. */
-        if (auto res = input.settings->getCache()->lookupStorePath(revInfoKey(rev), *store))
+        if (auto res = settings.getCache()->lookupStorePath(revInfoKey(rev), store))
             return makeResult(res->value, res->storePath);
 
-        Path tmpDir = createTempDir();
+        std::filesystem::path tmpDir = createTempDir();
         AutoDelete delTmpDir(tmpDir, true);
 
-        runHg({"archive", "-R", cacheDir, "-r", rev.gitRev(), tmpDir});
+        runHg({"archive", "-R", cacheDir.string(), "-r", rev.gitRev(), tmpDir.string()});
 
-        deletePath(tmpDir + "/.hg_archival.txt");
+        deletePath(tmpDir / ".hg_archival.txt");
 
-        auto storePath = store->addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
+        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir.string())});
 
         Attrs infoAttrs({
             {"revCount", (uint64_t) revCount},
         });
 
         if (!origRev)
-            input.settings->getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
+            settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
 
-        input.settings->getCache()->upsert(revInfoKey(rev), *store, infoAttrs, storePath);
+        settings.getCache()->upsert(revInfoKey(rev), store, infoAttrs, storePath);
 
         return makeResult(infoAttrs, std::move(storePath));
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         Input input(_input);
 
-        auto storePath = fetchToStore(store, input);
-        auto accessor = store->requireStoreObjectAccessor(storePath);
+        auto storePath = fetchToStore(settings, store, input);
+        auto accessor = store.requireStoreObjectAccessor(storePath);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
         return {accessor, input};
     }
 
-    bool isLocked(const Input & input) const override
+    bool isLocked(const Settings & settings, const Input & input) const override
     {
         return (bool) input.getRev();
     }
 
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
     {
         if (auto rev = input.getRev())
             return rev->gitRev();

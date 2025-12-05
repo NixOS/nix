@@ -172,7 +172,7 @@ void LocalStore::optimisePath_(
         auto stLink = lstat(linkPath.string());
         if (st.st_size != stLink.st_size || (repair && hash != ({
                                                            hashPath(
-                                                               PosixSourceAccessor::createAtRoot(linkPath),
+                                                               makeFSSourceAccessor(linkPath),
                                                                FileSerialisationMethod::NixArchive,
                                                                HashAlgorithm::SHA256)
                                                                .hash;
@@ -234,7 +234,7 @@ void LocalStore::optimisePath_(
        its timestamp back to 0. */
     MakeReadOnly makeReadOnly(mustToggle ? dirOfPath : "");
 
-    std::filesystem::path tempLink = fmt("%1%/.tmp-link-%2%-%3%", config->realStoreDir, getpid(), rand());
+    std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
@@ -255,8 +255,12 @@ void LocalStore::optimisePath_(
     try {
         std::filesystem::rename(tempLink, path);
     } catch (std::filesystem::filesystem_error & e) {
-        std::filesystem::remove(tempLink);
-        printError("unable to unlink %1%", tempLink);
+        {
+            std::error_code ec;
+            remove(tempLink, ec); /* Clean up after ourselves. */
+            if (ec)
+                printError("unable to unlink %1%: %2%", tempLink, ec.message());
+        }
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it

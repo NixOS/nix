@@ -5,19 +5,23 @@ Before we discuss the concrete Nix store's notion of a store object, we need to 
 Nix uses a simplified model of the file system, which consists of file system objects.
 Every file system object is one of the following:
 
- - File
+ - [**Regular File**]{#regular}
 
    - A possibly empty sequence of bytes for contents
    - A single boolean representing the [executable](https://en.m.wikipedia.org/wiki/File-system_permissions#Permissions) permission
 
- - Directory
+ - [**Directory**]{#directory}
 
    Mapping of names to child file system objects
 
- - [Symbolic link](https://en.m.wikipedia.org/wiki/Symbolic_link)
+ - [**Symbolic link**]{#symlink}
 
-   An arbitrary string.
-   Nix does not assign any semantics to symbolic links.
+   An arbitrary string, known as the *target* of the symlink.
+
+   In general, Nix does not assign any semantics to symbolic links.
+   Certain operations however, may make additional assumptions and attempt to use the target to find another file system object.
+
+   > See [the Wikpedia article on symbolic links](https://en.m.wikipedia.org/wiki/Symbolic_link) for background information if you are unfamiliar with this Unix concept.
 
 File system objects and their children form a tree.
 A bare file or symlink can be a root file system object.

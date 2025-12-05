@@ -105,7 +105,7 @@ struct Source
  * A buffered abstract source. Warning: a BufferedSource should not be
  * used from multiple threads concurrently.
  */
-struct BufferedSource : Source
+struct BufferedSource : virtual Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
     std::unique_ptr<char[]> buffer;
@@ -130,6 +130,14 @@ protected:
      * Underlying read call, to be overridden.
      */
     virtual size_t readUnbuffered(char * data, size_t len) = 0;
+};
+
+/**
+ * Source type that can be restarted.
+ */
+struct RestartableSource : virtual Source
+{
+    virtual void restart() = 0;
 };
 
 /**
@@ -174,7 +182,7 @@ private:
 /**
  * A source that reads data from a file descriptor.
  */
-struct FdSource : BufferedSource
+struct FdSource : BufferedSource, RestartableSource
 {
     Descriptor fd;
     size_t read = 0;
@@ -196,6 +204,7 @@ struct FdSource : BufferedSource
     FdSource & operator=(FdSource && s) = default;
 
     bool good() override;
+    void restart() override;
 
     /**
      * Return true if the buffer is not empty after a non-blocking
@@ -233,7 +242,7 @@ struct StringSink : Sink
 /**
  * A source that reads data from a string.
  */
-struct StringSource : Source
+struct StringSource : RestartableSource
 {
     std::string_view s;
     size_t pos;
@@ -257,6 +266,55 @@ struct StringSource : Source
     size_t read(char * data, size_t len) override;
 
     void skip(size_t len) override;
+
+    void restart() override
+    {
+        pos = 0;
+    }
+};
+
+/**
+ * Compresses a RestartableSource using the specified compression method.
+ *
+ * @note currently this buffers the entire compressed data stream in memory. In the future it may instead compress data
+ * on demand, lazily pulling from the original `RestartableSource`. In that case, the `size()` method would go away
+ * because we would not in fact know the compressed size in advance.
+ */
+struct CompressedSource : RestartableSource
+{
+private:
+    std::string compressedData;
+    std::string compressionMethod;
+    StringSource stringSource;
+
+public:
+    /**
+     * Compress a RestartableSource using the specified compression method.
+     *
+     * @param source The source data to compress
+     * @param compressionMethod The compression method to use (e.g., "xz", "br")
+     */
+    CompressedSource(RestartableSource & source, const std::string & compressionMethod);
+
+    size_t read(char * data, size_t len) override
+    {
+        return stringSource.read(data, len);
+    }
+
+    void restart() override
+    {
+        stringSource.restart();
+    }
+
+    uint64_t size() const
+    {
+        return compressedData.size();
+    }
+
+    std::string_view getCompressionMethod() const
+    {
+        return compressionMethod;
+    }
 };
 
 /**
@@ -381,18 +439,27 @@ struct LengthSource : Source
  */
 struct LambdaSink : Sink
 {
-    typedef std::function<void(std::string_view data)> lambda_t;
+    typedef std::function<void(std::string_view data)> data_t;
+    typedef std::function<void()> cleanup_t;
 
-    lambda_t lambda;
+    data_t dataFun;
+    cleanup_t cleanupFun;
 
-    LambdaSink(const lambda_t & lambda)
-        : lambda(lambda)
+    LambdaSink(
+        const data_t & dataFun, const cleanup_t & cleanupFun = []() {})
+        : dataFun(dataFun)
+        , cleanupFun(cleanupFun)
     {
+    }
+
+    ~LambdaSink()
+    {
+        cleanupFun();
     }
 
     void operator()(std::string_view data) override
     {
-        lambda(data);
+        dataFun(data);
     }
 };
 

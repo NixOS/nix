@@ -62,14 +62,14 @@ struct DerivationBuilderParams
     /**
      * The derivation stored at drvPath.
      */
-    const Derivation & drv;
+    const BasicDerivation & drv;
 
     /**
      * The derivation options of `drv`.
      *
      * @todo this should be part of `Derivation`.
      */
-    const DerivationOptions & drvOptions;
+    const DerivationOptions<StorePath> & drvOptions;
 
     // The remainder is state held during the build.
 

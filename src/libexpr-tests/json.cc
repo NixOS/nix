@@ -1,5 +1,6 @@
 #include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/value-to-json.hh"
+#include "nix/expr/static-string-data.hh"
 
 namespace nix {
 // Testing the conversion to JSON
@@ -54,7 +55,7 @@ TEST_F(JSONValueTest, IntNegative)
 TEST_F(JSONValueTest, String)
 {
     Value v;
-    v.mkStringNoCopy("test");
+    v.mkStringNoCopy("test"_sds);
     ASSERT_EQ(getJSONValue(v), "\"test\"");
 }
 
@@ -62,7 +63,7 @@ TEST_F(JSONValueTest, StringQuotes)
 {
     Value v;
 
-    v.mkStringNoCopy("test\"");
+    v.mkStringNoCopy("test\""_sds);
     ASSERT_EQ(getJSONValue(v), "\"test\\\"\"");
 }
 
@@ -72,7 +73,7 @@ TEST_F(JSONValueTest, StringQuotes)
 TEST_F(JSONValueTest, DISABLED_Path)
 {
     Value v;
-    v.mkPath(state.rootPath(CanonPath("/test")));
+    v.mkPath(state.rootPath(CanonPath("/test")), state.mem);
     ASSERT_EQ(getJSONValue(v), "\"/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x\"");
 }
 } /* namespace nix */

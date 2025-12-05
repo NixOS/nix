@@ -1,0 +1,89 @@
+{
+  "additionalSandboxProfile": "sandcastle",
+  "allowLocalNetworking": true,
+  "allowSubstitutes": false,
+  "exportReferencesGraph": {
+    "refs1": [
+      {
+        "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+        "output": "out"
+      }
+    ],
+    "refs2": [
+      "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv"
+    ]
+  },
+  "impureEnvVars": [
+    "UNICORN"
+  ],
+  "impureHostDeps": [
+    "/usr/bin/ditto"
+  ],
+  "noChroot": true,
+  "outputChecks": {
+    "perOutput": {
+      "bin": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [
+          {
+            "drvPath": "self",
+            "output": "dev"
+          },
+          {
+            "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+            "output": "out"
+          }
+        ],
+        "disallowedRequisites": [
+          {
+            "drvPath": "qnml92yh97a6fbrs2m5qg5cqlc8vni58-bar.drv",
+            "output": "dev"
+          }
+        ],
+        "ignoreSelfRefs": false,
+        "maxClosureSize": null,
+        "maxSize": null
+      },
+      "dev": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [],
+        "disallowedRequisites": [],
+        "ignoreSelfRefs": false,
+        "maxClosureSize": 5909,
+        "maxSize": 789
+      },
+      "out": {
+        "allowedReferences": [
+          {
+            "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+            "output": "out"
+          }
+        ],
+        "allowedRequisites": [
+          {
+            "drvPath": "self",
+            "output": "bin"
+          },
+          {
+            "drvPath": "j56sf12rxpcv5swr14vsjn5cwm6bj03h-foo.drv",
+            "output": "dev"
+          }
+        ],
+        "disallowedReferences": [],
+        "disallowedRequisites": [],
+        "ignoreSelfRefs": false,
+        "maxClosureSize": null,
+        "maxSize": null
+      }
+    }
+  },
+  "passAsFile": [],
+  "preferLocalBuild": true,
+  "requiredSystemFeatures": [
+    "rainbow",
+    "uid-range"
+  ],
+  "unsafeDiscardReferences": {}
+}

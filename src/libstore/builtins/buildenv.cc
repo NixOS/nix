@@ -10,6 +10,12 @@
 
 namespace nix {
 
+RegisterBuiltinBuilder::BuiltinBuilders & RegisterBuiltinBuilder::builtinBuilders()
+{
+    static RegisterBuiltinBuilder::BuiltinBuilders builders;
+    return builders;
+}
+
 namespace {
 
 struct State

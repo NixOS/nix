@@ -1,6 +1,6 @@
 #include <nlohmann/json.hpp>
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -39,7 +39,7 @@ ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std:
 
     if (cacheDir != "") {
         try {
-            nlohmann::json j = listNar(narAccessor, CanonPath::root, true);
+            nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
             writeFile(makeCacheFile(hashPart, "ls"), j.dump());
         } catch (...) {
             ignoreExceptionExceptInterrupt();

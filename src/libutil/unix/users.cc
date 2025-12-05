@@ -18,7 +18,7 @@ std::string getUserName()
     return name;
 }
 
-Path getHomeOf(uid_t userId)
+std::filesystem::path getHomeOf(uid_t userId)
 {
     std::vector<char> buf(16384);
     struct passwd pwbuf;
@@ -28,9 +28,9 @@ Path getHomeOf(uid_t userId)
     return pw->pw_dir;
 }
 
-Path getHome()
+std::filesystem::path getHome()
 {
-    static Path homeDir = []() {
+    static std::filesystem::path homeDir = []() {
         std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
         if (homeDir) {

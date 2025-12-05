@@ -896,7 +896,7 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->toRealPath(path), conn.to);
+        store->narFromPath(path, conn.to);
         break;
     }
 
@@ -964,7 +964,7 @@ static void performOp(
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            auto outputId = DrvOutput::parse(readString(conn.from));
+            auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
             auto outputPath = StorePath(readString(conn.from));
             store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
         } else {
@@ -977,7 +977,7 @@ static void performOp(
 
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(conn.from));
+        auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
@@ -1025,6 +1025,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
+    ReceiveInterrupts receiveInterrupts;
 #endif
 
     /* Exchange the greeting. */

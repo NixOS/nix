@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
@@ -200,6 +201,17 @@ bool FdSource::hasData()
     }
 }
 
+void FdSource::restart()
+{
+    if (!isSeekable)
+        throw Error("can't seek to the start of a file");
+    buffer.reset();
+    read = bufPosIn = bufPosOut = 0;
+    int fd_ = fromDescriptorReadOnly(fd);
+    if (lseek(fd_, 0, SEEK_SET) == -1)
+        throw SysError("seeking to the start of a file");
+}
+
 void FdSource::skip(size_t len)
 {
     /* Discard data in the buffer. */
@@ -250,6 +262,19 @@ void StringSource::skip(size_t len)
         throw EndOfFile("end of string reached");
     }
     pos += len;
+}
+
+CompressedSource::CompressedSource(RestartableSource & source, const std::string & compressionMethod)
+    : compressedData([&]() {
+        StringSink sink;
+        auto compressionSink = makeCompressionSink(compressionMethod, sink);
+        source.drainInto(*compressionSink);
+        compressionSink->finish();
+        return std::move(sink.s);
+    }())
+    , compressionMethod(compressionMethod)
+    , stringSource(compressedData)
+{
 }
 
 std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)

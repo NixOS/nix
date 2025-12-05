@@ -334,7 +334,7 @@ private:
 
 protected:
 
-    void addDependency(const StorePath & path) override;
+    void addDependencyImpl(const StorePath & path) override;
 
     /**
      * Make a file owned by the builder.
@@ -1203,11 +1203,8 @@ void DerivationBuilderImpl::stopDaemon()
     daemonSocket.close();
 }
 
-void DerivationBuilderImpl::addDependency(const StorePath & path)
+void DerivationBuilderImpl::addDependencyImpl(const StorePath & path)
 {
-    if (isAllowed(path))
-        return;
-
     addedPaths.insert(path);
 }
 
@@ -1399,7 +1396,17 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     struct PerhapsNeedToRegister
     {
         StorePathSet refs;
+        /**
+         * References to other outputs. Built by looking up in
+         * `scratchOutputsInverse`.
+         */
+        StringSet otherOutputs;
     };
+
+    /* inverse map of scratchOutputs for efficient lookup */
+    std::map<StorePath, std::string> scratchOutputsInverse;
+    for (auto & [outputName, path] : scratchOutputs)
+        scratchOutputsInverse.insert_or_assign(path, outputName);
 
     std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
     std::map<std::string, struct stat> outputStats;
@@ -1469,47 +1476,54 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             references = scanForReferences(blank, actualPath, referenceablePaths);
         }
 
-        outputReferencesIfUnregistered.insert_or_assign(outputName, PerhapsNeedToRegister{.refs = references});
+        StringSet referencedOutputs;
+        for (auto & r : references)
+            if (auto * o = get(scratchOutputsInverse, r))
+                referencedOutputs.insert(*o);
+
+        outputReferencesIfUnregistered.insert_or_assign(
+            outputName,
+            PerhapsNeedToRegister{
+                .refs = references,
+                .otherOutputs = referencedOutputs,
+            });
         outputStats.insert_or_assign(outputName, std::move(st));
     }
 
-    auto sortedOutputNames = topoSort(
-        outputsToSort,
-        {[&](const std::string & name) {
-            auto orifu = get(outputReferencesIfUnregistered, name);
-            if (!orifu)
+    StringSet emptySet;
+
+    auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) -> const StringSet & {
+        auto * orifu = get(outputReferencesIfUnregistered, name);
+        if (!orifu)
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "no output reference for '%s' in build of '%s'",
+                name,
+                store.printStorePath(drvPath));
+        return std::visit(
+            overloaded{
+                /* Since we'll use the already installed versions of these, we
+                   can treat them as leaves and ignore any references they
+                   have. */
+                [&](const AlreadyRegistered &) -> const StringSet & { return emptySet; },
+                [&](const PerhapsNeedToRegister & refs) -> const StringSet & { return refs.otherOutputs; },
+            },
+            *orifu);
+    });
+
+    auto sortedOutputNames = std::visit(
+        overloaded{
+            [&](Cycle<std::string> & cycle) -> std::vector<std::string> {
+                // TODO with more -vvvv also show the temporary paths for manual inspection.
                 throw BuildError(
                     BuildResult::Failure::OutputRejected,
-                    "no output reference for '%s' in build of '%s'",
-                    name,
-                    store.printStorePath(drvPath));
-            return std::visit(
-                overloaded{
-                    /* Since we'll use the already installed versions of these, we
-                       can treat them as leaves and ignore any references they
-                       have. */
-                    [&](const AlreadyRegistered &) { return StringSet{}; },
-                    [&](const PerhapsNeedToRegister & refs) {
-                        StringSet referencedOutputs;
-                        /* FIXME build inverted map up front so no quadratic waste here */
-                        for (auto & r : refs.refs)
-                            for (auto & [o, p] : scratchOutputs)
-                                if (r == p)
-                                    referencedOutputs.insert(o);
-                        return referencedOutputs;
-                    },
-                },
-                *orifu);
-        }},
-        {[&](const std::string & path, const std::string & parent) {
-            // TODO with more -vvvv also show the temporary paths for manual inspection.
-            return BuildError(
-                BuildResult::Failure::OutputRejected,
-                "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
-                store.printStorePath(drvPath),
-                path,
-                parent);
-        }});
+                    "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
+                    store.printStorePath(drvPath),
+                    cycle.path,
+                    cycle.parent);
+            },
+            [](auto & sorted) { return sorted; }},
+        topoSortResult);
 
     std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
 
@@ -1887,7 +1901,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store.Store::toRealPath(i.second));
+            deletePath(store.toRealPath(i.second));
     }
 
     if (topTmpDir != "") {

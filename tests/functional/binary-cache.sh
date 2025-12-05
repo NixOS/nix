@@ -18,7 +18,7 @@ outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix copy --to "file://$cacheDir" "$outPath"
 
-readarray -t paths < <(nix path-info --all --json --store "file://$cacheDir" | jq 'keys|sort|.[]' -r)
+readarray -t paths < <(nix path-info --all --json --json-format 2 --store "file://$cacheDir" | jq '.info|keys|sort|.[]' -r)
 [[ "${#paths[@]}" -eq 3 ]]
 for path in "${paths[@]}"; do
     [[ "$path" =~ -dependencies-input-0$ ]] \

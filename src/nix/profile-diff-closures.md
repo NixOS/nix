@@ -23,6 +23,6 @@ R""(
 
 This command shows the difference between the closures of subsequent
 versions of a profile. See [`nix store
-diff-closures`](nix3-store-diff-closures.md) for details.
+diff-closures`](./nix3-store-diff-closures.md) for details.
 
 )""

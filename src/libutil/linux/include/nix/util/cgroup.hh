@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <optional>
+#include <filesystem>
 
 #include "nix/util/types.hh"
 
@@ -16,6 +17,11 @@ struct CgroupStats
 {
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 };
+
+/**
+ * Read statistics from the given cgroup.
+ */
+CgroupStats getCgroupStats(const std::filesystem::path & cgroup);
 
 /**
  * Destroy the cgroup denoted by 'path'. The postcondition is that

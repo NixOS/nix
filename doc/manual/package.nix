@@ -6,7 +6,6 @@
   ninja,
   lowdown-unsandboxed,
   mdbook,
-  mdbook-linkcheck,
   jq,
   python3,
   rsync,
@@ -18,6 +17,9 @@
   # Configuration Options
 
   version,
+
+  # `tests` attribute
+  testers,
 }:
 
 let
@@ -34,10 +36,17 @@ mkMesonDerivation (finalAttrs: {
       (fileset.unions [
         ../../.version
         # For example JSON
+        ../../src/libutil-tests/data/memory-source-accessor
         ../../src/libutil-tests/data/hash
         ../../src/libstore-tests/data/content-address
         ../../src/libstore-tests/data/store-path
+        ../../src/libstore-tests/data/realisation
+        ../../src/libstore-tests/data/derivation
         ../../src/libstore-tests/data/derived-path
+        ../../src/libstore-tests/data/path-info
+        ../../src/libstore-tests/data/nar-info
+        ../../src/libstore-tests/data/build-result
+        ../../src/libstore-tests/data/dummy-store
         # Too many different types of files to filter for now
         ../../doc/manual
         ./.
@@ -51,13 +60,12 @@ mkMesonDerivation (finalAttrs: {
     "man"
   ];
 
-  # Hack for sake of the dev shell
-  passthru.externalNativeBuildInputs = [
+  nativeBuildInputs = [
+    nix-cli
     meson
     ninja
     (lib.getBin lowdown-unsandboxed)
     mdbook
-    mdbook-linkcheck
     jq
     python3
     rsync
@@ -71,10 +79,6 @@ mkMesonDerivation (finalAttrs: {
     changelog-d
   ];
 
-  nativeBuildInputs = finalAttrs.passthru.externalNativeBuildInputs ++ [
-    nix-cli
-  ];
-
   preConfigure = ''
     chmod u+w ./.version
     echo ${finalAttrs.version} > ./.version
@@ -84,6 +88,29 @@ mkMesonDerivation (finalAttrs: {
     mkdir -p ''$out/nix-support
     echo "doc manual ''$out/share/doc/nix/manual" >> ''$out/nix-support/hydra-build-products
   '';
+
+  /**
+    The root of the HTML manual.
+    E.g. "${nix-manual.site}/index.html" exists.
+  */
+  passthru.site = finalAttrs.finalPackage + "/share/doc/nix/manual";
+
+  passthru.tests = {
+    # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+    linkcheck = testers.lycheeLinkCheck {
+      inherit (finalAttrs.finalPackage) site;
+      extraConfig = {
+        exclude = [
+          # Exclude auto-generated JSON schema documentation which has
+          # auto-generated fragment IDs that don't match the link references
+          ".*/protocols/json/.*\\.html"
+          # Exclude undocumented builtins
+          ".*/language/builtins\\.html#builtins-addErrorContext"
+          ".*/language/builtins\\.html#builtins-appendContext"
+        ];
+      };
+    };
+  };
 
   meta = {
     platforms = lib.platforms.all;

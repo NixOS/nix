@@ -31,6 +31,7 @@ headers = [ config_pub_h ] + files(
   'print.hh',
   'repl-exit-status.hh',
   'search-path.hh',
+  'static-string-data.hh',
   'symbol-table.hh',
   'value-to-json.hh',
   'value-to-xml.hh',

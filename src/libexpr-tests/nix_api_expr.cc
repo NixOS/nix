@@ -14,17 +14,17 @@
 
 namespace nixC {
 
-TEST_F(nix_api_store_test, nix_eval_state_lookup_path)
+TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 {
     auto tmpDir = nix::createTempDir();
     auto delTmpDir = std::make_unique<nix::AutoDelete>(tmpDir, true);
-    auto nixpkgs = tmpDir + "/pkgs";
-    auto nixos = tmpDir + "/cfg";
+    auto nixpkgs = tmpDir / "pkgs";
+    auto nixos = tmpDir / "cfg";
     std::filesystem::create_directories(nixpkgs);
     std::filesystem::create_directories(nixos);
 
-    std::string nixpkgsEntry = "nixpkgs=" + nixpkgs;
-    std::string nixosEntry = "nixos-config=" + nixos;
+    std::string nixpkgsEntry = "nixpkgs=" + nixpkgs.string();
+    std::string nixosEntry = "nixos-config=" + nixos.string();
     const char * lookupPath[] = {nixpkgsEntry.c_str(), nixosEntry.c_str(), nullptr};
 
     auto builder = nix_eval_state_builder_new(ctx, store);
@@ -42,12 +42,16 @@ TEST_F(nix_api_store_test, nix_eval_state_lookup_path)
     nix_expr_eval_from_string(ctx, state, "builtins.seq <nixos-config> <nixpkgs>", ".", value);
     assert_ctx_ok();
 
+    nix_state_free(state);
+
     ASSERT_EQ(nix_get_type(ctx, value), NIX_TYPE_PATH);
     assert_ctx_ok();
 
     auto pathStr = nix_get_path_string(ctx, value);
     assert_ctx_ok();
-    ASSERT_EQ(0, strcmp(pathStr, nixpkgs.c_str()));
+    ASSERT_EQ(0, strcmp(pathStr, nixpkgs.string().c_str()));
+
+    nix_gc_decref(nullptr, value);
 }
 
 TEST_F(nix_api_expr_test, nix_expr_eval_from_string)

@@ -42,10 +42,10 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
     return st.st_mtime + static_cast<time_t>(settings.tarballTtl) > now;
 }
 
-Path getCachePath(std::string_view key, bool shallow)
+std::filesystem::path getCachePath(std::string_view key, bool shallow)
 {
-    return getCacheDir() + "/gitv3/" + hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false)
-           + (shallow ? "-shallow" : "");
+    return getCacheDir() / "gitv3"
+           / (hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : ""));
 }
 
 // Returns the name of the HEAD branch.
@@ -55,13 +55,13 @@ Path getCachePath(std::string_view key, bool shallow)
 //
 //   ref: refs/heads/main       HEAD
 //   ...
-std::optional<std::string> readHead(const Path & path)
+std::optional<std::string> readHead(const std::filesystem::path & path)
 {
     auto [status, output] = runProgram(
         RunOptions{
             .program = "git",
             // FIXME: use 'HEAD' to avoid returning all refs
-            .args = {"ls-remote", "--symref", path},
+            .args = {"ls-remote", "--symref", path.string()},
             .isInteractive = true,
         });
     if (status != 0)
@@ -86,9 +86,9 @@ std::optional<std::string> readHead(const Path & path)
 // Persist the HEAD ref from the remote repo in the local cached repo.
 bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::string & headRef)
 {
-    Path cacheDir = getCachePath(actualUrl, shallow);
+    std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
     try {
-        runProgram("git", true, {"-C", cacheDir, "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
+        runProgram("git", true, {"-C", cacheDir.string(), "--git-dir", ".", "symbolic-ref", "--", "HEAD", headRef});
     } catch (ExecError & e) {
         if (
 #ifndef WIN32 // TODO abstract over exit status handling on Windows
@@ -109,13 +109,13 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
-    Path cacheDir = getCachePath(actualUrl, shallow);
-    Path headRefFile = cacheDir + "/HEAD";
+    std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
+    std::filesystem::path headRefFile = cacheDir / "HEAD";
 
     time_t now = time(0);
     struct stat st;
     std::optional<std::string> cachedRef;
-    if (stat(headRefFile.c_str(), &st) == 0) {
+    if (stat(headRefFile.string().c_str(), &st) == 0) {
         cachedRef = readHead(cacheDir);
         if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
@@ -164,13 +164,10 @@ struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
     {
-        auto parsedScheme = parseUrlScheme(url.scheme);
-        if (parsedScheme.application != "git")
+        if (url.scheme != "git" && parseUrlScheme(url.scheme).application != "git")
             return {};
 
         auto url2(url);
-        if (hasPrefix(url2.scheme, "git+"))
-            url2.scheme = std::string(url2.scheme, 4);
         url2.query.clear();
 
         Attrs attrs;
@@ -197,28 +194,183 @@ struct GitInputScheme : InputScheme
         return "git";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
     {
-        return {
-            "url",
-            "ref",
-            "rev",
-            "shallow",
-            "submodules",
-            "lfs",
-            "exportIgnore",
-            "lastModified",
-            "revCount",
-            "narHash",
-            "allRefs",
-            "name",
-            "dirtyRev",
-            "dirtyShortRev",
-            "verifyCommit",
-            "keytype",
-            "publicKey",
-            "publicKeys",
+        return stripIndentation(R"(
+          Fetch a Git tree and copy it to the Nix store.
+          This is similar to [`builtins.fetchGit`](@docroot@/language/builtins.md#builtins-fetchGit).
+        )");
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "url",
+                {
+                    .type = "String",
+                    .required = true,
+                    .doc = R"(
+                      The URL formats supported are the same as for Git itself.
+
+                      > **Example**
+                      >
+                      > ```nix
+                      > fetchTree {
+                      >   type = "git";
+                      >   url = "git@github.com:NixOS/nixpkgs.git";
+                      > }
+                      > ```
+
+                      > **Note**
+                      >
+                      > If the URL points to a local directory, and no `ref` or `rev` is given, Nix only considers files added to the Git index, as listed by `git ls-files` but uses the *current file contents* of the Git working directory.
+                    )",
+                },
+            },
+            {
+                "ref",
+                {
+                    .type = "String",
+                    .required = false,
+                    .doc = R"(
+                      By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+                      A [Git reference](https://git-scm.com/book/en/v2/Git-Internals-Git-References), such as a branch or tag name.
+
+                      Default: `"HEAD"`
+                    )",
+                },
+            },
+            {
+                "rev",
+                {
+                    .type = "String",
+                    .required = false,
+                    .doc = R"(
+                      A Git revision; a commit hash.
+
+                      Default: the tip of `ref`
+                    )",
+                },
+            },
+            {
+                "shallow",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      Make a shallow clone when fetching the Git tree.
+                      When this is enabled, the options `ref` and `allRefs` have no effect anymore.
+
+                      Default: `true`
+                    )",
+                },
+            },
+            {
+                "submodules",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      Also fetch submodules if available.
+
+                      Default: `false`
+                    )",
+                },
+            },
+            {
+                "lfs",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      Fetch any [Git LFS](https://git-lfs.com/) files.
+
+                      Default: `false`
+                    )",
+                },
+            },
+            {
+                "exportIgnore",
+                {},
+            },
+            {
+                "lastModified",
+                {
+                    .type = "Integer",
+                    .required = false,
+                    .doc = R"(
+                      Unix timestamp of the fetched commit.
+
+                      If set, pass through the value to the output attribute set.
+                      Otherwise, generated from the fetched Git tree.
+                    )",
+                },
+            },
+            {
+                "revCount",
+                {
+                    .type = "Integer",
+                    .required = false,
+                    .doc = R"(
+                      Number of revisions in the history of the Git repository before the fetched commit.
+
+                      If set, pass through the value to the output attribute set.
+                      Otherwise, generated from the fetched Git tree.
+                    )",
+                },
+            },
+            {
+                "narHash",
+                {},
+            },
+            {
+                "allRefs",
+                {
+                    .type = "Bool",
+                    .required = false,
+                    .doc = R"(
+                      By default, this has no effect. This becomes relevant only once `shallow` cloning is disabled.
+
+                      Whether to fetch all references (eg. branches and tags) of the repository.
+                      With this argument being true, it's possible to load a `rev` from *any* `ref`.
+                      (Without setting this option, only `rev`s from the specified `ref` are supported).
+
+                      Default: `false`
+                    )",
+                },
+            },
+            {
+                "name",
+                {},
+            },
+            {
+                "dirtyRev",
+                {},
+            },
+            {
+                "dirtyShortRev",
+                {},
+            },
+            {
+                "verifyCommit",
+                {},
+            },
+            {
+                "keytype",
+                {},
+            },
+            {
+                "publicKey",
+                {},
+            },
+            {
+                "publicKeys",
+                {},
+            },
         };
+        return attrs;
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
@@ -232,7 +384,7 @@ struct GitInputScheme : InputScheme
         if (auto ref = maybeGetStrAttr(attrs, "ref"); ref && !isLegalRefName(*ref))
             throw BadURL("invalid Git branch/tag name '%s'", *ref);
 
-        Input input{settings};
+        Input input{};
         input.attrs = attrs;
         input.attrs["url"] = fixGitURL(getStrAttr(attrs, "url")).to_string();
         getShallowAttr(input);
@@ -281,7 +433,8 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void clone(const Input & input, const Path & destDir) const override
+    void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
+        const override
     {
         auto repoInfo = getRepoInfo(input);
 
@@ -297,7 +450,7 @@ struct GitInputScheme : InputScheme
         if (input.getRev())
             throw UnimplementedError("cloning a specific revision is not implemented");
 
-        args.push_back(destDir);
+        args.push_back(destDir.string());
 
         runProgram("git", true, args, {}, true);
     }
@@ -626,7 +779,7 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromCommit(ref<Store> store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromCommit(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
     {
         assert(!repoInfo.workdirInfo.isDirty);
 
@@ -683,7 +836,7 @@ struct GitInputScheme : InputScheme
                     auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
                                     : input.getRev()                  ? input.getRev()->gitRev()
                                     : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
-                                    : ref == "HEAD"                   ? ref
+                                    : ref == "HEAD"                   ? "HEAD:HEAD"
                                                                       : fmt("%1%:%1%", "refs/heads/" + ref);
 
                     repo->fetch(repoUrl.to_string(), fetchRef, shallow);
@@ -736,13 +889,10 @@ struct GitInputScheme : InputScheme
 
         auto rev = *input.getRev();
 
-        Attrs infoAttrs({
-            {"rev", rev.gitRev()},
-            {"lastModified", getLastModified(*input.settings, repoInfo, repoDir, rev)},
-        });
+        input.attrs.insert_or_assign("lastModified", getLastModified(settings, repoInfo, repoDir, rev));
 
         if (!getShallowAttr(input))
-            infoAttrs.insert_or_assign("revCount", getRevCount(*input.settings, repoInfo, repoDir, rev));
+            input.attrs.insert_or_assign("revCount", getRevCount(settings, repoInfo, repoDir, rev));
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
 
@@ -750,7 +900,8 @@ struct GitInputScheme : InputScheme
 
         bool exportIgnore = getExportIgnoreAttr(input);
         bool smudgeLfs = getLfsAttr(input);
-        auto accessor = repo->getAccessor(rev, exportIgnore, "«" + input.to_string() + "»", smudgeLfs);
+        auto accessor = repo->getAccessor(
+            rev, {.exportIgnore = exportIgnore, .smudgeLfs = smudgeLfs}, "«" + input.to_string() + "»");
 
         /* If the repo has submodules, fetch them and return a mounted
            input accessor consisting of the accessor for the top-level
@@ -785,8 +936,8 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("submodules", Explicit<bool>{true});
                 attrs.insert_or_assign("lfs", Explicit<bool>{smudgeLfs});
                 attrs.insert_or_assign("allRefs", Explicit<bool>{true});
-                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
+                auto submoduleInput = fetchers::Input::fromAttrs(settings, std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
@@ -798,15 +949,12 @@ struct GitInputScheme : InputScheme
         }
 
         assert(!origRev || origRev == rev);
-        if (!getShallowAttr(input))
-            input.attrs.insert_or_assign("revCount", getIntAttr(infoAttrs, "revCount"));
-        input.attrs.insert_or_assign("lastModified", getIntAttr(infoAttrs, "lastModified"));
 
         return {accessor, std::move(input)};
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromWorkdir(ref<Store> store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromWorkdir(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
     {
         auto repoPath = repoInfo.getPath().value();
 
@@ -820,7 +968,7 @@ struct GitInputScheme : InputScheme
         auto exportIgnore = getExportIgnoreAttr(input);
 
         ref<SourceAccessor> accessor =
-            repo->getAccessor(repoInfo.workdirInfo, exportIgnore, makeNotAllowedError(repoPath));
+            repo->getAccessor(repoInfo.workdirInfo, {.exportIgnore = exportIgnore}, makeNotAllowedError(repoPath));
 
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
@@ -838,8 +986,8 @@ struct GitInputScheme : InputScheme
                 // TODO: fall back to getAccessorFromCommit-like fetch when submodules aren't checked out
                 // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
-                auto submoduleInput = fetchers::Input::fromAttrs(*input.settings, std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(store);
+                auto submoduleInput = fetchers::Input::fromAttrs(settings, std::move(attrs));
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
@@ -866,12 +1014,12 @@ struct GitInputScheme : InputScheme
             input.attrs.insert_or_assign("rev", rev.gitRev());
             if (!getShallowAttr(input)) {
                 input.attrs.insert_or_assign(
-                    "revCount", rev == nullRev ? 0 : getRevCount(*input.settings, repoInfo, repoPath, rev));
+                    "revCount", rev == nullRev ? 0 : getRevCount(settings, repoInfo, repoPath, rev));
             }
 
             verifyCommit(input, repo);
         } else {
-            repoInfo.warnDirty(*input.settings);
+            repoInfo.warnDirty(settings);
 
             if (repoInfo.workdirInfo.headRev) {
                 input.attrs.insert_or_assign("dirtyRev", repoInfo.workdirInfo.headRev->gitRev() + "-dirty");
@@ -883,14 +1031,14 @@ struct GitInputScheme : InputScheme
 
         input.attrs.insert_or_assign(
             "lastModified",
-            repoInfo.workdirInfo.headRev
-                ? getLastModified(*input.settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
-                : 0);
+            repoInfo.workdirInfo.headRev ? getLastModified(settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
+                                         : 0);
 
         return {accessor, std::move(input)};
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & _input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         Input input(_input);
 
@@ -906,13 +1054,13 @@ struct GitInputScheme : InputScheme
         }
 
         auto [accessor, final] = input.getRef() || input.getRev() || !repoInfo.getPath()
-                                     ? getAccessorFromCommit(store, repoInfo, std::move(input))
-                                     : getAccessorFromWorkdir(store, repoInfo, std::move(input));
+                                     ? getAccessorFromCommit(settings, store, repoInfo, std::move(input))
+                                     : getAccessorFromWorkdir(settings, store, repoInfo, std::move(input));
 
         return {accessor, std::move(final)};
     }
 
-    std::optional<std::string> getFingerprint(ref<Store> store, const Input & input) const override
+    std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
     {
         auto makeFingerprint = [&](const Hash & rev) {
             return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "")
@@ -943,7 +1091,7 @@ struct GitInputScheme : InputScheme
         }
     }
 
-    bool isLocked(const Input & input) const override
+    bool isLocked(const Settings & settings, const Input & input) const override
     {
         auto rev = input.getRev();
         return rev && rev != nullRev;

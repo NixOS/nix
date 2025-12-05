@@ -1,6 +1,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/nar-accessor.hh"
+#include "nix/util/nar-accessor.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 
@@ -75,12 +75,12 @@ struct CmdCatNar : StoreCommand, MixCat
 
     void run(ref<Store> store) override
     {
-        AutoCloseFD fd = open(narPath.c_str(), O_RDONLY);
+        AutoCloseFD fd = toDescriptor(open(narPath.c_str(), O_RDONLY));
         if (!fd)
             throw SysError("opening NAR file '%s'", narPath);
         auto source = FdSource{fd.get()};
         auto narAccessor = makeNarAccessor(source);
-        auto listing = listNar(narAccessor, CanonPath::root, true);
+        nlohmann::json listing = listNarDeep(*narAccessor, CanonPath::root);
         cat(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
     }
 };

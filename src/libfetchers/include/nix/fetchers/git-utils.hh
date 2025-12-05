@@ -22,11 +22,18 @@ struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
     virtual Hash flush() = 0;
 };
 
+struct GitAccessorOptions
+{
+    bool exportIgnore = false;
+    bool smudgeLfs = false;
+};
+
 struct GitRepo
 {
     virtual ~GitRepo() {}
 
-    static ref<GitRepo> openRepo(const std::filesystem::path & path, bool create = false, bool bare = false);
+    static ref<GitRepo>
+    openRepo(const std::filesystem::path & path, bool create = false, bool bare = false, bool packfilesOnly = false);
 
     virtual uint64_t getRevCount(const Hash & rev) = 0;
 
@@ -89,10 +96,10 @@ struct GitRepo
     virtual bool hasObject(const Hash & oid) = 0;
 
     virtual ref<SourceAccessor>
-    getAccessor(const Hash & rev, bool exportIgnore, std::string displayPrefix, bool smudgeLfs = false) = 0;
+    getAccessor(const Hash & rev, const GitAccessorOptions & options, std::string displayPrefix) = 0;
 
-    virtual ref<SourceAccessor>
-    getAccessor(const WorkdirInfo & wd, bool exportIgnore, MakeNotAllowedError makeNotAllowedError) = 0;
+    virtual ref<SourceAccessor> getAccessor(
+        const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError) = 0;
 
     virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
@@ -119,8 +126,6 @@ struct GitRepo
      */
     virtual Hash dereferenceSingletonDirectory(const Hash & oid) = 0;
 };
-
-ref<GitRepo> getTarballCache();
 
 // A helper to ensure that the `git_*_free` functions get called.
 template<auto del>

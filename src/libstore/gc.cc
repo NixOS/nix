@@ -907,7 +907,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 #endif
             ;
 
-        printInfo("note: currently hard linking saves %s", renderSize(unsharedSize - actualSize - overhead));
+        printInfo("note: hard linking is currently saving %s", renderSize(unsharedSize - actualSize - overhead));
     }
 
     /* While we're at it, vacuum the database. */

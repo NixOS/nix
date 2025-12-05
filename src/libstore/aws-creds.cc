@@ -79,7 +79,18 @@ class AwsCredentialProviderImpl : public AwsCredentialProvider
 public:
     AwsCredentialProviderImpl()
     {
-        apiHandle.InitializeLogging(Aws::Crt::LogLevel::Warn, static_cast<FILE *>(nullptr));
+        // Map Nix's verbosity to AWS CRT log level
+        Aws::Crt::LogLevel logLevel;
+        if (verbosity >= lvlVomit) {
+            logLevel = Aws::Crt::LogLevel::Trace;
+        } else if (verbosity >= lvlDebug) {
+            logLevel = Aws::Crt::LogLevel::Debug;
+        } else if (verbosity >= lvlChatty) {
+            logLevel = Aws::Crt::LogLevel::Info;
+        } else {
+            logLevel = Aws::Crt::LogLevel::Warn;
+        }
+        apiHandle.InitializeLogging(logLevel, stderr);
     }
 
     AwsCredentials getCredentialsRaw(const std::string & profile);

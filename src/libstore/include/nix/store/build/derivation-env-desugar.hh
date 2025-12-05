@@ -8,6 +8,7 @@ namespace nix {
 
 class Store;
 struct Derivation;
+template<typename Input>
 struct DerivationOptions;
 
 /**
@@ -77,7 +78,10 @@ struct DesugaredEnv
      * just part of `Derivation`.
      */
     static DesugaredEnv create(
-        Store & store, const Derivation & drv, const DerivationOptions & drvOptions, const StorePathSet & inputPaths);
+        Store & store,
+        const Derivation & drv,
+        const DerivationOptions<StorePath> & drvOptions,
+        const StorePathSet & inputPaths);
 };
 
 } // namespace nix

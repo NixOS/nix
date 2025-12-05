@@ -19,6 +19,15 @@ findAlongAttrPath(EvalState & state, const std::string & attrPath, Bindings & au
  */
 std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v, std::string what);
 
-std::vector<Symbol> parseAttrPath(EvalState & state, std::string_view s);
+struct AttrPath : std::vector<Symbol>
+{
+    using std::vector<Symbol>::vector;
+
+    static AttrPath parse(EvalState & state, std::string_view s);
+
+    std::string to_string(EvalState & state) const;
+
+    std::vector<SymbolStr> resolve(EvalState & state) const;
+};
 
 } // namespace nix

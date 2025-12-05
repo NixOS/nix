@@ -99,7 +99,7 @@ TEST(references, scanForReferencesDeep)
     // Create an in-memory file system with various reference patterns
     auto accessor = make_ref<MemorySourceAccessor>();
     accessor->root = File::Directory{
-        .contents{
+        .entries{
             {
                 // file1.txt: contains hash1
                 "file1.txt",
@@ -125,7 +125,7 @@ TEST(references, scanForReferencesDeep)
                 // subdir: a subdirectory
                 "subdir",
                 File::Directory{
-                    .contents{
+                    .entries{
                         {
                             // subdir/file4.txt: contains hash1 again
                             "file4.txt",

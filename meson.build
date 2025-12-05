@@ -60,4 +60,9 @@ if get_option('unit-tests')
   subproject('libflake-tests')
 endif
 subproject('nix-functional-tests')
-subproject('json-schema-checks')
+if get_option('json-schema-checks')
+  subproject('json-schema-checks')
+endif
+if get_option('kaitai-struct-checks')
+  subproject('kaitai-struct-checks')
+endif

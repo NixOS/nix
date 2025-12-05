@@ -47,9 +47,17 @@ try2 () {
     hashFromGit=$(git -C "$repo" rev-parse "HEAD:$hashPath")
     [[ "$hashFromGit" == "$expected" ]]
 
-    local caFromNix
-    caFromNix=$(nix path-info --json "$path" | jq -r ".[] | .ca")
-    [[ "fixed:git:$hashAlgo:$(nix hash convert --to nix32 "$hashAlgo:$hashFromGit")" = "$caFromNix" ]]
+    nix path-info --json --json-format 2 "$path" | jq -e \
+        --arg algo "$hashAlgo" \
+        --arg hash "$hashFromGit" \
+        '.info.[].ca == {
+            method: "git",
+            hash: {
+                algorithm: $algo,
+                format: "base16",
+                hash: $hash
+            },
+        }'
 }
 
 test0 () {

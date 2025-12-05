@@ -29,6 +29,18 @@ nix-build -o "$TEST_ROOT"/result dependencies.nix --post-build-hook "$pushToStor
 export BUILD_HOOK_ONLY_OUT_PATHS=$([ ! "$NIX_TESTS_CA_BY_DEFAULT" ])
 nix-build -o "$TEST_ROOT"/result-mult multiple-outputs.nix -A a.first --post-build-hook "$pushToStore"
 
+if isDaemonNewer "2.33.0pre20251029"; then
+    # Regression test for issue #14287: `--check` should re-run post build
+    # hook, even though nothing is getting newly registered.
+    export HOOK_DEST=$TEST_ROOT/listing
+    # Needed so the hook will get the above environment variable.
+    restartDaemon
+    nix-build -o "$TEST_ROOT"/result-mult multiple-outputs.nix --check -A a.first --post-build-hook "$PWD/build-hook-list-paths.sh"
+    grepQuiet a-first "$HOOK_DEST"
+    grepQuiet a-second "$HOOK_DEST"
+    unset HOOK_DEST
+fi
+
 clearStore
 
 # Ensure that the remote store contains both the runtime and build-time

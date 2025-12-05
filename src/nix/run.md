@@ -33,6 +33,16 @@ R""(
   # nix run nixpkgs#vim -- --help
   ```
 
+* Run the default app from the current directory with arguments:
+
+  ```console
+  # nix run . -- arg1 arg2
+  ```
+
+  Note: The first positional argument is always treated as the *installable*,
+  even after `--`. To pass arguments to the default installable, specify it
+  explicitly: `nix run . -- arg1 arg2` or `nix run -- . arg1 arg2`.
+
 # Description
 
 `nix run` builds and runs [*installable*](./nix.md#installables), which must evaluate to an

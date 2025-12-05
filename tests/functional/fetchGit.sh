@@ -228,6 +228,10 @@ path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rep
 rev4=$(git -C "$repo" rev-parse HEAD)
 rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
 [[ $rev4 = "$rev4_nix" ]]
+export _NIX_FORCE_HTTP=1
+rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
+[[ $rev4 = "$rev4_nix" ]]
+unset _NIX_FORCE_HTTP
 
 # The name argument should be handled
 path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; name = \"foo\"; }).outPath")

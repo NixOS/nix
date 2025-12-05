@@ -11,9 +11,19 @@ namespace nix {
 
 using nlohmann::json;
 
-class NarInfoTest : public CharacterizationTest, public LibStoreTest
+class NarInfoTestV1 : public CharacterizationTest, public LibStoreTest
 {
-    std::filesystem::path unitTestData = getUnitTestData() / "nar-info";
+    std::filesystem::path unitTestData = getUnitTestData() / "nar-info" / "json-1";
+
+    std::filesystem::path goldenMaster(PathView testStem) const override
+    {
+        return unitTestData / (testStem + ".json");
+    }
+};
+
+class NarInfoTestV2 : public CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "nar-info" / "json-2";
 
     std::filesystem::path goldenMaster(PathView testStem) const override
     {
@@ -59,27 +69,63 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
     return info;
 }
 
-#define JSON_TEST(STEM, PURE)                                                                          \
-    TEST_F(NarInfoTest, NarInfo_##STEM##_from_json)                                                    \
-    {                                                                                                  \
-        readTest(#STEM, [&](const auto & encoded_) {                                                   \
-            auto encoded = json::parse(encoded_);                                                      \
-            auto expected = makeNarInfo(*store, PURE);                                                 \
-            NarInfo got = NarInfo::fromJSON(*store, expected.path, encoded);                           \
-            ASSERT_EQ(got, expected);                                                                  \
-        });                                                                                            \
-    }                                                                                                  \
-                                                                                                       \
-    TEST_F(NarInfoTest, NarInfo_##STEM##_to_json)                                                      \
-    {                                                                                                  \
-        writeTest(                                                                                     \
-            #STEM,                                                                                     \
-            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(*store, PURE, HashFormat::SRI); }, \
-            [](const auto & file) { return json::parse(readFile(file)); },                             \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });  \
+#define JSON_READ_TEST_V1(STEM, PURE)                              \
+    TEST_F(NarInfoTestV1, NarInfo_##STEM##_from_json)              \
+    {                                                              \
+        readTest(#STEM, [&](const auto & encoded_) {               \
+            auto encoded = json::parse(encoded_);                  \
+            auto expected = makeNarInfo(*store, PURE);             \
+            auto got = UnkeyedNarInfo::fromJSON(&*store, encoded); \
+            ASSERT_EQ(got, expected);                              \
+        });                                                        \
     }
 
-JSON_TEST(pure, false)
-JSON_TEST(impure, true)
+#define JSON_WRITE_TEST_V1(STEM, PURE)                                                                         \
+    TEST_F(NarInfoTestV1, NarInfo_##STEM##_to_json)                                                            \
+    {                                                                                                          \
+        writeTest(                                                                                             \
+            #STEM,                                                                                             \
+            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(&*store, PURE, PathInfoJsonFormat::V1); }, \
+            [](const auto & file) { return json::parse(readFile(file)); },                                     \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });          \
+    }
+
+#define JSON_TEST_V1(STEM, PURE)  \
+    JSON_READ_TEST_V1(STEM, PURE) \
+    JSON_WRITE_TEST_V1(STEM, PURE)
+
+#define JSON_READ_TEST_V2(STEM, PURE)                              \
+    TEST_F(NarInfoTestV2, NarInfo_##STEM##_from_json)              \
+    {                                                              \
+        readTest(#STEM, [&](const auto & encoded_) {               \
+            auto encoded = json::parse(encoded_);                  \
+            auto expected = makeNarInfo(*store, PURE);             \
+            auto got = UnkeyedNarInfo::fromJSON(nullptr, encoded); \
+            ASSERT_EQ(got, expected);                              \
+        });                                                        \
+    }
+
+#define JSON_WRITE_TEST_V2(STEM, PURE)                                                                         \
+    TEST_F(NarInfoTestV2, NarInfo_##STEM##_to_json)                                                            \
+    {                                                                                                          \
+        writeTest(                                                                                             \
+            #STEM,                                                                                             \
+            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(nullptr, PURE, PathInfoJsonFormat::V2); }, \
+            [](const auto & file) { return json::parse(readFile(file)); },                                     \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });          \
+    }
+
+#define JSON_TEST_V2(STEM, PURE)  \
+    JSON_READ_TEST_V2(STEM, PURE) \
+    JSON_WRITE_TEST_V2(STEM, PURE)
+
+JSON_TEST_V1(pure, false)
+JSON_TEST_V1(impure, true)
+
+// Test that JSON without explicit version field parses as V1
+JSON_READ_TEST_V1(pure_noversion, false)
+
+JSON_TEST_V2(pure, false)
+JSON_TEST_V2(impure, true)
 
 } // namespace nix

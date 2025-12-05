@@ -81,12 +81,29 @@ protected:
     bool fileExists(const std::string & path) override;
 
     void upsertFile(
-        const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType,
-        uint64_t sizeHint) override;
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
     FileTransferRequest makeRequest(std::string_view path);
+
+    /**
+     * Uploads data to the binary cache.
+     *
+     * This is a lower-level method that handles the actual upload after
+     * compression has been applied. It does not handle compression or
+     * error wrapping - those are the caller's responsibility.
+     *
+     * @param path The path in the binary cache to upload to
+     * @param source The data source (should already be compressed if needed)
+     * @param sizeHint Size hint for the data
+     * @param mimeType The MIME type of the content
+     * @param contentEncoding Optional Content-Encoding header value (e.g., "xz", "br")
+     */
+    void upload(
+        std::string_view path,
+        RestartableSource & source,
+        uint64_t sizeHint,
+        std::string_view mimeType,
+        std::optional<Headers> headers);
 
     void getFile(const std::string & path, Sink & sink) override;
 

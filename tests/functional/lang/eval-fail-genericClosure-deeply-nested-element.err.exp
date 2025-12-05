@@ -1,0 +1,18 @@
+error:
+       … while calling the 'seq' builtin
+         at /pwd/lang/eval-fail-genericClosure-deeply-nested-element.nix:25:1:
+           24| in
+           25| builtins.seq finiteVal (
+             | ^
+           26|   builtins.genericClosure {
+
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-deeply-nested-element.nix:26:3:
+           25| builtins.seq finiteVal (
+           26|   builtins.genericClosure {
+             |   ^
+           27|     startSet = [
+
+       … in genericClosure element { finite = { a0 = { a1 = { a2 = { a3 = { a4 = { a5 = { a6 = { a7 = { a8 = { ... }; }; }; }; }; }; }; }; }; }; «1 attribute elided» }
+
+       error: attribute 'key' missing

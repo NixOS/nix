@@ -65,7 +65,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
  * @note subclasses must implement at least one of the two
  * virtual getFile() methods.
  */
-struct BinaryCacheStore : virtual Store, virtual LogStore
+struct alignas(8) /* Work around ASAN failures on i686-linux. */
+    BinaryCacheStore : virtual Store,
+                       virtual LogStore
 {
     using Config = BinaryCacheStoreConfig;
 
@@ -101,10 +103,7 @@ public:
     virtual bool fileExists(const std::string & path) = 0;
 
     virtual void upsertFile(
-        const std::string & path,
-        std::shared_ptr<std::basic_iostream<char>> istream,
-        const std::string & mimeType,
-        uint64_t sizeHint) = 0;
+        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
 
     void upsertFile(
         const std::string & path,
