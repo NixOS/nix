@@ -12,6 +12,7 @@
       "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv"
     ],
     "registrationTime": null,
+    "lastUsageTime": null,
     "signatures": [],
     "ultimate": false,
     "version": 2
@@ -37,6 +38,7 @@
       "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
     ],
     "registrationTime": null,
+    "lastUsageTime": null,
     "signatures": [
       "fake-sig-1",
       "fake-sig-2"
