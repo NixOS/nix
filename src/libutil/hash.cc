@@ -61,103 +61,81 @@ std::strong_ordering Hash::operator<=>(const Hash & h) const noexcept
     return std::strong_ordering::equivalent;
 }
 
+Base HashFormat::toBase() const
+{
+    return std::visit(
+        overloaded{
+            [](Base base) { return base; },
+            [](const HashFormatSRI &) { return Base::Base64; },
+        },
+        raw);
+}
+
 std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
 {
     std::string s;
-    if (hashFormat == HashFormat::SRI || includeAlgo) {
-        s += printHashAlgo(algo);
-        s += hashFormat == HashFormat::SRI ? '-' : ':';
-    }
+    std::visit(
+        overloaded{
+            [&](Base) {
+                if (includeAlgo) {
+                    s += printHashAlgo(algo);
+                    s += ':';
+                }
+            },
+            [&](const HashFormatSRI &) {
+                // SRI format always includes the algorithm
+                s += printHashAlgo(algo);
+                s += '-';
+            },
+        },
+        hashFormat.raw);
     const auto bytes = std::as_bytes(std::span<const uint8_t>{&hash[0], hashSize});
-    switch (hashFormat) {
-    case HashFormat::Base16:
-        assert(hashSize);
-        s += base16::encode(bytes);
-        break;
-    case HashFormat::Nix32:
-        assert(hashSize);
-        s += BaseNix32::encode(bytes);
-        break;
-    case HashFormat::Base64:
-    case HashFormat::SRI:
-        assert(hashSize);
-        s += base64::encode(bytes);
-        break;
-    }
+    assert(hashSize);
+    s += getBaseEncoding(hashFormat.toBase()).encode(bytes);
     return s;
 }
 
 Hash Hash::dummy(HashAlgorithm::SHA256);
 
-namespace {
-
-/// Private convenience
-struct DecodeNamePair
-{
-    decltype(base16::decode) * decode;
-    std::string_view encodingName;
-};
-
-} // namespace
-
-static DecodeNamePair baseExplicit(HashFormat format)
-{
-    switch (format) {
-    case HashFormat::Base16:
-        return {base16::decode, "base16"};
-    case HashFormat::Nix32:
-        return {BaseNix32::decode, "nix32"};
-    case HashFormat::Base64:
-        return {base64::decode, "Base64"};
-    case HashFormat::SRI:
-        break;
-    }
-    unreachable();
-}
-
 /**
- * Given the expected size of the message once decoded it, figure out
- * which encoding we are using by looking at the size of the encoded
- * message.
+ * Given the encoded string and hash algorithm, detect the base encoding.
+ * Throws BadHash if no encoding matches the expected size.
  */
-static HashFormat baseFromSize(std::string_view rest, HashAlgorithm algo)
+static Base detectBase(std::string_view s, HashAlgorithm algo)
 {
-    auto hashSize = regularHashSize(algo);
-
-    if (rest.size() == base16::encodedLength(hashSize))
-        return HashFormat::Base16;
-
-    if (rest.size() == BaseNix32::encodedLength(hashSize))
-        return HashFormat::Nix32;
-
-    if (rest.size() == base64::encodedLength(hashSize))
-        return HashFormat::Base64;
-
-    throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", rest, printHashAlgo(algo));
+    auto base = baseFromEncodedSize(s.size(), regularHashSize(algo));
+    if (!base)
+        throw BadHash("hash '%s' has wrong length for hash algorithm '%s'", s, printHashAlgo(algo));
+    return *base;
 }
 
 /**
- * Given the exact decoding function, and a display name for in error
- * messages.
+ * @param rest the string view to parse. Must *not* include any
+ * `<algo>(:|-)` prefix.
  *
- * @param rest the string view to parse. Must not include any `<algo>(:|-)` prefix.
+ * @param format the hash format whose underlying base is to use for
+ * decoding. `HashFormat` not `Base` is used just for error messages.
  */
 static Hash parseLowLevel(
     std::string_view rest,
     HashAlgorithm algo,
-    DecodeNamePair pair,
+    HashFormat format,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
     Hash res{algo, xpSettings};
     std::string d;
     try {
-        d = pair.decode(rest);
+        d = getBaseEncoding(format.toBase()).decode(rest);
     } catch (Error & e) {
         e.addTrace({}, "While decoding hash '%s'", rest);
     }
     if (d.size() != res.hashSize)
         throw BadHash(
-            "invalid %s hash '%s', length %d != expected length %d", pair.encodingName, rest, d.size(), res.hashSize);
+            "invalid %s hash '%s', length %d != expected length %d",
+            printHashFormatDisplay(format),
+            rest,
+            d.size(),
+            res.hashSize);
     assert(res.hashSize);
     memcpy(res.hash, d.data(), res.hashSize);
 
@@ -174,7 +152,7 @@ Hash Hash::parseSRI(std::string_view original)
         throw BadHash("hash '%s' is not SRI", original);
     HashAlgorithm parsedType = parseHashAlgo(*hashRaw);
 
-    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"});
+    return parseLowLevel(rest, parsedType, HashFormat::SRI);
 }
 
 /**
@@ -182,8 +160,10 @@ Hash Hash::parseSRI(std::string_view original)
  *
  * @param resolveAlgo resolves the parsed type (or throws an error when it is not
  * possible.)
+ *
+ * @return the parsed hash and the format it was parsed from
  */
-static Hash parseAnyHelper(std::string_view rest, auto resolveAlgo)
+static std::pair<Hash, HashFormat> parseAnyHelper(std::string_view rest, auto resolveAlgo)
 {
     bool isSRI = false;
 
@@ -203,34 +183,39 @@ static Hash parseAnyHelper(std::string_view rest, auto resolveAlgo)
 
     HashAlgorithm algo = resolveAlgo(std::move(optParsedAlgo));
 
-    auto [decode, formatName] = [&]() -> DecodeNamePair {
-        if (isSRI) {
-            /* In the SRI case, we always are using Base64. If the
-               length is wrong, get an error later. */
-            return {base64::decode, "SRI"};
-        } else {
-            /* Otherwise, decide via the length of the hash (for the
-               given algorithm) what base encoding it is. */
-            return baseExplicit(baseFromSize(rest, algo));
-        }
-    }();
+    auto format = isSRI
+                      /* In the SRI case, we always are using Base64. If the
+                         length is wrong, get an error later. */
+                      ? HashFormat::SRI
+                      /* Otherwise, decide via the length of the hash (for the
+                         given algorithm) what base encoding it is. */
+                      : HashFormat{detectBase(rest, algo)};
 
-    return parseLowLevel(rest, algo, {decode, formatName});
+    return {parseLowLevel(rest, algo, format), format};
 }
 
 Hash Hash::parseAnyPrefixed(std::string_view original)
 {
-    return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
-        // Either the string or user must provide the type, if they both do they
-        // must agree.
-        if (!optParsedAlgo)
-            throw BadHash("hash '%s' does not include a type", original);
+    return parseAnyHelper(
+               original,
+               [&](std::optional<HashAlgorithm> optParsedAlgo) {
+                   // Either the string or user must provide the type, if they both do they
+                   // must agree.
+                   if (!optParsedAlgo)
+                       throw BadHash("hash '%s' does not include a type", original);
 
-        return *optParsedAlgo;
-    });
+                   return *optParsedAlgo;
+               })
+        .first;
 }
 
 Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optAlgo)
+{
+    return parseAnyReturningFormat(original, optAlgo).first;
+}
+
+std::pair<Hash, HashFormat>
+Hash::parseAnyReturningFormat(std::string_view original, std::optional<HashAlgorithm> optAlgo)
 {
     return parseAnyHelper(original, [&](std::optional<HashAlgorithm> optParsedAlgo) {
         // Either the string or user must provide the type, if they both do they
@@ -246,13 +231,13 @@ Hash Hash::parseAny(std::string_view original, std::optional<HashAlgorithm> optA
 
 Hash Hash::parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo)
 {
-    return parseExplicitFormatUnprefixed(s, algo, baseFromSize(s, algo));
+    return parseExplicitFormatUnprefixed(s, algo, detectBase(s, algo));
 }
 
 Hash Hash::parseExplicitFormatUnprefixed(
-    std::string_view s, HashAlgorithm algo, HashFormat format, const ExperimentalFeatureSettings & xpSettings)
+    std::string_view s, HashAlgorithm algo, Base base, const ExperimentalFeatureSettings & xpSettings)
 {
-    return parseLowLevel(s, algo, baseExplicit(format), xpSettings);
+    return parseLowLevel(s, algo, HashFormat{base}, xpSettings);
 }
 
 Hash Hash::random(HashAlgorithm algo)
@@ -411,16 +396,8 @@ Hash compressHash(const Hash & hash, unsigned int newSize)
 
 std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName)
 {
-    if (hashFormatName == "base16")
-        return HashFormat::Base16;
-    if (hashFormatName == "nix32")
-        return HashFormat::Nix32;
-    if (hashFormatName == "base32") {
-        warn(R"("base32" is a deprecated alias for hash format "nix32".)");
-        return HashFormat::Nix32;
-    }
-    if (hashFormatName == "base64")
-        return HashFormat::Base64;
+    if (auto base = parseBaseOpt(hashFormatName))
+        return *base;
     if (hashFormatName == "sri")
         return HashFormat::SRI;
     return std::nullopt;
@@ -434,22 +411,24 @@ HashFormat parseHashFormat(std::string_view hashFormatName)
     throw UsageError("unknown hash format '%1%', expect 'base16', 'base32', 'base64', or 'sri'", hashFormatName);
 }
 
-std::string_view printHashFormat(HashFormat HashFormat)
+std::string_view printHashFormat(HashFormat hashFormat)
 {
-    switch (HashFormat) {
-    case HashFormat::Base64:
-        return "base64";
-    case HashFormat::Nix32:
-        return "nix32";
-    case HashFormat::Base16:
-        return "base16";
-    case HashFormat::SRI:
-        return "sri";
-    default:
-        // illegal hash base enum value internally, as opposed to external input
-        // which should be validated with nice error message.
-        assert(false);
-    }
+    return std::visit(
+        overloaded{
+            [](Base base) -> std::string_view { return printBase(base); },
+            [](const HashFormatSRI &) -> std::string_view { return "sri"; },
+        },
+        hashFormat.raw);
+}
+
+std::string_view printHashFormatDisplay(HashFormat hashFormat)
+{
+    return std::visit(
+        overloaded{
+            [](Base base) -> std::string_view { return printBaseDisplay(base); },
+            [](const HashFormatSRI &) -> std::string_view { return "SRI"; },
+        },
+        hashFormat.raw);
 }
 
 std::optional<HashAlgorithm> parseHashAlgoOpt(std::string_view s, const ExperimentalFeatureSettings & xpSettings)
@@ -509,15 +488,15 @@ Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatur
     auto & obj = getObject(json);
     auto algo = parseHashAlgo(getString(valueAt(obj, "algorithm")), xpSettings);
     auto formatStr = getString(valueAt(obj, "format"));
-    auto format = parseHashFormat(formatStr);
+    auto base = parseBase(formatStr);
 
     // Only base16 format is supported for JSON serialization
-    if (format != HashFormat::Base16) {
+    if (base != Base::Base16) {
         throw Error("hash format '%s' is not supported in JSON; only 'base16' is currently supported", formatStr);
     }
 
     auto & hashS = getString(valueAt(obj, "hash"));
-    return Hash::parseExplicitFormatUnprefixed(hashS, algo, format, xpSettings);
+    return Hash::parseExplicitFormatUnprefixed(hashS, algo, base, xpSettings);
 }
 
 void adl_serializer<Hash>::to_json(json & json, const Hash & hash)

@@ -16,7 +16,7 @@
 namespace nix {
 
 enum struct HashAlgorithm : char;
-enum struct HashFormat : int;
+struct HashFormat;
 
 class MultiCommand;
 

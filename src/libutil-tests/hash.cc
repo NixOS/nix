@@ -193,7 +193,7 @@ TEST(hashParseExplicitFormatUnprefixed, testKnownSHA256Hashes1_wrongBase)
 
 TEST(hashFormat, testRoundTripPrintParse)
 {
-    for (const HashFormat hashFormat : {HashFormat::Base64, HashFormat::Nix32, HashFormat::Base16, HashFormat::SRI}) {
+    for (const HashFormat hashFormat : {HashFormat{Base::Base64}, {Base::Nix32}, {Base::Base16}, {HashFormat::SRI}}) {
         ASSERT_EQ(parseHashFormat(printHashFormat(hashFormat)), hashFormat);
         ASSERT_EQ(*parseHashFormatOpt(printHashFormat(hashFormat)), hashFormat);
     }
