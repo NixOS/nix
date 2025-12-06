@@ -164,6 +164,11 @@ private:
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     /**
+     * Bump the last usage time in both the lower and upper DBs.
+     */
+    void bumpLastUsageTime(const StorePath & path) override;
+
+    /**
      * First copy up any lower store realisation with the same key, so we
      * merge rather than mask it.
      */
