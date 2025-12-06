@@ -91,7 +91,7 @@ std::string Hash::to_string(HashFormat hashFormat, bool includeAlgo) const
         hashFormat.raw);
     const auto bytes = std::as_bytes(std::span<const uint8_t>{&hash[0], hashSize});
     assert(hashSize);
-    s += encodeForBase(hashFormat.toBase())(bytes);
+    s += getBaseEncoding(hashFormat.toBase()).encode(bytes);
     return s;
 }
 
@@ -125,7 +125,7 @@ static Hash parseLowLevel(
     Hash res{algo, xpSettings};
     std::string d;
     try {
-        d = decodeForBase(format.toBase())(rest);
+        d = getBaseEncoding(format.toBase()).decode(rest);
     } catch (Error & e) {
         e.addTrace({}, "While decoding hash '%s'", rest);
     }

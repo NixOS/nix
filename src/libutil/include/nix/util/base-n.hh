@@ -101,13 +101,26 @@ std::string decode(std::string_view s);
 } // namespace base64
 
 /**
- * Get the encoding function for the given base encoding.
+ * Abstract interface for base-N encoding/decoding operations.
  */
-decltype(base16::encode) * encodeForBase(Base base);
+struct BaseEncoding
+{
+    virtual ~BaseEncoding() = default;
+
+    /**
+     * Encode arbitrary bytes to a string.
+     */
+    virtual std::string encode(std::span<const std::byte> data) const = 0;
+
+    /**
+     * Decode a string to bytes.
+     */
+    virtual std::string decode(std::string_view s) const = 0;
+};
 
 /**
- * Get the decoding function for the given base encoding.
+ * Get the encoding/decoding functions for the given base encoding.
  */
-decltype(base16::decode) * decodeForBase(Base base);
+const BaseEncoding & getBaseEncoding(Base base);
 
 } // namespace nix

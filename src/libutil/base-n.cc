@@ -177,28 +177,62 @@ std::string base64::decode(std::string_view s)
     return res;
 }
 
-decltype(base16::encode) * encodeForBase(Base base)
-{
-    switch (base) {
-    case Base::Base16:
-        return base16::encode;
-    case Base::Nix32:
-        return BaseNix32::encode;
-    case Base::Base64:
-        return base64::encode;
-    }
-    unreachable();
-}
+namespace {
 
-decltype(base16::decode) * decodeForBase(Base base)
+struct Base16Encoding final : BaseEncoding
+{
+    std::string encode(std::span<const std::byte> data) const override
+    {
+        return base16::encode(data);
+    }
+
+    std::string decode(std::string_view s) const override
+    {
+        return base16::decode(s);
+    }
+};
+
+struct Nix32Encoding final : BaseEncoding
+{
+    std::string encode(std::span<const std::byte> data) const override
+    {
+        return BaseNix32::encode(data);
+    }
+
+    std::string decode(std::string_view s) const override
+    {
+        return BaseNix32::decode(s);
+    }
+};
+
+struct Base64Encoding final : BaseEncoding
+{
+    std::string encode(std::span<const std::byte> data) const override
+    {
+        return base64::encode(data);
+    }
+
+    std::string decode(std::string_view s) const override
+    {
+        return base64::decode(s);
+    }
+};
+
+const Base16Encoding base16Encoding;
+const Nix32Encoding nix32Encoding;
+const Base64Encoding base64Encoding;
+
+} // anonymous namespace
+
+const BaseEncoding & getBaseEncoding(Base base)
 {
     switch (base) {
     case Base::Base16:
-        return base16::decode;
+        return base16Encoding;
     case Base::Nix32:
-        return BaseNix32::decode;
+        return nix32Encoding;
     case Base::Base64:
-        return base64::decode;
+        return base64Encoding;
     }
     unreachable();
 }
