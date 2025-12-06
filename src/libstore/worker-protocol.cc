@@ -262,6 +262,9 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
         info.sigs = readStrings<StringSet>(conn.from);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
+    if (conn.features && conn.features->contains(WorkerProto::pathLastUsageTimeFeature)) {
+        conn.from >> info.lastUsageTime;
+    }
     return info;
 }
 
@@ -274,6 +277,9 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
         conn.to << pathInfo.ultimate << pathInfo.sigs << renderContentAddress(pathInfo.ca);
+    }
+    if (conn.features && conn.features->contains(WorkerProto::pathLastUsageTimeFeature)) {
+        conn.to << pathInfo.lastUsageTime;
     }
 }
 
