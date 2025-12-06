@@ -4,3 +4,10 @@ option(
   value : true,
   description : 'Whether this is an official release build (affects documentation URLs)',
 )
+
+option(
+  'html-manual',
+  type : 'boolean',
+  value : true,
+  description : 'Whether to build the HTML manual (requires mdbook)',
+)

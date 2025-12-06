@@ -19,6 +19,11 @@
   # Configuration Options
 
   version,
+  /**
+    Whether to build the HTML manual.
+    When false, only manpages are built, avoiding the mdbook dependency.
+  */
+  buildHtmlManual ? true,
 
   # `tests` attribute
   testers,
@@ -57,9 +62,22 @@ mkMesonDerivation (finalAttrs: {
       ../../doc/manual/package.nix;
 
   # TODO the man pages should probably be separate
-  outputs = [
-    "out"
-    "man"
+  outputs =
+    if buildHtmlManual then
+      [
+        "out"
+        "man"
+      ]
+    else
+      [ "out" ]; # Only one output when HTML manual is disabled; use "out" for manpages
+
+  # When HTML manual is disabled, install manpages to "out" instead of "man"
+  mesonFlags = [
+    (lib.mesonBool "official-release" officialRelease)
+    (lib.mesonBool "html-manual" buildHtmlManual)
+  ]
+  ++ lib.optionals (!buildHtmlManual) [
+    "--mandir=${placeholder "out"}/share/man"
   ];
 
   nativeBuildInputs = [
@@ -67,22 +85,19 @@ mkMesonDerivation (finalAttrs: {
     meson
     ninja
     (lib.getBin lowdown-unsandboxed)
-    mdbook
     jq
     python3
+  ]
+  ++ lib.optionals buildHtmlManual [
+    mdbook
     rsync
     json-schema-for-humans
-    changelog-d
   ]
-  ++ lib.optionals (!officialRelease) [
+  ++ lib.optionals (!officialRelease && buildHtmlManual) [
     # When not an official release, we likely have changelog entries that have
     # yet to be rendered.
     # When released, these are rendered into a committed file to save a dependency.
     changelog-d
-  ];
-
-  mesonFlags = [
-    (lib.mesonBool "official-release" officialRelease)
   ];
 
   preConfigure = ''
@@ -90,45 +105,48 @@ mkMesonDerivation (finalAttrs: {
     echo ${finalAttrs.version} > ./.version
   '';
 
-  postInstall = ''
+  postInstall = lib.optionalString buildHtmlManual ''
     mkdir -p ''$out/nix-support
     echo "doc manual ''$out/share/doc/nix/manual" >> ''$out/nix-support/hydra-build-products
   '';
 
-  /**
-    The root of the HTML manual.
-    E.g. "${nix-manual.site}/index.html" exists.
-  */
-  passthru.site = finalAttrs.finalPackage + "/share/doc/nix/manual";
+  passthru = lib.optionalAttrs buildHtmlManual {
+    /**
+      The root of the HTML manual.
+      E.g. "${nix-manual.site}/index.html" exists.
+    */
 
-  passthru.tests =
-    let
-      redirect-targets = callPackage ./redirect-targets-html.nix { };
-    in
-    {
-      # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
-      linkcheck = testers.lycheeLinkCheck {
-        site =
-          let
-            plain = finalAttrs.finalPackage.site;
-          in
-          runCommand "nix-manual-with-redirect-targets" { } ''
-            cp -r ${plain} $out
-            chmod -R u+w $out
-            cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
-          '';
-        extraConfig = {
-          exclude = [
-            # Exclude auto-generated JSON schema documentation which has
-            # auto-generated fragment IDs that don't match the link references
-            ".*/protocols/json/.*\\.html"
-            # Exclude undocumented builtins
-            ".*/language/builtins\\.html#builtins-addErrorContext"
-            ".*/language/builtins\\.html#builtins-appendContext"
-          ];
+    site = finalAttrs.finalPackage + "/share/doc/nix/manual";
+
+    tests =
+      let
+        redirect-targets = callPackage ./redirect-targets-html.nix { };
+      in
+      {
+        # https://nixos.org/manual/nixpkgs/stable/index.html#tester-lycheeLinkCheck
+        linkcheck = testers.lycheeLinkCheck {
+          site =
+            let
+              plain = finalAttrs.finalPackage.site;
+            in
+            runCommand "nix-manual-with-redirect-targets" { } ''
+              cp -r ${plain} $out
+              chmod -R u+w $out
+              cp ${redirect-targets}/redirect-targets.html $out/redirect-targets.html
+            '';
+          extraConfig = {
+            exclude = [
+              # Exclude auto-generated JSON schema documentation which has
+              # auto-generated fragment IDs that don't match the link references
+              ".*/protocols/json/.*\\.html"
+              # Exclude undocumented builtins
+              ".*/language/builtins\\.html#builtins-addErrorContext"
+              ".*/language/builtins\\.html#builtins-appendContext"
+            ];
+          };
         };
       };
-    };
+  };
 
   meta = {
     platforms = lib.platforms.all;

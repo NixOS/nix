@@ -429,6 +429,15 @@ in
     The manual as would be published on https://nix.dev/reference/nix-manual
   */
   nix-manual = callPackage ../doc/manual/package.nix { version = fineVersion; };
+
+  /**
+    Manpages only (no HTML manual, no mdbook dependency)
+  */
+  nix-manual-manpages-only = callPackage ../doc/manual/package.nix {
+    version = fineVersion;
+    buildHtmlManual = false;
+  };
+
   /**
     Doxygen pages for C++ code
   */

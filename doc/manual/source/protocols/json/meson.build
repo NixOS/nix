@@ -35,27 +35,27 @@ endforeach
 
 json_schema_generated_files = []
 
-# Generate markdown documentation from JSON schema
-# Note: output must be just a filename, not a path
-gen_file = custom_target(
-  schema_name + '-schema-docs.tmp',
-  command : [
-    json_schema_for_humans,
-    '--config-file',
-    json_schema_config,
-    meson.current_source_dir() / 'schema',
-    meson.current_build_dir(),
-  ],
-  input : schema_files + [
-    json_schema_config,
-  ],
-  output : schema_outputs,
-  capture : false,
-  build_by_default : true,
-)
-
-idx = 0
 if json_schema_for_humans.found()
+  # Generate markdown documentation from JSON schema
+  # Note: output must be just a filename, not a path
+  gen_file = custom_target(
+    schema_name + '-schema-docs.tmp',
+    command : [
+      json_schema_for_humans,
+      '--config-file',
+      json_schema_config,
+      meson.current_source_dir() / 'schema',
+      meson.current_build_dir(),
+    ],
+    input : schema_files + [
+      json_schema_config,
+    ],
+    output : schema_outputs,
+    capture : false,
+    build_by_default : true,
+  )
+
+  idx = 0
   foreach schema_name : schemas
     #schema_file = 'schema' / schema_name + '.yaml'
 
