@@ -84,6 +84,11 @@ struct UnkeyedValidPathInfo
     time_t registrationTime = 0;
 
     /**
+     * When this store object was last used, if known.
+     */
+    time_t lastUsageTime = 0;
+
+    /**
      * 0 = unknown
      */
     uint64_t narSize = 0;

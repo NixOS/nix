@@ -8,6 +8,7 @@
       "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv"
     ],
     "registrationTime": null,
+    "lastUsageTime": null,
     "signatures": [],
     "storeDir": "/nix/store",
     "ultimate": false,
@@ -26,6 +27,7 @@
       "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
     ],
     "registrationTime": null,
+    "lastUsageTime": null,
     "signatures": [
       "fake-sig-1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
       "fake-sig-2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
