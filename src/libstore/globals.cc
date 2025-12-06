@@ -50,6 +50,9 @@ Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
 
+// Global jobserver FIFO path (set by daemon, used by derivation-builder)
+std::string jobserverFifoPath;
+
 Settings::Settings()
     : nixPrefix(NIX_PREFIX)
     , nixStore(

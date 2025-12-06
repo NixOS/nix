@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/select.h>
@@ -34,6 +35,7 @@
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 
 #ifdef __linux__
 #  include "nix/util/cgroup.hh"
@@ -288,6 +290,10 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
     return {trusted, std::move(user)};
 }
 
+// Global FDs for jobserver (kept open for daemon lifetime)
+static AutoCloseFD jobserverReaderFd;
+static AutoCloseFD jobserverWriterFd;
+
 /**
  * Run a server. The loop opens a socket and accepts new connections from that
  * socket.
@@ -341,6 +347,72 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         writeFile(daemonCgroupPath + "/cgroup.procs", fmt("%d", getpid()));
     }
 #endif
+
+    // Initialize GNU Make jobserver if enabled
+    if (settings.useJobserver) {
+        jobserverFifoPath = settings.nixStateDir + "/jobserver.fifo";
+
+        int totalTokens = settings.jobserverTokens;
+        if (totalTokens == 0) {
+            totalTokens = settings.buildCores ? settings.buildCores : settings.getDefaultCores();
+        }
+
+        /* GNU Make Protocol: Account for implicit slots
+         * Each concurrent build gets one free slot without touching the FIFO
+         * So if we want N total parallel jobs with M concurrent builds,
+         * we put N-M tokens in the FIFO */
+        int implicitSlots = settings.maxBuildJobs;
+        if (implicitSlots == 0)
+            implicitSlots = 1;
+
+        int fifoTokens = totalTokens - implicitSlots;
+        if (fifoTokens < 1) {
+            // Safety: ensure at least some tokens in FIFO
+            fifoTokens = totalTokens;
+            implicitSlots = 0;
+        }
+
+        // Remove old FIFO if it exists
+        unlink(jobserverFifoPath.c_str());
+        createDirs(dirOf(jobserverFifoPath));
+
+        // Create FIFO with permissions allowing build users to access
+        if (mkfifo(jobserverFifoPath.c_str(), 0660) == 0) {
+            // Open reader FD (non-blocking) - keeps FIFO alive, prevents EOF
+            jobserverReaderFd = open(jobserverFifoPath.c_str(), O_RDONLY | O_NONBLOCK);
+            if (jobserverReaderFd) {
+                // Open writer FD (non-blocking) - MUST stay open per protocol
+                jobserverWriterFd = open(jobserverFifoPath.c_str(), O_WRONLY | O_NONBLOCK);
+                if (jobserverWriterFd) {
+                    // Write tokens (each token is a single '+' character)
+                    std::string tokens(fifoTokens, '+');
+                    ssize_t written = write(jobserverWriterFd.get(), tokens.c_str(), fifoTokens);
+                    if (written == fifoTokens) {
+                        printInfo(
+                            "jobserver: initialized with %d tokens at %s (%d implicit slots reserved)",
+                            fifoTokens,
+                            jobserverFifoPath,
+                            implicitSlots);
+                    } else {
+                        warn("jobserver: only wrote %zd of %d tokens", written, fifoTokens);
+                    }
+                    // DO NOT CLOSE writer FD - must stay open for daemon lifetime
+                } else {
+                    warn("jobserver: failed to open writer: %s", strerror(errno));
+                    jobserverReaderFd.close();
+                    unlink(jobserverFifoPath.c_str());
+                    jobserverFifoPath.clear();
+                }
+            } else {
+                warn("jobserver: failed to open reader: %s", strerror(errno));
+                unlink(jobserverFifoPath.c_str());
+                jobserverFifoPath.clear();
+            }
+        } else {
+            warn("jobserver: failed to create FIFO: %s", strerror(errno));
+            jobserverFifoPath.clear();
+        }
+    }
 
     //  Loop accepting connections.
     while (1) {
@@ -410,12 +482,30 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 options);
 
         } catch (Interrupted & e) {
+            // Clean up jobserver on interrupt (e.g., SIGINT)
+            if (jobserverWriterFd) {
+                jobserverWriterFd.close();
+                jobserverReaderFd.close();
+                if (!jobserverFifoPath.empty()) {
+                    unlink(jobserverFifoPath.c_str());
+                }
+            }
             return;
         } catch (Error & error) {
             auto ei = error.info();
             // FIXME: add to trace?
             ei.msg = HintFmt("error processing connection: %1%", ei.msg.str());
             logError(ei);
+        }
+    }
+
+    // Clean up jobserver resources on daemon exit
+    if (jobserverWriterFd) {
+        printInfo("jobserver: cleaning up");
+        jobserverWriterFd.close();
+        jobserverReaderFd.close();
+        if (!jobserverFifoPath.empty()) {
+            unlink(jobserverFifoPath.c_str());
         }
     }
 }
