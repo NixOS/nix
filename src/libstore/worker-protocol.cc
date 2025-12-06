@@ -28,6 +28,7 @@ const WorkerProto::Version WorkerProto::latest = {
             std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
             std::string{WorkerProto::featureAddTempRoots},
+            std::string{WorkerProto::featurePathLastUsageTime},
         },
 };
 
@@ -432,6 +433,9 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
         info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
+    if (conn.version.features.contains(WorkerProto::featurePathLastUsageTime)) {
+        conn.from >> info.lastUsageTime;
+    }
     return info;
 }
 
@@ -446,6 +450,9 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
         conn.to << pathInfo.ultimate;
         WorkerProto::write(store, conn, pathInfo.sigs);
         conn.to << renderContentAddress(pathInfo.ca);
+    }
+    if (conn.version.features.contains(WorkerProto::featurePathLastUsageTime)) {
+        conn.to << pathInfo.lastUsageTime;
     }
 }
 
