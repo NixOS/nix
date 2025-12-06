@@ -285,6 +285,7 @@ enum struct WorkerProto::Op : uint64_t {
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
     AddTempRoots = 49,
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
+    BumpLastUsageTime = 51,
     SubmitOutput = 1000, // Only used within derivations with feature
     AddToStoreScanning = 1001,
 };
