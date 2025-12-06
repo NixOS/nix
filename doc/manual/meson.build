@@ -201,6 +201,7 @@ nix_nested_manpages = [
   ],
 ]
 
+# Manpage generation (standalone, no mdbook dependency)
 foreach command : nix_nested_manpages
   foreach page : command[1]
     title = command[0] + ' --' + page
@@ -208,15 +209,18 @@ foreach command : nix_nested_manpages
     custom_target(
       command : [
         bash,
-        files('./render-manpage.sh'),
+        '@INPUT0@',
         '--out-no-smarty',
         title,
         section,
-        '@INPUT0@/command-ref' / command[0] / (page + '.md'),
+        meson.current_source_dir() / 'source',
+        meson.current_build_dir() / 'source',
+        meson.current_source_dir() / 'source/command-ref' / command[0] / (page + '.md'),
         '@OUTPUT0@',
       ],
       input : [
-        manual_md,
+        files('./render-manpage.sh'),
+        files('./expand-includes.py'),
         nix_input,
       ],
       output : command[0] + '-' + page + '.1',
@@ -325,14 +329,20 @@ foreach page : nix3_manpages
     command : [
       bash,
       '@INPUT0@',
+      # Note: no --out-no-smarty flag (original behavior)
       page,
       section,
-      '@INPUT1@/command-ref/new-cli/@0@.md'.format(page),
+      meson.current_source_dir() / 'source',
+      meson.current_build_dir() / 'source',
+      meson.current_build_dir() / 'source/command-ref/new-cli/@0@.md'.format(
+        page,
+      ),
       '@OUTPUT@',
     ],
     input : [
       files('./render-manpage.sh'),
-      manual_md,
+      files('./expand-includes.py'),
+      nix3_cli_files,
       nix_input,
     ],
     output : page + '.1',
@@ -352,7 +362,12 @@ nix_manpages = [
   [ 'nix-channel', 1 ],
   [ 'nix-hash', 1 ],
   [ 'nix-copy-closure', 1 ],
-  [ 'nix.conf', 5, conf_file_md.full_path() ],
+  [
+    'nix.conf',
+    5,
+    conf_file_md.full_path(),
+    [ conf_file_md, experimental_features_shortlist_md ],
+  ],
   [ 'nix-daemon', 8 ],
   [ 'nix-profiles', 5, 'files/profiles.md' ],
 ]
@@ -364,19 +379,23 @@ foreach entry : nix_manpages
   # Therefore we use an optional third element of this array to override the name pattern
   md_file = entry.get(2, title + '.md')
   section = entry[1].to_string()
-  md_file_resolved = join_paths('@INPUT1@/command-ref/', md_file)
+  input_file = meson.current_source_dir() / 'source/command-ref' / md_file
+
   custom_target(
     command : [
       bash,
       '@INPUT0@',
+      # Note: no --out-no-smarty flag (original behavior)
       title,
       section,
-      md_file_resolved,
+      meson.current_source_dir() / 'source',
+      meson.current_build_dir() / 'source',
+      input_file,
       '@OUTPUT@',
     ],
     input : [
       files('./render-manpage.sh'),
-      manual_md,
+      files('./expand-includes.py'),
       entry.get(3, []),
       nix_input,
     ],
