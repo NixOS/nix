@@ -11,6 +11,7 @@
     "path": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
     "references": [],
     "registrationTime": 23423,
+    "lastUsageTime": null,
     "signatures": [],
     "ultimate": true,
     "version": 2
@@ -30,6 +31,7 @@
       "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo"
     ],
     "registrationTime": 23423,
+    "lastUsageTime": null,
     "signatures": [
       "fake-sig-1",
       "fake-sig-2"
@@ -59,6 +61,7 @@
       "n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
     ],
     "registrationTime": 23423,
+    "lastUsageTime": null,
     "signatures": [],
     "ultimate": false,
     "version": 2

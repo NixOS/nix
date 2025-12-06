@@ -274,8 +274,10 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         mustBuildDrv(drvPath, *drv);
                 },
                 [&](const DerivedPath::Opaque & bo) {
-                    if (isValidPath(bo.path))
+                    if (isValidPath(bo.path)) {
+                        bumpLastUsageTime(bo.path);
                         return;
+                    }
 
                     SubstitutablePathInfos infos;
                     querySubstitutablePathInfos({{bo.path, std::nullopt}}, infos);
