@@ -26,6 +26,8 @@ required:
   - requiredSystemFeatures
   - preferLocalBuild
   - allowSubstitutes
+  # Note: `meta` is not in the required list to maintain backward compatibility
+  # with existing JSON that predates the derivation-meta feature
 properties:
   outputChecks:
     type: object
@@ -138,6 +140,19 @@ properties:
     title: Allow Substitutes
     description: |
       Whether substituting from other stores should be allowed for this derivation's outputs.
+
+  meta:
+    oneOf:
+      - type: object
+      - type: "null"
+    title: Metadata
+    description: |
+      Metadata excluded from hash computation when using structured attributes with the `derivation-meta` system feature.
+
+      Must be a JSON object containing arbitrary metadata about the derivation (description, license, maintainers, etc.).
+      This field is only populated when both `__meta` is present in structured attributes and `derivation-meta`
+      is listed in `requiredSystemFeatures`. Otherwise, `__meta` remains as a regular attribute in structured attributes
+      and is included in the derivation hash.
 
 additionalProperties: false
 
