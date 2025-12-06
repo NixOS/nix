@@ -401,6 +401,14 @@ static void performOp(
         break;
     }
 
+    case WorkerProto::Op::BumpLastUsageTime: {
+        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
+        logger->startWork();
+        store->bumpLastUsageTime(path);
+        logger->stopWork();
+        break;
+    }
+
     case WorkerProto::Op::AddToStore: {
         if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 25) {
             auto name = readString(conn.from);
