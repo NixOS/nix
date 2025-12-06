@@ -147,6 +147,7 @@
   - [CLI guideline](development/cli-guideline.md)
   - [JSON guideline](development/json-guideline.md)
   - [C++ style guide](development/cxx.md)
+  - [Static Analysis](development/static-analysis.md)
   - [Experimental Features](development/experimental-features.md)
   - [Contributing](development/contributing.md)
 - [Releases](release-notes/index.md)

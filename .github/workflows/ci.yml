@@ -271,6 +271,23 @@ jobs:
         docker tag nix:$NIX_VERSION $IMAGE_ID:master
         docker push $IMAGE_ID:master
 
+  clang-tidy:
+    needs: basic-checks
+    runs-on: ubuntu-24.04
+    name: clang-tidy
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        extra_nix_config: "sandbox = true"
+    - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+    - name: Run clang-tidy
+      run: nix build .#hydraJobs.clangTidy.x86_64-linux -L
+
   flake_regressions:
     needs: tests
     runs-on: ubuntu-24.04
