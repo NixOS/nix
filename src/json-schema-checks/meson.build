@@ -73,12 +73,12 @@ schemas = [
     'stem' : 'derivation-options',
     'schema' : schema_dir / 'derivation-options-v1.yaml',
     'files' : [
-      'ia' / 'defaults.json',
-      'ia' / 'all_set.json',
-      'ia' / 'structuredAttrs_defaults.json',
-      'ia' / 'structuredAttrs_all_set.json',
-      'ca' / 'all_set.json',
-      'ca' / 'structuredAttrs_all_set.json',
+      'ia' / 'derivation-options' / 'defaults.json',
+      'ia' / 'derivation-options' / 'all_set.json',
+      'ia' / 'derivation-options' / 'structuredAttrs_defaults.json',
+      'ia' / 'derivation-options' / 'structuredAttrs_all_set.json',
+      'ca' / 'derivation-options' / 'all_set.json',
+      'ca' / 'derivation-options' / 'structuredAttrs_all_set.json',
     ],
   },
 ]
