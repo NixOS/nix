@@ -70,6 +70,7 @@ let
       ]
       ++ lib.optionals enableDocs [
         "nix-manual"
+        "nix-manual-manpages-only"
         "nix-internal-api-docs"
         "nix-external-api-docs"
       ]

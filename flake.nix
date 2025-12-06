@@ -369,6 +369,7 @@
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
+          nix-manual-manpages-only = nixpkgsFor.${system}.native.nixComponents2.nix-manual-manpages-only;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
         }

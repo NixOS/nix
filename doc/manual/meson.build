@@ -5,11 +5,29 @@ project(
   license : 'LGPL-2.1-or-later',
 )
 
+# Compute documentation URL based on version and release type
+version = meson.project_version()
+official_release = get_option('official-release')
+
+if official_release
+  # For official releases, use versioned URL (dropping patch version)
+  version_parts = version.split('.')
+  major_minor = '@0@.@1@'.format(version_parts[0], version_parts[1])
+  doc_url = 'https://nix.dev/manual/nix/@0@'.format(major_minor)
+else
+  # For development builds, use /latest
+  doc_url = 'https://nix.dev/manual/nix/latest'
+endif
+
 nix = find_program('nix', native : true)
 
-mdbook = find_program('mdbook', native : true)
 bash = find_program('bash', native : true)
-rsync = find_program('rsync', required : true, native : true)
+
+# HTML manual dependencies (conditional)
+if get_option('html-manual')
+  mdbook = find_program('mdbook', native : true)
+  rsync = find_program('rsync', required : true, native : true)
+endif
 
 pymod = import('python')
 python = pymod.find_installation('python3')
@@ -95,67 +113,71 @@ else
   nix_input = []
 endif
 
-manual = custom_target(
-  'manual',
-  command : [
-    bash,
-    '-euo',
-    'pipefail',
-    '-c',
-    '''
-        @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
-        @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
-        sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
-        @4@ -r -L --exclude='*.drv' --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
-        (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
-        rm -rf @2@/manual
-        mv @2@/html @2@/manual
-        # Remove Mathjax 2.7, because we will actually use MathJax 3.x
-        find @2@/manual | grep .html | xargs sed -i -e '/2.7.1.MathJax.js/d'
-        find @2@/manual -iname meson.build -delete
-    '''.format(
-      python.full_path(),
-      mdbook.full_path(),
-      meson.current_build_dir(),
-      meson.project_version(),
-      rsync.full_path(),
-    ),
-  ],
-  input : [
-    generate_manual_deps,
-    'substitute.py',
-    'book.toml.in',
-    'anchors.jq',
-    'custom.css',
-    redirects_js,
-    nix3_cli_files,
-    experimental_features_shortlist_md,
-    experimental_feature_descriptions_md,
-    types_dir,
-    conf_file_md,
-    builtins_md,
-    rl_next_generated,
-    summary_rl_next,
-    json_schema_generated_files,
-    nix_input,
-  ],
-  output : [
+# HTML manual build (conditional)
+if get_option('html-manual')
+  manual = custom_target(
     'manual',
-    'markdown',
-  ],
-  depfile : 'manual.d',
-  env : {
-    'RUST_LOG' : 'info',
-    'MDBOOK_SUBSTITUTE_SEARCH' : meson.current_build_dir() / 'source',
-  },
-)
-manual_html = manual[0]
-manual_md = manual[1]
+    command : [
+      bash,
+      '-euo',
+      'pipefail',
+      '-c',
+      '''
+          @0@ @INPUT0@ @CURRENT_SOURCE_DIR@ > @DEPFILE@
+          @0@ @INPUT1@ summary @2@ < @CURRENT_SOURCE_DIR@/source/SUMMARY.md.in > @2@/source/SUMMARY.md
+          sed -e 's|@version@|@3@|g' < @INPUT2@ > @2@/book.toml
+          @4@ -r -L --exclude='*.drv' --include='*.md' @CURRENT_SOURCE_DIR@/ @2@/
+          (cd @2@; RUST_LOG=warn @1@ build -d @2@ 3>&2 2>&1 1>&3) | { grep -Fv "because fragment resolution isn't implemented" || :; } 3>&2 2>&1 1>&3
+          rm -rf @2@/manual
+          mv @2@/html @2@/manual
+          # Remove Mathjax 2.7, because we will actually use MathJax 3.x
+          find @2@/manual | grep .html | xargs sed -i -e '/2.7.1.MathJax.js/d'
+          find @2@/manual -iname meson.build -delete
+      '''.format(
+        python.full_path(),
+        mdbook.full_path(),
+        meson.current_build_dir(),
+        meson.project_version(),
+        rsync.full_path(),
+      ),
+    ],
+    input : [
+      generate_manual_deps,
+      'substitute.py',
+      'book.toml.in',
+      'anchors.jq',
+      'custom.css',
+      redirects_js,
+      nix3_cli_files,
+      experimental_features_shortlist_md,
+      experimental_feature_descriptions_md,
+      types_dir,
+      conf_file_md,
+      builtins_md,
+      rl_next_generated,
+      summary_rl_next,
+      json_schema_generated_files,
+      nix_input,
+    ],
+    output : [
+      'manual',
+      'markdown',
+    ],
+    depfile : 'manual.d',
+    build_by_default : true,
+    env : {
+      'RUST_LOG' : 'info',
+      'MDBOOK_SUBSTITUTE_SEARCH' : meson.current_build_dir() / 'source',
+    },
+  )
+  manual_html = manual[0]
+  manual_md = manual[1]
 
-install_subdir(
-  manual_html.full_path(),
-  install_dir : get_option('datadir') / 'doc/nix',
-)
+  install_subdir(
+    manual_html.full_path(),
+    install_dir : get_option('datadir') / 'doc/nix',
+  )
+endif
 
 nix_nested_manpages = [
   [
@@ -201,6 +223,7 @@ nix_nested_manpages = [
   ],
 ]
 
+# Manpage generation (standalone, no mdbook dependency)
 foreach command : nix_nested_manpages
   foreach page : command[1]
     title = command[0] + ' --' + page
@@ -208,15 +231,19 @@ foreach command : nix_nested_manpages
     custom_target(
       command : [
         bash,
-        files('./render-manpage.sh'),
+        '@INPUT0@',
         '--out-no-smarty',
         title,
         section,
-        '@INPUT0@/command-ref' / command[0] / (page + '.md'),
+        meson.current_source_dir() / 'source',
+        meson.current_build_dir() / 'source',
+        doc_url,
+        meson.current_source_dir() / 'source/command-ref' / command[0] / (page + '.md'),
         '@OUTPUT0@',
       ],
       input : [
-        manual_md,
+        files('./render-manpage.sh'),
+        files('./expand-includes.py'),
         nix_input,
       ],
       output : command[0] + '-' + page + '.1',
@@ -325,14 +352,21 @@ foreach page : nix3_manpages
     command : [
       bash,
       '@INPUT0@',
+      # Note: no --out-no-smarty flag (original behavior)
       page,
       section,
-      '@INPUT1@/command-ref/new-cli/@0@.md'.format(page),
+      meson.current_source_dir() / 'source',
+      meson.current_build_dir() / 'source',
+      doc_url,
+      meson.current_build_dir() / 'source/command-ref/new-cli/@0@.md'.format(
+        page,
+      ),
       '@OUTPUT@',
     ],
     input : [
       files('./render-manpage.sh'),
-      manual_md,
+      files('./expand-includes.py'),
+      nix3_cli_files,
       nix_input,
     ],
     output : page + '.1',
@@ -352,7 +386,12 @@ nix_manpages = [
   [ 'nix-channel', 1 ],
   [ 'nix-hash', 1 ],
   [ 'nix-copy-closure', 1 ],
-  [ 'nix.conf', 5, conf_file_md.full_path() ],
+  [
+    'nix.conf',
+    5,
+    conf_file_md.full_path(),
+    [ conf_file_md, experimental_features_shortlist_md ],
+  ],
   [ 'nix-daemon', 8 ],
   [ 'nix-profiles', 5, 'files/profiles.md' ],
 ]
@@ -364,19 +403,24 @@ foreach entry : nix_manpages
   # Therefore we use an optional third element of this array to override the name pattern
   md_file = entry.get(2, title + '.md')
   section = entry[1].to_string()
-  md_file_resolved = join_paths('@INPUT1@/command-ref/', md_file)
+  input_file = meson.current_source_dir() / 'source/command-ref' / md_file
+
   custom_target(
     command : [
       bash,
       '@INPUT0@',
+      # Note: no --out-no-smarty flag (original behavior)
       title,
       section,
-      md_file_resolved,
+      meson.current_source_dir() / 'source',
+      meson.current_build_dir() / 'source',
+      doc_url,
+      input_file,
       '@OUTPUT@',
     ],
     input : [
       files('./render-manpage.sh'),
-      manual_md,
+      files('./expand-includes.py'),
       entry.get(3, []),
       nix_input,
     ],
