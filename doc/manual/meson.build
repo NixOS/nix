@@ -5,6 +5,20 @@ project(
   license : 'LGPL-2.1-or-later',
 )
 
+# Compute documentation URL based on version and release type
+version = meson.project_version()
+official_release = get_option('official-release')
+
+if official_release
+  # For official releases, use versioned URL (dropping patch version)
+  version_parts = version.split('.')
+  major_minor = '@0@.@1@'.format(version_parts[0], version_parts[1])
+  doc_url = 'https://nix.dev/manual/nix/@0@'.format(major_minor)
+else
+  # For development builds, use /latest
+  doc_url = 'https://nix.dev/manual/nix/latest'
+endif
+
 nix = find_program('nix', native : true)
 
 mdbook = find_program('mdbook', native : true)
@@ -215,6 +229,7 @@ foreach command : nix_nested_manpages
         section,
         meson.current_source_dir() / 'source',
         meson.current_build_dir() / 'source',
+        doc_url,
         meson.current_source_dir() / 'source/command-ref' / command[0] / (page + '.md'),
         '@OUTPUT0@',
       ],
@@ -334,6 +349,7 @@ foreach page : nix3_manpages
       section,
       meson.current_source_dir() / 'source',
       meson.current_build_dir() / 'source',
+      doc_url,
       meson.current_build_dir() / 'source/command-ref/new-cli/@0@.md'.format(
         page,
       ),
@@ -390,6 +406,7 @@ foreach entry : nix_manpages
       section,
       meson.current_source_dir() / 'source',
       meson.current_build_dir() / 'source',
+      doc_url,
       input_file,
       '@OUTPUT@',
     ],

@@ -1,0 +1,6 @@
+option(
+  'official-release',
+  type : 'boolean',
+  value : true,
+  description : 'Whether this is an official release build (affects documentation URLs)',
+)

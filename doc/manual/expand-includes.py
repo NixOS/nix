@@ -91,7 +91,7 @@ def expand_includes(
     return ''.join(lines)
 
 
-def resolve_docroot(content: str, current_file: Path, source_root: Path) -> str:
+def resolve_docroot(content: str, current_file: Path, source_root: Path, docroot_url: str) -> str:
     """
     Replace @docroot@ with nix.dev URL and convert .md to .html.
 
@@ -99,10 +99,6 @@ def resolve_docroot(content: str, current_file: Path, source_root: Path) -> str:
     manpages are viewed standalone. lowdown will display these as proper
     references in the manpage output.
     """
-    # Use the latest nix.dev documentation URL
-    # This matches what users would actually want to reference from a manpage
-    docroot_url = "https://nix.dev/manual/nix/latest"
-
     # Replace @docroot@ with the base URL
     content = content.replace("@docroot@", docroot_url)
 
@@ -126,6 +122,7 @@ def process_file(
     input_file: Path,
     source_root: Path,
     generated_root: Path | None,
+    docroot_url: str,
 ) -> str:
     """Process a single markdown file."""
     content = input_file.read_text()
@@ -134,7 +131,7 @@ def process_file(
     content = expand_includes(content, input_file, source_root, generated_root)
 
     # Resolve @docroot@ references
-    content = resolve_docroot(content, input_file, source_root)
+    content = resolve_docroot(content, input_file, source_root, docroot_url)
 
     # Resolve @_at_ escapes
     content = resolve_at_escapes(content)
@@ -181,6 +178,12 @@ Examples:
         type=Path,
         help="Output file (default: stdout)",
     )
+    parser.add_argument(
+        "-u", "--doc-url",
+        type=str,
+        default="https://nix.dev/manual/nix/latest",
+        help="Base URL for documentation links (default: https://nix.dev/manual/nix/latest)",
+    )
 
     args = parser.parse_args()
 
@@ -199,7 +202,7 @@ Examples:
 
     try:
         # Process the file
-        output = process_file(args.input_file, args.source_root, args.generated_root)
+        output = process_file(args.input_file, args.source_root, args.generated_root, args.doc_url)
 
         # Write output
         if args.output:

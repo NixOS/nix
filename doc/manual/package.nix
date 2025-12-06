@@ -81,6 +81,10 @@ mkMesonDerivation (finalAttrs: {
     changelog-d
   ];
 
+  mesonFlags = [
+    (lib.mesonBool "official-release" officialRelease)
+  ];
+
   preConfigure = ''
     chmod u+w ./.version
     echo ${finalAttrs.version} > ./.version
