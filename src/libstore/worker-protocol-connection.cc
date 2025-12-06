@@ -5,7 +5,9 @@
 
 namespace nix {
 
-const WorkerProto::FeatureSet WorkerProto::allFeatures{};
+const WorkerProto::Feature WorkerProto::pathLastUsageTimeFeature = "path-last-usage-time";
+
+const WorkerProto::FeatureSet WorkerProto::allFeatures{WorkerProto::pathLastUsageTimeFeature};
 
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {

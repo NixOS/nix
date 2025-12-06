@@ -59,6 +59,13 @@ struct WorkerProto
      */
     using Version = unsigned int;
 
+    using Feature = std::string;
+    using FeatureSet = std::set<Feature, std::less<>>;
+
+    static const Feature pathLastUsageTimeFeature;
+
+    static const FeatureSet allFeatures;
+
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
@@ -67,6 +74,7 @@ struct WorkerProto
     {
         Source & from;
         Version version;
+        const FeatureSet * features{nullptr};
     };
 
     /**
@@ -77,6 +85,7 @@ struct WorkerProto
     {
         Sink & to;
         Version version;
+        const FeatureSet * features{nullptr};
     };
 
     /**
@@ -133,11 +142,6 @@ struct WorkerProto
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
-
-    using Feature = std::string;
-    using FeatureSet = std::set<Feature, std::less<>>;
-
-    static const FeatureSet allFeatures;
 };
 
 enum struct WorkerProto::Op : uint64_t {
