@@ -29,6 +29,7 @@
         "references": [],
         "registrationTime": null,
         "signatures": [],
+        "storeDir": "/nix/store",
         "ultimate": false,
         "version": 2
       }

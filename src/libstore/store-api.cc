@@ -1095,7 +1095,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
             throw Error("number expected");
         hashGiven = {narHash, *narSize};
     }
-    ValidPathInfo info(store.parseStorePath(path), hashGiven->hash);
+    ValidPathInfo info(store.parseStorePath(path), {store, hashGiven->hash});
     info.narSize = hashGiven->numBytesDigested;
     std::string deriver;
     getline(str, deriver);

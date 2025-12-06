@@ -20,10 +20,16 @@ PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
     }
 }
 
+UnkeyedValidPathInfo::UnkeyedValidPathInfo(const StoreDirConfig & store, Hash narHash)
+    : UnkeyedValidPathInfo{store.storeDir, narHash}
+{
+}
+
 GENERATE_CMP_EXT(
     ,
     std::weak_ordering,
     UnkeyedValidPathInfo,
+    me->storeDir,
     me->deriver,
     me->narHash,
     me->references,
@@ -141,7 +147,7 @@ ValidPathInfo ValidPathInfo::makeFromCA(
 {
     ValidPathInfo res{
         store.makeFixedOutputPathFromCA(name, ca),
-        narHash,
+        UnkeyedValidPathInfo(store, narHash),
     };
     res.ca = ContentAddress{
         .method = ca.getMethod(),
@@ -172,6 +178,8 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
     auto jsonObject = json::object();
 
     jsonObject["version"] = format;
+
+    jsonObject["storeDir"] = storeDir;
 
     jsonObject["narHash"] = format == PathInfoJsonFormat::V1
                                 ? static_cast<json>(narHash.to_string(HashFormat::SRI, true))
@@ -213,10 +221,6 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
 
 UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store, const nlohmann::json & _json)
 {
-    UnkeyedValidPathInfo res{
-        Hash(Hash::dummy),
-    };
-
     auto & json = getObject(_json);
 
     PathInfoJsonFormat format = PathInfoJsonFormat::V1;
@@ -226,10 +230,20 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
     if (format == PathInfoJsonFormat::V1)
         assert(store);
 
-    if (format == PathInfoJsonFormat::V1)
-        res.narHash = Hash::parseSRI(getString(valueAt(json, "narHash")));
-    else
-        res.narHash = valueAt(json, "narHash");
+    UnkeyedValidPathInfo res{
+        [&] {
+            if (auto * rawStoreDir = optionalValueAt(json, "storeDir"))
+                return getString(*rawStoreDir);
+            else if (format == PathInfoJsonFormat::V1)
+                return store->storeDir;
+            else
+                throw Error("'storeDir' field is required in path info JSON format version 2");
+        }(),
+        [&] {
+            return format == PathInfoJsonFormat::V1 ? Hash::parseSRI(getString(valueAt(json, "narHash")))
+                                                    : Hash(valueAt(json, "narHash"));
+        }(),
+    };
 
     res.narSize = getUnsigned(valueAt(json, "narSize"));
 

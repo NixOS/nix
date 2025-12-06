@@ -46,6 +46,7 @@ $defs:
       - narSize
       - references
       - ca
+      - storeDir
     properties:
       version:
         type: integer
@@ -101,6 +102,12 @@ $defs:
           If the store object is [content-addressed](@docroot@/store/store-object/content-address.md),
           this is the content address of this store object's file system object, used to compute its store path.
           Otherwise (i.e. if it is [input-addressed](@docroot@/glossary.md#gloss-input-addressed-store-object)), this is `null`.
+
+      storeDir:
+        type: string
+        title: Store Directory
+        description: |
+          The [store directory](@docroot@/store/store-path.md#store-directory) this store object belongs to (e.g. `/nix/store`).
     additionalProperties: false
 
   impure:
@@ -115,6 +122,7 @@ $defs:
       - narSize
       - references
       - ca
+      - storeDir
       # impure
       - deriver
       - registrationTime
@@ -127,6 +135,7 @@ $defs:
       narSize: { $ref: "#/$defs/base/properties/narSize" }
       references: { $ref: "#/$defs/base/properties/references" }
       ca: { $ref: "#/$defs/base/properties/ca" }
+      storeDir: { $ref: "#/$defs/base/properties/storeDir" }
       deriver:
         oneOf:
           - "$ref": "./store-path-v1.yaml"
@@ -192,6 +201,7 @@ $defs:
       - narSize
       - references
       - ca
+      - storeDir
       # impure
       - deriver
       - registrationTime
@@ -209,6 +219,7 @@ $defs:
       narSize: { $ref: "#/$defs/base/properties/narSize" }
       references: { $ref: "#/$defs/base/properties/references" }
       ca: { $ref: "#/$defs/base/properties/ca" }
+      storeDir: { $ref: "#/$defs/base/properties/storeDir" }
       deriver: { $ref: "#/$defs/impure/properties/deriver" }
       registrationTime: { $ref: "#/$defs/impure/properties/registrationTime" }
       ultimate: { $ref: "#/$defs/impure/properties/ultimate" }

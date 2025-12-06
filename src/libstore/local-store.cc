@@ -757,7 +757,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
         throw Error("invalid-path entry for '%s': %s", printStorePath(path), e.what());
     }
 
-    auto info = std::make_shared<ValidPathInfo>(path, narHash);
+    auto info = std::make_shared<ValidPathInfo>(path, UnkeyedValidPathInfo(*this, narHash));
 
     info->id = id;
 

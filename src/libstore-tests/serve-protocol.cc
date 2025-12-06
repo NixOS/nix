@@ -17,6 +17,8 @@ namespace nix {
 
 const char serveProtoDir[] = "serve-protocol";
 
+static constexpr std::string_view defaultStoreDir = "/nix/store";
+
 struct ServeProtoTest : VersionedProtoTest<ServeProto, serveProtoDir>
 {
     /**
@@ -263,12 +265,12 @@ VERSIONED_CHARACTERIZATION_TEST(
     2 << 8 | 3,
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
-            UnkeyedValidPathInfo info{Hash::dummy};
+            UnkeyedValidPathInfo info{std::string{defaultStoreDir}, Hash::dummy};
             info.narSize = 34878;
             info;
         }),
         ({
-            UnkeyedValidPathInfo info{Hash::dummy};
+            UnkeyedValidPathInfo info{std::string{defaultStoreDir}, Hash::dummy};
             info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };
@@ -290,6 +292,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
+                std::string{defaultStoreDir},
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.deriver = StorePath{

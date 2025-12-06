@@ -13,6 +13,7 @@
     ],
     "registrationTime": null,
     "signatures": [],
+    "storeDir": "/nix/store",
     "ultimate": false,
     "version": 2
   },
@@ -41,6 +42,7 @@
       "fake-sig-1",
       "fake-sig-2"
     ],
+    "storeDir": "/nix/store",
     "ultimate": false,
     "version": 2
   }

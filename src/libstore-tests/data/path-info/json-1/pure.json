@@ -6,5 +6,6 @@
     "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
     "/nix/store/n5wkd9frr45pa74if5gpz9j7mifg27fh-foo"
   ],
+  "storeDir": "/nix/store",
   "version": 1
 }

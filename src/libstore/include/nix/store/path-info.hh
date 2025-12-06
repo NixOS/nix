@@ -55,6 +55,14 @@ using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
 struct UnkeyedValidPathInfo
 {
     /**
+     * The store directory this store object belongs to.
+     *
+     * This supports relocatable store objects where different objects
+     * may have different store directories.
+     */
+    std::string storeDir;
+
+    /**
      * Path to derivation that produced this store object, if known.
      */
     std::optional<StorePath> deriver;
@@ -110,15 +118,20 @@ struct UnkeyedValidPathInfo
      * path then implies the contents.)
      *
      * Ideally, the content-addressability assertion would just be a Boolean,
-     * and the store path would be computed from the name component, ‘narHash’
-     * and ‘references’. However, we support many types of content addresses.
+     * and the store path would be computed from the name component, 'narHash'
+     * and 'references'. However, we support many types of content addresses.
      */
     std::optional<ContentAddress> ca;
 
     UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
 
-    UnkeyedValidPathInfo(Hash narHash)
-        : narHash(narHash) {};
+    UnkeyedValidPathInfo(const StoreDirConfig & store, Hash narHash);
+
+    UnkeyedValidPathInfo(std::string storeDir, Hash narHash)
+        : storeDir(std::move(storeDir))
+        , narHash(std::move(narHash))
+    {
+    }
 
     bool operator==(const UnkeyedValidPathInfo &) const noexcept;
 

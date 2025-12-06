@@ -154,7 +154,7 @@ struct DummyStoreImpl : DummyStore
                 /* compute path info on demand */
                 auto narHash =
                     hashPath({accessor, CanonPath::root}, FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
-                auto info = std::make_shared<ValidPathInfo>(path, UnkeyedValidPathInfo{narHash.hash});
+                auto info = std::make_shared<ValidPathInfo>(path, UnkeyedValidPathInfo{*this, narHash.hash});
                 info->narSize = narHash.numBytesDigested;
                 info->ca = ContentAddress{
                     .method = ContentAddressMethod::Raw::Text,

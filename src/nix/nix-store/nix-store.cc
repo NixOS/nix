@@ -1057,7 +1057,10 @@ static void opServe(Strings opFlags, Strings opArgs)
             auto deriver = readString(in);
             ValidPathInfo info{
                 store->parseStorePath(path),
-                Hash::parseAny(readString(in), HashAlgorithm::SHA256),
+                {
+                    *store,
+                    Hash::parseAny(readString(in), HashAlgorithm::SHA256),
+                },
             };
             if (deriver != "")
                 info.deriver = store->parseStorePath(deriver);

@@ -49,8 +49,13 @@ struct NarInfo : ValidPathInfo, UnkeyedNarInfo
     {
     }
 
-    NarInfo(StorePath path, Hash narHash)
-        : NarInfo{ValidPathInfo{std::move(path), UnkeyedValidPathInfo(narHash)}}
+    NarInfo(const StoreDirConfig & store, StorePath path, Hash narHash)
+        : NarInfo{ValidPathInfo{std::move(path), UnkeyedValidPathInfo{store, narHash}}}
+    {
+    }
+
+    NarInfo(std::string storeDir, StorePath path, Hash narHash)
+        : NarInfo{ValidPathInfo{std::move(path), UnkeyedValidPathInfo{std::move(storeDir), narHash}}}
     {
     }
 

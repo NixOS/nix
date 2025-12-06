@@ -17,6 +17,8 @@ namespace nix {
 
 const char workerProtoDir[] = "worker-protocol";
 
+static constexpr std::string_view defaultStoreDir = "/nix/store";
+
 struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
 {
     /**
@@ -426,6 +428,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
+                std::string{defaultStoreDir},
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.registrationTime = 23423;
@@ -434,6 +437,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         }),
         ({
             UnkeyedValidPathInfo info{
+                std::string{defaultStoreDir},
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.deriver = StorePath{
@@ -462,6 +466,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -475,6 +480,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -509,6 +515,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -523,6 +530,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
