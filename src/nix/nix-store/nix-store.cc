@@ -116,6 +116,8 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
             store->ensurePath(path.path);
         else if (!store->isValidPath(path.path))
             throw Error("path '%s' does not exist and cannot be created", store->printStorePath(path.path));
+        else
+            store->bumpLastUsageTime(path.path);
         if (store2) {
             if (gcRoot == "")
                 printGCWarning();

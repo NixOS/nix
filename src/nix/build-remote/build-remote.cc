@@ -387,6 +387,8 @@ static int main_build_remote(int argc, char ** argv)
                 assert(hopefullyOutputPath.second);
                 if (!store->isValidPath(*hopefullyOutputPath.second))
                     missingPaths.insert(*hopefullyOutputPath.second);
+                else
+                    store->bumpLastUsageTime(*hopefullyOutputPath.second);
             }
         }
 
