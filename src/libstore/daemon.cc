@@ -812,6 +812,14 @@ static void performOp(
         readInt(conn.from);
         readInt(conn.from);
 
+        if (rconn.version.features.contains(WorkerProto::featurePathLastUsageTime)) {
+            bool hasOlderThan;
+            time_t olderThan;
+            conn.from >> hasOlderThan >> olderThan;
+            if (hasOlderThan)
+                options.olderThan = olderThan;
+        }
+
         if (options.action == GCAction::gcDeleteDead
             && std::holds_alternative<GCOptions::SpecificPaths>(options.pathsToDelete)
             && !conn.protoVersion.features.contains(WorkerProto::featureDeleteDeadSpecificReferrers)) {
