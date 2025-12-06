@@ -160,6 +160,8 @@ if s3_aws_auth.enabled()
   deps_other += aws_crt_cpp
   aws_c_common = cxx.find_library('aws-c-common', required : true)
   deps_other += aws_c_common
+  aws_c_auth = cxx.find_library('aws-c-auth', required : true)
+  deps_other += aws_c_auth
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
