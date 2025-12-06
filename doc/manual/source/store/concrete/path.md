@@ -6,7 +6,7 @@
 >
 > A rendered store path
 
-Nix implements references to [store objects](./store-object.md) as *store paths*.
+Nix implements references to [store objects](object.md) as *store paths*.
 
 Think of a store path as an [opaque], [unique identifier]:
 The only way to obtain store path is by adding or building store objects.
@@ -77,3 +77,53 @@ Therefore one can only copy store objects to a different store if
 One cannot copy a store object to a store with a different store directory.
 Instead, it has to be rebuilt, together with all its dependencies.
 It is in general not enough to replace the store directory string in file contents, as this may render executables unusable by invalidating their internal offsets or checksums.
+
+## Name
+
+The name part is a human readable name for the path.
+
+## Digest
+
+The [digest][digest] is a [cryptographic hash][hash] of enough information to determine the store object.
+
+It is rendered as in a custom variant of [base-32](https://en.m.wikipedia.org/wiki/Base32), with 20 arbitrary bytes of information expanding 32 ASCII characters.
+
+The hash itself is the first 20 byte (160 bits) of a [SHA-256][sha-256] hash of the underlying information.
+
+> **Historical Note**
+> The 20 byte length is because originally digests were [SHA-1][sha-1] hashes.
+
+Finally, the underlying information is a string (let's call it `pre`) in the following form:
+
+```bnf
+<pre> ::= <type>:sha256:<inner-digest>:<store-dir>:<name>
+```
+
+Note how it includes the other parts of the store path --- the store dir as well as the name.
+This makes sure that changes to either of those are reflected in the hash.
+For example, you won't get `/nix/store/<digest>-name1` and `/nix/store/<digest>-name2` with equal hash parts (absent an exceedingly improbable hash collision).
+
+Putting it altogether, we have
+
+```idris
+digest = truncate (sha256 (intercallate ":" type "sha256" innerDigest storeDir name))
+```
+
+[digest]: https://en.m.wiktionary.org/wiki/digest#Noun
+[hash]: https://en.m.wikipedia.org/wiki/Cryptographic_hash_function
+[sha-1]: https://en.m.wikipedia.org/wiki/SHA-1
+[sha-256]: https://en.m.wikipedia.org/wiki/SHA-256
+
+
+### The Type and the Inner Digest
+
+The remaining bits of information making up the pre-image of the digest are the *store object type* and the *inner digest*.
+
+Unlike the information discussed so far, these two values depend on the type of store object we are referencing.
+Broadly speaking, store objects are referenced in one of two ways:
+
+ - *content-addressed*: where the store object is referred to its own contents
+
+ - *input-addressed*: where the store object is referred to by the way in which it was made.
+
+We will go over the details of how these two methods determine the type and inner digest in subsequent sections.

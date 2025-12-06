@@ -1,13 +1,22 @@
-## Store Object
+# Abstract store object
 
-A Nix store is a collection of *store objects* with *references* between them.
-A store object consists of
+Nix organizes the data it manages into *store objects*.
+An abstract store object is a black box that can reference other store objects.
 
-  - A [file system object](./file-system-object.md) as data
+In pseudo-code:
 
-  - A set of [store paths](./store-path.md) as references to store objects
+```idris
+data StoreObject
+data StoreObjectRef
+
+getReferences : StoreObject -> Set StoreObjectRef
+```
 
 ### References
+
+A store object reference is an [opaque][opaque-data-type], [unique identifier][unique-identifier]:
+The only way to obtain references is by adding store objects.
+A reference will always point to exactly one store object.
 
 Store objects can refer to both other store objects and themselves.
 References from a store object to itself are called *self-references*.
