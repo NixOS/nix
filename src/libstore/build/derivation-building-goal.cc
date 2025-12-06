@@ -320,8 +320,10 @@ Goal::Co<void> DerivationBuildingGoal::realiseInputs()
     }
 
     for (auto & i : drv->inputs) {
-        if (worker.store.isValidPath(i))
+        if (worker.store.isValidPath(i)) {
+            worker.store.bumpLastUsageTime(i);
             continue;
+        }
         if (!worker.settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",

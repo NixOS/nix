@@ -29,6 +29,7 @@
           "method": "nar"
         },
         "deriver": null,
+        "lastUsageTime": null,
         "narHash": "sha256-0mlhg9y1FGb7YsHAsNOmtuW44b8TfoPaNPK6SjVYe5s=",
         "narSize": 232,
         "references": [],
@@ -51,6 +52,7 @@
           "method": "nar"
         },
         "deriver": null,
+        "lastUsageTime": null,
         "narHash": "sha256-HK2LBzSTtwuRjc44PH3Ac1JHHPKmfnAgNxz6I5mVgL8=",
         "narSize": 144,
         "references": [],

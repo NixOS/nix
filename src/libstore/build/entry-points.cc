@@ -27,8 +27,10 @@ BuildResult LocalBuilder::buildDerivation(const StorePath & drvPath, const Basic
 void LocalBuilder::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
-    if (store->isValidPath(path))
+    if (store->isValidPath(path)) {
+        store->bumpLastUsageTime(path);
         return;
+    }
 
     getWorker()->ensurePath(path);
 }
@@ -125,8 +127,10 @@ BuildResult Worker::buildDerivation(const StorePath & drvPath, const BasicDeriva
 void Worker::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
-    if (store.isValidPath(path))
+    if (store.isValidPath(path)) {
+        store.bumpLastUsageTime(path);
         return;
+    }
 
     GoalPtr goal = makePathSubstitutionGoal(path);
     Goals goals = {goal};

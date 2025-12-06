@@ -171,6 +171,14 @@ using Sync =
     SyncBase<T, std::mutex, std::unique_lock<std::mutex>, std::unique_lock<std::mutex>, std::condition_variable>;
 
 template<class T>
+using SyncRec = SyncBase<
+    T,
+    std::recursive_mutex,
+    std::unique_lock<std::recursive_mutex>,
+    std::unique_lock<std::recursive_mutex>,
+    std::condition_variable_any>;
+
+template<class T>
 using SharedSync = SyncBase<
     T,
     std::shared_mutex,

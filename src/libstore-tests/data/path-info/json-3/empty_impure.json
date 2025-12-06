@@ -1,6 +1,7 @@
 {
   "ca": null,
   "deriver": null,
+  "lastUsageTime": null,
   "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
   "narSize": 0,
   "references": [],

@@ -7,6 +7,7 @@
     "path": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
     "references": [],
     "registrationTime": 23423,
+    "lastUsageTime": null,
     "signatures": [],
     "storeDir": "/nix/store",
     "ultimate": false,
@@ -23,6 +24,7 @@
       "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo"
     ],
     "registrationTime": 23423,
+    "lastUsageTime": null,
     "signatures": [],
     "storeDir": "/nix/store",
     "ultimate": false,

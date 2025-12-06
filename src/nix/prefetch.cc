@@ -148,6 +148,8 @@ std::tuple<StorePath, Hash> prefetchFile(
         storePath = info.path;
         assert(info.ca);
         hash = info.ca->hash;
+    } else {
+        store->bumpLastUsageTime(storePath.value());
     }
 
     return {storePath.value(), hash.value()};

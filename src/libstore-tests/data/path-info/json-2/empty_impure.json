@@ -5,6 +5,7 @@
   "narSize": 0,
   "references": [],
   "registrationTime": null,
+  "lastUsageTime": null,
   "signatures": [],
   "storeDir": "/nix/store",
   "ultimate": false,
