@@ -23,8 +23,8 @@
 | [Greater than or equal to][Comparison] | *expr* `>=` *expr*                         | none          | 10         |
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
-| [Logical conjunction] (`AND`)          | *bool* `&&` *bool*                         | left          | 12         |
-| [Logical disjunction] (`OR`)           | *bool* <code>\|\|</code> *bool*            | left          | 13         |
+| [Logical conjunction] (`AND`)          | *bool* `&&` *bool*                         | left          | [12](#precedence-and-disjunctive-normal-form)         |
+| [Logical disjunction] (`OR`)           | *bool* <code>\|\|</code> *bool*            | left          | [13](#precedence-and-disjunctive-normal-form)         |
 | [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
 | [Pipe operator] (experimental)         | *expr* `\|>` *func*                        | left          | 15         |
 | [Pipe operator] (experimental)         | *func* `<\|` *expr*                        | right         | 15         |
@@ -250,6 +250,13 @@ This operator is [strict](@docroot@/language/evaluation.md#strictness) in *bool1
 > ```
 
 [Logical disjunction]: #logical-disjunction
+
+### Precedence and disjunctive normal form
+
+The precedence of `&&` and `||` aligns with disjunctive normal form.
+Without parentheses, an expression describes multiple "permissible situations" (connected by `||`), where each situation consists of multiple simultaneous conditions (connected by `&&`).
+
+For example, `A || B && C || D && E` is parsed as `A || (B && C) || (D && E)`, describing three permissible situations: A holds, or both B and C hold, or both D and E hold.
 
 ## Logical implication
 
