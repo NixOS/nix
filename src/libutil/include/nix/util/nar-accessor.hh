@@ -32,7 +32,15 @@ using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
  */
 GetNarBytes seekableGetNarBytes(const Path & path);
 
+GetNarBytes seekableGetNarBytes(Descriptor fd);
+
 ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes);
+
+/**
+ * Creates a NAR accessor from a given stream and a GetNarBytes getter.
+ * @param source Consumed eagerly. References to it are not persisted in the resulting SourceAccessor.
+ */
+ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
 
 struct NarListingRegularFile
 {

@@ -154,9 +154,7 @@ struct CmdLsNar : Command, MixLs
         if (!fd)
             throw SysError("opening NAR file '%s'", narPath);
         auto source = FdSource{fd.get()};
-        auto narAccessor = makeNarAccessor(source);
-        nlohmann::json listing = listNarDeep(*narAccessor, CanonPath::root);
-        list(makeLazyNarAccessor(listing, seekableGetNarBytes(narPath)), CanonPath{path});
+        list(makeLazyNarAccessor(source, seekableGetNarBytes(fd.get())), CanonPath{path});
     }
 };
 
