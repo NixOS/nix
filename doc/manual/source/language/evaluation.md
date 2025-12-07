@@ -74,4 +74,48 @@ in f { x = throw "error"; y = throw "error"; }
 => "ok"
 ```
 
+## Evaluation order
+
+The order in which expressions are evaluated is generally unspecified, because it does not affect successful evaluation outcomes.
+This allows more freedom for the evaluator to evolve and to evaluate efficiently.
+
+Data dependencies naturally impose some ordering constraints: a value cannot be used before it is computed.
+Beyond these constraints, the evaluator is free to choose any order.
+
+The order in which side effects such as [`builtins.trace`](@docroot@/language/builtins.md#builtins-trace) output occurs is not defined, but may be expected to follow data dependencies. <!-- we may want to be more specific about this. -->
+
+In a lazy language, evaluation order is often opposite to expectations from strict languages.
+For example, in `let wrap = x: { wrapped = x; }; in wrap (1 + 2)`, the function body produces a result (`{ wrapped = ...; }`) *before* evaluating `x`.
+
+## Infinite recursion and stack overflow
+
+During evaluation, two types of errors can occur when expressions reference themselves or call functions too deeply:
+
+### Infinite recursion
+
+This error occurs when a value depends on itself through a cycle, making it impossible to compute.
+
+```nix
+let x = x; in x
+=> error: infinite recursion encountered
+```
+
+Infinite recursion happens at the value level when evaluating an expression requires evaluating the same expression again.
+
+Despite the name, infinite recursion is cheap to compute and does not involve a stack overflow.
+The cycle is finite and fairly easy to detect.
+
+### Stack overflow
+
+This error occurs when the call depth exceeds the maximum allowed limit.
+
+```nix
+let f = x: f (x + 1);
+in f 0
+=> error: stack overflow; max-call-depth exceeded
+```
+
+Stack overflow happens when too many function calls are nested without returning.
+The maximum call depth is controlled by the [`max-call-depth` setting](@docroot@/command-ref/conf-file.md#conf-max-call-depth).
+
 [C API]: @docroot@/c-api.md

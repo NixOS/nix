@@ -23,8 +23,8 @@
 | [Greater than or equal to][Comparison] | *expr* `>=` *expr*                         | none          | 10         |
 | [Equality]                             | *expr* `==` *expr*                         | none          | 11         |
 | Inequality                             | *expr* `!=` *expr*                         | none          | 11         |
-| Logical conjunction (`AND`)            | *bool* `&&` *bool*                         | left          | 12         |
-| Logical disjunction (`OR`)             | *bool* <code>\|\|</code> *bool*            | left          | 13         |
+| [Logical conjunction] (`AND`)          | *bool* `&&` *bool*                         | left          | 12         |
+| [Logical disjunction] (`OR`)           | *bool* <code>\|\|</code> *bool*            | left          | 13         |
 | [Logical implication]                  | *bool* `->` *bool*                         | right         | 14         |
 | [Pipe operator] (experimental)         | *expr* `\|>` *func*                        | left          | 15         |
 | [Pipe operator] (experimental)         | *func* `<\|` *expr*                        | right         | 15         |
@@ -162,6 +162,9 @@ Update [attribute set] *attrset1* with names and values from *attrset2*.
 The returned attribute set will have all of the attributes in *attrset1* and *attrset2*.
 If an attribute name is present in both, the attribute value from the latter is taken.
 
+This operator is [strict](@docroot@/language/evaluation.md#strictness) in both *attrset1* and *attrset2*.
+That means that both arguments are evaluated to [weak head normal form](@docroot@/language/evaluation.md#values), so the attribute sets themselves are evaluated, but their attribute values are not evaluated.
+
 [Update]: #update
 
 ## Comparison
@@ -185,18 +188,88 @@ All comparison operators are implemented in terms of `<`, and the following equi
 
 ## Equality
 
-- [Attribute sets][attribute set] and [lists][list] are compared recursively, and therefore are fully evaluated.
-- Comparison of [functions][function] always returns `false`.
+- [Attribute sets][attribute set] are compared first by attribute names and then by items until a difference is found.
+- [Lists][list] are compared first by length and then by items until a difference is found.
+- Comparison of distinct [functions][function] returns `false`, but identical functions may be subject to [value identity optimization](#value-identity-optimization).
 - Numbers are type-compatible, see [arithmetic] operators.
 - Floating point numbers only differ up to a limited precision.
+
+The `==` operator is [strict](@docroot@/language/evaluation.md#strictness) in both arguments; when comparing composite types ([attribute sets][attribute set] and [lists][list]), it is partially strict in their contained values: they are evaluated until a difference is found. <!-- this is woefully underspecified, affecting which expressions evaluate correctly; not just "ordering" or error messages. -->
+
+### Value identity optimization
+
+Nix performs equality comparisons of nested values by pointer equality or more abstractly, _identity_.
+Nix semantics ideally do not assign a unique identity to values as they are created, but equality is an exception to this rule.
+The disputable benefit of this is that it is more efficient, and it allows cyclical structures to be compared, e.g. `let x = { x = x; }; in x == x` evaluates to `true`.
+However, as a consequence, it makes a function equal to itself when the comparison is made in a list or attribute set, in contradiction to a simple direct comparison.
 
 [function]: ./syntax.md#functions
 
 [Equality]: #equality
 
+## Logical conjunction
+
+> **Syntax**
+>
+> *bool1* `&&` *bool2*
+
+Logical AND. Equivalent to `if` *bool1* `then` *bool2* `else false`.
+
+This operator is [strict](@docroot@/language/evaluation.md#strictness) in *bool1*, but only evaluates *bool2* if *bool1* is `true`.
+
+> **Example**
+>
+> ```nix
+> true && false
+> => false
+>
+> false && throw "never evaluated"
+> => false
+> ```
+
+[Logical conjunction]: #logical-conjunction
+
+## Logical disjunction
+
+> **Syntax**
+>
+> *bool1* `||` *bool2*
+
+Logical OR. Equivalent to `if` *bool1* `then true` `else` *bool2*.
+
+This operator is [strict](@docroot@/language/evaluation.md#strictness) in *bool1*, but only evaluates *bool2* if *bool1* is `false`.
+
+> **Example**
+>
+> ```nix
+> true || false
+> => true
+>
+> true || throw "never evaluated"
+> => true
+> ```
+
+[Logical disjunction]: #logical-disjunction
+
 ## Logical implication
 
-Equivalent to `!`*b1* `||` *b2*  (or `if` *b1* `then` *b2* `else true`)
+> **Syntax**
+>
+> *bool1* `->` *bool2*
+
+Logical implication. Equivalent to `!`*bool1* `||` *bool2* (or `if` *bool1* `then` *bool2* `else true`).
+
+This operator is [strict](@docroot@/language/evaluation.md#strictness) in *bool1*, but only evaluates *bool2* if *bool1* is `true`.
+
+> **Example**
+>
+> ```nix
+> true -> false
+> => false
+>
+> false -> throw "never evaluated"
+> => true
+> ```
 
 [Logical implication]: #logical-implication
 
