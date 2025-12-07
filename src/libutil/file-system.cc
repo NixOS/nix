@@ -260,8 +260,7 @@ std::string readFile(const Path & path)
     AutoCloseFD fd = toDescriptor(open(
         path.c_str(),
         O_RDONLY
-// TODO
-#ifndef _WIN32
+#ifdef O_CLOEXEC
             | O_CLOEXEC
 #endif
         ));
@@ -294,8 +293,7 @@ void readFile(const Path & path, Sink & sink, bool memory_map)
     AutoCloseFD fd = toDescriptor(open(
         path.c_str(),
         O_RDONLY
-// TODO
-#ifndef _WIN32
+#ifdef O_CLOEXEC
             | O_CLOEXEC
 #endif
         ));
@@ -309,8 +307,7 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
     AutoCloseFD fd = toDescriptor(open(
         path.c_str(),
         O_WRONLY | O_TRUNC | O_CREAT
-// TODO
-#ifndef _WIN32
+#ifdef O_CLOEXEC
             | O_CLOEXEC
 #endif
         ,
@@ -344,8 +341,7 @@ void writeFile(const Path & path, Source & source, mode_t mode, FsSync sync)
     AutoCloseFD fd = toDescriptor(open(
         path.c_str(),
         O_WRONLY | O_TRUNC | O_CREAT
-// TODO
-#ifndef _WIN32
+#ifdef O_CLOEXEC
             | O_CLOEXEC
 #endif
         ,
