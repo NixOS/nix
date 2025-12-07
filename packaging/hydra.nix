@@ -64,6 +64,7 @@ let
         "nix-functional-tests"
         "nix-json-schema-checks"
         "nix-kaitai-struct-checks"
+        "nix-clang-tidy-plugin"
       ]
       ++ lib.optionals enableBindings [
         "nix-perl-bindings"
@@ -172,6 +173,20 @@ rec {
       );
     in
     forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
+
+  # Static analysis with clang-tidy
+  clangTidy = lib.genAttrs linux64BitSystems (
+    system:
+    let
+      pkgs = nixpkgsFor.${system}.nativeForStdenv.clangStdenv;
+      tidyScope = pkgs.nixComponents2.overrideScope (
+        self: super: {
+          withClangTidy = true;
+        }
+      );
+    in
+    tidyScope.nix-everything
+  );
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
