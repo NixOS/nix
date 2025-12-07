@@ -23,6 +23,8 @@ diff -u data.cat-nar "$storePath/foo/data"
 # Check that file contents of baz match.
 nix nar cat "$narFile" /foo/baz > baz.cat-nar
 diff -u baz.cat-nar "$storePath/foo/baz"
+nix nar cat /dev/stdin /foo/baz < "$narFile" > baz.cat-nar-pipe
+expect 1 nix nar cat "$narFile" /foo/baz/doesntexist 2>&1 | grep "NAR does not contain regular file '/foo/baz/doesntexist'"
 
 nix store cat "$storePath/foo/baz" > baz.cat-nar
 diff -u baz.cat-nar "$storePath/foo/baz"

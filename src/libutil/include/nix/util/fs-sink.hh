@@ -12,7 +12,7 @@ namespace nix {
  *
  * See `FileSystemObjectSink::createRegularFile`.
  */
-struct CreateRegularFileSink : Sink
+struct CreateRegularFileSink : virtual Sink
 {
     /**
      * If set to true, the sink will not be called with the contents
