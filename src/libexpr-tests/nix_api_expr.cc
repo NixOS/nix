@@ -232,22 +232,22 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
     nix_realised_string_free(r);
 }
 
-const char * SAMPLE_USER_DATA = "whatever";
+static const char SAMPLE_USER_DATA = 0;
 
 static void
 primop_square(void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret)
 {
     assert(context);
     assert(state);
-    assert(user_data == SAMPLE_USER_DATA);
+    assert(user_data == &SAMPLE_USER_DATA);
     auto i = nix_get_int(context, args[0]);
     nix_init_int(context, ret, i * i);
 }
 
 TEST_F(nix_api_expr_test, nix_expr_primop)
 {
-    PrimOp * primop =
-        nix_alloc_primop(ctx, primop_square, 1, "square", nullptr, "square an integer", (void *) SAMPLE_USER_DATA);
+    PrimOp * primop = nix_alloc_primop(
+        ctx, primop_square, 1, "square", nullptr, "square an integer", const_cast<char *>(&SAMPLE_USER_DATA));
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
@@ -273,7 +273,7 @@ primop_repeat(void * user_data, nix_c_context * context, EvalState * state, nix_
 {
     assert(context);
     assert(state);
-    assert(user_data == SAMPLE_USER_DATA);
+    assert(user_data == &SAMPLE_USER_DATA);
 
     // Get the string to repeat
     std::string s;
@@ -295,8 +295,8 @@ primop_repeat(void * user_data, nix_c_context * context, EvalState * state, nix_
 
 TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_multiple_calls)
 {
-    PrimOp * primop =
-        nix_alloc_primop(ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", (void *) SAMPLE_USER_DATA);
+    PrimOp * primop = nix_alloc_primop(
+        ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", const_cast<char *>(&SAMPLE_USER_DATA));
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
@@ -330,8 +330,8 @@ TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_multiple_calls)
 
 TEST_F(nix_api_expr_test, nix_expr_primop_arity_2_single_call)
 {
-    PrimOp * primop =
-        nix_alloc_primop(ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", (void *) SAMPLE_USER_DATA);
+    PrimOp * primop = nix_alloc_primop(
+        ctx, primop_repeat, 2, "repeat", nullptr, "repeat a string", const_cast<char *>(&SAMPLE_USER_DATA));
     assert_ctx_ok();
     nix_value * primopValue = nix_alloc_value(ctx, state);
     assert_ctx_ok();
