@@ -181,7 +181,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
     std::pair<Path, Path> addDependencyPrep(const StorePath & path)
     {
-        DerivationBuilderImpl::addDependency(path);
+        DerivationBuilderImpl::addDependencyImpl(path);
 
         debug("materialising '%s' in the sandbox", store.printStorePath(path));
 
