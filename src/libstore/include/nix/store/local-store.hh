@@ -61,6 +61,8 @@ private:
             > `build-dir` must not be set to a world-writable directory.
             > Placing temporary build directories in a world-writable place allows other users to access or modify build data that is currently in use.
             > This alone is merely an impurity, but combined with another factor this has allowed malicious derivations to escape the build sandbox.
+
+            See also the global [`build-dir`](@docroot@/command-ref/conf-file.md#conf-build-dir) setting.
         )"};
 public:
     Path getBuildDir() const;
