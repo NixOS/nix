@@ -265,24 +265,33 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
     drv.inputSrcs.insert(std::move(getEnvShPath));
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-        for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{}, drv.env[output.first] = hashPlaceholder(output.first);
-        }
-    } else {
-        for (auto & output : drv.outputs) {
-            output.second = DerivationOutput::Deferred{};
-            drv.env[output.first] = "";
-        }
-        auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
+    for (auto & [outputName, output] : drv.outputs) {
+        std::visit(
+            overloaded{
+                [&](const DerivationOutput::InputAddressed &) {
+                    output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = "";
+                },
+                [&](const DerivationOutput::CAFixed &) {
+                    output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = "";
+                },
+                [&](const auto &) {
+                    // Do nothing for CAFloating, Deferred, Impure
+                },
+            },
+            output.raw);
+    }
+    auto hashesModulo = hashDerivationModulo(*evalStore, drv, true);
 
-        for (auto & output : drv.outputs) {
-            Hash h = hashesModulo.hashes.at(output.first);
-            auto outPath = store->makeOutputPath(output.first, h, drv.name);
-            output.second = DerivationOutput::InputAddressed{
+    for (auto & [outputName, output] : drv.outputs) {
+        if (hashesModulo.kind == DrvHash::Kind::Regular) {
+            auto h = hashesModulo.hashes.at(outputName);
+            auto outPath = evalStore->makeOutputPath(outputName, h, drv.name);
+            output = DerivationOutput::InputAddressed{
                 .path = outPath,
             };
-            drv.env[output.first] = store->printStorePath(outPath);
+            drv.env[outputName] = evalStore->printStorePath(outPath);
         }
     }
 
