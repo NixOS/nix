@@ -111,6 +111,7 @@ struct NarAccessor : public SourceAccessor
                 path,
                 NarMember{.stat = {.type = Type::tRegular, .fileSize = 0, .isExecutable = false, .narOffset = 0}});
             NarMemberConstructor nmc{nm, pos};
+            nmc.skipContents = true; /* Don't care about contents. */
             func(nmc);
         }
 
@@ -136,6 +137,13 @@ struct NarAccessor : public SourceAccessor
     }
 
     NarAccessor(Source & source)
+    {
+        NarIndexer indexer(*this, source);
+        parseDump(indexer, indexer);
+    }
+
+    NarAccessor(Source & source, GetNarBytes getNarBytes)
+        : getNarBytes(std::move(getNarBytes))
     {
         NarIndexer indexer(*this, source);
         parseDump(indexer, indexer);
@@ -249,24 +257,35 @@ ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBy
     return make_ref<NarAccessor>(listing, getNarBytes);
 }
 
+ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
+{
+    return make_ref<NarAccessor>(source, getNarBytes);
+}
+
 GetNarBytes seekableGetNarBytes(const Path & path)
 {
-    return [path](uint64_t offset, uint64_t length) {
-        AutoCloseFD fd = toDescriptor(open(
-            path.c_str(),
-            O_RDONLY
-#ifndef _WIN32
-                | O_CLOEXEC
+    AutoCloseFD fd = toDescriptor(open(
+        path.c_str(),
+        O_RDONLY
+#ifdef O_CLOEXEC
+            | O_CLOEXEC
 #endif
-            ));
-        if (!fd)
-            throw SysError("opening NAR cache file '%s'", path);
+        ));
+    if (!fd)
+        throw SysError("opening NAR cache file '%s'", path);
 
-        if (lseek(fromDescriptorReadOnly(fd.get()), offset, SEEK_SET) != (off_t) offset)
-            throw SysError("seeking in '%s'", path);
+    return [inner = seekableGetNarBytes(fd.get()), fd = make_ref<AutoCloseFD>(std::move(fd))](
+               uint64_t offset, uint64_t length) { return inner(offset, length); };
+}
+
+GetNarBytes seekableGetNarBytes(Descriptor fd)
+{
+    return [fd](uint64_t offset, uint64_t length) {
+        if (::lseek(fromDescriptorReadOnly(fd), offset, SEEK_SET) == -1)
+            throw SysError("seeking in file");
 
         std::string buf(length, 0);
-        readFull(fd.get(), buf.data(), length);
+        readFull(fd, buf.data(), length);
 
         return buf;
     };
