@@ -48,6 +48,20 @@ jobs:
       sentry_org: ${{ secrets.SENTRY_ORG }}
       sentry_project: ${{ secrets.SENTRY_PROJECT }}
 
+  build_x86_64-linux_no_dsp:
+    uses: ./.github/workflows/build.yml
+    if: github.event_name == 'merge_group'
+    with:
+      flake: .
+      system: x86_64-linux
+      runner: namespace-profile-linuxamd32c64g-cache
+      runner_for_virt: UbuntuLatest32Cores128G
+      runner_small: ubuntu-latest
+      run_tests: true
+      run_vm_tests: true
+      run_regression_tests: true
+      upload_artifacts: false
+
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
@@ -131,7 +145,7 @@ jobs:
               )
             }}
         run: |
-          nix build .#fallbackPathsNix --out-link fallback
+          nix build ./packaging/secure-packages#fallbackPathsNix --out-link fallback
           cat fallback > ./artifacts/fallback-paths.nix
 
       - uses: DeterminateSystems/push-artifact-ids@main
