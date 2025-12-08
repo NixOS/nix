@@ -13,7 +13,7 @@ static void hashFormatCompleter(AddCompletions & completions, size_t index, std:
 
 Args::Flag hashFormatWithDefault(std::string && longName, HashFormat * hf)
 {
-    assert(*hf == nix::HashFormat::SRI);
+    assert(std::holds_alternative<HashFormatSRI>(hf->raw));
     return Args::Flag{
         .longName = std::move(longName),
         .description = "Hash format (`base16`, `nix32`, `base64`, `sri`). Default: `sri`.",

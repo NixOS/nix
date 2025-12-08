@@ -1,11 +1,15 @@
 #pragma once
 ///@file
 
+#include "nix/util/base-n.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/json-impls.hh"
+#include "nix/util/variant-wrapper.hh"
+
+#include <variant>
 
 namespace nix {
 
@@ -37,19 +41,43 @@ constexpr inline size_t regularHashSize(HashAlgorithm type)
 extern const StringSet hashAlgorithms;
 
 /**
- * @brief Enumeration representing the hash formats.
+ * @brief Tag type for SRI (Subresource Integrity) hash format.
+ *
+ * SRI format is "<hash algo>-<base64 hash>".
+ * @see W3C recommendation [Subresource Integrity](https://www.w3.org/TR/SRI/).
  */
-enum struct HashFormat : int {
-    /// @brief Base 64 encoding.
-    /// @see [IETF RFC 4648, section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4).
-    Base64,
-    /// @brief Nix-specific base-32 encoding. @see BaseNix32
-    Nix32,
-    /// @brief Lowercase hexadecimal encoding. @see base16Chars
-    Base16,
-    /// @brief "<hash algo>:<Base 64 hash>", format of the SRI integrity attribute.
-    /// @see W3C recommendation [Subresource Integrity](https://www.w3.org/TR/SRI/).
-    SRI
+struct HashFormatSRI
+{
+    bool operator==(const HashFormatSRI &) const = default;
+    auto operator<=>(const HashFormatSRI &) const = default;
+};
+
+/**
+ * @brief Hash format: either a base encoding or SRI format.
+ *
+ * This is a variant that can hold either:
+ * - A `Base` value (Base16, Nix32, or Base64) for plain encoded hashes
+ * - An `SRI` tag for Subresource Integrity format ("<algo>-<base64>")
+ */
+struct HashFormat
+{
+    using Raw = std::variant<Base, HashFormatSRI>;
+    Raw raw;
+
+    MAKE_WRAPPER_CONSTRUCTOR(HashFormat);
+
+    bool operator==(const HashFormat &) const = default;
+    auto operator<=>(const HashFormat &) const = default;
+
+    /**
+     * Get the base encoding for this hash format.
+     * SRI format uses Base64.
+     */
+    Base toBase() const;
+
+    /// Backwards compatibility constants
+    using enum Base;
+    static constexpr struct HashFormatSRI SRI{};
 };
 
 extern const StringSet hashFormats;
@@ -86,28 +114,25 @@ struct Hash
     parseAnyReturningFormat(std::string_view s, std::optional<HashAlgorithm> optAlgo);
 
     /**
-     * Parse a hash from a string representation like the above, except the
-     * type prefix is mandatory is there is no separate argument.
+     * Parse a plain hash that must not have any prefix indicating the type.
+     * The type is passed in to disambiguate.
      */
     static Hash parseAnyPrefixed(std::string_view s);
 
     /**
-     * Parse a plain hash that musst not have any prefix indicating the type.
-     * The type is passed in to disambiguate.
+     * Parse a plain hash that must not have any prefix indicating the type.
+     * The algorithm is passed in; the base encoding is auto-detected from size.
      */
     static Hash parseNonSRIUnprefixed(std::string_view s, HashAlgorithm algo);
 
     /**
      * Like `parseNonSRIUnprefixed`, but the hash format has been
      * explicitly given.
-     *
-     * @param explicitFormat cannot be SRI, but must be one of the
-     * "bases".
      */
     static Hash parseExplicitFormatUnprefixed(
         std::string_view s,
         HashAlgorithm algo,
-        HashFormat explicitFormat,
+        Base explicitFormat,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     static Hash parseSRI(std::string_view original);
@@ -195,6 +220,11 @@ std::optional<HashFormat> parseHashFormatOpt(std::string_view hashFormatName);
  * The reverse of parseHashFormat.
  */
 std::string_view printHashFormat(HashFormat hashFormat);
+
+/**
+ * User-friendly display of hash format (e.g., "base-64" instead of "base64").
+ */
+std::string_view printHashFormatDisplay(HashFormat hashFormat);
 
 /**
  * Parse a string representing a hash algorithm.

@@ -37,25 +37,25 @@ struct CmdHashBase : Command
         addFlag({
             .longName = "sri",
             .description = "Print the hash in SRI format.",
-            .handler = {&hashFormat, HashFormat::SRI},
+            .handler = {&hashFormat, HashFormat{HashFormat::SRI}},
         });
 
         addFlag({
             .longName = "base64",
             .description = "Print the hash in base-64 format.",
-            .handler = {&hashFormat, HashFormat::Base64},
+            .handler = {&hashFormat, HashFormat{HashFormat::Base64}},
         });
 
         addFlag({
             .longName = "base32",
             .description = "Print the hash in base-32 (Nix-specific) format.",
-            .handler = {&hashFormat, HashFormat::Nix32},
+            .handler = {&hashFormat, HashFormat{HashFormat::Nix32}},
         });
 
         addFlag({
             .longName = "base16",
             .description = "Print the hash in base-16 format.",
-            .handler = {&hashFormat, HashFormat::Base16},
+            .handler = {&hashFormat, HashFormat{HashFormat::Base16}},
         });
 
         addFlag(flag::hashAlgo("type", &hashAlgo));
@@ -129,7 +129,7 @@ struct CmdHashBase : Command
 
             if (truncate && h.hashSize > 20)
                 h = compressHash(h, 20);
-            logger->cout(h.to_string(hashFormat, hashFormat == HashFormat::SRI));
+            logger->cout(h.to_string(hashFormat, std::holds_alternative<HashFormatSRI>(hashFormat.raw)));
         }
     }
 };
@@ -191,10 +191,7 @@ struct CmdToBase : Command
     {
         return fmt(
             "convert a hash to %s representation (deprecated, use `nix hash convert` instead)",
-            hashFormat == HashFormat::Base16   ? "base-16"
-            : hashFormat == HashFormat::Nix32  ? "base-32"
-            : hashFormat == HashFormat::Base64 ? "base-64"
-                                               : "SRI");
+            printHashFormat(hashFormat));
     }
 
     void run() override
@@ -202,7 +199,9 @@ struct CmdToBase : Command
         if (!legacyCli)
             warn("The old format conversion subcommands of `nix hash` were deprecated in favor of `nix hash convert`.");
         for (const auto & s : args)
-            logger->cout(Hash::parseAny(s, hashAlgo).to_string(hashFormat, hashFormat == HashFormat::SRI));
+            logger->cout(
+                Hash::parseAny(s, hashAlgo)
+                    .to_string(hashFormat, std::holds_alternative<HashFormatSRI>(hashFormat.raw)));
     }
 };
 
@@ -256,7 +255,7 @@ struct CmdHashConvert : Command
                     printHashFormat(parsedFormat),
                     printHashFormat(*from));
             }
-            logger->cout(h.to_string(to, to == HashFormat::SRI));
+            logger->cout(h.to_string(to, std::holds_alternative<HashFormatSRI>(to.raw)));
         }
     }
 };
