@@ -174,22 +174,23 @@ static bool matchUser(std::string_view user, const struct group & gr)
  *
  * Otherwise: No.
  */
-static bool matchUser(const std::string & user, const std::string & group, const Strings & users)
+static bool
+matchUser(const std::optional<std::string> & user, const std::optional<std::string> & group, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
 
-    if (find(users.begin(), users.end(), user) != users.end())
+    if (user && find(users.begin(), users.end(), *user) != users.end())
         return true;
 
     for (auto & i : users)
         if (i.substr(0, 1) == "@") {
-            if (group == i.substr(1))
+            if (group && *group == i.substr(1))
                 return true;
             struct group * gr = getgrnam(i.c_str() + 1);
             if (!gr)
                 continue;
-            if (matchUser(user, *gr))
+            if (user && matchUser(*user, *gr))
                 return true;
         }
 
@@ -264,15 +265,19 @@ static ref<Store> openUncachedStore()
  *
  * If the potential client is not allowed to talk to us, we throw an `Error`.
  */
-static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
+static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const PeerInfo & peer)
 {
     TrustedFlag trusted = NotTrusted;
 
     auto pw = peer.uid ? getpwuid(*peer.uid) : nullptr;
-    std::string user = pw ? pw->pw_name : peer.uid ? std::to_string(*peer.uid) : "";
+    auto user = pw         ? std::optional<std::string>(pw->pw_name)
+                : peer.uid ? std::optional(std::to_string(*peer.uid))
+                           : std::nullopt;
 
     auto gr = peer.gid ? getgrgid(*peer.gid) : 0;
-    std::string group = gr ? gr->gr_name : peer.gid ? std::to_string(*peer.gid) : "";
+    auto group = gr         ? std::optional<std::string>(gr->gr_name)
+                 : peer.gid ? std::optional(std::to_string(*peer.gid))
+                            : std::nullopt;
 
     const Strings & trustedUsers = authorizationSettings.trustedUsers;
     const Strings & allowedUsers = authorizationSettings.allowedUsers;
@@ -281,7 +286,7 @@ static std::pair<TrustedFlag, std::string> authPeer(const PeerInfo & peer)
         trusted = Trusted;
 
     if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
-        throw Error("user '%1%' is not allowed to connect to the Nix daemon", user);
+        throw Error("user '%1%' is not allowed to connect to the Nix daemon", user.value_or("<unknown>"));
 
     return {trusted, std::move(user)};
 }
@@ -360,21 +365,21 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 
             PeerInfo peer;
             TrustedFlag trusted;
-            std::string user = "<unknown>";
+            std::optional<std::string> userName;
 
             if (forceTrustClientOpt)
                 trusted = *forceTrustClientOpt;
             else {
                 peer = getPeerInfo(remote.get());
-                auto [_trusted, _user] = authPeer(peer);
+                auto [_trusted, _userName] = authPeer(peer);
                 trusted = _trusted;
-                user = _user;
+                userName = _userName;
             };
 
             printInfo(
                 (std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
                 peer.pid ? std::to_string(*peer.pid) : "<unknown>",
-                user);
+                userName.value_or("<unknown>"));
 
             //  Fork a child to handle the connection.
             ProcessOptions options;
@@ -412,7 +417,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         } catch (Error & error) {
             auto ei = error.info();
             // FIXME: add to trace?
-            ei.msg = HintFmt("error processing connection: %1%", ei.msg.str());
+            ei.msg = HintFmt("while processing connection: %1%", ei.msg.str());
             logError(ei);
         }
     }
