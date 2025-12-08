@@ -98,7 +98,7 @@ struct CmdCatNar : StoreCommand, MixCat
                 if (path == neededPath) {
                     logger->stop();
                     crfSink.skipContents = false;
-                    crfSink.fd = STDOUT_FILENO;
+                    crfSink.fd = getStandardOutput();
                     found = true;
                 } else {
                     crfSink.skipContents = true;
