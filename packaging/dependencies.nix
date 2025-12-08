@@ -74,4 +74,9 @@ scope: {
         buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
+
+  libblake3 = pkgs.libblake3.override {
+    # see nix-meson-build-support/common/meson.build: TBB is not wanted
+    useTBB = false;
+  };
 }
