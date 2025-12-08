@@ -22,10 +22,12 @@
  *
  * The moral equivalent of `using Raw::Raw;`
  */
-#define MAKE_WRAPPER_CONSTRUCTOR(CLASS_NAME)       \
-    FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)         \
-                                                   \
-    CLASS_NAME(auto &&... arg)                     \
-        : raw(std::forward<decltype(arg)>(arg)...) \
-    {                                              \
+#define MAKE_WRAPPER_CONSTRUCTOR(CLASS_NAME)                                                                \
+    FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)                                                                  \
+                                                                                                            \
+    template<typename... Args>                                                                              \
+        requires(!(sizeof...(Args) == 1 && (std::is_same_v<std::remove_cvref_t<Args>, CLASS_NAME> && ...))) \
+    CLASS_NAME(Args &&... arg)                                                                              \
+        : raw(std::forward<Args>(arg)...)                                                                   \
+    {                                                                                                       \
     }
