@@ -58,7 +58,7 @@ nix store verify -r "$outPath2" --sigs-needed 1 --trusted-public-keys "$pk1"
 # Build something content-addressed.
 outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0 --no-out-link)
 
-nix path-info --json --json-format 2 "$outPathCA" | jq -e '.info.[].ca | .method == "flat" and .hash.algorithm == "md5"'
+nix path-info --json --json-format 2 "$outPathCA" | jq -e '.info.[].ca | .method == "flat" and (.hash | startswith("md5-"))'
 
 # Content-addressed paths don't need signatures, so they verify
 # regardless of --sigs-needed.

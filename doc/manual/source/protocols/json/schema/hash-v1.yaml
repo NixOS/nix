@@ -4,36 +4,13 @@ title: Hash
 description: |
   A cryptographic hash value used throughout Nix for content addressing and integrity verification.
 
-  This schema describes the JSON representation of Nix's `Hash` type.
-type: object
-properties:
-  algorithm:
-    "$ref": "#/$defs/algorithm"
-  format:
-    type: string
-    enum:
-    - base16
-    title: Hash format
-    description: |
-      The encoding format of the hash value.
+  This schema describes the JSON representation of Nix's `Hash` type as an [SRI](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) string.
+type: string
+pattern: "^(blake3|md5|sha1|sha256|sha512)-[A-Za-z0-9+/]+=*$"
+examples:
+- "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="
+- "sha512-IEqPxt2oLwoM7XvrjgikFlfBbvRosiioJ5vjMacDwzWW/RXBOxsH+aodO+pXeJygMa2Fx6cd1wNU7GMSOMo0RQ=="
 
-      `base16` (lowercase hexadecimal) is the only format that is currently supported for JSON serialization.
-      This field exists primarily to reduce ambiguity about what the hash means.
-      It would also help us support other formats in the future, but there are no concrete plans to do so at this.
-  hash:
-    type: string
-    title: Hash
-    description: |
-      The encoded hash value, itself.
-
-      It is specified in the format specified by the `format` field.
-      It must be the right length for the hash algorithm specified in the `algorithm` field, also.
-      The hash value does not include any algorithm prefix.
-required:
-- algorithm
-- format
-- hash
-additionalProperties: false
 "$defs":
   algorithm:
     type: string
