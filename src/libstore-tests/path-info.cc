@@ -33,6 +33,7 @@ class PathInfoTestV2 : public CharacterizationTest, public LibStoreTest
 static UnkeyedValidPathInfo makeEmpty()
 {
     return {
+        "/nix/store",
         Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
     };
 }

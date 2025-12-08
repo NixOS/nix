@@ -253,7 +253,7 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
 {
     auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(store, conn);
     auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
-    UnkeyedValidPathInfo info(narHash);
+    UnkeyedValidPathInfo info(store, narHash);
     info.deriver = std::move(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;

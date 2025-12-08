@@ -78,7 +78,7 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
 {
     /* Hash should be set below unless very old `nix-store --serve`.
        Caller should assert that it did set it. */
-    UnkeyedValidPathInfo info{Hash::dummy};
+    UnkeyedValidPathInfo info{store, Hash::dummy};
 
     auto deriver = readString(conn.from);
     if (deriver != "")

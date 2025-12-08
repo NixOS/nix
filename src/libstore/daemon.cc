@@ -905,7 +905,7 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(*store, rconn);
         auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
-        ValidPathInfo info{path, narHash};
+        ValidPathInfo info{path, {*store, narHash}};
         info.deriver = std::move(deriver);
         info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         conn.from >> info.registrationTime >> info.narSize >> info.ultimate;

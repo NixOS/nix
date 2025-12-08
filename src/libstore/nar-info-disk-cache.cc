@@ -264,8 +264,8 @@ public:
                     return {oInvalid, 0};
 
                 auto namePart = queryNAR.getStr(1);
-                auto narInfo =
-                    make_ref<NarInfo>(StorePath(hashPart + "-" + namePart), Hash::parseAnyPrefixed(queryNAR.getStr(6)));
+                auto narInfo = make_ref<NarInfo>(
+                    cache.storeDir, StorePath(hashPart + "-" + namePart), Hash::parseAnyPrefixed(queryNAR.getStr(6)));
                 narInfo->url = queryNAR.getStr(2);
                 narInfo->compression = queryNAR.getStr(3);
                 if (!queryNAR.isNull(4))
