@@ -46,4 +46,24 @@ rec {
   };
 
   importAddPathExpr = import addPathExpr;
+
+  symlink = mkDerivation {
+    name = "symlink";
+    buildCommand = ''
+      mkdir $out
+      echo hello world > $out/text
+      ln -s $out/text $out/symlink
+      ln -s ${step1} $out/symlink2
+    '';
+  };
+
+  pathFromDerivation = builtins.path {
+    name = "path-from-derivation";
+    path = "${symlink}/";
+  };
+
+  pathFromDerivation2 = builtins.path {
+    name = "path-from-derivation";
+    path = "${symlink}/text";
+  };
 }
