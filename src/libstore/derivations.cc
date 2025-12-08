@@ -1230,7 +1230,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     std::optional<DrvHash> hashesModulo;
 
     for (auto & [outputName, output] : drv.outputs) {
-        auto envHasRightPath = [&](const StorePath & actual) {
+        auto envHasRightPath = [&](const StorePath & actual, bool isDeferred = false) {
             if constexpr (fillIn) {
                 auto j = drv.env.find(outputName);
                 /* Fill in mode: fill in missing or empty environment
@@ -1248,12 +1248,20 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     "derivation has missing environment variable '%s', should be '%s' but is not present",
                     outputName,
                     store.printStorePath(actual));
-            if (j->second != store.printStorePath(actual))
-                throw Error(
-                    "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
-                    outputName,
-                    store.printStorePath(actual),
-                    j->second);
+            if (j->second != store.printStorePath(actual)) {
+                if (isDeferred)
+                    warn(
+                        "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
+                        outputName,
+                        store.printStorePath(actual),
+                        j->second);
+                else
+                    throw Error(
+                        "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
+                        outputName,
+                        store.printStorePath(actual),
+                        j->second);
+            }
         };
         auto hash = [&]<typename Output>(const Output & outputVariant) {
             if (!hashesModulo) {
@@ -1287,8 +1295,9 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     else
                         /* Validation mode: deferred outputs
                            should have been filled in */
-                        throw Error(
-                            "derivation has incorrect deferred output, should be '%s'", store.printStorePath(outPath));
+                        warn(
+                            "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
+                            store.printStorePath(outPath));
                 } else {
                     /* Will never happen, based on where
                        `hash` is called. */
