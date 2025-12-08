@@ -63,7 +63,6 @@ let
         "nix-cli"
         "nix-functional-tests"
         "nix-json-schema-checks"
-        "nix-kaitai-struct-checks"
       ]
       ++ lib.optionals enableBindings [
         "nix-perl-bindings"
@@ -73,6 +72,7 @@ let
         "nix-manual-manpages-only"
         "nix-internal-api-docs"
         "nix-external-api-docs"
+        "nix-kaitai-struct-checks"
       ]
     );
 in
