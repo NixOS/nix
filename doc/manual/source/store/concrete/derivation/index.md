@@ -1,7 +1,6 @@
 # Store Derivation and Deriving Path
 
-Besides functioning as a [content-addressed store], the Nix store layer works as a [build system].
-Other systems (like Git or IPFS) also store and transfer immutable data, but they don't concern themselves with *how* that data was created.
+We return to derivations and derived paths in the context of making a build system for conventional software.
 
 This is where Nix distinguishes itself.
 *Derivations* represent individual build steps, and *deriving paths* are needed to refer to the *outputs* of those build steps before they are built.
@@ -31,6 +30,29 @@ A derivation consists of:
  - The ["system" type][system] (e.g. `x86_64-linux`) where the executable is to run.
 
  - The [process creation fields]: to spawn the arbitrary process which will perform the build step.
+
+All together in pseudo-code:
+
+```idris
+data DerivedRef -- from below
+
+type OutputName = String
+
+-- to be discussed, depends on exact type of derivation
+data DerivationOutput
+
+record Derivation where
+  outputs : Map OutputName DerivationOutput
+  inputs  : Set DerivedPath
+  builder : Path
+  args    : List String
+  env     : Map String String
+  name    : String
+
+inputs drv = drv.inputs
+
+outputs drv = Map.keys drv.outputs
+```
 
 [store derivation]: #store-derivation
 [inputs]: #inputs
@@ -64,19 +86,15 @@ There are two forms:
 
 In pseudo code:
 
-```typescript
-type OutputName = String;
+```idris
+type OutputName = String
 
-type ConstantPath = {
-  path: StorePath;
-};
-
-type OutputPath = {
-  drvPath: StorePath;
-  output: OutputName;
-};
-
-type DerivingPath = ConstantPath | OutputPath;
+data DerivingPath
+  = Constant { path : StorePath }
+  | Output {
+      drvPath : StorePath,
+      output  : OutputName,
+    }
 ```
 
 Deriving paths are necessary because, in general and particularly for [content-addressing derivations][content-addressing derivation], the [store path] of an [output] is not known in advance.
@@ -184,6 +202,12 @@ There are two types of placeholder, corresponding to the two cases where this pr
 >
 >   If we always build a dependency first, and then refer to its output by store path, we would lose the ability for a derivation graph to describe an entire build plan consisting of multiple build steps.
 
+> **Note**
+>
+> The current method of creating hashes which we substitute for string fields should be seen as an artifact of the current "ATerm" serialization format.
+> In order to be more explicit, and avoid gotchas analogous to [SQL injection](https://en.wikipedia.org/wiki/SQL_injection),
+> we ought to consider switching two a different format where we explicitly use a syntax for the concatenation of plain strings and [deriving paths] written more explicitly.
+
 ## Encoding
 
 ### Derivation {#derivation-encoding}
@@ -249,20 +273,13 @@ If those other derivations *also* abide by this common case (and likewise for tr
 
 **Experimental feature**: [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations)
 
-So far, we have used store paths to refer to derivations.
-That works because we've implicitly assumed that all derivations are created *statically* --- created by some mechanism out of band, and then manually inserted into the store.
-But what if derivations could also be created dynamically within Nix?
-In other words, what if derivations could be the outputs of other derivations?
+We can apply the same extension discussed for the abstract model to the concrete model.
+Again, only the data type for Deriving Paths needs to be modified.
+Derivations are the same except for using the new extended deriving path data type.
 
 > **Note**
 >
 > In the parlance of "Build Systems à la carte", we are generalizing the Nix store layer to be a "Monadic" instead of "Applicative" build system.
-
-How should we refer to such derivations?
-A deriving path works, the same as how we refer to other derivation outputs.
-But what about a dynamic derivations output?
-(i.e. how do we refer to the output of a derivation, which is itself an output of a derivation?)
-For that we need to generalize the definition of deriving path, replacing the store path used to refer to the derivation with a nested deriving path:
 
 ```diff
  type OutputPath = {

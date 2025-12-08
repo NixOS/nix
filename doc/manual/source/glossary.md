@@ -138,7 +138,7 @@
   >
   > `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
 
-  See [Store Path](@docroot@/store/store-path.md) for details.
+  See [Store Path](@docroot@/store/concrete/path.md) for details.
 
   [store path]: #gloss-store-path
 
@@ -146,7 +146,7 @@
 
   The Nix data model for representing simplified file system data.
 
-  See [File System Object](@docroot@/store/file-system-object.md) for details.
+  See [File System Object](@docroot@/store/concrete/file-system-object.md) for details.
 
   [file system object]: #gloss-file-system-object
 
