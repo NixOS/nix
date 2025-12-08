@@ -87,7 +87,7 @@ The derivation JSON format has been updated from version 3 to version 4:
 
 - **Consistent content addresses**:
 
-  Floating content-addressed outputs now use structured JSON format.
+  Fixed content-addressed outputs now use structured JSON format.
   This is the same format as `ca` in store path info (after the new version).
 
 Version 3 and earlier formats are *not* accepted when reading.
