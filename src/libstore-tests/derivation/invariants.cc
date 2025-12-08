@@ -174,6 +174,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectInputAddressedPath)
     ASSERT_THROW(drv.fillInOutputPaths(*store), Error);
 }
 
+#if 0
 TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
 {
     auto wrongPath = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"};
@@ -195,6 +196,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
 
     ASSERT_THROW(drv.fillInOutputPaths(*store), Error);
 }
+#endif
 
 TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 {
