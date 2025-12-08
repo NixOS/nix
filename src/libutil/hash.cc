@@ -164,7 +164,7 @@ static Hash parseLowLevel(
     return res;
 }
 
-Hash Hash::parseSRI(std::string_view original)
+Hash Hash::parseSRI(std::string_view original, const ExperimentalFeatureSettings & xpSettings)
 {
     auto rest = original;
 
@@ -172,9 +172,9 @@ Hash Hash::parseSRI(std::string_view original)
     auto hashRaw = splitPrefixTo(rest, '-');
     if (!hashRaw)
         throw BadHash("hash '%s' is not SRI", original);
-    HashAlgorithm parsedType = parseHashAlgo(*hashRaw);
+    HashAlgorithm parsedType = parseHashAlgo(*hashRaw, xpSettings);
 
-    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"});
+    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"}, xpSettings);
 }
 
 /**

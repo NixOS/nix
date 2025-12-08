@@ -110,7 +110,8 @@ struct Hash
         HashFormat explicitFormat,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
-    static Hash parseSRI(std::string_view original);
+    static Hash
+    parseSRI(std::string_view original, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 public:
     /**
