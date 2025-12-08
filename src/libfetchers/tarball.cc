@@ -6,6 +6,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/types.hh"
+#include "nix/util/url.hh"
 #include "nix/fetchers/store-path-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/git-utils.hh"
@@ -114,8 +115,8 @@ static DownloadTarballResult downloadTarball_(
     // Namely lets catch when the url is a local file path, but
     // it is not in fact a tarball.
     if (url.rfind("file://", 0) == 0) {
-        // Remove "file://" prefix to get the local file path
-        std::string localPath = url.substr(7);
+        // Remove "file://" prefix and decode to get the local file path
+        std::string localPath = percentDecode(url.substr(7));
         if (!std::filesystem::exists(localPath)) {
             throw Error("tarball '%s' does not exist.", localPath);
         }
