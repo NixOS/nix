@@ -5,13 +5,13 @@
 ### SHA-256
 
 ```json
-{{#include schema/hash-v1/sha256-base16.json}}
+{{#include schema/hash-v1/sha256.json}}
 ```
 
 ### BLAKE3
 
 ```json
-{{#include schema/hash-v1/blake3-base16.json}}
+{{#include schema/hash-v1/blake3.json}}
 ```
 
 <!-- need to convert YAML to JSON first

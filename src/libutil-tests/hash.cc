@@ -215,9 +215,6 @@ struct HashJsonTest : virtual HashTest,
                       ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
 {};
 
-struct HashJsonParseFailureTest : virtual HashTest, ::testing::WithParamInterface<std::string_view>
-{};
-
 struct BLAKE3HashJsonTest : virtual HashTest,
                             BLAKE3HashTest,
                             JsonCharacterizationTest<Hash>,
@@ -236,14 +233,6 @@ TEST_P(HashJsonTest, to_json)
     writeJsonTest(name, value);
 }
 
-TEST_P(HashJsonParseFailureTest, from_json)
-{
-    auto & name = GetParam();
-    auto path = goldenMaster(Path{name} + ".json");
-    auto encoded = json::parse(readFile(path));
-    ASSERT_THROW(nlohmann::adl_serializer<Hash>::from_json(encoded), Error);
-}
-
 TEST_P(BLAKE3HashJsonTest, from_json)
 {
     auto & [name, expected] = GetParam();
@@ -256,32 +245,25 @@ TEST_P(BLAKE3HashJsonTest, to_json)
     writeJsonTest(name, expected);
 }
 
-// Round-trip tests (from_json + to_json) for base16 format only
-// (to_json always outputs base16)
 INSTANTIATE_TEST_SUITE_P(
     HashJSON,
     HashJsonTest,
     ::testing::Values(
         std::pair{
-            "simple",
+            "sha256",
             hashString(HashAlgorithm::SHA256, "asdf"),
         },
         std::pair{
-            "sha256-base16",
+            "sha512",
             hashString(HashAlgorithm::SHA256, "asdf"),
         }));
-
-// Failure tests for unsupported formats (base64, nix32, sri)
-// These verify that non-base16 formats are rejected
-INSTANTIATE_TEST_SUITE_P(
-    HashJSONParseFailure, HashJsonParseFailureTest, ::testing::Values("sha256-base64", "sha256-nix32"));
 
 INSTANTIATE_TEST_SUITE_P(BLAKE3HashJSON, BLAKE3HashJsonTest, ([] {
                              ExperimentalFeatureSettings mockXpSettings;
                              mockXpSettings.set("experimental-features", "blake3-hashes");
                              return ::testing::Values(
                                  std::pair{
-                                     "blake3-base16",
+                                     "blake3",
                                      hashString(HashAlgorithm::BLAKE3, "asdf", mockXpSettings),
                                  });
                          }()));

@@ -1,11 +1,7 @@
 [
   null,
   {
-    "hash": {
-      "algorithm": "sha1",
-      "format": "base16",
-      "hash": "8067a60687a7562359337862c2a9ecfc5833ab0a"
-    },
+    "hash": "sha1-gGemBoenViNZM3hiwqns/Fgzqwo=",
     "method": "flat"
   }
 ]

@@ -49,17 +49,10 @@ The new structured format follows the [JSON guidelines](@docroot@/development/js
   Content address is now a structured JSON object instead of a string:
 
   - Old: `"ca": "fixed:r:sha256:1abc..."`
-  - New: `"ca": {"method": "nar", "hash": {"algorithm": "sha256", "format": "base16", "hash": "10c209fa..."}}`
+  - New: `"ca": {"method": "nar", "hash": "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="}`
   - Still `null` values for input-addressed store objects
 
-- **Structured hash fields**:
-
-  Hash values (`narHash` and `downloadHash`) are now structured JSON objects instead of strings:
-
-  - Old: `"narHash": "sha256:FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="`
-  - New: `"narHash": {"algorithm": "sha256", "format": "base16", "hash": "15e3c5608946..."}`
-  - Same structure applies to `downloadHash` in NAR info contexts
-  - The `format` field is always `"base16"` (hexadecimal)
+  The `hash` field uses the [SRI](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) format like other hashes.
 
 Nix currently only produces, and doesn't consume this format.
 
@@ -87,7 +80,7 @@ The derivation JSON format has been updated from version 3 to version 4:
 
 - **Consistent content addresses**:
 
-  Floating content-addressed outputs now use structured JSON format.
+  Fixed content-addressed outputs now use structured JSON format.
   This is the same format as `ca` in store path info (after the new version).
 
 Version 3 and earlier formats are *not* accepted when reading.

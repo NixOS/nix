@@ -164,7 +164,7 @@ static Hash parseLowLevel(
     return res;
 }
 
-Hash Hash::parseSRI(std::string_view original)
+Hash Hash::parseSRI(std::string_view original, const ExperimentalFeatureSettings & xpSettings)
 {
     auto rest = original;
 
@@ -172,9 +172,9 @@ Hash Hash::parseSRI(std::string_view original)
     auto hashRaw = splitPrefixTo(rest, '-');
     if (!hashRaw)
         throw BadHash("hash '%s' is not SRI", original);
-    HashAlgorithm parsedType = parseHashAlgo(*hashRaw);
+    HashAlgorithm parsedType = parseHashAlgo(*hashRaw, xpSettings);
 
-    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"});
+    return parseLowLevel(rest, parsedType, {base64::decode, "SRI"}, xpSettings);
 }
 
 /**
@@ -519,27 +519,13 @@ using namespace nix;
 
 Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
 {
-    auto & obj = getObject(json);
-    auto algo = parseHashAlgo(getString(valueAt(obj, "algorithm")), xpSettings);
-    auto formatStr = getString(valueAt(obj, "format"));
-    auto format = parseHashFormat(formatStr);
-
-    // Only base16 format is supported for JSON serialization
-    if (format != HashFormat::Base16) {
-        throw Error("hash format '%s' is not supported in JSON; only 'base16' is currently supported", formatStr);
-    }
-
-    auto & hashS = getString(valueAt(obj, "hash"));
-    return Hash::parseExplicitFormatUnprefixed(hashS, algo, format, xpSettings);
+    auto & s = getString(json);
+    return Hash::parseSRI(s, xpSettings);
 }
 
 void adl_serializer<Hash>::to_json(json & json, const Hash & hash)
 {
-    json = {
-        {"format", printHashFormat(HashFormat::Base16)},
-        {"algorithm", printHashAlgo(hash.algo)},
-        {"hash", hash.to_string(HashFormat::Base16, false)},
-    };
+    json = hash.to_string(HashFormat::SRI, true);
 }
 
 } // namespace nlohmann

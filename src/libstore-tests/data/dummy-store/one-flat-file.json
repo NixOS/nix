@@ -12,19 +12,11 @@
       },
       "info": {
         "ca": {
-          "hash": {
-            "algorithm": "sha256",
-            "format": "base16",
-            "hash": "7f579dbae488602d41a1f5c0d6dc9c17bf408b635230942d504af1e43c4b6125"
-          },
+          "hash": "sha256-f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU=",
           "method": "nar"
         },
         "deriver": null,
-        "narHash": {
-          "algorithm": "sha256",
-          "format": "base16",
-          "hash": "7f579dbae488602d41a1f5c0d6dc9c17bf408b635230942d504af1e43c4b6125"
-        },
+        "narHash": "sha256-f1eduuSIYC1BofXA1tycF79Ai2NSMJQtUErx5DxLYSU=",
         "narSize": 120,
         "references": [],
         "registrationTime": null,
