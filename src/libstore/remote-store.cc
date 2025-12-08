@@ -694,7 +694,8 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(getConnection());
 
-    conn->to << WorkerProto::Op::CollectGarbage << options.action;
+    conn->to << WorkerProto::Op::CollectGarbage;
+    WorkerProto::write(*this, *conn, options.action);
     WorkerProto::write(*this, *conn, options.pathsToDelete);
     conn->to << options.ignoreLiveness
              << options.maxFreed
