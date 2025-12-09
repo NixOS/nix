@@ -23,13 +23,21 @@
 
 ## Performance improvements
 
-- Git fetcher computes `revCount`s using multiple threads [#14462](https://github.com/NixOS/nix/pull/14462) 
+- Git fetcher computes `revCount`s using multiple threads [#14462](https://github.com/NixOS/nix/pull/14462)
 
   When using Git repositories with a long history, calculating the `revCount` attribute can take a long time. Nix now computes `revCount` using multiple threads, making it much faster (e.g. 9.1s to 3.7s for Nixpkgs).
 
   Note that if you don't need `revCount`, you can disable it altogether by setting the flake input attribute `shallow = true`.
 
   Upstreamed from [Determinate Nix 3.12.2](https://github.com/DeterminateSystems/nix-src/pull/245).
+
+- `builtins.stringLength` now runs in constant time [#14442](https://github.com/NixOS/nix/pull/14442)
+
+  The internal representation of strings has been replaced with a size-prefixed Pascal style string. Previously Nix stored strings as a NUL-terminated array of bytes, necessitating a linear scan to calculate the length.
+
+- Uploads to `http://` and `https://` binary cache stores now run in constant memory [#14390](https://github.com/NixOS/nix/pull/14390)
+
+  Nix used to buffer the whole compressed NAR contents in memory. It now reads it in a streaming fashion.
 
 - Channel URLs migrated to channels.nixos.org subdomain [#14517](https://github.com/NixOS/nix/issues/14517) [#14518](https://github.com/NixOS/nix/pull/14518)
 
@@ -43,6 +51,16 @@
   This is expected to improve download performance on fast connections, since previously a single slow download consumer would stall the thread and prevent any other transfers from progressing.
 
   Many thanks go out to the [Lix project](https://lix.systems/) for the [implementation](https://git.lix.systems/lix-project/lix/commit/4ae6fb5a8f0d456b8d2ba2aaca3712b4e49057fc) that served as inspiration for this change and for triaging libcurl [issues with pausing](https://github.com/curl/curl/issues/19334).
+
+- Significantly improve tarball unpacking performance [#14689](https://github.com/NixOS/nix/pull/14689) [#14696](https://github.com/NixOS/nix/pull/14696) [#10683](https://github.com/NixOS/nix/issues/10683) [#11098](https://github.com/NixOS/nix/issues/11098)
+
+  Nix uses a content-addressed cache backed by libgit2 for deduplicating files fetched via `fetchTarball` and `github`, `tarball` flake inputs. Its usage has been significantly optimised to reduce the amount of I/O operations that are performed. For a typical nixpkgs source tarball this results in 200 times fewer system calls on Linux. In combination with libcurl pausing this alleviates performance regressions stemming from the tarball cache.
+
+- Already valid derivations are no longer copied to the store [#14219](https://github.com/NixOS/nix/pull/14219)
+
+  This results in a modest speedup when using the Nix daemon.
+
+- `nix nar ls` and `nix nar cat` are significantly faster and no longer buffer the whole NAR in memory [#14273](https://github.com/NixOS/nix/pull/14273) [#14732](https://github.com/NixOS/nix/pull/14732)
 
 ## S3 improvements
 
@@ -191,6 +209,23 @@ Version 3 and earlier formats are *not* accepted when reading.
   Previously, this only worked once per REPL session; further attempts would be ignored.
   This issue is now fixed, so REPL commands such as `:b` or `:p` can be canceled consistently.
   This is a cherry-pick of the change from the [Lix project](https://gerrit.lix.systems/c/lix/+/1097).
+
+- NAR unpacking code has been rewritten to make use of dirfd-based `openat` and `openat2` system calls when available [#14597](https://github.com/NixOS/nix/pull/14597)
+
+- Dynamic size unit rendering [#14423](https://github.com/NixOS/nix/pull/14423) [#14364](https://github.com/NixOS/nix/pull/14364)
+
+  Various commands and the progress bar now use dynamically determined size units instead
+  of always using `MiB`. For example, the progress bar now reports download status like:
+
+  ```
+  [1/196/197 copied (773.7 MiB/2.1 GiB), 172.4/421.5 MiB DL]
+  ```
+
+  Instead of:
+
+  ```
+  [1/196/197 copied (773.7/2147.3 MiB), 172.4/421.5 MiB DL]
+  ```
 
 ## Contributors
 
