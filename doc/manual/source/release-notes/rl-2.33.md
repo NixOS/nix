@@ -2,96 +2,9 @@
 
 - Channel URLs migrated to channels.nixos.org subdomain [#14517](https://github.com/NixOS/nix/issues/14517) [#14518](https://github.com/NixOS/nix/pull/14518)
 
-  Channel URLs have been updated from `https://nixos.org/channels/` to `https://channels.nixos.org/` throughout Nix.
+  Channel URLs have been updated from `https://nixos.org/channels/` to `https://channels.nixos.org/` throughout Nix. This subdomain provides better reliability with IPv6 support and improved CDN distribution. The old domain apex (`nixos.org/channels/`) currently redirects to the new location but may be deprecated in the future.
 
-  The subdomain provides better reliability with IPv6 support and improved CDN distribution. The old domain apex (`nixos.org/channels/`) currently redirects to the new location but may be deprecated in the future.
-
-- JSON format changes for store path info and derivations
-
-  JSON formats for store path info and derivations have been updated with new versions and structured fields.
-
-  ## Store Path Info JSON
-
-  `nix path-info --json` now requires a `--json-format` flag to specify the output format version.
-  Using `--json` without `--json-format` is deprecated and will become an error in a future release.
-  For now, it defaults to version 1 with a warning, for a smoother migration.
-
-  ### Version 1 (`--json-format 1`)
-
-  This is the legacy format, preserved for backwards compatibility:
-
-  - String-based hash values (e.g., `"narHash": "sha256:FePFYIlM..."`)
-  - String-based content addresses (e.g., `"ca": "fixed:r:sha256:1abc..."`)
-  - Full store paths for map keys and references (e.g., `"/nix/store/abc...-foo"`)
-  - Now includes `"storeDir"` field at the top level
-
-  ### Version 2 (`--json-format 2`)
-
-  The new structured format follows the [JSON guidelines](@docroot@/development/json-guideline.md) with the following changes:
-
-  - **Nested structure with top-level metadata**:
-
-    The output is now wrapped in an object with `version`, `storeDir`, and `info` fields:
-
-    ```json
-    {
-      "version": 2,
-      "storeDir": "/nix/store",
-      "info": { ... }
-    }
-    ```
-
-    The map from store bath base names to store object info is nested under the `info` field.
-
-  - **Store path base names instead of full paths**:
-
-    Map keys and references use store path base names (e.g., `"abc...-foo"`) instead of full absolute store paths.
-    Combined with `storeDir`, the full path can be reconstructed.
-
-  - **Structured `ca` field**:
-
-    Content address is now a structured JSON object instead of a string:
-
-    - Old: `"ca": "fixed:r:sha256:1abc..."`
-    - New: `"ca": {"method": "nar", "hash": "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="}`
-    - Still `null` values for input-addressed store objects
-
-    The `hash` field uses the [SRI](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) format like other hashes.
-
-  Nix currently only produces, and doesn't consume this format.
-
-  Additionally the following field is added to both formats.
-  (The `version` tracks breaking changes, and adding fields to outputted JSON is not a breaking change.)
-
-  - **`version` field**:
-
-    All store path info JSON now includes `"version": <1|2>`.
-
-  - **`storeDir` field**:
-
-    Top-level `"storeDir"` field contains the store directory path (e.g., `"/nix/store"`).
-
-  ## Derivation JSON (Version 4)
-
-  The derivation JSON format has been updated from version 3 to version 4:
-
-  - **Restructured inputs**:
-
-    Inputs are now nested under an `inputs` object:
-
-    - Old: `"inputSrcs": [...], "inputDrvs": {...}`
-    - New: `"inputs": {"srcs": [...], "drvs": {...}}`
-
-  - **Consistent content addresses**:
-
-    Fixed content-addressed outputs now use structured JSON format.
-    This is the same format as `ca` in store path info (after the new version).
-
-  Version 3 and earlier formats are *not* accepted when reading.
-
-  **Affected command**: `nix derivation`, namely its `show` and `add` sub-commands.
-
-- Fix "download buffer is full; consider increasing the 'download-buffer-size' setting" warning [#11728](https://github.com/NixOS/nix/issues/11728) [#14614](https://github.com/NixOS/nix/pull/14614)
+- Fix `download buffer is full; consider increasing the 'download-buffer-size' setting` warning [#11728](https://github.com/NixOS/nix/issues/11728) [#14614](https://github.com/NixOS/nix/pull/14614)
 
   The underlying issue that led to [#11728](https://github.com/NixOS/nix/issues/11728) has been resolved by utilizing
   [libcurl write pausing functionality](https://curl.se/libcurl/c/curl_easy_pause.html) to control backpressure when unpacking to slow destinations like the git-backed tarball cache. The default value of `download-buffer-size` is now 1 MiB and it's no longer recommended to increase it, since the root cause has been fixed.
@@ -106,44 +19,31 @@
   This issue is now fixed, so REPL commands such as `:b` or `:p` can be canceled consistently.
   This is a cherry-pick of the change from the [Lix project](https://gerrit.lix.systems/c/lix/+/1097).
 
+## S3 improvements
+
 - Improved S3 binary cache support via HTTP [#11748](https://github.com/NixOS/nix/issues/11748) [#12403](https://github.com/NixOS/nix/issues/12403) [#12671](https://github.com/NixOS/nix/issues/12671) [#13084](https://github.com/NixOS/nix/issues/13084) [#13752](https://github.com/NixOS/nix/pull/13752) [#13823](https://github.com/NixOS/nix/pull/13823) [#14026](https://github.com/NixOS/nix/pull/14026) [#14120](https://github.com/NixOS/nix/pull/14120) [#14131](https://github.com/NixOS/nix/pull/14131) [#14135](https://github.com/NixOS/nix/pull/14135) [#14144](https://github.com/NixOS/nix/pull/14144) [#14170](https://github.com/NixOS/nix/pull/14170) [#14190](https://github.com/NixOS/nix/pull/14190) [#14198](https://github.com/NixOS/nix/pull/14198) [#14206](https://github.com/NixOS/nix/pull/14206) [#14209](https://github.com/NixOS/nix/pull/14209) [#14222](https://github.com/NixOS/nix/pull/14222) [#14223](https://github.com/NixOS/nix/pull/14223) [#14330](https://github.com/NixOS/nix/pull/14330) [#14333](https://github.com/NixOS/nix/pull/14333) [#14335](https://github.com/NixOS/nix/pull/14335) [#14336](https://github.com/NixOS/nix/pull/14336) [#14337](https://github.com/NixOS/nix/pull/14337) [#14350](https://github.com/NixOS/nix/pull/14350) [#14356](https://github.com/NixOS/nix/pull/14356) [#14357](https://github.com/NixOS/nix/pull/14357) [#14374](https://github.com/NixOS/nix/pull/14374) [#14375](https://github.com/NixOS/nix/pull/14375) [#14376](https://github.com/NixOS/nix/pull/14376) [#14377](https://github.com/NixOS/nix/pull/14377) [#14391](https://github.com/NixOS/nix/pull/14391) [#14393](https://github.com/NixOS/nix/pull/14393) [#14420](https://github.com/NixOS/nix/pull/14420) [#14421](https://github.com/NixOS/nix/pull/14421)
 
-  S3 binary cache operations now happen via HTTP, leveraging `libcurl`'s native
-  AWS SigV4 authentication instead of the AWS C++ SDK, providing significant
-  improvements:
+  S3 binary cache operations now happen via HTTP, leveraging `libcurl`'s native AWS SigV4 authentication instead of the AWS C++ SDK, providing significant improvements:
 
-  - **Reduced memory usage**: Eliminates memory buffering issues that caused
-    segfaults with large files
-  - **Fixed upload reliability**: Resolves AWS SDK chunking errors
-    (`InvalidChunkSizeError`)
-  - **Lighter dependencies**: Uses lightweight `aws-crt-cpp` instead of full
-    `aws-cpp-sdk`, reducing build complexity
+  - **Reduced memory usage**: Eliminates memory buffering issues that caused segfaults with large files
+  - **Fixed upload reliability**: Resolves AWS SDK chunking errors (`InvalidChunkSizeError`)
+  - **Lighter dependencies**: Uses lightweight `aws-crt-cpp` instead of full `aws-cpp-sdk`, reducing build complexity
 
-  The new implementation requires curl >= 7.75.0 and `aws-crt-cpp` for credential
-  management.
+  The new implementation requires curl >= 7.75.0 and `aws-crt-cpp` for credential management.
 
-  All existing S3 URL formats and parameters remain supported, however the store
-  settings for configuring multipart uploads have changed:
+  All existing S3 URL formats and parameters remain supported, however the store settings for configuring multipart uploads have changed:
 
-  - **`multipart-upload`** (default: `false`): Enable multipart uploads for large
-    files. When enabled, files exceeding the multipart threshold will be uploaded
-    in multiple parts.
+  - **`multipart-upload`** (default: `false`): Enable multipart uploads for large files. When enabled, files exceeding the multipart threshold will be uploaded in multiple parts.
 
-  - **`multipart-threshold`** (default: `100 MiB`): Minimum file size for using
-    multipart uploads. Files smaller than this will use regular PUT requests.
-    Only takes effect when `multipart-upload` is enabled.
+  - **`multipart-threshold`** (default: `100 MiB`): Minimum file size for using multipart uploads. Files smaller than this will use regular PUT requests. Only takes effect when `multipart-upload` is enabled.
 
-  - **`multipart-chunk-size`** (default: `5 MiB`): Size of each part in multipart
-    uploads. Must be at least 5 MiB (AWS S3 requirement). Larger chunk sizes
-    reduce the number of requests but use more memory.
+  - **`multipart-chunk-size`** (default: `5 MiB`): Size of each part in multipart uploads. Must be at least 5 MiB (AWS S3 requirement). Larger chunk sizes reduce the number of requests but use more memory.
 
   - **`buffer-size`**: Has been replaced by `multipart-chunk-size` and is now an alias to it.
 
-  Note that this change also means Nix now supports S3 binary cache stores even
-  if built without `aws-crt-cpp`, but only for public buckets which do not
-  require authentication.
+  Note that this change also means Nix now supports S3 binary cache stores even if built without `aws-crt-cpp`, but only for public buckets which do not require authentication.
 
-- S3 URLs now support object versioning via versionId parameter [#13955](https://github.com/NixOS/nix/issues/13955) [#14274](https://github.com/NixOS/nix/pull/14274)
+- S3 URLs now support object versioning via `versionId` parameter [#13955](https://github.com/NixOS/nix/issues/13955) [#14274](https://github.com/NixOS/nix/pull/14274)
 
   S3 URLs now support a `versionId` query parameter to fetch specific versions
   of objects from S3 buckets with versioning enabled. This allows pinning to
@@ -173,8 +73,88 @@
   See the [S3 storage classes documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html) for available storage classes and their characteristics.
 
 
-## Contributors
+## Store path info JSON format changes
 
+The JSON format for store path info has a new version.
+  
+`nix path-info --json` now requires a `--json-format` flag to specify the output format version.
+Using `--json` without `--json-format` is deprecated and will become an error in a future release.
+For now, it defaults to version 1 with a warning, for a smoother migration.
+
+### Version 1 (`--json-format 1`)
+
+This is the legacy format, preserved for backwards compatibility:
+
+- String-based hash values (e.g., `"narHash": "sha256:FePFYIlM..."`)
+- String-based content addresses (e.g., `"ca": "fixed:r:sha256:1abc..."`)
+- Full store paths for map keys and references (e.g., `"/nix/store/abc...-foo"`)
+- Now includes `"storeDir"` field at the top level
+
+### Version 2 (`--json-format 2`)
+
+The new structured format follows the [JSON guidelines](@docroot@/development/json-guideline.md) with the following changes:
+
+- **Nested structure with top-level metadata**:
+
+  The output is now wrapped in an object with `version`, `storeDir`, and `info` fields:
+
+  ```json
+  {
+    "version": 2,
+    "storeDir": "/nix/store",
+    "info": { ... }
+  }
+  ```
+
+  The map from store bath base names to store object info is nested under the `info` field.
+
+- **Store path base names instead of full paths**:
+
+  Map keys and references use store path base names (e.g., `"abc...-foo"`) instead of full absolute store paths.
+  Combined with `storeDir`, the full path can be reconstructed.
+
+- **Structured `ca` field**:
+
+  Content address is now a structured JSON object instead of a string:
+
+  - Old: `"ca": "fixed:r:sha256:1abc..."`
+  - New: `"ca": {"method": "nar", "hash": "sha256-ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0="}`
+  - Still `null` values for input-addressed store objects
+
+  The `hash` field uses the [SRI](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) format like other hashes.
+
+Additionally the following fields are added to both formats:
+
+  - **`version` field**:
+
+    All store path info JSON now includes `"version": <1|2>`. The `version` tracks breaking changes, and adding fields to outputted JSON is not a breaking change.
+
+  - **`storeDir` field**:
+
+    Top-level `"storeDir"` field contains the store directory path (e.g., `"/nix/store"`).
+
+## Derivation JSON format changes
+
+The derivation JSON format has been updated from version 3 to version 4:
+
+- **Restructured inputs**:
+
+  Inputs are now nested under an `inputs` object:
+
+  - Old: `"inputSrcs": [...], "inputDrvs": {...}`
+  - New: `"inputs": {"srcs": [...], "drvs": {...}}`
+
+- **Consistent content addresses**:
+
+  Fixed content-addressed outputs now use structured JSON format.
+  This is the same format as `ca` in store path info (after the new version).
+
+Version 3 and earlier formats are *not* accepted when reading.
+
+**Affected command**: `nix derivation`, namely its `show` and `add` sub-commands.
+
+
+## Contributors
 
 This release was made possible by the following 33 contributors:
 
