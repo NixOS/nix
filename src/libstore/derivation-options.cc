@@ -200,33 +200,106 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                     for (auto & [outputName, output_] : getObject(*outputChecks)) {
                         auto & output = getObject(output_);
 
-                        auto get_ =
-                            [&](const std::string & name) -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {
-                            if (auto * i = get(output, name)) {
-                                try {
-                                    std::set<DrvRef<SingleDerivedPath>> res;
-                                    for (auto & s : getStringList(*i))
-                                        res.insert(parseRef(s));
-                                    return res;
-                                } catch (Error & e) {
-                                    e.addTrace({}, "while parsing attribute 'outputChecks.\"%s\".%s'", outputName, name);
-                                    throw;
-                                }
-                            }
-                            return {};
+                        auto getRefSet = [&](const nlohmann::json & j) -> std::set<DrvRef<SingleDerivedPath>> {
+                            std::set<DrvRef<SingleDerivedPath>> res;
+                            for (auto & s : getStringList(j))
+                                res.insert(parseRef(s));
+                            return res;
                         };
 
                         res.insert_or_assign(
                             outputName,
                             OutputChecks<SingleDerivedPath>{
-                                .maxSize = ptrToOwned<uint64_t>(get(output, "maxSize")),
-                                .maxClosureSize = ptrToOwned<uint64_t>(get(output, "maxClosureSize")),
-                                .allowedReferences = get_("allowedReferences"),
+                                .maxSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto * i = get(output, "maxSize")) {
+                                        try {
+                                            return *i;
+                                        } catch (Error & e) {
+                                            e.addTrace(
+                                                {},
+                                                "while parsing attribute 'outputChecks.\"%s\".maxSize'",
+                                                outputName);
+                                            throw;
+                                        }
+                                    }
+                                    return {};
+                                }(),
+                                .maxClosureSize = [&]() -> std::optional<uint64_t> {
+                                    if (auto * i = get(output, "maxClosureSize")) {
+                                        try {
+                                            return *i;
+                                        } catch (Error & e) {
+                                            e.addTrace(
+                                                {},
+                                                "while parsing attribute 'outputChecks.\"%s\".maxClosureSize'",
+                                                outputName);
+                                            throw;
+                                        }
+                                    }
+                                    return {};
+                                }(),
+                                .allowedReferences = [&]() -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {
+                                    if (auto * i = get(output, "allowedReferences")) {
+                                        if (auto * j = getNullable(*i)) {
+                                            try {
+                                                return getRefSet(*j);
+                                            } catch (Error & e) {
+                                                e.addTrace(
+                                                    {},
+                                                    "while parsing attribute 'outputChecks.\"%s\".allowedReferences'",
+                                                    outputName);
+                                                throw;
+                                            }
+                                        }
+                                    }
+                                    return {};
+                                }(),
                                 .disallowedReferences =
-                                    get_("disallowedReferences").value_or(std::set<DrvRef<SingleDerivedPath>>{}),
-                                .allowedRequisites = get_("allowedRequisites"),
+                                    [&] {
+                                        if (auto * i = get(output, "disallowedReferences")) {
+                                            try {
+                                                return getRefSet(*i);
+                                            } catch (Error & e) {
+                                                e.addTrace(
+                                                    {},
+                                                    "while parsing attribute 'outputChecks.\"%s\".disallowedReferences'",
+                                                    outputName);
+                                                throw;
+                                            }
+                                        }
+                                        return std::set<DrvRef<SingleDerivedPath>>{};
+                                    }(),
+                                .allowedRequisites = [&]() -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {
+                                    if (auto * i = get(output, "allowedRequisites")) {
+                                        if (auto * j = getNullable(*i)) {
+                                            try {
+                                                return getRefSet(*j);
+                                            } catch (Error & e) {
+                                                e.addTrace(
+                                                    {},
+                                                    "while parsing attribute 'outputChecks.\"%s\".allowedRequisites'",
+                                                    outputName);
+                                                throw;
+                                            }
+                                        }
+                                    }
+                                    return {};
+                                }(),
                                 .disallowedRequisites =
-                                    get_("disallowedRequisites").value_or(std::set<DrvRef<SingleDerivedPath>>{}),
+                                    [&] {
+                                        if (auto * i = get(output, "disallowedRequisites")) {
+                                            try {
+                                                return getRefSet(*i);
+                                            } catch (Error & e) {
+                                                e.addTrace(
+                                                    {},
+                                                    "while parsing attribute 'outputChecks.\"%s\".disallowedRequisites'",
+                                                    outputName);
+                                                throw;
+                                            }
+                                        }
+                                        return std::set<DrvRef<SingleDerivedPath>>{};
+                                    }(),
                             });
                     }
                 }

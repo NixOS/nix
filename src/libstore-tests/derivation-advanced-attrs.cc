@@ -126,6 +126,7 @@ TEST_ATERM_JSON(advancedAttributes, "advanced-attributes-defaults");
 TEST_ATERM_JSON(advancedAttributes_defaults, "advanced-attributes");
 TEST_ATERM_JSON(advancedAttributes_structuredAttrs, "advanced-attributes-structured-attrs-defaults");
 TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attributes-structured-attrs");
+TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults_null, "advanced-attributes-structured-attrs-defaults-null");
 
 #undef TEST_ATERM_JSON
 
@@ -349,6 +350,62 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
 TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults)
 {
     testRequiredSystemFeatures("advanced-attributes-structured-attrs-defaults.drv", {"ca-derivations"});
+};
+
+/**
+ * Test that null values for allowedReferences and allowedRequisites are
+ * treated as "not set" (no restriction), same as if the field was missing.
+ *
+ * The outputChecks map will have an entry for "out" (since outputChecks.out
+ * exists in the nix file), but the OutputChecks for that entry should have
+ * default/empty values for the nullable fields.
+ */
+DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults_null = {
+    .outputChecks =
+        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks>{
+            // null values result in nullopt/empty, same as if not specified
+            {"out", DerivationOptions<SingleDerivedPath>::OutputChecks{}},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults_null)
+{
+    this->readTest("advanced-attributes-structured-attrs-defaults-null.drv", [&](auto encoded) {
+        auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+
+        auto options = derivationOptionsFromStructuredAttrs(
+            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+
+        EXPECT_TRUE(got.structuredAttrs);
+
+        EXPECT_EQ(options, advancedAttributes_structuredAttrs_defaults_null);
+
+        EXPECT_EQ(options.canBuildLocally(*this->store, got), false);
+        EXPECT_EQ(options.willBuildLocally(*this->store, got), false);
+        EXPECT_EQ(options.substitutesAllowed(), true);
+        EXPECT_EQ(options.useUidRange(got), false);
+    });
+};
+
+TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults_null)
+{
+    testRequiredSystemFeatures("advanced-attributes-structured-attrs-defaults-null.drv", {});
+};
+
+TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs_defaults_null)
+{
+    testRequiredSystemFeatures("advanced-attributes-structured-attrs-defaults-null.drv", {"ca-derivations"});
 };
 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)

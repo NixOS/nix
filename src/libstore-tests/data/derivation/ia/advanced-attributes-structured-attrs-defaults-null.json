@@ -1,0 +1,41 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "dev": "/nix/store/390jivcxmgr11md7knrcyzwv9v2v64cc-advanced-attributes-structured-attrs-defaults-null-dev",
+    "out": "/nix/store/s579dvk7r4jvp7rjmzq1gy3bf9sp7b4k-advanced-attributes-structured-attrs-defaults-null"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "advanced-attributes-structured-attrs-defaults-null",
+  "outputs": {
+    "dev": {
+      "path": "390jivcxmgr11md7knrcyzwv9v2v64cc-advanced-attributes-structured-attrs-defaults-null-dev"
+    },
+    "out": {
+      "path": "s579dvk7r4jvp7rjmzq1gy3bf9sp7b4k-advanced-attributes-structured-attrs-defaults-null"
+    }
+  },
+  "structuredAttrs": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-structured-attrs-defaults-null",
+    "outputChecks": {
+      "out": {
+        "allowedReferences": null,
+        "allowedRequisites": null
+      }
+    },
+    "outputs": [
+      "out",
+      "dev"
+    ],
+    "system": "my-system"
+  },
+  "system": "my-system",
+  "version": 4
+}
