@@ -1,5 +1,36 @@
 # Release 2.33.0 (2025-12-09)
 
+## New features
+
+- New command `nix registry resolve` [#14595](https://github.com/NixOS/nix/pull/14595)
+
+  This command looks up a flake registry input name and returns the flakeref it resolves to.
+
+  For example, looking up Nixpkgs:
+
+  ```
+  $ nix registry resolve nixpkgs
+  github:NixOS/nixpkgs/nixpkgs-unstable
+  ```
+
+  Upstreamed from [Determinate Nix 3.14.0](https://github.com/DeterminateSystems/nix-src/pull/273).
+
+- `nix flake clone` supports all input types [#14581](https://github.com/NixOS/nix/pull/14581)
+
+  `nix flake clone` now supports arbitrary input types. In particular, this allows you to clone tarball flakes, such as flakes on FlakeHub.
+
+  Upstreamed from [Determinate Nix 3.12.0](https://github.com/DeterminateSystems/nix-src/pull/229).
+
+## Performance improvements
+
+- Git fetcher computes `revCount`s usings multiple threads [#14462](https://github.com/NixOS/nix/pull/14462) 
+
+  When using Git repositories with a long history, calculating the `revCount` attribute can take a long time. Nix now computes `revCount` using multiple threads, making it much faster (e.g. 9.1s to 3.7s. for Nixpkgs).
+
+  Note that if you don't need `revCount`, you can disable it altogether by setting the flake input attribute `shallow = false`.
+
+  Upstreamed from [Determinate Nix 3.12.2](https://github.com/DeterminateSystems/nix-src/pull/245).
+
 - Channel URLs migrated to channels.nixos.org subdomain [#14517](https://github.com/NixOS/nix/issues/14517) [#14518](https://github.com/NixOS/nix/pull/14518)
 
   Channel URLs have been updated from `https://nixos.org/channels/` to `https://channels.nixos.org/` throughout Nix. This subdomain provides better reliability with IPv6 support and improved CDN distribution. The old domain apex (`nixos.org/channels/`) currently redirects to the new location but may be deprecated in the future.
@@ -12,12 +43,6 @@
   This is expected to improve download performance on fast connections, since previously a single slow download consumer would stall the thread and prevent any other transfers from progressing.
 
   Many thanks go out to the [Lix project](https://lix.systems/) for the [implementation](https://git.lix.systems/lix-project/lix/commit/4ae6fb5a8f0d456b8d2ba2aaca3712b4e49057fc) that served as inspiration for this change and for triaging libcurl [issues with pausing](https://github.com/curl/curl/issues/19334).
-
-- Interrupting REPL commands works more than once [#13481](https://github.com/NixOS/nix/issues/13481)
-
-  Previously, this only worked once per REPL session; further attempts would be ignored.
-  This issue is now fixed, so REPL commands such as `:b` or `:p` can be canceled consistently.
-  This is a cherry-pick of the change from the [Lix project](https://gerrit.lix.systems/c/lix/+/1097).
 
 ## S3 improvements
 
@@ -153,6 +178,19 @@ Version 3 and earlier formats are *not* accepted when reading.
 
 **Affected command**: `nix derivation`, namely its `show` and `add` sub-commands.
 
+## Miscellaneous changes
+
+- Git fetcher: Restore progress indication [#14487](https://github.com/NixOS/nix/pull/14487)
+
+  Nix used to feel "stuck" while it was cloning large repositories. Nix now shows Git's native progress indicator while fetching.
+
+  Upstreamed from [Determinate Nix 3.13.0](https://github.com/DeterminateSystems/nix-src/pull/250).
+
+- Interrupting REPL commands works more than once [#13481](https://github.com/NixOS/nix/issues/13481)
+
+  Previously, this only worked once per REPL session; further attempts would be ignored.
+  This issue is now fixed, so REPL commands such as `:b` or `:p` can be canceled consistently.
+  This is a cherry-pick of the change from the [Lix project](https://gerrit.lix.systems/c/lix/+/1097).
 
 ## Contributors
 
