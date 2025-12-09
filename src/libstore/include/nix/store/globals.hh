@@ -776,6 +776,8 @@ public:
         "build-dir",
         R"(
             Override the `build-dir` store setting for all stores that have this setting.
+
+            See also the per-store [`build-dir`](@docroot@/store/types/local-store.md#store-local-store-build-dir) setting.
         )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{
