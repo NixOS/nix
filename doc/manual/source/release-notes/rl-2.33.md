@@ -23,11 +23,11 @@
 
 ## Performance improvements
 
-- Git fetcher computes `revCount`s usings multiple threads [#14462](https://github.com/NixOS/nix/pull/14462) 
+- Git fetcher computes `revCount`s using multiple threads [#14462](https://github.com/NixOS/nix/pull/14462) 
 
-  When using Git repositories with a long history, calculating the `revCount` attribute can take a long time. Nix now computes `revCount` using multiple threads, making it much faster (e.g. 9.1s to 3.7s. for Nixpkgs).
+  When using Git repositories with a long history, calculating the `revCount` attribute can take a long time. Nix now computes `revCount` using multiple threads, making it much faster (e.g. 9.1s to 3.7s for Nixpkgs).
 
-  Note that if you don't need `revCount`, you can disable it altogether by setting the flake input attribute `shallow = false`.
+  Note that if you don't need `revCount`, you can disable it altogether by setting the flake input attribute `shallow = true`.
 
   Upstreamed from [Determinate Nix 3.12.2](https://github.com/DeterminateSystems/nix-src/pull/245).
 
@@ -100,9 +100,9 @@
 
 ## Store path info JSON format changes
 
-The JSON format for store path info has a new version.
-  
-`nix path-info --json` now requires a `--json-format` flag to specify the output format version.
+The JSON format emitted by `nix path-info --json` has been updated to a new version with improved structure.
+
+To maintain compatibility, `nix path-info --json` now requires a `--json-format` flag to specify the output format version.
 Using `--json` without `--json-format` is deprecated and will become an error in a future release.
 For now, it defaults to version 1 with a warning, for a smoother migration.
 
@@ -131,7 +131,7 @@ The new structured format follows the [JSON guidelines](@docroot@/development/js
   }
   ```
 
-  The map from store bath base names to store object info is nested under the `info` field.
+  The map from store path base names to store object info is nested under the `info` field.
 
 - **Store path base names instead of full paths**:
 
@@ -229,4 +229,3 @@ This release was made possible by the following 33 contributors:
 - Henry [**(@cootshk)**](https://github.com/cootshk)
 - Martin Joerg [**(@mjoerg)**](https://github.com/mjoerg)
 - Farid Zakaria [**(@fzakaria)**](https://github.com/fzakaria)
-- Graham Dennis
