@@ -37,6 +37,7 @@ struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
 enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
+enum class GCAction;
 
 /**
  * The "worker protocol", used by unix:// and ssh-ng:// stores.
@@ -262,6 +263,8 @@ template<>
 DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(BuildMode);
+template<>
+DECLARE_WORKER_SERIALISER(GCAction);
 template<>
 DECLARE_WORKER_SERIALISER(std::optional<TrustedFlag>);
 template<>

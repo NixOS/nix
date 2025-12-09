@@ -1,6 +1,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/gc-store.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
@@ -45,6 +46,46 @@ void WorkerProto::Serialise<BuildMode>::write(
     default:
         assert(false);
     };
+}
+
+GCAction WorkerProto::Serialise<GCAction>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto temp = readNum<unsigned>(conn.from);
+    using enum GCAction;
+    switch (temp) {
+    case 0:
+        return gcReturnLive;
+    case 1:
+        return gcReturnDead;
+    case 2:
+        return gcDeleteDead;
+    case 3:
+        return gcDeleteSpecific;
+    default:
+        throw Error("Invalid GC action");
+    }
+}
+
+void WorkerProto::Serialise<GCAction>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const GCAction & action)
+{
+    using enum GCAction;
+    switch (action) {
+    case gcReturnLive:
+        conn.to << unsigned{0};
+        break;
+    case gcReturnDead:
+        conn.to << unsigned{1};
+        break;
+    case gcDeleteDead:
+        conn.to << unsigned{2};
+        break;
+    case gcDeleteSpecific:
+        conn.to << unsigned{3};
+        break;
+    default:
+        assert(false);
+    }
 }
 
 std::optional<TrustedFlag>
