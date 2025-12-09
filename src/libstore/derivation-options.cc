@@ -341,8 +341,12 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 
                 if (parsed) {
                     auto * e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
-                    if (!e || !e->is_object())
+                    if (!e)
                         return ret;
+                    if (!e->is_object()) {
+                        warn("'exportReferencesGraph' in structured attrs is not a JSON object, ignoring");
+                        return ret;
+                    }
                     for (auto & [key, storePathsJson] : getObject(*e)) {
                         StringSet ss;
                         flatten(storePathsJson, ss);
