@@ -1141,7 +1141,7 @@ public:
 
     Setting<std::string> netrcFile{
         this,
-        fmt("%s/%s", nixConfDir, "netrc"),
+        (nixConfDir / "netrc").string(),
         "netrc-file",
         R"(
           If set to an absolute path to a `netrc` file, Nix uses the HTTP
