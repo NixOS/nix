@@ -18,7 +18,7 @@ mkDerivation rec {
     PATH=${builtins.getEnv "EXTRA_PATH"}:$PATH
 
     # JSON of pre-existing drv
-    nix derivation show $drv | jq .[] > drv0.json
+    nix derivation show $drv | jq '.derivations[]' > drv0.json
 
     # Fix name
     jq < drv0.json '.name = "${innerName}"' > drv1.json
