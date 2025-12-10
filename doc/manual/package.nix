@@ -6,7 +6,6 @@
   ninja,
   lowdown-unsandboxed,
   mdbook,
-  mdbook-linkcheck,
   jq,
   python3,
   rsync,
@@ -49,7 +48,6 @@ mkMesonDerivation (finalAttrs: {
     ninja
     (lib.getBin lowdown-unsandboxed)
     mdbook
-    mdbook-linkcheck
     jq
     python3
     rsync
