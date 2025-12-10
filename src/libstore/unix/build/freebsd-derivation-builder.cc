@@ -341,7 +341,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             /* N.B. it is realistic that these paths might not exist. It
                happens when testing Nix building fixed-output derivations
                within a pure derivation. */
-            for (std::filesystem::path path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
+            for (std::string path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
                 if (pathExists(path)) {
                     // TODO: Copy the actual file, not the symlink, because we don't know where
                     // the symlink is pointing, and we don't want to chase down the entire
@@ -359,7 +359,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                     //
                     // I also just generally feel icky about modifying sandbox state under a build,
                     // even though it really shouldn't be a big deal. -K900
-                    copyFile(path, std::filesystem::path{chrootRootDir} / path, false);
+                    copyFile(path, std::filesystem::path{chrootRootDir} + path, false);
                 }
             }
 
