@@ -1,5 +1,5 @@
 {
-  description = "fetchTree fetches git repos shallowly by default";
+  description = "fetchTree fetches git repos shallowly if possible";
   script = ''
     # purge nix git cache to make sure we start with a clean slate
     client.succeed("rm -rf ~/.cache/nix")
@@ -28,6 +28,7 @@
         type = "git";
         url = "{repo.remote}";
         rev = "{commit2_rev}";
+        revCount = 1234;
       }}
     """
 

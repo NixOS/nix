@@ -131,6 +131,7 @@ in
     start_all()
 
     machine.wait_for_unit("nginx.service")
+    machine.wait_for_open_port(80)
 
     # Original test: zstd archive with gzip content-encoding
     # Make sure that the file is properly compressed as the test would be meaningless otherwise
