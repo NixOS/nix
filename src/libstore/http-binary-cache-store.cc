@@ -193,7 +193,13 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    auto req = FileTransferRequest(result);
+
+    for (auto & [header, headerValue] : config->httpHeaders.get()) {
+        req.headers.emplace_back(header, headerValue);
+    }
+
+    return req;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
