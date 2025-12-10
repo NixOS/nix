@@ -180,6 +180,21 @@ Additionally the following fields are added to both formats:
 
 The derivation JSON format has been updated from version 3 to version 4:
 
+- **Nested structure with top-level metadata**:
+
+  The output of `nix derivation show` is now wrapped in an object with `version` and `derivations` fields:
+
+  ```json
+  {
+    "version": 4,
+    "derivations": { ... }
+  }
+  ```
+
+  The map from derivation paths to derivation info is nested under the `derivations` field.
+
+  This matches the structure used for `nix path-info --json --json-format 2`, and likewise brings this command into compliance with the JSON guidelines.
+
 - **Restructured inputs**:
 
   Inputs are now nested under an `inputs` object:

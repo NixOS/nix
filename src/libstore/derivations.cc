@@ -1489,8 +1489,6 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
-static unsigned constexpr expectedJsonVersionDerivation = 4;
-
 void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 {
     res = nlohmann::json::object();

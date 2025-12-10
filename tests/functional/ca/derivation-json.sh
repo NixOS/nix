@@ -6,7 +6,7 @@ export NIX_TESTS_CA_BY_DEFAULT=1
 
 drvPath=$(nix-instantiate ../simple.nix)
 
-nix derivation show "$drvPath" | jq .[] > "$TEST_HOME"/simple.json
+nix derivation show "$drvPath" | jq '.derivations[]' > "$TEST_HOME"/simple.json
 
 drvPath2=$(nix derivation add < "$TEST_HOME"/simple.json)
 
@@ -27,5 +27,5 @@ drvPath4=$(nix derivation add < "$TEST_HOME"/foo.json)
 [[ -e "$drvPath3" ]]
 
 # The modified derivation read back as JSON matches
-nix derivation show "$drvPath3" | jq .[] > "$TEST_HOME"/foo-read.json
+nix derivation show "$drvPath3" | jq '.derivations[]' > "$TEST_HOME"/foo-read.json
 diff "$TEST_HOME"/foo.json "$TEST_HOME"/foo-read.json

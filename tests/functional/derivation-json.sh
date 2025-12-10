@@ -4,7 +4,7 @@ source common.sh
 
 drvPath=$(nix-instantiate simple.nix)
 
-nix derivation show "$drvPath" | jq '.[]' > "$TEST_HOME/simple.json"
+nix derivation show "$drvPath" | jq '.derivations[]' > "$TEST_HOME/simple.json"
 
 # Round tripping to JSON works
 drvPath2=$(nix derivation add < "$TEST_HOME/simple.json")
