@@ -4061,6 +4061,8 @@ static RegisterPrimOp primop_sort({
 
         1. Transitivity
 
+        If a is less than b and b is less than c, then it follows that a is less than c.
+
         ```nix
         comparator a b && comparator b c -> comparator a c
         ```
@@ -4073,9 +4075,23 @@ static RegisterPrimOp primop_sort({
 
         1. Transitivity of equivalence
 
+        First, two values a and b are considered equivalent with respect to the comparator if:
+
+        ```
+        !comparator a b && !comparator b a
+        ```
+
+        In other words, neither is considered "less than" the other.
+
+        Transitivity of equivalence means:
+
+        If a is equivalent to b, and b is equivalent to c, then a must also be equivalent to c.
+
         ```nix
-        let equiv = a: b: (!comparator a b && !comparator b a); in
-        equiv a b && equiv b c -> equiv a c
+        let
+          equiv = x: y: (!comparator x y && !comparator y x);
+        in
+          equiv a b && equiv b c -> equiv a c
         ```
 
       If the *comparator* violates any of these properties, then `builtins.sort`
