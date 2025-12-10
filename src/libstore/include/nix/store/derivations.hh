@@ -586,6 +586,12 @@ void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDeriva
  */
 std::string hashPlaceholder(const OutputNameView outputName);
 
+/**
+ * The expected JSON version for derivation serialization.
+ * Used by `nix derivation show` and `nix derivation add`.
+ */
+constexpr unsigned expectedJsonVersionDerivation = 4;
+
 } // namespace nix
 
 JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
