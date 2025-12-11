@@ -613,6 +613,8 @@ static void main_nix_build(int argc, char ** argv)
            environment variables and shell functions.  Also don't
            lose the current $PATH directories. */
         auto rcfile = (tmpDir.path() / "rc").string();
+        auto tz = getEnv("TZ");
+        auto tzExport = tz ? "export TZ=" + escapeShellArgAlways(*tz) + "; " : "";
         std::string rc = fmt(
                 (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
                   "trap _nix_shell_clean_tmpdir EXIT; "
@@ -646,7 +648,7 @@ static void main_nix_build(int argc, char ** argv)
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
                 escapeShellArgAlways(dirOf(*shell)),
                 escapeShellArgAlways(*shell),
-                (getenv("TZ") ? (std::string("export TZ=") + escapeShellArgAlways(getenv("TZ")) + "; ") : ""),
+                tzExport,
                 envCommand);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
