@@ -15,7 +15,11 @@ namespace nix {
  */
 static inline std::filesystem::path getUnitTestData()
 {
-    return getEnv("_NIX_TEST_UNIT_DATA").value();
+    auto data = getEnv("_NIX_TEST_UNIT_DATA");
+    if (!data)
+        throw Error(
+            "_NIX_TEST_UNIT_DATA environment variable is not set. Recommendation: use meson, example: 'meson test -C build --gdb'");
+    return std::filesystem::path(*data);
 }
 
 /**
