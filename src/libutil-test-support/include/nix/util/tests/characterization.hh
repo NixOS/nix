@@ -4,23 +4,10 @@
 #include <gtest/gtest.h>
 
 #include "nix/util/types.hh"
-#include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/tests/test-data.hh"
 
 namespace nix {
-
-/**
- * The path to the unit test data directory. See the contributing guide
- * in the manual for further details.
- */
-static inline std::filesystem::path getUnitTestData()
-{
-    auto data = getEnv("_NIX_TEST_UNIT_DATA");
-    if (!data)
-        throw Error(
-            "_NIX_TEST_UNIT_DATA environment variable is not set. Recommendation: use meson, example: 'meson test -C build --gdb'");
-    return std::filesystem::path(*data);
-}
 
 /**
  * Whether we should update "golden masters" instead of running tests
