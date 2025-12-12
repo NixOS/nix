@@ -41,9 +41,16 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
+namespace {
+
+using curlSList = std::unique_ptr<::curl_slist, decltype([](::curl_slist * list) { ::curl_slist_free_all(list); })>;
+using curlMulti = std::unique_ptr<::CURLM, decltype([](::CURLM * multi) { ::curl_multi_cleanup(multi); })>;
+
+} // namespace
+
 struct curlFileTransfer : public FileTransfer
 {
-    CURLM * curlm = 0;
+    curlMulti curlm;
 
     std::random_device rd;
     std::mt19937 mt19937;
@@ -69,7 +76,7 @@ struct curlFileTransfer : public FileTransfer
            has been reached. */
         std::chrono::steady_clock::time_point embargo;
 
-        struct curl_slist * requestHeaders = 0;
+        curlSList requestHeaders;
 
         std::string encoding;
 
@@ -90,6 +97,15 @@ struct curlFileTransfer : public FileTransfer
             if (protocol == CURLPROTO_HTTP || protocol == CURLPROTO_HTTPS)
                 curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
             return httpStatus;
+        }
+
+        void appendHeaders(const std::string & header)
+        {
+            curlSList tmpSList = curlSList(::curl_slist_append(requestHeaders.get(), requireCString(header)));
+            if (!tmpSList)
+                throw std::bad_alloc();
+            requestHeaders.release();
+            requestHeaders = std::move(tmpSList);
         }
 
         TransferItem(
@@ -131,13 +147,13 @@ struct curlFileTransfer : public FileTransfer
         {
             result.urls.push_back(request.uri.to_string());
 
-            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
+            appendHeaders("Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
-                requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
+                appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
-                requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
+                appendHeaders("Content-Type: " + request.mimeType);
             for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+                appendHeaders(fmt("%s: %s", it->first, it->second));
             }
         }
 
@@ -145,11 +161,9 @@ struct curlFileTransfer : public FileTransfer
         {
             if (req) {
                 if (active)
-                    curl_multi_remove_handle(fileTransfer.curlm, req);
+                    curl_multi_remove_handle(fileTransfer.curlm.get(), req);
                 curl_easy_cleanup(req);
             }
-            if (requestHeaders)
-                curl_slist_free_all(requestHeaders);
             try {
                 if (!done)
                     fail(FileTransferError(
@@ -429,7 +443,7 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_XFERINFODATA, this);
             curl_easy_setopt(req, CURLOPT_NOPROGRESS, 0);
 
-            curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
+            curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders.get());
 
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
@@ -709,13 +723,13 @@ struct curlFileTransfer : public FileTransfer
         static std::once_flag globalInit;
         std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
 
-        curlm = curl_multi_init();
+        curlm = curlMulti(curl_multi_init());
 
 #if LIBCURL_VERSION_NUM >= 0x072b00 // Multiplex requires >= 7.43.0
-        curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+        curl_multi_setopt(curlm.get(), CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
 #endif
 #if LIBCURL_VERSION_NUM >= 0x071e00 // Max connections requires >= 7.30.0
-        curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS, fileTransferSettings.httpConnections.get());
+        curl_multi_setopt(curlm.get(), CURLMOPT_MAX_TOTAL_CONNECTIONS, fileTransferSettings.httpConnections.get());
 #endif
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
@@ -731,9 +745,6 @@ struct curlFileTransfer : public FileTransfer
         stopWorkerThread();
 
         workerThread.join();
-
-        if (curlm)
-            curl_multi_cleanup(curlm);
     }
 
     void stopWorkerThread()
@@ -775,19 +786,19 @@ struct curlFileTransfer : public FileTransfer
 
             /* Let curl do its thing. */
             int running;
-            CURLMcode mc = curl_multi_perform(curlm, &running);
+            CURLMcode mc = curl_multi_perform(curlm.get(), &running);
             if (mc != CURLM_OK)
                 throw nix::Error("unexpected error from curl_multi_perform(): %s", curl_multi_strerror(mc));
 
             /* Set the promises of any finished requests. */
             CURLMsg * msg;
             int left;
-            while ((msg = curl_multi_info_read(curlm, &left))) {
+            while ((msg = curl_multi_info_read(curlm.get(), &left))) {
                 if (msg->msg == CURLMSG_DONE) {
                     auto i = items.find(msg->easy_handle);
                     assert(i != items.end());
                     i->second->finish(msg->data.result);
-                    curl_multi_remove_handle(curlm, i->second->req);
+                    curl_multi_remove_handle(curlm.get(), i->second->req);
                     i->second->active = false;
                     items.erase(i);
                 }
@@ -810,7 +821,7 @@ struct curlFileTransfer : public FileTransfer
                                              .count())
                                    : maxSleepTimeMs;
             vomit("download thread waiting for %d ms", sleepTimeMs);
-            mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
+            mc = curl_multi_wait(curlm.get(), extraFDs, 1, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
                 throw nix::Error("unexpected error from curl_multi_wait(): %s", curl_multi_strerror(mc));
 
@@ -848,7 +859,7 @@ struct curlFileTransfer : public FileTransfer
             for (auto & item : incoming) {
                 debug("starting %s of %s", item->request.noun(), item->request.uri);
                 item->init();
-                curl_multi_add_handle(curlm, item->req);
+                curl_multi_add_handle(curlm.get(), item->req);
                 item->active = true;
                 items[item->req] = item;
             }
