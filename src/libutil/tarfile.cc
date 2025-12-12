@@ -136,7 +136,7 @@ static void extract_archive(TarArchive & archive, const std::filesystem::path & 
         if (!name)
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
         if (r == ARCHIVE_WARN)
-            warn(archive_error_string(archive.archive));
+            warn("getting archive member '%1%': %2%", name, archive_error_string(archive.archive));
         else
             archive.check(r);
 
@@ -193,7 +193,7 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
             throw Error("cannot get archive member name: %s", archive_error_string(archive.archive));
         auto cpath = CanonPath{path};
         if (r == ARCHIVE_WARN)
-            warn(archive_error_string(archive.archive));
+            warn("getting archive member '%1%': %2%", path, archive_error_string(archive.archive));
         else
             archive.check(r);
 
