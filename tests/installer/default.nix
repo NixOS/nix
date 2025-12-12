@@ -137,6 +137,16 @@ let
       extraQemuOpts = "-cpu Westmere-v2";
     };
 
+    "alpine-3-18" = {
+      image = import <nix/fetchurl.nix> {
+        url = "https://app.vagrantup.com/nix-installer/boxes/alpine318/versions/1.0.1/providers/libvirt.box";
+        hash = "sha256-97fgBByJXzaHodG82G315a0RO5pE6LuVKC2AF5E1gfM=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+      openRc = "true";
+    };
+
   };
 
   makeTest =
@@ -190,6 +200,7 @@ let
 
         ssh_opts="-o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -i ./vagrant_insecure_key"
         ssh="ssh -p 20022 -q $ssh_opts vagrant@localhost"
+        ssh_env="$ssh bash -l"
 
         echo "Waiting for SSH..."
         for ((i = 0; i < 120; i++)); do
@@ -221,15 +232,31 @@ let
         # use a plain tarpipe instead
         tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
 
-        echo "Testing Nix installation..."
-        $ssh <<EOF
-          set -ex
+        # since openrc isn't supported by the installer, perform those setup steps now. We do this in an earlier SSH connection so the group permissions are updated
+        if [ "${image.openRc or ""}" = "true" ]; then
+          echo "Testing if a OpenRC init script should be made..."
+          $ssh_env <<'EOL'
+            env
+            if [ "$__ETC_PROFILE_NIX_SOURCED" = "1" ]; then
+              echo "Creating OpenRC init script..."
+              cat <<'RC' | sudo tee /etc/init.d/nix-daemon 
+        #!/sbin/openrc-run
+        description="Nix multi-user daemon"
+        command="/nix/var/nix/profiles/default/bin/nix-daemon"
+        command_background="yes"
+        pidfile="/run/$RC_SVCNAME.pid"
+        RC
+              sudo chmod a+rx /etc/init.d/nix-daemon
+              sudo rc-update add nix-daemon
+              sudo rc-service nix-daemon start
+              sudo adduser vagrant nixbld
+            fi
+        EOL
+        fi
 
-          # FIXME: get rid of this; ideally ssh should just work.
-          source ~/.bash_profile || true
-          source ~/.bash_login || true
-          source ~/.profile || true
-          source /etc/bashrc || true
+        echo "Testing Nix installation..."
+        $ssh_env <<EOF
+          set -ex
 
           nix-env --version
           nix --extra-experimental-features nix-command store info
