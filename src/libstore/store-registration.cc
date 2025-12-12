@@ -30,14 +30,11 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     auto storeConfig = std::visit(
         overloaded{
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
-                auto stateDir = getOr(params, "state", settings.nixStateDir);
-                if (access(stateDir.c_str(), R_OK | W_OK) == 0)
-                    return make_ref<LocalStore::Config>(params);
-                else if (pathExists(settings.nixDaemonSocketFile))
+                if (pathExists(settings.nixDaemonSocketFile))
                     return make_ref<UDSRemoteStore::Config>(params);
 #ifdef __linux__
-                else if (
-                    !pathExists(stateDir) && params.empty() && !isRootUser() && !getEnv("NIX_STORE_DIR").has_value()
+                auto stateDir = getOr(params, "state", settings.nixStateDir);
+                if (!pathExists(stateDir) && params.empty() && !isRootUser() && !getEnv("NIX_STORE_DIR").has_value()
                     && !getEnv("NIX_STATE_DIR").has_value()) {
                     /* If /nix doesn't exist, there is no daemon socket, and
                        we're not root, then automatically set up a chroot
@@ -55,8 +52,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     return make_ref<LocalStore::Config>("local", chrootStore, params);
                 }
 #endif
-                else
-                    return make_ref<LocalStore::Config>(params);
+                return make_ref<LocalStore::Config>(params);
             },
             [&](const StoreReference::Specified & g) {
                 for (const auto & [storeName, implem] : Implementations::registered())
