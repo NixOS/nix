@@ -6,6 +6,9 @@
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/config-impl.hh"
+#include "nix/util/abstract-setting-to-json.hh"
 
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
@@ -389,12 +392,7 @@ struct curlFileTransfer : public FileTransfer
 #if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
 #endif
-#if LIBCURL_VERSION_NUM >= 0x072f00
-            if (fileTransferSettings.enableHttp2)
-                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
-            else
-                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-#endif
+            curl_easy_setopt(req, CURLOPT_HTTP_VERSION, curlHttpVersion(request.httpVersion));
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, TransferItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
@@ -1083,6 +1081,107 @@ FileTransferError::FileTransferError(
         err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
+}
+
+template<>
+HttpVersion BaseSetting<HttpVersion>::parse(const std::string & str) const
+{
+    if (str == "none")
+        return HttpVersion::None;
+    else if (str == "http1")
+        return HttpVersion::Http1_0;
+    else if (str == "http1-1")
+        return HttpVersion::Http1_1;
+    else if (str == "http2")
+        return HttpVersion::Http2;
+    else if (str == "http2-tls")
+        return HttpVersion::Http2Tls;
+    else if (str == "http2-prior-knowledge")
+        return HttpVersion::Http2PriorKnowledge;
+    else if (str == "http3")
+        return HttpVersion::Http3;
+    else if (str == "http3-only")
+        return HttpVersion::Http3Only;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<>
+struct BaseSetting<HttpVersion>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<>
+std::string BaseSetting<HttpVersion>::to_string() const
+{
+    if (value == HttpVersion::None)
+        return "none";
+    else if (value == HttpVersion::Http1_0)
+        return "http1";
+    else if (value == HttpVersion::Http1_1)
+        return "http1-1";
+    else if (value == HttpVersion::Http2)
+        return "http2";
+    else if (value == HttpVersion::Http2Tls)
+        return "http2-tls";
+    else if (value == HttpVersion::Http2PriorKnowledge)
+        return "http2-prior-knowledge";
+    else if (value == HttpVersion::Http3)
+        return "http3";
+    else if (value == HttpVersion::Http3Only)
+        return "http3-only";
+    else
+        unreachable();
+}
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    HttpVersion,
+    {
+        {HttpVersion::None, "none"},
+        {HttpVersion::Http1_0, "http1"},
+        {HttpVersion::Http1_1, "http1-1"},
+        {HttpVersion::Http2, "http2"},
+        {HttpVersion::Http2Tls, "http2-tls"},
+        {HttpVersion::Http2PriorKnowledge, "http2-prior-knowledge"},
+        {HttpVersion::Http3, "http3"},
+        {HttpVersion::Http3Only, "http3-only"},
+    });
+
+/* Explicit instantiation of templates */
+template class BaseSetting<HttpVersion>;
+
+long curlHttpVersion(HttpVersion httpVersion)
+{
+    switch (httpVersion) {
+    case HttpVersion::None:
+        return CURL_HTTP_VERSION_NONE;
+    case HttpVersion::Http1_0:
+        return CURL_HTTP_VERSION_1_0;
+    case HttpVersion::Http1_1:
+        return CURL_HTTP_VERSION_1_1;
+    case HttpVersion::Http2:
+        return CURL_HTTP_VERSION_2_0;
+    case HttpVersion::Http2Tls:
+#if LIBCURL_VERSION_NUM >= 0x072f00
+        return CURL_HTTP_VERSION_2TLS;
+#endif
+    case HttpVersion::Http2PriorKnowledge:
+#if LIBCURL_VERSION_NUM >= 0x073100
+        return CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+#endif
+    case HttpVersion::Http3:
+#if LIBCURL_VERSION_NUM >= 0x074200
+        return CURL_HTTP_VERSION_3;
+#endif
+    case HttpVersion::Http3Only:
+#if LIBCURL_VERSION_NUM >= 0x075800
+        return CURL_HTTP_VERSION_3ONLY;
+#endif
+    default:
+        // If we get here somehow, let curl decide
+        return CURL_HTTP_VERSION_NONE;
+    }
 }
 
 } // namespace nix

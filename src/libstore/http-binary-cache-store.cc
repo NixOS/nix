@@ -90,6 +90,15 @@ std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std:
         return std::nullopt;
 }
 
+HttpVersion HttpBinaryCacheStore::getHttpVersion()
+{
+    // Check filetransfer settings for backwards compatibility
+    if (config->httpVersion == HttpVersion::Http2Tls && !fileTransferSettings.enableHttp2) {
+        return HttpVersion::Http1_1;
+    }
+    return config->httpVersion;
+}
+
 void HttpBinaryCacheStore::maybeDisable()
 {
     auto state(_state.lock());
@@ -193,7 +202,9 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    auto req = FileTransferRequest(result);
+    req.httpVersion = getHttpVersion();
+    return req;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)

@@ -36,6 +36,18 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
           (e.g. `brotli`).
         )"};
 
+    const Setting<HttpVersion> httpVersion{this, HttpVersion::Http2Tls, "http-version", R"(
+        The HTTP version to use. This maps to the HTTP versions supported by
+        [libcurl](https://curl.se/libcurl/c/CURLOPT_HTTP_VERSION.html). Accepted values are:
+        `none`, `http1`, `http1-1`, `http2`, `http2-tls`, `http2-prior-knowledge`,
+        `http3`, `http3-only`. The default value can be globally downgraded
+        to `http1-1` by setting [`http2 = false`](@docroot@/command-ref/conf-file.md#conf-http2).
+        
+        > **Note**
+        > 
+        > HTTPv3 has not been tested, but is included here for completion and
+        > to allow for experimentation.)"};
+
     static const std::string name()
     {
         return "HTTP Binary Cache Store";
@@ -73,6 +85,8 @@ public:
 protected:
 
     std::optional<std::string> getCompressionMethod(const std::string & path);
+
+    HttpVersion getHttpVersion();
 
     void maybeDisable();
 
