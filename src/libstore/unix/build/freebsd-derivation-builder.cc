@@ -199,7 +199,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
     {
     }
 
-    void cleanupBuild(bool force)
+    void cleanupBuild(bool force) override
     {
         /* Unmount and free jail id, if in use */
         autoDelMounts.clear();
@@ -343,10 +343,6 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                within a pure derivation. */
             for (std::string path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
                 if (pathExists(path)) {
-                    // TODO: Copy the actual file, not the symlink, because we don't know where
-                    // the symlink is pointing, and we don't want to chase down the entire
-                    // chain.
-                    //
                     // This means if your network config changes during a FOD build,
                     // the DNS in the sandbox will be wrong. However, this is pretty unlikely
                     // to actually be a problem, because FODs are generally pretty fast,
@@ -359,29 +355,37 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                     //
                     // I also just generally feel icky about modifying sandbox state under a build,
                     // even though it really shouldn't be a big deal. -K900
-                    copyFile(path, std::filesystem::path{chrootRootDir} + path, false);
+                    copyFile(path, std::filesystem::path{chrootRootDir} + path, false, true);
                 }
             }
 
             if (settings.caFile != "" && pathExists(std::filesystem::path{settings.caFile.get()})) {
-                // TODO: For the same reasons as above, copy the CA certificates file too.
+                // For the same reasons as above, copy the CA certificates file too.
                 // It should be even less likely to change during the build than resolv.conf.
                 createDirs(chrootRootDir + "/etc/ssl/certs");
                 copyFile(
                     std::filesystem::path{settings.caFile.get()},
                     std::filesystem::path{chrootRootDir} + "/etc/ssl/certs/ca-certificates.crt",
-                    false);
+                    false, true);
             }
         }
     }
 
-    void enterChroot() override
+    void startChild() override
     {
         int jid;
 
+        RunChildArgs args{
+#  if NIX_WITH_AWS_AUTH
+            .awsCredentials = preResolveAwsCredentials(),
+#  endif
+        };
+
         if (derivationType.isSandboxed()) {
             jid = jail_setv(
-                JAIL_CREATE | JAIL_ATTACH,
+                JAIL_CREATE,
+                "persist",
+                "true",
                 "path",
                 chrootRootDir.c_str(),
                 "host.hostname",
@@ -391,34 +395,11 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 "new",
                 NULL);
             if (jid < 0) {
-                throw SysError("Failed to create jail (isolated network)");
+                throw SysError("Failed to create jail (isolated network): %1%", jail_errmsg);
             }
             autoDelJail = std::make_shared<AutoRemoveJail>(jid);
 
-            if (system(("ifconfig -j " + std::to_string(jid) + " lo0 inet 127.0.0.1/8 up").c_str()) != 0) {
-                throw SysError("Failed to set up isolated network");
-            }
-        } else {
-            jid = jail_setv(
-                JAIL_CREATE | JAIL_ATTACH,
-                "path",
-                chrootRootDir.c_str(),
-                "host.hostname",
-                "localhost",
-                "ip4",
-                "inherit",
-                "ip6",
-                "inherit",
-                "allow.raw_sockets",
-                "true",
-                NULL);
-            if (jid < 0) {
-                throw SysError("Failed to create jail (fixed-derivation)");
-            }
-            autoDelJail = std::make_shared<AutoRemoveJail>(jid);
-        }
-
-        if (derivationType.isSandboxed()) {
+            // Everything from here to the end of the block is setting up the network
             AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, 0));
             if (!fd)
                 throw SysError("cannot open IP socket");
@@ -470,16 +451,46 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             } else if (response.err.error != 0) {
                 throw SysError(response.err.error, "Could not set loopback interface address");
             }
+        } else {
+            jid = jail_setv(
+                JAIL_CREATE,
+                "persist",
+                "true",
+                "devfs_ruleset",
+                "4",
+                "path",
+                chrootRootDir.c_str(),
+                "host.hostname",
+                "localhost",
+                "ip4",
+                "inherit",
+                "ip6",
+                "inherit",
+                "allow.raw_sockets",
+                "true",
+                NULL);
+            if (jid < 0) {
+                throw SysError("Failed to create jail (networked): %1%", jail_errmsg);
+            }
+            autoDelJail = std::make_shared<AutoRemoveJail>(jid);
         }
+
+        pid = startProcess([&]() {
+            openSlave();
+            runChild(args);
+        });
     }
 
-    void startChild() override {}
+    void enterChroot() override {
+        if (jail_attach(autoDelJail->jid) < 0) {
+            throw SysError("Failed to attach to jail");
+        }
+    }
 
     void addDependency(const StorePath & path)
     {
         auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
-
-        warn("Not yet implemented, dependency not added inside sandbox");
+        throw Error("Unimplemented");
     }
 };
 

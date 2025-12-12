@@ -7,9 +7,9 @@ namespace nix {
 
 class AutoRemoveJail
 {
-    int jid;
     bool del;
 public:
+    int jid;
     AutoRemoveJail(int jid);
     AutoRemoveJail();
     ~AutoRemoveJail();
