@@ -144,7 +144,6 @@ let
       };
       rootDisk = "box.img";
       system = "x86_64-linux";
-      openRc = "true";
     };
 
   };
@@ -231,28 +230,6 @@ let
         # `scp -r` doesn't seem to work properly on some rhel instances, so let's
         # use a plain tarpipe instead
         tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
-
-        # since openrc isn't supported by the installer, perform those setup steps now. We do this in an earlier SSH connection so the group permissions are updated
-        if [ "${image.openRc or ""}" = "true" ]; then
-          echo "Testing if a OpenRC init script should be made..."
-          $ssh_env <<'EOL'
-            env
-            if [ "$__ETC_PROFILE_NIX_SOURCED" = "1" ]; then
-              echo "Creating OpenRC init script..."
-              cat <<'RC' | sudo tee /etc/init.d/nix-daemon 
-        #!/sbin/openrc-run
-        description="Nix multi-user daemon"
-        command="/nix/var/nix/profiles/default/bin/nix-daemon"
-        command_background="yes"
-        pidfile="/run/$RC_SVCNAME.pid"
-        RC
-              sudo chmod a+rx /etc/init.d/nix-daemon
-              sudo rc-update add nix-daemon
-              sudo rc-service nix-daemon start
-              sudo adduser vagrant nixbld
-            fi
-        EOL
-        fi
 
         echo "Testing Nix installation..."
         $ssh_env <<EOF
