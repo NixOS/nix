@@ -958,10 +958,12 @@ struct GitInputScheme : InputScheme
     {
         auto repoPath = repoInfo.getPath().value();
 
-        if (getSubmodulesAttr(input))
-            /* Create mountpoints for the submodules. */
-            for (auto & submodule : repoInfo.workdirInfo.submodules)
-                repoInfo.workdirInfo.files.insert(submodule.path);
+        /* Create mountpoints for the submodules.
+           Even though submodules are enabled with attribute `submodules`,
+           we always want to at least include empty submodule directories
+           to match the behavior of schemas `github` and `git+https`. */
+        for (auto & submodule : repoInfo.workdirInfo.submodules)
+            repoInfo.workdirInfo.files.insert(submodule.path);
 
         auto repo = GitRepo::openRepo(repoPath, false, false);
 
