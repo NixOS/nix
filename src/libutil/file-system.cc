@@ -811,7 +811,9 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
             std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
         } else {
             std::filesystem::copy(
-                from, to, std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+                from,
+                to,
+                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
         }
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);

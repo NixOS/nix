@@ -284,7 +284,8 @@ void moveFile(const Path & src, const Path & dst);
  * If contents is set, always create a regular file, even if the source is a
  * link.
  */
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
+void copyFile(
+    const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
 
 /**
  * Automatic cleanup of resources.

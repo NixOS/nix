@@ -366,7 +366,8 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 copyFile(
                     std::filesystem::path{settings.caFile.get()},
                     std::filesystem::path{chrootRootDir} + "/etc/ssl/certs/ca-certificates.crt",
-                    false, true);
+                    false,
+                    true);
             }
         }
     }
@@ -481,7 +482,8 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
         });
     }
 
-    void enterChroot() override {
+    void enterChroot() override
+    {
         if (jail_attach(autoDelJail->jid) < 0) {
             throw SysError("Failed to attach to jail");
         }
