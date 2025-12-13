@@ -479,6 +479,15 @@ public:
     queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
+     * Like the above, but takes the derivation directly.
+     *
+     * @note For CA derivations, the derivation should already be
+     * resolved, or output path lookup will not work.
+     */
+    std::map<std::string, std::optional<StorePath>>
+    queryPartialDerivationOutputMap(const Derivation & drv, Store * evalStore = nullptr);
+
+    /**
      * Like `queryPartialDerivationOutputMap` but only considers
      * statically known output paths (i.e. those that can be gotten from
      * the derivation itself.
@@ -488,6 +497,12 @@ public:
      */
     virtual std::map<std::string, std::optional<StorePath>>
     queryStaticPartialDerivationOutputMap(const StorePath & path);
+
+    /**
+     * Like the above, but for a single output.
+     */
+    virtual std::optional<StorePath>
+    queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName);
 
     /**
      * Query the mapping outputName=>outputPath for the given derivation.

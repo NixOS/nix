@@ -2,6 +2,7 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/globals.hh"
@@ -457,7 +458,7 @@ static void queryInstSources(
 
             if (path.isDerivation()) {
                 elem.setDrvPath(path);
-                auto outputs = state.store->queryDerivationOutputMap(path);
+                auto outputs = deepQueryDerivationOutputMap(*state.store, path);
                 elem.setOutPath(outputs.at("out"));
                 if (name.size() >= drvExtension.size()
                     && std::string(name, name.size() - drvExtension.size()) == drvExtension)
