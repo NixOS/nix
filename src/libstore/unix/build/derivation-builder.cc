@@ -659,17 +659,17 @@ static void handleChildException(bool sendException)
     }
 }
 
-static bool checkNotWorldWritable(std::filesystem::path path)
+static void checkNotWorldWritable(std::filesystem::path path)
 {
     while (true) {
         auto st = lstat(path);
         if (st.st_mode & S_IWOTH)
-            return false;
+            throw Error("Path %s is world-writable or a symlink. That's not allowed for security.", path);
         if (path == path.parent_path())
             break;
         path = path.parent_path();
     }
-    return true;
+    return;
 }
 
 void DerivationBuilderImpl::checkSystem()
@@ -720,9 +720,8 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     createDirs(buildDir);
 
-    if (buildUser && !checkNotWorldWritable(buildDir))
-        throw Error(
-            "Path %s or a parent directory is world-writable or a symlink. That's not allowed for security.", buildDir);
+    if (buildUser)
+        checkNotWorldWritable(buildDir);
 
     /* Create a temporary directory where the build will take
        place. */
