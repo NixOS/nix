@@ -66,7 +66,15 @@ struct SQLite
      */
     void isCache();
 
-    void exec(const std::string & stmt);
+    /**
+     * Execute a SQL statement. The string must be null-terminated.
+     */
+    void exec(const char * stmt);
+
+    void exec(const std::string & stmt)
+    {
+        exec(stmt.c_str());
+    }
 
     uint64_t getLastInsertedRowId();
 };

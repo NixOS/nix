@@ -171,7 +171,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_READ_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     realisation_with_deps,
     "realisation-with-deps",
@@ -181,16 +181,6 @@ VERSIONED_CHARACTERIZATION_TEST(
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                 .signatures = {"asdf", "qwer"},
-                .dependentRealisations =
-                    {
-                        {
-                            DrvOutput{
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "quux",
-                            },
-                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                        },
-                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
