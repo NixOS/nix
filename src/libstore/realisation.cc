@@ -35,29 +35,24 @@ std::set<Realisation> Realisation::closure(Store & store, const std::set<Realisa
 
 void Realisation::closure(Store & store, const std::set<Realisation> & startOutputs, std::set<Realisation> & res)
 {
-    auto getDeps = [&](const Realisation & current) -> std::set<Realisation> {
+    auto getDeps = [&store](const Realisation & current) -> asio::awaitable<std::set<Realisation>> {
         std::set<Realisation> res;
         for (auto & [currentDep, _] : current.dependentRealisations) {
-            if (auto currentRealisation = store.queryRealisation(currentDep))
+            auto currentRealisation = co_await callbackToAwaitable<std::shared_ptr<const UnkeyedRealisation>>(
+                [currentDep, &store](Callback<std::shared_ptr<const UnkeyedRealisation>> cb) {
+                    store.queryRealisation(currentDep, std::move(cb));
+                });
+
+            if (currentRealisation)
                 res.insert({*currentRealisation, currentDep});
             else
                 throw Error("Unrealised derivation '%s'", currentDep.to_string());
         }
-        return res;
+        co_return res;
     };
-
     computeClosure<Realisation>(
-        startOutputs,
-        res,
-        [&](const Realisation & current, std::function<void(std::promise<std::set<Realisation>> &)> processEdges) {
-            std::promise<std::set<Realisation>> promise;
-            try {
-                auto res = getDeps(current);
-                promise.set_value(res);
-            } catch (...) {
-                promise.set_exception(std::current_exception());
-            }
-            return processEdges(promise);
+        startOutputs, res, [&](const Realisation & current) -> asio::awaitable<std::set<Realisation>> {
+            co_return co_await getDeps(current);
         });
 }
 
