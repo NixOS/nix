@@ -1157,7 +1157,7 @@ std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * eva
 }
 
 static bool tryResolveInput(
-    Store & store,
+    const StoreDirConfig & store,
     StorePathSet & inputSrcs,
     StringMap & inputRewrites,
     const DownstreamPlaceholder * placeholderOpt,
