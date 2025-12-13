@@ -323,6 +323,7 @@ sources = files(
   'nar-info-disk-cache.cc',
   'nar-info.cc',
   'optimise-store.cc',
+  'outputs-query.cc',
   'outputs-spec.cc',
   'parsed-derivations.cc',
   'path-info.cc',

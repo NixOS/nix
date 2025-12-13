@@ -584,6 +584,12 @@ public:
     queryStaticPartialDerivationOutputMap(const StorePath & path);
 
     /**
+     * Like the above, but for a single output.
+     */
+    virtual std::optional<StorePath>
+    queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName);
+
+    /**
      * Query the mapping outputName=>outputPath for the given derivation.
      * Assume every output has a mapping and throw an exception otherwise.
      */

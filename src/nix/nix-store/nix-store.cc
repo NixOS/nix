@@ -1,5 +1,6 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/outputs-query.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
@@ -79,7 +80,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
     if (path.path.isDerivation()) {
         if (build)
             store->buildPaths({path.toDerivedPath()});
-        auto outputPaths = store->queryDerivationOutputMap(path.path);
+        auto outputPaths = deepQueryDerivationOutputMap(*store, path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
