@@ -1,6 +1,7 @@
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/cache-impl.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/archive.hh"
@@ -28,80 +29,99 @@ DownloadFileResult downloadFile(
             {"name", name},
         }}};
 
-    auto cached = settings.getCache()->lookupStorePath(key, store);
+    auto cache = settings.getCache();
 
-    auto useCached = [&]() -> DownloadFileResult {
+    auto makeCachedResult = [&](Cache::ResultWithStorePath & cached) -> DownloadFileResult {
         return {
-            .storePath = std::move(cached->storePath),
-            .etag = getStrAttr(cached->value, "etag"),
-            .effectiveUrl = getStrAttr(cached->value, "url"),
-            .immutableUrl = maybeGetStrAttr(cached->value, "immutableUrl"),
+            .storePath = std::move(cached.storePath),
+            .etag = getStrAttr(cached.value, "etag"),
+            .effectiveUrl = getStrAttr(cached.value, "url"),
+            .immutableUrl = maybeGetStrAttr(cached.value, "immutableUrl"),
         };
     };
 
-    if (cached && !cached->expired)
-        return useCached();
-
-    FileTransferRequest request(VerbatimURL{url});
-    request.headers = headers;
-    if (cached)
-        request.expectedETag = getStrAttr(cached->value, "etag");
-    FileTransferResult res;
-    try {
-        res = getFileTransfer()->download(request);
-    } catch (FileTransferError & e) {
-        if (cached) {
-            warn("%s; using cached version", e.msg());
-            return useCached();
-        } else
-            throw;
+    /* Fast path: check cache without lock. */
+    if (auto cached = cache->lookupStorePath(key, store)) {
+        if (!cached->expired)
+            return makeCachedResult(*cached);
     }
 
-    Attrs infoAttrs({
-        {"etag", res.etag},
-    });
+    /* Slow path: use locked fetch to prevent duplicate downloads. */
+    auto result = cache->lookupOrFetch(
+        key,
+        store,
+        [&]() -> std::pair<Attrs, StorePath> {
+            /* Re-check for cached entry (may have expired ETag we can use). */
+            auto cached = cache->lookupStorePath(key, store);
 
-    if (res.immutableUrl)
-        infoAttrs.emplace("immutableUrl", *res.immutableUrl);
+            FileTransferRequest request(VerbatimURL{url});
+            request.headers = headers;
+            if (cached)
+                request.expectedETag = getStrAttr(cached->value, "etag");
 
-    std::optional<StorePath> storePath;
+            FileTransferResult res;
+            try {
+                res = getFileTransfer()->download(request);
+            } catch (FileTransferError & e) {
+                if (cached) {
+                    warn("%s; using cached version", e.msg());
+                    /* Return the cached entry's attributes and path. */
+                    return {cached->value, cached->storePath};
+                } else
+                    throw;
+            }
 
-    if (res.cached) {
-        assert(cached);
-        storePath = std::move(cached->storePath);
-    } else {
-        StringSink sink;
-        dumpString(res.data, sink);
-        auto hash = hashString(HashAlgorithm::SHA256, res.data);
-        auto info = ValidPathInfo::makeFromCA(
-            store,
-            name,
-            FixedOutputInfo{
-                .method = FileIngestionMethod::Flat,
-                .hash = hash,
-                .references = {},
-            },
-            hashString(HashAlgorithm::SHA256, sink.s));
-        info.narSize = sink.s.size();
-        auto source = StringSource{sink.s};
-        store.addToStore(info, source, NoRepair, NoCheckSigs);
-        storePath = std::move(info.path);
-    }
+            Attrs infoAttrs({
+                {"etag", res.etag},
+            });
 
-    /* Cache metadata for all URLs in the redirect chain. */
-    for (auto & url : res.urls) {
-        key.second.insert_or_assign("url", url);
-        assert(!res.urls.empty());
-        infoAttrs.insert_or_assign("url", *res.urls.rbegin());
-        settings.getCache()->upsert(key, store, infoAttrs, *storePath);
-    }
+            if (res.immutableUrl)
+                infoAttrs.emplace("immutableUrl", *res.immutableUrl);
 
-    return {
-        .storePath = std::move(*storePath),
-        .etag = res.etag,
-        .effectiveUrl = *res.urls.rbegin(),
-        .immutableUrl = res.immutableUrl,
-    };
+            StorePath storePath = [&]() {
+                if (res.cached) {
+                    assert(cached);
+                    return cached->storePath;
+                } else {
+                    StringSink sink;
+                    dumpString(res.data, sink);
+                    auto hash = hashString(HashAlgorithm::SHA256, res.data);
+                    auto info = ValidPathInfo::makeFromCA(
+                        store,
+                        name,
+                        FixedOutputInfo{
+                            .method = FileIngestionMethod::Flat,
+                            .hash = hash,
+                            .references = {},
+                        },
+                        hashString(HashAlgorithm::SHA256, sink.s));
+                    info.narSize = sink.s.size();
+                    auto source = StringSource{sink.s};
+                    store.addToStore(info, source, NoRepair, NoCheckSigs);
+                    return std::move(info.path);
+                }
+            }();
+
+            /* Cache metadata for all URLs in the redirect chain. */
+            assert(!res.urls.empty());
+            infoAttrs.insert_or_assign("url", *res.urls.rbegin());
+
+            /* Note: we cache additional redirect URLs outside of the lock
+               since lookupOrFetch handles the primary key. */
+            for (auto it = res.urls.begin(); it != std::prev(res.urls.end()); ++it) {
+                Cache::Key redirectKey = key;
+                redirectKey.second.insert_or_assign("url", *it);
+                cache->upsert(redirectKey, store, infoAttrs, storePath);
+            }
+
+            return {infoAttrs, storePath};
+        },
+        settings.fetchLockTimeout);
+
+    if (!result)
+        throw Error("failed to fetch '%s'", url);
+
+    return makeCachedResult(*result);
 }
 
 static DownloadTarballResult downloadTarball_(
@@ -132,9 +152,8 @@ static DownloadTarballResult downloadTarball_(
         }
     }
 
+    auto cache = settings.getCache();
     Cache::Key cacheKey{"tarball", {{"url", urlS}}};
-
-    auto cached = settings.getCache()->lookupExpired(cacheKey);
 
     auto attrsToResult = [&](const Attrs & infoAttrs) {
         auto treeHash = getRevAttr(infoAttrs, "treeHash");
@@ -146,78 +165,97 @@ static DownloadTarballResult downloadTarball_(
         };
     };
 
-    if (cached && !settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
-        cached.reset();
-
-    if (cached && !cached->expired)
-        /* We previously downloaded this tarball and it's younger than
-           `tarballTtl`, so no need to check the server. */
-        return attrsToResult(cached->value);
-
-    auto _res = std::make_shared<Sync<FileTransferResult>>();
-
-    auto source = sinkToSource([&](Sink & sink) {
-        FileTransferRequest req(url);
-        req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
-        getFileTransfer()->download(std::move(req), sink, [_res](FileTransferResult r) { *_res->lock() = r; });
-    });
-
-    // TODO: fall back to cached value if download fails.
-
-    auto act = std::make_unique<Activity>(*logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", url));
-
-    AutoDelete cleanupTemp;
-
-    /* Note: if the download is cached, `importTarball()` will receive
-       no data, which causes it to import an empty tarball. */
-    auto archive = !url.path.empty() && hasSuffix(toLower(url.path.back()), ".zip") ? ({
-        /* In streaming mode, libarchive doesn't handle
-           symlinks in zip files correctly (#10649). So write
-           the entire file to disk so libarchive can access it
-           in random-access mode. */
-        auto [fdTemp, path] = createTempFile("nix-zipfile");
-        cleanupTemp.reset(path);
-        debug("downloading '%s' into '%s'...", url, path);
-        {
-            FdSink sink(fdTemp.get());
-            source->drainInto(sink);
+    /* Fast path: check cache without lock. */
+    if (auto cached = cache->lookupExpired(cacheKey)) {
+        if (settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash"))) {
+            if (!cached->expired)
+                return attrsToResult(cached->value);
         }
-        TarArchive{path};
-    })
-                                                                                    : TarArchive{*source};
-    auto tarballCache = settings.getTarballCache();
-    auto parseSink = tarballCache->getFileSystemObjectSink();
-    auto lastModified = unpackTarfileToSink(archive, *parseSink);
-    auto tree = parseSink->flush();
-
-    act.reset();
-
-    auto res(_res->lock());
-
-    Attrs infoAttrs;
-
-    if (res->cached) {
-        /* The server says that the previously downloaded version is
-           still current. */
-        infoAttrs = cached->value;
-    } else {
-        infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(tree).gitRev());
-        infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
-        if (res->immutableUrl)
-            infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
     }
 
-    /* Insert a cache entry for every URL in the redirect chain. */
-    for (auto & url : res->urls) {
-        cacheKey.second.insert_or_assign("url", url);
-        settings.getCache()->upsert(cacheKey, infoAttrs);
-    }
+    /* Slow path: use locked fetch to prevent duplicate downloads. */
+    return withFetchLock(
+        "tarball:" + urlS,
+        settings.fetchLockTimeout.get(),
+        [&]() -> std::optional<DownloadTarballResult> {
+            /* Double-check: another process may have populated the cache. */
+            auto cached = cache->lookupExpired(cacheKey);
+            if (cached && settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash"))) {
+                if (!cached->expired)
+                    return attrsToResult(cached->value);
+            }
+            return std::nullopt;
+        },
+        [&]() -> DownloadTarballResult {
+            /* Re-lookup for ETag. */
+            auto cached = cache->lookupExpired(cacheKey);
 
-    // FIXME: add a cache entry for immutableUrl? That could allow
-    // cache poisoning.
+            auto _res = std::make_shared<Sync<FileTransferResult>>();
 
-    return attrsToResult(infoAttrs);
+            auto source = sinkToSource([&](Sink & sink) {
+                FileTransferRequest req(url);
+                req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
+                getFileTransfer()->download(std::move(req), sink, [_res](FileTransferResult r) { *_res->lock() = r; });
+            });
+
+            // TODO: fall back to cached value if download fails.
+
+            auto act =
+                std::make_unique<Activity>(*logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", url));
+
+            AutoDelete cleanupTemp;
+
+            /* Note: if the download is cached, `importTarball()` will receive
+               no data, which causes it to import an empty tarball. */
+            auto archive = !url.path.empty() && hasSuffix(toLower(url.path.back()), ".zip") ? ({
+                /* In streaming mode, libarchive doesn't handle
+                   symlinks in zip files correctly (#10649). So write
+                   the entire file to disk so libarchive can access it
+                   in random-access mode. */
+                auto [fdTemp, path] = createTempFile("nix-zipfile");
+                cleanupTemp.reset(path);
+                debug("downloading '%s' into '%s'...", url, path);
+                {
+                    FdSink sink(fdTemp.get());
+                    source->drainInto(sink);
+                }
+                TarArchive{path};
+            })
+                                                                                            : TarArchive{*source};
+            auto tarballCache = settings.getTarballCache();
+            auto parseSink = tarballCache->getFileSystemObjectSink();
+            auto lastModified = unpackTarfileToSink(archive, *parseSink);
+            auto tree = parseSink->flush();
+
+            act.reset();
+
+            auto res(_res->lock());
+
+            Attrs infoAttrs;
+
+            if (res->cached) {
+                /* The server says that the previously downloaded version is
+                   still current. */
+                infoAttrs = cached->value;
+            } else {
+                infoAttrs.insert_or_assign("etag", res->etag);
+                infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(tree).gitRev());
+                infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
+                if (res->immutableUrl)
+                    infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);
+            }
+
+            /* Insert a cache entry for every URL in the redirect chain. */
+            for (auto & url : res->urls) {
+                cacheKey.second.insert_or_assign("url", url);
+                cache->upsert(cacheKey, infoAttrs);
+            }
+
+            // FIXME: add a cache entry for immutableUrl? That could allow
+            // cache poisoning.
+
+            return attrsToResult(infoAttrs);
+        });
 }
 
 ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, const std::string & url)

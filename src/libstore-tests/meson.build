@@ -76,6 +76,7 @@ sources = files(
   'outputs-spec.cc',
   'path-info.cc',
   'path.cc',
+  'pathlocks-timeout.cc',
   'realisation.cc',
   'references.cc',
   's3-binary-cache-store.cc',
