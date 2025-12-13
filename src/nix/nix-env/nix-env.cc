@@ -457,7 +457,7 @@ static void queryInstSources(
 
             if (path.isDerivation()) {
                 elem.setDrvPath(path);
-                auto outputs = state.store->queryDerivationOutputMap(path);
+                auto outputs = state.store->deepQueryDerivationOutputMap(path);
                 elem.setOutPath(outputs.at("out"));
                 if (name.size() >= drvExtension.size()
                     && std::string(name, name.size() - drvExtension.size()) == drvExtension)

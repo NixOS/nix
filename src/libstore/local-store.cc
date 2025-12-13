@@ -875,6 +875,27 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
     });
 }
 
+std::optional<StorePath>
+LocalStore::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
+{
+    auto outputs = queryStaticPartialDerivationOutputMap(path);
+    auto it = outputs.find(outputName);
+    if (it == outputs.end()) {
+        /* Only throw if CA derivations is disabled, because then the
+           SQL table is complete.
+
+           With CA derivations enabled, derivations without static
+           outputs exist, this absence of a row in this table does not
+           mean the derivation doesn't have an output necessarily, just
+           that that it doesn't have an output with a known output path.
+          */
+        if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+            throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
+        return std::nullopt;
+    }
+    return it->second;
+}
+
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
 {
     if (hashPart.size() != StorePath::HashLen)

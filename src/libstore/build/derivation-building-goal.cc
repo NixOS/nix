@@ -142,7 +142,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
                 auto outMap = [&] {
                     for (auto * drvStore : {&worker.evalStore, &worker.store})
                         if (drvStore->isValidPath(depDrvPath))
-                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                            return worker.store.deepQueryDerivationOutputMap(depDrvPath, drvStore);
                     assert(false);
                 }();
 
