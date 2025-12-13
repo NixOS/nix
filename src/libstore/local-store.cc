@@ -360,14 +360,14 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->RegisterRealisedOutput.create(
             state->db,
             R"(
-                insert into BuildTraceV2 (drvPath, outputName, outputPath, signatures)
-                values (?, ?, (select id from ValidPaths where path = ?), ?)
+                insert into BuildTraceV3 (drvPath, outputName, outputPath, signatures)
+                values (?, ?, ?, ?)
                 ;
             )");
         state->stmts->UpdateRealisedOutput.create(
             state->db,
             R"(
-                update BuildTraceV2
+                update BuildTraceV3
                     set signatures = ?
                 where
                     drvPath = ? and
@@ -377,16 +377,14 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
-                select BuildTraceV2.id, Output.path, BuildTraceV2.signatures from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
+                select id, outputPath, signatures from BuildTraceV3
                     where drvPath = ? and outputName = ?
                     ;
             )");
         state->stmts->QueryAllRealisedOutputs.create(
             state->db,
             R"(
-                select outputName, Output.path from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
+                select outputName, outputPath from BuildTraceV3
                     where drvPath = ?
                     ;
             )");
@@ -604,7 +602,7 @@ void LocalStore::upgradeDBSchema(State & state)
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         doUpgrade(
-            "20251016-ca-derivations",
+            "20251017-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
 }
