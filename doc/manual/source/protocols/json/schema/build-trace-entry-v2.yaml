@@ -1,0 +1,82 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/build-trace-entry-v2.json"
+title: Build Trace Entry
+description: |
+  A record of a successful build outcome for a specific derivation output.
+
+  This schema describes the JSON representation of a [build trace entry](@docroot@/store/build-trace.md).
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-ca-derivations)
+  > and subject to change.
+
+  Verision history:
+
+  - Version 1: Original format
+
+  - Version 2:
+    - Use `drvPath` not `drvHash` to refer to derivation in a more conventional way.
+    - Remove `dependentRealisations`
+    - Separate into `key` and `value`
+
+type: object
+required:
+  - key
+  - value
+properties:
+  key:
+    "$ref": "#/$defs/key"
+  value:
+    "$ref": "#/$defs/value"
+additionalProperties: false
+
+"$defs":
+  key:
+    title: Build Trace Key
+    description: |
+      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      This is the "key" part, refering to a derivation and output.
+    type: object
+    required:
+      - drvPath
+      - outputName
+    properties:
+      drvPath:
+        "$ref": "store-path-v1.yaml"
+        title: Derivation Path
+        description: |
+          The store path of the derivation that was built.
+      outputName:
+        type: string
+        title: Output Name
+        description: |
+          Name of the specific output (e.g., "out", "dev", "doc")
+    additionalProperties: false
+
+  value:
+    title: Build Trace Value
+    description: |
+      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      This is the "value" part, describing an output.
+    type: object
+    required:
+      - outPath
+      - signatures
+    properties:
+      outPath:
+        "$ref": "store-path-v1.yaml"
+        title: Output Store Path
+        description: |
+          The path to the store object that resulted from building this derivation for the given output name.
+
+      signatures:
+        type: array
+        title: Build Signatures
+        description: |
+          A set of cryptographic signatures attesting to the authenticity of this build trace entry.
+        items:
+          type: string
+          title: Signature
+          description: A single cryptographic signature
