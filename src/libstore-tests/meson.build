@@ -83,6 +83,7 @@ sources = files(
   'serve-protocol.cc',
   'ssh-store.cc',
   'store-reference.cc',
+  'substitution-lock.cc',
   'uds-remote-store.cc',
   'worker-protocol.cc',
   'worker-substitution.cc',
