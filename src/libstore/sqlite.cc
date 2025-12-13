@@ -11,6 +11,7 @@
 #include <sqlite3.h>
 
 #include <atomic>
+#include <random>
 #include <thread>
 
 namespace nix {
@@ -251,10 +252,11 @@ bool SQLiteStmt::Use::isNull(int col)
     return sqlite3_column_type(stmt, col) == SQLITE_NULL;
 }
 
-SQLiteTxn::SQLiteTxn(sqlite3 * db)
+SQLiteTxn::SQLiteTxn(sqlite3 * db, SQLiteTxnMode mode)
 {
     this->db = db;
-    if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
+    const char * sql = (mode == SQLiteTxnMode::Immediate) ? "begin immediate;" : "begin;";
+    if (sqlite3_exec(db, sql, 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "starting transaction");
     active = true;
 }
@@ -287,8 +289,10 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
     /* Sleep for a while since retrying the transaction right away
        is likely to fail again. */
     checkInterrupt();
-    /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 100});
+    /* <= 0.1s - Use thread-local RNG for thread safety */
+    thread_local std::mt19937 gen{std::random_device{}()};
+    std::uniform_int_distribution<> dist(0, 99);
+    std::this_thread::sleep_for(std::chrono::milliseconds{dist(gen)});
 }
 
 } // namespace nix
