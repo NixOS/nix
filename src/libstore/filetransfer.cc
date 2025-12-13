@@ -29,8 +29,8 @@
 #include <random>
 #include <thread>
 #include <regex>
-
-using namespace std::string_literals;
+#include <ranges>
+#include <algorithm>
 
 namespace nix {
 
@@ -668,14 +668,7 @@ struct curlFileTransfer : public FileTransfer
                     decompressionSink.reset();
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    try {
-                        fileTransfer.enqueueItem(ref{shared_from_this()});
-                    } catch (const nix::Error & e) {
-                        // If enqueue fails (e.g., during shutdown), fail the transfer properly
-                        // instead of letting the exception propagate, which would leave done=false
-                        // and cause the destructor to attempt a second callback invocation
-                        fail(std::move(exc));
-                    }
+                    fileTransfer.enqueueItem(ref{shared_from_this()});
                 } else
                     fail(std::move(exc));
             }
@@ -876,33 +869,48 @@ struct curlFileTransfer : public FileTransfer
         }
     }
 
-    ItemHandle enqueueItem(ref<TransferItem> item)
+    ItemHandle enqueueItem(State & state, ref<TransferItem> item) noexcept
     {
-        if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
-            && item->request.uri.scheme() != "s3")
-            throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
-
-        {
-            auto state(state_.lock());
-            if (state->isQuitting())
-                throw nix::Error("cannot enqueue download request because the download thread is shutting down");
-            state->incoming.push(item);
-        }
-
+        state.incoming.push(item); /* Don't care about handling OOM here. */
         wakeupMulti();
         return ItemHandle(static_cast<Item &>(*item));
     }
 
-    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
+    std::optional<ItemHandle> enqueueItem(ref<TransferItem> item) noexcept
     {
-        /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
-        if (request.uri.scheme() == "s3") {
-            auto modifiedRequest = request;
-            modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-        }
+        auto state(state_.lock());
+        if (state->isQuitting())
+            return std::nullopt;
+        return enqueueItem(*state, item);
+    }
 
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+    template<typename... Args>
+    std::optional<ItemHandle> enqueueItem(Args &&... args) noexcept
+    {
+        auto state(state_.lock());
+        if (state->isQuitting())
+            return std::nullopt;
+        return enqueueItem(*state, make_ref<TransferItem>(std::forward<Args>(args)...));
+    }
+
+    ItemHandle enqueueFileTransfer(const FileTransferRequest & request_, Callback<FileTransferResult> callback) override
+    {
+        auto request = request_;
+        bool isUpload = request.data.has_value();
+        auto scheme = request.uri.scheme();
+
+        if (isUpload && !std::ranges::contains(std::array{"http", "https", "s3"}, scheme))
+            throw nix::Error("uploading to '%s' is not supported", request.uri.to_string());
+
+        /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
+        if (scheme == "s3")
+            request.setupForS3();
+
+        auto maybeItem = enqueueItem(*this, std::move(request), std::move(callback));
+        if (!maybeItem)
+            throw nix::Error("cannot enqueue download request because the download thread is shutting down");
+
+        return *maybeItem;
     }
 
     void unpauseTransfer(ref<TransferItem> item)
