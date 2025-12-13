@@ -128,10 +128,10 @@ void SQLite::isCache()
     exec("pragma main.journal_mode = wal");
 }
 
-void SQLite::exec(const std::string & stmt)
+void SQLite::exec(const char * stmt)
 {
     retrySQLite<void>([&]() {
-        if (sqlite3_exec(db, stmt.c_str(), 0, 0, 0) != SQLITE_OK)
+        if (sqlite3_exec(db, stmt, 0, 0, 0) != SQLITE_OK)
             SQLiteError::throw_(db, "executing SQLite statement '%s'", stmt);
     });
 }
