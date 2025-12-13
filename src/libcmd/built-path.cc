@@ -1,6 +1,7 @@
 #include "nix/cmd/built-path.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/util/comparator.hh"
 
 #include <nlohmann/json.hpp>
@@ -109,18 +110,15 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
             [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
             [&](const BuiltPath::Built & p) {
                 for (auto & [outputName, outputPath] : p.outputs) {
-                    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-                        DrvOutput key{
-                            .drvPath = p.drvPath->outPath(),
-                            .outputName = outputName,
-                        };
-                        auto thisRealisation = store.queryRealisation(key);
-                        // We’ve built it, so we must have the realisation.
-                        assert(thisRealisation);
-                        res.insert(Realisation{*thisRealisation, key});
-                    } else {
-                        res.insert(outputPath);
-                    }
+                    /* Use a custom callback to collect realisations as they're queried. */
+                    deepQueryPartialDerivationOutput(
+                        store, p.drvPath->outPath(), outputName, nullptr, [&](const DrvOutput & drvOutput) {
+                            auto realisation = store.queryRealisation(drvOutput);
+                            if (realisation)
+                                res.insert(Realisation{*realisation, drvOutput});
+                            return realisation;
+                        });
+                    res.insert(outputPath);
                 }
             },
         },

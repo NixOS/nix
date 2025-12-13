@@ -61,6 +61,7 @@ headers = [ config_pub_h ] + files(
   'names.hh',
   'nar-info-disk-cache.hh',
   'nar-info.hh',
+  'outputs-query.hh',
   'outputs-spec.hh',
   'parsed-derivations.hh',
   'path-info.hh',

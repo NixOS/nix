@@ -1,8 +1,14 @@
 {
   "buildTrace": {
-    "11yvkl84ashq63ilwc2mi4va41z2disw-root-drv.drv": {
+    "am42vl3rp8w29f5hyp9ljckxll50icpl-root-drv.drv": {
       "out": {
         "outPath": "px7apdw6ydm9ynjy5g0bpdcylw3xz2kj-root-drv-out",
+        "signatures": []
+      }
+    },
+    "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+      "out": {
+        "outPath": "w0yjpwh59kpbyc7hz9jgmi44r9br908i-dep-drv-out",
         "signatures": []
       }
     }
@@ -25,6 +31,28 @@
         "deriver": null,
         "narHash": "sha256-0mlhg9y1FGb7YsHAsNOmtuW44b8TfoPaNPK6SjVYe5s=",
         "narSize": 232,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    },
+    "w0yjpwh59kpbyc7hz9jgmi44r9br908i-dep-drv-out": {
+      "contents": {
+        "contents": "I am the dependency output",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-HK2LBzSTtwuRjc44PH3Ac1JHHPKmfnAgNxz6I5mVgL8=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-HK2LBzSTtwuRjc44PH3Ac1JHHPKmfnAgNxz6I5mVgL8=",
+        "narSize": 144,
         "references": [],
         "registrationTime": null,
         "signatures": [],
