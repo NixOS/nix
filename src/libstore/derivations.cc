@@ -139,8 +139,10 @@ StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
-    if (isValidPath(path) && !repair)
+    if (isValidPath(path) && !repair) {
+        bumpLastUsageTime(path);
         return path;
+    }
 
     StringSource s{contents};
     auto path2 = addToStoreFromDump(

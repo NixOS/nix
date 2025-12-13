@@ -4,7 +4,7 @@
 
 # Synopsis
 
-`nix-collect-garbage` [`--delete-old`] [`-d`] [`--delete-older-than` *period*] [`--max-freed` *bytes*] [`--dry-run`]
+`nix-collect-garbage` [`--delete-old`] [`-d`] [`--delete-older-than` *period*] [`--delete-paths-older-than` *period*] [`--max-freed` *bytes*] [`--dry-run`]
 
 # Description
 
@@ -62,7 +62,17 @@ These options are for deleting old [profiles] prior to deleting unreachable [sto
   This is the equivalent of invoking [`nix-env --delete-generations <period>`](@docroot@/command-ref/nix-env/delete-generations.md#generations-time) on each found profile.
   See the documentation of that command for additional information about the *period* argument.
 
-  - <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
+- <span id="opt-delete-paths-older-than">[`--delete-paths-older-than`](#opt-delete-paths-older-than)</span> *period*
+
+  Only delete store paths older than the specified amount, i.e. restrict the GC
+  to only deleting store paths whose most recent usage is more than *N* days in
+  the past. *period* is a value such as `30d`, which would mean 30 days.
+
+  "Usage" is intentionally defined ambiguously, however in general all
+  operations which produce/require the presence of a given store path count as
+  "usage".
+
+- <span id="opt-max-freed">[`--max-freed`](#opt-max-freed)</span> *bytes*
 
 <!-- duplication from https://github.com/NixOS/nix/blob/442a2623e48357ff72c77bb11cf2cf06d94d2f90/doc/manual/source/command-ref/nix-store/gc.md?plain=1#L39-L44 -->
 

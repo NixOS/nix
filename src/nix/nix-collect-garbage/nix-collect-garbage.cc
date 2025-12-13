@@ -78,6 +78,8 @@ static int main_nix_collect_garbage(int argc, char ** argv)
             else if (*arg == "--delete-older-than") {
                 removeOld = true;
                 deleteOlderThan = getArg(*arg, arg, end);
+            } else if (*arg == "--delete-paths-older-than") {
+                options.olderThan = parseOlderThanTimeSpec(getArg(*arg, arg, end));
             } else if (*arg == "--dry-run")
                 dryRun = true;
             else if (*arg == "--max-freed")

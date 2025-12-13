@@ -179,6 +179,12 @@ std::optional<StorePath> LocalOverlayStore::queryPathFromHashPart(const std::str
         return lowerStore->queryPathFromHashPart(hashPart);
 }
 
+void LocalOverlayStore::bumpLastUsageTime(const StorePath & path)
+{
+    LocalStore::bumpLastUsageTime(path);
+    lowerStore->bumpLastUsageTime(path);
+}
+
 void LocalOverlayStore::registerValidPaths(const ValidPathInfos & infos)
 {
     // First, get any from lower store so we merge

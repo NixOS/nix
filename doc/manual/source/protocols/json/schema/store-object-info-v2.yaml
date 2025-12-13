@@ -126,6 +126,7 @@ $defs:
       # impure
       - deriver
       - registrationTime
+      - lastUsageTime
       - ultimate
       - signatures
     properties:
@@ -152,6 +153,15 @@ $defs:
         title: Registration Time
         description: |
           If known, when this derivation was added to the store (Unix timestamp).
+          Otherwise `null`.
+
+          > This is an "impure" field that may not be included in certain contexts.
+
+      lastUsageTime:
+        type: ["integer", "null"]
+        title: Last Usage Time
+        description: |
+          If known, when this derivation was last used (Unix timestamp).
           Otherwise `null`.
 
           > This is an "impure" field that may not be included in certain contexts.
@@ -205,6 +215,7 @@ $defs:
       # impure
       - deriver
       - registrationTime
+      - lastUsageTime
       - ultimate
       - signatures
       # nar
@@ -222,6 +233,7 @@ $defs:
       storeDir: { $ref: "#/$defs/base/properties/storeDir" }
       deriver: { $ref: "#/$defs/impure/properties/deriver" }
       registrationTime: { $ref: "#/$defs/impure/properties/registrationTime" }
+      lastUsageTime: { $ref: "#/$defs/impure/properties/lastUsageTime" }
       ultimate: { $ref: "#/$defs/impure/properties/ultimate" }
       signatures: { $ref: "#/$defs/impure/properties/signatures" }
       closureSize: { $ref: "#/$defs/impure/properties/closureSize" }
