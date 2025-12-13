@@ -36,7 +36,10 @@ testRemoteCacheFor () {
     copyAttr "$derivationPath" 1
     clearStore
     # Check nothing gets built.
-    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir" --no-require-sigs |& grepQuietInverse " will be built:"
+    # copyClosure copies unsigned input-addressed closure deps into the
+    # binary cache, so mark the substituter as trusted to skip the
+    # signature check in substitution-goal.cc.
+    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir?trusted=1" -j0
 }
 
 testRemoteCache () {

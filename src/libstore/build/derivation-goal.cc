@@ -13,6 +13,7 @@
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
+#include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
 
 #include <fstream>
@@ -209,18 +210,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     wantedOutput);
             }();
 
-            if (!drv->type().isImpure()) {
-                Realisation newRealisation{
-                    realisation,
-                    {
-                        .drvPath = drvPath,
-                        .outputName = wantedOutput,
-                    }};
-                newRealisation.signatures.clear();
-                worker.store.signRealisation(newRealisation);
-                worker.store.registerDrvOutput(newRealisation);
-            }
-
             auto status = success.status;
             if (status == BuildResult::Success::AlreadyValid)
                 status = BuildResult::Success::ResolvesToAlreadyValid;
@@ -299,7 +288,7 @@ Goal::Co DerivationGoal::repairClosure()
     auto outputs = [&] {
         for (auto * drvStore : {&worker.evalStore, &worker.store})
             if (drvStore->isValidPath(drvPath))
-                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+                return deepQueryDerivationOutputMap(worker.store, drvPath, drvStore);
 
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
