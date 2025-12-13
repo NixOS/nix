@@ -10,4 +10,5 @@ headers = files(
   'json-characterization.hh',
   'nix_api_util.hh',
   'string_callback.hh',
+  'test-data.hh',
 )

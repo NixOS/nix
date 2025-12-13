@@ -8,6 +8,7 @@
 #include "nix/store/tests/nix_api_store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/tests/test-data.hh"
 #include "nix/util/url.hh"
 
 #include "store-tests-config.hh"
@@ -302,7 +303,7 @@ public:
 
         store = open_local_store();
 
-        std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+        std::filesystem::path unitTestData = nix::getUnitTestData();
         std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
         std::stringstream buffer;
         buffer << t.rdbuf();
@@ -357,7 +358,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
 
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
@@ -404,7 +405,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -449,7 +450,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -494,7 +495,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -870,7 +871,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_error_propagati
  */
 static std::string load_json_from_test_data(const char * filename)
 {
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / filename};
     std::stringstream buffer;
     buffer << t.rdbuf();
