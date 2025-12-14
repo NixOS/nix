@@ -40,16 +40,7 @@ DerivationBuildingGoal::DerivationBuildingGoal(
     worker.store.addTempRoot(this->drvPath);
 }
 
-DerivationBuildingGoal::~DerivationBuildingGoal()
-{
-    /* Careful: we should never ever throw an exception from a
-       destructor. */
-    try {
-        closeLogFile();
-    } catch (...) {
-        ignoreExceptionInDestructor();
-    }
-}
+DerivationBuildingGoal::~DerivationBuildingGoal() = default;
 
 std::string DerivationBuildingGoal::key()
 {
@@ -173,6 +164,19 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     co_return tryToBuild();
 }
 
+/**
+ * RAII wrapper for build log file.
+ * Constructor opens the log file, destructor closes it.
+ */
+struct LogFile
+{
+    AutoCloseFD fd;
+    std::shared_ptr<BufferedSink> fileSink, sink;
+
+    LogFile(Store & store, const StorePath & drvPath);
+    ~LogFile();
+};
+
 Goal::Co DerivationBuildingGoal::tryToBuild()
 {
     auto drvOptions = [&] {
@@ -237,6 +241,13 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #ifndef _WIN32 // TODO enable build hook on Windows
     std::unique_ptr<HookInstance> hook;
 #endif
+
+    std::unique_ptr<BuildLog> buildLog;
+    std::unique_ptr<LogFile> logFile;
+
+    auto openLogFile = [&]() { logFile = std::make_unique<LogFile>(worker.store, drvPath); };
+
+    auto closeLogFile = [&]() { logFile.reset(); };
 
     auto started = [&]() {
         auto msg =
@@ -357,7 +368,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(initialOutputs, drvOptions, hook)) {
+            switch (tryBuildHook(initialOutputs, drvOptions, hook, openLogFile)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -440,11 +451,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     logSize += data.size();
                     if (settings.maxLogSize && logSize > settings.maxLogSize) {
                         hook.reset();
-                        co_return doneFailureLogTooLong();
+                        co_return doneFailureLogTooLong(*buildLog);
                     }
                     (*buildLog)(data);
-                    if (logSink)
-                        (*logSink)(data);
+                    if (logFile->sink)
+                        (*logFile->sink)(data);
                 } else if (fd == hook->fromHook.readSide.get()) {
                     for (auto c : data)
                         if (c == '\n') {
@@ -454,11 +465,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                                     *json, worker.act, hook->activities, "the derivation builder", true);
                                 // ensure that logs from a builder using `ssh-ng://` as protocol
                                 // are also available to `nix log`.
-                                if (s && logSink) {
+                                if (s && logFile->sink) {
                                     const auto type = (*json)["type"];
                                     const auto fields = (*json)["fields"];
                                     if (type == resBuildLogLine) {
-                                        (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                                        (*logFile->sink)(
+                                            (fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
                                     } else if (type == resSetPhase && !fields.is_null()) {
                                         const auto phase = fields[0];
                                         if (!phase.is_null()) {
@@ -469,7 +481,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                                             //   @nix { "action": "setPhase", "phase": "$curPhase" }
                                             const auto logLine =
                                                 nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
-                                            (*logSink)(
+                                            (*logFile->sink)(
                                                 "@nix "
                                                 + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
                                                 + "\n");
@@ -522,7 +534,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
         /* Check the exit status. */
         if (!statusOk(status)) {
-            auto e = fixupBuilderFailureErrorMessage({BuildResult::Failure::MiscFailure, status, ""});
+            auto e = fixupBuilderFailureErrorMessage({BuildResult::Failure::MiscFailure, status, ""}, *buildLog);
 
             outputLocks.unlock();
 
@@ -604,9 +616,16 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             struct DerivationBuildingGoalCallbacks : DerivationBuilderCallbacks
             {
                 DerivationBuildingGoal & goal;
+                std::function<void()> openLogFileFn;
+                std::function<void()> closeLogFileFn;
 
-                DerivationBuildingGoalCallbacks(DerivationBuildingGoal & goal)
+                DerivationBuildingGoalCallbacks(
+                    DerivationBuildingGoal & goal,
+                    std::function<void()> openLogFileFn,
+                    std::function<void()> closeLogFileFn)
                     : goal{goal}
+                    , openLogFileFn{std::move(openLogFileFn)}
+                    , closeLogFileFn{std::move(closeLogFileFn)}
                 {
                 }
 
@@ -617,14 +636,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                std::filesystem::path openLogFile() override
+                void openLogFile() override
                 {
-                    return goal.openLogFile();
+                    openLogFileFn();
                 }
 
                 void closeLogFile() override
                 {
-                    goal.closeLogFile();
+                    closeLogFileFn();
                 }
             };
 
@@ -674,15 +693,16 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
-            builder =
-                externalBuilder
-                    ? makeExternalDerivationBuilder(
-                          *localStoreP,
-                          std::make_unique<DerivationBuildingGoalCallbacks>(*this),
-                          std::move(params),
-                          *externalBuilder)
-                    : makeDerivationBuilder(
-                          *localStoreP, std::make_unique<DerivationBuildingGoalCallbacks>(*this), std::move(params));
+            builder = externalBuilder
+                          ? makeExternalDerivationBuilder(
+                                *localStoreP,
+                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::move(params),
+                                *externalBuilder)
+                          : makeDerivationBuilder(
+                                *localStoreP,
+                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::move(params));
         }
 
         if (auto builderOutOpt = builder->startBuild()) {
@@ -717,11 +737,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 if (settings.maxLogSize && logSize > settings.maxLogSize) {
                     if (builder->killChild())
                         worker.childTerminated(this);
-                    co_return doneFailureLogTooLong();
+                    co_return doneFailureLogTooLong(*buildLog);
                 }
                 (*buildLog)(output->data);
-                if (logSink)
-                    (*logSink)(output->data);
+                if (logFile->sink)
+                    (*logFile->sink)(output->data);
             }
         } else if (std::get_if<ChildEOF>(&event)) {
             buildLog->flush();
@@ -741,7 +761,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
-        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e)));
+        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e), *buildLog));
     } catch (BuildError & e) {
         builder.reset();
         outputLocks.unlock();
@@ -862,7 +882,7 @@ static void runPostBuildHook(
     });
 }
 
-BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e)
+BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
 {
     auto msg =
         fmt("Cannot build '%s'.\n"
@@ -872,7 +892,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
 
     msg += showKnownOutputs(worker.store, *drv);
 
-    auto & logTail = buildLog->getTail();
+    auto & logTail = buildLog.getTail();
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt("\nLast %d log lines:\n", logTail.size());
         for (auto & line : logTail) {
@@ -898,7 +918,8 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
 HookReply DerivationBuildingGoal::tryBuildHook(
     const std::map<std::string, InitialOutput> & initialOutputs,
     const DerivationOptions<StorePath> & drvOptions,
-    std::unique_ptr<HookInstance> & hook)
+    std::unique_ptr<HookInstance> & hook,
+    std::function<void()> openLogFile)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -995,7 +1016,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    [[maybe_unused]] Path logFile = openLogFile();
+    openLogFile();
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -1006,16 +1027,15 @@ HookReply DerivationBuildingGoal::tryBuildHook(
 #endif
 }
 
-Path DerivationBuildingGoal::openLogFile()
+LogFile::LogFile(Store & store, const StorePath & drvPath)
 {
     if (!settings.keepLog)
-        return "";
+        return;
 
-    auto baseName = std::string(baseNameOf(worker.store.printStorePath(drvPath)));
+    auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
 
-    /* Create a log file. */
     Path logDir;
-    if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
+    if (auto localStore = dynamic_cast<LocalStore *>(&store))
         logDir = localStore->config->logDir;
     else
         logDir = settings.nixLogDir;
@@ -1024,7 +1044,7 @@ Path DerivationBuildingGoal::openLogFile()
 
     Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), settings.compressLog ? ".bz2" : "");
 
-    fdLogFile = toDescriptor(open(
+    fd = toDescriptor(open(
         logFileName.c_str(),
         O_CREAT | O_WRONLY | O_TRUNC
 #ifndef _WIN32
@@ -1032,31 +1052,31 @@ Path DerivationBuildingGoal::openLogFile()
 #endif
         ,
         0666));
-    if (!fdLogFile)
+    if (!fd)
         throw SysError("creating log file '%1%'", logFileName);
 
-    logFileSink = std::make_shared<FdSink>(fdLogFile.get());
+    fileSink = std::make_shared<FdSink>(fd.get());
 
     if (settings.compressLog)
-        logSink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *logFileSink));
+        sink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *fileSink));
     else
-        logSink = logFileSink;
-
-    return logFileName;
+        sink = fileSink;
 }
 
-void DerivationBuildingGoal::closeLogFile()
+LogFile::~LogFile()
 {
-    auto logSink2 = std::dynamic_pointer_cast<CompressionSink>(logSink);
-    if (logSink2)
-        logSink2->finish();
-    if (logFileSink)
-        logFileSink->flush();
-    logSink = logFileSink = 0;
-    fdLogFile.close();
+    try {
+        auto sink2 = std::dynamic_pointer_cast<CompressionSink>(sink);
+        if (sink2)
+            sink2->finish();
+        if (fileSink)
+            fileSink->flush();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
 }
 
-Goal::Done DerivationBuildingGoal::doneFailureLogTooLong()
+Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
 {
     return doneFailure(BuildError(
         BuildResult::Failure::LogLimitExceeded,

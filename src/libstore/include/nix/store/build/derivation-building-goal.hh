@@ -63,17 +63,6 @@ private:
      */
     StorePathSet inputPaths;
 
-    /**
-     * File descriptor for the log file.
-     */
-    AutoCloseFD fdLogFile;
-    std::shared_ptr<BufferedSink> logFileSink, logSink;
-
-    /**
-     * Build log line processor. Also owns the build Activity.
-     */
-    std::unique_ptr<BuildLog> buildLog;
-
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
@@ -92,19 +81,10 @@ private:
     HookReply tryBuildHook(
         const std::map<std::string, InitialOutput> & initialOutputs,
         const DerivationOptions<StorePath> & drvOptions,
-        std::unique_ptr<HookInstance> & hook);
+        std::unique_ptr<HookInstance> & hook,
+        std::function<void()> openLogFile);
 
-    /**
-     * Open a log file and a pipe to it.
-     */
-    Path openLogFile();
-
-    /**
-     * Close the log file.
-     */
-    void closeLogFile();
-
-    Done doneFailureLogTooLong();
+    Done doneFailureLogTooLong(BuildLog & buildLog);
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
@@ -125,7 +105,7 @@ private:
 
     Done doneFailure(BuildError ex);
 
-    BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg);
+    BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg, BuildLog & buildLog);
 
     JobCategory jobCategory() const override
     {
