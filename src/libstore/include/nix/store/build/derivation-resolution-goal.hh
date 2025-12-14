@@ -43,8 +43,6 @@ struct DerivationResolutionGoal : public Goal
      */
     std::unique_ptr<std::pair<StorePath, BasicDerivation>> resolvedDrv;
 
-    void timedOut(TimedOut && ex) override {}
-
 private:
 
     /**

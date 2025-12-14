@@ -109,8 +109,6 @@ struct DerivationTrampolineGoal : public Goal
 
     virtual ~DerivationTrampolineGoal();
 
-    void timedOut(TimedOut && ex) override {}
-
     std::string key() override;
 
     JobCategory jobCategory() const override

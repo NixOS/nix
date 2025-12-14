@@ -52,11 +52,6 @@ struct DerivationGoal : public Goal
         bool storeDerivation);
     ~DerivationGoal() = default;
 
-    void timedOut(TimedOut && ex) override
-    {
-        unreachable();
-    };
-
     std::string key() override;
 
     JobCategory jobCategory() const override

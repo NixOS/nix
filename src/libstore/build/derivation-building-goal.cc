@@ -71,14 +71,6 @@ void DerivationBuildingGoal::killChild()
 #endif
 }
 
-void DerivationBuildingGoal::timedOut(TimedOut && ex)
-{
-    killChild();
-    // We're not inside a coroutine, hence we can't use co_return here.
-    // Thus we ignore the return value.
-    [[maybe_unused]] Done _ = doneFailure(std::move(ex));
-}
-
 std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)
 {
     std::string msg;
@@ -443,7 +435,20 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     if (useHook) {
         buildResult.startTime = time(0); // inexact
         started();
-        co_await Suspend{};
+
+        while (true) {
+            auto event = co_await WaitForChildEvent{};
+            if (auto * output = std::get_if<ChildOutput>(&event)) {
+                co_await processChildOutput(output->fd, output->data);
+            } else if (std::get_if<ChildEOF>(&event)) {
+                if (!currentLogLine.empty())
+                    flushLine();
+                break;
+            } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
+                killChild();
+                co_return doneFailure(std::move(*timeout));
+            }
+        }
 
 #ifndef _WIN32
         assert(hook);
@@ -664,7 +669,20 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     worker.childStarted(shared_from_this(), {builderOut}, true, true);
 
     started();
-    co_await Suspend{};
+
+    while (true) {
+        auto event = co_await WaitForChildEvent{};
+        if (auto * output = std::get_if<ChildOutput>(&event)) {
+            co_await processChildOutput(output->fd, output->data);
+        } else if (std::get_if<ChildEOF>(&event)) {
+            if (!currentLogLine.empty())
+                flushLine();
+            break;
+        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
+            killChild();
+            co_return doneFailure(std::move(*timeout));
+        }
+    }
 
     trace("build done");
 
@@ -997,7 +1015,7 @@ bool DerivationBuildingGoal::isReadDesc(Descriptor fd)
 #endif
 }
 
-void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view data)
+Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_view data)
 {
     // local & `ssh://`-builds are dealt with here.
     auto isWrittenToLog = isReadDesc(fd);
@@ -1005,14 +1023,11 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
             killChild();
-            // We're not inside a coroutine, hence we can't use co_return here.
-            // Thus we ignore the return value.
-            [[maybe_unused]] Done _ = doneFailure(BuildError(
+            co_return doneFailure(BuildError(
                 BuildResult::Failure::LogLimitExceeded,
                 "%s killed after writing more than %d bytes of log output",
                 getName(),
                 settings.maxLogSize));
-            return;
         }
 
         for (auto c : data)
@@ -1065,13 +1080,7 @@ void DerivationBuildingGoal::handleChildOutput(Descriptor fd, std::string_view d
                 currentHookLine += c;
     }
 #endif
-}
-
-void DerivationBuildingGoal::handleEOF(Descriptor fd)
-{
-    if (!currentLogLine.empty())
-        flushLine();
-    worker.wakeUp(shared_from_this());
+    co_return Return{};
 }
 
 void DerivationBuildingGoal::flushLine()

@@ -33,14 +33,7 @@ public:
 
     Co init();
 
-    void timedOut(TimedOut && ex) override
-    {
-        unreachable();
-    };
-
     std::string key() override;
-
-    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override
     {
