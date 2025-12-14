@@ -52,7 +52,7 @@ struct DerivationGoal : public Goal
         bool storeDerivation);
     ~DerivationGoal() = default;
 
-    void timedOut(Error && ex) override
+    void timedOut(TimedOut && ex) override
     {
         unreachable();
     };

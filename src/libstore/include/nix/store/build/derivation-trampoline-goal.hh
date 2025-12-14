@@ -109,7 +109,7 @@ struct DerivationTrampolineGoal : public Goal
 
     virtual ~DerivationTrampolineGoal();
 
-    void timedOut(Error && ex) override {}
+    void timedOut(TimedOut && ex) override {}
 
     std::string key() override;
 

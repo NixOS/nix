@@ -53,7 +53,7 @@ public:
         std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();
 
-    void timedOut(Error && ex) override
+    void timedOut(TimedOut && ex) override
     {
         unreachable();
     };

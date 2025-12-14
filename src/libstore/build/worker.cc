@@ -479,14 +479,13 @@ void Worker::waitForInput()
 
         if (goal->exitCode == Goal::ecBusy && 0 != settings.maxSilentTime && j->respectTimeouts
             && after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime)) {
-            goal->timedOut(
-                Error("%1% timed out after %2% seconds of silence", goal->getName(), settings.maxSilentTime));
+            goal->timedOut(TimedOut(settings.maxSilentTime));
         }
 
         else if (
             goal->exitCode == Goal::ecBusy && 0 != settings.buildTimeout && j->respectTimeouts
             && after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout)) {
-            goal->timedOut(Error("%1% timed out after %2% seconds", goal->getName(), settings.buildTimeout));
+            goal->timedOut(TimedOut(settings.buildTimeout));
         }
     }
 

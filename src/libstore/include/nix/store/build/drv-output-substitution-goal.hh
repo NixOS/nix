@@ -33,7 +33,7 @@ public:
 
     Co init();
 
-    void timedOut(Error && ex) override
+    void timedOut(TimedOut && ex) override
     {
         unreachable();
     };

@@ -71,12 +71,12 @@ void DerivationBuildingGoal::killChild()
 #endif
 }
 
-void DerivationBuildingGoal::timedOut(Error && ex)
+void DerivationBuildingGoal::timedOut(TimedOut && ex)
 {
     killChild();
     // We're not inside a coroutine, hence we can't use co_return here.
     // Thus we ignore the return value.
-    [[maybe_unused]] Done _ = doneFailure({BuildResult::Failure::TimedOut, std::move(ex)});
+    [[maybe_unused]] Done _ = doneFailure(std::move(ex));
 }
 
 std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)

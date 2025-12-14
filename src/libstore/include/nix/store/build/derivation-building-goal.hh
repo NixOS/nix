@@ -100,7 +100,7 @@ private:
 
     std::map<ActivityId, Activity> builderActivities;
 
-    void timedOut(Error && ex) override;
+    void timedOut(TimedOut && ex) override;
 
     std::string key() override;
 

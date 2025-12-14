@@ -8,6 +8,13 @@
 
 namespace nix {
 
+struct TimedOut : BuildError
+{
+    time_t maxDuration;
+
+    TimedOut(time_t maxDuration);
+};
+
 /**
  * Forward definition.
  */
@@ -454,7 +461,7 @@ public:
      * get rid of any running child processes that are being monitored
      * by the worker (important!), etc.
      */
-    virtual void timedOut(Error && ex) = 0;
+    virtual void timedOut(TimedOut && ex) = 0;
 
     /**
      * Used for comparisons. The order matters a bit for scheduling. We

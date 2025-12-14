@@ -4,6 +4,12 @@
 
 namespace nix {
 
+TimedOut::TimedOut(time_t maxDuration)
+    : BuildError(BuildResult::Failure::TimedOut, "timed out after %1% seconds", maxDuration)
+    , maxDuration(maxDuration)
+{
+}
+
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 using handle_type = nix::Goal::handle_type;
