@@ -368,7 +368,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(initialOutputs, drvOptions, hook, openLogFile)) {
+            switch (tryBuildHook(drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -432,6 +432,45 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     actLock.reset();
 
     if (useHook) {
+        hook = std::move(worker.hook);
+
+        try {
+            hook->machineName = readLine(hook->fromHook.readSide.get());
+        } catch (Error & e) {
+            e.addTrace({}, "while reading the machine name from the build hook");
+            throw;
+        }
+
+        CommonProto::WriteConn conn{hook->sink};
+
+        /* Tell the hook all the inputs that have to be copied to the
+           remote system. */
+        CommonProto::write(worker.store, conn, inputPaths);
+
+        /* Tell the hooks the missing outputs that have to be copied back
+           from the remote system. */
+        {
+            StringSet missingOutputs;
+            for (auto & [outputName, status] : initialOutputs) {
+                // XXX: Does this include known CA outputs?
+                if (buildMode != bmCheck && status.known && status.known->isValid())
+                    continue;
+                missingOutputs.insert(outputName);
+            }
+            CommonProto::write(worker.store, conn, missingOutputs);
+        }
+
+        hook->sink = FdSink();
+        hook->toHook.writeSide.close();
+
+        /* Create the log file and pipe. */
+        openLogFile();
+
+        std::set<MuxablePipePollState::CommChannel> fds;
+        fds.insert(hook->fromHook.readSide.get());
+        fds.insert(hook->builderOut.readSide.get());
+        worker.childStarted(shared_from_this(), fds, false, false);
+
         buildResult.startTime = time(0); // inexact
         started();
 
@@ -915,11 +954,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(
-    const std::map<std::string, InitialOutput> & initialOutputs,
-    const DerivationOptions<StorePath> & drvOptions,
-    std::unique_ptr<HookInstance> & hook,
-    std::function<void()> openLogFile)
+HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -983,45 +1018,6 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         } else
             throw;
     }
-
-    hook = std::move(worker.hook);
-
-    try {
-        hook->machineName = readLine(hook->fromHook.readSide.get());
-    } catch (Error & e) {
-        e.addTrace({}, "while reading the machine name from the build hook");
-        throw;
-    }
-
-    CommonProto::WriteConn conn{hook->sink};
-
-    /* Tell the hook all the inputs that have to be copied to the
-       remote system. */
-    CommonProto::write(worker.store, conn, inputPaths);
-
-    /* Tell the hooks the missing outputs that have to be copied back
-       from the remote system. */
-    {
-        StringSet missingOutputs;
-        for (auto & [outputName, status] : initialOutputs) {
-            // XXX: Does this include known CA outputs?
-            if (buildMode != bmCheck && status.known && status.known->isValid())
-                continue;
-            missingOutputs.insert(outputName);
-        }
-        CommonProto::write(worker.store, conn, missingOutputs);
-    }
-
-    hook->sink = FdSink();
-    hook->toHook.writeSide.close();
-
-    /* Create the log file and pipe. */
-    openLogFile();
-
-    std::set<MuxablePipePollState::CommChannel> fds;
-    fds.insert(hook->fromHook.readSide.get());
-    fds.insert(hook->builderOut.readSide.get());
-    worker.childStarted(shared_from_this(), fds, false, false);
 
     return rpAccept;
 #endif

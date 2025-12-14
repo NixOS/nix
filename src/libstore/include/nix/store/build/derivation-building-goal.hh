@@ -78,11 +78,7 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(
-        const std::map<std::string, InitialOutput> & initialOutputs,
-        const DerivationOptions<StorePath> & drvOptions,
-        std::unique_ptr<HookInstance> & hook,
-        std::function<void()> openLogFile);
+    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
 
     Done doneFailureLogTooLong(BuildLog & buildLog);
 
