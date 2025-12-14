@@ -60,17 +60,6 @@ std::string DerivationBuildingGoal::key()
     return "dd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-void DerivationBuildingGoal::killChild()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook.reset();
-#endif
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder && builder->killChild())
-        worker.childTerminated(this);
-#endif
-}
-
 std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)
 {
     std::string msg;
@@ -490,7 +479,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     flushLine();
                 break;
             } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-                killChild();
+                hook.reset();
                 co_return doneFailure(std::move(*timeout));
             }
         }
@@ -721,7 +710,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 flushLine();
             break;
         } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-            killChild();
+            if (builder && builder->killChild())
+                worker.childTerminated(this);
             co_return doneFailure(std::move(*timeout));
         }
     }
@@ -1064,7 +1054,13 @@ Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_v
     if (isWrittenToLog) {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            killChild();
+#ifndef _WIN32 // TODO enable build hook on Windows
+            hook.reset();
+#endif
+#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
+            if (builder && builder->killChild())
+                worker.childTerminated(this);
+#endif
             co_return doneFailure(BuildError(
                 BuildResult::Failure::LogLimitExceeded,
                 "%s killed after writing more than %d bytes of log output",

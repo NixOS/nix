@@ -146,11 +146,6 @@ private:
      */
     std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
 
-    /**
-     * Forcibly kill the child process, if any.
-     */
-    void killChild();
-
     Done doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs);
 
     Done doneFailure(BuildError ex);
