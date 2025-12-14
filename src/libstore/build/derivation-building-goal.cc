@@ -44,10 +44,6 @@ DerivationBuildingGoal::~DerivationBuildingGoal()
 {
     /* Careful: we should never ever throw an exception from a
        destructor. */
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder)
-        builder.reset();
-#endif
     try {
         closeLogFile();
     } catch (...) {
@@ -409,9 +405,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                             Magenta(
                                 "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-                    builder.reset();
-#endif
                     outputLocks.unlock();
                     worker.permanentFailure = true;
                     co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
@@ -584,6 +577,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #else
     assert(!hook);
 
+    std::unique_ptr<DerivationBuilder> builder;
     Descriptor builderOut;
 
     // Will continue here while waiting for a build user below
@@ -711,9 +705,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
-            if (isReadDesc(output->fd)) {
+            if (output->fd == builder->builderOut.get()) {
                 if (processChildOutput(output->data)) {
-                    if (builder && builder->killChild())
+                    if (builder->killChild())
                         worker.childTerminated(this);
                     co_return doneFailureLogTooLong();
                 }
@@ -723,7 +717,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 flushLine();
             break;
         } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-            if (builder && builder->killChild())
+            if (builder->killChild())
                 worker.childTerminated(this);
             co_return doneFailure(std::move(*timeout));
         }
@@ -1051,15 +1045,6 @@ void DerivationBuildingGoal::closeLogFile()
         logFileSink->flush();
     logSink = logFileSink = 0;
     fdLogFile.close();
-}
-
-bool DerivationBuildingGoal::isReadDesc(Descriptor fd)
-{
-#ifdef _WIN32 // TODO enable build hook on Windows
-    return false;
-#else
-    return builder && fd == builder->builderOut.get();
-#endif
 }
 
 bool DerivationBuildingGoal::processChildOutput(std::string_view data)

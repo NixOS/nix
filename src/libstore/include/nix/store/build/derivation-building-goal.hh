@@ -81,10 +81,6 @@ private:
     std::string currentLogLine;
     size_t currentLogLinePos = 0; // to handle carriage return
 
-#ifndef _WIN32 // TODO enable build hook on Windows
-    std::unique_ptr<DerivationBuilder> builder;
-#endif
-
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
@@ -118,8 +114,6 @@ private:
      * Close the log file.
      */
     void closeLogFile();
-
-    bool isReadDesc(Descriptor fd);
 
     /**
      * Process log output from a child process.
