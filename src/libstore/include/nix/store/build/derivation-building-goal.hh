@@ -46,18 +46,18 @@ struct DerivationBuildingGoal : public Goal
 private:
 
     /** The path of the derivation. */
-    StorePath drvPath;
+    const StorePath drvPath;
 
     /**
      * The derivation stored at drvPath.
      */
-    std::unique_ptr<Derivation> drv;
+    const std::unique_ptr<Derivation> drv;
 
     /**
      * The remainder is state held during the build.
      */
 
-    BuildMode buildMode;
+    const BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
 
