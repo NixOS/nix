@@ -427,6 +427,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
 
         std::string currentHookLine;
+        uint64_t logSize = 0;
 
         while (true) {
             auto event = co_await WaitForChildEvent{};
@@ -704,6 +705,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     worker.childStarted(shared_from_this(), {builderOut}, true, true);
 
     started();
+
+    uint64_t logSize = 0;
 
     while (true) {
         auto event = co_await WaitForChildEvent{};

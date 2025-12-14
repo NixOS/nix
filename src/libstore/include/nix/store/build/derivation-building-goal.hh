@@ -70,11 +70,6 @@ private:
     std::shared_ptr<BufferedSink> logFileSink, logSink;
 
     /**
-     * Number of bytes received from the builder.
-     */
-    uint64_t logSize = 0;
-
-    /**
      * Build log line processor (pure, no I/O).
      */
     std::unique_ptr<BuildLog> buildLog;
