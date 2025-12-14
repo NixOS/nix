@@ -57,12 +57,6 @@ private:
      * The remainder is state held during the build.
      */
 
-    /**
-     * All input paths (that is, the union of FS closures of the
-     * immediate input paths).
-     */
-    StorePathSet inputPaths;
-
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
@@ -73,7 +67,7 @@ private:
      * The states.
      */
     Co gaveUpOnSubstitution(bool storeDerivation);
-    Co tryToBuild();
+    Co tryToBuild(StorePathSet inputPaths);
 
     /**
      * Is the build hook willing to perform the build?

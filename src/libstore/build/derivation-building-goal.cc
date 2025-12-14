@@ -122,6 +122,8 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
         writeDerivation(worker.store, *drv);
     }
 
+    StorePathSet inputPaths;
+
     {
         /* If we get this far, we know no dynamic drvs inputs */
 
@@ -161,7 +163,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-    co_return tryToBuild();
+    co_return tryToBuild(std::move(inputPaths));
 }
 
 /**
@@ -177,7 +179,7 @@ struct LogFile
     ~LogFile();
 };
 
-Goal::Co DerivationBuildingGoal::tryToBuild()
+Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
     auto drvOptions = [&] {
         DerivationOptions<SingleDerivedPath> temp;
@@ -644,7 +646,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (curBuilds >= settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild();
+            co_return tryToBuild(std::move(inputPaths));
         }
 
         if (!builder) {
