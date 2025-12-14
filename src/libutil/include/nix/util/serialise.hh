@@ -159,6 +159,8 @@ struct FdSink : BufferedSink
     }
 
     FdSink(FdSink &&) = default;
+    FdSink(const FdSink &) = delete;
+    FdSink & operator=(const FdSink &) = delete;
 
     FdSink & operator=(FdSink && s)
     {
@@ -200,8 +202,10 @@ struct FdSource : BufferedSource, RestartableSource
     }
 
     FdSource(FdSource &&) = default;
-
     FdSource & operator=(FdSource && s) = default;
+    FdSource(const FdSource &) = delete;
+    FdSource & operator=(const FdSource & s) = delete;
+    ~FdSource() = default;
 
     bool good() override;
     void restart() override;
@@ -452,6 +456,11 @@ struct LambdaSink : Sink
     {
     }
 
+    LambdaSink(LambdaSink &&) = delete;
+    LambdaSink(const LambdaSink &) = delete;
+    LambdaSink & operator=(LambdaSink &&) = delete;
+    LambdaSink & operator=(const LambdaSink &) = delete;
+
     ~LambdaSink()
     {
         cleanupFun();
@@ -628,6 +637,11 @@ struct FramedSource : Source
     {
     }
 
+    FramedSource(FramedSource &&) = delete;
+    FramedSource(const FramedSource &) = delete;
+    FramedSource & operator=(FramedSource &&) = delete;
+    FramedSource & operator=(const FramedSource &) = delete;
+
     ~FramedSource()
     {
         try {
@@ -684,6 +698,11 @@ struct FramedSink : nix::BufferedSink
         , checkError(checkError)
     {
     }
+
+    FramedSink(FramedSink &&) = delete;
+    FramedSink(const FramedSink &) = delete;
+    FramedSink & operator=(FramedSink &&) = delete;
+    FramedSink & operator=(const FramedSink &) = delete;
 
     ~FramedSink()
     {

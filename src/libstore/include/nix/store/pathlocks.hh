@@ -61,6 +61,10 @@ struct FdLock
     bool acquired = false;
 
     FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view waitMsg);
+    FdLock(const FdLock &) = delete;
+    FdLock & operator=(const FdLock &) = delete;
+    FdLock(FdLock &&) = delete;
+    FdLock & operator=(FdLock &&) = delete;
 
     ~FdLock()
     {

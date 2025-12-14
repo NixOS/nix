@@ -141,6 +141,16 @@ struct InterruptCallbackImpl : InterruptCallback
 {
     InterruptCallbacks::Token token;
 
+    InterruptCallbackImpl(InterruptCallbacks::Token token)
+        : token(token)
+    {
+    }
+
+    InterruptCallbackImpl(InterruptCallbackImpl &&) = delete;
+    InterruptCallbackImpl(const InterruptCallbackImpl &) = delete;
+    InterruptCallbackImpl & operator=(InterruptCallbackImpl &&) = delete;
+    InterruptCallbackImpl & operator=(const InterruptCallbackImpl &) = delete;
+
     ~InterruptCallbackImpl() override
     {
         auto interruptCallbacks(_interruptCallbacks.lock());
@@ -153,11 +163,7 @@ std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()>
     auto interruptCallbacks(_interruptCallbacks.lock());
     auto token = interruptCallbacks->nextToken++;
     interruptCallbacks->callbacks.emplace(token, callback);
-
-    std::unique_ptr<InterruptCallbackImpl> res{new InterruptCallbackImpl{}};
-    res->token = token;
-
-    return std::unique_ptr<InterruptCallback>(res.release());
+    return std::make_unique<InterruptCallbackImpl>(token);
 }
 
 } // namespace nix

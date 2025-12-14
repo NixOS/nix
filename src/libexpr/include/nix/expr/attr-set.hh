@@ -107,6 +107,8 @@ private:
     Bindings & operator=(const Bindings &) = delete;
     Bindings & operator=(Bindings &&) = delete;
 
+    ~Bindings() = default;
+
     friend class BindingsBuilder;
 
     /**

@@ -164,14 +164,17 @@ public:
     Value ** elems;
     ListBuilder(EvalMemory & mem, size_t size);
 
-    // NOTE: Can be noexcept because we are just copying integral values and
-    // raw pointers.
     ListBuilder(ListBuilder && x) noexcept
         : size(x.size)
         , inlineElems{x.inlineElems[0], x.inlineElems[1]}
         , elems(size <= 2 ? inlineElems : x.elems)
     {
     }
+
+    ListBuilder(const ListBuilder &) = delete;
+    ListBuilder & operator=(ListBuilder &&) = delete;
+    ListBuilder & operator=(const ListBuilder &) = delete;
+    ~ListBuilder() = default;
 
     Value *& operator[](size_t n)
     {

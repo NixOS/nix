@@ -27,6 +27,10 @@ private:
 
 public:
     MonitorFdHup(int fd);
+    MonitorFdHup(MonitorFdHup &&) = delete;
+    MonitorFdHup(const MonitorFdHup &) = delete;
+    MonitorFdHup & operator=(MonitorFdHup &&) = delete;
+    MonitorFdHup & operator=(const MonitorFdHup &) = delete;
 
     ~MonitorFdHup()
     {
