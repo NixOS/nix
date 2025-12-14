@@ -238,6 +238,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     }
     checkPathValidity(initialOutputs);
 
+#ifndef _WIN32 // TODO enable build hook on Windows
+    std::unique_ptr<HookInstance> hook;
+#endif
+
     auto started = [&]() {
         auto msg =
             fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
@@ -355,7 +359,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (buildLocally) {
             useHook = false;
         } else {
-            switch (tryBuildHook(initialOutputs, drvOptions)) {
+            switch (tryBuildHook(initialOutputs, drvOptions, hook)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -436,12 +440,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             if (auto * output = std::get_if<ChildOutput>(&event)) {
                 auto & fd = output->fd;
                 auto & data = output->data;
-                if (processChildOutput(fd, data)) {
-                    hook.reset();
-                    co_return doneFailureLogTooLong();
-                }
-                auto isWrittenToLog = isReadDesc(fd);
-                if (fd == hook->fromHook.readSide.get()) {
+                if (fd == hook->builderOut.readSide.get()) {
+                    if (processChildOutput(data)) {
+                        hook.reset();
+                        co_return doneFailureLogTooLong();
+                    }
+                } else if (fd == hook->fromHook.readSide.get()) {
                     for (auto c : data)
                         if (c == '\n') {
                             auto json = parseJSONMessage(currentHookLine, "the derivation builder");
@@ -450,7 +454,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                                     *json, worker.act, hook->activities, "the derivation builder", true);
                                 // ensure that logs from a builder using `ssh-ng://` as protocol
                                 // are also available to `nix log`.
-                                if (s && !isWrittenToLog && logSink) {
+                                if (s && logSink) {
                                     const auto type = (*json)["type"];
                                     const auto fields = (*json)["fields"];
                                     if (type == resBuildLogLine) {
@@ -707,10 +711,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
-            if (processChildOutput(output->fd, output->data)) {
-                if (builder && builder->killChild())
-                    worker.childTerminated(this);
-                co_return doneFailureLogTooLong();
+            if (isReadDesc(output->fd)) {
+                if (processChildOutput(output->data)) {
+                    if (builder && builder->killChild())
+                        worker.childTerminated(this);
+                    co_return doneFailureLogTooLong();
+                }
             }
         } else if (std::get_if<ChildEOF>(&event)) {
             if (!currentLogLine.empty())
@@ -885,7 +891,9 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
 }
 
 HookReply DerivationBuildingGoal::tryBuildHook(
-    const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions)
+    const std::map<std::string, InitialOutput> & initialOutputs,
+    const DerivationOptions<StorePath> & drvOptions,
+    std::unique_ptr<HookInstance> & hook)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1050,34 +1058,30 @@ bool DerivationBuildingGoal::isReadDesc(Descriptor fd)
 #ifdef _WIN32 // TODO enable build hook on Windows
     return false;
 #else
-    return (hook && fd == hook->builderOut.readSide.get()) || (builder && fd == builder->builderOut.get());
+    return builder && fd == builder->builderOut.get();
 #endif
 }
 
-bool DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_view data)
+bool DerivationBuildingGoal::processChildOutput(std::string_view data)
 {
-    // local & `ssh://`-builds are dealt with here.
-    auto isWrittenToLog = isReadDesc(fd);
-    if (isWrittenToLog) {
-        logSize += data.size();
-        if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            return true;
+    logSize += data.size();
+    if (settings.maxLogSize && logSize > settings.maxLogSize) {
+        return true;
+    }
+
+    for (auto c : data)
+        if (c == '\r')
+            currentLogLinePos = 0;
+        else if (c == '\n')
+            flushLine();
+        else {
+            if (currentLogLinePos >= currentLogLine.size())
+                currentLogLine.resize(currentLogLinePos + 1);
+            currentLogLine[currentLogLinePos++] = c;
         }
 
-        for (auto c : data)
-            if (c == '\r')
-                currentLogLinePos = 0;
-            else if (c == '\n')
-                flushLine();
-            else {
-                if (currentLogLinePos >= currentLogLine.size())
-                    currentLogLine.resize(currentLogLinePos + 1);
-                currentLogLine[currentLogLinePos++] = c;
-            }
-
-        if (logSink)
-            (*logSink)(data);
-    }
+    if (logSink)
+        (*logSink)(data);
 
     return false;
 }

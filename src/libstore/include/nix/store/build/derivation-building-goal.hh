@@ -82,11 +82,6 @@ private:
     size_t currentLogLinePos = 0; // to handle carriage return
 
 #ifndef _WIN32 // TODO enable build hook on Windows
-    /**
-     * The build hook.
-     */
-    std::unique_ptr<HookInstance> hook;
-
     std::unique_ptr<DerivationBuilder> builder;
 #endif
 
@@ -110,7 +105,9 @@ private:
      * Is the build hook willing to perform the build?
      */
     HookReply tryBuildHook(
-        const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions);
+        const std::map<std::string, InitialOutput> & initialOutputs,
+        const DerivationOptions<StorePath> & drvOptions,
+        std::unique_ptr<HookInstance> & hook);
 
     /**
      * Open a log file and a pipe to it.
@@ -125,11 +122,11 @@ private:
     bool isReadDesc(Descriptor fd);
 
     /**
-     * Process output from a child process.
+     * Process log output from a child process.
      *
      * @return true if log limit was exceeded and child should be killed.
      */
-    bool processChildOutput(Descriptor fd, std::string_view data);
+    bool processChildOutput(std::string_view data);
 
     Done doneFailureLogTooLong();
 
