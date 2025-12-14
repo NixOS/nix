@@ -16,6 +16,7 @@ R""(
 
 ; Allow DNS lookups.
 (allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))
+(allow mach-lookup (global-name "com.apple.SystemConfiguration.DNSConfiguration"))
 
 ; Allow access to trustd.
 (allow mach-lookup (global-name "com.apple.trustd"))
