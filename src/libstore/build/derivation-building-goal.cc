@@ -434,10 +434,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 auto & fd = output->fd;
                 auto & data = output->data;
                 if (fd == hook->builderOut.readSide.get()) {
-                    if (processChildOutput(data)) {
+                    logSize += data.size();
+                    if (settings.maxLogSize && logSize > settings.maxLogSize) {
                         hook.reset();
                         co_return doneFailureLogTooLong();
                     }
+                    (*buildLog)(data);
+                    if (logSink)
+                        (*logSink)(data);
                 } else if (fd == hook->fromHook.readSide.get()) {
                     for (auto c : data)
                         if (c == '\n') {
@@ -475,8 +479,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                             currentHookLine += c;
                 }
             } else if (std::get_if<ChildEOF>(&event)) {
-                if (!currentLogLine.empty())
-                    flushLine();
+                buildLog->flush();
                 break;
             } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
                 hook.reset();
@@ -706,15 +709,18 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
             if (output->fd == builder->builderOut.get()) {
-                if (processChildOutput(output->data)) {
+                logSize += output->data.size();
+                if (settings.maxLogSize && logSize > settings.maxLogSize) {
                     if (builder->killChild())
                         worker.childTerminated(this);
                     co_return doneFailureLogTooLong();
                 }
+                (*buildLog)(output->data);
+                if (logSink)
+                    (*logSink)(output->data);
             }
         } else if (std::get_if<ChildEOF>(&event)) {
-            if (!currentLogLine.empty())
-                flushLine();
+            buildLog->flush();
             break;
         } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
             if (builder->killChild())
@@ -862,6 +868,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
 
     msg += showKnownOutputs(worker.store, *drv);
 
+    auto & logTail = buildLog->getTail();
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt("\nLast %d log lines:\n", logTail.size());
         for (auto & line : logTail) {
@@ -997,7 +1004,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(
 
 Path DerivationBuildingGoal::openLogFile()
 {
-    logSize = 0;
+    buildLog = std::make_unique<BuildLog>(
+        settings.logLines, [this](std::string_view line) { return handleLogLine(line); });
 
     if (!settings.keepLog)
         return "";
@@ -1047,27 +1055,14 @@ void DerivationBuildingGoal::closeLogFile()
     fdLogFile.close();
 }
 
-bool DerivationBuildingGoal::processChildOutput(std::string_view data)
+bool DerivationBuildingGoal::handleLogLine(std::string_view line)
 {
-    logSize += data.size();
-    if (settings.maxLogSize && logSize > settings.maxLogSize) {
+    std::string lineStr{line};
+    if (handleJSONLogMessage(lineStr, *act, builderActivities, "the derivation builder", false)) {
         return true;
     }
 
-    for (auto c : data)
-        if (c == '\r')
-            currentLogLinePos = 0;
-        else if (c == '\n')
-            flushLine();
-        else {
-            if (currentLogLinePos >= currentLogLine.size())
-                currentLogLine.resize(currentLogLinePos + 1);
-            currentLogLine[currentLogLinePos++] = c;
-        }
-
-    if (logSink)
-        (*logSink)(data);
-
+    act->result(resBuildLogLine, lineStr);
     return false;
 }
 
@@ -1078,23 +1073,6 @@ Goal::Done DerivationBuildingGoal::doneFailureLogTooLong()
         "%s killed after writing more than %d bytes of log output",
         getName(),
         settings.maxLogSize));
-}
-
-void DerivationBuildingGoal::flushLine()
-{
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-        ;
-
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines)
-            logTail.pop_front();
-
-        act->result(resBuildLogLine, currentLogLine);
-    }
-
-    currentLogLine = "";
-    currentLogLinePos = 0;
 }
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()

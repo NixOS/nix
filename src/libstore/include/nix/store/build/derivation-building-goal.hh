@@ -9,6 +9,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/build/build-log.hh"
 
 namespace nix {
 
@@ -69,17 +70,14 @@ private:
     std::shared_ptr<BufferedSink> logFileSink, logSink;
 
     /**
-     * Number of bytes received from the builder's stdout/stderr.
+     * Number of bytes received from the builder.
      */
-    unsigned long logSize;
+    uint64_t logSize = 0;
 
     /**
-     * The most recent log lines.
+     * Build log line processor (pure, no I/O).
      */
-    std::list<std::string> logTail;
-
-    std::string currentLogLine;
-    size_t currentLogLinePos = 0; // to handle carriage return
+    std::unique_ptr<BuildLog> buildLog;
 
     BuildMode buildMode;
 
@@ -116,15 +114,13 @@ private:
     void closeLogFile();
 
     /**
-     * Process log output from a child process.
-     *
-     * @return true if log limit was exceeded and child should be killed.
+     * Callback for BuildLog line processing.
+     * Handles JSON log messages and emits to activity.
+     * @return true if line was handled as JSON
      */
-    bool processChildOutput(std::string_view data);
+    bool handleLogLine(std::string_view line);
 
     Done doneFailureLogTooLong();
-
-    void flushLine();
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
