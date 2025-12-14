@@ -11,6 +11,24 @@ class AutoRemoveJail
     bool del;
 public:
     AutoRemoveJail(int jid);
+    AutoRemoveJail(const AutoRemoveJail &) = delete;
+    AutoRemoveJail & operator=(const AutoRemoveJail &) = delete;
+
+    AutoRemoveJail(AutoRemoveJail && other) noexcept
+        : jid(other.jid)
+        , del(other.del)
+    {
+        other.cancel();
+    }
+
+    AutoRemoveJail & operator=(AutoRemoveJail && other) noexcept
+    {
+        jid = other.jid;
+        del = other.del;
+        other.cancel();
+        return *this;
+    }
+
     AutoRemoveJail();
     ~AutoRemoveJail();
     void cancel();
