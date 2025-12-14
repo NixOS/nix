@@ -436,7 +436,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             if (auto * output = std::get_if<ChildOutput>(&event)) {
                 auto & fd = output->fd;
                 auto & data = output->data;
-                co_await processChildOutput(fd, data);
+                if (processChildOutput(fd, data)) {
+                    hook.reset();
+                    co_return doneFailureLogTooLong();
+                }
                 auto isWrittenToLog = isReadDesc(fd);
                 if (fd == hook->fromHook.readSide.get()) {
                     for (auto c : data)
@@ -704,7 +707,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
-            co_await processChildOutput(output->fd, output->data);
+            if (processChildOutput(output->fd, output->data)) {
+                if (builder && builder->killChild())
+                    worker.childTerminated(this);
+                co_return doneFailureLogTooLong();
+            }
         } else if (std::get_if<ChildEOF>(&event)) {
             if (!currentLogLine.empty())
                 flushLine();
@@ -1047,25 +1054,14 @@ bool DerivationBuildingGoal::isReadDesc(Descriptor fd)
 #endif
 }
 
-Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_view data)
+bool DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_view data)
 {
     // local & `ssh://`-builds are dealt with here.
     auto isWrittenToLog = isReadDesc(fd);
     if (isWrittenToLog) {
         logSize += data.size();
         if (settings.maxLogSize && logSize > settings.maxLogSize) {
-#ifndef _WIN32 // TODO enable build hook on Windows
-            hook.reset();
-#endif
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-            if (builder && builder->killChild())
-                worker.childTerminated(this);
-#endif
-            co_return doneFailure(BuildError(
-                BuildResult::Failure::LogLimitExceeded,
-                "%s killed after writing more than %d bytes of log output",
-                getName(),
-                settings.maxLogSize));
+            return true;
         }
 
         for (auto c : data)
@@ -1083,7 +1079,16 @@ Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_v
             (*logSink)(data);
     }
 
-    co_return Return{};
+    return false;
+}
+
+Goal::Done DerivationBuildingGoal::doneFailureLogTooLong()
+{
+    return doneFailure(BuildError(
+        BuildResult::Failure::LogLimitExceeded,
+        "%s killed after writing more than %d bytes of log output",
+        getName(),
+        settings.maxLogSize));
 }
 
 void DerivationBuildingGoal::flushLine()

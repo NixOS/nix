@@ -126,8 +126,12 @@ private:
 
     /**
      * Process output from a child process.
+     *
+     * @return true if log limit was exceeded and child should be killed.
      */
-    Co processChildOutput(Descriptor fd, std::string_view data);
+    bool processChildOutput(Descriptor fd, std::string_view data);
+
+    Done doneFailureLogTooLong();
 
     void flushLine();
 
