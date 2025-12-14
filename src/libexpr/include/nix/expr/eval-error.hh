@@ -54,6 +54,20 @@ MakeError(TypeError, EvalError);
 MakeError(UndefinedVarError, EvalError);
 MakeError(MissingArgumentError, EvalError);
 MakeError(InfiniteRecursionError, EvalError);
+
+/**
+ * Resource exhaustion error when evaluation exceeds max-call-depth.
+ * Inherits from EvalBaseError (not EvalError) because resource exhaustion
+ * should not be cached.
+ */
+struct StackOverflowError : public EvalBaseError
+{
+    StackOverflowError(EvalState & state)
+        : EvalBaseError(state, "stack overflow; max-call-depth exceeded")
+    {
+    }
+};
+
 MakeError(IFDError, EvalBaseError);
 
 struct InvalidPathError : public EvalError

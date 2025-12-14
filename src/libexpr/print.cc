@@ -537,6 +537,16 @@ private:
         output.flush();
         checkInterrupt();
 
+        // Catch infinite recursion before it overflows the C++ stack.
+        // Non-cyclic structures can be infinitely deep when values are
+        // lazily produced (e.g., `let f = n: { inner = f (n + 1); }; in f 0`).
+        // We check print depth against max-call-depth rather than incrementing
+        // the callDepth counter, because accessing an attribute is not a call.
+        // Other places do increment callDepth for simplicity, but that is
+        // technically incorrect.
+        if (depth > state.settings.maxCallDepth)
+            state.error<StackOverflowError>().atPos(v.determinePos(noPos)).debugThrow();
+
         try {
             if (options.force) {
                 state.forceValue(v, v.determinePos(noPos));
@@ -592,6 +602,11 @@ private:
                 printUnknown();
                 break;
             }
+        } catch (StackOverflowError &) {
+            // Always re-throw because stack overflow is a serious condition
+            // that expressions should avoid, unlike say `throw`, which can
+            // be part of legitimate expression patterns.
+            throw;
         } catch (Error & e) {
             if (options.errors == ErrorPrintBehavior::Throw
                 || (options.errors == ErrorPrintBehavior::ThrowTopLevel && depth == 0)) {

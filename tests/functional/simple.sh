@@ -35,3 +35,24 @@ if test "$outPath" != "/foo/xxiwa5zlaajv6xdjynf9yym9g319d6mn-big-derivation-attr
     echo "big-derivation-attr.nix hash appears broken, got $outPath. Memory corruption in large drv attr?"
     exit 1
 fi
+
+# Test that nix-instantiate on a deeply nested recurseForDerivations structure
+# produces a controlled stack overflow error rather than a segfault.
+expectStderr 1 nix-instantiate --expr 'let x = { recurseForDerivations = true; more = x; }; in x' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Test that nix-env -qa --meta on deeply nested meta attributes produces a
+# controlled stack overflow error rather than a segfault.
+echo 'let f = n: { type = "derivation"; name = "test"; system = "x86_64-linux"; meta.nested = f (n + 1); }; in { pkg = f 0; }' > "$TEST_ROOT/deep-meta.nix"
+expectStderr 1 nix-env -qa -f "$TEST_ROOT/deep-meta.nix" --json --meta \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Test that nix-instantiate --eval on a pre-forced deep structure (built with
+# foldl' to avoid thunks) produces a controlled stack overflow error rather than
+# a segfault when printAmbiguous traverses the structure.
+# Note: Without the fix, this test may pass if the system stack is large enough.
+# The fix ensures we get a controlled error at max-call-depth (default 10000)
+# rather than relying on the system stack limit.
+# shellcheck disable=SC2016
+expectStderr 1 nix-instantiate --eval --expr 'builtins.foldl'\'' (acc: _: { inner = acc; }) null (builtins.genList (x: x) 20000)' \
+  | grepQuiet "stack overflow; max-call-depth exceeded"

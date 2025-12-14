@@ -66,6 +66,8 @@ static void printValueAsXML(
 {
     checkInterrupt();
 
+    auto _level = state.addCallDepth(pos);
+
     if (strict)
         state.forceValue(v, pos);
 
