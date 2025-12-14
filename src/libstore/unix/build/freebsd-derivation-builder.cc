@@ -341,7 +341,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             /* N.B. it is realistic that these paths might not exist. It
                happens when testing Nix building fixed-output derivations
                within a pure derivation. */
-            for (std::string path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
+            for (std::filesystem::path path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
                 if (pathExists(path)) {
                     // This means if your network config changes during a FOD build,
                     // the DNS in the sandbox will be wrong. However, this is pretty unlikely
@@ -355,7 +355,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                     //
                     // I also just generally feel icky about modifying sandbox state under a build,
                     // even though it really shouldn't be a big deal. -K900
-                    copyFile(path, std::filesystem::path{chrootRootDir} + path, false, true);
+                    copyFile(path, std::filesystem::path{chrootRootDir} / path.relative_path(), false, true);
                 }
             }
 
@@ -365,7 +365,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 createDirs(chrootRootDir + "/etc/ssl/certs");
                 copyFile(
                     std::filesystem::path{settings.caFile.get()},
-                    std::filesystem::path{chrootRootDir} + "/etc/ssl/certs/ca-certificates.crt",
+                    chrootRootDir + "/etc/ssl/certs/ca-certificates.crt",
                     false,
                     true);
             }
