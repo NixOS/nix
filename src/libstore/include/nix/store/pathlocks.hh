@@ -33,6 +33,22 @@ private:
 public:
     PathLocks();
     PathLocks(const std::set<std::filesystem::path> & paths, const std::string & waitMsg = "");
+
+    PathLocks(PathLocks && other) noexcept
+        : fds(std::exchange(other.fds, {}))
+        , deletePaths(other.deletePaths)
+    {
+    }
+
+    PathLocks & operator=(PathLocks && other) noexcept
+    {
+        fds = std::exchange(other.fds, {});
+        deletePaths = other.deletePaths;
+        return *this;
+    }
+
+    PathLocks(const PathLocks &) = delete;
+    PathLocks & operator=(const PathLocks &) = delete;
     bool lockPaths(const std::set<std::filesystem::path> & _paths, const std::string & waitMsg = "", bool wait = true);
     ~PathLocks();
     void unlock();
