@@ -436,10 +436,53 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         buildResult.startTime = time(0); // inexact
         started();
 
+#ifndef _WIN32
+        assert(hook);
+#endif
+
         while (true) {
             auto event = co_await WaitForChildEvent{};
             if (auto * output = std::get_if<ChildOutput>(&event)) {
-                co_await processChildOutput(output->fd, output->data);
+                auto & fd = output->fd;
+                auto & data = output->data;
+                co_await processChildOutput(fd, data);
+                auto isWrittenToLog = isReadDesc(fd);
+                if (fd == hook->fromHook.readSide.get()) {
+                    for (auto c : data)
+                        if (c == '\n') {
+                            auto json = parseJSONMessage(currentHookLine, "the derivation builder");
+                            if (json) {
+                                auto s = handleJSONLogMessage(
+                                    *json, worker.act, hook->activities, "the derivation builder", true);
+                                // ensure that logs from a builder using `ssh-ng://` as protocol
+                                // are also available to `nix log`.
+                                if (s && !isWrittenToLog && logSink) {
+                                    const auto type = (*json)["type"];
+                                    const auto fields = (*json)["fields"];
+                                    if (type == resBuildLogLine) {
+                                        (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                                    } else if (type == resSetPhase && !fields.is_null()) {
+                                        const auto phase = fields[0];
+                                        if (!phase.is_null()) {
+                                            // nixpkgs' stdenv produces lines in the log to signal
+                                            // phase changes.
+                                            // We want to get the same lines in case of remote builds.
+                                            // The format is:
+                                            //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                            const auto logLine =
+                                                nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
+                                            (*logSink)(
+                                                "@nix "
+                                                + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
+                                                + "\n");
+                                        }
+                                    }
+                                }
+                            }
+                            currentHookLine.clear();
+                        } else
+                            currentHookLine += c;
+                }
             } else if (std::get_if<ChildEOF>(&event)) {
                 if (!currentLogLine.empty())
                     flushLine();
@@ -449,10 +492,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 co_return doneFailure(std::move(*timeout));
             }
         }
-
-#ifndef _WIN32
-        assert(hook);
-#endif
 
         trace("hook build done");
 
@@ -1046,41 +1085,6 @@ Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_v
             (*logSink)(data);
     }
 
-#ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook && fd == hook->fromHook.readSide.get()) {
-        for (auto c : data)
-            if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
-                if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
-                    // ensure that logs from a builder using `ssh-ng://` as protocol
-                    // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink) {
-                        const auto type = (*json)["type"];
-                        const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
-                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && !fields.is_null()) {
-                            const auto phase = fields[0];
-                            if (!phase.is_null()) {
-                                // nixpkgs' stdenv produces lines in the log to signal
-                                // phase changes.
-                                // We want to get the same lines in case of remote builds.
-                                // The format is:
-                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
-                                const auto logLine = nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
-                                (*logSink)(
-                                    "@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
-                                    + "\n");
-                            }
-                        }
-                    }
-                }
-                currentHookLine.clear();
-            } else
-                currentHookLine += c;
-    }
-#endif
     co_return Return{};
 }
 
