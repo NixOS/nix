@@ -16,6 +16,7 @@ namespace nix {
 using std::map;
 
 struct BuilderFailureError;
+struct ExternalBuilder;
 #ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
 struct DerivationBuilder;
@@ -68,6 +69,17 @@ private:
      */
     Co gaveUpOnSubstitution(bool storeDerivation);
     Co tryToBuild(StorePathSet inputPaths);
+    Co buildWithHook(
+        StorePathSet inputPaths,
+        std::map<std::string, InitialOutput> initialOutputs,
+        DerivationOptions<StorePath> drvOptions,
+        PathLocks outputLocks);
+    Co buildLocally(
+        StorePathSet inputPaths,
+        std::map<std::string, InitialOutput> initialOutputs,
+        DerivationOptions<StorePath> drvOptions,
+        PathLocks outputLocks,
+        const ExternalBuilder * externalBuilder);
 
     /**
      * Is the build hook willing to perform the build?
