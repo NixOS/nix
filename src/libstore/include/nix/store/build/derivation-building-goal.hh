@@ -81,8 +81,6 @@ private:
     std::string currentLogLine;
     size_t currentLogLinePos = 0; // to handle carriage return
 
-    std::string currentHookLine;
-
 #ifndef _WIN32 // TODO enable build hook on Windows
     /**
      * The build hook.

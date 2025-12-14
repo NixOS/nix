@@ -440,6 +440,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         assert(hook);
 #endif
 
+        std::string currentHookLine;
+
         while (true) {
             auto event = co_await WaitForChildEvent{};
             if (auto * output = std::get_if<ChildOutput>(&event)) {
