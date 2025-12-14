@@ -1,37 +1,31 @@
 #pragma once
 ///@file
 
+#include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 
-#include <functional>
 #include <list>
+#include <map>
 #include <string>
 
 namespace nix {
 
 /**
- * Pure line buffering and log tracking for build output.
+ * Line buffering and log tracking for build output.
  *
  * This class handles:
- * - Tracking log size (for enforcing limits)
+ * - Owning the build Activity for logging
  * - Buffering partial lines (handling \r and \n)
  * - Maintaining a tail of recent log lines (for error messages)
+ * - Processing JSON log messages via handleJSONLogMessage
  *
  * Implements Sink so it can be used as a data destination.
  * I/O is handled separately by the caller.
  */
 struct BuildLog : Sink
 {
-    /**
-     * Callback for complete log lines.
-     * @param line The complete log line (without newline)
-     * @return true if line was handled as structured JSON (don't add to tail)
-     */
-    using LineCallback = std::function<bool(std::string_view line)>;
-
 private:
     size_t maxTailLines;
-    LineCallback onLine;
 
     std::list<std::string> logTail;
     std::string currentLogLine;
@@ -41,14 +35,24 @@ private:
 
 public:
     /**
-     * @param maxTailLines Maximum number of tail lines to keep
-     * @param onLine Callback for each complete line
+     * The build activity. Owned by BuildLog.
      */
-    BuildLog(size_t maxTailLines, LineCallback onLine);
+    std::unique_ptr<Activity> act;
+
+    /**
+     * Map for tracking nested activities from JSON messages.
+     */
+    std::map<ActivityId, Activity> builderActivities;
+
+    /**
+     * @param maxTailLines Maximum number of tail lines to keep
+     * @param act Activity for this build
+     */
+    BuildLog(size_t maxTailLines, std::unique_ptr<Activity> act);
 
     /**
      * Process output data from child process.
-     * Calls the stored callback for each complete line encountered.
+     * Handles JSON log messages and emits regular lines to activity.
      * @param data Raw output data from child
      */
     void operator()(std::string_view data) override;

@@ -2,9 +2,9 @@
 
 namespace nix {
 
-BuildLog::BuildLog(size_t maxTailLines, LineCallback onLine)
+BuildLog::BuildLog(size_t maxTailLines, std::unique_ptr<Activity> act)
     : maxTailLines(maxTailLines)
-    , onLine(std::move(onLine))
+    , act(std::move(act))
 {
 }
 
@@ -33,8 +33,9 @@ void BuildLog::flushLine()
     // Truncate to actual content (currentLogLinePos may be less than size due to \r)
     currentLogLine.resize(currentLogLinePos);
 
-    if (!onLine(currentLogLine)) {
-        // Line was not handled as JSON, add to tail
+    if (!handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false)) {
+        // Line was not handled as JSON, emit and add to tail
+        act->result(resBuildLogLine, currentLogLine);
         logTail.push_back(currentLogLine);
         if (logTail.size() > maxTailLines)
             logTail.pop_front();

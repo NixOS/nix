@@ -70,17 +70,13 @@ private:
     std::shared_ptr<BufferedSink> logFileSink, logSink;
 
     /**
-     * Build log line processor (pure, no I/O).
+     * Build log line processor. Also owns the build Activity.
      */
     std::unique_ptr<BuildLog> buildLog;
 
     BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
-
-    std::unique_ptr<Activity> act;
-
-    std::map<ActivityId, Activity> builderActivities;
 
     std::string key() override;
 
@@ -107,13 +103,6 @@ private:
      * Close the log file.
      */
     void closeLogFile();
-
-    /**
-     * Callback for BuildLog line processing.
-     * Handles JSON log messages and emits to activity.
-     * @return true if line was handled as JSON
-     */
-    bool handleLogLine(std::string_view line);
 
     Done doneFailureLogTooLong();
 

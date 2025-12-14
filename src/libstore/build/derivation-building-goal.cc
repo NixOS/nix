@@ -248,19 +248,21 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
         if (hook)
             msg += fmt(" on '%s'", hook->machineName);
 #endif
-        act = std::make_unique<Activity>(
-            *logger,
-            lvlInfo,
-            actBuild,
-            msg,
-            Logger::Fields{
-                worker.store.printStorePath(drvPath),
+        buildLog = std::make_unique<BuildLog>(
+            settings.logLines,
+            std::make_unique<Activity>(
+                *logger,
+                lvlInfo,
+                actBuild,
+                msg,
+                Logger::Fields{
+                    worker.store.printStorePath(drvPath),
 #ifndef _WIN32 // TODO enable build hook on Windows
-                hook ? hook->machineName :
+                    hook ? hook->machineName :
 #endif
-                     "",
-                1,
-                1});
+                         "",
+                    1,
+                    1}));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -603,8 +605,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             {
                 DerivationBuildingGoal & goal;
 
-                DerivationBuildingGoalCallbacks(
-                    DerivationBuildingGoal & goal, std::unique_ptr<DerivationBuilder> & builder)
+                DerivationBuildingGoalCallbacks(DerivationBuildingGoal & goal)
                     : goal{goal}
                 {
                 }
@@ -673,15 +674,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
-            builder = externalBuilder ? makeExternalDerivationBuilder(
-                                            *localStoreP,
-                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
-                                            std::move(params),
-                                            *externalBuilder)
-                                      : makeDerivationBuilder(
-                                            *localStoreP,
-                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
-                                            std::move(params));
+            builder =
+                externalBuilder
+                    ? makeExternalDerivationBuilder(
+                          *localStoreP,
+                          std::make_unique<DerivationBuildingGoalCallbacks>(*this),
+                          std::move(params),
+                          *externalBuilder)
+                    : makeDerivationBuilder(
+                          *localStoreP, std::make_unique<DerivationBuildingGoalCallbacks>(*this), std::move(params));
         }
 
         if (auto builderOutOpt = builder->startBuild()) {
@@ -1007,9 +1008,6 @@ HookReply DerivationBuildingGoal::tryBuildHook(
 
 Path DerivationBuildingGoal::openLogFile()
 {
-    buildLog = std::make_unique<BuildLog>(
-        settings.logLines, [this](std::string_view line) { return handleLogLine(line); });
-
     if (!settings.keepLog)
         return "";
 
@@ -1056,17 +1054,6 @@ void DerivationBuildingGoal::closeLogFile()
         logFileSink->flush();
     logSink = logFileSink = 0;
     fdLogFile.close();
-}
-
-bool DerivationBuildingGoal::handleLogLine(std::string_view line)
-{
-    std::string lineStr{line};
-    if (handleJSONLogMessage(lineStr, *act, builderActivities, "the derivation builder", false)) {
-        return true;
-    }
-
-    act->result(resBuildLogLine, lineStr);
-    return false;
 }
 
 Goal::Done DerivationBuildingGoal::doneFailureLogTooLong()
