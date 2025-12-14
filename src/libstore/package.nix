@@ -16,6 +16,7 @@
   sqlite,
 
   busybox-sandbox-shell ? null,
+  pkgsStatic,
 
   # Configuration Options
 
@@ -80,6 +81,9 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isFreeBSD [
+    (lib.mesonOption "sandbox-shell" "${pkgsStatic.bash}/bin/bash")
   ];
 
   meta = {
