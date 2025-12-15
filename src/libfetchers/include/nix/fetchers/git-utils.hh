@@ -32,8 +32,14 @@ struct GitRepo
 {
     virtual ~GitRepo() {}
 
-    static ref<GitRepo>
-    openRepo(const std::filesystem::path & path, bool create = false, bool bare = false, bool packfilesOnly = false);
+    struct Options
+    {
+        bool create = false;
+        bool bare = false;
+        bool packfilesOnly = false;
+    };
+
+    static ref<GitRepo> openRepo(const std::filesystem::path & path, Options options);
 
     virtual uint64_t getRevCount(const Hash & rev) = 0;
 

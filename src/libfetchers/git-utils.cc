@@ -234,7 +234,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     /** Location of the repository on disk. */
     std::filesystem::path path;
 
-    bool bare;
+    Options options;
 
     /**
      * libgit2 repository. Note that new objects are not written to disk,
@@ -255,18 +255,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     git_odb_backend * packBackend = nullptr;
 
-    GitRepoImpl(std::filesystem::path _path, bool create, bool bare, bool packfilesOnly = false)
+    GitRepoImpl(std::filesystem::path _path, Options _options)
         : path(std::move(_path))
-        , bare(bare)
+        , options(_options)
     {
         initLibGit2();
 
-        initRepoAtomically(path, bare);
+        initRepoAtomically(path, options.bare);
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
         ObjectDb odb;
-        if (packfilesOnly) {
+        if (options.packfilesOnly) {
             /* Create a fresh object database because by default the repo also
                loose object backends. We are not using any of those for the
                tarball cache, but libgit2 still does a bunch of unnecessary
@@ -295,7 +295,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_odb_add_backend(odb.get(), mempackBackend, 999))
             throw Error("adding mempack backend to Git object database: %s", git_error_last()->message);
 
-        if (packfilesOnly) {
+        if (options.packfilesOnly) {
             if (git_repository_set_odb(repo.get(), odb.get()))
                 throw Error("setting Git object database: %s", git_error_last()->message);
         }
@@ -366,7 +366,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         // TODO: as an optimization, it would be nice to include `this` in the pool.
         return Pool<GitRepoImpl>(std::numeric_limits<size_t>::max(), [this]() -> ref<GitRepoImpl> {
-            return make_ref<GitRepoImpl>(path, false, bare);
+            return make_ref<GitRepoImpl>(path, options);
         });
     }
 
@@ -712,9 +712,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 };
 
-ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, bool create, bool bare, bool packfilesOnly)
+ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Options options)
 {
-    return make_ref<GitRepoImpl>(path, create, bare, packfilesOnly);
+    return make_ref<GitRepoImpl>(path, options);
 }
 
 /**
@@ -1428,7 +1428,7 @@ namespace fetchers {
 ref<GitRepo> Settings::getTarballCache() const
 {
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache";
-    return GitRepo::openRepo(repoDir, /*create=*/true, /*bare=*/true, /*packfilesOnly=*/true);
+    return GitRepo::openRepo(repoDir, {.create = true, .bare = true, .packfilesOnly = true});
 }
 
 } // namespace fetchers
@@ -1442,7 +1442,7 @@ GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path &
         if (i != cache->end())
             return i->second;
     }
-    auto workdirInfo = GitRepo::openRepo(path)->getWorkdirInfo();
+    auto workdirInfo = GitRepo::openRepo(path, {})->getWorkdirInfo();
     _cache.lock()->emplace(path, workdirInfo);
     return workdirInfo;
 }

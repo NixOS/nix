@@ -48,7 +48,7 @@ public:
 
     ref<GitRepo> openRepo()
     {
-        return GitRepo::openRepo(tmpDir, true, false);
+        return GitRepo::openRepo(tmpDir, {.create = true});
     }
 
     std::string getRepoName() const
