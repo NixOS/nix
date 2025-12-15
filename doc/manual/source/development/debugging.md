@@ -6,14 +6,7 @@ Additionally, see [Testing Nix](./testing.md) for further instructions on how to
 
 ## Building Nix with Debug Symbols
 
-In the development shell, set the `mesonBuildType` environment variable to `debug` before configuring the build:
-
-```console
-[nix-shell]$ export mesonBuildType=debugoptimized
-```
-
-Then, proceed to build Nix as described in [Building Nix](./building.md).
-This will build Nix with debug symbols, which are essential for effective debugging.
+In the development shell, `mesonBuildType` is set automatically to `debugoptimized`. This builds Nix with debug symbols, which are essential for effective debugging.
 
 It is also possible to build without optimization for faster build:
 
