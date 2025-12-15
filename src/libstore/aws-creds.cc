@@ -79,6 +79,8 @@ class AwsCredentialProviderImpl : public AwsCredentialProvider
 public:
     AwsCredentialProviderImpl()
     {
+        ::FILE * fp = ::stderr;
+
         // Map Nix's verbosity to AWS CRT log level
         Aws::Crt::LogLevel logLevel;
         if (verbosity >= lvlVomit) {
@@ -88,9 +90,14 @@ public:
         } else if (verbosity >= lvlChatty) {
             logLevel = Aws::Crt::LogLevel::Info;
         } else {
-            logLevel = Aws::Crt::LogLevel::Warn;
+            /* By default the sdk is very chatty and barf unwanted messages if e.g.
+               .aws/config doesn't exist and such. Shut it since it would spam messages
+               if you only set up creds via the environment. */
+            logLevel = Aws::Crt::LogLevel::None;
+            fp = nullptr;
         }
-        apiHandle.InitializeLogging(logLevel, stderr);
+
+        apiHandle.InitializeLogging(logLevel, fp);
     }
 
     AwsCredentials getCredentialsRaw(const std::string & profile);
