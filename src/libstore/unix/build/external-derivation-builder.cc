@@ -15,7 +15,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
-    Path tmpDirInSandbox() override
+    std::filesystem::path tmpDirInSandbox() override
     {
         /* In a sandbox, for determinism, always use the same temporary
            directory. */
@@ -24,7 +24,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     void setBuildTmpDir() override
     {
-        tmpDir = topTmpDir + "/build";
+        tmpDir = topTmpDir / "build";
         createDir(tmpDir, 0700);
     }
 
@@ -49,9 +49,9 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 j.emplace(name, rewriteStrings(value, inputRewrites));
             json.emplace("env", std::move(j));
         }
-        json.emplace("topTmpDir", topTmpDir);
-        json.emplace("tmpDir", tmpDir);
-        json.emplace("tmpDirInSandbox", tmpDirInSandbox());
+        json.emplace("topTmpDir", topTmpDir.native());
+        json.emplace("tmpDir", tmpDir.native());
+        json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
         json.emplace("storeDir", store.storeDir);
         json.emplace("realStoreDir", store.config->realStoreDir.get());
         json.emplace("system", drv.platform);
@@ -88,7 +88,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 args.insert(args.end(), jsonFile);
 
                 if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into '%1%'", tmpDir);
+                    throw SysError("changing into %1%", tmpDir);
 
                 chownToBuilder(topTmpDir);
 
@@ -97,7 +97,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
 
-                throw SysError("executing '%s'", externalBuilder.program);
+                throw SysError("executing %s", externalBuilder.program);
             } catch (...) {
                 handleChildException(true);
                 _exit(1);
