@@ -637,11 +637,6 @@ struct GitInputScheme : InputScheme
                     url);
             }
 
-            // If we don't check here for the path existence, then we can give libgit2 any directory
-            // and it will initialize them as git directories.
-            if (!pathExists(path)) {
-                throw Error("The path '%s' does not exist.", path);
-            }
             repoInfo.location = std::filesystem::absolute(path);
         } else {
             if (url.scheme == "file")
@@ -703,7 +698,7 @@ struct GitInputScheme : InputScheme
         if (auto res = cache->lookup(key))
             return getIntAttr(*res, "lastModified");
 
-        auto lastModified = GitRepo::openRepo(repoDir)->getLastModified(rev);
+        auto lastModified = GitRepo::openRepo(repoDir, {})->getLastModified(rev);
 
         cache->upsert(key, {{"lastModified", lastModified}});
 
@@ -726,7 +721,7 @@ struct GitInputScheme : InputScheme
         Activity act(
             *logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
 
-        auto revCount = GitRepo::openRepo(repoDir)->getRevCount(rev);
+        auto revCount = GitRepo::openRepo(repoDir, {})->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
@@ -737,7 +732,7 @@ struct GitInputScheme : InputScheme
     {
         auto head = std::visit(
             overloaded{
-                [&](const std::filesystem::path & path) { return GitRepo::openRepo(path)->getWorkdirRef(); },
+                [&](const std::filesystem::path & path) { return GitRepo::openRepo(path, {})->getWorkdirRef(); },
                 [&](const ParsedURL & url) { return readHeadCached(url.to_string(), shallow); }},
             repoInfo.location);
         if (!head) {
@@ -795,7 +790,7 @@ struct GitInputScheme : InputScheme
         if (auto repoPath = repoInfo.getPath()) {
             repoDir = *repoPath;
             if (!input.getRev())
-                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir)->resolveRef(ref).gitRev());
+                input.attrs.insert_or_assign("rev", GitRepo::openRepo(repoDir, {})->resolveRef(ref).gitRev());
         } else {
             auto repoUrl = std::get<ParsedURL>(repoInfo.location);
             std::filesystem::path cacheDir = getCachePath(repoUrl.to_string(), shallow);
@@ -805,7 +800,7 @@ struct GitInputScheme : InputScheme
             std::filesystem::create_directories(cacheDir.parent_path());
             PathLocks cacheDirLock({cacheDir.string()});
 
-            auto repo = GitRepo::openRepo(cacheDir, true, true);
+            auto repo = GitRepo::openRepo(cacheDir, {.create = true, .bare = true});
 
             // We need to set the origin so resolving submodule URLs works
             repo->setRemote("origin", repoUrl.to_string());
@@ -876,7 +871,7 @@ struct GitInputScheme : InputScheme
             // the remainder
         }
 
-        auto repo = GitRepo::openRepo(repoDir);
+        auto repo = GitRepo::openRepo(repoDir, {});
 
         auto isShallow = repo->isShallow();
 
@@ -963,7 +958,7 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
-        auto repo = GitRepo::openRepo(repoPath, false, false);
+        auto repo = GitRepo::openRepo(repoPath, {});
 
         auto exportIgnore = getExportIgnoreAttr(input);
 
@@ -1003,7 +998,7 @@ struct GitInputScheme : InputScheme
         }
 
         if (!repoInfo.workdirInfo.isDirty) {
-            auto repo = GitRepo::openRepo(repoPath);
+            auto repo = GitRepo::openRepo(repoPath, {});
 
             if (auto ref = repo->getWorkdirRef())
                 input.attrs.insert_or_assign("ref", *ref);
