@@ -637,12 +637,6 @@ struct GitInputScheme : InputScheme
                     url);
             }
 
-            // If we don't check here for the path existence, then we can give libgit2 any directory
-            // and it will initialize them as git directories.
-            // FIXME
-            if (!pathExists(path)) {
-                throw Error("The path '%s' does not exist.", path);
-            }
             repoInfo.location = std::filesystem::absolute(path);
         } else {
             if (url.scheme == "file")

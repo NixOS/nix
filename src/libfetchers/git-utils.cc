@@ -203,16 +203,19 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 } // extern "C"
 
-static void initRepoAtomically(std::filesystem::path & path, bool bare)
+static void initRepoAtomically(std::filesystem::path & path, GitRepo::Options options)
 {
     if (pathExists(path.string()))
         return;
+
+    if (!options.create)
+        throw Error("Git repository %s does not exist.", path);
 
     std::filesystem::path tmpDir = createTempDir(path.parent_path());
     AutoDelete delTmpDir(tmpDir, true);
     Repository tmpRepo;
 
-    if (git_repository_init(Setter(tmpRepo), tmpDir.string().c_str(), bare))
+    if (git_repository_init(Setter(tmpRepo), tmpDir.string().c_str(), options.bare))
         throw Error("creating Git repository %s: %s", path, git_error_last()->message);
     try {
         std::filesystem::rename(tmpDir, path);
@@ -261,7 +264,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        initRepoAtomically(path, options.bare);
+        initRepoAtomically(path, options);
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
 
