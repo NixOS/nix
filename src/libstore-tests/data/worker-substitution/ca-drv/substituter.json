@@ -1,0 +1,39 @@
+{
+  "buildTrace": {
+    "gnRuK+wfbXqRPzgO5MyiBebXrV10Kzv+tkZCEuPm7pY=": {
+      "out": {
+        "dependentRealisations": {},
+        "outPath": "hrva7l0gsk67wffmks761mv4ks4vzsx7-test-ca-drv-out",
+        "signatures": []
+      }
+    }
+  },
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {
+    "hrva7l0gsk67wffmks761mv4ks4vzsx7-test-ca-drv-out": {
+      "contents": {
+        "contents": "I am the output of a CA derivation",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-l0+gmYB0AK65UWuoSh7AbVRI4rAc5/VGqzBGTHgMsiU=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-l0+gmYB0AK65UWuoSh7AbVRI4rAc5/VGqzBGTHgMsiU=",
+        "narSize": 152,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    }
+  },
+  "derivations": {}
+}

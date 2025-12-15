@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/store/build/worker.hh"
+#include "nix/store/derivations.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/memory-source-accessor.hh"
@@ -97,7 +98,7 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     ASSERT_TRUE(dummyStore->isValidPath(pathInSubstituter));
 
     // Verify the goal succeeded
-    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
 }
 
 TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
@@ -170,7 +171,106 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
     ASSERT_TRUE(dummyStore->isValidPath(mainPath));
 
     // Verify the goal succeeded
-    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+}
+
+TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
+{
+    // Enable CA derivations experimental feature
+    experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+
+    // Create a CA floating output derivation
+    Derivation drv;
+    drv.name = "test-ca-drv";
+    drv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::CAFloating{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        },
+    };
+
+    // Write the derivation to the destination store
+    auto drvPath = writeDerivation(*dummyStore, drv);
+
+    // Snapshot the destination store before
+    checkpointJson("ca-drv/store-before", dummyStore);
+
+    // Compute the hash modulo of the derivation
+    // For CA floating derivations, the kind is Deferred since outputs aren't known until build
+    auto hashModulo = hashDerivationModulo(*dummyStore, drv, true);
+    ASSERT_EQ(hashModulo.kind, DrvHash::Kind::Deferred);
+    auto drvHash = hashModulo.hashes.at("out");
+
+    // Create the output store object
+    auto outputPath = substituter->addToStore(
+        "test-ca-drv-out",
+        SourcePath{
+            [] {
+                auto sc = make_ref<MemorySourceAccessor>();
+                sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+                    .executable = false,
+                    .contents = "I am the output of a CA derivation",
+                }};
+                return sc;
+            }(),
+        },
+        ContentAddressMethod::Raw::NixArchive,
+        HashAlgorithm::SHA256);
+
+    // Add the realisation (build trace) to the substituter
+    substituter->buildTrace.insert_or_assign(
+        drvHash,
+        std::map<std::string, UnkeyedRealisation>{
+            {
+                "out",
+                UnkeyedRealisation{
+                    .outPath = outputPath,
+                },
+            },
+        });
+
+    // Snapshot the substituter
+    checkpointJson("ca-drv/substituter", substituter);
+
+    // The realisation should not exist in the destination store yet
+    DrvOutput drvOutput{drvHash, "out"};
+    ASSERT_FALSE(dummyStore->queryRealisation(drvOutput));
+
+    // Create a worker with our custom substituter
+    Worker worker{*dummyStore, *dummyStore};
+
+    // Override the substituters to use our dummy store substituter
+    ref<Store> substituterAsStore = substituter;
+    worker.getSubstituters = [substituterAsStore]() -> std::list<ref<Store>> { return {substituterAsStore}; };
+
+    // Create a derivation goal for the CA derivation output
+    // The worker should substitute the output rather than building
+    auto goal = worker.makeDerivationGoal(drvPath, drv, "out", bmNormal, true);
+
+    // Run the worker
+    Goals goals;
+    goals.insert(upcast_goal(goal));
+    worker.run(goals);
+
+    // Snapshot the destination store after
+    checkpointJson("ca-drv/store-after", dummyStore);
+
+    // The output path should now exist in the destination store
+    ASSERT_TRUE(dummyStore->isValidPath(outputPath));
+
+    // The realisation should now exist in the destination store
+    auto realisation = dummyStore->queryRealisation(drvOutput);
+    ASSERT_TRUE(realisation);
+    ASSERT_EQ(realisation->outPath, outputPath);
+
+    // Verify the goal succeeded
+    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+
+    // Disable CA derivations experimental feature
+    experimentalFeatureSettings.set("extra-experimental-features", "");
 }
 
 } // namespace nix
