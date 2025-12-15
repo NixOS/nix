@@ -151,11 +151,6 @@ static void fetchTree(
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
-        // fetchTree should fetch git repos with shallow = true by default
-        if (type == "git" && !params.isFetchGit && !attrs.contains("shallow")) {
-            attrs.emplace("shallow", Explicit<bool>{true});
-        }
-
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>("argument 'name' isn’t supported in call to '%s'", fetcher)
@@ -367,10 +362,13 @@ void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Val
 }
 
 static RegisterPrimOp primop_fetchFinalTree({
-    .name = "fetchFinalTree",
+    .name = "__fetchFinalTree",
     .args = {"input"},
+    .doc = R"(
+      Like `fetchTree`, but does not return any additional fetcher attributes (like `revCount`).
+      This allows inputs to be substituted if `narHash` is specified.
+    )",
     .fun = prim_fetchFinalTree,
-    .internal = true,
 });
 
 static void fetch(
