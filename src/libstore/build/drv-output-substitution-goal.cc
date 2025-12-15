@@ -66,7 +66,16 @@ Goal::Co DrvOutputSubstitutionGoal::init()
             true,
             false);
 
-        co_await Suspend{};
+        while (true) {
+            auto event = co_await WaitForChildEvent{};
+            if (std::get_if<ChildOutput>(&event)) {
+                // Doesn't process child output
+            } else if (std::get_if<ChildEOF>(&event)) {
+                break;
+            } else if (std::get_if<TimedOut>(&event)) {
+                unreachable();
+            }
+        }
 
         worker.childTerminated(this);
 
@@ -147,11 +156,6 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 std::string DrvOutputSubstitutionGoal::key()
 {
     return "a$" + std::string(id.to_string());
-}
-
-void DrvOutputSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
 }
 
 } // namespace nix

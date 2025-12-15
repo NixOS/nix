@@ -100,8 +100,6 @@ private:
 
     std::map<ActivityId, Activity> builderActivities;
 
-    void timedOut(Error && ex) override;
-
     std::string key() override;
 
     /**
@@ -129,10 +127,10 @@ private:
     bool isReadDesc(Descriptor fd);
 
     /**
-     * Callback used by the worker to write to the log.
+     * Process output from a child process.
      */
-    void handleChildOutput(Descriptor fd, std::string_view data) override;
-    void handleEOF(Descriptor fd) override;
+    Co processChildOutput(Descriptor fd, std::string_view data);
+
     void flushLine();
 
     /**

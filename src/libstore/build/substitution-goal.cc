@@ -258,7 +258,16 @@ Goal::Co PathSubstitutionGoal::tryToRun(
         true,
         false);
 
-    co_await Suspend{};
+    while (true) {
+        auto event = co_await WaitForChildEvent{};
+        if (std::get_if<ChildOutput>(&event)) {
+            // Substitution doesn't process child output
+        } else if (std::get_if<ChildEOF>(&event)) {
+            break;
+        } else if (std::get_if<TimedOut>(&event)) {
+            unreachable(); // Substitution doesn't use timeouts
+        }
+    }
 
     trace("substitute finished");
 
@@ -308,11 +317,6 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     worker.updateProgress();
 
     co_return doneSuccess(BuildResult::Success::Substituted);
-}
-
-void PathSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
 }
 
 void PathSubstitutionGoal::cleanup()
