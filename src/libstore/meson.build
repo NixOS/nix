@@ -39,28 +39,32 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 
-run_command(
-  'ln',
-  '-s',
-  meson.project_build_root() / '__nothing_link_target',
-  meson.project_build_root() / '__nothing_symlink',
-  # native doesn't allow dangling symlinks, which the tests require
-  env : {'MSYS' : 'winsymlinks:lnk'},
-  check : true,
-)
-can_link_symlink = run_command(
-  'ln',
-  meson.project_build_root() / '__nothing_symlink',
-  meson.project_build_root() / '__nothing_hardlink',
-  check : false,
-).returncode() == 0
-run_command(
-  'rm',
-  '-f',
-  meson.project_build_root() / '__nothing_symlink',
-  meson.project_build_root() / '__nothing_hardlink',
-  check : true,
-)
+can_link_symlink = false
+native_ln = find_program('ln', required : false, native : true)
+if native_ln.found()
+  run_command(
+    native_ln,
+    '-s',
+    meson.project_build_root() / '__nothing_link_target',
+    meson.project_build_root() / '__nothing_symlink',
+    # native doesn't allow dangling symlinks, which the tests require
+    env : {'MSYS' : 'winsymlinks:lnk'},
+    check : true,
+  )
+  can_link_symlink = run_command(
+    native_ln,
+    meson.project_build_root() / '__nothing_symlink',
+    meson.project_build_root() / '__nothing_hardlink',
+    check : false,
+  ).returncode() == 0
+  run_command(
+    'rm',
+    '-f',
+    meson.project_build_root() / '__nothing_symlink',
+    meson.project_build_root() / '__nothing_hardlink',
+    check : true,
+  )
+endif
 summary('can hardlink to symlink', can_link_symlink, bool_yn : true)
 configdata_priv.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 
