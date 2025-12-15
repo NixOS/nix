@@ -1353,6 +1353,8 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
             .msg = HintFmt(std::string(msgStr)),
             .pos = state.positions[pos],
             .isFromExpr = true,
+            // Do not indent relative to the "evaluation warning: " prefix if the message starts with a newline.
+            .noIndent = msgStr.starts_with("\n"),
         };
         logWarning(info);
     }
