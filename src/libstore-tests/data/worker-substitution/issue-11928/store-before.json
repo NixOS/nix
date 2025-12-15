@@ -1,0 +1,52 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {},
+  "derivations": {
+    "11yvkl84ashq63ilwc2mi4va41z2disw-root-drv.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {
+          "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+            "dynamicOutputs": {},
+            "outputs": [
+              "out"
+            ]
+          }
+        },
+        "srcs": []
+      },
+      "name": "root-drv",
+      "outputs": {
+        "out": {
+          "hashAlgo": "sha256",
+          "method": "nar"
+        }
+      },
+      "system": "",
+      "version": 4
+    },
+    "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {},
+        "srcs": []
+      },
+      "name": "dep-drv",
+      "outputs": {
+        "out": {
+          "hashAlgo": "sha256",
+          "method": "nar"
+        }
+      },
+      "system": "",
+      "version": 4
+    }
+  }
+}

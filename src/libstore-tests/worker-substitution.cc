@@ -273,4 +273,177 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     experimentalFeatureSettings.set("extra-experimental-features", "");
 }
 
+/**
+ * Test for issue #11928: substituting a CA derivation output should not
+ * require fetching the output of an input derivation when that output
+ * is not referenced.
+ */
+TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
+{
+    // Enable CA derivations experimental feature
+    experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+
+    // Create the dependency CA floating derivation
+    Derivation depDrv;
+    depDrv.name = "dep-drv";
+    depDrv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::CAFloating{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        },
+    };
+
+    // Write the dependency derivation to the destination store
+    auto depDrvPath = writeDerivation(*dummyStore, depDrv);
+
+    // Compute the hash modulo for the dependency derivation
+    auto depHashModulo = hashDerivationModulo(*dummyStore, depDrv, true);
+    ASSERT_EQ(depHashModulo.kind, DrvHash::Kind::Deferred);
+    auto depDrvHash = depHashModulo.hashes.at("out");
+
+    // Create the output store object for the dependency in the substituter
+    auto depOutputPath = substituter->addToStore(
+        "dep-drv-out",
+        SourcePath{
+            [] {
+                auto sc = make_ref<MemorySourceAccessor>();
+                sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+                    .executable = false,
+                    .contents = "I am the dependency output",
+                }};
+                return sc;
+            }(),
+        },
+        ContentAddressMethod::Raw::NixArchive,
+        HashAlgorithm::SHA256);
+
+    // Add the realisation for the dependency to the substituter
+    substituter->buildTrace.insert_or_assign(
+        depDrvHash,
+        std::map<std::string, UnkeyedRealisation>{
+            {
+                "out",
+                UnkeyedRealisation{
+                    .outPath = depOutputPath,
+                },
+            },
+        });
+
+    // Create the root CA floating derivation that depends on depDrv
+    Derivation rootDrv;
+    rootDrv.name = "root-drv";
+    rootDrv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::CAFloating{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        },
+    };
+    // Add the dependency derivation as an input
+    rootDrv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+
+    // Write the root derivation to the destination store
+    auto rootDrvPath = writeDerivation(*dummyStore, rootDrv);
+
+    // Snapshot the destination store before
+    checkpointJson("issue-11928/store-before", dummyStore);
+
+    // Compute the hash modulo for the root derivation
+    auto rootHashModulo = hashDerivationModulo(*dummyStore, rootDrv, true);
+    ASSERT_EQ(rootHashModulo.kind, DrvHash::Kind::Deferred);
+    auto rootDrvHash = rootHashModulo.hashes.at("out");
+
+    // Create the output store object for the root derivation
+    // Note: it does NOT reference the dependency's output
+    auto rootOutputPath = substituter->addToStore(
+        "root-drv-out",
+        SourcePath{
+            [] {
+                auto sc = make_ref<MemorySourceAccessor>();
+                sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+                    .executable = false,
+                    .contents =
+                        "I am the root output. "
+                        "I don't reference anything because the other derivation's output is just needed at build time.",
+                }};
+                return sc;
+            }(),
+        },
+        ContentAddressMethod::Raw::NixArchive,
+        HashAlgorithm::SHA256);
+
+    // The DrvOutputs for both derivations
+    DrvOutput depDrvOutput{depDrvHash, "out"};
+    DrvOutput rootDrvOutput{rootDrvHash, "out"};
+
+    // Add the realisation for the root derivation to the substituter
+    // Include the dependency realisation in dependentRealisations
+    substituter->buildTrace.insert_or_assign(
+        rootDrvHash,
+        std::map<std::string, UnkeyedRealisation>{
+            {
+                "out",
+                UnkeyedRealisation{
+                    .outPath = rootOutputPath,
+                    .dependentRealisations = {{depDrvOutput, depOutputPath}},
+                },
+            },
+        });
+
+    // Snapshot the substituter
+    // Note: it has realisations for both drvs, but only the root's output store object
+    checkpointJson("issue-11928/substituter", substituter);
+
+    // The realisations should not exist in the destination store yet
+    ASSERT_FALSE(dummyStore->queryRealisation(depDrvOutput));
+    ASSERT_FALSE(dummyStore->queryRealisation(rootDrvOutput));
+
+    // Create a worker with our custom substituter
+    Worker worker{*dummyStore, *dummyStore};
+
+    // Override the substituters to use our dummy store substituter
+    ref<Store> substituterAsStore = substituter;
+    worker.getSubstituters = [substituterAsStore]() -> std::list<ref<Store>> { return {substituterAsStore}; };
+
+    // Create a derivation goal for the root derivation output
+    // The worker should substitute the output rather than building
+    auto goal = worker.makeDerivationGoal(rootDrvPath, rootDrv, "out", bmNormal, false);
+
+    // Run the worker
+    Goals goals;
+    goals.insert(upcast_goal(goal));
+    worker.run(goals);
+
+    // Snapshot the destination store after
+    checkpointJson("issue-11928/store-after", dummyStore);
+
+    // The root output path should now exist in the destination store
+    ASSERT_TRUE(dummyStore->isValidPath(rootOutputPath));
+
+    // The root realisation should now exist in the destination store
+    auto rootRealisation = dummyStore->queryRealisation(rootDrvOutput);
+    ASSERT_TRUE(rootRealisation);
+    ASSERT_EQ(rootRealisation->outPath, rootOutputPath);
+
+    // The dependency's REALISATION should have been fetched
+    auto depRealisation = dummyStore->queryRealisation(depDrvOutput);
+    ASSERT_TRUE(depRealisation);
+    ASSERT_EQ(depRealisation->outPath, depOutputPath);
+
+    // TODO #11928: The dependency's OUTPUT should NOT be fetched (not referenced
+    // by root output). Once #11928 is fixed, change ASSERT_TRUE to ASSERT_FALSE.
+    ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
+
+    // Verify the goal succeeded
+    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+
+    // Disable CA derivations experimental feature
+    experimentalFeatureSettings.set("extra-experimental-features", "");
+}
+
 } // namespace nix
