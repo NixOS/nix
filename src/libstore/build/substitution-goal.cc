@@ -1,5 +1,4 @@
 #include "nix/store/build/worker.hh"
-#include "nix/store/store-open.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
@@ -60,7 +59,7 @@ Goal::Co PathSubstitutionGoal::init()
         throw Error(
             "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
-    auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
+    auto subs = worker.getSubstituters();
 
     bool substituterFailed = false;
     std::optional<Error> lastStoresException = std::nullopt;

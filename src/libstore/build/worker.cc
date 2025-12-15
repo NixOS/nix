@@ -1,5 +1,6 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/machines.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
@@ -21,6 +22,7 @@ Worker::Worker(Store & store, Store & evalStore)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
     , evalStore(evalStore)
+    , getSubstituters{[] { return settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{}; }}
 {
     nrLocalBuilds = 0;
     nrSubstitutions = 0;

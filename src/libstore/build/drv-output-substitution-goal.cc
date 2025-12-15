@@ -3,8 +3,6 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/util/callback.hh"
-#include "nix/store/store-open.hh"
-#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -25,7 +23,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         co_return amDone(ecSuccess);
     }
 
-    auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
+    auto subs = worker.getSubstituters();
 
     bool substituterFailed = false;
 
