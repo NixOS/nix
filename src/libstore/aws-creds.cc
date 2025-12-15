@@ -61,7 +61,9 @@ static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createSSOProvider(
 
     options.bootstrap = bootstrap->GetUnderlyingHandle();
     options.tls_ctx = tlsContext ? tlsContext->GetUnderlyingHandle() : nullptr;
-    options.profile_name_override = aws_byte_cursor_from_c_str(profileName.c_str());
+    if (!profileName.empty()) {
+        options.profile_name_override = aws_byte_cursor_from_c_str(profileName.c_str());
+    }
 
     // Create the SSO provider - will return nullptr if SSO isn't configured for this profile
     // createWrappedProvider handles nullptr gracefully
