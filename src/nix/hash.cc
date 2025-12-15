@@ -85,9 +85,7 @@ struct CmdHashBase : Command
                     return std::make_unique<HashSink>(hashAlgo);
             };
 
-            auto makeSourcePath = [&]() -> SourcePath {
-                return PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
-            };
+            auto makeSourcePath = [&]() -> SourcePath { return makeFSSourceAccessor(makeParentCanonical(path)); };
 
             Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
             switch (mode) {

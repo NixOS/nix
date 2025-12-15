@@ -43,36 +43,6 @@ public:
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
 
-    /**
-     * Create a `PosixSourceAccessor` and `SourcePath` corresponding to
-     * some native path.
-     *
-     * @param Whether the accessor should return a non-null getLastModified.
-     * When true the accessor must be used only by a single thread.
-     *
-     * The `PosixSourceAccessor` is rooted as far up the tree as
-     * possible, (e.g. on Windows it could scoped to a drive like
-     * `C:\`). This allows more `..` parent accessing to work.
-     *
-     * @note When `path` is trusted user input, canonicalize it using
-     * `std::filesystem::canonical`, `makeParentCanonical`, `std::filesystem::weakly_canonical`, etc,
-     * as appropriate for the use case. At least weak canonicalization is
-     * required for the `SourcePath` to do anything useful at the location it
-     * points to.
-     *
-     * @note A canonicalizing behavior is not built in `createAtRoot` so that
-     * callers do not accidentally introduce symlink-related security vulnerabilities.
-     * Furthermore, `createAtRoot` does not know whether the file pointed to by
-     * `path` should be resolved if it is itself a symlink. In other words,
-     * `createAtRoot` can not decide between aforementioned `canonical`, `makeParentCanonical`, etc. for its callers.
-     *
-     * See
-     * [`std::filesystem::path::root_path`](https://en.cppreference.com/w/cpp/filesystem/path/root_path)
-     * and
-     * [`std::filesystem::path::relative_path`](https://en.cppreference.com/w/cpp/filesystem/path/relative_path).
-     */
-    static SourcePath createAtRoot(const std::filesystem::path & path, bool trackLastModified = false);
-
     std::optional<std::time_t> getLastModified() override
     {
         return trackLastModified ? std::optional{mtime} : std::nullopt;

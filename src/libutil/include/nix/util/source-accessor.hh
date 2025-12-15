@@ -233,7 +233,7 @@ ref<SourceAccessor> getFSSourceAccessor();
  * elements, and that absolute symlinks are resolved relative to
  * `root`.
  */
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

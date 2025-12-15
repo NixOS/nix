@@ -191,7 +191,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
         throw UsageError("unknown flag");
 
     for (auto & i : opArgs) {
-        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(i));
+        SourcePath sourcePath = makeFSSourceAccessor(makeParentCanonical(i));
         cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), sourcePath)));
     }
 }
@@ -215,7 +215,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (auto & i : opArgs) {
-        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(i));
+        SourcePath sourcePath = makeFSSourceAccessor(makeParentCanonical(i));
         std::cout << fmt(
             "%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), sourcePath, method, hashAlgo).path));
     }
