@@ -50,3 +50,16 @@ expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "
 # Check it works with the expected structured attrs
 hacky=$(nix-instantiate --expr "$hackyExpr")
 nix derivation show "$hacky" | jq --exit-status '.derivations."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'
+
+# Test warning for non-object exportReferencesGraph in structured attrs
+# shellcheck disable=SC2016
+expectStderr 0 nix-build --expr '
+  with import ./config.nix;
+  mkDerivation {
+    name = "export-graph-non-object";
+    __structuredAttrs = true;
+    exportReferencesGraph = [ "foo" "bar" ];
+    builder = "/bin/sh";
+    args = ["-c" "echo foo > ${builtins.placeholder "out"}"];
+  }
+' | grepQuiet "warning:.*exportReferencesGraph.*not a JSON object"
