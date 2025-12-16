@@ -3,6 +3,10 @@
 This section provides some notes on how to start hacking on Nix.
 To get the latest version of Nix from GitHub:
 
+> **Note**
+>
+> When checking out the repo on Windows, make sure you have the git setting `core.symlinks` enabled, before cloning, as there are symlinks in the repo.
+
 ```console
 $ git clone https://github.com/NixOS/nix.git
 $ cd nix
