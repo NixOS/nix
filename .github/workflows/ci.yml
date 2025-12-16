@@ -164,7 +164,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Download installer tarball
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: installer-${{matrix.os}}
         path: out
