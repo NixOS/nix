@@ -369,7 +369,26 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         // TODO: as an optimization, it would be nice to include `this` in the pool.
         return Pool<GitRepoImpl>(std::numeric_limits<size_t>::max(), [this]() -> ref<GitRepoImpl> {
-            return make_ref<GitRepoImpl>(path, options);
+            auto repo = make_ref<GitRepoImpl>(path, options);
+
+            /* Monkey-patching the pack backend to only read the pack directory
+               once. Otherwise it will do a readdir for each added oid when it's
+               not found and that translates to ~6 syscalls. Since we are never
+               writing pack files until flushing we can force the odb backend to
+               read the directory just once. It's very convenient that the vtable is
+               semi-public interface and is up for grabs.
+
+               This is purely an optimization for our use-case with a tarball cache.
+               libgit2 calls refresh() if the backend provides it when an oid isn't found.
+               We are only writing objects to a mempack (it has higher priority) and there isn't
+               a realistic use-case where a previously missing object would appear from thin air
+               on the disk (unless another process happens to be unpacking a similar tarball to
+               the cache at the same time, but that's a very unrealistic scenario).
+            */
+            if (auto * backend = repo->packBackend)
+                backend->refresh = nullptr;
+
+            return repo;
         });
     }
 
@@ -1060,9 +1079,14 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     Pool<GitRepoImpl> repoPool;
 
-    unsigned int concurrency = std::min(std::thread::hardware_concurrency(), 8U);
+    unsigned int concurrency = std::min(std::thread::hardware_concurrency(), 10U);
 
     ThreadPool workers{concurrency};
+
+    /** Total file contents in flight. */
+    std::atomic<size_t> totalBufSize{0};
+
+    static constexpr std::size_t maxBufSize = 16 * 1024 * 1024;
 
     GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
         : repo(repo)
@@ -1070,8 +1094,14 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     {
     }
 
+    ~GitFileSystemObjectSinkImpl()
+    {
+        assert(totalBufSize == 0);
+    }
+
     struct Child;
 
+    /// A directory to be written as a Git tree.
     struct Directory
     {
         std::map<std::string, Child> children;
@@ -1098,6 +1128,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             return i->second;
         }
     };
+
+    size_t nextId = 0; // for Child.id
 
     struct Child
     {
@@ -1137,55 +1169,101 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             cur->children.insert_or_assign(name, std::move(child));
     }
 
-    size_t nextId = 0;
-
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
     {
+        /* Multithreaded blob writing. We read the incoming file data into memory and asynchronously write it to a Git
+           blob object. However, to avoid unbounded memory usage, if the amount of data in flight exceeds a threshold,
+           we switch to writing directly to a Git write stream. */
+
+        using WriteStream = std::unique_ptr<::git_writestream, decltype([](::git_writestream * stream) {
+                                                if (stream)
+                                                    stream->free(stream);
+                                            })>;
+
         struct CRF : CreateRegularFileSink
         {
-            std::string data;
+            CanonPath path;
+            GitFileSystemObjectSinkImpl & parent;
+            WriteStream stream;
+            std::optional<decltype(parent.repoPool)::Handle> repo;
+
+            std::string contents;
             bool executable = false;
+
+            CRF(CanonPath path, GitFileSystemObjectSinkImpl & parent)
+                : path(std::move(path))
+                , parent(parent)
+            {
+            }
+
+            ~CRF()
+            {
+                parent.totalBufSize -= contents.size();
+            }
 
             void operator()(std::string_view data) override
             {
-                this->data += data;
+                if (!stream) {
+                    contents.append(data);
+                    parent.totalBufSize += data.size();
+
+                    if (parent.totalBufSize > parent.maxBufSize) {
+                        repo.emplace(parent.repoPool.get());
+
+                        if (git_blob_create_from_stream(Setter(stream), **repo, nullptr))
+                            throw Error("creating a blob stream object: %s", git_error_last()->message);
+
+                        if (stream->write(stream.get(), contents.data(), contents.size()))
+                            throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+
+                        parent.totalBufSize -= contents.size();
+                        contents.clear();
+                    }
+                } else {
+                    if (stream->write(stream.get(), data.data(), data.size()))
+                        throw Error("writing a blob for tarball member '%s': %s", path, git_error_last()->message);
+                }
             }
 
             void isExecutable() override
             {
                 executable = true;
             }
-        } crf;
+        };
 
-        func(crf);
+        auto crf = std::make_shared<CRF>(path, *this);
 
-        workers.enqueue([this, path, data{std::move(crf.data)}, executable(crf.executable), id(nextId++)]() {
+        func(*crf);
+
+        auto id = nextId++;
+
+        if (crf->stream) {
+            /* Finish the slow path by creating the blob object synchronously.
+               Call .release(), since git_blob_create_from_stream_commit
+               acquires ownership and frees the stream. */
+            git_oid oid;
+            if (git_blob_create_from_stream_commit(&oid, crf->stream.release()))
+                throw Error("creating a blob object for '%s': %s", path, git_error_last()->message);
+            addNode(
+                *_state.lock(),
+                crf->path,
+                Child{crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
+            return;
+        }
+
+        /* Fast path: create the blob object in a separate thread. */
+        workers.enqueue([this, crf{std::move(crf)}, id]() {
             auto repo(repoPool.get());
 
-            /* Monkey-patching the pack backend to only read the pack directory
-               once. Otherwise it will do a readdir for each added oid when it's
-               not found and that translates to ~6 syscalls. Since we are never
-               writing pack files until flushing we can force the odb backend to
-               read the directory just once. It's very convenient that the vtable is
-               semi-public interface and is up for grabs.
-
-               This is purely an optimization for our use-case with a tarball cache.
-               libgit2 calls refresh() if the backend provides it when an oid isn't found.
-               We are only writing objects to a mempack (it has higher priority) and there isn't
-               a realistic use-case where a previously missing object would appear from thin air
-               on the disk (unless another process happens to be unpacking a similar tarball to
-               the cache at the same time, but that's a very unrealistic scenario).
-            */
-            if (auto * backend = repo->packBackend)
-                backend->refresh = nullptr;
-
             git_oid oid;
-            if (git_blob_create_from_buffer(&oid, *repo, data.data(), data.size()))
+            if (git_blob_create_from_buffer(&oid, *repo, crf->contents.data(), crf->contents.size()))
                 throw Error(
-                    "creating a blob object for '%s' from in-memory buffer: %s", path, git_error_last()->message);
+                    "creating a blob object for '%s' from in-memory buffer: %s", crf->path, git_error_last()->message);
 
-            auto state(_state.lock());
-            addNode(*state, path, Child{executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
+            addNode(
+                *_state.lock(),
+                crf->path,
+                Child{crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
         });
     }
 
