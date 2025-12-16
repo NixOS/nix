@@ -43,7 +43,7 @@ All installation scripts are invoked the same way:
 
 ```console
 $ export VERSION=2.19.2 
-$ curl -L https://releases.nixos.org/nix/nix-$VERSION/install | sh
+$ bash <(curl -L https://releases.nixos.org/nix/nix-$VERSION/install)
 ```
 
 # Multi User Installation
