@@ -1320,55 +1320,47 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             }
         }
 
-        auto & root = _state.lock()->root;
-
-        auto doFlush = [&]() {
+        // Flush all repo objects to disk.
+        {
             auto repos = repoPool.clear();
             ThreadPool workers{repos.size()};
             for (auto & repo : repos)
                 workers.enqueue([repo]() { repo->flush(); });
             workers.process();
-        };
+        }
 
-        doFlush();
+        // Write the Git trees to disk. Would be nice to have this multithreaded too, but that's hard because a tree
+        // can't refer to an object that hasn't been written yet. Also it doesn't make a big difference for performance.
+        auto repo(repoPool.get());
 
-        processGraph<Directory *>(
-            {&root},
-            [&](Directory * const & node) -> std::set<Directory *> {
-                std::set<Directory *> edges;
-                for (auto & child : node->children)
-                    if (auto dir = std::get_if<Directory>(&child.second.file))
-                        edges.insert(dir);
-                return edges;
-            },
-            [&](Directory * const & node) {
-                auto repo(repoPool.get());
+        [&](this const auto & visit, Directory & node) -> void {
+            // Write the child directories.
+            for (auto & child : node.children)
+                if (auto dir = std::get_if<Directory>(&child.second.file))
+                    visit(*dir);
 
-                git_treebuilder * b;
-                if (git_treebuilder_new(&b, *repo, nullptr))
-                    throw Error("creating a tree builder: %s", git_error_last()->message);
-                TreeBuilder builder(b);
+            // Write this directory.
+            git_treebuilder * b;
+            if (git_treebuilder_new(&b, *repo, nullptr))
+                throw Error("creating a tree builder: %s", git_error_last()->message);
+            TreeBuilder builder(b);
 
-                for (auto & [name, child] : node->children) {
-                    auto oid_p = std::get_if<git_oid>(&child.file);
-                    auto oid = oid_p ? *oid_p : std::get<Directory>(child.file).oid.value();
-                    if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.mode))
-                        throw Error("adding a file to a tree builder: %s", git_error_last()->message);
-                }
+            for (auto & [name, child] : node.children) {
+                auto oid_p = std::get_if<git_oid>(&child.file);
+                auto oid = oid_p ? *oid_p : std::get<Directory>(child.file).oid.value();
+                if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.mode))
+                    throw Error("adding a file to a tree builder: %s", git_error_last()->message);
+            }
 
-                git_oid oid;
-                if (git_treebuilder_write(&oid, builder.get()))
-                    throw Error("creating a tree object: %s", git_error_last()->message);
-                node->oid = oid;
-            },
-            true,
-            // FIXME: make this multi-threaded again? Doesn't work
-            // with packfiles.
-            1);
+            git_oid oid;
+            if (git_treebuilder_write(&oid, builder.get()))
+                throw Error("creating a tree object: %s", git_error_last()->message);
+            node.oid = oid;
+        }(_state.lock()->root);
 
-        doFlush();
+        repo->flush();
 
-        return toHash(root.oid.value());
+        return toHash(_state.lock()->root.oid.value());
     }
 };
 
