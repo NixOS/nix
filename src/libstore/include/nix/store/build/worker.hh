@@ -8,6 +8,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
 
+#include <functional>
 #include <future>
 #include <thread>
 
@@ -170,6 +171,14 @@ public:
 
     Store & store;
     Store & evalStore;
+
+    /**
+     * Function to get the substituters to use for path substitution.
+     *
+     * Defaults to `getDefaultSubstituters`. This allows tests to
+     * inject custom substituters.
+     */
+    std::function<std::list<ref<Store>>()> getSubstituters;
 
 #ifndef _WIN32 // TODO Enable building on Windows
     std::unique_ptr<HookInstance> hook;

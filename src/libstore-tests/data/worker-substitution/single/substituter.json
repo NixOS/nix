@@ -1,0 +1,31 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {
+    "axqic2q30v0sqvcpiqxs139q8w6zd4n8-hello": {
+      "contents": {
+        "contents": "Hello, world!",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-KShIJtIwWG1gMSpvPMt5drppc1h5WMwHWzVpNJiVqGI=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-KShIJtIwWG1gMSpvPMt5drppc1h5WMwHWzVpNJiVqGI=",
+        "narSize": 128,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    }
+  },
+  "derivations": {}
+}

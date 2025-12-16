@@ -1,0 +1,27 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {},
+  "derivations": {
+    "vvyyj6h5ilinsv4q48q5y5vn7s3hxmhl-test-ca-drv.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {},
+        "srcs": []
+      },
+      "name": "test-ca-drv",
+      "outputs": {
+        "out": {
+          "hashAlgo": "sha256",
+          "method": "nar"
+        }
+      },
+      "system": "",
+      "version": 4
+    }
+  }
+}

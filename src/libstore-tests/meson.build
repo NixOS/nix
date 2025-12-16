@@ -85,6 +85,7 @@ sources = files(
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol.cc',
+  'worker-substitution.cc',
   'write-derivation.cc',
 )
 

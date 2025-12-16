@@ -84,6 +84,31 @@ void checkpointJson(CharacterizationTest & test, PathView testStem, const T & go
 }
 
 /**
+ * Specialization for when we need to do "JSON -> `ref<T>`" in one
+ * direction, but "`const T &` -> JSON" in the other direction.
+ */
+template<typename T>
+void checkpointJson(CharacterizationTest & test, PathView testStem, const ref<T> & got)
+{
+    using namespace nlohmann;
+
+    auto file = test.goldenMaster(Path{testStem} + ".json");
+
+    json gotJson = static_cast<json>(*got);
+
+    if (testAccept()) {
+        std::filesystem::create_directories(file.parent_path());
+        writeFile(file, gotJson.dump(2) + "\n");
+        ADD_FAILURE() << "Updating golden master " << file;
+    } else {
+        json expectedJson = json::parse(readFile(file));
+        ASSERT_EQ(gotJson, expectedJson);
+        ref<T> expected = adl_serializer<ref<T>>::from_json(expectedJson);
+        ASSERT_EQ(*got, *expected);
+    }
+}
+
+/**
  * Mixin class for writing characterization tests for `nlohmann::json`
  * conversions for a given type.
  */
