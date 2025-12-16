@@ -988,7 +988,7 @@ Path DerivationBuildingGoal::openLogFile()
     logFileSink = std::make_shared<FdSink>(fdLogFile.get());
 
     if (settings.compressLog)
-        logSink = std::shared_ptr<CompressionSink>(makeCompressionSink("bzip2", *logFileSink));
+        logSink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *logFileSink));
     else
         logSink = logFileSink;
 
