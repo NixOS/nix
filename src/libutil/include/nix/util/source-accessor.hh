@@ -222,6 +222,24 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
+struct SymlinkNotAllowed : public Error
+{
+    CanonPath path;
+
+    SymlinkNotAllowed(CanonPath path)
+        : Error("relative path '%s' points to a symlink, which is not allowed", path.rel())
+        , path(std::move(path))
+    {
+    }
+
+    template<typename... Args>
+    SymlinkNotAllowed(CanonPath path, const std::string & fs, Args &&... args)
+        : Error(fs, std::forward<Args>(args)...)
+        , path(std::move(path))
+    {
+    }
+};
+
 /**
  * Return an accessor for the root filesystem.
  */
