@@ -741,6 +741,11 @@ public:
         inDebugger = true;
     }
 
+    DebuggerGuard(DebuggerGuard &&) = delete;
+    DebuggerGuard(const DebuggerGuard &) = delete;
+    DebuggerGuard & operator=(DebuggerGuard &&) = delete;
+    DebuggerGuard & operator=(const DebuggerGuard &) = delete;
+
     ~DebuggerGuard()
     {
         inDebugger = false;

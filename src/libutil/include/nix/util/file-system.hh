@@ -480,8 +480,23 @@ class AutoUnmount
     Path path;
     bool del;
 public:
-    AutoUnmount(Path &);
     AutoUnmount();
+    AutoUnmount(Path &);
+    AutoUnmount(const AutoUnmount &) = delete;
+
+    AutoUnmount(AutoUnmount && other) noexcept
+        : path(std::move(other.path))
+        , del(std::exchange(other.del, false))
+    {
+    }
+
+    AutoUnmount & operator=(AutoUnmount && other) noexcept
+    {
+        path = std::move(other.path);
+        del = std::exchange(other.del, false);
+        return *this;
+    }
+
     ~AutoUnmount();
     void cancel();
 };

@@ -69,13 +69,10 @@ public:
         {
         }
     public:
-        Lock(Lock && l)
-            : s(l.s)
-        {
-            unreachable();
-        }
-
+        Lock(Lock && l) = delete;
         Lock(const Lock & l) = delete;
+        Lock & operator=(Lock && l) = delete;
+        Lock & operator=(const Lock & l) = delete;
 
         ~Lock() {}
 
@@ -110,6 +107,8 @@ public:
 
     struct WriteLock : Lock<WL>
     {
+        using Lock<WL>::Lock;
+
         T * operator->()
         {
             return &WriteLock::s->data;
@@ -131,6 +130,8 @@ public:
 
     struct ReadLock : Lock<RL>
     {
+        using Lock<RL>::Lock;
+
         const T * operator->()
         {
             return &ReadLock::s->data;
