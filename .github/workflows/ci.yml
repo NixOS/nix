@@ -125,13 +125,13 @@ jobs:
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: coverage-reports
         path: coverage-reports/
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: installer-${{matrix.os}}
         path: out/*
