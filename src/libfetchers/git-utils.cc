@@ -1094,11 +1094,6 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     {
     }
 
-    ~GitFileSystemObjectSinkImpl()
-    {
-        assert(totalBufSize == 0);
-    }
-
     struct Child;
 
     /// A directory to be written as a Git tree.
