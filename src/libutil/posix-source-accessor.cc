@@ -208,7 +208,7 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
         if (st && S_ISLNK(st->st_mode))
-            throw Error("path '%s' is a symlink", showPath(path));
+            throw SymlinkNotAllowed(path, "path '%s' is a symlink", showPath(path));
         path.pop();
     }
 }
@@ -219,8 +219,8 @@ ref<SourceAccessor> getFSSourceAccessor()
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
 {
-    return make_ref<PosixSourceAccessor>(std::move(root));
+    return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
 } // namespace nix
