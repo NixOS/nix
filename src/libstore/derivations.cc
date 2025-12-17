@@ -1120,6 +1120,39 @@ static void rewriteDerivation(Store & store, BasicDerivation & drv, const String
     }
 }
 
+bool Derivation::shouldResolve() const
+{
+    /* No input drvs means nothing to resolve. */
+    if (inputDrvs.map.empty())
+        return false;
+
+    auto drvType = type();
+
+    bool typeNeedsResolve = std::visit(
+        overloaded{
+            [&](const DerivationType::InputAddressed & ia) {
+                /* Must resolve if deferred. */
+                return ia.deferred;
+            },
+            [&](const DerivationType::ContentAddressed & ca) {
+                return ca.fixed
+                           /* Can optionally resolve if fixed, which is good
+                              for avoiding unnecessary rebuilds. */
+                           ? experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
+                           /* Must resolve if floating. */
+                           : true;
+            },
+            [&](const DerivationType::Impure &) { return true; },
+        },
+        drvType.raw);
+
+    /* Also need to resolve if any inputs are outputs of dynamic derivations. */
+    bool hasDynamicInputs = std::ranges::any_of(
+        inputDrvs.map.begin(), inputDrvs.map.end(), [](auto & pair) { return !pair.second.childMap.empty(); });
+
+    return typeNeedsResolve || hasDynamicInputs;
+}
+
 std::optional<BasicDerivation> Derivation::tryResolve(Store & store, Store * evalStore) const
 {
     return tryResolve(
