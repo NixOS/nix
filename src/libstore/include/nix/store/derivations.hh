@@ -341,6 +341,19 @@ struct Derivation : BasicDerivation
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
+     * Determine whether this derivation should be resolved before building.
+     *
+     * Resolution is needed when:
+     * - Input-addressed derivations are deferred (depend on CA derivations)
+     * - Content-addressed derivations have input drvs and are either:
+     *   - Floating (non-fixed), which must always be resolved
+     *   - Fixed, which can optionally be resolved when ca-derivations is enabled
+     * - Impure derivations always need resolution
+     * - Any input derivations have outputs from dynamic derivations
+     */
+    bool shouldResolve() const;
+
+    /**
      * Return the underlying basic derivation but with these changes:
      *
      * 1. Input drvs are emptied, but the outputs of them that were used
