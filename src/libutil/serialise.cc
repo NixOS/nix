@@ -163,11 +163,11 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
         _good = false;
         throw SysError("reading from file");
     }
+#endif
     if (n == 0) {
         _good = false;
         throw EndOfFile(std::string(*endOfFileError));
     }
-#endif
     read += n;
     return n;
 }
