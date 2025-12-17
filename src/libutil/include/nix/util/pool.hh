@@ -215,7 +215,7 @@ public:
     std::vector<ref<R>> clear()
     {
         auto state_(state.lock());
-        return std::move(state_->idle);
+        return std::exchange(state_->idle, {});
     }
 };
 

@@ -1171,6 +1171,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
     {
+        checkInterrupt();
+
         /* Multithreaded blob writing. We read the incoming file data into memory and asynchronously write it to a Git
            blob object. However, to avoid unbounded memory usage, if the amount of data in flight exceeds a threshold,
            we switch to writing directly to a Git write stream. */
@@ -1334,6 +1336,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         auto repo(repoPool.get());
 
         [&](this const auto & visit, Directory & node) -> void {
+            checkInterrupt();
+
             // Write the child directories.
             for (auto & child : node.children)
                 if (auto dir = std::get_if<Directory>(&child.second.file))
