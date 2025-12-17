@@ -110,8 +110,6 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
-    SQLiteStmt QueryRealisationReferences;
-    SQLiteStmt AddRealisationReference;
 };
 
 LocalStore::LocalStore(ref<const Config> config)
@@ -390,21 +388,6 @@ LocalStore::LocalStore(ref<const Config> config)
                     where drvPath = ?
                     ;
             )");
-        state->stmts->QueryRealisationReferences.create(
-            state->db,
-            R"(
-                select drvPath, outputName from Realisations
-                    join RealisationsRefs on realisationReference = Realisations.id
-                    where referrer = ?;
-            )");
-        state->stmts->AddRealisationReference.create(
-            state->db,
-            R"(
-                insert or replace into RealisationsRefs (referrer, realisationReference)
-                values (
-                    (select id from Realisations where drvPath = ? and outputName = ?),
-                    (select id from Realisations where drvPath = ? and outputName = ?));
-            )");
     }
 }
 
@@ -652,25 +635,6 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             state->stmts->RegisterRealisedOutput
                 .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
                     concatStringsSep(" ", info.signatures))
-                .exec();
-        }
-        for (auto & [outputId, depPath] : info.dependentRealisations) {
-            auto localRealisation = queryRealisationCore_(*state, outputId);
-            if (!localRealisation)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on the non existent '%s'",
-                    info.id.to_string(),
-                    outputId.to_string());
-            if (localRealisation->second.outPath != depPath)
-                throw Error(
-                    "unable to register the derivation '%s' as it "
-                    "depends on a realisation of '%s' that doesn’t"
-                    "match what we have locally",
-                    info.id.to_string(),
-                    outputId.to_string());
-            state->stmts->AddRealisationReference
-                .use()(info.id.strHash())(info.id.outputName)(outputId.strHash())(outputId.outputName)
                 .exec();
         }
     });
@@ -1605,21 +1569,6 @@ std::optional<const UnkeyedRealisation> LocalStore::queryRealisation_(LocalStore
     if (!maybeCore)
         return std::nullopt;
     auto [realisationDbId, res] = *maybeCore;
-
-    std::map<DrvOutput, StorePath> dependentRealisations;
-    auto useRealisationRefs(state.stmts->QueryRealisationReferences.use()(realisationDbId));
-    while (useRealisationRefs.next()) {
-        auto depId = DrvOutput{
-            Hash::parseAnyPrefixed(useRealisationRefs.getStr(0)),
-            useRealisationRefs.getStr(1),
-        };
-        auto dependentRealisation = queryRealisationCore_(state, depId);
-        assert(dependentRealisation); // Enforced by the db schema
-        auto outputPath = dependentRealisation->second.outPath;
-        dependentRealisations.insert({depId, outputPath});
-    }
-
-    res.dependentRealisations = dependentRealisations;
 
     return {res};
 }

@@ -22,7 +22,10 @@ nix copy --to "$REMOTE_STORE" --file ./content-addressed.nix
 
 # Restart the build on an empty store, ensuring that we don't build
 clearStore
-buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0 transitivelyDependentCA
+# FIXME: `dependentCA` should not need to be explicitly mentioned in
+# this. Force the use of small-step resolutions only to allow not
+# mentioning it explicitly again. (#11896, #11928).
+buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0 transitivelyDependentCA dependentCA
 # Check that the thing we’ve just substituted has its realisation stored
 nix realisation info --file ./content-addressed.nix transitivelyDependentCA
 # Check that its dependencies have it too
