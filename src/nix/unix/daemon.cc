@@ -437,22 +437,23 @@ static void forwardStdioConnection(RemoteStore & store)
     int from = conn->from.fd;
     int to = conn->to.fd;
 
-    auto nfds = std::max(from, STDIN_FILENO) + 1;
+    Socket fromSock = toSocket(from), stdinSock = toSocket(getStandardInput());
+    auto nfds = std::max(fromSock, stdinSock) + 1;
     while (true) {
         fd_set fds;
         FD_ZERO(&fds);
-        FD_SET(from, &fds);
-        FD_SET(STDIN_FILENO, &fds);
+        FD_SET(fromSock, &fds);
+        FD_SET(stdinSock, &fds);
         if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
             throw SysError("waiting for data from client or server");
-        if (FD_ISSET(from, &fds)) {
+        if (FD_ISSET(fromSock, &fds)) {
             auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
             if (res == -1)
                 throw SysError("splicing data from daemon socket to stdout");
             else if (res == 0)
                 throw EndOfFile("unexpected EOF from daemon socket");
         }
-        if (FD_ISSET(STDIN_FILENO, &fds)) {
+        if (FD_ISSET(stdinSock, &fds)) {
             auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
             if (res == -1)
                 throw SysError("splicing data from stdin to daemon socket");
