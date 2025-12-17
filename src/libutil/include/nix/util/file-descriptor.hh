@@ -261,4 +261,14 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
 
 MakeError(EndOfFile, Error);
 
+#ifdef _WIN32
+
+/**
+ * Windows specific replacement for POSIX `lseek` that operates on a `HANDLE` and not
+ * a file descriptor.
+ */
+off_t lseek(Descriptor fd, off_t offset, int whence);
+
+#endif
+
 } // namespace nix

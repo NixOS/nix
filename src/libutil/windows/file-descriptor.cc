@@ -5,13 +5,12 @@
 #include "nix/util/windows-error.hh"
 #include "nix/util/file-path.hh"
 
-#ifdef _WIN32
-#  include <fileapi.h>
-#  include <error.h>
-#  include <namedpipeapi.h>
-#  include <namedpipeapi.h>
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
+#include <fileapi.h>
+#include <error.h>
+#include <namedpipeapi.h>
+#include <namedpipeapi.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace nix {
 
@@ -46,16 +45,16 @@ void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
         if (allowInterrupts)
             checkInterrupt();
         DWORD res;
-#  if _WIN32_WINNT >= 0x0600
+#if _WIN32_WINNT >= 0x0600
         auto path = handleToPath(handle); // debug; do it before because handleToPath changes lasterror
         if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
             throw WinError("writing to file %1%:%2%", handle, path);
         }
-#  else
+#else
         if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
             throw WinError("writing to file %1%", handle);
         }
-#  endif
+#endif
         if (res > 0)
             s.remove_prefix(res);
     }
@@ -120,7 +119,7 @@ void Pipe::create()
 
 //////////////////////////////////////////////////////////////////////
 
-#  if _WIN32_WINNT >= 0x0600
+#if _WIN32_WINNT >= 0x0600
 
 std::wstring windows::handleToFileName(HANDLE handle)
 {
@@ -149,7 +148,37 @@ Path windows::handleToPath(HANDLE handle)
     return os_string_to_string(handleToFileName(handle));
 }
 
-#  endif
+#endif
+
+off_t lseek(HANDLE h, off_t offset, int whence)
+{
+    DWORD method;
+    switch (whence) {
+    case SEEK_SET:
+        method = FILE_BEGIN;
+        break;
+    case SEEK_CUR:
+        method = FILE_CURRENT;
+        break;
+    case SEEK_END:
+        method = FILE_END;
+        break;
+    default:
+        throw Error("lseek: invalid whence %d", whence);
+    }
+
+    LARGE_INTEGER li;
+    li.QuadPart = offset;
+    LARGE_INTEGER newPos;
+
+    if (!SetFilePointerEx(h, li, &newPos, method)) {
+        /* Convert to a POSIX error, since caller code works with this as if it were
+           a POSIX lseek. */
+        errno = std::error_code(GetLastError(), std::system_category()).default_error_condition().value();
+        return -1;
+    }
+
+    return newPos.QuadPart;
+}
 
 } // namespace nix
-#endif
