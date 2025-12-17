@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
@@ -162,11 +163,11 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
         _good = false;
         throw SysError("reading from file");
     }
+#endif
     if (n == 0) {
         _good = false;
         throw EndOfFile(std::string(*endOfFileError));
     }
-#endif
     read += n;
     return n;
 }
@@ -207,8 +208,7 @@ void FdSource::restart()
         throw Error("can't seek to the start of a file");
     buffer.reset();
     read = bufPosIn = bufPosOut = 0;
-    int fd_ = fromDescriptorReadOnly(fd);
-    if (lseek(fd_, 0, SEEK_SET) == -1)
+    if (lseek(fd, 0, SEEK_SET) == -1)
         throw SysError("seeking to the start of a file");
 }
 

@@ -362,6 +362,8 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
 /**
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
+ * Uses GetTempPathW on windows which respects TMP, TEMP, USERPROFILE env variables.
+ * Does not resolve symlinks and the returned path might not be directory or exist at all.
  */
 std::filesystem::path defaultTempDir();
 
