@@ -69,24 +69,54 @@ struct ArchiveDecompressionSource : Source
     }
 };
 
+/* These strings are a part of the public API in store parameters and such. Do not change!
+   Happens to match enum names. */
+#define NIX_FOR_EACH_LA_ALGO(MACRO) \
+    MACRO(bzip2)                    \
+    MACRO(compress)                 \
+    MACRO(grzip)                    \
+    MACRO(gzip)                     \
+    MACRO(lrzip)                    \
+    MACRO(lz4)                      \
+    MACRO(lzip)                     \
+    MACRO(lzma)                     \
+    MACRO(lzop)                     \
+    MACRO(xz)                       \
+    MACRO(zstd)
+
 struct ArchiveCompressionSink : CompressionSink
 {
     Sink & nextSink;
     struct archive * archive;
 
-    ArchiveCompressionSink(Sink & nextSink, std::string format, bool parallel, int level = COMPRESSION_LEVEL_DEFAULT)
+    ArchiveCompressionSink(
+        Sink & nextSink, CompressionAlgo method, bool parallel, int level = COMPRESSION_LEVEL_DEFAULT)
         : nextSink(nextSink)
     {
         archive = archive_write_new();
         if (!archive)
             throw Error("failed to initialize libarchive");
-        check(archive_write_add_filter_by_name(archive, format.c_str()), "couldn't initialize compression (%s)");
+
+        auto [addFilter, format] = [method]() -> std::pair<int (*)(struct archive *), const char *> {
+            switch (method) {
+            case CompressionAlgo::none:
+            case CompressionAlgo::brotli:
+                unreachable();
+#define NIX_DEF_LA_ALGO_CASE(algo) \
+    case CompressionAlgo::algo:    \
+        return {archive_write_add_filter_##algo, #algo};
+                NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_CASE)
+#undef NIX_DEF_LA_ALGO_CASE
+            }
+            unreachable();
+        }();
+
+        check(addFilter(archive), "couldn't initialize compression (%s)");
         check(archive_write_set_format_raw(archive));
         if (parallel)
-            check(archive_write_set_filter_option(archive, format.c_str(), "threads", "0"));
+            check(archive_write_set_filter_option(archive, format, "threads", "0"));
         if (level != COMPRESSION_LEVEL_DEFAULT)
-            check(archive_write_set_filter_option(
-                archive, format.c_str(), "compression-level", std::to_string(level).c_str()));
+            check(archive_write_set_filter_option(archive, format, "compression-level", std::to_string(level).c_str()));
         // disable internal buffering
         check(archive_write_set_bytes_per_block(archive, 0));
         // disable output padding
@@ -289,19 +319,52 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
+/* Parses a *compression* method into the corresponding enum. This is only used
+   in the *compression* case and user interface. Content-Encoding should not use
+   these. */
+static CompressionAlgo parseNixCompressionAlgoString(std::string_view method)
+{
+    static const std::unordered_map<std::string_view, CompressionAlgo> lookupTable = {
+        {"none", CompressionAlgo::none},
+        {"br", CompressionAlgo::brotli},
+#define NIX_DEF_LA_ALGO_NAME(algo) {#algo, CompressionAlgo::algo},
+        NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_NAME)
+#undef NIX_DEF_LA_ALGO_NAME
+    };
+
+    if (auto it = lookupTable.find(method); it != lookupTable.end())
+        return it->second;
+
+    static const StringSet allNames = [&]() {
+        StringSet res;
+        for (auto & [name, _] : lookupTable)
+            res.emplace(name);
+        return res;
+    }();
+
+    throw UnknownCompressionMethod(
+        Suggestions::bestMatches(allNames, method), "unknown compression method '%s'", method);
+}
+
 ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
 {
-    std::vector<std::string> la_supports = {
-        "bzip2", "compress", "grzip", "gzip", "lrzip", "lz4", "lzip", "lzma", "lzop", "xz", "zstd"};
-    if (std::find(la_supports.begin(), la_supports.end(), method) != la_supports.end()) {
-        return make_ref<ArchiveCompressionSink>(nextSink, method, parallel, level);
-    }
-    if (method == "none")
+    return makeCompressionSink(parseNixCompressionAlgoString(method), nextSink, parallel, level);
+}
+
+ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel, int level)
+{
+    switch (method) {
+    case CompressionAlgo::none:
         return make_ref<NoneSink>(nextSink);
-    else if (method == "br")
+    case CompressionAlgo::brotli:
         return make_ref<BrotliCompressionSink>(nextSink);
-    else
-        throw UnknownCompressionMethod("unknown compression method '%s'", method);
+        /* Everything else is supported via libarchive. */
+#define NIX_DEF_LA_ALGO_CASE(algo) case CompressionAlgo::algo:
+        NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_CASE)
+        return make_ref<ArchiveCompressionSink>(nextSink, method, parallel, level);
+#undef NIX_DEF_LA_ALGO_CASE
+    }
+    unreachable();
 }
 
 std::string compress(const std::string & method, std::string_view in, const bool parallel, int level)

@@ -16,6 +16,22 @@ struct CompressionSink : BufferedSink, FinishSink
     using FinishSink::finish;
 };
 
+enum class CompressionAlgo {
+    none,
+    brotli,
+    bzip2,
+    compress,
+    grzip,
+    gzip,
+    lrzip,
+    lz4,
+    lzip,
+    lzma,
+    lzop,
+    xz,
+    zstd,
+};
+
 std::string decompress(const std::string & method, std::string_view in);
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
@@ -24,6 +40,9 @@ std::string compress(const std::string & method, std::string_view in, const bool
 
 ref<CompressionSink>
 makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
+
+ref<CompressionSink>
+makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel = false, int level = -1);
 
 MakeError(UnknownCompressionMethod, Error);
 
