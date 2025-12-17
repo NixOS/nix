@@ -210,11 +210,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                         .outputName = wantedOutput,
                     }};
                 newRealisation.signatures.clear();
-                if (!drv->type().isFixed()) {
-                    auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
-                    newRealisation.dependentRealisations =
-                        drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
-                }
                 worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }

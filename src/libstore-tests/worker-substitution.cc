@@ -382,7 +382,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     DrvOutput rootDrvOutput{rootDrvHash, "out"};
 
     // Add the realisation for the root derivation to the substituter
-    // Include the dependency realisation in dependentRealisations
     substituter->buildTrace.insert_or_assign(
         rootDrvHash,
         std::map<std::string, UnkeyedRealisation>{
@@ -390,7 +389,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
                 "out",
                 UnkeyedRealisation{
                     .outPath = rootOutputPath,
-                    .dependentRealisations = {{depDrvOutput, depOutputPath}},
                 },
             },
         });
@@ -430,14 +428,17 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(rootRealisation);
     ASSERT_EQ(rootRealisation->outPath, rootOutputPath);
 
-    // The dependency's REALISATION should have been fetched
+    // #11928: The dependency's REALISATION should be fetched, because
+    // it is needed to resolve the underlying derivation. Currently the
+    // realisation is not fetched (bug). Once fixed: Change
+    // depRealisation ASSERT_FALSE to ASSERT_TRUE and uncomment the
+    // ASSERT_EQ
     auto depRealisation = dummyStore->queryRealisation(depDrvOutput);
-    ASSERT_TRUE(depRealisation);
-    ASSERT_EQ(depRealisation->outPath, depOutputPath);
+    ASSERT_FALSE(depRealisation);
+    // ASSERT_EQ(depRealisation->outPath, depOutputPath);
 
-    // TODO #11928: The dependency's OUTPUT should NOT be fetched (not referenced
-    // by root output). Once #11928 is fixed, change ASSERT_TRUE to ASSERT_FALSE.
-    ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
+    // The dependency's OUTPUT is correctly not fetched (not referenced by root output)
+    ASSERT_FALSE(dummyStore->isValidPath(depOutputPath));
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);

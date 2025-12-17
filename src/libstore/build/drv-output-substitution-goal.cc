@@ -93,31 +93,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         if (!outputInfo)
             continue;
 
-        bool failed = false;
-
         Goals waitees;
-
-        for (const auto & [depId, depPath] : outputInfo->dependentRealisations) {
-            if (depId != id) {
-                if (auto localOutputInfo = worker.store.queryRealisation(depId);
-                    localOutputInfo && localOutputInfo->outPath != depPath) {
-                    warn(
-                        "substituter '%s' has an incompatible realisation for '%s', ignoring.\n"
-                        "Local:  %s\n"
-                        "Remote: %s",
-                        sub->config.getHumanReadableURI(),
-                        depId.to_string(),
-                        worker.store.printStorePath(localOutputInfo->outPath),
-                        worker.store.printStorePath(depPath));
-                    failed = true;
-                    break;
-                }
-                waitees.insert(worker.makeDrvOutputSubstitutionGoal(depId));
-            }
-        }
-
-        if (failed)
-            continue;
 
         waitees.insert(worker.makePathSubstitutionGoal(outputInfo->outPath));
 
