@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "nix/util/file-system.hh"
+#include "nix/util/environment-variables.hh"
 
 #include "util-unix-config-private.hh"
 
@@ -17,6 +18,11 @@ namespace nix {
 Descriptor openDirectory(const std::filesystem::path & path)
 {
     return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+}
+
+std::filesystem::path defaultTempDir()
+{
+    return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
 void setWriteTime(

@@ -115,9 +115,6 @@ Path canonPath(PathView path, bool resolveSymlinks)
     if (!isAbsolute(path))
         throw Error("not an absolute path: '%1%'", path);
 
-    // For Windows
-    auto rootName = std::filesystem::path{path}.root_name();
-
     /* This just exists because we cannot set the target of `remaining`
        (the callback parameter) directly to a newly-constructed string,
        since it is `std::string_view`. */
@@ -147,8 +144,6 @@ Path canonPath(PathView path, bool resolveSymlinks)
             }
         });
 
-    if (!rootName.empty())
-        ret = rootName.string() + std::move(ret);
     return ret;
 }
 
@@ -671,11 +666,6 @@ void AutoUnmount::cancel()
 #endif
 
 //////////////////////////////////////////////////////////////////////
-
-std::filesystem::path defaultTempDir()
-{
-    return getEnvNonEmpty("TMPDIR").value_or("/tmp");
-}
 
 std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {

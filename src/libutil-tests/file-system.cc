@@ -416,4 +416,11 @@ TEST(FdSource, restartWorks)
     EXPECT_EQ(source.drain(), "");
 }
 
+TEST(createTempDir, works)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+    ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
+}
+
 } // namespace nix

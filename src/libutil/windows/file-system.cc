@@ -1,8 +1,10 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/windows-error.hh"
 #include "nix/util/logging.hh"
 
-#ifdef _WIN32
 namespace nix {
+
+using namespace nix::windows;
 
 void setWriteTime(
     const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
@@ -28,5 +30,13 @@ Descriptor openDirectory(const std::filesystem::path & path)
         NULL);
 }
 
+std::filesystem::path defaultTempDir()
+{
+    wchar_t buf[MAX_PATH + 1];
+    DWORD len = GetTempPathW(MAX_PATH + 1, buf);
+    if (len == 0 || len > MAX_PATH)
+        throw WinError("getting default temporary directory");
+    return std::filesystem::path(buf);
+}
+
 } // namespace nix
-#endif
