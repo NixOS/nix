@@ -39,4 +39,18 @@ std::filesystem::path defaultTempDir()
     return std::filesystem::path(buf);
 }
 
+void deletePath(const std::filesystem::path & path)
+{
+    std::error_code ec;
+    std::filesystem::remove_all(path, ec);
+    if (ec && ec != std::errc::no_such_file_or_directory)
+        throw SysError(ec.default_error_condition().value(), "recursively deleting %1%", path);
+}
+
+void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
+{
+    bytesFreed = 0;
+    deletePath(path);
+}
+
 } // namespace nix
