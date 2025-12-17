@@ -3,6 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -301,10 +302,10 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             if (errno == ENOTDIR) /* Path component might be a symlink. */ {
                 struct ::stat st;
                 if (::fstatat(getParentFd(), component.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(st.st_mode))
-                    throw unix::SymlinkNotAllowed(path2);
+                    throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
             } else if (errno == ELOOP) {
-                throw unix::SymlinkNotAllowed(path2);
+                throw SymlinkNotAllowed(path2);
             }
 
             return INVALID_DESCRIPTOR;
@@ -315,7 +316,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
 
     auto res = ::openat(getParentFd(), std::string(path.baseName().value()).c_str(), flags | O_NOFOLLOW, mode);
     if (res < 0 && errno == ELOOP)
-        throw unix::SymlinkNotAllowed(path);
+        throw SymlinkNotAllowed(path);
     return res;
 }
 
@@ -328,7 +329,7 @@ Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPa
         dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
     if (maybeFd) {
         if (*maybeFd < 0 && errno == ELOOP)
-            throw unix::SymlinkNotAllowed(path);
+            throw SymlinkNotAllowed(path);
         return *maybeFd;
     }
 #endif
