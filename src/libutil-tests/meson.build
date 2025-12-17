@@ -33,6 +33,9 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
+gmock = dependency('gmock')
+deps_private += gmock
+
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
@@ -72,6 +75,7 @@ sources = files(
   'position.cc',
   'processes.cc',
   'sort.cc',
+  'source-accessor.cc',
   'spawn.cc',
   'strings.cc',
   'suggestions.cc',

@@ -103,7 +103,8 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
 {
-    auto path2 = PosixSourceAccessor::createAtRoot(path, /*trackLastModified=*/true);
+    SourcePath path2 = {
+        makeFSSourceAccessor(std::filesystem::path{}, /*trackLastModified=*/true), CanonPath(absPath(path))};
     path2.dumpPath(sink, filter);
     return path2.accessor->getLastModified().value();
 }

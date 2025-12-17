@@ -1,7 +1,5 @@
 #include "nix/util/posix-source-accessor.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/sync.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -18,15 +16,6 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool 
 PosixSourceAccessor::PosixSourceAccessor()
     : PosixSourceAccessor(std::filesystem::path{})
 {
-}
-
-SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path, bool trackLastModified)
-{
-    std::filesystem::path path2 = absPath(path);
-    return {
-        make_ref<PosixSourceAccessor>(path2.root_path(), trackLastModified),
-        CanonPath{path2.relative_path().string()},
-    };
 }
 
 std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
@@ -208,7 +197,7 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
         if (st && S_ISLNK(st->st_mode))
-            throw Error("path '%s' is a symlink", showPath(path));
+            throw SymlinkNotAllowed(path, "path '%s' is a symlink", showPath(path));
         path.pop();
     }
 }
@@ -219,8 +208,8 @@ ref<SourceAccessor> getFSSourceAccessor()
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
 {
-    return make_ref<PosixSourceAccessor>(std::move(root));
+    return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
 } // namespace nix
