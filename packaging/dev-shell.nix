@@ -148,6 +148,15 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     isInternal =
       dep: internalDrvs ? ${builtins.unsafeDiscardStringContext dep.drvPath or "_non-existent_"};
 
+    activeComponentNames = lib.listToAttrs (
+      map (c: {
+        name = c.pname or c.name;
+        value = null;
+      }) activeComponents
+    );
+
+    isActiveComponent = name: activeComponentNames ? ${name};
+
   in
   {
     pname = "shell-for-nix";
@@ -190,27 +199,19 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
           }
         );
 
-      small =
-        (finalAttrs.finalPackage.withActiveComponents (
-          c:
-          lib.intersectAttrs (lib.genAttrs [
-            "nix-cli"
-            "nix-util-tests"
-            "nix-store-tests"
-            "nix-expr-tests"
-            "nix-fetchers-tests"
-            "nix-flake-tests"
-            "nix-functional-tests"
-            "nix-perl-bindings"
-          ] (_: null)) c
-        )).overrideAttrs
-          (o: {
-            mesonFlags = o.mesonFlags ++ [
-              # TODO: infer from activeComponents or vice versa
-              "-Dkaitai-struct-checks=false"
-              "-Djson-schema-checks=false"
-            ];
-          });
+      small = finalAttrs.finalPackage.withActiveComponents (
+        c:
+        lib.intersectAttrs (lib.genAttrs [
+          "nix-cli"
+          "nix-util-tests"
+          "nix-store-tests"
+          "nix-expr-tests"
+          "nix-fetchers-tests"
+          "nix-flake-tests"
+          "nix-functional-tests"
+          "nix-perl-bindings"
+        ] (_: null)) c
+      );
     };
 
     # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
@@ -278,21 +279,33 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
 
     dontUseCmakeConfigure = true;
 
-    mesonFlags =
-      map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
-      ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
-      ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents2.nix-fetchers.mesonFlags)
-      ++ lib.optionals havePerl (
-        map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents2.nix-perl-bindings.mesonFlags)
-      )
-      ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents2.nix-expr.mesonFlags)
-      ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
+    mesonFlags = [
+      (lib.mesonBool "kaitai-struct-checks" (isActiveComponent "nix-kaitai-struct-checks"))
+      (lib.mesonBool "json-schema-checks" (isActiveComponent "nix-json-schema-checks"))
+    ]
+    ++ map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
+    ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
+    ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents2.nix-fetchers.mesonFlags)
+    ++ lib.optionals havePerl (
+      map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents2.nix-perl-bindings.mesonFlags)
+    )
+    ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents2.nix-expr.mesonFlags)
+    ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
 
     nativeBuildInputs =
       let
         inputs =
           dedupByString (v: "${v}") (
-            lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.nativeBuildInputs) activeComponents)
+            lib.filter (x: !isInternal x) (
+              lib.lists.concatMap (
+                # Nix manual has a build-time dependency on nix, but we
+                # don't want to do a native build just to enter the ross
+                # dev shell.
+                #
+                # TODO: think of a more principled fix for this.
+                c: lib.filter (f: f.pname or null != "nix") c.nativeBuildInputs
+              ) activeComponents
+            )
           )
           ++ lib.optional (
             !buildCanExecuteHost
@@ -308,8 +321,8 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             pkgs.buildPackages.nixfmt-rfc-style
             pkgs.buildPackages.shellcheck
             pkgs.buildPackages.include-what-you-use
-            pkgs.buildPackages.gdb
           ]
+          ++ lib.optional pkgs.hostPlatform.isUnix pkgs.buildPackages.gdb
           ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
             lib.hiPrio pkgs.buildPackages.clang-tools
           )
@@ -325,13 +338,13 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       )
     );
 
-    buildInputs = [
-      pkgs.gbenchmark
-    ]
-    ++ dedupByString (v: "${v}") (
-      lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.buildInputs) activeComponents)
-    )
-    ++ lib.optional havePerl pkgs.perl;
+    buildInputs =
+      # TODO change Nixpkgs to mark gbenchmark as building on Windows
+      lib.optional pkgs.hostPlatform.isUnix pkgs.gbenchmark
+      ++ dedupByString (v: "${v}") (
+        lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.buildInputs) activeComponents)
+      )
+      ++ lib.optional havePerl pkgs.perl;
 
     propagatedBuildInputs = dedupByString (v: "${v}") (
       lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.propagatedBuildInputs) activeComponents)
