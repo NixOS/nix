@@ -647,7 +647,7 @@ void LocalStore::cacheDrvOutputMapping(
         [&]() { state.stmts->AddDerivationOutput.use()(deriver)(outputName) (printStorePath(output)).exec(); });
 }
 
-uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs)
+uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs, Derivation * drv)
 {
     if (info.ca.has_value() && !info.isContentAddressed(*this))
         throw Error(
@@ -668,7 +668,7 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, boo
        efficiently query whether a path is an output of some
        derivation. */
     if (info.path.isDerivation()) {
-        auto drv = readInvalidDerivation(info.path);
+        auto parsedDrv = readInvalidDerivation(info.path);
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -676,14 +676,17 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info, boo
            DB transaction is rolled back, so the path validity
            registration above is undone. */
         if (checkOutputs)
-            drv.checkInvariants(*this, info.path);
+            parsedDrv.checkInvariants(*this, info.path);
 
-        for (auto & i : drv.outputsAndOptPaths(*this)) {
+        for (auto & i : parsedDrv.outputsAndOptPaths(*this)) {
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
             if (i.second.second)
                 cacheDrvOutputMapping(state, id, i.first, *i.second.second);
         }
+
+        if (drv)
+            *drv = std::move(parsedDrv);
     }
 
     pathInfoCache->lock()->upsert(info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
@@ -924,12 +927,19 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         SQLiteTxn txn(state->db);
         StorePathSet paths;
 
+        std::map<StorePath, Derivation> derivations;
+
         for (auto & [_, i] : infos) {
             assert(i.narHash.algo == HashAlgorithm::SHA256);
             if (isValidPath_(*state, i.path))
                 updatePathInfo(*state, i);
-            else
+            else if (i.path.isDerivation()) {
+                Derivation drv;
+                addValidPath(*state, i, false, &drv);
+                derivations.emplace(i.path, std::move(drv));
+            } else {
                 addValidPath(*state, i, false);
+            }
             paths.insert(i.path);
         }
 
@@ -944,8 +954,11 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            not be valid yet. */
         for (auto & [_, i] : infos)
             if (i.path.isDerivation()) {
-                // FIXME: inefficient; we already loaded the derivation in addValidPath().
-                readInvalidDerivation(i.path).checkInvariants(*this, i.path);
+                if (auto drv = derivations.find(i.path); drv != derivations.end()) {
+                    drv->second.checkInvariants(*this, i.path);
+                } else {
+                    readInvalidDerivation(i.path).checkInvariants(*this, i.path);
+                }
             }
 
         /* Do a topological sort of the paths.  This will throw an
