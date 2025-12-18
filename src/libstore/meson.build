@@ -286,6 +286,7 @@ sources = files(
   'build/derivation-goal.cc',
   'build/derivation-resolution-goal.cc',
   'build/derivation-trampoline-goal.cc',
+  'build/derived-output-goal.cc',
   'build/drv-output-substitution-goal.cc',
   'build/entry-points.cc',
   'build/goal.cc',
