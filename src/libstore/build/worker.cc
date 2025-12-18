@@ -162,7 +162,9 @@ template<typename G>
 static bool
 removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
 {
-    return removeGoal(goal, node.value) || removeGoal(goal, node.childMap);
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
 }
 
 void Worker::removeGoal(GoalPtr goal)
