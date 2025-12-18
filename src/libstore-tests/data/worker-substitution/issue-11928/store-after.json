@@ -38,28 +38,6 @@
         "ultimate": false,
         "version": 2
       }
-    },
-    "w0yjpwh59kpbyc7hz9jgmi44r9br908i-dep-drv-out": {
-      "contents": {
-        "contents": "I am the dependency output",
-        "executable": false,
-        "type": "regular"
-      },
-      "info": {
-        "ca": {
-          "hash": "sha256-HK2LBzSTtwuRjc44PH3Ac1JHHPKmfnAgNxz6I5mVgL8=",
-          "method": "nar"
-        },
-        "deriver": null,
-        "narHash": "sha256-HK2LBzSTtwuRjc44PH3Ac1JHHPKmfnAgNxz6I5mVgL8=",
-        "narSize": 144,
-        "references": [],
-        "registrationTime": null,
-        "signatures": [],
-        "storeDir": "/nix/store",
-        "ultimate": false,
-        "version": 2
-      }
     }
   },
   "derivations": {
