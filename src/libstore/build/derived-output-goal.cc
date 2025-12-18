@@ -33,7 +33,52 @@ Goal::Co DerivedOutputGoal::init()
 {
     trace("init");
 
-    // ASSUME WE CANNOT FETCH REALISTION
+    /* Check if this is an input-addressed derivation with a statically-known
+       output path. If so, skip build trace lookup and build directly. */
+    bool usesBuildTrace = true;
+    if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&*id.drvPath)) {
+        for (auto * drvStore : {&worker.evalStore, &worker.store}) {
+            if (drvStore->isValidPath(opaque->path)) {
+                auto drv = drvStore->readDerivation(opaque->path);
+                auto outputs = drv.outputsAndOptPaths(worker.store);
+                if (auto * output = get(outputs, id.output)) {
+                    if (output->second) {
+                        /* Output path is statically known (input-addressed).
+                           Check if it already exists. */
+                        if (worker.store.isValidPath(*output->second)) {
+                            trace("output already exists");
+                            outputPath = *output->second;
+                            co_return amDone(ecSuccess);
+                        }
+                        /* Input-addressed, but output doesn't exist. Build it. */
+                        trace("input-addressed derivation, skipping build trace");
+                        usesBuildTrace = false;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    if (usesBuildTrace) {
+        /* Try to look up the realisation via BuildTraceTrampolineGoal. */
+        auto btGoal = worker.makeBuildTraceTrampolineGoal(id);
+
+        co_await await(Goals{upcast_goal(btGoal)});
+
+        if (btGoal->outputInfo) {
+            /* Found a realisation! We're done. */
+            trace("found realisation via build trace lookup");
+            outputPath = btGoal->outputInfo->outPath;
+            co_return amDone(ecSuccess);
+        }
+
+        trace("no realisation found, falling back to building");
+    }
+
+    /* Reset counters since we're starting a fresh build attempt. */
+    nrFailed = 0;
+    nrNoSubstituters = 0;
 
     /* No realisation found. Fall back to building via DerivationGoal.
        We use makeGoal which will create a DerivationTrampolineGoal,
