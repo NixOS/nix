@@ -3,7 +3,6 @@
 
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/memory-source-accessor.hh"
@@ -180,17 +179,16 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     EnableExperimentalFeature enableCA{"ca-derivations"};
 
     // Create a CA floating output derivation
-    Derivation drv{
-        .outputs{
-            {
-                "out",
-                DerivationOutput{DerivationOutput::CAFloating{
-                    .method = ContentAddressMethod::Raw::NixArchive,
-                    .hashAlgo = HashAlgorithm::SHA256,
-                }},
-            },
+    Derivation drv;
+    drv.name = "test-ca-drv";
+    drv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::CAFloating{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
         },
-        .name = "test-ca-drv",
     };
 
     // Write the derivation to the destination store
@@ -243,7 +241,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Create a derivation goal for the CA derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(drvPath, make_ref<Derivation>(drv), "out", bmNormal, true);
+    auto goal = worker.makeDerivationGoal(drvPath, make_ref<const Derivation>(drv), "out", bmNormal, true);
 
     // Run the worker
     Goals goals;
@@ -319,19 +317,23 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
         });
 
     // Create the root CA floating derivation that depends on depDrv
-    Derivation rootDrv{
-        .outputs =
-            {{"out",
-              DerivationOutput{DerivationOutput::CAFloating{
-                  .method = ContentAddressMethod::Raw::NixArchive,
-                  .hashAlgo = HashAlgorithm::SHA256,
-              }}}},
-        // Add the dependency derivation as an input
-        .inputs = {SingleDerivedPath::Built{
-            .drvPath = make_ref<SingleDerivedPath>(SingleDerivedPath::Opaque{depDrvPath}),
+    Derivation rootDrv;
+    rootDrv.name = "root-drv";
+    rootDrv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::CAFloating{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hashAlgo = HashAlgorithm::SHA256,
+            }},
+        },
+    };
+    // Add the dependency derivation as an input
+    rootDrv.inputs = {
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(depDrvPath),
             .output = "out",
-        }},
-        .name = "root-drv",
+        },
     };
 
     // Write the root derivation to the destination store
@@ -406,7 +408,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Create a derivation goal for the root derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(rootDrvPath, make_ref<Derivation>(rootDrv), "out", bmNormal, false);
+    auto goal = worker.makeDerivationGoal(rootDrvPath, make_ref<const Derivation>(rootDrv), "out", bmNormal, false);
 
     // Run the worker
     Goals goals;
@@ -429,9 +431,9 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(depRealisation);
     ASSERT_EQ(depRealisation->outPath, depOutputPath);
 
-    // TODO #11928: The dependency's OUTPUT should NOT be fetched (not referenced
-    // by root output). Once #11928 is fixed, change ASSERT_TRUE to ASSERT_FALSE.
-    ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
+    // The dependency's OUTPUT should NOT be fetched (not referenced by
+    // root output).
+    ASSERT_FALSE(dummyStore->isValidPath(depOutputPath));
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
