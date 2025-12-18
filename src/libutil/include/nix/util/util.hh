@@ -6,7 +6,6 @@
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 
-#include <filesystem>
 #include <functional>
 #include <map>
 #include <sstream>
@@ -25,99 +24,6 @@ void initLibUtil();
 std::vector<char *> stringsToCharPtrs(const Strings & ss);
 
 MakeError(FormatError, Error);
-
-template<class... Parts>
-auto concatStrings(Parts &&... parts)
-    -> std::enable_if_t<(... && std::is_convertible_v<Parts, std::string_view>), std::string>
-{
-    std::string_view views[sizeof...(parts)] = {parts...};
-    return concatStringsSep({}, views);
-}
-
-/**
- * Add quotes around a string.
- */
-inline std::string quoteString(std::string_view s, char quote = '\'')
-{
-    std::string result;
-    result.reserve(s.size() + 2);
-    result += quote;
-    result += s;
-    result += quote;
-    return result;
-}
-
-/**
- * Add quotes around a collection of strings.
- */
-template<class C>
-Strings quoteStrings(const C & c, char quote = '\'')
-{
-    Strings res;
-    for (auto & s : c)
-        res.push_back(quoteString(s, quote));
-    return res;
-}
-
-inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char quote = '\'')
-{
-    return paths | std::views::transform([&](const auto & p) { return quoteString(p.string(), quote); })
-           | std::ranges::to<Strings>();
-}
-
-/**
- * Remove trailing whitespace from a string.
- *
- * \todo return std::string_view.
- */
-std::string chomp(std::string_view s);
-
-/**
- * Remove whitespace from the start and end of a string.
- */
-std::string trim(std::string_view s, std::string_view whitespace = " \n\r\t");
-
-/**
- * Replace all occurrences of a string inside another string.
- */
-std::string replaceStrings(std::string s, std::string_view from, std::string_view to);
-
-std::string rewriteStrings(std::string s, const StringMap & rewrites);
-
-/**
- * Parse a string into an integer.
- */
-template<class N>
-std::optional<N> string2Int(const std::string_view s);
-
-/**
- * Like string2Int(), but support an optional suffix 'K', 'M', 'G' or
- * 'T' denoting a binary unit prefix.
- */
-template<class N>
-N string2IntWithUnitPrefix(std::string_view s)
-{
-    uint64_t multiplier = 1;
-    if (!s.empty()) {
-        char u = std::toupper(*s.rbegin());
-        if (std::isalpha(u)) {
-            if (u == 'K')
-                multiplier = 1ULL << 10;
-            else if (u == 'M')
-                multiplier = 1ULL << 20;
-            else if (u == 'G')
-                multiplier = 1ULL << 30;
-            else if (u == 'T')
-                multiplier = 1ULL << 40;
-            else
-                throw UsageError("invalid unit specifier '%1%'", u);
-            s.remove_suffix(1);
-        }
-    }
-    if (auto n = string2Int<N>(s))
-        return *n * multiplier;
-    throw UsageError("'%s' is not an integer", s);
-}
 
 // Base also uses 'K', because it should also displayed as KiB => 100 Bytes => 0.1 KiB
 #define NIX_UTIL_SIZE_UNITS               \
@@ -163,12 +69,6 @@ char getSizeUnitSuffix(SizeUnit unit);
 std::string renderSize(int64_t value, bool align = false);
 
 /**
- * Parse a string into a float.
- */
-template<class N>
-std::optional<N> string2Float(const std::string_view s);
-
-/**
  * Convert a little-endian integer to host order.
  */
 template<typename T>
@@ -180,31 +80,6 @@ T readLittleEndian(unsigned char * p)
     }
     return x;
 }
-
-/**
- * @return true iff `s` starts with `prefix`.
- */
-bool hasPrefix(std::string_view s, std::string_view prefix);
-
-/**
- * @return true iff `s` ends in `suffix`.
- */
-bool hasSuffix(std::string_view s, std::string_view suffix);
-
-/**
- * Convert a string to lower case.
- */
-std::string toLower(std::string s);
-
-/**
- * Escape a string as a shell word.
- *
- * This always adds single quotes, even if escaping is not strictly necessary.
- * So both
- * - `"hello world"` -> `"'hello world'"`, which needs escaping because of the space
- * - `"echo"` -> `"'echo'"`, which doesn't need escaping
- */
-std::string escapeShellArgAlways(const std::string_view s);
 
 /**
  * Exception handling in destructors: print an error message, then
@@ -234,20 +109,6 @@ constexpr char treeConn[] = "├───";
 constexpr char treeLast[] = "└───";
 constexpr char treeLine[] = "│   ";
 constexpr char treeNull[] = "    ";
-
-/**
- * Remove common leading whitespace from the lines in the string
- * 's'. For example, if every line is indented by at least 3 spaces,
- * then we remove 3 spaces from the start of every line.
- */
-std::string stripIndentation(std::string_view s);
-
-/**
- * Get the prefix of 's' up to and excluding the next line break (LF
- * optionally preceded by CR), and the remainder following the line
- * break.
- */
-std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 /**
  * Get a pointer to the contents of a `std::optional` if it is set, or a
