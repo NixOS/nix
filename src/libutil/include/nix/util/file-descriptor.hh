@@ -86,6 +86,13 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
 std::string readLine(Descriptor fd, bool eofOk = false);
 
 /**
+ * Discard any buffered state associated with `readLine`.
+ *
+ * This is intended for internal use by file descriptor wrappers like `AutoCloseFD`.
+ */
+void clearReadLineCache(Descriptor fd);
+
+/**
  * Write a line to a file descriptor.
  */
 void writeLine(Descriptor fd, std::string s);

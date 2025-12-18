@@ -83,6 +83,8 @@ std::string readLine(HANDLE handle, bool eofOk)
     }
 }
 
+void clearReadLineCache(HANDLE) {}
+
 void drainFD(HANDLE handle, Sink & sink /*, bool block*/)
 {
     std::vector<unsigned char> buf(64 * 1024);

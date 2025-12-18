@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <poll.h>
 
+#include <unordered_map>
+
 #if defined(__linux__) && defined(__NR_openat2)
 #  define HAVE_OPENAT2 1
 #  include <sys/syscall.h>
@@ -24,6 +26,14 @@ namespace nix {
 
 namespace {
 
+struct ReadLineState
+{
+    std::string buffer;
+    size_t offset = 0;
+};
+
+thread_local std::unordered_map<int, ReadLineState> readLineStates;
+
 // This function is needed to handle non-blocking reads/writes. This is needed in the buildhook, because
 // somehow the json logger file descriptor ends up being non-blocking and breaks remote-building.
 // TODO: get rid of buildhook and remove this function again (https://github.com/NixOS/nix/issues/12688)
@@ -38,6 +48,11 @@ void pollFD(int fd, int events)
     }
 }
 } // namespace
+
+void clearReadLineCache(int fd)
+{
+    readLineStates.erase(fd);
+}
 
 std::string readFile(int fd)
 {
@@ -93,32 +108,59 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
 
 std::string readLine(int fd, bool eofOk)
 {
-    std::string s;
-    while (1) {
+    auto & state = readLineStates[fd];
+
+    while (true) {
+        if (state.offset < state.buffer.size()) {
+            auto newlinePos = state.buffer.find('\n', state.offset);
+            if (newlinePos != std::string::npos) {
+                std::string line(state.buffer, state.offset, newlinePos - state.offset);
+                state.offset = newlinePos + 1;
+
+                if (state.offset == state.buffer.size()) {
+                    // Clear the buffer (no more data)
+                    state.buffer.clear();
+                    state.offset = 0;
+                } else if (state.offset > 64 * 1024 && state.offset > state.buffer.size() / 2) {
+                    // Compact the buffer (has more data)
+                    state.buffer.erase(0, state.offset);
+                    state.offset = 0;
+                }
+
+                return line;
+            }
+        }
+
         checkInterrupt();
-        char ch;
-        // FIXME: inefficient
-        ssize_t rd = read(fd, &ch, 1);
+
+        char buf[8192];
+        ssize_t rd = read(fd, buf, sizeof(buf));
         if (rd == -1) {
             switch (errno) {
             case EINTR:
                 continue;
-            case EAGAIN: {
+            case EAGAIN:
                 pollFD(fd, POLLIN);
                 continue;
-            }
             default:
                 throw SysError("reading a line");
             }
         } else if (rd == 0) {
+            std::string line;
+            if (state.offset < state.buffer.size()) {
+                // Consume the rest of the buffer
+                line.assign(state.buffer, state.offset, state.buffer.size() - state.offset);
+                state.buffer.clear();
+                state.offset = 0;
+            }
+
+            clearReadLineCache(fd);
+
             if (eofOk)
-                return s;
-            else
-                throw EndOfFile("unexpected EOF reading a line");
+                return line;
+            throw EndOfFile("unexpected EOF reading a line");
         } else {
-            if (ch == '\n')
-                return s;
-            s += ch;
+            state.buffer.append(buf, rd);
         }
     }
 }

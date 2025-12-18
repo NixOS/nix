@@ -1,3 +1,4 @@
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 
@@ -77,6 +78,7 @@ Descriptor AutoCloseFD::get() const
 void AutoCloseFD::close()
 {
     if (fd != INVALID_DESCRIPTOR) {
+        clearReadLineCache(fd);
         if (
 #ifdef _WIN32
             ::CloseHandle(fd)
