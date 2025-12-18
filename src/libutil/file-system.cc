@@ -553,17 +553,27 @@ AutoCloseFD createAnonymousTempFile()
 {
     AutoCloseFD fd;
 #ifdef O_TMPFILE
-    fd = ::open(defaultTempDir().c_str(), O_TMPFILE | O_CLOEXEC | O_RDWR, S_IWUSR | S_IRUSR);
-    if (!fd)
-        throw SysError("creating anonymous temporary file");
-#else
+    static std::atomic_flag tmpfileUnsupported{};
+    if (!tmpfileUnsupported.test()) /* Try with O_TMPFILE first. */ {
+        /* Use O_EXCL, because the file is never supposed to be linked into filesystem. */
+        fd = ::open(defaultTempDir().c_str(), O_TMPFILE | O_CLOEXEC | O_RDWR | O_EXCL, S_IWUSR | S_IRUSR);
+        if (!fd) {
+            /* Not supported by the filesystem or the kernel. */
+            if (errno == EOPNOTSUPP || errno == EISDIR)
+                tmpfileUnsupported.test_and_set(); /* Set flag and fall through to createTempFile. */
+            else
+                throw SysError("creating anonymous temporary file");
+        } else {
+            return fd; /* Successfully created. */
+        }
+    }
+#endif
     auto [fd2, path] = createTempFile("nix-anonymous");
     if (!fd2)
         throw SysError("creating temporary file '%s'", path);
     fd = std::move(fd2);
-#  ifndef _WIN32
+#ifndef _WIN32
     unlink(requireCString(path)); /* We only care about the file descriptor. */
-#  endif
 #endif
     return fd;
 }
