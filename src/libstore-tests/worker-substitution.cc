@@ -431,9 +431,9 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(depRealisation);
     ASSERT_EQ(depRealisation->outPath, depOutputPath);
 
-    // TODO #11928: The dependency's OUTPUT should NOT be fetched (not referenced
-    // by root output). Once #11928 is fixed, change ASSERT_TRUE to ASSERT_FALSE.
-    ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
+    // The dependency's OUTPUT should NOT be fetched (not referenced by
+    // root output).
+    ASSERT_FALSE(dummyStore->isValidPath(depOutputPath));
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
