@@ -40,6 +40,11 @@ struct UnixPathTrait
     {
         return path.rfind('/', from);
     }
+
+    static size_t rootNameLen(StringView)
+    {
+        return 0;
+    }
 };
 
 /**
@@ -83,6 +88,18 @@ struct WindowsPathTrait
         size_t p2 = path.rfind(preferredSep, from);
         return p1 == String::npos ? p2 : p2 == String::npos ? p1 : std::max(p1, p2);
     }
+
+    static size_t rootNameLen(StringView path)
+    {
+        if (path.size() >= 2 && path[1] == ':') {
+            char driveLetter = path[0];
+            if ((driveLetter >= 'A' && driveLetter <= 'Z') || (driveLetter >= 'a' && driveLetter <= 'z'))
+                return 2;
+        }
+        /* TODO: This needs to also handle UNC paths.
+         * https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats#unc-paths */
+        return 0;
+    }
 };
 
 template<typename CharT>
@@ -115,6 +132,11 @@ typename PathDict::String canonPathInner(typename PathDict::StringView remaining
 
     typename PathDict::String result;
     result.reserve(256);
+
+    if (auto rootNameLength = PathDict::rootNameLen(remaining)) {
+        result += remaining.substr(0, rootNameLength); /* Copy drive letter verbatim. */
+        remaining.remove_prefix(rootNameLength);
+    }
 
     while (true) {
 

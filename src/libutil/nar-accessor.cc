@@ -1,4 +1,5 @@
 #include "nix/util/nar-accessor.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/archive.hh"
 
 #include <map>
@@ -281,7 +282,7 @@ GetNarBytes seekableGetNarBytes(const Path & path)
 GetNarBytes seekableGetNarBytes(Descriptor fd)
 {
     return [fd](uint64_t offset, uint64_t length) {
-        if (::lseek(fromDescriptorReadOnly(fd), offset, SEEK_SET) == -1)
+        if (lseek(fd, offset, SEEK_SET) == -1)
             throw SysError("seeking in file");
 
         std::string buf(length, 0);
