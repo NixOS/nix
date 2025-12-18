@@ -420,7 +420,7 @@ private:
 
     uint64_t queryValidPathId(State & state, const StorePath & path);
 
-    uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
+    uint64_t addValidPath(State & state, const ValidPathInfo & info);
 
     void invalidatePath(State & state, const StorePath & path);
 
