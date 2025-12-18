@@ -733,8 +733,22 @@ std::string Derivation::unparse(
     }
 
     s += "],"sv;
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
-    printUnquotedStrings(s, paths.begin(), paths.end());
+    s += '[';
+    first = true;
+    for (auto & i : inputSrcs) {
+        if (first)
+            first = false;
+        else
+            s += ',';
+
+        s += '"';
+        // Specialized and inlined StoreDirConfig::printStorePath
+        s += store.storeDir;
+        s += '/';
+        s += i.to_string();
+        s += '"';
+    }
+    s += ']';
 
     s += ',';
     printUnquotedString(s, platform);
