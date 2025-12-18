@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
+#include "nix/store/build/derived-output-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 
@@ -26,12 +27,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 {
     Goals waitees;
 
-    using ValueComparison = decltype([]<typename T>(const ref<T> & lhs, const ref<T> & rhs) {
-        /* Compare the values, not the pointers themselves. */
-        return *lhs < *rhs;
-    });
-
-    std::map<ref<const SingleDerivedPath>, GoalPtr, ValueComparison> inputGoals;
+    /**
+     * Map from output deriving path to the DerivedOutputGoal
+     * that will get its realisation (either from build trace lookup or by building).
+     */
+    std::map<SingleDerivedPath::Built, std::shared_ptr<DerivedOutputGoal>> inputGoals;
 
     for (const auto & input : drv->inputs) {
         std::visit(
@@ -62,15 +62,9 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                         }
                     }
 
-                    auto inputDrvRef = make_ref<SingleDerivedPath>(input);
-                    auto g = worker.makeGoal(
-                        DerivedPath::Built{
-                            .drvPath = built.drvPath,
-                            .outputs = OutputsSpec::Names{built.output},
-                        },
-                        buildMode == bmRepair ? bmRepair : bmNormal);
-                    inputGoals.insert_or_assign(inputDrvRef, g);
-                    waitees.insert(std::move(g));
+                    auto g = worker.makeDerivedOutputGoal(built, buildMode == bmRepair ? bmRepair : bmNormal);
+                    inputGoals.insert_or_assign(built, g);
+                    waitees.insert(upcast_goal(g));
                 }},
             input.raw());
     }
@@ -147,23 +141,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 
         auto attempt = fullDrv.tryResolve(
             worker.store,
-            [&](ref<const SingleDerivedPath> inputDrvPath, const std::string & outputName) -> std::optional<StorePath> {
-                auto inputDrvRef = make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrvPath, outputName});
-                auto mEntry = get(inputGoals, inputDrvRef);
-                if (!mEntry)
+            [&](ref<const SingleDerivedPath> inputDrv, const std::string & outputName) -> std::optional<StorePath> {
+                auto mGoal = get(inputGoals, SingleDerivedPath::Built{inputDrv, outputName});
+                if (!mGoal)
                     return std::nullopt;
-                auto & buildResult = (*mEntry)->buildResult;
-                return std::visit(
-                    overloaded{
-                        [](const BuildResult::Failure &) -> std::optional<StorePath> { return std::nullopt; },
-                        [&](const BuildResult::Success & success) -> std::optional<StorePath> {
-                            auto i = get(success.builtOutputs, outputName);
-                            if (i)
-                                return i->outPath;
-                            return std::nullopt;
-                        },
-                    },
-                    buildResult.inner);
+                return (*mGoal)->outputPath;
             });
 
         if (!attempt) {
