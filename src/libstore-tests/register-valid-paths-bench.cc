@@ -74,6 +74,6 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
     state.SetItemsProcessed(state.iterations() * derivationCount);
 }
 
-BENCHMARK(BM_RegisterValidPathsDerivations)->Arg(10)->Arg(50)->Arg(200);
+BENCHMARK(BM_RegisterValidPathsDerivations)->Arg(10);
 
 #endif
