@@ -5,6 +5,7 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/build-trace-trampoline-goal.hh"
+#include "nix/store/build/derived-output-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
@@ -116,6 +117,12 @@ std::shared_ptr<BuildTraceTrampolineGoal> Worker::makeBuildTraceTrampolineGoal(c
     return initGoalIfNeeded(buildTraceTrampolineGoals.ensureSlot(id).value, id, *this);
 }
 
+std::shared_ptr<DerivedOutputGoal>
+Worker::makeDerivedOutputGoal(const SingleDerivedPath::Built & id, BuildMode buildMode)
+{
+    return initGoalIfNeeded(derivedOutputGoals.ensureSlot(id).value, id, *this, buildMode);
+}
+
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(
@@ -196,6 +203,8 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<BuildTraceTrampolineGoal>(goal))
         nix::removeGoal(subGoal, buildTraceTrampolineGoals.map);
+    else if (auto subGoal = std::dynamic_pointer_cast<DerivedOutputGoal>(goal))
+        nix::removeGoal(subGoal, derivedOutputGoals.map);
     else
         assert(false);
 
@@ -573,6 +582,11 @@ GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
 }
 
 GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivedOutputGoal> subGoal)
 {
     return subGoal;
 }
