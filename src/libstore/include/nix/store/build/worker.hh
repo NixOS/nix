@@ -24,6 +24,7 @@ struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 class BuildTraceTrampolineGoal;
+class DerivedOutputGoal;
 
 /**
  * Workaround for not being able to declare a something like
@@ -42,6 +43,7 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<BuildTraceTrampolineGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivedOutputGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -123,6 +125,7 @@ private:
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
     DerivedPathMap<std::weak_ptr<BuildTraceTrampolineGoal>> buildTraceTrampolineGoals;
+    DerivedPathMap<std::weak_ptr<DerivedOutputGoal>> derivedOutputGoals;
 
     /**
      * Goals waiting for busy paths to be unlocked.
@@ -250,6 +253,11 @@ public:
      * @ref BuildTraceTrampolineGoal "build trace trampoline goal"
      */
     std::shared_ptr<BuildTraceTrampolineGoal> makeBuildTraceTrampolineGoal(const SingleDerivedPath::Built & id);
+
+    /**
+     * @ref DerivedOutputGoal "derived output goal"
+     */
+    std::shared_ptr<DerivedOutputGoal> makeDerivedOutputGoal(const SingleDerivedPath::Built & id, BuildMode buildMode);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.
