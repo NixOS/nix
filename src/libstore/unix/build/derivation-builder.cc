@@ -490,6 +490,8 @@ bool DerivationBuilderImpl::killChild()
         killSandbox(true);
 
         pid.wait();
+
+        miscMethods->childTerminated();
     }
     return ret;
 }
