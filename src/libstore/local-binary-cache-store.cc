@@ -56,9 +56,11 @@ protected:
     void upsertFile(
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
-        auto path2 = config->binaryCacheDir + "/" + path;
+        auto path2 = std::filesystem::path{config->binaryCacheDir} / path;
         static std::atomic<int> counter{0};
-        Path tmp = fmt("%s.tmp.%d.%d", path2, getpid(), ++counter);
+        createDirs(path2.parent_path());
+        auto tmp = path2;
+        tmp += fmt(".tmp.%d.%d", getpid(), ++counter);
         AutoDelete del(tmp, false);
         writeFile(tmp, source);
         std::filesystem::rename(tmp, path2);
