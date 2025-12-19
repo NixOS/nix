@@ -1,6 +1,7 @@
 #include "nix/store/build/derived-output-goal.hh"
 #include "nix/store/build/build-trace-trampoline-goal.hh"
 #include "nix/store/build/worker.hh"
+#include "nix/store/derivations.hh"
 #include "nix/util/util.hh"
 
 namespace nix {
@@ -52,6 +53,20 @@ Goal::Co DerivedOutputGoal::init()
                         }
                         /* Input-addressed, but output doesn't exist. Build it. */
                         trace("input-addressed derivation, skipping build trace");
+                        usesBuildTrace = false;
+                    } else if (drv.type().isImpure()) {
+                        /* Impure derivation without static output path.
+                           Check local realisation database directly. */
+                        auto outputId = DrvOutput{opaque->path, id.output};
+                        if (auto realisation = worker.store.queryRealisation(outputId)) {
+                            if (worker.store.isValidPath(realisation->outPath)) {
+                                trace("impure derivation already built");
+                                outputPath = realisation->outPath;
+                                co_return amDone(ecSuccess);
+                            }
+                        }
+                        /* No existing realisation found, or output missing. Build it. */
+                        trace("impure derivation, skipping build trace");
                         usesBuildTrace = false;
                     }
                 }
