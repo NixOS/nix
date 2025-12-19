@@ -123,6 +123,8 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
+    void deleteBuildTrace(const DrvOutput & id) override;
+
     void optimiseStore() override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
