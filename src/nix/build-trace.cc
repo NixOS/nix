@@ -1,5 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/store-cast.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -78,5 +80,48 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 };
 
 static auto rCmdBuildTraceInfo = registerCommand2<CmdRealisationInfo>({"store", "build-trace", "info"});
+
+struct CmdRealisationDelete : virtual StoreCommand
+{
+    std::vector<std::string> ids;
+
+    CmdRealisationDelete()
+    {
+        expectArgs({
+            .label = "id",
+            .handler = {&ids},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete build traces from the store";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "build-trace/delete.md"
+            ;
+    }
+
+    Category category() override
+    {
+        return catSecondary;
+    }
+
+    void run(ref<Store> store) override
+    {
+        experimentalFeatureSettings.require(Xp::CaDerivations);
+        auto & gcStore = require<GcStore>(*store);
+
+        for (auto & id : ids) {
+            auto drvOutput = DrvOutput::parse(*store, id);
+            gcStore.deleteBuildTrace(drvOutput.drvPath, OutputsSpec::parse(drvOutput.outputName));
+        }
+    }
+};
+
+static auto rCmdRealisationDelete = registerCommand2<CmdRealisationDelete>({"store", "build-trace", "delete"});
 
 } // namespace nix
