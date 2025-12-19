@@ -699,6 +699,11 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     pathInfoCache->lock()->clear();
 }
 
+void RemoteStore::deleteBuildTrace(const DrvOutput & id)
+{
+    unsupported("deleteBuildTrace");
+}
+
 void RemoteStore::optimiseStore()
 {
     auto conn(getConnection());
