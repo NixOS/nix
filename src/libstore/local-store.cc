@@ -104,6 +104,7 @@ struct LocalStore::State::Stmts
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt UpdateRealisedOutput;
+    SQLiteStmt DeleteRealisedOutput;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
@@ -372,6 +373,15 @@ LocalStore::LocalStore(ref<const Config> config)
                     outputName = ?
                 ;
             )");
+        state->stmts->DeleteRealisedOutput.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
@@ -635,6 +645,15 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                     concatStringsSep(" ", info.signatures))
                 .exec();
         }
+    });
+}
+
+void LocalStore::deleteBuildTrace(const DrvOutput & id)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
+    retrySQLite<void>([&]() {
+        auto state(_state->lock());
+        state->stmts->DeleteRealisedOutput.use()(id.drvPath.to_string())(id.outputName).exec();
     });
 }
 
