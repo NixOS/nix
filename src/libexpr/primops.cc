@@ -4709,21 +4709,28 @@ static RegisterPrimOp primop_convertHash({
 
 struct RegexCache
 {
-    boost::concurrent_flat_map<std::string, std::regex, StringViewHash, std::equal_to<>> cache;
-
-    std::regex get(std::string_view re)
+    struct Entry
     {
-        std::regex regex;
-        /* No std::regex constructor overload from std::string_view, but can be constructed
-           from a pointer + size or an iterator range. */
+        ref<const std::regex> regex;
+
+        Entry(const char * s, size_t count)
+            : regex(make_ref<const std::regex>(s, count, std::regex::extended))
+        {
+        }
+    };
+
+    boost::concurrent_flat_map<std::string, Entry, StringViewHash, std::equal_to<>> cache;
+
+    ref<const std::regex> get(std::string_view re)
+    {
+        std::optional<ref<const std::regex>> regex;
         cache.try_emplace_and_cvisit(
             re,
             /*s=*/re.data(),
             /*count=*/re.size(),
-            std::regex::extended,
-            [&regex](const auto & kv) { regex = kv.second; },
-            [&regex](const auto & kv) { regex = kv.second; });
-        return regex;
+            [&regex](const auto & kv) { regex = kv.second.regex; },
+            [&regex](const auto & kv) { regex = kv.second.regex; });
+        return *regex;
     }
 };
 
@@ -4745,7 +4752,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.match");
 
         std::cmatch match;
-        if (!std::regex_match(str.begin(), str.end(), match, regex)) {
+        if (!std::regex_match(str.begin(), str.end(), match, *regex)) {
             v.mkNull();
             return;
         }
@@ -4818,7 +4825,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
         const auto str =
             state.forceString(*args[1], context, pos, "while evaluating the second argument passed to builtins.split");
 
-        auto begin = std::cregex_iterator(str.begin(), str.end(), regex);
+        auto begin = std::cregex_iterator(str.begin(), str.end(), *regex);
         auto end = std::cregex_iterator();
 
         // Any matches results are surrounded by non-matching results.
