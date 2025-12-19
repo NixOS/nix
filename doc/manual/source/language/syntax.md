@@ -272,7 +272,7 @@ will crash with an `infinite recursion encountered` error message.
 
 A let-expression allows you to define local variables for an expression.
 
-> *let-in* = `let` [ *identifier* = *expr* ]... `in` *expr*
+> *let-in* = `let` [ *identifier* = *expr* `;` ]... `in` *expr*
 
 Example:
 
