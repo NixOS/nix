@@ -46,6 +46,7 @@ issue_6572_dependent_outputs() {
     if [[ -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
         # Resolved derivations interferre with the deletion
         nix-store --delete "${NIX_STORE_DIR}"/*.drv
+        #nix realisation delete "$(jq -r <"$TEST_ROOT"/a.json .[0].outputs.second)"
     fi
     nix-store --delete "$(jq -r <"$TEST_ROOT"/a.json .[0].outputs.second)"
     p=$(nix build -f multiple-outputs.nix use-a --no-link --print-out-paths)
