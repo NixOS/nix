@@ -52,6 +52,12 @@ public:
      */
     void process();
 
+    /**
+     * Shut down all worker threads and wait until they've exited.
+     * Active work items are finished, but any pending work items are discarded.
+     */
+    void shutdown();
+
 private:
 
     size_t maxThreads;
@@ -72,8 +78,6 @@ private:
     std::condition_variable work;
 
     void doWork(bool mainThread);
-
-    void shutdown();
 };
 
 /**
