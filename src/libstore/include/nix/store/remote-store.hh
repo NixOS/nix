@@ -132,6 +132,12 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
+    void deleteBuildTraces(const std::set<DrvOutput> & keys) override
+    {
+        // TODO support this in the protocol someday
+        unsupported("deleteBuildTraces");
+    };
+
     void optimiseStore() override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;

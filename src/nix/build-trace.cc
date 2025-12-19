@@ -1,7 +1,10 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
+#include "nix/store/gc-store.hh"
+#include "nix/store/store-cast.hh"
 
 #include <nlohmann/json.hpp>
+#include <ranges>
 
 namespace nix {
 
@@ -20,6 +23,11 @@ struct CmdBuildTrace : NixMultiCommand
     Category category() override
     {
         return catUtility;
+    }
+
+    std::optional<ExperimentalFeature> experimentalFeature() override
+    {
+        return Xp::CaDerivations;
     }
 };
 
@@ -46,7 +54,6 @@ struct CmdBuildTraceInfo : BuiltPathsCommand, MixJSON
 
     void run(ref<Store> store, BuiltPaths && paths, BuiltPaths && rootPaths) override
     {
-        experimentalFeatureSettings.require(Xp::CaDerivations);
         RealisedPath::Set realisations;
 
         for (auto & builtPath : paths) {
@@ -78,5 +85,47 @@ struct CmdBuildTraceInfo : BuiltPathsCommand, MixJSON
 };
 
 static auto rCmdBuildTraceInfo = registerCommand2<CmdBuildTraceInfo>({"store", "build-trace", "info"});
+
+struct CmdBuildTraceDelete : virtual StoreCommand
+{
+    std::vector<std::string> ids;
+
+    CmdBuildTraceDelete()
+    {
+        expectArgs({
+            .label = "id",
+            .handler = {&ids},
+        });
+    }
+
+    std::string description() override
+    {
+        return "delete build traces from the store";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "build-trace/delete.md"
+            ;
+    }
+
+    Category category() override
+    {
+        return catSecondary;
+    }
+
+    void run(ref<Store> store) override
+    {
+        auto & gcStore = require<GcStore>(*store);
+
+        auto keys = ids | std::views::transform([&](std::string_view s) { return DrvOutput::parse(*store, s); })
+                    | std::ranges::to<std::set>();
+
+        gcStore.deleteBuildTraces(keys);
+    }
+};
+
+static auto rCmdBuildTraceDelete = registerCommand2<CmdBuildTraceDelete>({"store", "build-trace", "delete"});
 
 } // namespace nix

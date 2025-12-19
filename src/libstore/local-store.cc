@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <time.h>
+#include <variant>
 
 #ifndef _WIN32
 #  include <grp.h>
@@ -112,6 +113,7 @@ struct LocalStore::State::Stmts
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt UpdateRealisedOutput;
+    SQLiteStmt DeleteRealisedOutputByName;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
@@ -384,6 +386,15 @@ LocalStore::LocalStore(ref<const Config> config)
             R"(
                 update BuildTraceV3
                     set signatures = ?
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
+        state->stmts->DeleteRealisedOutputByName.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
                 where
                     drvPath = ? and
                     outputName = ?
@@ -693,6 +704,19 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 .apply(concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
+    });
+}
+
+void LocalStore::deleteBuildTraces(const std::set<DrvOutput> & keys)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
+    retrySQLite<void>([&]() {
+        auto state(_state->lock());
+        SQLiteTxn txn(state->db);
+        for (const auto & key : keys) {
+            state->stmts->DeleteRealisedOutputByName.use().apply(key.drvPath.to_string()).apply(key.outputName).exec();
+        }
+        txn.commit();
     });
 }
 
