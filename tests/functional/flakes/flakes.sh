@@ -395,6 +395,9 @@ nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1
 nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/"$hash1"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
 
+# Test that --override-input with empty input path is rejected (issue #14816).
+expectStderr 1 nix flake lock "$flake3Dir" --override-input '' . | grepQuiet "input path cannot be empty"
+
 # Test --update-input.
 nix flake lock "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") = "$hash1" ]]
