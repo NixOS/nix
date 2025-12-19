@@ -523,7 +523,6 @@ Derivation parseDerivation(
  */
 static void printString(std::string & res, std::string_view s)
 {
-    res.reserve(res.size() + s.size() * 2 + 2);
     res += '"';
     static constexpr auto chunkSize = 1024;
     std::array<char, 2 * chunkSize + 2> buffer;
