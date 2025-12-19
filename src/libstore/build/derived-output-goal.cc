@@ -67,13 +67,29 @@ Goal::Co DerivedOutputGoal::init()
         co_await await(Goals{upcast_goal(btGoal)});
 
         if (btGoal->outputInfo) {
-            /* Found a realisation! We're done. */
+            /* Found a realisation! Check if the output is available. */
             trace("found realisation via build trace lookup");
             outputPath = btGoal->outputInfo->outPath;
-            co_return amDone(ecSuccess);
-        }
 
-        trace("no realisation found, falling back to building");
+            /* Check if the output path exists locally or in any substitutor. */
+            if (worker.store.isValidPath(*outputPath)) {
+                trace("realisation found, and output is known to exist in default store");
+                co_return amDone(ecSuccess);
+            }
+
+            for (auto & sub : worker.getSubstituters()) {
+                if (sub->isValidPath(*outputPath)) {
+                    trace(
+                        fmt("realisation found, and output is known to exist in substitutor '%s'",
+                            sub->config.getHumanReadableURI()));
+                    co_return amDone(ecSuccess);
+                }
+            }
+
+            trace("realisation found but output not available, falling back to building");
+        } else {
+            trace("no realisation found, falling back to building");
+        }
     }
 
     /* Reset counters since we're starting a fresh build attempt. */
