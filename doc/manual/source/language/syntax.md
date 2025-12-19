@@ -285,6 +285,27 @@ in x + y
 
 This evaluates to `"foobar"`.
 
+There is also another, older, syntax for let expressions that should not be used in new code:
+
+> *let* = `let` `{` *identifier* = *expr* `;` [ *identifier* = *expr* `;`]...  `}`
+
+In this form, the attribute set between the `{` `}` is recursive.
+
+One of the attributes must have the special name `body`,
+which is the result of the expression.
+
+Example:
+
+```nix
+let {
+  foo = bar;
+  bar = "baz";
+  body = foo;
+}
+```
+
+This evaluates to "baz".
+
 ## Inheriting attributes
 
 When defining an [attribute set](./types.md#type-attrs) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
