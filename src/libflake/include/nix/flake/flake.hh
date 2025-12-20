@@ -211,7 +211,7 @@ struct LockFlags
      * Flake inputs to be updated. This means that any existing lock
      * for those inputs will be ignored.
      */
-    std::set<InputAttrPath> inputUpdates;
+    std::set<NonEmptyInputAttrPath> inputUpdates;
 };
 
 LockedFlake

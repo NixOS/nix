@@ -116,7 +116,11 @@ MixFlakeOptions::MixFlakeOptions()
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             warn("'--update-input' is a deprecated alias for 'flake update' and will be removed in a future version.");
-            lockFlags.inputUpdates.insert(flake::parseInputAttrPath(s));
+            auto path = flake::NonEmptyInputAttrPath::parse(s);
+            if (!path)
+                throw UsageError(
+                    "--update-input was passed a zero-length input path, which would refer to the flake itself, not an input");
+            lockFlags.inputUpdates.insert(*path);
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);

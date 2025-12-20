@@ -617,7 +617,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                     updatesUsed.insert(inputAttrPath);
 
-                    if (oldNode && !lockFlags.inputUpdates.count(inputAttrPath))
+                    if (oldNode && !lockFlags.inputUpdates.count(nonEmptyInputAttrPath))
                         if (auto oldLock2 = get(oldNode->inputs, id))
                             if (auto oldLock3 = std::get_if<0>(&*oldLock2))
                                 oldLock = *oldLock3;
@@ -636,10 +636,10 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                         /* If we have this input in updateInputs, then we
                            must fetch the flake to update it. */
-                        auto lb = lockFlags.inputUpdates.lower_bound(inputAttrPath);
+                        auto lb = lockFlags.inputUpdates.lower_bound(nonEmptyInputAttrPath);
 
-                        auto mustRefetch = lb != lockFlags.inputUpdates.end() && lb->size() > inputAttrPath.size()
-                                           && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->begin());
+                        auto mustRefetch = lb != lockFlags.inputUpdates.end() && lb->get().size() > inputAttrPath.size()
+                                           && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->get().begin());
 
                         FlakeInputs fakeInputs;
 
