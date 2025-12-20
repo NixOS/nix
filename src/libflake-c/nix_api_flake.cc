@@ -162,10 +162,10 @@ nix_err nix_flake_lock_flags_add_input_override(
 {
     nix_clear_err(context);
     try {
-        auto path = nix::flake::parseInputAttrPath(inputPath);
-        if (path.empty())
+        auto path = nix::flake::NonEmptyInputAttrPath::parse(inputPath);
+        if (!path)
             throw nix::UsageError("input override path cannot be empty");
-        flags->lockFlags->inputOverrides.emplace(path, *flakeRef->flakeRef);
+        flags->lockFlags->inputOverrides.emplace(std::move(*path), *flakeRef->flakeRef);
         if (flags->lockFlags->writeLockFile) {
             return nix_flake_lock_flags_set_mode_virtual(context, flags);
         }

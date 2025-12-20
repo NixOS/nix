@@ -131,11 +131,11 @@ MixFlakeOptions::MixFlakeOptions()
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputAttrPath, std::string flakeRef) {
             lockFlags.writeLockFile = false;
-            auto path = flake::parseInputAttrPath(inputAttrPath);
-            if (path.empty())
+            auto path = flake::NonEmptyInputAttrPath::parse(inputAttrPath);
+            if (!path)
                 throw UsageError("--override-input: input path cannot be empty");
             lockFlags.inputOverrides.insert_or_assign(
-                std::move(path), parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
+                std::move(*path), parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
