@@ -434,7 +434,7 @@ TEST_F(nix_api_store_test, nix_api_flake_lock_flags_add_input_override_empty_pat
     // Verify error message contains expected text
     const char * errMsg = nix_err_msg(nullptr, ctx, nullptr);
     ASSERT_NE(nullptr, errMsg);
-    ASSERT_NE(std::string(errMsg).find("input override path cannot be empty"), std::string::npos);
+    ASSERT_NE(std::string(errMsg).find("input override path cannot be zero-length"), std::string::npos);
 
     nix_flake_reference_free(flakeReference);
     nix_flake_reference_parse_flags_free(parseFlags);
