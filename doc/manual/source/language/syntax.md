@@ -51,6 +51,7 @@ See [String literals](string-literals.md).
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
+  [string interpolation]: ./string-interpolation.md
   [interpolated into other expressions]: ./string-interpolation.md#interpolated-expression
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
