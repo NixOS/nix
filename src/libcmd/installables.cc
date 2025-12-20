@@ -137,7 +137,8 @@ MixFlakeOptions::MixFlakeOptions()
             lockFlags.writeLockFile = false;
             auto path = flake::NonEmptyInputAttrPath::parse(inputAttrPath);
             if (!path)
-                throw UsageError("--override-input: input path cannot be empty");
+                throw UsageError(
+                    "--override-input was passed a zero-length input path, which would refer to the flake itself, not an input");
             lockFlags.inputOverrides.insert_or_assign(
                 std::move(*path), parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
