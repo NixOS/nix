@@ -4,6 +4,7 @@
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
 #  include "nix/util/logging.hh"
+#  include "nix/util/serialise.hh"
 #  include "linux/fchmodat2-compat.hh"
 
 #  include <sys/ioctl.h>
@@ -385,7 +386,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             userNamespaceSync.writeSide = -1;
         });
 
-        auto ss = tokenizeString<std::vector<std::string>>(readLine(sendPid.readSide.get()));
+        FdSource sendPidSource(sendPid.readSide.get());
+        auto ss = tokenizeString<std::vector<std::string>>(sendPidSource.readLine());
         assert(ss.size() == 1);
         pid = string2Int<pid_t>(ss[0]).value();
 
