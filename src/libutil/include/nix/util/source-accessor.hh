@@ -221,6 +221,11 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 ref<SourceAccessor> makeEmptySourceAccessor();
 
 /**
+ * Helper function that's shared between PosixSourceAccessor and UNIX accessors.
+ */
+SourceAccessor::Stat posixStatToAccessorStat(const struct ::stat & st);
+
+/**
  * Exception thrown when accessing a filtered path (see
  * `FilteringSourceAccessor`).
  */

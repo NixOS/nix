@@ -76,6 +76,27 @@ SourceAccessor::Stat SourceAccessor::lstat(const CanonPath & path)
         throw FileNotFound("path '%s' does not exist", showPath(path));
 }
 
+SourceAccessor::Stat posixStatToAccessorStat(const struct ::stat & st)
+{
+    using enum SourceAccessor::Type;
+    return SourceAccessor::Stat{
+        .type = S_ISREG(st.st_mode)   ? tRegular
+                : S_ISDIR(st.st_mode) ? tDirectory
+                : S_ISLNK(st.st_mode) ? tSymlink
+                : S_ISCHR(st.st_mode) ? tChar
+                : S_ISBLK(st.st_mode) ? tBlock
+                :
+#ifdef S_ISSOCK
+                S_ISSOCK(st.st_mode) ? tSocket
+                :
+#endif
+                S_ISFIFO(st.st_mode) ? tFifo
+                                     : tUnknown,
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
+    };
+}
+
 void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displaySuffix)
 {
     this->displayPrefix = std::move(displayPrefix);
