@@ -205,13 +205,13 @@ struct LockFlags
     /**
      * Flake inputs to be overridden.
      */
-    std::map<InputAttrPath, FlakeRef> inputOverrides;
+    std::map<NonEmptyInputAttrPath, FlakeRef> inputOverrides;
 
     /**
      * Flake inputs to be updated. This means that any existing lock
      * for those inputs will be ignored.
      */
-    std::set<InputAttrPath> inputUpdates;
+    std::set<NonEmptyInputAttrPath> inputUpdates;
 };
 
 LockedFlake

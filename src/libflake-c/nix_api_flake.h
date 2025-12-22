@@ -160,8 +160,9 @@ nix_err nix_flake_lock_flags_set_mode_write_as_needed(nix_c_context * context, n
  * @brief Add input overrides to the lock flags
  * @param[out] context Optional, stores error information
  * @param[in] flags The flags to modify
- * @param[in] inputPath The input path to override
+ * @param[in] inputPath The input path to override (must not be empty)
  * @param[in] flakeRef The flake reference to use as the override
+ * @return NIX_ERR_NIX_ERROR if inputPath is empty
  *
  * This switches the `flags` to `nix_flake_lock_flags_set_mode_virtual` if not in mode
  * `nix_flake_lock_flags_set_mode_check`.

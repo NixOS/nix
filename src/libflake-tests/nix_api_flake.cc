@@ -384,4 +384,62 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
     nix_flake_settings_free(settings);
 }
 
+TEST_F(nix_api_store_test, nix_api_flake_lock_flags_add_input_override_empty_path)
+{
+    auto tmpDir = nix::createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, true);
+
+    nix::writeFile(tmpDir / "flake.nix", R"(
+        {
+            outputs = { ... }: { };
+        }
+    )");
+
+    nix_libstore_init(ctx);
+    assert_ctx_ok();
+
+    auto fetchSettings = nix_fetchers_settings_new(ctx);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, fetchSettings);
+
+    auto settings = nix_flake_settings_new(ctx);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, settings);
+
+    auto lockFlags = nix_flake_lock_flags_new(ctx, settings);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, lockFlags);
+
+    auto parseFlags = nix_flake_reference_parse_flags_new(ctx, settings);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, parseFlags);
+
+    auto r0 = nix_flake_reference_parse_flags_set_base_directory(
+        ctx, parseFlags, tmpDir.string().c_str(), tmpDir.string().size());
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, r0);
+
+    nix_flake_reference * flakeReference = nullptr;
+    std::string fragment;
+    nix_flake_reference_and_fragment_from_string(
+        ctx, fetchSettings, settings, parseFlags, ".", 1, &flakeReference, OBSERVE_STRING(fragment));
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, flakeReference);
+
+    // Test that empty input path is rejected (issue #14816)
+    auto r = nix_flake_lock_flags_add_input_override(ctx, lockFlags, "", flakeReference);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, r);
+    assert_ctx_err();
+
+    // Verify error message contains expected text
+    const char * errMsg = nix_err_msg(nullptr, ctx, nullptr);
+    ASSERT_NE(nullptr, errMsg);
+    ASSERT_NE(std::string(errMsg).find("input override path cannot be zero-length"), std::string::npos);
+
+    nix_flake_reference_free(flakeReference);
+    nix_flake_reference_parse_flags_free(parseFlags);
+    nix_flake_lock_flags_free(lockFlags);
+    nix_flake_settings_free(settings);
+}
+
 } // namespace nixC

@@ -316,6 +316,19 @@ InputAttrPath parseInputAttrPath(std::string_view s)
     return path;
 }
 
+std::optional<NonEmptyInputAttrPath> NonEmptyInputAttrPath::parse(std::string_view s)
+{
+    auto path = parseInputAttrPath(s);
+    return make(std::move(path));
+}
+
+std::optional<NonEmptyInputAttrPath> NonEmptyInputAttrPath::make(InputAttrPath path)
+{
+    if (path.empty())
+        return std::nullopt;
+    return NonEmptyInputAttrPath{std::move(path)};
+}
+
 std::map<InputAttrPath, Node::Edge> LockFile::getAllInputs() const
 {
     std::set<ref<Node>> done;

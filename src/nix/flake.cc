@@ -90,9 +90,12 @@ public:
             .optional = true,
             .handler = {[&](std::vector<std::string> inputsToUpdate) {
                 for (const auto & inputToUpdate : inputsToUpdate) {
-                    InputAttrPath inputAttrPath;
+                    std::optional<NonEmptyInputAttrPath> inputAttrPath;
                     try {
-                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
+                        inputAttrPath = flake::NonEmptyInputAttrPath::parse(inputToUpdate);
+                        if (!inputAttrPath)
+                            throw UsageError(
+                                "input path to be updated cannot be zero-length; it would refer to the flake itself, not an input");
                     } catch (Error & e) {
                         warn(
                             "Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.",
@@ -100,11 +103,11 @@ public:
                             inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                    if (lockFlags.inputUpdates.contains(*inputAttrPath))
                         warn(
                             "Input '%s' was specified multiple times. You may have done this by accident.",
-                            printInputAttrPath(inputAttrPath));
-                    lockFlags.inputUpdates.insert(inputAttrPath);
+                            printInputAttrPath(*inputAttrPath));
+                    lockFlags.inputUpdates.insert(*inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
