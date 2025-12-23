@@ -30,7 +30,11 @@ enum class SymlinkResolution {
     Full,
 };
 
-MakeError(FileNotFound, Error);
+MakeError(SourceAccessorError, Error);
+MakeError(FileNotFound, SourceAccessorError);
+MakeError(NotASymlink, SourceAccessorError);
+MakeError(NotADirectory, SourceAccessorError);
+MakeError(NotARegularFile, SourceAccessorError);
 
 /**
  * A read-only filesystem abstraction. This is used by the Nix
