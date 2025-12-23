@@ -63,6 +63,50 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
+        // SCP-like URL, no user (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "github.com:owner/repo.git",
+            .expected = "ssh://github.com/owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                        },
+                    .path = {"", "owner", "repo.git"},
+                },
+        },
+        // SCP-like URL, no user, absolute path (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "github.com:/owner/repo.git",
+            .expected = "ssh://github.com/owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                        },
+                    .path = {"", "owner", "repo.git"},
+                },
+        },
+        // SCP-like URL (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "user@server.com:/path/to/repo",
+            .expected = "ssh://user@server.com/path/to/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "server.com",
+                            .user = "user",
+                        },
+                    .path = {"", "path", "to", "repo"},
+                },
+        },
+#ifndef _WIN32
         // Absolute path (becomes file:)
         FixGitURLParam{
             .input = "/home/me/repo",
@@ -74,9 +118,20 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "home", "me", "repo"},
                 },
         },
+#else
+        // Absolute path (becomes file:) (Windows)
+        FixGitURLParam{
+            .input = "C:\\home\\me\\repo",
+            .expected = "file:///C:/home/me/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "home", "me", "repo"},
+                },
+        },
+#endif
         // Already file: scheme
-        // NOTE: Git/SCP treat this as a `<hostname>:<path>`, so we are
-        // failing to "fix up" this case.
         FixGitURLParam{
             .input = "file:/var/repos/x",
             .expected = "file:/var/repos/x",
@@ -87,10 +142,68 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "var", "repos", "x"},
                 },
         },
+        // git+file scheme
+        FixGitURLParam{
+            .input = "git+file:///var/repos/x",
+            .expected = "file:///var/repos/x",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "var", "repos", "x"},
+                },
+        },
+#ifndef _WIN32
+        // absolute path with a space
+        FixGitURLParam{
+            .input = "/repos/git repo",
+            .expected = "file:///repos/git%20repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "repos", "git repo"},
+                },
+        },
+        // quoted path
+        FixGitURLParam{
+            .input = "/repos/\"git repo\"",
+            .expected = "file:///repos/%22git%20repo%22",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "repos", "\"git repo\""},
+                },
+        },
+#else
+        // absolute path with a space (Windows)
+        FixGitURLParam{
+            .input = "C:\\repos\\git repo",
+            .expected = "file:///C:/repos/git%20repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "repos", "git repo"},
+                },
+        },
+        // quoted path (Windows)
+        FixGitURLParam{
+            .input = "C:\\repos\\\"git repo\"",
+            .expected = "file:///C:/repos/%22git%20repo%22",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "repos", "\"git repo\""},
+                },
+        },
+#endif
         // IPV6 test case
         FixGitURLParam{
             .input = "user@[2001:db8:1::2]:/home/file",
-            .expected = "ssh://user@[2001:db8:1::2]//home/file",
+            .expected = "ssh://user@[2001:db8:1::2]/home/file",
             .parsed =
                 ParsedURL{
                     .scheme = "ssh",
@@ -100,7 +213,139 @@ INSTANTIATE_TEST_SUITE_P(
                             .host = "2001:db8:1::2",
                             .user = "user",
                         },
-                    .path = {"", "", "home", "file"},
+                    .path = {"", "home", "file"},
+                },
+        },
+        // https://github.com/NixOS/nix/issues/14867
+        // Verify input doesn't trigger an assert.
+        // Intent is git@github, but gets parsed as git scheme with a relative path
+        FixGitURLParam{
+            .input = "git:github.com:nixos/nixpkgs",
+            .expected = "git:github.com:nixos/nixpkgs",
+            .parsed =
+                ParsedURL{
+                    .scheme = "git",
+                    .authority = std::nullopt,
+                    .path = {"github.com:nixos", "nixpkgs"},
+                },
+        },
+        // https://github.com/NixOS/nix/issues/14867#issuecomment-3699499232
+        // Verify input doesn't trigger an assert.
+        // The authority should have a "//" prefix, but instead gets parsed as a path component
+        FixGitURLParam{
+            .input = "git+https:/codeberg.org/forgejo/forgejo",
+            .expected = "https:/codeberg.org/forgejo/forgejo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority = std::nullopt,
+                    .path = {"", "codeberg.org", "forgejo", "forgejo"},
+                },
+        },
+        FixGitURLParam{
+            .input = "user%20@[::1]:repo/path",
+            .expected = "ssh://user%2520@[::1]/repo/path",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = ParsedURL::Authority::HostType::IPv6,
+                            .host = "::1",
+                            .user = "user%20",
+                        },
+                    .path = {"", "repo", "path"},
+                },
+        },
+        // IPv6 SCP-like. Looks like a port but is actually a path.
+        FixGitURLParam{
+            .input = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]:12345",
+            .expected = "ssh://[2a02:8071:8192:c100:311d:192d:81ac:11ea]/12345",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = ParsedURL::Authority::HostType::IPv6,
+                            .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
+                            .user = std::nullopt,
+                        },
+                    .path = {"", "12345"},
+                },
+        },
+#ifndef _WIN32
+        // Treats percent as a literal and not pct-encoding.
+        FixGitURLParam{
+            .input = "/a/b/%20",
+            .expected = "file:///a/b/%2520",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "a", "b", "%20"},
+                },
+        },
+#else
+        // Treats percent as a literal and not pct-encoding (Windows).
+        FixGitURLParam{
+            .input = "C:\\a\\b\\%20",
+            .expected = "file:///C:/a/b/%2520",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "a", "b", "%20"},
+                },
+        },
+#endif
+        // Brackets in hostname (not IPv6). SSH's valid_hostname() accepts
+        // brackets, so these are legal SSH aliases, even if they are not legal
+        // DNS domains.
+        FixGitURLParam{
+            .input = "host[1]:repo",
+            .expected = "ssh://host%5B1%5D/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "host[1]",
+                        },
+                    .path = {"", "repo"},
+                },
+        },
+        // Leading `[` with `@[` later: git prefers `@[` (see host_end()
+        // in connect.c), so `[user]` is the username and `[::1]` is IPv6.
+        FixGitURLParam{
+            .input = "[user]@[::1]:path",
+            .expected = "ssh://%5Buser%5D@[::1]/path",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "::1",
+                            .user = "[user]",
+                        },
+                    .path = {"", "path"},
+                },
+        },
+        // Colon in the path part, not the host. Git splits at the first
+        // `:`, so `notuser` is the host and the rest is path.
+        // $ GIT_TRACE=1 git ls-remote 'notuser:notpass@notjusthost:restofpath'
+        // → ssh notuser 'git-upload-pack notpass@notjusthost:restofpath'
+        FixGitURLParam{
+            .input = "notuser:notpass@notjusthost:restofpath",
+            .expected = "ssh://notuser/notpass@notjusthost:restofpath",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "notuser",
+                        },
+                    .path = {"", "notpass@notjusthost:restofpath"},
                 },
         }));
 
@@ -112,16 +357,16 @@ TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
     EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, rejectScpLikeNoUser)
+// This is an idempotence-like condition: every SCP URL has a corresponding bona fide URL that will parse correctly.
+TEST_P(FixGitURLTestSuite, parsedNormalized)
 {
-    // SCP-like URL without user. Proper support can be implemented, but this is
-    // a deceptively deep feature - study existing implementations carefully.
-    EXPECT_THAT(
-        []() { fixGitURL("github.com:owner/repo.git"); },
-        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("SCP-like URL")));
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.expected);
+    EXPECT_EQ(actual, p.parsed);
+    EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
+TEST(FixGitURLTestSuite, rejectFileURLWithAuthority)
 {
     /* From the underlying `parseURL` validations. */
     EXPECT_THAT(
@@ -130,24 +375,120 @@ TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
             testing::HasSubstrIgnoreANSIMatcher("file:// URL 'file://var/repos/x' has unexpected authority 'var'")));
 }
 
-TEST(FixGitURLTestSuite, rejectScpLikeNoUserLeadingSlash)
+TEST(FixGitURLTestSuite, rejectRelativePath)
 {
+    /* From the underlying `parseURL` validations. */
     EXPECT_THAT(
-        []() { fixGitURL("github.com:/owner/repo.git"); },
-        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("SCP-like URL")));
+        []() { fixGitURL("relative/repo"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("doesn't have a scheme")));
 }
 
-TEST(FixGitURLTestSuite, relativePath)
+TEST(FixGitURLTestSuite, rejectEmptyPathGitScp)
 {
-    // Relative path - parsed as file path without authority
-    auto parsed = fixGitURL("relative/repo");
-    EXPECT_EQ(
-        parsed,
-        (ParsedURL{
-            .scheme = "file",
-            .path = {"relative", "repo"},
-        }));
-    EXPECT_EQ(parsed.to_string(), "file:relative/repo");
+    /* Reject SCP-style URLs with no path component. */
+    EXPECT_THAT(
+        []() { fixGitURL("host:"); },
+        ::testing::ThrowsMessage<BadURL>(
+            testing::HasSubstrIgnoreANSIMatcher("SCP-style Git URL 'host:' has an empty path")));
+}
+
+TEST(FixGitURLTestSuite, rejectMalformedBracketedURLs)
+{
+    /* Brackets not in host position go through the colon-based path,
+       consistent with git (which also finds the first colon). These
+       are garbage parses, but SSH's `valid_hostname()` accepts brackets
+       so they can't be rejected outright. */
+
+    /* First colon is inside brackets → schemeOrHost = "user[2001". */
+    auto parsed1 = fixGitURL("user[2001:db8:1::2]:/home/@file");
+    EXPECT_EQ(parsed1.scheme, "ssh");
+    EXPECT_EQ(parsed1.authority->host, "user[2001");
+
+    /* First colon is before brackets → schemeOrHost = "user". */
+    auto parsed2 = fixGitURL("user:[2001:db8:1::2]:/home/@file");
+    EXPECT_EQ(parsed2.scheme, "ssh");
+    EXPECT_EQ(parsed2.authority->host, "user");
+
+    /* `user:@[...]` has `@[` so enters the IPv6 bracket path.
+       The bracket regex matches on `[2001:db8:1::2]:/home/file`,
+       and everything before `@[` becomes the username (`user:`). */
+    auto parsed3 = fixGitURL("user:@[2001:db8:1::2]:/home/file");
+    EXPECT_EQ(parsed3.scheme, "ssh");
+    EXPECT_EQ(parsed3.authority->host, "2001:db8:1::2");
+    EXPECT_EQ(parsed3.authority->user, "user:");
+}
+
+TEST(FixGitURLTestSuite, mismatchedBrackets)
+{
+    /* Missing `]`: git's `host_end()` falls back to `end = host` and
+       finds the first `:` as separator. We do the same — fall through
+       to the colon-based path.
+       $ GIT_TRACE=1 git ls-remote 'user@[host:path'
+       → ssh 'user@[host' 'git-upload-pack path' */
+    auto parsed1 = fixGitURL("user@[host:path");
+    EXPECT_EQ(parsed1.scheme, "ssh");
+    EXPECT_EQ(parsed1.authority->user, "user");
+    EXPECT_EQ(parsed1.authority->host, "[host");
+
+    /* Leading `[` with no `]`: same fallback to colon-based path.
+       $ GIT_TRACE=1 git ls-remote '[:path'
+       → ssh '[' 'git-upload-pack path' */
+    auto parsed2 = fixGitURL("[:path");
+    EXPECT_EQ(parsed2.scheme, "ssh");
+    EXPECT_EQ(parsed2.authority->host, "[");
+
+    /* `]` present but not followed by `:` — not SCP-style, let
+       parseURL handle it. */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[::1]/path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+
+    /* Nested `[` inside brackets: `[[]:path` has `]` at position 2
+       followed by `:`. Parsed as bracketed host `[[]`, but `[` is
+       not valid IPv6. Git also parses this way (strips brackets,
+       gets host `[`, SSH rejects).
+       $ GIT_TRACE=1 git ls-remote '[[]:path'
+       → ssh '[' 'git-upload-pack path' */
+    EXPECT_THAT(
+        []() { fixGitURL("[[]:path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid IPv6 address")));
+}
+
+TEST(FixGitURLTestSuite, slashBeforeColonIsNotScp)
+{
+    /* A slash before the first colon means it's not SCP — consistent
+       with git's `url_is_local_not_ssh()`. */
+    EXPECT_THAT(
+        []() { fixGitURL("x@foo/bar:baz"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("doesn't have a scheme")));
+}
+
+TEST(FixGitURLTestSuite, noColonIsNotScp)
+{
+    /* No `:` at all means not SCP — consistent with git's
+       `url_is_local_not_ssh()` in `connect.c`.
+       $ GIT_TRACE=1 git ls-remote 'user@[host]'
+       → git-upload-pack ']'  (treated as local, not SCP)
+       $ GIT_TRACE=1 git ls-remote 'user@[host]/path'
+       → git-upload-pack ']/path'  (treated as local, not SCP) */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[host]"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+    EXPECT_THAT(
+        []() { fixGitURL("user@[host]/path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+}
+
+TEST(FixGitURLTestSuite, gitBugDiscardedCharsBetweenBracketAndColon)
+{
+    /* Git's `host_end()` returns `end` past `]`, then `strchr(end, ':')`
+       finds `:` anywhere after — silently discarding characters between
+       `]` and `:`. This is a git bug; we refuse to parse as SCP.
+       $ GIT_TRACE=1 git ls-remote 'user@[::1]foo:path'
+       → ssh user@::1 'git-upload-pack path'  (git discards `foo`) */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[::1]foo:path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
 }
 
 struct ParseURLSuccessCase
