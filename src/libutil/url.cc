@@ -8,6 +8,12 @@
 
 #include <boost/url.hpp>
 
+namespace {
+    const std::regex uriRegex(R"((.+:)//(.+@)?(\[.+\]|[^:/]+)(:[0-9]+)?((/.*)*)(.*))");
+    const std::regex githubRegex(R"((.+@)?(github.com):/?([^:/]+/[^:/]+\.git))");
+    const std::regex scpRegex(R"((.+@)?(\[.+\]|[^:/]+):([0-9]+)?(/.*))");
+} // anonymous namespace
+
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
@@ -414,20 +420,36 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
-        return ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = splitString<std::vector<std::string>>(url, "/"),
-        };
-    auto parsed = parseURL(url);
+    std::smatch match;
+    if (url.starts_with("/")) {
+        // absolute paths use file scheme with default (localhost) authority
+        url.insert(0, "file://");
+    } else if (std::regex_match(url, uriRegex)) {
+        // pass: already looks like a uri
+    } else if (std::regex_match(url, githubRegex)) {
+        // NOTE: github SCP-like paths have a known format and are allowed to use a relative path
+        // github specifiers use ssh scheme and absolute paths
+        url = std::regex_replace(url, githubRegex, "ssh://$1$2/$3");
+    } else if (std::regex_match(url, match, scpRegex)) {
+        std::string scheme = match[2].str();
+        if (scheme.starts_with("git+")) {
+            scheme = scheme.substr(4);
+        }
+
+        if (!(match[1].matched || match[3].matched) && scheme == "file") {
+            // pass: scheme overlaps SCP syntax
+        } else {
+            // SCP-like paths use ssh scheme
+            const char *rep = match[3].matched ? "ssh://$1$2:$3$4" : "ssh://$1$2$3$4";
+            url = std::regex_replace(url, scpRegex, rep);
+        }
+    }
+
+    auto parsed = parseURL(replaceStrings(url, " ", "%20"));
     // Drop the superfluous "git+" from the scheme.
-    auto scheme = parseUrlScheme(parsed.scheme);
-    if (scheme.application == "git")
-        parsed.scheme = scheme.transport;
+    if (auto parsed_scheme = parseUrlScheme(parsed.scheme); parsed_scheme.application == "git") {
+        parsed.scheme = parsed_scheme.transport;
+    }
     return parsed;
 }
 
