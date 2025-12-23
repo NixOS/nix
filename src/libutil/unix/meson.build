@@ -58,6 +58,7 @@ sources += files(
   'os-string.cc',
   'processes.cc',
   'signals.cc',
+  'unix-source-accessor.cc',
   'users.cc',
 )
 

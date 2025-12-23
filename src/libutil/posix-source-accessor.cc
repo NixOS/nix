@@ -198,6 +198,7 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+#ifdef _WIN32
 ref<SourceAccessor> getFSSourceAccessor()
 {
     static auto rootFS = make_ref<PosixSourceAccessor>();
@@ -208,4 +209,6 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
 {
     return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
+#endif
+
 } // namespace nix

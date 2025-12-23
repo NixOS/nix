@@ -259,6 +259,18 @@ ref<SourceAccessor> getFSSourceAccessor();
  * that it is not possible to escape `root` by appending `..` path
  * elements, and that absolute symlinks are resolved relative to
  * `root`.
+ *
+ * @param root Path to the root of the accessor. Must exist. Symlinks in non-last
+ * components are followed. If \ref root names a symlink an accessor for that symlink
+ * is returned.
+ *
+ * @note Once created the accessor cannot be used if the root of the accessor is modified.
+ * For example, if \ref root names a directory it will be possible to call readDirectory(CanonPath:root).
+ * Similarly with symlinks and regular files.
+ *
+ * @todo Use file HANDLEs on windows.
+ *
+ * @throws SysError if path doesn't exist.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
 

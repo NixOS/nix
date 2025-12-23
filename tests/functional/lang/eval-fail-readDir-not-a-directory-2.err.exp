@@ -13,4 +13,4 @@ error:
              |                          ^
             3| }
 
-       error: cannot read directory "/pwd/lang/readDir/foo/git-hates-directories": Not a directory
+       error: '/pwd/lang/readDir/foo/git-hates-directories' is not a directory
