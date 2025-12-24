@@ -184,9 +184,9 @@ Print the build-time dependencies of `svn`:
 
 ```console
 $ nix-store --query --requisites $(nix-store --query --deriver $(which svn))
-/nix/store/02iizgn86m42q905rddvg4ja975bk2i4-grep-2.5.1.tar.bz2.drv
-/nix/store/07a2bzxmzwz5hp58nf03pahrv2ygwgs3-gcc-wrapper.sh
-/nix/store/0ma7c9wsbaxahwwl04gbw3fcd806ski4-glibc-2.3.4.drv
+/nix/store/y6qa66l9h0pw161crnlk6y16rdrcljx4-grep-2.5.1.tar.bz2.drv
+/nix/store/z716h753s97jhnzvfank2srqbljswpgm-gcc-wrapper.sh
+/nix/store/f39x0q73rjdyvzm93y9wrkfr6x39lb7f-glibc-2.3.4.drv
 ... lots of other paths ...
 ```
 
@@ -199,10 +199,10 @@ Show the build-time dependencies as a tree:
 ```console
 $ nix-store --query --tree $(nix-store --query --deriver $(which svn))
 /nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
-+---/nix/store/d8afh10z72n8l1cr5w42366abiblgn54-builder.sh
-+---/nix/store/fmzxmpjx2lh849ph0l36snfj9zdibw67-bash-3.0.drv
-|   +---/nix/store/570hmhmx3v57605cqg9yfvvyh0nnb8k8-bash
-|   +---/nix/store/p3srsbd8dx44v2pg6nbnszab5mcwx03v-builder.sh
++---/nix/store/vxnmkc8l8d2ijjha4xwhkfgx9vvc3q4c-builder.sh
++---/nix/store/rn9776dy82n5qrgz7xbcl1iw4vfkcrkk-bash-3.0.drv
+|   +---/nix/store/x9j20hz6bln1crzn55qifk0bbsm8v5ac-bash
+|   +---/nix/store/ajnn1mcm45wjvn0rlc22gvx2cwhjnazx-builder.sh
 ...
 ```
 

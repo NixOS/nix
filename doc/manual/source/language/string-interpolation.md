@@ -181,7 +181,7 @@ A derivation interpolates to the [store path] of its first [output](./derivation
 > "${pkgs.hello}"
 > ```
 >
->     "/nix/store/4xpfqf29z4m8vbhrqcz064wfmb46w5r7-hello-2.12.1"
+>     "/nix/store/qnlr7906z0mrl2syrkdbpicffq02nw07-hello-2.12.1"
 
 An attribute set interpolates to the return value of the function in the `__toString` applied to the attribute set itself.
 

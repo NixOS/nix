@@ -23,7 +23,7 @@ R""(
   [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
   ```console
-  # nix store copy-log --to ssh-ng://machine /nix/store/ilgm50plpmcgjhcp33z6n4qbnpqfhxym-glibc-2.33-59.drv
+  # nix store copy-log --to ssh-ng://machine /nix/store/yaxvykk956vdrwrx9cxyw44mpqr1ml7i-glibc-2.33-59.drv
   ```
 
 # Description
