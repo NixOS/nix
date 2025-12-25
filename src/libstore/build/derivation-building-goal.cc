@@ -255,23 +255,29 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 : buildMode == bmCheck ? "checking outputs of '%s'"
                                        : "building '%s'",
                 worker.store.printStorePath(drvPath));
+
+        std::string builderName;
 #ifndef _WIN32 // TODO enable build hook on Windows
-        if (hook)
-            msg += fmt(" on '%s'", hook->machineName);
+        if (hook) {
+            builderName = fmt("remote builder: %s", hook->machineName);
+        } else if (builder) {
+            auto maybeUID = builder->getBuilderUID();
+            if (maybeUID)
+                builderName = fmt("localhost builder with uid: %s", std::to_string(*maybeUID));
+            else
+                builderName = "";
+        } else {
+            builderName = "";
+        }
+#else
+        builderName = "";
 #endif
+        if (builderName != "")
+            msg += fmt(" on '%s'", builderName);
+
         act = std::make_unique<Activity>(
-            *logger,
-            lvlInfo,
-            actBuild,
-            msg,
-            Logger::Fields{
-                worker.store.printStorePath(drvPath),
-#ifndef _WIN32 // TODO enable build hook on Windows
-                hook ? hook->machineName :
-#endif
-                     "",
-                1,
-                1});
+            *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), builderName, 1, 1});
+
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
