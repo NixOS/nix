@@ -17,7 +17,7 @@ SourcePath EvalState::rootPath(PathView path)
 
 SourcePath EvalState::storePath(const StorePath & path)
 {
-    return {rootFS, CanonPath{store->printStorePath(path)}};
+    return {storeFS, CanonPath{path.to_str()}};
 }
 
 StorePath
