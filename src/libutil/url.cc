@@ -13,6 +13,62 @@ namespace nix {
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 
+static std::optional<std::string> rewriteScpLikeGitURL(std::string_view url)
+{
+    // Parse Git/OpenSSH "scp-like" URLs of the form `user@host:path`
+    // and rewrite them to `ssh://user@host/path`.
+    //
+    // Design notes:
+    // - We require `user@` to avoid rewriting ambiguous `host:path` inputs.
+    // - We split on the first host/path ':' so ':' may appear in the path.
+    // - Bracketed IPv6 hosts use `user@[v6]:path`.
+
+    auto at = url.find('@');
+    if (at == std::string_view::npos || at == 0)
+        return std::nullopt;
+
+    // Abort if we see ':' (scheme-ish) or '/' (scheme:// or path-like) before '@'.
+    if (auto bad = url.find_first_of(":/"); bad != std::string_view::npos && bad < at)
+        return std::nullopt;
+
+    size_t hostStart = at + 1;
+    if (hostStart >= url.size())
+        return std::nullopt;
+
+    size_t colon = std::string_view::npos;
+    std::string_view host;
+
+    if (url[hostStart] == '[') {
+        // Bracketed IPv6 literal host: `user@[...]:path`.
+        auto close = url.find(']', hostStart + 1);
+        if (close == std::string_view::npos)
+            return std::nullopt;
+        if (close + 1 >= url.size() || url[close + 1] != ':')
+            return std::nullopt;
+        colon = close + 1;
+        host = url.substr(hostStart, colon - hostStart);
+    } else {
+        // Regular hostname: reject any '/' before the separator.
+        colon = url.find_first_of(":/", hostStart);
+        if (colon == std::string_view::npos || url[colon] != ':')
+            return std::nullopt;
+        host = url.substr(hostStart, colon - hostStart);
+    }
+
+    // Host and path must be non-empty.
+    if (host.empty() || colon + 1 >= url.size())
+        return std::nullopt;
+
+    std::string rewritten;
+    rewritten.reserve(url.size() + 6);
+    rewritten += "ssh://";
+    rewritten.append(url.substr(0, at + 1));
+    rewritten.append(host);
+    rewritten += "/";
+    rewritten.append(url.substr(colon + 1));
+    return rewritten;
+}
+
 ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthority)
 {
     auto parsed = boost::urls::parse_authority(encodedAuthority);
@@ -414,9 +470,10 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    if (!hasPrefix(url, "/"))
+        if (auto rewritten = rewriteScpLikeGitURL(url))
+            return parseURL(*rewritten);
+
     if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
         return ParsedURL{
             .scheme = "file",
