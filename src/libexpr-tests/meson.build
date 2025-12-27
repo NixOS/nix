@@ -95,6 +95,7 @@ if get_option('benchmarks')
   benchmark_sources = files(
     'bench-main.cc',
     'dynamic-attrs-bench.cc',
+    'generic-closure-bench.cc',
     'get-drvs-bench.cc',
     'regex-cache-bench.cc',
   )
