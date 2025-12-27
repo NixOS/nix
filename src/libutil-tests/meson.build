@@ -59,6 +59,7 @@ sources = files(
   'config.cc',
   'executable-path.cc',
   'file-content-address.cc',
+  'file-descriptor.cc',
   'file-system.cc',
   'git.cc',
   'hash.cc',

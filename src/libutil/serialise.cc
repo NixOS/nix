@@ -125,7 +125,7 @@ void Source::skip(size_t len)
 size_t BufferedSource::read(char * data, size_t len)
 {
     if (!buffer)
-        buffer = decltype(buffer)(new char[bufSize]);
+        buffer = std::make_unique_for_overwrite<char[]>(bufSize);
 
     if (!bufPosIn)
         bufPosIn = readUnbuffered(buffer.get(), bufSize);
@@ -137,6 +137,51 @@ size_t BufferedSource::read(char * data, size_t len)
     if (bufPosIn == bufPosOut)
         bufPosIn = bufPosOut = 0;
     return n;
+}
+
+std::string BufferedSource::readLine(bool eofOk)
+{
+    if (!buffer)
+        buffer = std::make_unique_for_overwrite<char[]>(bufSize);
+
+    std::string line;
+    while (true) {
+        if (bufPosOut < bufPosIn) {
+            auto * start = buffer.get() + bufPosOut;
+            auto * end = buffer.get() + bufPosIn;
+            if (auto * newline = static_cast<char *>(memchr(start, '\n', end - start))) {
+                line.append(start, newline - start);
+                bufPosOut = (newline - buffer.get()) + 1;
+                if (bufPosOut == bufPosIn)
+                    bufPosOut = bufPosIn = 0;
+                return line;
+            }
+
+            line.append(start, end - start);
+            bufPosOut = bufPosIn = 0;
+        }
+
+        auto handleEof = [&]() -> std::string {
+            bufPosOut = bufPosIn = 0;
+            if (eofOk)
+                return line;
+            throw EndOfFile("unexpected EOF reading a line");
+        };
+
+        size_t n = 0;
+        try {
+            n = readUnbuffered(buffer.get(), bufSize);
+        } catch (EndOfFile & e) {
+            return handleEof();
+        }
+
+        if (n == 0) {
+            return handleEof();
+        }
+
+        bufPosIn = n;
+        bufPosOut = 0;
+    }
 }
 
 bool BufferedSource::hasData()
