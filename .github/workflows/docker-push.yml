@@ -2,6 +2,15 @@ name: "Push Docker Image"
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to build the docker image from"
+        required: true
+        type: string
+      is_master:
+        description: "Whether run from master branch"
+        required: true
+        type: boolean
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -42,6 +51,7 @@ jobs:
     - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       with:
         fetch-depth: 0
+        ref: ${{ inputs.ref }}
     - uses: ./.github/actions/install-nix-action
       with:
         dogfood: false
@@ -50,8 +60,6 @@ jobs:
     - run: echo NIX_VERSION="$(nix eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
     - run: nix build .#dockerImage -L
     - run: docker load -i ./result/image.tar.gz
-    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
-    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
     # We'll deploy the newly built image to both Docker Hub and Github Container Registry.
     #
     # Push to Docker Hub first
@@ -60,8 +68,17 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
-    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
+    - name: Push to Docker Hub
+      env:
+        IS_MASTER: ${{ inputs.is_master }}
+        DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nix
+      run: |
+        docker tag nix:$NIX_VERSION $DOCKERHUB_REPO:$NIX_VERSION
+        docker push $DOCKERHUB_REPO:$NIX_VERSION
+        if [ "$IS_MASTER" = "true" ]; then
+          docker tag nix:$NIX_VERSION $DOCKERHUB_REPO:master
+          docker push $DOCKERHUB_REPO:master
+        fi
     # Push to GitHub Container Registry as well
     - name: Login to GitHub Container Registry
       uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
@@ -69,16 +86,21 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Push image
+    - name: Push to GHCR
+      env:
+        IS_MASTER: ${{ inputs.is_master }}
       run: |
         IMAGE_ID=ghcr.io/${{ github.repository_owner }}/nix
-        # Change all uppercase to lowercase
         IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
 
         docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
-        docker tag nix:$NIX_VERSION $IMAGE_ID:latest
         docker push $IMAGE_ID:$NIX_VERSION
-        docker push $IMAGE_ID:latest
-        # deprecated 2024-02-24
-        docker tag nix:$NIX_VERSION $IMAGE_ID:master
-        docker push $IMAGE_ID:master
+        if [ "$IS_MASTER" = "true" ]; then
+          # FIXME: Do not tag master as latest. Upload to GHCR as part of
+          # releng instead. Possibly adapt this reusable workflow for the (yet
+          # nonexistent) release workflow.
+          docker tag nix:$NIX_VERSION $IMAGE_ID:latest
+          docker tag nix:$NIX_VERSION $IMAGE_ID:master
+          docker push $IMAGE_ID:latest
+          docker push $IMAGE_ID:master
+        fi

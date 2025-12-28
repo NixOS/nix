@@ -202,6 +202,9 @@ jobs:
     needs: [flake_regressions, installer_test]
     if: github.event_name == 'push' && github.ref_name == 'master'
     uses: ./.github/workflows/docker-push.yml
+    with:
+      ref: ${{ github.sha }}
+      is_master: true
     permissions:
       contents: read
       packages: write
