@@ -48,7 +48,7 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "path"},
                 },
         },
-        // github SCP with relative path (rewritten to ssh://)
+        // SCP-like URL (rewritten to ssh://)
         FixGitURLParam{
             .input = "git@github.com:owner/repo.git",
             .expected = "ssh://git@github.com/owner/repo.git",
@@ -63,7 +63,7 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
-        // github SCP with relative path, no user (rewritten to ssh://)
+        // SCP-like URL, no user (rewritten to ssh://)
         FixGitURLParam{
             .input = "github.com:owner/repo.git",
             .expected = "ssh://github.com/owner/repo.git",
@@ -77,7 +77,7 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
-        // github SCP with absolute path, no user (rewritten to ssh://)
+        // SCP-like URL, no user, absolute path (rewritten to ssh://)
         FixGitURLParam{
             .input = "github.com:/owner/repo.git",
             .expected = "ssh://github.com/owner/repo.git",
@@ -91,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
-        // SCP (rewritten to ssh://)
+        // SCP-like URL (rewritten to ssh://)
         FixGitURLParam{
             .input = "user@server.com:/path/to/repo",
             .expected = "ssh://user@server.com/path/to/repo",
@@ -102,21 +102,6 @@ INSTANTIATE_TEST_SUITE_P(
                         ParsedURL::Authority{
                             .host = "server.com",
                             .user = "user",
-                        },
-                    .path = {"", "path", "to", "repo"},
-                },
-        },
-        // SCP no user, with port (rewritten to ssh://)
-        FixGitURLParam{
-            .input = "server.com:1111/path/to/repo",
-            .expected = "ssh://server.com:1111/path/to/repo",
-            .parsed =
-                ParsedURL{
-                    .scheme = "ssh",
-                    .authority =
-                        ParsedURL::Authority{
-                            .host = "server.com",
-                            .port = 1111,
                         },
                     .path = {"", "path", "to", "repo"},
                 },
@@ -133,8 +118,6 @@ INSTANTIATE_TEST_SUITE_P(
                 },
         },
         // Already file: scheme
-        // NOTE: Git/SCP treat this as a `<hostname>:<path>`, so we are
-        // failing to "fix up" this case.
         FixGitURLParam{
             .input = "file:/var/repos/x",
             .expected = "file:/var/repos/x",

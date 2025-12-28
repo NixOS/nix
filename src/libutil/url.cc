@@ -8,12 +8,6 @@
 
 #include <boost/url.hpp>
 
-namespace {
-    const std::regex uriRegex(R"((.+:)//(.+@)?(\[.+\]|[^:/]+)(:[0-9]+)?((/.*)*)(.*))");
-    const std::regex githubRegex(R"((.+@)?(github.com):/?([^:/]+/[^:/]+\.git))");
-    const std::regex scpRegex(R"((.+@)?(\[.+\]|[^:/]+):([0-9]+)?(/.*))");
-} // anonymous namespace
-
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
@@ -420,28 +414,46 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
-    std::smatch match;
+    // NOTE: Git URLs support the following forms
+    // reference: https://git-scm.com/docs/git-clone#_git_urls
+    //
+    // ssh://[<user>@]<host>[:<port>]/<path-to-git-repo>
+    // git://<host>[:<port>]/<path-to-git-repo>
+    // http[s]://<host>[:<port>]/<path-to-git-repo>
+    // ftp[s]://<host>[:<port>]/<path-to-git-repo>
+    //
+    // An alternative scp-like syntax may also be used with the ssh protocol:
+    // [<user>@]<host>:/<path-to-git-repo>
+    // This syntax is only recognized if there are no slashes before the first colon.
+    //
+    // For local repositories, also supported by Git natively, the following syntaxes may be used:
+    // /path/to/repo.git/
+    // file:///path/to/repo.git/
+
     if (url.starts_with("/")) {
         // absolute paths use file scheme with default (localhost) authority
         url.insert(0, "file://");
-    } else if (std::regex_match(url, uriRegex)) {
+    } else if (url.contains("://")) {
         // pass: already looks like a uri
-    } else if (std::regex_match(url, githubRegex)) {
-        // NOTE: github SCP-like paths have a known format and are allowed to use a relative path
-        // github specifiers use ssh scheme and absolute paths
-        url = std::regex_replace(url, githubRegex, "ssh://$1$2/$3");
-    } else if (std::regex_match(url, match, scpRegex)) {
-        std::string scheme = match[2].str();
-        if (scheme.starts_with("git+")) {
-            scheme = scheme.substr(4);
+    } else  if (auto schemeEnd = url.find(':'); schemeEnd != url.npos) {
+        // attempt to parse an SCP path
+
+        if (url.starts_with("git+")) {
+            url.erase(0, 4);
+            schemeEnd -= 4;
         }
 
-        if (!(match[1].matched || match[3].matched) && scheme == "file") {
-            // pass: scheme overlaps SCP syntax
-        } else {
+        // NOTE: SCP syntax overlaps with simple URIs like file:/path/to/repo
+        if (!(url.starts_with("file:") || url.find("/", 0, schemeEnd) != url.npos)) {
+            // Force absolute paths
+            // NOTE: This is needed to support relative paths (ex: github.com:owner/repo.git)
+            if (const auto hostEnd = url.rfind(':', url.find("/")); hostEnd != url.npos && hostEnd < url.size()) {
+                if (url[hostEnd+1] != '/') {
+                    url.insert(hostEnd+1, "/");
+                }
+            }
             // SCP-like paths use ssh scheme
-            const char *rep = match[3].matched ? "ssh://$1$2:$3$4" : "ssh://$1$2$3$4";
-            url = std::regex_replace(url, scpRegex, rep);
+            url.insert(0, "ssh://");
         }
     }
 
