@@ -265,7 +265,7 @@ struct AttrDb
         case AttrType::String: {
             NixStringContext context;
             if (!queryAttribute.isNull(3))
-                for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), ";"))
+                for (auto & s : tokenizeString<std::vector<std::string>>(queryAttribute.getStr(3), " "))
                     context.insert(NixStringContextElem::parse(s));
             return {{rowId, string_t{queryAttribute.getStr(2), context}}};
         }
