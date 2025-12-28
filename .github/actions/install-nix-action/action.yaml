@@ -4,15 +4,29 @@ inputs:
   dogfood:
     description: "Whether to use Nix installed from the latest artifact from master branch"
     required: true # Be explicit about the fact that we are using unreleased artifacts
+  experimental-installer:
+    description: "Whether to use the experimental installer to install Nix"
+    default: false
+  experimental-installer-version:
+    description: "Version of the experimental installer to use. If `latest`, the newest artifact from the default branch is used."
+    # TODO: This should probably be pinned to a release after https://github.com/NixOS/experimental-nix-installer/pull/49 lands in one
+    default: "latest"
   extra_nix_config:
     description: "Gets appended to `/etc/nix/nix.conf` if passed."
   install_url:
     description: "URL of the Nix installer"
     required: false
     default: "https://releases.nixos.org/nix/nix-2.30.2/install"
+  tarball_url:
+    description: "URL of the Nix tarball to use with the experimental installer"
+    required: false
   github_token:
     description: "Github token"
     required: true
+  use_cache:
+    description: "Whether to setup magic-nix-cache"
+    default: true
+    required: false
 runs:
   using: "composite"
   steps:
@@ -37,14 +51,81 @@ runs:
 
         gh run download "$RUN_ID" --repo "$DOGFOOD_REPO" -n "$INSTALLER_ARTIFACT" -D "$INSTALLER_DOWNLOAD_DIR"
         echo "installer-path=file://$INSTALLER_DOWNLOAD_DIR" >> "$GITHUB_OUTPUT"
+        TARBALL_PATH="$(find "$INSTALLER_DOWNLOAD_DIR" -name 'nix*.tar.xz' -print | head -n 1)"
+        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
 
         echo "::notice ::Dogfooding Nix installer from master (https://github.com/$DOGFOOD_REPO/actions/runs/$RUN_ID)"
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         DOGFOOD_REPO: "NixOS/nix"
+    - name: "Gather system info for experimental installer"
+      shell: bash
+      if: ${{ inputs.experimental-installer == 'true' }}
+      run: |
+        echo "::notice Using experimental installer from $EXPERIMENTAL_INSTALLER_REPO (https://github.com/$EXPERIMENTAL_INSTALLER_REPO)"
+
+        if [ "$RUNNER_OS" == "Linux" ]; then
+          EXPERIMENTAL_INSTALLER_SYSTEM="linux"
+          echo "EXPERIMENTAL_INSTALLER_SYSTEM=$EXPERIMENTAL_INSTALLER_SYSTEM" >> "$GITHUB_ENV"
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          EXPERIMENTAL_INSTALLER_SYSTEM="darwin"
+          echo "EXPERIMENTAL_INSTALLER_SYSTEM=$EXPERIMENTAL_INSTALLER_SYSTEM" >> "$GITHUB_ENV"
+        else
+          echo "::error ::Unsupported RUNNER_OS: $RUNNER_OS"
+          exit 1
+        fi
+
+        if [ "$RUNNER_ARCH" == "X64" ]; then
+          EXPERIMENTAL_INSTALLER_ARCH=x86_64
+          echo "EXPERIMENTAL_INSTALLER_ARCH=$EXPERIMENTAL_INSTALLER_ARCH" >> "$GITHUB_ENV"
+        elif [ "$RUNNER_ARCH" == "ARM64" ]; then
+          EXPERIMENTAL_INSTALLER_ARCH=aarch64
+          echo "EXPERIMENTAL_INSTALLER_ARCH=$EXPERIMENTAL_INSTALLER_ARCH" >> "$GITHUB_ENV"
+        else
+          echo "::error ::Unsupported RUNNER_ARCH: $RUNNER_ARCH"
+          exit 1
+        fi
+
+        echo "EXPERIMENTAL_INSTALLER_ARTIFACT=nix-installer-$EXPERIMENTAL_INSTALLER_ARCH-$EXPERIMENTAL_INSTALLER_SYSTEM" >> "$GITHUB_ENV"
+      env:
+        EXPERIMENTAL_INSTALLER_REPO: "NixOS/experimental-nix-installer"
+    - name: "Download latest experimental installer"
+      shell: bash
+      id: download-latest-experimental-installer
+      if: ${{ inputs.experimental-installer == 'true' && inputs.experimental-installer-version == 'latest' }}
+      run: |
+        RUN_ID=$(gh run list --repo "$EXPERIMENTAL_INSTALLER_REPO" --workflow ci.yml --branch main --status success --json databaseId --jq ".[0].databaseId")
+
+        EXPERIMENTAL_INSTALLER_DOWNLOAD_DIR="$GITHUB_WORKSPACE/$EXPERIMENTAL_INSTALLER_ARTIFACT"
+        mkdir -p "$EXPERIMENTAL_INSTALLER_DOWNLOAD_DIR"
+
+        gh run download "$RUN_ID" --repo "$EXPERIMENTAL_INSTALLER_REPO" -n "$EXPERIMENTAL_INSTALLER_ARTIFACT" -D "$EXPERIMENTAL_INSTALLER_DOWNLOAD_DIR"
+        # Executable permissions are lost in artifacts
+        find $EXPERIMENTAL_INSTALLER_DOWNLOAD_DIR -type f -exec chmod +x {} +
+        echo "installer-path=$EXPERIMENTAL_INSTALLER_DOWNLOAD_DIR" >> "$GITHUB_OUTPUT"
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        EXPERIMENTAL_INSTALLER_REPO: "NixOS/experimental-nix-installer"
     - uses: cachix/install-nix-action@c134e4c9e34bac6cab09cf239815f9339aaaf84e # v31.5.1
+      if: ${{ inputs.experimental-installer != 'true' }}
       with:
         # Ternary operator in GHA: https://www.github.com/actions/runner/issues/409#issuecomment-752775072
         install_url: ${{ inputs.dogfood == 'true' && format('{0}/install', steps.download-nix-installer.outputs.installer-path) || inputs.install_url }}
         install_options: ${{ inputs.dogfood == 'true' && format('--tarball-url-prefix {0}', steps.download-nix-installer.outputs.installer-path) || '' }}
         extra_nix_config: ${{ inputs.extra_nix_config }}
+    - uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 # v20
+      if: ${{ inputs.experimental-installer == 'true' }}
+      with:
+        diagnostic-endpoint: ""
+        # TODO: It'd be nice to use `artifacts.nixos.org` for both of these, maybe through an `/experimental-installer/latest` endpoint? or `/commit/<hash>`?
+        local-root: ${{ inputs.experimental-installer-version == 'latest' && steps.download-latest-experimental-installer.outputs.installer-path || '' }}
+        source-url: ${{ inputs.experimental-installer-version != 'latest' && 'https://artifacts.nixos.org/experimental-installer/tag/${{ inputs.experimental-installer-version }}/${{ env.EXPERIMENTAL_INSTALLER_ARTIFACT }}' || '' }}
+        nix-package-url: ${{ inputs.dogfood == 'true' && steps.download-nix-installer.outputs.tarball-path || (inputs.tarball_url || '') }}
+        extra-conf: ${{ inputs.extra_nix_config }}
+    - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
+      if: ${{ inputs.use_cache == 'true' }}
+      with:
+        diagnostic-endpoint: ''
+        use-flakehub: false
+        use-gha-cache: true
+        source-revision: 92d9581367be2233c2d5714a2640e1339f4087d8 # main
