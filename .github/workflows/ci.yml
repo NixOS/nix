@@ -19,6 +19,7 @@ jobs:
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
+        use_cache: false
     - run: nix flake show --all-systems --json
 
   tests:
@@ -47,7 +48,6 @@ jobs:
         extra_nix_config: |
           sandbox = true
           max-jobs = 1
-    - uses: DeterminateSystems/magic-nix-cache-action@main
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
     # https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -99,84 +99,20 @@ jobs:
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
-  # Steps to test CI automation in your own fork.
-  # 1. Sign-up for https://hub.docker.com/
-  # 2. Store your dockerhub username as DOCKERHUB_USERNAME in "Repository secrets" of your fork repository settings (https://github.com/$githubuser/nix/settings/secrets/actions)
-  # 3. Create an access token in https://hub.docker.com/settings/security and store it as DOCKERHUB_TOKEN in "Repository secrets" of your fork
-  check_secrets:
-    permissions:
-      contents: none
-    name: Check Docker secrets present for installer tests
-    runs-on: ubuntu-24.04
-    outputs:
-      docker: ${{ steps.secret.outputs.docker }}
-    steps:
-      - name: Check for secrets
-        id: secret
-        env:
-          _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-        run: |
-          echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-
   docker_push_image:
-    needs: [tests, vm_tests, check_secrets]
+    name: Push docker image to DockerHub and GHCR
+    needs: [tests, vm_tests]
+    if: github.event_name == 'push' && github.ref_name == 'master'
+    uses: ./.github/workflows/docker-push.yml
+    with:
+      ref: ${{ github.sha }}
+      is_master: true
     permissions:
       contents: read
       packages: write
-    if: >-
-      needs.check_secrets.outputs.docker == 'true' &&
-      github.event_name == 'push' &&
-      github.ref_name == 'master'
-    runs-on: ubuntu-24.04
-    steps:
-    - name: Check for secrets
-      id: secret
-      env:
-        _DOCKER_SECRETS: ${{ secrets.DOCKERHUB_USERNAME }}${{ secrets.DOCKERHUB_TOKEN }}
-      run: |
-        echo "::set-output name=docker::${{ env._DOCKER_SECRETS != '' }}"
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - uses: cachix/install-nix-action@v31
-      with:
-        install_url: https://releases.nixos.org/nix/nix-2.20.3/install
-    - uses: DeterminateSystems/magic-nix-cache-action@main
-    - run: echo NIX_VERSION="$(nix --experimental-features 'nix-command flakes' eval .\#nix.version | tr -d \")" >> $GITHUB_ENV
-    - run: nix --experimental-features 'nix-command flakes' build .#dockerImage -L
-    - run: docker load -i ./result/image.tar.gz
-    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
-    - run: docker tag nix:$NIX_VERSION ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
-    # We'll deploy the newly built image to both Docker Hub and Github Container Registry.
-    #
-    # Push to Docker Hub first
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:$NIX_VERSION
-    - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/nix:master
-    # Push to GitHub Container Registry as well
-    - name: Login to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-    - name: Push image
-      run: |
-        IMAGE_ID=ghcr.io/${{ github.repository_owner }}/nix
-        # Change all uppercase to lowercase
-        IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
-
-        docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
-        docker tag nix:$NIX_VERSION $IMAGE_ID:latest
-        docker push $IMAGE_ID:$NIX_VERSION
-        docker push $IMAGE_ID:latest
-        # deprecated 2024-02-24
-        docker tag nix:$NIX_VERSION $IMAGE_ID:master
-        docker push $IMAGE_ID:master
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
 
   vm_tests:
     runs-on: ubuntu-24.04
@@ -219,5 +155,4 @@ jobs:
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix build -L --out-link ./new-nix && PATH=$(pwd)/new-nix/bin:$PATH MAX_FLAKES=25 flake-regressions/eval-all.sh
