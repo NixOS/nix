@@ -324,7 +324,7 @@ unless ($opt->skip_git) {
     chdir($opt->project_root) or die "Cannot chdir to " . $opt->project_root . ": $!";
     system("git remote update origin") == 0 or die;
     system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
-    system("git push --tags") == 0 or die;
+    system("git push origin refs/tags/$version") == 0 or die;
     system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
 }
 
