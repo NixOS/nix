@@ -71,7 +71,7 @@ jobs:
     - name: Push to Docker Hub
       env:
         IS_MASTER: ${{ inputs.is_master }}
-        DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/nix
+        DOCKERHUB_REPO: ${{ github.repository_owner == 'NixOS' && 'nixos' || secrets.DOCKERHUB_USERNAME }}/nix
       run: |
         docker tag nix:$NIX_VERSION $DOCKERHUB_REPO:$NIX_VERSION
         docker push $DOCKERHUB_REPO:$NIX_VERSION
