@@ -124,24 +124,24 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .status = status}
+        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .status = status}
     {
     }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, args...)}
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}}
     {
     }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .suggestions = sug}
+        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .suggestions = sug}
     {
     }
 
     BaseError(HintFmt hint)
-        : err{.level = lvlError, .msg = hint}
+        : err{.level = lvlError, .msg = hint, .pos = {}}
     {
     }
 
