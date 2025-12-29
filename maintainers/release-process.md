@@ -5,7 +5,7 @@
 The release process is intended to create the following for each
 release:
 
-* A Git tag
+* A signed Git tag (public keys in `maintainers/keys/`)
 
 * Binary tarballs in https://releases.nixos.org/?prefix=nix/
 
