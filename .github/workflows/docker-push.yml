@@ -96,11 +96,6 @@ jobs:
         docker tag nix:$NIX_VERSION $IMAGE_ID:$NIX_VERSION
         docker push $IMAGE_ID:$NIX_VERSION
         if [ "$IS_MASTER" = "true" ]; then
-          # FIXME: Do not tag master as latest. Upload to GHCR as part of
-          # releng instead. Possibly adapt this reusable workflow for the (yet
-          # nonexistent) release workflow.
-          docker tag nix:$NIX_VERSION $IMAGE_ID:latest
           docker tag nix:$NIX_VERSION $IMAGE_ID:master
-          docker push $IMAGE_ID:latest
           docker push $IMAGE_ID:master
         fi
