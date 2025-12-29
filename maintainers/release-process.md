@@ -9,7 +9,7 @@ release:
 
 * Binary tarballs in https://releases.nixos.org/?prefix=nix/
 
-* Docker images
+* Docker images (arm64 and amd64 variants, uploaded to DockerHub and GHCR)
 
 * Closures in https://cache.nixos.org
 

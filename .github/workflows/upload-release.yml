@@ -14,6 +14,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  packages: write
 jobs:
   release:
     runs-on: ubuntu-24.04
@@ -43,10 +44,26 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload release
         run: |
           ./maintainers/upload-release.pl \
             ${{ inputs.eval_id }} \
             --skip-git
+        env:
+          IS_LATEST: ${{ inputs.is_latest && '1' || '' }}
+      - name: Push to GHCR
+        run: |
+          DOCKER_OWNER="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[A-Z]' '[a-z]')/nix"
+          ./maintainers/upload-release.pl \
+            ${{ inputs.eval_id }} \
+            --skip-git \
+            --skip-s3 \
+            --docker-owner "$DOCKER_OWNER"
         env:
           IS_LATEST: ${{ inputs.is_latest && '1' || '' }}
