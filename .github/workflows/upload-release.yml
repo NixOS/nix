@@ -1,0 +1,52 @@
+name: Upload Release
+on:
+  workflow_dispatch:
+    inputs:
+      eval_id:
+        description: "Hydra evaluation ID"
+        required: true
+        type: number
+      is_latest:
+        description: "Mark as latest release"
+        required: false
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: releases
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: ./.github/actions/install-nix-action
+        with:
+          dogfood: false # Use stable version
+          use_cache: false # Don't want any cache injection shenanigans
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Set NIX_PATH from flake input
+        run: |
+          NIXPKGS_PATH=$(nix build --inputs-from .# nixpkgs#path --print-out-paths --no-link)
+          # Shebangs with perl have issues. Pin nixpkgs this way. nix shell should maybe
+          # get the same uberhack that nix-shell has to support it.
+          echo "NIX_PATH=nixpkgs=$NIXPKGS_PATH" >> "$GITHUB_ENV"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        with:
+          role-to-assume: "arn:aws:iam::080433136561:role/nix-release"
+          role-session-name: nix-release-oidc-${{ github.run_id }}
+          aws-region: eu-west-1
+      - name: Login to Docker Hub
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Upload release
+        run: |
+          ./maintainers/upload-release.pl \
+            ${{ inputs.eval_id }} \
+            --skip-git
+        env:
+          IS_LATEST: ${{ inputs.is_latest && '1' || '' }}
