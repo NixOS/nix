@@ -357,6 +357,8 @@ public:
         return stats;
     }
 
+    Value * allocInt(NixInt::Inner n);
+
     /**
      * Storage for the AST nodes
      */

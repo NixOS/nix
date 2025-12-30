@@ -26,4 +26,11 @@ Value Value::vFalse = []() {
     return res;
 }();
 
+std::array<Value, 32> Value::vSmallInts = []() {
+    decltype(Value::vSmallInts) arr;
+    for (size_t i = 0; i < arr.size(); ++i)
+        arr[i].mkInt(i);
+    return arr;
+}();
+
 } // namespace nix

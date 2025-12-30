@@ -232,6 +232,15 @@ EvalMemory::EvalMemory()
     assertGCInitialized();
 }
 
+Value * EvalMemory::allocInt(NixInt::Inner n)
+{
+    if (n >= 0 && n < (NixInt::Inner) Value::vSmallInts.size())
+        return &Value::vSmallInts[n];
+    Value * v = allocValue();
+    v->mkInt(NixInt(n));
+    return v;
+}
+
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,

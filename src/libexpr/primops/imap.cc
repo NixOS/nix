@@ -18,9 +18,7 @@ static void prim_imap(EvalState & state, const PosIdx pos, Value ** args, Value 
     auto outList = state.buildList(list.listSize());
     for (const auto & [n, v] : enumerate(outList)) {
         v = state.allocValue();
-        auto vIdx = state.allocValue();
-        vIdx->mkInt(n + shift);
-        Value * args[] = {vIdx, list.listView()[n]};
+        Value * args[] = {state.mem.allocInt(n + shift), list.listView()[n]};
         state.callFunction(f, args, *v, pos);
     }
 

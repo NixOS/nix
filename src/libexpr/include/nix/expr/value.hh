@@ -1016,6 +1016,13 @@ struct Value : public ValueStorage<sizeof(void *)>
      */
     static Value vFalse;
 
+    /**
+     * Small pre-allocated integer constants.
+     *
+     * These are _not_ singletons. Pointer equality is _not_ sufficient.
+     */
+    static std::array<Value, 32> vSmallInts;
+
 private:
     template<InternalType... discriminator>
     bool isa() const noexcept
