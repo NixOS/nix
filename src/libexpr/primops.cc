@@ -3161,7 +3161,8 @@ static struct LazyPosAccessors
 
     void operator()(EvalState & state, const PosIdx pos, Value & line, Value & column)
     {
-        auto posV = state.mem.allocInt(pos.id);
+        Value * posV = state.allocValue();
+        posV->mkInt(pos.id);
         line.mkApp(&lineOfPos, posV);
         column.mkApp(&columnOfPos, posV);
     }
@@ -3965,8 +3966,11 @@ static void prim_genList(EvalState & state, const PosIdx pos, Value ** args, Val
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.genList");
 
     auto list = state.buildList(len);
-    for (const auto & [n, v] : enumerate(list))
-        (v = state.allocValue())->mkApp(args[0], state.mem.allocInt(n));
+    for (const auto & [n, v] : enumerate(list)) {
+        auto arg = state.allocValue();
+        arg->mkInt(n);
+        (v = state.allocValue())->mkApp(args[0], arg);
+    }
     v.mkList(list);
 }
 
