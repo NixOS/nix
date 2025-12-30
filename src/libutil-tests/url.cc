@@ -150,6 +150,17 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "repos", "git repo"},
                 },
         },
+        // quoted path
+        FixGitURLParam{
+            .input = "/repos/\"git repo\"",
+            .expected = "file:///repos/%22git%20repo%22",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "repos", "\"git repo\""},
+                },
+        },
         // IPV6 test case
         FixGitURLParam{
             .input = "user@[2001:db8:1::2]:/home/file",

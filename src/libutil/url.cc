@@ -94,6 +94,11 @@ std::string ParsedURL::Authority::to_string() const
 static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInFragment = " \"^";
 
 /**
+ * Characters that need URL encoding in the path.
+ */
+static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInPath = " \"";
+
+/**
  * Additional characters that don't need URL encoding in the query.
  */
 static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInQuery = " \"";
@@ -130,6 +135,32 @@ try {
             std::string fixed;
             std::string_view view = url;
 
+            // Parse scheme
+            if (const auto schemeEnd = view.find(':'); schemeEnd != view.npos) {
+                fixed += view.substr(0, schemeEnd + 1);
+                view.remove_prefix(schemeEnd + 1);
+            } else {
+                throw BadURL("'%s' doesn't have a scheme", url);
+            }
+
+            // Parse authority (optional)
+            if (view.starts_with("//")) {
+                if (const auto pathStart = view.find('/', 2); pathStart != view.npos) {
+                    fixed += view.substr(0, pathStart);
+                    view.remove_prefix(pathStart);
+                }
+            }
+
+            // Parse path (can be empty)
+            if (view.starts_with("/")) {
+                const auto pathEnd = view.find_first_of("?#");
+                auto pathView = view.substr(0, pathEnd);
+                const auto fixedPath = percentEncodeCharSet(pathView, extraAllowedCharsInPath);
+                fixed += fixedPath;
+                view.remove_prefix(pathView.size());
+            }
+
+            // Parse query (optional)
             if (auto beforeQuery = splitPrefixTo(view, '?')) {
                 fixed += *beforeQuery;
                 fixed += '?';
@@ -140,6 +171,7 @@ try {
                 view.remove_prefix(std::min(fragmentStart, view.size()));
             }
 
+            // Parse fragment (optional)
             if (auto beforeFragment = splitPrefixTo(view, '#')) {
                 fixed += *beforeFragment;
                 fixed += '#';
@@ -457,7 +489,7 @@ ParsedURL fixGitURL(std::string url)
         }
     }
 
-    auto parsed = parseURL(replaceStrings(url, " ", "%20"));
+    auto parsed = parseURL(url, true);
     // Drop the superfluous "git+" from the scheme.
     if (auto parsed_scheme = parseUrlScheme(parsed.scheme); parsed_scheme.application == "git") {
         parsed.scheme = parsed_scheme.transport;
