@@ -176,6 +176,32 @@ INSTANTIATE_TEST_SUITE_P(
                         },
                     .path = {"", "home", "file"},
                 },
+        },
+        // https://github.com/NixOS/nix/issues/14867
+        // Verify input doesn't trigger an assert.
+        // Intent is git@github, but gets parsed as git scheme with a relative path
+        FixGitURLParam{
+            .input = "git:github.com:nixos/nixpkgs",
+            .expected = "git:github.com:nixos/nixpkgs",
+            .parsed =
+                ParsedURL{
+                    .scheme = "git",
+                    .authority = std::nullopt,
+                    .path = {"github.com:nixos", "nixpkgs"},
+                },
+        },
+        // https://github.com/NixOS/nix/issues/14867#issuecomment-3699499232
+        // Verify input doesn't trigger an assert.
+        // The authority should have a "//" prefix, but instead gets parsed as a path component
+        FixGitURLParam{
+            .input = "git+https:/codeberg.org/forgejo/forgejo",
+            .expected = "https:/codeberg.org/forgejo/forgejo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority = std::nullopt,
+                    .path = {"", "codeberg.org", "forgejo", "forgejo"},
+                },
         }));
 
 TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
@@ -186,7 +212,7 @@ TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
     EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
+TEST(FixGitURLTestSuite, rejectFileURLWithAuthority)
 {
     /* From the underlying `parseURL` validations. */
     EXPECT_THAT(

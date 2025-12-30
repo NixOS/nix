@@ -475,8 +475,14 @@ ParsedURL fixGitURL(std::string url)
             schemeEnd -= 4;
         }
 
-        // NOTE: SCP syntax overlaps with simple URIs like file:/path/to/repo
-        if (!(url.starts_with("file:") || url.find("/", 0, schemeEnd) != url.npos)) {
+        // https://github.com/NixOS/nix/issues/14867
+        // SCP syntax overlaps with simple URIs like file:/path/to/repo
+        // Don't be fooled by invalid auth separator (ex: http:/server.com/path)
+        if (!(
+            url.starts_with("file:") || url.starts_with("git:") || url.starts_with("ssh:") ||
+            url.starts_with("ftp:") || url.starts_with("ftps:") ||
+            url.starts_with("http:") || url.starts_with("https:") ||
+            url.find("/", 0, schemeEnd) != url.npos)) {
             // Force absolute paths
             // NOTE: This is needed to support relative paths (ex: github.com:owner/repo.git)
             if (const auto hostEnd = url.rfind(':', url.find("/")); hostEnd != url.npos && hostEnd < url.size()) {
