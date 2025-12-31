@@ -3002,16 +3002,19 @@ static RegisterPrimOp primop_path({
 
         - recursive\
           When `false`, when `path` is added to the store it is with a
-          flat hash, rather than a hash of the NAR serialization of the
-          file. Thus, `path` must refer to a regular file, not a
+          [flat hash](@docroot@/store/file-system-object/content-address.md#serial-flat),
+          rather than a hash of the
+          [NAR serialization](@docroot@/store/file-system-object/content-address.md#serial-nix-archive)
+          of the file. Thus, `path` must refer to a regular file, not a
           directory. This allows similar behavior to `fetchurl`. Defaults
           to `true`.
 
         - sha256\
-          When provided, this is the expected hash of the file at the
-          path. Evaluation fails if the hash is incorrect, and
-          providing a hash allows `builtins.path` to be used even when the
-          `pure-eval` nix config option is on.
+          When provided, this is the expected
+          [content hash](@docroot@/store/file-system-object/content-address.md)
+          of the path. Evaluation fails if the hash is incorrect,
+          and providing a hash allows `builtins.path` to be used even
+          when the `pure-eval` nix config option is on.
     )",
     .fun = prim_path,
 });
