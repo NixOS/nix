@@ -5,9 +5,9 @@ R""(
 * Start a shell providing `youtube-dl` from the `nixpkgs` flake:
 
   ```console
-  # nix shell nixpkgs#youtube-dl
-  # youtube-dl --version
-  2020.11.01.1
+  # nix shell nixpkgs#yt-dlp
+  # yt-dlp --version
+  2025.12.08
   ```
 
 * Start a shell providing GNU Hello from NixOS 20.03:
