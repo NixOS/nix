@@ -65,6 +65,6 @@ mkMesonDerivation (finalAttrs: {
   '';
 
   meta = {
-    platforms = lib.platforms.unix;
+    platforms = lib.platforms.x86_64 ++ lib.platforms.x86 ++ lib.platforms.i686;
   };
 })
