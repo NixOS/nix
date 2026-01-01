@@ -94,11 +94,6 @@ std::string ParsedURL::Authority::to_string() const
 static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInFragment = " \"^";
 
 /**
- * Characters that need URL encoding in the path.
- */
-static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInPath = " \"";
-
-/**
  * Additional characters that don't need URL encoding in the query.
  */
 static constexpr boost::urls::grammar::lut_chars extraAllowedCharsInQuery = " \"";
@@ -135,32 +130,6 @@ try {
             std::string fixed;
             std::string_view view = url;
 
-            // Parse scheme
-            if (const auto schemeEnd = view.find(':'); schemeEnd != view.npos) {
-                fixed += view.substr(0, schemeEnd + 1);
-                view.remove_prefix(schemeEnd + 1);
-            } else {
-                throw BadURL("'%s' doesn't have a scheme", url);
-            }
-
-            // Parse authority (optional)
-            if (view.starts_with("//")) {
-                if (const auto pathStart = view.find('/', 2); pathStart != view.npos) {
-                    fixed += view.substr(0, pathStart);
-                    view.remove_prefix(pathStart);
-                }
-            }
-
-            // Parse path (can be empty)
-            if (view.starts_with("/")) {
-                const auto pathEnd = view.find_first_of("?#");
-                auto pathView = view.substr(0, pathEnd);
-                const auto fixedPath = percentEncodeCharSet(pathView, extraAllowedCharsInPath);
-                fixed += fixedPath;
-                view.remove_prefix(pathView.size());
-            }
-
-            // Parse query (optional)
             if (auto beforeQuery = splitPrefixTo(view, '?')) {
                 fixed += *beforeQuery;
                 fixed += '?';
@@ -171,7 +140,6 @@ try {
                 view.remove_prefix(std::min(fragmentStart, view.size()));
             }
 
-            // Parse fragment (optional)
             if (auto beforeFragment = splitPrefixTo(view, '#')) {
                 fixed += *beforeFragment;
                 fixed += '#';
@@ -462,43 +430,54 @@ ParsedURL fixGitURL(std::string url)
     // /path/to/repo.git/
     // file:///path/to/repo.git/
 
-    if (url.starts_with("/")) {
-        // absolute paths use file scheme with default (localhost) authority
-        url.insert(0, "file://");
-    } else if (url.contains("://")) {
-        // pass: already looks like a uri
-    } else  if (auto schemeEnd = url.find(':'); schemeEnd != url.npos) {
-        // attempt to parse an SCP path
-
-        if (url.starts_with("git+")) {
-            url.erase(0, 4);
-            schemeEnd -= 4;
+    // Normalize git paths into URLs
+    {
+        if (url.starts_with("/")) {
+            // absolute paths use a file scheme with default (localhost) authority (file:///)
+            url.insert(0, "file://");
         }
 
-        // https://github.com/NixOS/nix/issues/14867
-        // SCP syntax overlaps with simple URIs like file:/path/to/repo
-        // Don't be fooled by invalid auth separator (ex: http:/server.com/path)
-        if (!(
-            url.starts_with("file:") || url.starts_with("git:") || url.starts_with("ssh:") ||
-            url.starts_with("ftp:") || url.starts_with("ftps:") ||
-            url.starts_with("http:") || url.starts_with("https:") ||
-            url.find("/", 0, schemeEnd) != url.npos)) {
-            // Force absolute paths
-            // NOTE: This is needed to support relative paths (ex: github.com:owner/repo.git)
-            if (const auto hostEnd = url.rfind(':', url.find("/")); hostEnd != url.npos && hostEnd < url.size()) {
-                if (url[hostEnd+1] != '/') {
-                    url.insert(hostEnd+1, "/");
+        const std::string_view scheme = [&url] {
+            if (const auto schemeEnd = url.find(':'); schemeEnd != url.npos) {
+                return std::string_view(url).substr(url.starts_with("git+") ? 4 : 0, schemeEnd);
+            }
+            throw BadURL("'%s' doesn't have a scheme", url);
+        }();
+
+        // Git's SCP syntax overlaps with simple URIs like file:/path/to/repo
+        // If it's not a supported scheme (listed above) treat it as an SCP path
+        if (!(scheme.find_first_of("/+") != scheme.npos || scheme == "file" || scheme == "ftp" || scheme == "ftps"
+              || scheme == "git" || scheme == "http" || scheme == "https" || scheme == "ssh")) {
+            // Force relative paths to be absolute
+            // This is needed to support (ex: github.com:owner/repo.git)
+            if (const auto hostEnd = url.rfind(':', url.find('/')); hostEnd != url.npos && hostEnd < url.size()) {
+                if (url[hostEnd + 1] != '/') {
+                    url.insert(hostEnd + 1, "/");
                 }
             }
-            // SCP-like paths use ssh scheme
+            // SCP-like paths use an ssh scheme
             url.insert(0, "ssh://");
         }
     }
 
-    auto parsed = parseURL(url, true);
+    // All valid git paths should now be URLs with a scheme and authority separator
+    // Git doesn't require %-encoded characters, but parseURL does.  Here we locate
+    // the path portion of the url and %-encode problematic chars.
+    if (const auto authStart = url.find("://"); authStart != url.npos) {
+        if (auto pathStart = url.find('/', authStart + 3); pathStart != url.npos) {
+            constexpr boost::urls::grammar::lut_chars pathEncodedChars = " \"";
+
+            const auto pathEnd = url.find_first_of("?#", pathStart);
+            const auto pathLen = (pathEnd != url.npos ? pathEnd : url.size()) - pathStart;
+            const auto path = percentEncodeCharSet(std::string_view(url).substr(pathStart, pathLen), pathEncodedChars);
+            url.replace(pathStart, pathLen, path);
+        }
+    }
+
+    auto parsed = parseURL(url);
     // Drop the superfluous "git+" from the scheme.
-    if (auto parsed_scheme = parseUrlScheme(parsed.scheme); parsed_scheme.application == "git") {
-        parsed.scheme = parsed_scheme.transport;
+    if (auto scheme = parseUrlScheme(parsed.scheme); scheme.application == "git") {
+        parsed.scheme = scheme.transport;
     }
     return parsed;
 }

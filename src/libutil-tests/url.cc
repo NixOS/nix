@@ -226,8 +226,7 @@ TEST(FixGitURLTestSuite, rejectRelativePath)
     /* From the underlying `parseURL` validations. */
     EXPECT_THAT(
         []() { fixGitURL("relative/repo"); },
-        ::testing::ThrowsMessage<BadURL>(
-            testing::HasSubstrIgnoreANSIMatcher("'relative/repo' doesn't have a scheme")));
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("'relative/repo' doesn't have a scheme")));
 }
 
 struct ParseURLSuccessCase
