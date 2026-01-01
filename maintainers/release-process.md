@@ -5,11 +5,11 @@
 The release process is intended to create the following for each
 release:
 
-* A Git tag
+* A signed Git tag (public keys in `maintainers/keys/`)
 
 * Binary tarballs in https://releases.nixos.org/?prefix=nix/
 
-* Docker images
+* Docker images (arm64 and amd64 variants, uploaded to DockerHub and GHCR)
 
 * Closures in https://cache.nixos.org
 
@@ -104,21 +104,17 @@ release:
   evaluation ID (e.g. `1780832` in
   `https://hydra.nixos.org/eval/1780832`).
 
-* Tag the release and upload the release artifacts to
-  [`releases.nixos.org`](https://releases.nixos.org/) and [Docker Hub](https://hub.docker.com/):
+* Tag the release:
 
   ```console
-  $ IS_LATEST=1 ./maintainers/upload-release.pl <EVAL-ID>
+  $ IS_LATEST=1 ./maintainers/upload-release.pl --skip-docker --skip-s3 --project-root $PWD <EVAL-ID>
   ```
 
   Note: `IS_LATEST=1` causes the `latest-release` branch to be
   force-updated. This is used by the `nixos.org` website to get the
   [latest Nix manual](https://nixos.org/manual/nixpkgs/unstable/).
 
-  TODO: This script requires the right AWS credentials. Document.
-
-  TODO: This script currently requires a
-  `/home/eelco/Dev/nix-pristine`.
+* Trigger the [`upload-release.yml` workflow](https://github.com/NixOS/nix/actions/workflows/upload-release.yml) via `workflow_dispatch` trigger. At the top click `Run workflow` -> select the current release branch from `Use workflow from` -> fill in `Hydra evaluation ID` with `<EVAL-ID>` value from previous steps -> click `Run workflow`. Wait for the run to be approved by `NixOS/nix-team` (or bypass checks if warranted). Wait for the workflow to succeed.
 
   TODO: trigger nixos.org netlify: https://docs.netlify.com/configure-builds/build-hooks/
 
@@ -182,15 +178,17 @@ release:
 * Wait for the desired evaluation of the maintenance jobset to finish
   building.
 
-* Run
+* Tag the release
 
   ```console
-  $ IS_LATEST=1 ./maintainers/upload-release.pl <EVAL-ID>
+  $ IS_LATEST=1 ./maintainers/upload-release.pl --skip-docker --skip-s3 --project-root $PWD <EVAL-ID>
   ```
 
   Omit `IS_LATEST=1` when creating a point release that is not on the
   most recent stable branch. This prevents `nixos.org` to going back
   to an older release.
+
+* Trigger the [`upload-release.yml` workflow](https://github.com/NixOS/nix/actions/workflows/upload-release.yml) via `workflow_dispatch` trigger. At the top click `Run workflow` -> select the current release branch from `Use workflow from` -> fill in `Hydra evaluation ID` with `<EVAL-ID>` value from previous steps -> click `Run workflow`. Wait for the run to be approved by `NixOS/nix-team` (or bypass checks if warranted). Wait for the workflow to succeed.
 
 * Bump the version number of the release branch as above (e.g. to
   `2.12.2`).
