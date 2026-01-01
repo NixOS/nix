@@ -418,10 +418,6 @@
                 supportsCross = false;
               };
 
-              "nix-kaitai-struct-checks" = {
-                supportsCross = false;
-              };
-
               "nix-perl-bindings" = {
                 supportsCross = false;
               };
