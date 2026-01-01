@@ -1,5 +1,5 @@
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p awscli perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp perlPackages.NetAmazonS3 perlPackages.GetoptLongDescriptive gnupg1
+#! nix-shell -i perl -p awscli2 perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp perlPackages.NetAmazonS3 perlPackages.GetoptLongDescriptive gnupg1
 
 use strict;
 use Getopt::Long::Descriptive;
@@ -112,8 +112,8 @@ unless ($opt->skip_s3) {
           aws_secret_access_key => $aws_secret_access_key,
           $aws_session_token ? (aws_session_token => $aws_session_token) : (),
           retry                 => 1,
-          host                  => $opt->s3_host,
-          secure                => ($opt->s3_endpoint && $opt->s3_endpoint =~ /^http:/) ? 0 : 1,
+          $opt->s3_endpoint ? (host => $opt->s3_host) : (),
+          $opt->s3_endpoint ? (secure => ($opt->s3_endpoint =~ /^http:/) ? 0 : 1) : (),
         });
 
     $channelsBucket = $s3_channels->bucket($channelsBucketName) or die;
