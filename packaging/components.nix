@@ -452,11 +452,6 @@ in
   */
   nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
 
-  /**
-    Kaitai struct schema validation checks
-  */
-  nix-kaitai-struct-checks = callPackage ../src/kaitai-struct-checks/package.nix { };
-
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 
   /**

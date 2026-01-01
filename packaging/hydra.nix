@@ -72,7 +72,6 @@ let
         "nix-manual-manpages-only"
         "nix-internal-api-docs"
         "nix-external-api-docs"
-        "nix-kaitai-struct-checks"
       ]
     );
 in
