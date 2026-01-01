@@ -115,7 +115,7 @@ static DownloadTarballResult downloadTarball_(
     // it is not in fact a tarball.
     if (url.rfind("file://", 0) == 0) {
         // Remove "file://" prefix to get the local file path
-        std::string localPath = url.substr(7);
+        std::string localPath = percentDecode(url.substr(7));
         if (!std::filesystem::exists(localPath)) {
             throw Error("tarball '%s' does not exist.", localPath);
         }
