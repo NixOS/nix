@@ -3,6 +3,8 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/fs-sink.hh"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 namespace nix {
 
 namespace fetchers {
@@ -82,6 +84,9 @@ struct GitRepo
 
         /* The submodules listed in .gitmodules of this workdir. */
         std::vector<Submodule> submodules;
+
+        /* The empty directories that must be present in the nix derivation output. */
+        boost::unordered_flat_set<CanonPath> emptyDirs;
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
