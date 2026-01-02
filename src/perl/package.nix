@@ -47,6 +47,8 @@ perl.pkgs.toPerlModule (
       nix-store
       bzip2
       libsodium
+      perlPackages.DBI
+      perlPackages.DBDSQLite
     ];
 
     # `perlPackages.Test2Harness` is marked broken for Darwin
@@ -64,8 +66,6 @@ perl.pkgs.toPerlModule (
       '';
 
     mesonFlags = [
-      (lib.mesonOption "dbi_path" "${perlPackages.DBI}/${perl.libPrefix}")
-      (lib.mesonOption "dbd_sqlite_path" "${perlPackages.DBDSQLite}/${perl.libPrefix}")
       (lib.mesonEnable "tests" finalAttrs.finalPackage.doCheck)
     ];
 

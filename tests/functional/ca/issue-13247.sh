@@ -52,8 +52,8 @@ buildViaSubstitute use-a-more-outputs^first
 
 delete
 
-# Failure with 2.28 encountered in CI
-requireDaemonNewerThan "2.29"
+# Failure with 2.34 encountered in CI
+requireDaemonNewerThan "2.34"
 
 # Substitue just the first output
 #
