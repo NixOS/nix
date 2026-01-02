@@ -213,6 +213,8 @@ StringSet PackageInfo::queryMetaNames()
 
 bool PackageInfo::checkMeta(Value & v)
 {
+    auto _level = state->addCallDepth(v.determinePos(noPos));
+
     state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
         for (auto elem : v.listView())
@@ -397,6 +399,8 @@ static void getDerivations(
     Done & done,
     bool ignoreAssertionFailures)
 {
+    auto _level = state.addCallDepth(vIn.determinePos(noPos));
+
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
 
