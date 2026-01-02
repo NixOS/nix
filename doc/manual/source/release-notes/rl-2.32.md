@@ -8,7 +8,7 @@
 
 - Derivation JSON format now uses store path basenames only [#13570](https://github.com/NixOS/nix/issues/13570) [#13980](https://github.com/NixOS/nix/pull/13980)
 
-  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell) has shown that the use of the store directory in JSON formats is an impediment to systematic JSON formats, because it requires the serializer/deserializer to take an extra paramater (the store directory).
+  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell) has shown that the use of the store directory in JSON formats is an impediment to systematic JSON formats, because it requires the serializer/deserializer to take an extra parameter (the store directory).
 
   We ultimately want to rectify this issue with all JSON formats to the extent allowed by our stability promises. To start with, we are changing the JSON format for derivations because the `nix derivation` commands are — in addition to being formally unstable — less widely used than other unstable commands.
 
@@ -128,3 +128,38 @@ This release was made possible by the following 32 contributors:
 - Cole Helbling [**(@cole-h)**](https://github.com/cole-h)
 - Sinan Mohd [**(@sinanmohd)**](https://github.com/sinanmohd)
 - Philipp Otterbein
+# Release 2.32.5 (2026-01-02)
+
+## Bug fixes
+
+- Fix `builtins.fetchGit` with `ref = "HEAD"` [#13948](https://github.com/NixOS/nix/issues/13948) [#14673](https://github.com/NixOS/nix/pull/14673)
+
+- Fix dynamic attributes that are simple string expressions [#14642](https://github.com/NixOS/nix/issues/14642) [#14646](https://github.com/NixOS/nix/pull/14646)
+
+  Dynamic attributes are typically not allowed in [`let` expressions](https://nix.dev/manual/nix/2.32/language/syntax.html#let-expressions), but simple [string literals](https://nix.dev/manual/nix/2.32/language/string-literals.html) are allowed. This special-case was broken in prior releases of 2.32.
+
+- Fix null pointer dereference on reading non-existent derivations [#14571](https://github.com/NixOS/nix/issues/14571) [#14891](https://github.com/NixOS/nix/issues/14891) [#14572](https://github.com/NixOS/nix/pull/14572)
+
+- Fix use-after-free in derivation build scheduler [#14782](https://github.com/NixOS/nix/pull/14782)
+
+- Avoid querying remaining substituters after first success [#14836](https://github.com/NixOS/nix/issues/14836) [#14839](https://github.com/NixOS/nix/pull/14839)
+
+- Improve temporary path creation in hard link store optimisation [#7273](https://github.com/NixOS/nix/issues/7273) [#14680](https://github.com/NixOS/nix/pull/14680)
+
+  `auto-optimise-store` has been known to be flaky on Darwin due the usage of `rand()` when constructing the path of a temporary hardlink.
+
+- Move singletons out of headers [#14558](https://github.com/NixOS/nix/issues/14558)
+
+  Such variables have ["vague linkage"](https://gcc.gnu.org/onlinedocs/gcc-14.2.0/gcc/Vague-Linkage.html) and require special support from the dynamic linker to deduplicate across different shared libraries. Platforms such as Cygwin do not support this and duplicate the symbols instead.
+
+- Fix `curl` with `c-ares` failing to resolve DNS inside sandbox on macOS [#14859](https://github.com/NixOS/nix/pull/14859)
+
+- Fix `recursive-nix` [#14730](https://github.com/NixOS/nix/pull/14730)
+
+## Improvements
+
+- Support building manual with mdbook 0.5 [#14628](https://github.com/NixOS/nix/issues/14628) [#14693](https://github.com/NixOS/nix/pull/14693)
+
+- Improve `parent directory is world-writable or a symlink` error message to include the offending path component [#13701](https://github.com/NixOS/nix/issues/13701) [#14849](https://github.com/NixOS/nix/pull/14849)
+
+- Correct `build-dir` documentation in manual [#14748](https://github.com/NixOS/nix/pull/14748)
