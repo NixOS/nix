@@ -414,20 +414,71 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
-        return ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = splitString<std::vector<std::string>>(url, "/"),
-        };
+    // NOTE: Git URLs support the following forms
+    // reference: https://git-scm.com/docs/git-clone#_git_urls
+    //
+    // ssh://[<user>@]<host>[:<port>]/<path-to-git-repo>
+    // git://<host>[:<port>]/<path-to-git-repo>
+    // http[s]://<host>[:<port>]/<path-to-git-repo>
+    // ftp[s]://<host>[:<port>]/<path-to-git-repo>
+    //
+    // An alternative scp-like syntax may also be used with the ssh protocol:
+    // [<user>@]<host>:/<path-to-git-repo>
+    // This syntax is only recognized if there are no slashes before the first colon.
+    //
+    // For local repositories, also supported by Git natively, the following syntaxes may be used:
+    // /path/to/repo.git/
+    // file:///path/to/repo.git/
+
+    // Normalize git paths into URLs
+    {
+        if (url.starts_with("/")) {
+            // absolute paths use a file scheme with default (localhost) authority (file:///)
+            url.insert(0, "file://");
+        }
+
+        const std::string_view scheme = [&url] {
+            if (const auto schemeEnd = url.find(':'); schemeEnd != url.npos) {
+                return std::string_view(url).substr(url.starts_with("git+") ? 4 : 0, schemeEnd);
+            }
+            throw BadURL("'%s' doesn't have a scheme", url);
+        }();
+
+        // Git's SCP syntax overlaps with simple URIs like file:/path/to/repo
+        // If it's not a supported scheme (listed above) treat it as an SCP path
+        if (!(scheme.find_first_of("/+") != scheme.npos || scheme == "file" || scheme == "ftp" || scheme == "ftps"
+              || scheme == "git" || scheme == "http" || scheme == "https" || scheme == "ssh")) {
+            // Force relative paths to be absolute
+            // This is needed to support (ex: github.com:owner/repo.git)
+            if (const auto hostEnd = url.rfind(':', url.find('/')); hostEnd != url.npos && hostEnd < url.size()) {
+                if (url[hostEnd + 1] != '/') {
+                    url.insert(hostEnd + 1, "/");
+                }
+            }
+            // SCP-like paths use an ssh scheme
+            url.insert(0, "ssh://");
+        }
+    }
+
+    // All valid git paths should now be URLs with a scheme and authority separator
+    // Git doesn't require %-encoded characters, but parseURL does.  Here we locate
+    // the path portion of the url and %-encode problematic chars.
+    if (const auto authStart = url.find("://"); authStart != url.npos) {
+        if (auto pathStart = url.find('/', authStart + 3); pathStart != url.npos) {
+            constexpr boost::urls::grammar::lut_chars pathEncodedChars = " \"";
+
+            const auto pathEnd = url.find_first_of("?#", pathStart);
+            const auto pathLen = (pathEnd != url.npos ? pathEnd : url.size()) - pathStart;
+            const auto path = percentEncodeCharSet(std::string_view(url).substr(pathStart, pathLen), pathEncodedChars);
+            url.replace(pathStart, pathLen, path);
+        }
+    }
+
     auto parsed = parseURL(url);
     // Drop the superfluous "git+" from the scheme.
-    auto scheme = parseUrlScheme(parsed.scheme);
-    if (scheme.application == "git")
+    if (auto scheme = parseUrlScheme(parsed.scheme); scheme.application == "git") {
         parsed.scheme = scheme.transport;
+    }
     return parsed;
 }
 
