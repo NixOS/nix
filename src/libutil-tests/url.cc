@@ -63,6 +63,21 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
+        // SCP-like URL with an absolute path (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "git@github.com:/owner/repo.git",
+            .expected = "ssh://git@github.com//owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                            .user = "git",
+                        },
+                    .path = {"", "", "owner", "repo.git"},
+                },
+        },
         // Absolute path (becomes file:)
         FixGitURLParam{
             .input = "/home/me/repo",
@@ -127,6 +142,17 @@ TEST(FixGitURLTestSuite, scpLikeNoUserParsesPoorly)
         }));
 }
 
+TEST(FixGitURLTestSuite, scpLikeEmptyUserDoesNotRewrite)
+{
+    EXPECT_EQ(
+        fixGitURL("@host:path"),
+        (ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = {"@host:path"},
+        }));
+}
+
 TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
 {
     /* From the underlying `parseURL` validations. */
@@ -169,6 +195,38 @@ TEST(FixGitURLTestSuite, relativePathParsesPoorly)
             .path = {"relative", "repo"}}));
 }
 
+TEST(FixGitURLTestSuite, scpLikeWithSlashBeforeAtDoesNotRewrite)
+{
+    EXPECT_EQ(
+        fixGitURL("foo/bar@baz:qux"),
+        (ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = {"foo", "bar@baz:qux"},
+        }));
+}
+
+TEST(FixGitURLTestSuite, scpLikeAtAfterColonDoesNotBlockRewrite)
+{
+    const auto actual = fixGitURL("user@host:path@part");
+    ASSERT_EQ(actual.scheme, "ssh");
+    ASSERT_EQ(actual.to_string(), "ssh://user@host/path@part");
+}
+
+TEST(FixGitURLTestSuite, scpLikePathMayContainColon)
+{
+    const auto actual = fixGitURL("user@host:a:b");
+    ASSERT_EQ(actual.scheme, "ssh");
+    ASSERT_EQ(actual.to_string(), "ssh://user@host/a:b");
+}
+
+TEST(FixGitURLTestSuite, scpLikeIPv6PathMayContainColon)
+{
+    const auto actual = fixGitURL("user@[2001:db8:1::2]:a:b");
+    ASSERT_EQ(actual.scheme, "ssh");
+    ASSERT_EQ(actual.to_string(), "ssh://user@[2001:db8:1::2]/a:b");
+}
+
 struct ParseURLSuccessCase
 {
     std::string_view input;
@@ -189,6 +247,17 @@ INSTANTIATE_TEST_SUITE_P(
                     .scheme = "http",
                     .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
                     .path = {"", "file.tar.gz"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
+            .input = "ssh://user@domain:1234/path",
+            .expected =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority = Authority{.hostType = HostType::Name, .host = "domain", .user = "user", .port = 1234},
+                    .path = {"", "path"},
                     .query = (StringMap) {},
                     .fragment = "",
                 },
