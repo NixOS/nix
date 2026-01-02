@@ -78,3 +78,7 @@
     RapidCheck are required, which are available at
     <https://google.github.io/googletest/> and
     <https://github.com/emil-e/rapidcheck> respectively.
+
+  - blake3, cmake, libarchive, libgit, perl-DBD-SQLite, toml11, kaitai-struct-cpp-stl-runtime
+
+  - https://github.com/santhosh-tekuri/jsonschema
