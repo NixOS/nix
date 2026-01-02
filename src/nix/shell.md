@@ -2,7 +2,7 @@ R""(
 
 # Examples
 
-* Start a shell providing `youtube-dl` from the `nixpkgs` flake:
+* Start a shell providing `yt-dlp` from the `nixpkgs` flake:
 
   ```console
   # nix shell nixpkgs#yt-dlp
