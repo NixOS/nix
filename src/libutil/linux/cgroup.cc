@@ -15,9 +15,9 @@
 
 namespace nix {
 
-std::optional<Path> getCgroupFS()
+std::optional<std::filesystem::path> getCgroupFS()
 {
-    static auto res = [&]() -> std::optional<Path> {
+    static auto res = [&]() -> std::optional<std::filesystem::path> {
         auto fp = fopen("/proc/mounts", "r");
         if (!fp)
             return std::nullopt;
@@ -32,7 +32,7 @@ std::optional<Path> getCgroupFS()
 }
 
 // FIXME: obsolete, check for cgroup2
-StringMap getCgroups(const Path & cgroupFile)
+StringMap getCgroups(const std::filesystem::path & cgroupFile)
 {
     StringMap cgroups;
 
@@ -150,7 +150,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     return stats;
 }
 
-CgroupStats destroyCgroup(const Path & cgroup)
+CgroupStats destroyCgroup(const std::filesystem::path & cgroup)
 {
     return destroyCgroup(cgroup, true);
 }

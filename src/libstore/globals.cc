@@ -335,7 +335,16 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
     });
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ChrootPath, source, optional)
+void to_json(nlohmann::json & j, const ChrootPath & cp)
+{
+    j = nlohmann::json{{"source", cp.source.string()}, {"optional", cp.optional}};
+}
+
+void from_json(const nlohmann::json & j, ChrootPath & cp)
+{
+    cp.source = j.at("source").get<std::string>();
+    cp.optional = j.at("optional").get<bool>();
+}
 
 template<>
 PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const
@@ -368,7 +377,9 @@ std::string BaseSetting<PathsInChroot>::to_string() const
 {
     std::vector<std::string> accum;
     for (auto & [name, cp] : value) {
-        std::string s = name == cp.source ? name : name + "=" + cp.source;
+        auto nameStr = name.string();
+        auto sourceStr = cp.source.string();
+        std::string s = name == cp.source ? nameStr : nameStr + "=" + sourceStr;
         if (cp.optional)
             s += "?";
         accum.push_back(std::move(s));

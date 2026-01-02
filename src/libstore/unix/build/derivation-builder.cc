@@ -129,13 +129,13 @@ protected:
     /**
      * The temporary directory used for the build.
      */
-    Path tmpDir;
+    std::filesystem::path tmpDir;
 
     /**
      * The top-level temporary directory. `tmpDir` is either equal to
      * or a child of this directory.
      */
-    Path topTmpDir;
+    std::filesystem::path topTmpDir;
 
     /**
      * The file descriptor of the temporary directory.
@@ -175,7 +175,7 @@ protected:
      */
     OutputPathMap scratchOutputs;
 
-    const static Path homeDir;
+    const static std::filesystem::path homeDir;
 
     /**
      * The recursive Nix daemon socket.
@@ -254,7 +254,7 @@ protected:
     /**
      * Return the path of the temporary directory in the sandbox.
      */
-    virtual Path tmpDirInSandbox()
+    virtual std::filesystem::path tmpDirInSandbox()
     {
         assert(!topTmpDir.empty());
         return topTmpDir;
@@ -280,9 +280,9 @@ protected:
         return Strings({store.printStorePath(drvPath)});
     }
 
-    virtual Path realPathInSandbox(const Path & p)
+    virtual std::filesystem::path realPathInSandbox(const std::filesystem::path & p)
     {
-        return store.toRealPath(p);
+        return store.toRealPath(p.native());
     }
 
     /**
@@ -342,12 +342,12 @@ protected:
      * SAFETY: this function is prone to TOCTOU as it receives a path and not a descriptor.
      * It's only safe to call in a child of a directory only visible to the owner.
      */
-    void chownToBuilder(const Path & path);
+    void chownToBuilder(const std::filesystem::path & path);
 
     /**
      * Make a file owned by the builder addressed by its file descriptor.
      */
-    void chownToBuilder(int fd, const Path & path);
+    void chownToBuilder(int fd, const std::filesystem::path & path);
 
     /**
      * Create a file in `tmpDir` owned by the builder.
@@ -437,7 +437,12 @@ private:
 };
 
 void handleDiffHook(
-    uid_t uid, uid_t gid, const Path & tryA, const Path & tryB, const Path & drvPath, const Path & tmpDir)
+    uid_t uid,
+    uid_t gid,
+    const std::filesystem::path & tryA,
+    const std::filesystem::path & tryB,
+    const std::filesystem::path & drvPath,
+    const std::filesystem::path & tmpDir)
 {
     auto & diffHookOpt = settings.diffHook.get();
     if (diffHookOpt && settings.runDiffHook) {
@@ -465,7 +470,7 @@ void handleDiffHook(
     }
 }
 
-const Path DerivationBuilderImpl::homeDir = "/homeless-shelter";
+const std::filesystem::path DerivationBuilderImpl::homeDir = "/homeless-shelter";
 
 void DerivationBuilderImpl::killSandbox(bool getStats)
 {
@@ -560,16 +565,16 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     return builtOutputs;
 }
 
-static void chmod_(const Path & path, mode_t mode)
+static void chmod_(const std::filesystem::path & path, mode_t mode)
 {
     if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on '%s'", path);
+        throw SysError("setting permissions on %s", path);
 }
 
 /* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
    it's a directory and we're not root (to be able to update the
    directory's parent link ".."). */
-static void movePath(const Path & src, const Path & dst)
+static void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
 {
     auto st = lstat(src);
 
@@ -584,13 +589,13 @@ static void movePath(const Path & src, const Path & dst)
         chmod_(dst, st.st_mode);
 }
 
-static void replaceValidPath(const Path & storePath, const Path & tmpPath)
+static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
        tmpPath (the replacement), so we have to move it out of the
        way first.  We'd better not be interrupted here, because if
        we're repairing (say) Glibc, we end up with a broken system. */
-    Path oldPath;
+    std::filesystem::path oldPath;
 
     if (pathExists(storePath)) {
         // why do we loop here?
@@ -723,7 +728,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
        POSIX semantics.*/
     tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
     if (!tmpDirFd)
-        throw SysError("failed to open the build temporary directory descriptor '%1%'", tmpDir);
+        throw SysError("failed to open the build temporary directory descriptor %1%", tmpDir);
 
     chownToBuilder(tmpDirFd.get(), tmpDir);
 
@@ -789,7 +794,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     if (needsHashRewrite() && pathExists(homeDir))
         throw Error(
-            "home directory '%1%' exists; please remove it to assure purity of builds without sandboxing", homeDir);
+            "home directory %1% exists; please remove it to assure purity of builds without sandboxing", homeDir);
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
@@ -847,7 +852,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
        host file system. */
     PathsInChroot pathsInChroot = defaultPathsInChroot;
 
-    if (hasPrefix(store.storeDir, tmpDirInSandbox())) {
+    if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
@@ -862,10 +867,10 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         /* Note: we're not resolving symlinks here to prevent
            giving a non-root user info about inaccessible
            files. */
-        Path canonI = canonPath(i);
+        std::filesystem::path canonI = canonPath(i);
         /* If only we had a trie to do this more efficiently :) luckily, these are generally going to be pretty small */
         for (auto & a : allowedPaths) {
-            Path canonA = canonPath(a);
+            std::filesystem::path canonA = canonPath(a);
             if (isDirOrInDir(canonI, canonA)) {
                 found = true;
                 break;
@@ -1045,7 +1050,7 @@ void DerivationBuilderImpl::initEnv()
        *not* `drv.env`, because we've desugared things like like
        "passAFile", "expandReferencesGraph", structured attrs, etc. */
     for (const auto & [name, info] : desugaredEnv.variables) {
-        env[name] = info.prependBuildDirectory ? tmpDirInSandbox() + "/" + info.value : info.value;
+        env[name] = info.prependBuildDirectory ? (tmpDirInSandbox() / info.value).string() : info.value;
     }
 
     /* Add extra files, similar to `finalEnv` */
@@ -1124,8 +1129,8 @@ void DerivationBuilderImpl::startDaemon()
     addedPaths.clear();
 
     auto socketName = ".nix-socket";
-    Path socketPath = tmpDir + "/" + socketName;
-    env["NIX_REMOTE"] = "unix://" + tmpDirInSandbox() + "/" + socketName;
+    std::filesystem::path socketPath = tmpDir / socketName;
+    env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
 
     daemonSocket = createUnixDomainSocket(socketPath, 0600);
 
@@ -1207,20 +1212,20 @@ void DerivationBuilderImpl::addDependencyImpl(const StorePath & path)
     addedPaths.insert(path);
 }
 
-void DerivationBuilderImpl::chownToBuilder(const Path & path)
+void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
     if (!buildUser)
         return;
     if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError("cannot change ownership of '%1%'", path);
+        throw SysError("cannot change ownership of %1%", path);
 }
 
-void DerivationBuilderImpl::chownToBuilder(int fd, const Path & path)
+void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path & path)
 {
     if (!buildUser)
         return;
     if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError("cannot change ownership of file '%1%'", path);
+        throw SysError("cannot change ownership of file %1%", path);
 }
 
 void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::string_view contents)
@@ -1271,7 +1276,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         enterChroot();
 
         if (chdir(tmpDirInSandbox().c_str()) == -1)
-            throw SysError("changing into '%1%'", tmpDir);
+            throw SysError("changing into %1%", tmpDir);
 
         /* Close all other file descriptors. */
         unix::closeExtraFDs();
@@ -1468,7 +1473,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if (discardReferences)
             debug("discarding references of output '%s'", outputName);
         else {
-            debug("scanning for references for output '%s' in temp location '%s'", outputName, actualPath);
+            debug("scanning for references for output '%s' in temp location %s", outputName, actualPath);
 
             /* Pass blank Sink as we are not ready to hash data at this stage. */
             NullSink blank;
@@ -1564,7 +1569,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto rewriteOutput = [&](const StringMap & rewrites) {
             /* Apply hash rewriting if necessary. */
             if (!rewrites.empty()) {
-                debug("rewriting hashes in '%1%'; cross fingers", actualPath);
+                debug("rewriting hashes in %1%; cross fingers", actualPath);
 
                 /* FIXME: Is this actually streaming? */
                 auto source = sinkToSource([&](Sink & nextSink) {
@@ -1572,7 +1577,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     dumpPath(actualPath, rsink);
                     rsink.flush();
                 });
-                Path tmpPath = actualPath + ".tmp";
+                std::filesystem::path tmpPath = actualPath.native() + ".tmp";
                 restorePath(tmpPath, *source);
                 deletePath(actualPath);
                 movePath(tmpPath, actualPath);
@@ -1632,11 +1637,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 case FileIngestionMethod::NixArchive: {
                     HashModuloSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
-                    dumpPath({getFSSourceAccessor(), CanonPath(actualPath)}, caSink, (FileSerialisationMethod) fim);
+                    dumpPath(
+                        {getFSSourceAccessor(), CanonPath(actualPath.native())}, caSink, (FileSerialisationMethod) fim);
                     return caSink.finish().hash;
                 }
                 case FileIngestionMethod::Git: {
-                    return git::dumpHash(outputHash.hashAlgo, {getFSSourceAccessor(), CanonPath(actualPath)}).hash;
+                    return git::dumpHash(outputHash.hashAlgo, {getFSSourceAccessor(), CanonPath(actualPath.native())})
+                        .hash;
                 }
                 }
                 assert(false);
@@ -1658,7 +1665,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {getFSSourceAccessor(), CanonPath(actualPath)},
+                    {getFSSourceAccessor(), CanonPath(actualPath.native())},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.hash;
@@ -1682,7 +1689,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                             std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                     rewriteOutput(outputRewrites);
                     HashResult narHashAndSize = hashPath(
-                        {getFSSourceAccessor(), CanonPath(actualPath)},
+                        {getFSSourceAccessor(), CanonPath(actualPath.native())},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
                     ValidPathInfo newInfo0{requiredFinalPath, {store, narHashAndSize.hash}};
@@ -1699,8 +1706,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
                     // Replace the output by a fresh copy of itself to make sure
                     // that there's no stale file descriptor pointing to it
-                    Path tmpOutput = actualPath + ".tmp";
-                    copyFile(std::filesystem::path(actualPath), std::filesystem::path(tmpOutput), true);
+                    std::filesystem::path tmpOutput = actualPath.native() + ".tmp";
+                    copyFile(actualPath, tmpOutput, true);
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
@@ -1916,7 +1923,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
-            printError("note: keeping build directory '%s'", tmpDir);
+            printError("note: keeping build directory %s", tmpDir);
             chmod(topTmpDir.c_str(), 0755);
             chmod(tmpDir.c_str(), 0755);
         } else

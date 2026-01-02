@@ -9,9 +9,9 @@
 
 namespace nix {
 
-std::optional<Path> getCgroupFS();
+std::optional<std::filesystem::path> getCgroupFS();
 
-StringMap getCgroups(const Path & cgroupFile);
+StringMap getCgroups(const std::filesystem::path & cgroupFile);
 
 struct CgroupStats
 {
@@ -29,7 +29,7 @@ CgroupStats getCgroupStats(const std::filesystem::path & cgroup);
  * been killed. Also return statistics from the cgroup just before
  * destruction.
  */
-CgroupStats destroyCgroup(const Path & cgroup);
+CgroupStats destroyCgroup(const std::filesystem::path & cgroup);
 
 std::string getCurrentCgroup();
 

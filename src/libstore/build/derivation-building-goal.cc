@@ -581,7 +581,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                     goal.worker.childTerminated(&goal);
                 }
 
-                Path openLogFile() override
+                std::filesystem::path openLogFile() override
                 {
                     return goal.openLogFile();
                 }
@@ -602,8 +602,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             StorePathSet closure;
             for (auto & i : defaultPathsInChroot)
                 try {
-                    if (worker.store.isInStore(i.second.source))
-                        worker.store.computeFSClosure(worker.store.toStorePath(i.second.source).first, closure);
+                    if (worker.store.isInStore(i.second.source.string()))
+                        worker.store.computeFSClosure(
+                            worker.store.toStorePath(i.second.source.string()).first, closure);
                 } catch (InvalidPath & e) {
                 } catch (Error & e) {
                     e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
