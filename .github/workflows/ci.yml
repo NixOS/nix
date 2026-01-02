@@ -197,21 +197,6 @@ jobs:
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
 
-  docker_push_image:
-    name: Push docker image to DockerHub and GHCR
-    needs: [flake_regressions, installer_test]
-    if: github.event_name == 'push' && github.ref_name == 'master'
-    uses: ./.github/workflows/docker-push.yml
-    with:
-      ref: ${{ github.sha }}
-      is_master: true
-    permissions:
-      contents: read
-      packages: write
-    secrets:
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
   flake_regressions:
     needs: tests
     runs-on: ubuntu-24.04
