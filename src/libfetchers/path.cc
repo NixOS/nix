@@ -166,14 +166,11 @@ struct PathInputScheme : InputScheme
         // To prevent `fetchToStore()` copying the path again to Nix
         // store, pre-create an entry in the fetcher cache.
         auto info = store.queryPathInfo(*storePath);
-        accessor->fingerprint =
-            fmt("path:%s", store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
+        accessor->fingerprint = fmt("path:%s", info->narHash.to_string(HashFormat::SRI, true));
         settings.getCache()->upsert(
-            makeFetchToStoreCacheKey(
-                input.getName(), *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
-            store,
-            {},
-            *storePath);
+            makeSourcePathToHashCacheKey(
+                *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
+            {{"hash", info->narHash.to_string(HashFormat::SRI, true)}});
 
         /* Trust the lastModified value supplied by the user, if
            any. It's not a "secure" attribute so we don't care. */

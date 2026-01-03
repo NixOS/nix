@@ -24,7 +24,17 @@ StorePath fetchToStore(
     PathFilter * filter = nullptr,
     RepairFlag repair = NoRepair);
 
-fetchers::Cache::Key makeFetchToStoreCacheKey(
-    const std::string & name, const std::string & fingerprint, ContentAddressMethod method, const std::string & path);
+std::pair<StorePath, Hash> fetchToStore2(
+    const fetchers::Settings & settings,
+    Store & store,
+    const SourcePath & path,
+    FetchMode mode,
+    std::string_view name = "source",
+    ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,
+    PathFilter * filter = nullptr,
+    RepairFlag repair = NoRepair);
+
+fetchers::Cache::Key
+makeSourcePathToHashCacheKey(std::string_view fingerprint, ContentAddressMethod method, const CanonPath & path);
 
 } // namespace nix

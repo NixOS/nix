@@ -339,9 +339,10 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
             // can reuse the existing nar instead of copying the unpacked
             // input back into the store on every evaluation.
             if (accessor->fingerprint) {
-                ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
-                auto cacheKey = makeFetchToStoreCacheKey(getName(), *accessor->fingerprint, method, "/");
-                settings.getCache()->upsert(cacheKey, store, {}, storePath);
+                settings.getCache()->upsert(
+                    makeSourcePathToHashCacheKey(
+                        *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
+                    {{"hash", store.queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)}});
             }
 
             accessor->setPathDisplay("«" + to_string() + "»");
