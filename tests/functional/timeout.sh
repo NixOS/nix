@@ -7,39 +7,14 @@ source common.sh
 # XXX: This shouldn’t be, but #4813 cause this test to fail
 needLocalStore "see #4813"
 
-messages=$(nix-build -Q timeout.nix -A infiniteLoop --timeout 2 2>&1) && status=0 || status=$?
+# FIXME: https://github.com/NixOS/nix/issues/4813
+expectStderr 101 nix-build -Q timeout.nix -A infiniteLoop --timeout 2 | grepQuiet "timed out" \
+    || skipTest "Do not block CI until fixed"
 
-if [ "$status" -ne 101 ]; then
-    echo "error: 'nix-store' exited with '$status'; should have exited 101"
+expectStderr 1 nix-build -Q timeout.nix -A infiniteLoop --max-build-log-size 100 | grepQuiet "killed after writing more than 100 bytes of log output"
 
-    # FIXME: https://github.com/NixOS/nix/issues/4813
-    skipTest "Do not block CI until fixed"
+expectStderr 101 nix-build timeout.nix -A silent --max-silent-time 2 | grepQuiet "timed out after 2 seconds"
 
-    exit 1
-fi
+expectStderr 100 nix-build timeout.nix -A closeLog | grepQuiet "builder failed due to signal"
 
-if echo "$messages" | grepQuietInvert "timed out"; then
-    echo "error: build may have failed for reasons other than timeout; output:"
-    echo "$messages" >&2
-    exit 1
-fi
-
-if nix-build -Q timeout.nix -A infiniteLoop --max-build-log-size 100; then
-    echo "build should have failed"
-    exit 1
-fi
-
-if nix-build timeout.nix -A silent --max-silent-time 2; then
-    echo "build should have failed"
-    exit 1
-fi
-
-if nix-build timeout.nix -A closeLog; then
-    echo "build should have failed"
-    exit 1
-fi
-
-if nix build -f timeout.nix silent --max-silent-time 2; then
-    echo "build should have failed"
-    exit 1
-fi
+expectStderr 1 nix build -f timeout.nix silent --max-silent-time 2 | grepQuiet "timed out after 2 seconds"
