@@ -83,6 +83,19 @@ extern FileTransferSettings fileTransferSettings;
 
 extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
+enum struct HttpVersion {
+    None,
+    Http1_1,
+    Http2,
+    Http2PriorKnowledge,
+    Http3,
+};
+
+/**
+ * Get the libcurl HTTP Version corresponding to HttpVersion
+ */
+long curlHttpVersion(HttpVersion httpVersion);
+
 /**
  * HTTP methods supported by FileTransfer.
  */
@@ -116,6 +129,7 @@ struct FileTransferRequest
     Headers headers;
     std::string expectedETag;
     HttpMethod method = HttpMethod::Get;
+    HttpVersion httpVersion;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
