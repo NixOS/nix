@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
+#include "nix/store/build/derived-output-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 
@@ -38,7 +39,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 {
     Goals waitees;
 
-    std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
+    /**
+     * Map from output deriving path to the DerivedOutputGoal
+     * that will get its realisation (either from build trace lookup or by building).
+     */
+    std::map<SingleDerivedPath::Built, std::shared_ptr<DerivedOutputGoal>> inputGoals;
 
     {
         std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)>
@@ -46,15 +51,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 
         addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv,
                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            if (!inputNode.value.empty()) {
-                auto g = worker.makeGoal(
-                    DerivedPath::Built{
-                        .drvPath = inputDrv,
-                        .outputs = inputNode.value,
-                    },
-                    buildMode == bmRepair ? bmRepair : bmNormal);
-                inputGoals.insert_or_assign(inputDrv, g);
-                waitees.insert(std::move(g));
+            for (const auto & outputName : inputNode.value) {
+                SingleDerivedPath::Built id{inputDrv, outputName};
+                auto g = worker.makeDerivedOutputGoal(id, buildMode == bmRepair ? bmRepair : bmNormal);
+                inputGoals.insert_or_assign(std::move(id), g);
+                waitees.insert(upcast_goal(g));
             }
             for (const auto & [outputName, childNode] : inputNode.childMap)
                 addWaiteeDerivedPath(
@@ -102,32 +103,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
     {
         auto & fullDrv = *drv;
 
-        auto drvType = fullDrv.type();
-        bool resolveDrv =
-            std::visit(
-                overloaded{
-                    [&](const DerivationType::InputAddressed & ia) {
-                        /* must resolve if deferred. */
-                        return ia.deferred;
-                    },
-                    [&](const DerivationType::ContentAddressed & ca) {
-                        return !fullDrv.inputDrvs.map.empty()
-                               && (ca.fixed
-                                       /* Can optionally resolve if fixed, which is good
-                                          for avoiding unnecessary rebuilds. */
-                                       ? experimentalFeatureSettings.isEnabled(Xp::CaDerivations)
-                                       /* Must resolve if floating and there are any inputs
-                                          drvs. */
-                                       : true);
-                    },
-                    [&](const DerivationType::Impure &) { return true; }},
-                drvType.raw)
-            /* no inputs are outputs of dynamic derivations */
-            || std::ranges::any_of(fullDrv.inputDrvs.map.begin(), fullDrv.inputDrvs.map.end(), [](auto & pair) {
-                   return !pair.second.childMap.empty();
-               });
-
-        if (resolveDrv && !fullDrv.inputDrvs.map.empty()) {
+        if (fullDrv.shouldResolve()) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
 
             /* We are be able to resolve this derivation based on the
@@ -135,24 +111,12 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                stub goal aliasing that resolved derivation goal. */
             std::optional attempt = fullDrv.tryResolve(
                 worker.store,
-                [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
-                    auto mEntry = get(inputGoals, drvPath);
-                    if (!mEntry)
+                [&](ref<const SingleDerivedPath> inputDrv, const std::string & outputName) -> std::optional<StorePath> {
+                    auto mGoal = get(inputGoals, SingleDerivedPath::Built{inputDrv, outputName});
+                    if (!mGoal)
                         return std::nullopt;
 
-                    auto & buildResult = (*mEntry)->buildResult;
-                    return std::visit(
-                        overloaded{
-                            [](const BuildResult::Failure &) -> std::optional<StorePath> { return std::nullopt; },
-                            [&](const BuildResult::Success & success) -> std::optional<StorePath> {
-                                auto i = get(success.builtOutputs, outputName);
-                                if (!i)
-                                    return std::nullopt;
-
-                                return i->outPath;
-                            },
-                        },
-                        buildResult.inner);
+                    return (*mGoal)->outputPath;
                 });
             if (!attempt) {
                 /* TODO (impure derivations-induced tech debt) (see below):

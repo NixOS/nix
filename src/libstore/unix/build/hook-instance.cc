@@ -88,8 +88,11 @@ HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        if (pid != -1)
+        if (pid != -1) {
             pid.kill();
+            if (onKillChild)
+                onKillChild();
+        }
     } catch (...) {
         ignoreExceptionInDestructor();
     }

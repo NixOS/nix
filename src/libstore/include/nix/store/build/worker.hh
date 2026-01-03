@@ -21,6 +21,8 @@ struct DerivationResolutionGoal;
 struct DerivationBuildingGoal;
 struct PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
+class BuildTraceTrampolineGoal;
+class DerivedOutputGoal;
 
 /**
  * Workaround for not being able to declare a something like
@@ -36,7 +38,10 @@ class DrvOutputSubstitutionGoal;
  */
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceTrampolineGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal);
+GoalPtr upcast_goal(std::shared_ptr<DerivedOutputGoal> subGoal);
 
 typedef std::chrono::time_point<std::chrono::steady_clock> steady_time_point;
 
@@ -117,6 +122,8 @@ private:
     std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
+    DerivedPathMap<std::weak_ptr<BuildTraceTrampolineGoal>> buildTraceTrampolineGoals;
+    DerivedPathMap<std::weak_ptr<DerivedOutputGoal>> derivedOutputGoals;
 
     /**
      * Goals waiting for busy paths to be unlocked.
@@ -245,11 +252,25 @@ public:
         const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation);
 
     /**
-     * @ref PathSubstitutionGoal "substitution goal"
+     * @ref PathSubstitutionGoal "path substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
         const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * @ref DrvOutputSubstitutionGoal "derivation output substitution goal"
+     */
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id);
+
+    /**
+     * @ref BuildTraceTrampolineGoal "build trace trampoline goal"
+     */
+    std::shared_ptr<BuildTraceTrampolineGoal> makeBuildTraceTrampolineGoal(const SingleDerivedPath::Built & id);
+
+    /**
+     * @ref DerivedOutputGoal "derived output goal"
+     */
+    std::shared_ptr<DerivedOutputGoal> makeDerivedOutputGoal(const SingleDerivedPath::Built & id, BuildMode buildMode);
 
     /**
      * Make a goal corresponding to the `DerivedPath`.
@@ -295,8 +316,20 @@ public:
      * false if there is no sense in waking up goals that are sleeping
      * because they can't run yet (e.g., there is no free build slot,
      * or the hook would still say `postpone`).
+     *
+     * This overload requires `goal` to point to a fully constructed,
+     * valid goal object, as it calls `goal->jobCategory()`.
      */
     void childTerminated(Goal * goal, bool wakeSleepers = true);
+
+    /**
+     * Unregisters a running child process, like the other overload.
+     *
+     * This overload only uses `goal` as a pointer for comparison with
+     * weak goal references, so it is safe to call from destructors
+     * where the goal object may be partially destroyed.
+     */
+    void childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers = true);
 
     /**
      * Put `goal` to sleep until a build slot becomes available (which

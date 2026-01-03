@@ -964,14 +964,8 @@ static void performOp(
 
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
-            auto outputPath = StorePath(readString(conn.from));
-            store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
-        } else {
-            auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
-            store->registerDrvOutput(realisation);
-        }
+        auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
+        store->registerDrvOutput(realisation);
         logger->stopWork();
         break;
     }
@@ -979,19 +973,13 @@ static void performOp(
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
         auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
-        auto info = store->queryRealisation(outputId);
+        std::optional<UnkeyedRealisation> info = *store->queryRealisation(outputId);
         logger->stopWork();
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            std::set<StorePath> outPaths;
-            if (info)
-                outPaths.insert(info->outPath);
-            WorkerProto::write(*store, wconn, outPaths);
-        } else {
-            std::set<Realisation> realisations;
-            if (info)
-                realisations.insert({*info, outputId});
-            WorkerProto::write(*store, wconn, realisations);
-        }
+        /* Only return the > 39 format because if we got past
+           `DrvOutput` serialization, we know that is what we're using.
+           */
+        assert(GET_PROTOCOL_MINOR(conn.protoVersion) >= 39);
+        WorkerProto::write(*store, wconn, info);
         break;
     }
 

@@ -36,7 +36,7 @@ testRemoteCacheFor () {
     copyAttr "$derivationPath" 1
     clearStore
     # Check nothing gets built.
-    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir" --no-require-sigs |& grepQuietInverse " will be built:"
+    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir" --no-require-sigs -j0
 }
 
 testRemoteCache () {

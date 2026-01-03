@@ -110,7 +110,7 @@ struct DerivationBuilderCallbacks
     /**
      * Open a log file and a pipe to it.
      */
-    virtual Path openLogFile() = 0;
+    virtual void openLogFile() = 0;
 
     /**
      * Close the log file.

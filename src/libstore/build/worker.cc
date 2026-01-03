@@ -4,6 +4,8 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
+#include "nix/store/build/build-trace-trampoline-goal.hh"
+#include "nix/store/build/derived-output-goal.hh"
 #include "nix/store/build/derivation-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
@@ -111,6 +113,17 @@ std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal
     return initGoalIfNeeded(drvOutputSubstitutionGoals[id], id, *this);
 }
 
+std::shared_ptr<BuildTraceTrampolineGoal> Worker::makeBuildTraceTrampolineGoal(const SingleDerivedPath::Built & id)
+{
+    return initGoalIfNeeded(buildTraceTrampolineGoals.ensureSlot(id).value, id, *this);
+}
+
+std::shared_ptr<DerivedOutputGoal>
+Worker::makeDerivedOutputGoal(const SingleDerivedPath::Built & id, BuildMode buildMode)
+{
+    return initGoalIfNeeded(derivedOutputGoals.ensureSlot(id).value, id, *this, buildMode);
+}
+
 GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
 {
     return std::visit(
@@ -162,7 +175,17 @@ template<typename G>
 static bool
 removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
 {
-    return removeGoal(goal, node.value) || removeGoal(goal, node.childMap);
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
+}
+
+template<typename G>
+static bool removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::weak_ptr<G>>::ChildNode & node)
+{
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
 }
 
 void Worker::removeGoal(GoalPtr goal)
@@ -179,6 +202,10 @@ void Worker::removeGoal(GoalPtr goal)
         nix::removeGoal(subGoal, substitutionGoals);
     else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
         nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
+    else if (auto subGoal = std::dynamic_pointer_cast<BuildTraceTrampolineGoal>(goal))
+        nix::removeGoal(subGoal, buildTraceTrampolineGoals.map);
+    else if (auto subGoal = std::dynamic_pointer_cast<DerivedOutputGoal>(goal))
+        nix::removeGoal(subGoal, derivedOutputGoals.map);
     else
         assert(false);
 
@@ -246,12 +273,17 @@ void Worker::childStarted(
 
 void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
+    childTerminated(goal, goal->jobCategory(), wakeSleepers);
+}
+
+void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers)
+{
     auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
 
     if (i->inBuildSlot) {
-        switch (goal->jobCategory()) {
+        switch (jobCategory) {
         case JobCategory::Substitution:
             assert(nrSubstitutions > 0);
             nrSubstitutions--;
@@ -556,7 +588,22 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
     return subGoal;
 }
 
+GoalPtr upcast_goal(std::shared_ptr<BuildTraceTrampolineGoal> subGoal)
+{
+    return subGoal;
+}
+
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivationResolutionGoal> subGoal)
+{
+    return subGoal;
+}
+
+GoalPtr upcast_goal(std::shared_ptr<DerivedOutputGoal> subGoal)
 {
     return subGoal;
 }
