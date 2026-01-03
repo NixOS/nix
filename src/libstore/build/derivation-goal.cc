@@ -78,6 +78,23 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
+    /* Validate derivation-meta usage */
+    if (drv->structuredAttrs.has_value()) {
+        auto & structuredAttrs = drv->structuredAttrs->structuredAttrs;
+        bool hasMeta = structuredAttrs.contains("__meta");
+        bool hasFeature = usesDerivationMeta(*drv);
+
+        if (hasMeta && !hasFeature) {
+            throw Error(
+                "derivation '%s' has '__meta' attribute but does not require 'derivation-meta' system feature",
+                worker.store.printStorePath(drvPath));
+        }
+
+        if (hasFeature) {
+            experimentalFeatureSettings.require(Xp::DerivationMeta);
+        }
+    }
+
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
