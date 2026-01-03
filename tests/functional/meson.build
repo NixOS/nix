@@ -84,6 +84,8 @@ suites = [
       'referrers.sh',
       'optimise-store.sh',
       'substitute-with-invalid-ca.sh',
+      'socket-only-daemon.sh',
+      'socket-only-daemon-binary-cache.sh',
       'signing.sh',
       'hash-convert.sh',
       'hash-path.sh',
