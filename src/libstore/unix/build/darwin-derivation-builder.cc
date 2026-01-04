@@ -73,19 +73,19 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
                all have the same parents (the store), and there might be lots of inputs. This isn't
                particularly efficient... I doubt it'll be a bottleneck in practice */
             for (auto & i : pathsInChroot) {
-                Path cur = i.first;
-                while (cur.compare("/") != 0) {
-                    cur = dirOf(cur);
-                    ancestry.insert(cur);
+                std::filesystem::path cur = i.first;
+                while (cur != "/") {
+                    cur = cur.parent_path();
+                    ancestry.insert(cur.native());
                 }
             }
 
             /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
                path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = store.storeDir;
-            while (cur.compare("/") != 0) {
-                ancestry.insert(cur);
-                cur = dirOf(cur);
+            std::filesystem::path cur = store.storeDir;
+            while (cur != "/") {
+                ancestry.insert(cur.native());
+                cur = cur.parent_path();
             }
 
             /* Add all our input paths to the chroot */
@@ -174,18 +174,19 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different
            mechanisms to find temporary directories, so we want to open up a broader place for them to put their files,
            if needed. */
-        Path globalTmpDir = canonPath(defaultTempDir().string(), true);
+        std::filesystem::path globalTmpDir = canonPath(defaultTempDir().native(), true);
 
         /* They don't like trailing slashes on subpath directives */
-        while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
-            globalTmpDir.pop_back();
+        std::string globalTmpDirStr = globalTmpDir.native();
+        while (!globalTmpDirStr.empty() && globalTmpDirStr.back() == '/')
+            globalTmpDirStr.pop_back();
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
             sandboxArgs.push_back("_NIX_BUILD_TOP");
-            sandboxArgs.push_back(tmpDir);
+            sandboxArgs.push_back(tmpDir.native());
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
-            sandboxArgs.push_back(globalTmpDir);
+            sandboxArgs.push_back(globalTmpDirStr);
             if (drvOptions.allowLocalNetworking) {
                 sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
                 sandboxArgs.push_back("1");
