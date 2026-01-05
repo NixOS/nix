@@ -7,6 +7,7 @@
 #include "nix_api_util_internal.h"
 
 #include "nix/store/path.hh"
+#include "nix/store/path-info.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/build-result.hh"
@@ -336,6 +337,26 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
         return new nix_derivation{store->ptr->derivationFromPath(path->path)};
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_store_query_path_info_json(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    unsigned int format,
+    nix_get_string_callback callback,
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(store_path->path);
+        if (callback) {
+            auto result = info->toJSON(&store->ptr->config, true, nix::parsePathInfoJsonFormat(format)).dump();
+            callback(result.data(), result.size(), userdata);
+        }
+    }
+    NIXC_CATCH_ERRS
 }
 
 } // extern "C"
