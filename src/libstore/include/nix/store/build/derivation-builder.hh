@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <nlohmann/json_fwd.hpp>
 
 #include "nix/store/build-result.hh"
@@ -43,11 +44,11 @@ struct BuilderFailureError : BuildError
  */
 struct ChrootPath
 {
-    Path source;
+    std::filesystem::path source;
     bool optional = false;
 };
 
-typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+typedef std::map<std::filesystem::path, ChrootPath> PathsInChroot; // maps target path to source path
 
 /**
  * Parameters by (mostly) `const` reference for `DerivationBuilder`.
@@ -110,7 +111,7 @@ struct DerivationBuilderCallbacks
     /**
      * Open a log file and a pipe to it.
      */
-    virtual Path openLogFile() = 0;
+    virtual std::filesystem::path openLogFile() = 0;
 
     /**
      * Close the log file.
@@ -185,7 +186,7 @@ struct DerivationBuilder : RestrictionContext
 struct ExternalBuilder
 {
     StringSet systems;
-    Path program;
+    std::filesystem::path program;
     std::vector<std::string> args;
 };
 

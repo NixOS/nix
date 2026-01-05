@@ -51,6 +51,7 @@ See [String literals](string-literals.md).
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
+  [string interpolation]: ./string-interpolation.md
   [interpolated into other expressions]: ./string-interpolation.md#interpolated-expression
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
@@ -272,7 +273,7 @@ will crash with an `infinite recursion encountered` error message.
 
 A let-expression allows you to define local variables for an expression.
 
-> *let-in* = `let` [ *identifier* = *expr* ]... `in` *expr*
+> *let-in* = `let` [ *identifier* = *expr* `;` ]... `in` *expr*
 
 Example:
 
@@ -284,6 +285,27 @@ in x + y
 ```
 
 This evaluates to `"foobar"`.
+
+There is also another, older, syntax for let expressions that should not be used in new code:
+
+> *let* = `let` `{` *identifier* = *expr* `;` [ *identifier* = *expr* `;`]...  `}`
+
+In this form, the attribute set between the `{` `}` is recursive.
+
+One of the attributes must have the special name `body`,
+which is the result of the expression.
+
+Example:
+
+```nix
+let {
+  foo = bar;
+  bar = "baz";
+  body = foo;
+}
+```
+
+This evaluates to "baz".
 
 ## Inheriting attributes
 

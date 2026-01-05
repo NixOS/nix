@@ -142,7 +142,9 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     internalDrvs = byDrvPath (
       # Drop the attr names (not present in buildInputs anyway)
       lib.attrValues availableComponents
-      ++ lib.concatMap (c: lib.attrValues c.tests or { }) (lib.attrValues availableComponents)
+      ++ lib.concatMap (c: lib.filter (v: !v.meta.broken) (lib.attrValues (c.tests or { }))) (
+        lib.attrValues availableComponents
+      )
     );
 
     isInternal =
@@ -280,7 +282,6 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     dontUseCmakeConfigure = true;
 
     mesonFlags = [
-      (lib.mesonBool "kaitai-struct-checks" (isActiveComponent "nix-kaitai-struct-checks"))
       (lib.mesonBool "json-schema-checks" (isActiveComponent "nix-json-schema-checks"))
     ]
     ++ map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)

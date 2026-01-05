@@ -1,1 +1,0 @@
-../../doc/manual/source/protocols/nix-archive/nar.ksy

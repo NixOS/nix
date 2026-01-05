@@ -14,7 +14,6 @@
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/ansicolor.hh"
-#include "nix/util/signals.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>

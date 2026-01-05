@@ -5,6 +5,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 
@@ -576,9 +577,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     if (fcntl(fdClient.get(), F_SETFL, fcntl(fdClient.get(), F_GETFL) & ~O_NONBLOCK) == -1)
                         panic("Could not set non-blocking flag on client socket");
 
+                    FdSource source(fdClient.get());
                     while (true) {
                         try {
-                            auto path = readLine(fdClient.get());
+                            auto path = source.readLine();
                             auto storePath = maybeParseStorePath(path);
                             if (storePath) {
                                 debug("got new GC root '%s'", path);

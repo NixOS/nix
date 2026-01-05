@@ -76,7 +76,8 @@ void readFull(Descriptor fd, char * buf, size_t count);
 void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
 
 /**
- * Read a line from a file descriptor.
+ * Read a line from an unbuffered file descriptor.
+ * See BufferedSource::readLine for a buffered variant.
  *
  * @param fd The file descriptor to read from
  * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)

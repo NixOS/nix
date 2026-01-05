@@ -133,7 +133,7 @@ let
       +
         lib.optionalString
           (
-            !stdenv.hostPlatform.isWindows
+            !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isCygwin)
             # build failure
             && !stdenv.hostPlatform.isStatic
             # LTO breaks exception handling on x86-64-darwin.
@@ -451,11 +451,6 @@ in
     JSON schema validation checks
   */
   nix-json-schema-checks = callPackage ../src/json-schema-checks/package.nix { };
-
-  /**
-    Kaitai struct schema validation checks
-  */
-  nix-kaitai-struct-checks = callPackage ../src/kaitai-struct-checks/package.nix { };
 
   nix-perl-bindings = callPackage ../src/perl/package.nix { };
 

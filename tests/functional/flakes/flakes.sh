@@ -395,12 +395,21 @@ nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1
 nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/"$hash1"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
 
+# Test that --override-input with empty input path is rejected (issue #14816).
+expectStderr 1 nix flake lock "$flake3Dir" --override-input '' . | grepQuiet -- "--override-input was passed a zero-length input path, which would refer to the flake itself, not an input"
+
+# Test that deprecated --update-input with empty input path is rejected.
+expectStderr 1 nix flake lock "$flake3Dir" --update-input '' | grepQuiet -- "--update-input was passed a zero-length input path, which would refer to the flake itself, not an input"
+
 # Test --update-input.
 nix flake lock "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") = "$hash1" ]]
 
 nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+
+# Test that 'nix flake update' with empty input path is rejected.
+expectStderr 1 nix flake update '' --flake "$flake3Dir" | grepQuiet -- "input path to be updated cannot be zero-length; it would refer to the flake itself, not an input"
 
 # Test updating multiple inputs.
 nix flake lock "$flake3Dir" --override-input flake1 flake1/master/"$hash1"

@@ -8,6 +8,11 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#ifdef __FreeBSD__
+#  include <sys/param.h>
+#  include <sys/mount.h>
+#endif
+
 #include "nix/util/file-system.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
@@ -88,16 +93,14 @@ static void _deletePath(
     uint64_t & bytesFreed,
     std::exception_ptr & ex MOUNTEDPATHS_PARAM)
 {
-#ifndef _WIN32
     checkInterrupt();
-
-#  ifdef __FreeBSD__
+#ifdef __FreeBSD__
     // In case of emergency (unmount fails for some reason) not recurse into mountpoints.
     // This prevents us from tearing up the nullfs-mounted nix store.
     if (mountedPaths.find(path) != mountedPaths.end()) {
         return;
     }
-#  endif
+#endif
 
     std::string name(path.filename());
     assert(name != "." && name != ".." && !name.empty());
@@ -173,10 +176,6 @@ static void _deletePath(
                 ignoreExceptionExceptInterrupt();
         }
     }
-#else
-    // TODO implement
-    throw UnimplementedError("_deletePath");
-#endif
 }
 
 static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)

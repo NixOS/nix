@@ -5,6 +5,8 @@
 
 namespace nix {
 
+class EvalState;
+
 /**
  * Print a value in the deprecated format used by `nix-instantiate --eval` and
  * `nix-env` (for manifests).
@@ -15,7 +17,6 @@ namespace nix {
  *
  * See: https://github.com/NixOS/nix/issues/9730
  */
-void printAmbiguous(
-    Value & v, const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen, int depth);
+void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<const void *> * seen, size_t depth = 0);
 
 } // namespace nix

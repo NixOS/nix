@@ -2408,6 +2408,8 @@ BackedStringView EvalState::coerceToString(
     bool copyToStore,
     bool canonicalizePath)
 {
+    auto _level = addCallDepth(pos);
+
     forceValue(v, pos);
 
     if (v.type() == nString) {
@@ -2627,6 +2629,8 @@ SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value &
 // `assert a == b; x` are critical for our users' testing UX.
 void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
+    auto _level = addCallDepth(pos);
+
     // This implementation must match eqValues.
     forceValue(v1, pos);
     forceValue(v2, pos);
@@ -2833,6 +2837,8 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
 // This implementation must match assertEqValues
 bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_view errorCtx)
 {
+    auto _level = addCallDepth(pos);
+
     forceValue(v1, pos);
     forceValue(v2, pos);
 

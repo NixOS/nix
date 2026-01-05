@@ -1,7 +1,8 @@
 #! /usr/bin/env nix-shell
-#! nix-shell -i perl -p perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp perlPackages.NetAmazonS3 gnupg1
+#! nix-shell -i perl -p awscli2 perl perlPackages.LWPUserAgent perlPackages.LWPProtocolHttps perlPackages.FileSlurp perlPackages.NetAmazonS3 perlPackages.GetoptLongDescriptive gnupg1
 
 use strict;
+use Getopt::Long::Descriptive;
 use Data::Dumper;
 use File::Basename;
 use File::Path;
@@ -13,7 +14,30 @@ use Net::Amazon::S3;
 
 delete $ENV{'shell'}; # shut up a LWP::UserAgent.pm warning
 
-my $evalId = $ARGV[0] or die "Usage: $0 EVAL-ID\n";
+my ($opt, $usage) = describe_options(
+    '%c %o <eval-id>',
+    [ 'skip-docker',      'Skip Docker image upload' ],
+    [ 'skip-git',         'Skip Git tagging' ],
+    [ 'skip-s3',          'Skip S3 upload' ],
+    [ 'docker-owner=s',   'Docker image owner', { default => 'nixos/nix' } ],
+    [ 'project-root=s',   'Pristine git repository path' ],
+    [ 's3-endpoint=s',    'Custom S3 endpoint' ],
+    [ 's3-host=s',        'S3 host', { default => 's3-eu-west-1.amazonaws.com' } ],
+    [],
+    [ 'help|h',           'Show this help message', { shortcircuit => 1 } ],
+    [],
+    [ 'Environment variables:' ],
+    [ 'AWS_ACCESS_KEY_ID' ],
+    [ 'AWS_SECRET_ACCESS_KEY' ],
+    [ 'AWS_SESSION_TOKEN   For OIDC' ],
+    [ 'IS_LATEST           Set to "1" to mark as latest release' ],
+);
+
+print($usage->text), exit if $opt->help;
+
+my $evalId = $ARGV[0] or do { print STDERR $usage->text; exit 1 };
+
+die "--project-root is required unless --skip-git is specified\n" unless $opt->skip_git || $opt->project_root;
 
 my $releasesBucketName = "nix-releases";
 my $channelsBucketName = "nix-channels";
@@ -62,25 +86,38 @@ File::Path::make_path($narCache);
 my $binaryCache = "https://cache.nixos.org/?local-nar-cache=$narCache";
 
 # S3 setup.
-my $aws_access_key_id = $ENV{'AWS_ACCESS_KEY_ID'} or die "No AWS_ACCESS_KEY_ID given.";
-my $aws_secret_access_key = $ENV{'AWS_SECRET_ACCESS_KEY'} or die "No AWS_SECRET_ACCESS_KEY given.";
+my $aws_access_key_id = $ENV{'AWS_ACCESS_KEY_ID'};
+my $aws_secret_access_key = $ENV{'AWS_SECRET_ACCESS_KEY'};
+my $aws_session_token = $ENV{'AWS_SESSION_TOKEN'};
 
-my $s3 = Net::Amazon::S3->new(
-    { aws_access_key_id     => $aws_access_key_id,
-      aws_secret_access_key => $aws_secret_access_key,
-      retry                 => 1,
-      host                  => "s3-eu-west-1.amazonaws.com",
-    });
+my ($s3, $releasesBucket, $s3_channels, $channelsBucket);
 
-my $releasesBucket = $s3->bucket($releasesBucketName) or die;
+unless ($opt->skip_s3) {
+    $aws_access_key_id or die "No AWS_ACCESS_KEY_ID given.";
+    $aws_secret_access_key or die "No AWS_SECRET_ACCESS_KEY given.";
 
-my $s3_us = Net::Amazon::S3->new(
-    { aws_access_key_id     => $aws_access_key_id,
-      aws_secret_access_key => $aws_secret_access_key,
-      retry                 => 1,
-    });
+    $s3 = Net::Amazon::S3->new(
+        { aws_access_key_id     => $aws_access_key_id,
+          aws_secret_access_key => $aws_secret_access_key,
+          $aws_session_token ? (aws_session_token => $aws_session_token) : (),
+          retry                 => 1,
+          host                  => $opt->s3_host,
+          secure                => ($opt->s3_endpoint && $opt->s3_endpoint =~ /^http:/) ? 0 : 1,
+        });
 
-my $channelsBucket = $s3_us->bucket($channelsBucketName) or die;
+    $releasesBucket = $s3->bucket($releasesBucketName) or die;
+
+    $s3_channels = Net::Amazon::S3->new(
+        { aws_access_key_id     => $aws_access_key_id,
+          aws_secret_access_key => $aws_secret_access_key,
+          $aws_session_token ? (aws_session_token => $aws_session_token) : (),
+          retry                 => 1,
+          $opt->s3_endpoint ? (host => $opt->s3_host) : (),
+          $opt->s3_endpoint ? (secure => ($opt->s3_endpoint =~ /^http:/) ? 0 : 1) : (),
+        });
+
+    $channelsBucket = $s3_channels->bucket($channelsBucketName) or die;
+}
 
 sub getStorePath {
     my ($jobName, $output) = @_;
@@ -115,11 +152,12 @@ sub copyManual {
         File::Path::remove_tree("$tmpDir/manual.tmp", {safe => 1});
     }
 
-    system("aws s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
+    my $awsEndpoint = $opt->s3_endpoint ? "--endpoint-url " . $opt->s3_endpoint : "";
+    system("aws $awsEndpoint s3 sync '$tmpDir/manual' s3://$releasesBucketName/$releaseDir/manual") == 0
         or die "syncing manual to S3\n";
 }
 
-copyManual;
+copyManual unless $opt->skip_s3;
 
 sub downloadFile {
     my ($jobName, $productNr, $dstName) = @_;
@@ -158,30 +196,12 @@ sub downloadFile {
     return $sha256_expected;
 }
 
-downloadFile("binaryTarball.i686-linux", "1");
-downloadFile("binaryTarball.x86_64-linux", "1");
-downloadFile("binaryTarball.aarch64-linux", "1");
-downloadFile("binaryTarball.x86_64-darwin", "1");
-downloadFile("binaryTarball.aarch64-darwin", "1");
-eval {
-    downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
-};
-warn "$@" if $@;
-eval {
-    downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
-};
-warn "$@" if $@;
-eval {
-    downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
-};
-warn "$@" if $@;
-downloadFile("installerScript", "1");
-
-# Upload docker images to dockerhub.
+# Upload docker images.
 my $dockerManifest = "";
 my $dockerManifestLatest = "";
 my $haveDocker = 0;
 
+unless ($opt->skip_docker) {
 for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     my $system = $platforms->[0];
     my $dockerPlatform = $platforms->[1];
@@ -195,8 +215,8 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     print STDERR "loading docker image for $dockerPlatform...\n";
     system("docker load -i $tmpDir/$fn") == 0 or die;
 
-    my $tag = "nixos/nix:$version-$dockerPlatform";
-    my $latestTag = "nixos/nix:latest-$dockerPlatform";
+    my $tag = $opt->docker_owner . ":$version-$dockerPlatform";
+    my $latestTag = $opt->docker_owner . ":latest-$dockerPlatform";
 
     print STDERR "tagging $version docker image for $dockerPlatform...\n";
     system("docker tag nix:$version $tag") == 0 or die;
@@ -219,68 +239,94 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
 }
 
 if ($haveDocker) {
+    my $dockerOwner = $opt->docker_owner;
     print STDERR "creating multi-platform docker manifest...\n";
-    system("docker manifest rm nixos/nix:$version");
-    system("docker manifest create nixos/nix:$version $dockerManifest") == 0 or die;
+    system("docker manifest rm $dockerOwner:$version");
+    system("docker manifest create $dockerOwner:$version $dockerManifest") == 0 or die;
     if ($isLatest) {
         print STDERR "creating latest multi-platform docker manifest...\n";
-        system("docker manifest rm nixos/nix:latest");
-        system("docker manifest create nixos/nix:latest $dockerManifestLatest") == 0 or die;
+        system("docker manifest rm $dockerOwner:latest");
+        system("docker manifest create $dockerOwner:latest $dockerManifestLatest") == 0 or die;
     }
 
     print STDERR "pushing multi-platform docker manifest...\n";
-    system("docker manifest push nixos/nix:$version") == 0 or die;
+    system("docker manifest push $dockerOwner:$version") == 0 or die;
 
     if ($isLatest) {
         print STDERR "pushing latest multi-platform docker manifest...\n";
-        system("docker manifest push nixos/nix:latest") == 0 or die;
+        system("docker manifest push $dockerOwner:latest") == 0 or die;
     }
 }
+}
 
-# Upload nix-fallback-paths.nix.
-write_file("$tmpDir/fallback-paths.nix",
-    "{\n" .
-    "  x86_64-linux = \"" . getStorePath("build.nix-everything.x86_64-linux") . "\";\n" .
-    "  i686-linux = \"" . getStorePath("build.nix-everything.i686-linux") . "\";\n" .
-    "  aarch64-linux = \"" . getStorePath("build.nix-everything.aarch64-linux") . "\";\n" .
-    "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
-    "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
-    "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
-    "}\n");
 
 # Upload release files to S3.
-for my $fn (glob "$tmpDir/*") {
-    my $name = basename($fn);
-    next if $name eq "manual";
-    my $dstKey = "$releaseDir/" . $name;
-    unless (defined $releasesBucket->head_key($dstKey)) {
-        print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
+unless ($opt->skip_s3) {
+    downloadFile("binaryTarball.i686-linux", "1");
+    downloadFile("binaryTarball.x86_64-linux", "1");
+    downloadFile("binaryTarball.aarch64-linux", "1");
+    downloadFile("binaryTarball.x86_64-darwin", "1");
+    downloadFile("binaryTarball.aarch64-darwin", "1");
+    eval {
+        downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
+    };
+    warn "$@" if $@;
+    eval {
+        downloadFile("binaryTarballCross.x86_64-linux.armv7l-unknown-linux-gnueabihf", "1");
+    };
+    warn "$@" if $@;
+    eval {
+        downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
+    };
+    warn "$@" if $@;
+    downloadFile("installerScript", "1");
 
-        my $configuration = ();
-        $configuration->{content_type} = "application/octet-stream";
+    # Upload nix-fallback-paths.nix.
+    write_file("$tmpDir/fallback-paths.nix",
+        "{\n" .
+        "  x86_64-linux = \"" . getStorePath("build.nix-everything.x86_64-linux") . "\";\n" .
+        "  i686-linux = \"" . getStorePath("build.nix-everything.i686-linux") . "\";\n" .
+        "  aarch64-linux = \"" . getStorePath("build.nix-everything.aarch64-linux") . "\";\n" .
+        "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
+        "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
+        "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
+        "}\n");
 
-        if ($fn =~ /.sha256|install|\.nix$/) {
-            $configuration->{content_type} = "text/plain";
+    for my $fn (glob "$tmpDir/*") {
+        my $name = basename($fn);
+        next if $name eq "manual";
+        my $dstKey = "$releaseDir/" . $name;
+        unless (defined $releasesBucket->head_key($dstKey)) {
+            print STDERR "uploading $fn to s3://$releasesBucketName/$dstKey...\n";
+
+            my $configuration = ();
+            $configuration->{content_type} = "application/octet-stream";
+
+            if ($fn =~ /.sha256|install|\.nix$/) {
+                $configuration->{content_type} = "text/plain";
+            }
+
+            $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
+                or die $releasesBucket->err . ": " . $releasesBucket->errstr;
         }
-
-        $releasesBucket->add_key_filename($dstKey, $fn, $configuration)
-            or die $releasesBucket->err . ": " . $releasesBucket->errstr;
     }
+
+    # Update the "latest" symlink.
+    $channelsBucket->add_key(
+        "nix-latest/install", "",
+        { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
+        or die $channelsBucket->err . ": " . $channelsBucket->errstr
+        if $isLatest;
 }
 
-# Update the "latest" symlink.
-$channelsBucket->add_key(
-    "nix-latest/install", "",
-    { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
-    or die $channelsBucket->err . ": " . $channelsBucket->errstr
-    if $isLatest;
-
 # Tag the release in Git.
-chdir("/home/eelco/Dev/nix-pristine") or die;
-system("git remote update origin") == 0 or die;
-system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
-system("git push --tags") == 0 or die;
-system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
+unless ($opt->skip_git) {
+    chdir($opt->project_root) or die "Cannot chdir to " . $opt->project_root . ": $!";
+    system("git remote update origin") == 0 or die;
+    system("git tag --force --sign $version $nixRev -m 'Tagging release $version'") == 0 or die;
+    system("git push origin refs/tags/$version") == 0 or die;
+    system("git push --force-with-lease origin $nixRev:refs/heads/latest-release") == 0 or die if $isLatest;
+}
 
 File::Path::remove_tree($narCache, {safe => 1});
 File::Path::remove_tree($tmpDir, {safe => 1});

@@ -154,7 +154,9 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
         if (buildMode == bmCheck && !allValid)
             throw Error(
-                "some outputs of '%s' are not valid, so checking is not possible",
+                "some outputs of '%s' are not valid, so checking is not possible\n"
+                "Hint: --rebuild and --check error if the derivation was not previously built and cannot be substituted.\n"
+                "      Remove it to perform a fresh build, or use --repair to rewrite missing or corrupted builds in the store.",
                 worker.store.printStorePath(drvPath));
     }
 
