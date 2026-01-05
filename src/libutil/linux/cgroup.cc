@@ -155,7 +155,7 @@ CgroupStats destroyCgroup(const std::filesystem::path & cgroup)
     return destroyCgroup(cgroup, true);
 }
 
-std::string getCurrentCgroup()
+CanonPath getCurrentCgroup()
 {
     auto cgroupFS = getCgroupFS();
     if (!cgroupFS)
@@ -165,12 +165,12 @@ std::string getCurrentCgroup()
     auto ourCgroup = ourCgroups[""];
     if (ourCgroup == "")
         throw Error("cannot determine cgroup name from /proc/self/cgroup");
-    return ourCgroup;
+    return CanonPath{ourCgroup};
 }
 
-std::string getRootCgroup()
+CanonPath getRootCgroup()
 {
-    static std::string rootCgroup = getCurrentCgroup();
+    static auto rootCgroup = getCurrentCgroup();
     return rootCgroup;
 }
 

@@ -333,7 +333,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-        auto rootCgroupPath = canonPath(*cgroupFS + "/" + rootCgroup);
+        auto rootCgroupPath = *cgroupFS / rootCgroup.rel();
         if (!pathExists(rootCgroupPath))
             throw Error("expected cgroup directory '%s'", rootCgroupPath);
         auto daemonCgroupPath = rootCgroupPath + "/nix-daemon";
