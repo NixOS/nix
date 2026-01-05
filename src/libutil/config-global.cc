@@ -61,7 +61,16 @@ GlobalConfig globalConfig;
 
 GlobalConfig::Register::Register(Config * config)
 {
-    configRegistrations().emplace_back(config);
+    auto regs = configRegistrations();
+    if (std::find(regs.begin(), regs.end(), config) == regs.end()) {
+        configRegistrations().emplace_back(config);
+    }
+}
+
+GlobalConfig::Register::Register(Config * config, std::function<void()> && callback)
+    : Register(config)
+{
+    callback();
 }
 
 ExperimentalFeatureSettings experimentalFeatureSettings;

@@ -138,3 +138,12 @@ private:
 };
 
 } // namespace nix::fetchers
+
+namespace nix {
+
+/**
+ * @todo Get rid of global settings variables
+ */
+extern fetchers::Settings fetchSettings;
+
+} // namespace nix
