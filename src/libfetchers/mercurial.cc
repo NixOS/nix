@@ -207,24 +207,24 @@ struct MercurialInputScheme : InputScheme
                 if (settings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", actualUrl);
 
-                input.attrs.insert_or_assign("ref", chomp(runHg({"branch", "-R", actualUrl})));
+                input.attrs.insert_or_assign("ref", rtrim(runHg({"branch", "-R", actualUrl})));
 
                 auto files = tokenizeString<StringSet>(
                     runHg({"status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0"}),
                     "\0"s);
 
-                std::filesystem::path actualPath(absPath(actualUrl));
+                auto actualPath = absPath(actualUrl);
 
                 PathFilter filter = [&](const Path & p) -> bool {
-                    assert(hasPrefix(p, actualPath.string()));
-                    std::string file(p, actualPath.string().size() + 1);
+                    assert(p.starts_with(actualPath));
+                    std::string file(p, actualPath.size() + 1);
 
                     auto st = lstat(p);
 
                     if (S_ISDIR(st.st_mode)) {
                         auto prefix = file + "/";
                         auto i = files.lower_bound(prefix);
-                        return i != files.end() && hasPrefix(*i, prefix);
+                        return i != files.end() && i->starts_with(prefix);
                     }
 
                     return files.count(file);
@@ -232,7 +232,7 @@ struct MercurialInputScheme : InputScheme
 
                 auto storePath = store.addToStore(
                     input.getName(),
-                    {getFSSourceAccessor(), CanonPath(actualPath.string())},
+                    {getFSSourceAccessor(), CanonPath(actualPath)},
                     ContentAddressMethod::Raw::NixArchive,
                     HashAlgorithm::SHA256,
                     {},
@@ -275,34 +275,34 @@ struct MercurialInputScheme : InputScheme
                 return makeResult(res->value, res->storePath);
         }
 
-        std::filesystem::path cacheDir =
+        std::filesystem::path cacheDirPath =
             getCacheDir() / "hg" / hashString(HashAlgorithm::SHA256, actualUrl).to_string(HashFormat::Nix32, false);
+        auto cacheDir = cacheDirPath.string();
 
         /* If this is a commit hash that we already have, we don't
            have to pull again. */
-        if (!(input.getRev() && pathExists(cacheDir)
-              && runProgram(
-                     hgOptions({"log", "-R", cacheDir.string(), "-r", input.getRev()->gitRev(), "--template", "1"}))
+        if (!(input.getRev() && pathExists(cacheDirPath)
+              && runProgram(hgOptions({"log", "-R", cacheDir, "-r", input.getRev()->gitRev(), "--template", "1"}))
                          .second
                      == "1")) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
-            if (pathExists(cacheDir)) {
+            if (pathExists(cacheDirPath)) {
                 try {
-                    runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
+                    runHg({"pull", "-R", cacheDir, "--", actualUrl});
                 } catch (ExecError & e) {
-                    auto transJournal = cacheDir / ".hg" / "store" / "journal";
+                    auto transJournal = cacheDirPath / ".hg" / "store" / "journal";
                     /* hg throws "abandoned transaction" error only if this file exists */
                     if (pathExists(transJournal)) {
-                        runHg({"recover", "-R", cacheDir.string()});
-                        runHg({"pull", "-R", cacheDir.string(), "--", actualUrl});
+                        runHg({"recover", "-R", cacheDir});
+                        runHg({"pull", "-R", cacheDir, "--", actualUrl});
                     } else {
                         throw ExecError(e.status, "'hg pull' %s", statusToString(e.status));
                     }
                 }
             } else {
-                createDirs(dirOf(cacheDir.string()));
-                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir.string()});
+                createDirs(dirOf(cacheDir));
+                runHg({"clone", "--noupdate", "--", actualUrl, cacheDir});
             }
         }
 
@@ -310,7 +310,7 @@ struct MercurialInputScheme : InputScheme
         auto tokens = tokenizeString<std::vector<std::string>>(runHg(
             {"log",
              "-R",
-             cacheDir.string(),
+             cacheDir,
              "-r",
              input.getRev() ? input.getRev()->gitRev() : *input.getRef(),
              "--template",
@@ -327,14 +327,15 @@ struct MercurialInputScheme : InputScheme
         if (auto res = settings.getCache()->lookupStorePath(revInfoKey(rev), store))
             return makeResult(res->value, res->storePath);
 
-        std::filesystem::path tmpDir = createTempDir();
-        AutoDelete delTmpDir(tmpDir, true);
+        std::filesystem::path tmpDirPath = createTempDir();
+        auto tmpDir = tmpDirPath.string();
+        AutoDelete delTmpDir(tmpDirPath, true);
 
-        runHg({"archive", "-R", cacheDir.string(), "-r", rev.gitRev(), tmpDir.string()});
+        runHg({"archive", "-R", cacheDir, "-r", rev.gitRev(), tmpDir});
 
-        deletePath(tmpDir / ".hg_archival.txt");
+        deletePath(tmpDirPath / ".hg_archival.txt");
 
-        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir.string())});
+        auto storePath = store.addToStore(name, {getFSSourceAccessor(), CanonPath(tmpDir)});
 
         Attrs infoAttrs({
             {"revCount", (uint64_t) revCount},

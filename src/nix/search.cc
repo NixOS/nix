@@ -12,6 +12,7 @@
 #include "nix/util/hilite.hh"
 #include "nix/util/strings-inline.hh"
 
+#include <algorithm>
 #include <regex>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -113,7 +114,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     auto aMeta = cursor.maybeGetAttr(state->s.meta);
                     auto aDescription = aMeta ? aMeta->maybeGetAttr(state->s.description) : nullptr;
                     auto description = aDescription ? aDescription->getString() : "";
-                    std::replace(description.begin(), description.end(), '\n', ' ');
+                    std::ranges::replace(description, '\n', ' ');
 
                     std::vector<std::smatch> attrPathMatches;
                     std::vector<std::smatch> descriptionMatches;
@@ -167,7 +168,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                 }
 
                 else if (
-                    attrPath.size() == 0 || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
+                    attrPath.empty() || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
                     || (attrPathS[0] == "packages" && attrPath.size() <= 2))
                     recurse();
 

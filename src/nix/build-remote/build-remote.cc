@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <algorithm>
@@ -31,7 +32,7 @@ static void handleAlarm(int sig) {}
 
 std::string escapeUri(std::string uri)
 {
-    std::replace(uri.begin(), uri.end(), '/', '_');
+    std::ranges::replace(uri, '/', '_');
     return uri;
 }
 
@@ -237,7 +238,7 @@ static int main_build_remote(int argc, char ** argv)
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
                 } catch (std::exception & e) {
-                    auto msg = chomp(drainFD(5, false));
+                    auto msg = rtrim(drainFD(5, false));
                     printError("cannot build on '%s': %s%s", storeUri, e.what(), msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;

@@ -415,7 +415,7 @@ ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std:
 
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
-    if (es2.size() == 0) {
+    if (es2.empty()) {
         auto * const result = exprs.add<ExprString>(""_sds);
         return result;
     }

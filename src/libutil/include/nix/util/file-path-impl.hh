@@ -8,6 +8,8 @@
 #include <string>
 #include <string_view>
 
+#include "nix/util/ascii.hh"
+
 namespace nix {
 
 /**
@@ -93,7 +95,7 @@ struct WindowsPathTrait
     {
         if (path.size() >= 2 && path[1] == ':') {
             char driveLetter = path[0];
-            if ((driveLetter >= 'A' && driveLetter <= 'Z') || (driveLetter >= 'a' && driveLetter <= 'z'))
+            if (isAsciiAlpha(driveLetter))
                 return 2;
         }
         /* TODO: This needs to also handle UNC paths.

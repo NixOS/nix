@@ -2,6 +2,7 @@
 
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/split.hh"
 #include "nix/util/strings.hh"
 
 namespace nix {
@@ -79,9 +80,9 @@ StorePathWithOutputs::ParseResult StorePathWithOutputs::tryFromDerivedPath(const
 
 std::pair<std::string_view, StringSet> parsePathWithOutputs(std::string_view s)
 {
-    size_t n = s.find("!");
-    return n == s.npos ? std::make_pair(s, StringSet())
-                       : std::make_pair(s.substr(0, n), tokenizeString<StringSet>(s.substr(n + 1), ","));
+    if (auto split = splitOnce(s, '!'))
+        return {split->first, tokenizeString<StringSet>(split->second, ",")};
+    return {s, {}};
 }
 
 StorePathWithOutputs parsePathWithOutputs(const StoreDirConfig & store, std::string_view pathWithOutputs)

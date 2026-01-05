@@ -24,7 +24,7 @@ bool Config::set(const std::string & name, const std::string & value)
     bool append = false;
     auto i = _settings.find(name);
     if (i == _settings.end()) {
-        if (hasPrefix(name, "extra-")) {
+        if (name.starts_with("extra-")) {
             i = _settings.find(std::string(name, 6));
             if (i == _settings.end() || !i->second.setting->isAppendable())
                 return false;

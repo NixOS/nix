@@ -75,7 +75,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
         }
 
         else if (msg == STDERR_NEXT)
-            printError(chomp(readString(from)));
+            printError(rtrim(readString(from)));
 
         else if (msg == STDERR_START_ACTIVITY) {
             auto act = readNum<ActivityId>(from);

@@ -80,11 +80,11 @@ void HttpBinaryCacheStore::init()
 
 std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
 {
-    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+    if (path.ends_with(".narinfo") && !config->narinfoCompression.get().empty())
         return config->narinfoCompression;
-    else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+    else if (path.ends_with(".ls") && !config->lsCompression.get().empty())
         return config->lsCompression;
-    else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+    else if (path.starts_with("log/") && !config->logCompression.get().empty())
         return config->logCompression;
     else
         return std::nullopt;

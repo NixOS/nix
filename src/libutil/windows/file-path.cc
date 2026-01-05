@@ -11,8 +11,7 @@ namespace nix {
 
 std::optional<std::filesystem::path> maybePath(PathView path)
 {
-    if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z'))
-        && path[1] == ':' && WindowsPathTrait<char>::isPathSep(path[2])) {
+    if (path.length() >= 3 && isAsciiAlpha(path[0]) && path[1] == ':' && WindowsPathTrait<char>::isPathSep(path[2])) {
         std::filesystem::path::string_type sw = string_to_os_string(std::string{"\\\\?\\"} + path);
         std::replace(sw.begin(), sw.end(), '/', '\\');
         return sw;

@@ -1,4 +1,5 @@
 #include "nix/expr/search-path.hh"
+#include "nix/util/split.hh"
 
 namespace nix {
 
@@ -15,7 +16,7 @@ std::optional<std::string_view> LookupPath::Prefix::suffixIfPotentialMatch(std::
     }
 
     /* Prefix must be prefix of this path. */
-    if (path.compare(0, n, s) != 0) {
+    if (!path.starts_with(s)) {
         return std::nullopt;
     }
 
@@ -25,16 +26,16 @@ std::optional<std::string_view> LookupPath::Prefix::suffixIfPotentialMatch(std::
 
 LookupPath::Elem LookupPath::Elem::parse(std::string_view rawElem)
 {
-    size_t pos = rawElem.find('=');
+    auto split = splitOnce(rawElem, '=');
 
     return LookupPath::Elem{
         .prefix =
             Prefix{
-                .s = pos == std::string::npos ? std::string{""} : std::string{rawElem.substr(0, pos)},
+                .s = split ? std::string{split->first} : std::string{""},
             },
         .path =
             Path{
-                .s = std::string{rawElem.substr(pos + 1)},
+                .s = split ? std::string{split->second} : std::string{rawElem},
             },
     };
 }

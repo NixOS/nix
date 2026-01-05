@@ -10,6 +10,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "expr-tests-config.hh"
 
 namespace nixC {
@@ -49,7 +51,7 @@ TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 
     auto pathStr = nix_get_path_string(ctx, value);
     assert_ctx_ok();
-    ASSERT_EQ(0, strcmp(pathStr, nixpkgs.string().c_str()));
+    ASSERT_STREQ(pathStr, nixpkgs.string().c_str());
 
     nix_gc_decref(nullptr, value);
 }
@@ -223,7 +225,7 @@ TEST_F(nix_api_expr_test, nix_expr_realise_context)
         nix_store_path_name(p, OBSERVE_STRING(name));
         names.push_back(name);
     }
-    std::sort(names.begin(), names.end());
+    std::ranges::sort(names);
     ASSERT_EQ(3u, names.size());
     EXPECT_THAT(names[0], testing::StrEq("just-a-file"));
     EXPECT_THAT(names[1], testing::StrEq("letsbuild"));
@@ -505,7 +507,7 @@ TEST_F(nix_api_expr_test, nix_expr_attrset_update)
         assert_ctx_ok();
         values[i].first = name;
     }
-    std::sort(values.begin(), values.end(), [](const auto & lhs, const auto & rhs) { return lhs.first < rhs.first; });
+    std::ranges::sort(values, [](const auto & lhs, const auto & rhs) { return lhs.first < rhs.first; });
 
     nix_value * a = values[0].second;
     ASSERT_EQ("a", values[0].first);

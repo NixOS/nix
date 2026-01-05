@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -23,6 +24,9 @@
 #include "nix/util/users.hh"
 #include "nix/cmd/editor-for.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/ascii.hh"
+#include "nix/util/split.hh"
+#include "nix/util/util.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/expr/print.hh"
@@ -121,15 +125,6 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
             });
     }
 };
-
-std::string removeWhitespace(std::string s)
-{
-    s = chomp(s);
-    size_t n = s.find_first_not_of(" \n\r\t");
-    if (n != std::string::npos)
-        s = std::string(s, n);
-    return s;
-}
 
 NixRepl::NixRepl(
     const LookupPath & lookupPath,
@@ -254,7 +249,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             for (auto & entry : DirectoryIterator{dir == "" ? "/" : dir}) {
                 checkInterrupt();
                 auto name = entry.path().filename().string();
-                if (name[0] != '.' && hasPrefix(name, prefix2))
+                if (name[0] != '.' && name.starts_with(prefix2))
                     completions.insert(prev + entry.path().string());
             }
         } catch (Error &) {
@@ -263,7 +258,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
-            if (i->substr(0, cur.size()) != cur)
+            if (!i->starts_with(cur))
                 break;
             completions.insert(prev + *i);
             i++;
@@ -290,7 +285,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 
             for (auto & i : *v.attrs()) {
                 std::string_view name = state->symbols[i.name];
-                if (name.substr(0, cur2.size()) != cur2)
+                if (!name.starts_with(cur2))
                     continue;
                 completions.insert(concatStrings(prev, expr, ".", name));
             }
@@ -312,16 +307,9 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 // FIXME: DRY and match or use the parser
 static bool isVarName(std::string_view s)
 {
-    if (s.size() == 0)
-        return false;
-    char c = s[0];
-    if ((c >= '0' && c <= '9') || c == '-' || c == '\'')
-        return false;
-    for (auto & i : s)
-        if (!((i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9') || i == '_' || i == '-'
-              || i == '\''))
-            return false;
-    return true;
+    auto isStart = [](char c) { return !isAsciiDigit(c) && c != '-' && c != '\''; };
+    auto isContinue = [](char c) { return isAsciiAlpha(c) || isAsciiDigit(c) || c == '_' || c == '-' || c == '\''; };
+    return !s.empty() && isStart(s.front()) && std::ranges::all_of(s, isContinue);
 }
 
 StorePath NixRepl::getDerivationPath(Value & v)
@@ -365,7 +353,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         size_t p = line.find_first_of(" \n\r\t");
         command = line.substr(0, p);
         if (p != std::string::npos)
-            arg = removeWhitespace(line.substr(p));
+            arg = trim(std::string_view{line}.substr(p));
     } else {
         arg = line;
     }
@@ -693,11 +681,11 @@ ProcessLineResult NixRepl::processLine(std::string line)
         throw Error("unknown command '%1%'", command);
 
     else {
-        size_t p = line.find('=');
         std::string name;
-        if (p != std::string::npos && p < line.size() && line[p + 1] != '='
-            && isVarName(name = removeWhitespace(line.substr(0, p)))) {
-            Expr * e = parseString(line.substr(p + 1));
+        auto split = splitOnce(line, '=');
+        if (split && !split->second.empty() && !split->second.starts_with('=')
+            && isVarName(name = trim(split->first))) {
+            Expr * e = parseString(std::string(split->second));
             Value & v(*state->allocValue());
             v.mkThunk(env, e);
             addVarToScope(state->symbols.create(name), v);

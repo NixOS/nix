@@ -6,6 +6,7 @@
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
+#include "nix/util/util.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -15,6 +16,7 @@
 #include <fcntl.h>
 #include <regex>
 #include <pwd.h>
+#include <string_view>
 
 using namespace nix;
 
@@ -210,7 +212,7 @@ static int main_nix_channel(int argc, char ** argv)
             } else if (*arg == "--rollback") {
                 cmd = cRollback;
             } else {
-                if (hasPrefix(*arg, "-"))
+                if (arg->starts_with("-"))
                     throw UsageError("unsupported argument '%s'", *arg);
                 args.push_back(std::move(*arg));
             }
@@ -230,8 +232,8 @@ static int main_nix_channel(int argc, char ** argv)
                     name = args[1];
                 } else {
                     name = baseNameOf(url);
-                    name = std::regex_replace(name, std::regex("-unstable$"), "");
-                    name = std::regex_replace(name, std::regex("-stable$"), "");
+                    stripSuffix(name, "-unstable");
+                    stripSuffix(name, "-stable");
                 }
                 addChannel(url, name);
             }

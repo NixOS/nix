@@ -3,6 +3,7 @@
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/names.hh"
+#include "nix/util/split.hh"
 
 #include <atomic>
 #include <map>
@@ -30,8 +31,8 @@ static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
 static std::string_view storePathToName(std::string_view path)
 {
     auto base = baseNameOf(path);
-    auto i = base.find('-');
-    return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
+    auto split = splitOnce(base, '-');
+    return split ? split->second : base.substr(0, 0);
 }
 
 class ProgressBar : public Logger
@@ -217,7 +218,7 @@ public:
 
         if (type == actBuild) {
             std::string name(storePathToName(getS(fields, 0)));
-            if (hasSuffix(name, ".drv"))
+            if (name.ends_with(".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
@@ -236,15 +237,15 @@ public:
             auto name = storePathToName(getS(fields, 0));
             auto sub = getS(fields, 1);
             i->s =
-                fmt(hasPrefix(sub, "local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
-                                            : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
+                fmt(sub.starts_with("local") ? "copying " ANSI_BOLD "%s" ANSI_NORMAL " from %s"
+                                             : "fetching " ANSI_BOLD "%s" ANSI_NORMAL " from %s",
                     name,
                     sub);
         }
 
         if (type == actPostBuildHook) {
             auto name = storePathToName(getS(fields, 0));
-            if (hasSuffix(name, ".drv"))
+            if (name.ends_with(".drv"))
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
             i->name = DrvName(name).name;
@@ -311,7 +312,7 @@ public:
         }
 
         else if (type == resBuildLogLine || type == resPostBuildLogLine) {
-            auto lastLine = chomp(getS(fields, 0));
+            auto lastLine = rtrim(getS(fields, 0));
             auto i = state->its.find(act);
             assert(i != state->its.end());
             ActInfo info = *i->second;

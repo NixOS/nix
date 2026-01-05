@@ -23,6 +23,7 @@
 #  include <sys/socket.h>
 #endif
 
+#include <algorithm>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -91,7 +92,7 @@ void RemoteStore::initConnection(Connection & conn)
                 NullSink nullSink;
                 tee.drainInto(nullSink);
             }
-            throw Error("protocol mismatch, got '%s'", chomp(saved.s));
+            throw Error("protocol mismatch, got '%s'", rtrimView(saved.s));
         }
 
         static_cast<WorkerProto::ClientHandshakeInfo &>(conn) = conn.postHandshake(*this);
@@ -464,7 +465,7 @@ void RemoteStore::addMultipleToStore(
         size_t nrTotal = pathsToCopy.size();
         sink << nrTotal;
         // Reverse, so we can release memory at the original start
-        std::reverse(pathsToCopy.begin(), pathsToCopy.end());
+        std::ranges::reverse(pathsToCopy);
         while (!pathsToCopy.empty()) {
             act.progress(nrTotal - pathsToCopy.size(), nrTotal, size_t(1), size_t(0));
 

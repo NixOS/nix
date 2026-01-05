@@ -20,9 +20,11 @@
 #include "nix/util/terminal.hh"
 #include "man-pages.hh"
 
+#include <algorithm>
 #include <cerrno>
 #include <ctime>
 #include <algorithm>
+#include <cctype>
 #include <iostream>
 #include <sstream>
 
@@ -110,18 +112,17 @@ static void getAllExprs(EvalState & state, const SourcePath & path, StringSet & 
             continue; // ignore dangling symlinks in ~/.nix-defexpr
         }
 
-        if (isNixExpr(path2, st) && (st.type != SourceAccessor::tRegular || hasSuffix(path2.baseName(), ".nix"))) {
+        if (isNixExpr(path2, st) && (st.type != SourceAccessor::tRegular || path2.baseName().ends_with(".nix"))) {
             /* Strip off the `.nix' filename suffix (if applicable),
                otherwise the attribute cannot be selected with the
                `-A' option.  Useful if you want to stick a Nix
                expression directly in ~/.nix-defexpr. */
             std::string attrName = i;
-            if (hasSuffix(attrName, ".nix"))
+            if (attrName.ends_with(".nix"))
                 attrName = std::string(attrName, 0, attrName.size() - 4);
             if (!seen.insert(attrName).second) {
                 std::string suggestionMessage = "";
-                if (path2.path.abs().find("channels") != std::string::npos
-                    && path.path.abs().find("channels") != std::string::npos)
+                if (path2.path.abs().contains("channels") && path.path.abs().contains("channels"))
                     suggestionMessage =
                         fmt("\nsuggestion: remove '%s' from either the root channels or the user channels", attrName);
                 printError(
@@ -230,7 +231,7 @@ StringSet searchByPrefix(const PackageInfos & allElems, std::string_view prefix)
     StringSet result;
     for (const auto & packageInfo : allElems) {
         const auto drvName = DrvName{packageInfo.queryName()};
-        if (hasPrefix(drvName.name, prefix)) {
+        if (drvName.name.starts_with(prefix)) {
             result.emplace(drvName.name);
 
             if (result.size() >= maxResults) {
@@ -777,16 +778,15 @@ static void uninstallDerivations(Globals & globals, Strings & selectors, Path & 
             PackageInfos::iterator split = workingElems.begin();
             if (isPath(selector)) {
                 StorePath selectorStorePath = globals.state->store->followLinksToStorePath(selector);
-                split = std::partition(
-                    workingElems.begin(), workingElems.end(), [&selectorStorePath, globals](auto & elem) {
-                        return selectorStorePath != elem.queryOutPath();
-                    });
+                split = std::ranges::partition(workingElems, [&selectorStorePath, globals](auto & elem) {
+                            return selectorStorePath != elem.queryOutPath();
+                        }).begin();
             } else {
                 DrvName selectorName(selector);
-                split = std::partition(workingElems.begin(), workingElems.end(), [&selectorName](auto & elem) {
-                    DrvName elemName(elem.queryName());
-                    return !selectorName.matches(elemName);
-                });
+                split = std::ranges::partition(workingElems, [&selectorName](auto & elem) {
+                            DrvName elemName(elem.queryName());
+                            return !selectorName.matches(elemName);
+                        }).begin();
             }
             if (split == workingElems.end())
                 warn("selector '%s' matched no installed derivations", selector);
@@ -813,14 +813,14 @@ static void opUninstall(Globals & globals, Strings opFlags, Strings opArgs)
 
 static bool cmpChars(char a, char b)
 {
-    return toupper(a) < toupper(b);
+    return std::toupper(static_cast<unsigned char>(a)) < std::toupper(static_cast<unsigned char>(b));
 }
 
 static bool cmpElemByName(const PackageInfo & a, const PackageInfo & b)
 {
     auto a_name = a.queryName();
     auto b_name = b.queryName();
-    return lexicographical_compare(a_name.begin(), a_name.end(), b_name.begin(), b_name.end(), cmpChars);
+    return std::ranges::lexicographical_compare(a_name, b_name, cmpChars);
 }
 
 /* This function compares the version of an element against the
@@ -1008,7 +1008,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     std::vector<PackageInfo> elems;
     for (auto & i : elems_)
         elems.push_back(i);
-    sort(elems.begin(), elems.end(), cmpElemByName);
+    std::ranges::sort(elems, cmpElemByName);
 
     /* We only need to know the installed paths when we are querying
        the status of the derivation. */

@@ -112,7 +112,7 @@ std::ostream & printIdentifier(std::ostream & str, std::string_view s)
 
 static bool isVarName(std::string_view s)
 {
-    if (s.size() == 0)
+    if (s.empty())
         return false;
     if (isReservedKeyword(s))
         return false;

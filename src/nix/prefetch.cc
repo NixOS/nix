@@ -13,6 +13,7 @@
 #include "nix/cmd/misc-store-flags.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/split.hh"
 #include "nix/util/url.hh"
 #include "nix/store/path.hh"
 
@@ -26,14 +27,14 @@ using namespace nix;
    mirrors defined in Nixpkgs. */
 std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 {
-    if (url.substr(0, 9) != "mirror://")
+    if (!url.starts_with("mirror://"))
         return url;
 
     std::string s(url, 9);
-    auto p = s.find('/');
-    if (p == std::string::npos)
+    auto split = splitOnce(s, '/');
+    if (!split)
         throw Error("invalid mirror URL '%s'", url);
-    std::string mirrorName(s, 0, p);
+    std::string mirrorName(split->first);
 
     Value vMirrors;
     // FIXME: use nixpkgs flake
@@ -53,7 +54,7 @@ std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 
     std::string mirror(
         state.forceString(*mirrorList->value->listView()[0], noPos, "while evaluating the first available mirror"));
-    return mirror + (hasSuffix(mirror, "/") ? "" : "/") + s.substr(p + 1);
+    return mirror + (mirror.ends_with("/") ? "" : "/") + std::string(split->second);
 }
 
 std::tuple<StorePath, Hash> prefetchFile(
@@ -112,7 +113,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             if (executable)
                 mode = 0700;
 
-            AutoCloseFD fd = toDescriptor(open(tmpFile.string().c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
+            AutoCloseFD fd = toDescriptor(open(tmpFile.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
             if (!fd)
                 throw SysError("creating temporary file '%s'", tmpFile);
 
@@ -126,9 +127,9 @@ std::tuple<StorePath, Hash> prefetchFile(
         /* Optionally unpack the file. */
         if (unpack) {
             Activity act(*logger, lvlChatty, actUnknown, fmt("unpacking '%s'", url.to_string()));
-            auto unpacked = (tmpDir.path() / "unpacked").string();
+            auto unpacked = tmpDir.path() / "unpacked";
             createDirs(unpacked);
-            unpackTarfile(tmpFile.string(), unpacked);
+            unpackTarfile(tmpFile, unpacked);
 
             auto entries = DirectoryIterator{unpacked};
             /* If the archive unpacks to a single file/directory, then use

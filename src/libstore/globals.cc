@@ -6,6 +6,8 @@
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
+#include "nix/util/strings.hh"
 
 #include <algorithm>
 #include <map>
@@ -243,7 +245,7 @@ bool Settings::isWSL1()
     uname(&utsbuf);
     // WSL1 uses -Microsoft suffix
     // WSL2 uses -microsoft-standard suffix
-    return hasSuffix(utsbuf.release, "-Microsoft");
+    return std::string_view{utsbuf.release}.ends_with("-Microsoft");
 #else
     return false;
 #endif
@@ -358,14 +360,11 @@ PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const
             optional = true;
             i.pop_back();
         }
-        size_t p = i.find('=');
-        std::string inside, outside;
-        if (p == std::string::npos) {
-            inside = i;
-            outside = i;
-        } else {
-            inside = i.substr(0, p);
-            outside = i.substr(p + 1);
+        std::string inside = i;
+        std::string outside = i;
+        if (auto split = splitOnce(i, '=')) {
+            inside.assign(split->first);
+            outside.assign(split->second);
         }
         pathsInChroot[inside] = {.source = outside, .optional = optional};
     }
@@ -497,7 +496,7 @@ void initLibStore(bool loadConfig)
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
-    if (hasPrefix(defaultTempDir().string(), "/var/folders/"))
+    if (defaultTempDir().string().starts_with("/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 

@@ -64,7 +64,7 @@ void ConfigFile::apply(const Settings & flakeSettings)
 
     for (auto & [name, value] : settings) {
 
-        auto baseName = hasPrefix(name, "extra-") ? std::string(name, 6) : name;
+        auto baseName = name.starts_with("extra-") ? name.substr(6) : name;
 
         // FIXME: Move into libutil/config.cc.
         std::string valueS;
@@ -89,22 +89,22 @@ void ConfigFile::apply(const Settings & flakeSettings)
                     "Using saved setting for '%s = %s' from ~/.local/share/nix/trusted-settings.json.", name, valueS);
             } else {
                 // FIXME: filter ANSI escapes, newlines, \r, etc.
-                if (std::tolower(logger
-                                     ->ask(
-                                         fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED
-                                             "%s" ANSI_NORMAL "' (y/N)?",
-                                             name,
-                                             valueS))
-                                     .value_or('n'))
-                    == 'y') {
+                auto allow = logger
+                                 ->ask(
+                                     fmt("do you want to allow configuration setting '%s' to be set to '" ANSI_RED
+                                         "%s" ANSI_NORMAL "' (y/N)?",
+                                         name,
+                                         valueS))
+                                 .value_or('n');
+                if (allow == 'y' || allow == 'Y') {
                     trusted = true;
                 }
-                if (std::tolower(logger
-                                     ->ask(
-                                         fmt("do you want to permanently mark this value as %s (y/N)?",
-                                             trusted ? "trusted" : "untrusted"))
-                                     .value_or('n'))
-                    == 'y') {
+                auto persist = logger
+                                   ->ask(
+                                       fmt("do you want to permanently mark this value as %s (y/N)?",
+                                           trusted ? "trusted" : "untrusted"))
+                                   .value_or('n');
+                if (persist == 'y' || persist == 'Y') {
                     trustedList[name][valueS] = trusted;
                     writeTrustedList(trustedList);
                 }

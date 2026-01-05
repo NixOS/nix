@@ -53,7 +53,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             }
 #endif
 
-            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            auto decompressor = makeDecompressionSink(unpack && mainUrl.ends_with(".xz") ? "xz" : "none", sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
@@ -75,7 +75,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : settings.hashedMirrors.get())
             try {
-                if (!hasSuffix(hashedMirror, "/"))
+                if (!hashedMirror.ends_with("/"))
                     hashedMirror += '/';
                 fetch(
                     hashedMirror + printHashAlgo(dof->ca.hash.algo) + "/"

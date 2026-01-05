@@ -177,14 +177,14 @@ static bool matchUser(std::string_view user, const struct group & gr)
 static bool
 matchUser(const std::optional<std::string> & user, const std::optional<std::string> & group, const Strings & users)
 {
-    if (find(users.begin(), users.end(), "*") != users.end())
+    if (std::ranges::find(users, "*") != users.end())
         return true;
 
-    if (user && find(users.begin(), users.end(), *user) != users.end())
+    if (user && std::ranges::find(users, *user) != users.end())
         return true;
 
     for (auto & i : users)
-        if (i.substr(0, 1) == "@") {
+        if (i.starts_with("@")) {
             if (group && *group == i.substr(1))
                 return true;
             struct group * gr = getgrnam(i.c_str() + 1);

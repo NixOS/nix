@@ -317,32 +317,26 @@ namespace nix {
 
         const char *teststr = "this is 100%s correct!";
 
-        ASSERT_STREQ(
-            HintFmt(teststr).str().c_str(),
-            teststr);
+        ASSERT_EQ(HintFmt(teststr).str(), teststr);
 
     }
 
     TEST(HintFmt, fmtToHintfmt) {
 
-        ASSERT_STREQ(
-            HintFmt(fmt("the color of this this text is %1%", "not yellow")).str().c_str(),
-            "the color of this this text is not yellow");
+        ASSERT_EQ(HintFmt(fmt("the color of this this text is %1%", "not yellow")).str(), "the color of this this text is not yellow");
 
     }
 
     TEST(HintFmt, tooFewArguments) {
 
-        ASSERT_STREQ(
-            HintFmt("only one arg %1% %2%", "fulfilled").str().c_str(),
-            "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
+        ASSERT_EQ(HintFmt("only one arg %1% %2%", "fulfilled").str(), "only one arg " ANSI_WARNING "fulfilled" ANSI_NORMAL " ");
 
     }
 
     TEST(HintFmt, tooManyArguments) {
 
-        ASSERT_STREQ(
-            HintFmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
+        ASSERT_EQ(
+            HintFmt("what about this %1% %2%", "%3%", "one", "two").str(),
             "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
 
     }

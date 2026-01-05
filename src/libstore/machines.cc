@@ -21,9 +21,9 @@ Machine::Machine(
               // Backwards compatibility: if the URI is schemeless, is not a path,
               // and is not one of the special store connection words, prepend
               // ssh://.
-              storeUri.find("://") != std::string::npos || storeUri.find("/") != std::string::npos || storeUri == "auto"
-                      || storeUri == "daemon" || storeUri == "local" || hasPrefix(storeUri, "auto?")
-                      || hasPrefix(storeUri, "daemon?") || hasPrefix(storeUri, "local?") || hasPrefix(storeUri, "?")
+              storeUri.contains("://") || storeUri.contains("/") || storeUri == "auto" || storeUri == "daemon"
+                      || storeUri == "local" || storeUri.starts_with("auto?") || storeUri.starts_with("daemon?")
+                      || storeUri.starts_with("local?") || storeUri.starts_with("?")
                   ? storeUri
                   : "ssh://" + storeUri))
     , systemTypes(systemTypes)
@@ -40,21 +40,20 @@ Machine::Machine(
 
 bool Machine::systemSupported(const std::string & system) const
 {
-    return system == "builtin" || (systemTypes.count(system) > 0);
+    return system == "builtin" || systemTypes.contains(system);
 }
 
 bool Machine::allSupported(const StringSet & features) const
 {
-    return std::all_of(features.begin(), features.end(), [&](const std::string & feature) {
-        return supportedFeatures.count(feature) || mandatoryFeatures.count(feature);
+    return std::ranges::all_of(features, [&](const std::string & feature) {
+        return supportedFeatures.contains(feature) || mandatoryFeatures.contains(feature);
     });
 }
 
 bool Machine::mandatoryMet(const StringSet & features) const
 {
-    return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(), [&](const std::string & feature) {
-        return features.count(feature);
-    });
+    return std::ranges::all_of(
+        mandatoryFeatures, [&](const std::string & feature) { return features.contains(feature); });
 }
 
 StoreReference Machine::completeStoreReference() const
@@ -100,7 +99,7 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
 {
     std::vector<std::string> result;
     for (auto line : tokenizeString<std::vector<std::string>>(builders, "\n")) {
-        line.erase(std::find(line.begin(), line.end(), '#'), line.end());
+        line.erase(std::ranges::find(line, '#'), line.end());
         for (auto entry : tokenizeString<std::vector<std::string>>(line, ";")) {
             entry = trim(entry);
 
@@ -195,9 +194,8 @@ static Machine parseBuilderLine(const StringSet & defaultSystems, const std::str
 static Machines parseBuilderLines(const StringSet & defaultSystems, const std::vector<std::string> & builders)
 {
     Machines result;
-    std::transform(builders.begin(), builders.end(), std::back_inserter(result), [&](auto && line) {
-        return parseBuilderLine(defaultSystems, line);
-    });
+    std::ranges::transform(
+        builders, std::back_inserter(result), [&](auto && line) { return parseBuilderLine(defaultSystems, line); });
     return result;
 }
 

@@ -160,12 +160,12 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
         debug("Custom extension '%s' found, ignoring", line);
     }
 
-    if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), ::isxdigit)) {
+    if (oid.length() != 64 || !std::all_of(oid.begin(), oid.end(), [](unsigned char c) { return std::isxdigit(c); })) {
         debug("Invalid sha256 %s, skipping", oid);
         return std::nullopt;
     }
 
-    if (size.length() == 0 || !std::all_of(size.begin(), size.end(), ::isdigit)) {
+    if (size.empty() || !std::all_of(size.begin(), size.end(), [](unsigned char c) { return std::isdigit(c); })) {
         debug("Invalid size %s, skipping", size);
         return std::nullopt;
     }

@@ -380,7 +380,7 @@ struct CmdFlakeCheck : FlakeCommand
 
         auto argHasName = [&](Symbol arg, std::string_view expected) {
             std::string_view name = state->symbols[arg];
-            return name == expected || name == "_" || (hasPrefix(name, "_") && name.substr(1) == expected);
+            return name == expected || name == "_" || (name.starts_with("_") && name.substr(1) == expected);
         };
 
         auto checkSystemName = [&](std::string_view system, const PosIdx pos) {
@@ -921,11 +921,11 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                 else if (st.type == SourceAccessor::tRegular) {
                     auto contents = from2.readFile();
                     if (std::filesystem::exists(to_st)) {
-                        auto contents2 = readFile(to2.string());
+                        auto contents2 = readFile(to2);
                         if (contents != contents2) {
                             printError(
                                 "refusing to overwrite existing file '%s'\n please merge it manually with '%s'",
-                                to2.string(),
+                                to2,
                                 from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -940,7 +940,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         if (std::filesystem::read_symlink(to2) != target) {
                             printError(
                                 "refusing to overwrite existing file '%s'\n please merge it manually with '%s'",
-                                to2.string(),
+                                to2,
                                 from2);
                             conflictedFiles.push_back(to2);
                         } else {
@@ -1292,7 +1292,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     }
                 };
 
-                if (attrPath.size() == 0
+                if (attrPath.empty()
                     || (attrPath.size() == 1
                         && (attrPathS[0] == "defaultPackage" || attrPathS[0] == "devShell"
                             || attrPathS[0] == "formatter" || attrPathS[0] == "nixosConfigurations"

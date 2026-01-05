@@ -24,8 +24,10 @@
 #  include "nix/store/posix-fs-canonicalise.hh"
 #endif
 
+#include <algorithm>
 #include <iostream>
 #include <algorithm>
+#include <ranges>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -291,7 +293,7 @@ printTree(const StorePath & path, const std::string & firstPad, const std::strin
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
     auto sorted = store->topoSortPaths(info->references);
-    reverse(sorted.begin(), sorted.end());
+    std::ranges::reverse(sorted);
 
     for (const auto & [n, i] : enumerate(sorted)) {
         bool last = n + 1 == sorted.size();
@@ -343,7 +345,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         else if (i == "--valid-derivers")
             query = qValidDerivers;
         else if (i == "--binding" || i == "-b") {
-            if (opArgs.size() == 0)
+            if (opArgs.empty())
                 throw UsageError("expected binding name");
             bindingName = opArgs.front();
             opArgs.pop_front();
@@ -413,8 +415,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
         }
         auto sorted = store->topoSortPaths(paths);
-        for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+        for (auto & i : std::ranges::reverse_view(sorted))
+            cout << fmt("%s\n", store->printStorePath(i));
         break;
     }
 
@@ -434,8 +436,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
             }
         }
         auto sorted = store->topoSortPaths(result);
-        for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+        for (auto & i : std::ranges::reverse_view(sorted))
+            cout << fmt("%s\n", store->printStorePath(i));
         break;
     }
 

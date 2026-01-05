@@ -2,11 +2,10 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
 
 #include <array>
 #include <cctype>
-#include <iostream>
-#include <regex>
 
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>
@@ -56,19 +55,45 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 
 //////////////////////////////////////////////////////////////////////
 
+std::string rtrim(std::string_view s, std::string_view whitespace)
+{
+    return std::string(rtrimView(s, whitespace));
+}
+
 std::string chomp(std::string_view s)
 {
-    size_t i = s.find_last_not_of(" \n\r\t");
-    return i == s.npos ? "" : std::string(s, 0, i + 1);
+    return rtrim(s);
+}
+
+std::string ltrim(std::string_view s, std::string_view whitespace)
+{
+    return std::string(ltrimView(s, whitespace));
+}
+
+std::string_view rtrimView(std::string_view s, std::string_view whitespace)
+{
+    auto i = s.find_last_not_of(whitespace);
+    if (i == s.npos)
+        return {};
+    return s.substr(0, i + 1);
+}
+
+std::string_view ltrimView(std::string_view s, std::string_view whitespace)
+{
+    auto i = s.find_first_not_of(whitespace);
+    if (i == s.npos)
+        return {};
+    return s.substr(i);
+}
+
+std::string_view trimView(std::string_view s, std::string_view whitespace)
+{
+    return rtrimView(ltrimView(s, whitespace), whitespace);
 }
 
 std::string trim(std::string_view s, std::string_view whitespace)
 {
-    auto i = s.find_first_not_of(whitespace);
-    if (i == s.npos)
-        return "";
-    auto j = s.find_last_not_of(whitespace);
-    return std::string(s, i, j == s.npos ? j : j - i + 1);
+    return std::string(trimView(s, whitespace));
 }
 
 std::string replaceStrings(std::string res, std::string_view from, std::string_view to)
@@ -98,7 +123,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
 template<class N>
 std::optional<N> string2Int(const std::string_view s)
 {
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+    if (s.starts_with('-') && !std::numeric_limits<N>::is_signed)
         return std::nullopt;
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
@@ -190,20 +215,55 @@ std::string renderSize(int64_t value, bool align)
     return fmt("%s %ciB", renderSizeWithoutUnit(value, unit, align), getSizeUnitSuffix(unit));
 }
 
-bool hasPrefix(std::string_view s, std::string_view prefix)
+bool stripPrefix(std::string & s, std::string_view prefix)
 {
-    return s.compare(0, prefix.size(), prefix) == 0;
+    if (!s.starts_with(prefix))
+        return false;
+    s.erase(0, prefix.size());
+    return true;
 }
 
-bool hasSuffix(std::string_view s, std::string_view suffix)
+bool stripPrefix(std::string_view & s, std::string_view prefix)
 {
-    return s.size() >= suffix.size() && s.substr(s.size() - suffix.size()) == suffix;
+    if (!s.starts_with(prefix))
+        return false;
+    s.remove_prefix(prefix.size());
+    return true;
+}
+
+bool stripSuffix(std::string & s, std::string_view suffix)
+{
+    if (!s.ends_with(suffix))
+        return false;
+    s.resize(s.size() - suffix.size());
+    return true;
+}
+
+bool stripSuffix(std::string_view & s, std::string_view suffix)
+{
+    if (!s.ends_with(suffix))
+        return false;
+    s.remove_suffix(suffix.size());
+    return true;
+}
+
+std::string_view stripTrailing(std::string_view s, char c)
+{
+    while (!s.empty() && s.back() == c)
+        s.remove_suffix(1);
+    return s;
+}
+
+void stripTrailing(std::string & s, char c)
+{
+    while (!s.empty() && s.back() == c)
+        s.pop_back();
 }
 
 std::string toLower(std::string s)
 {
     for (auto & c : s)
-        c = std::tolower(c);
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return s;
 }
 
@@ -290,16 +350,14 @@ std::string stripIndentation(std::string_view s)
 
 std::pair<std::string_view, std::string_view> getLine(std::string_view s)
 {
-    auto newline = s.find('\n');
-
-    if (newline == s.npos) {
+    auto split = splitOnce(s, '\n');
+    if (!split)
         return {s, ""};
-    } else {
-        auto line = s.substr(0, newline);
-        if (!line.empty() && line[line.size() - 1] == '\r')
-            line = line.substr(0, line.size() - 1);
-        return {line, s.substr(newline + 1)};
-    }
+
+    auto line = split->first;
+    if (!line.empty() && line[line.size() - 1] == '\r')
+        line = line.substr(0, line.size() - 1);
+    return {line, split->second};
 }
 
 } // namespace nix

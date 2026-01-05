@@ -2,6 +2,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/split.hh"
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -10,13 +11,13 @@ MakeError(InvalidDerivationOutputId, Error);
 
 DrvOutput DrvOutput::parse(const std::string & strRep)
 {
-    size_t n = strRep.find("!");
-    if (n == strRep.npos)
+    auto split = splitOnce(strRep, '!');
+    if (!split)
         throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
 
     return DrvOutput{
-        .drvHash = Hash::parseAnyPrefixed(strRep.substr(0, n)),
-        .outputName = strRep.substr(n + 1),
+        .drvHash = Hash::parseAnyPrefixed(split->first),
+        .outputName = std::string(split->second),
     };
 }
 

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstring>
 #include <fstream>
 #include <iostream>
@@ -185,7 +186,7 @@ static void main_nix_build(int argc, char ** argv)
                     savedArgs.push_back(argv[i]);
                 args.clear();
                 for (auto line : lines) {
-                    line = chomp(line);
+                    line = rtrim(line);
                     std::smatch match;
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords({match[1].first, match[1].second}))
@@ -387,7 +388,7 @@ static void main_nix_build(int argc, char ** argv)
                 } catch (Error & e) {
                 };
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
-                if (evalStore->isStorePath(path) && hasSuffix(path, ".drv"))
+                if (evalStore->isStorePath(path) && path.ends_with(".drv"))
                     drvs.push_back(PackageInfo(*state, evalStore, absolute));
                 else {
                     /* If we're in a #! script, interpret filenames
@@ -509,7 +510,7 @@ static void main_nix_build(int argc, char ** argv)
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
+            if (std::ranges::all_of(envExclude, [&](const std::string & exclude) {
                     return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
                 })) {
                 accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);

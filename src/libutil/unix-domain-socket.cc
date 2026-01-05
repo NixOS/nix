@@ -86,7 +86,7 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
             }
         });
         pipe.writeSide.close();
-        auto errNo = string2Int<int>(chomp(drainFD(pipe.readSide.get())));
+        auto errNo = string2Int<int>(rtrimView(drainFD(pipe.readSide.get())));
         if (!errNo || *errNo == -1)
             throw Error("cannot %s to socket at '%s'", operationName, path);
         else if (*errNo > 0) {

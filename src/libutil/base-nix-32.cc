@@ -8,8 +8,8 @@ namespace nix {
 constexpr const std::array<unsigned char, 256> BaseNix32::reverseMap = [] {
     std::array<unsigned char, 256> map{};
 
-    for (size_t i = 0; i < map.size(); ++i)
-        map[i] = invalid; // invalid
+    for (unsigned char & value : map)
+        value = invalid; // invalid
 
     for (unsigned char i = 0; i < 32; ++i)
         map[static_cast<unsigned char>(characters[i])] = i;
@@ -19,7 +19,7 @@ constexpr const std::array<unsigned char, 256> BaseNix32::reverseMap = [] {
 
 std::string BaseNix32::encode(std::span<const std::byte> bs)
 {
-    if (bs.size() == 0)
+    if (bs.empty())
         return {};
 
     size_t len = encodedLength(bs.size());

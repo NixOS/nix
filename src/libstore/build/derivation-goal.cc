@@ -295,7 +295,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             /* If the wanted output is not in builtOutputs (e.g., because it
                was already valid and therefore not re-registered), we need to
                add it ourselves to ensure we return the correct information. */
-            if (success.builtOutputs.count(wantedOutput) == 0) {
+            if (!success.builtOutputs.contains(wantedOutput)) {
                 debug(
                     "BUG! wanted output '%s' not in builtOutputs, working around by adding it manually", wantedOutput);
                 success.builtOutputs = {{

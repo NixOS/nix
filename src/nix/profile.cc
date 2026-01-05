@@ -519,7 +519,7 @@ struct StorePathMatcher final : public Matcher
 
     bool matches(const std::string & name, const ProfileElement & element) override
     {
-        return element.storePaths.count(storePath);
+        return element.storePaths.contains(storePath);
     }
 };
 

@@ -178,8 +178,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         /* They don't like trailing slashes on subpath directives */
         std::string globalTmpDirStr = globalTmpDir.native();
-        while (!globalTmpDirStr.empty() && globalTmpDirStr.back() == '/')
-            globalTmpDirStr.pop_back();
+        stripTrailing(globalTmpDirStr, '/');
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
