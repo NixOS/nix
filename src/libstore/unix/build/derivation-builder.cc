@@ -280,7 +280,7 @@ protected:
         return Strings({store.printStorePath(drvPath)});
     }
 
-    virtual std::filesystem::path realPathInSandbox(const std::filesystem::path & p)
+    virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
         return store.toRealPath(p.native());
     }
@@ -1417,7 +1417,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         assert(scratchOutput);
-        auto actualPath = realPathInSandbox(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInHost(store.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
@@ -1537,7 +1537,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = realPathInSandbox(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInHost(store.printStorePath(*scratchPath));
 
         auto finish = [&](StorePath finalStorePath) {
             /* Store the final path */
