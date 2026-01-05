@@ -226,18 +226,18 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             /* If we're running from the daemon, then this will return the
                root cgroup of the service. Otherwise, it will return the
                current cgroup. */
-            auto rootCgroup = getRootCgroup();
             auto cgroupFS = getCgroupFS();
             if (!cgroupFS)
                 throw Error("cannot determine the cgroups file system");
-            auto rootCgroupPath = canonPath((*cgroupFS / rootCgroup).native());
+            auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
             if (!pathExists(rootCgroupPath))
                 throw Error("expected cgroup directory '%s'", rootCgroupPath);
 
             static std::atomic<unsigned int> counter{0};
 
-            cgroup = buildUser ? fmt("%s/nix-build-uid-%d", rootCgroupPath, buildUser->getUID())
-                               : fmt("%s/nix-build-pid-%d-%d", rootCgroupPath, getpid(), counter++);
+            cgroup = rootCgroupPath
+                     / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
+                                  : fmt("nix-build-pid-%d-%d", getpid(), counter++));
 
             debug("using cgroup %s", *cgroup);
 
@@ -248,7 +248,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 auto cgroupsDir = std::filesystem::path{settings.nixStateDir} / "cgroups";
                 createDirs(cgroupsDir);
 
-                auto cgroupFile = fmt("%s/%d", cgroupsDir, buildUser->getUID());
+                auto cgroupFile = cgroupsDir / std::to_string(buildUser->getUID());
 
                 if (pathExists(cgroupFile)) {
                     auto prevCgroup = readFile(cgroupFile);
