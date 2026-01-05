@@ -282,7 +282,6 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     dontUseCmakeConfigure = true;
 
     mesonFlags = [
-      (lib.mesonBool "kaitai-struct-checks" (isActiveComponent "nix-kaitai-struct-checks"))
       (lib.mesonBool "json-schema-checks" (isActiveComponent "nix-json-schema-checks"))
     ]
     ++ map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)

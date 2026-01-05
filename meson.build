@@ -63,6 +63,3 @@ subproject('nix-functional-tests')
 if get_option('json-schema-checks')
   subproject('json-schema-checks')
 endif
-if get_option('kaitai-struct-checks')
-  subproject('kaitai-struct-checks')
-endif
