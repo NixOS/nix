@@ -6,6 +6,7 @@
 #include "nix/expr/eval-gc.hh"
 #include "nix/store/globals.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/ref.hh"
 
 #include "nix_api_expr.h"
@@ -132,8 +133,8 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
         return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
             return nix_eval_state_builder{
                 .store = nix::ref<nix::Store>(store->ptr),
-                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
-                .fetchSettings = nix::fetchers::Settings{},
+                .settings = &nix::evalSettings,
+                .fetchSettings = &nix::fetchSettings,
                 .readOnlyMode = true,
             };
         });
@@ -154,9 +155,9 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
         context->last_err_code = NIX_OK;
     try {
         // TODO: load in one go?
-        builder->settings.readOnlyMode = nix::settings.readOnlyMode;
-        loadConfFile(builder->settings);
-        loadConfFile(builder->fetchSettings);
+        builder->settings->readOnlyMode = nix::settings.readOnlyMode;
+        loadConfFile(*builder->settings);
+        loadConfFile(*builder->fetchSettings);
     }
     NIXC_CATCH_ERRS
 }
@@ -183,9 +184,9 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     try {
         return unsafe_new_with_self<EvalState>([&](auto * self) {
             return EvalState{
-                .fetchSettings = std::move(builder->fetchSettings),
-                .settings = std::move(builder->settings),
-                .state = nix::EvalState(builder->lookupPath, builder->store, self->fetchSettings, self->settings),
+                .fetchSettings = builder->fetchSettings,
+                .settings = builder->settings,
+                .state = nix::EvalState(builder->lookupPath, builder->store, *self->fetchSettings, *self->settings),
             };
         });
     }

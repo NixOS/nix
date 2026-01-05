@@ -32,7 +32,7 @@ nix_err nix_flake_settings_add_to_eval_state_builder(
 {
     nix_clear_err(context);
     try {
-        settings->settings->configureEvalSettings(builder->settings);
+        settings->settings->configureEvalSettings(*builder->settings);
     }
     NIXC_CATCH_ERRS
 }

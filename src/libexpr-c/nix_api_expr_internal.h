@@ -13,8 +13,8 @@ extern "C" {
 struct nix_eval_state_builder
 {
     nix::ref<nix::Store> store;
-    nix::EvalSettings settings;
-    nix::fetchers::Settings fetchSettings;
+    nix::EvalSettings * settings;
+    nix::fetchers::Settings * fetchSettings;
     nix::LookupPath lookupPath;
     // TODO: make an EvalSettings setting own this instead?
     bool readOnlyMode;
@@ -22,8 +22,8 @@ struct nix_eval_state_builder
 
 struct EvalState
 {
-    nix::fetchers::Settings fetchSettings;
-    nix::EvalSettings settings;
+    nix::fetchers::Settings * fetchSettings;
+    nix::EvalSettings * settings;
     nix::EvalState state;
 };
 
