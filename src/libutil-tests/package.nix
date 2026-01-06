@@ -32,6 +32,7 @@ mkMesonExecutable (finalAttrs: {
     ../../.version
     ./.version
     ./meson.build
+    ./unix/meson.build
     # ./meson.options
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)

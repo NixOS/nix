@@ -17,6 +17,12 @@
 #  define HAVE_OPENAT2 0
 #endif
 
+#if defined(__linux__) && defined(__NR_fchmodat2)
+#  define HAVE_FCHMODAT2 1
+#else
+#  define HAVE_FCHMODAT2 0
+#endif
+
 #include "util-config-private.hh"
 #include "util-unix-config-private.hh"
 
@@ -264,6 +270,75 @@ std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t 
 } // namespace linux
 
 #endif
+
+void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode)
+{
+    assert(!path.isRoot());
+
+#if HAVE_FCHMODAT2
+    /* Cache whether fchmodat2 is not supported. */
+    static std::atomic_flag fchmodat2Unsupported{};
+    if (!fchmodat2Unsupported.test()) {
+        /* Try with fchmodat2 first. */
+        auto res = ::syscall(__NR_fchmodat2, dirFd, path.rel_c_str(), mode, AT_SYMLINK_NOFOLLOW);
+        /* Cache that the syscall is not supported. */
+        if (res < 0) {
+            if (errno == ENOSYS)
+                fchmodat2Unsupported.test_and_set();
+            else
+                throw SysError("fchmodat2 '%s' relative to parent directory", path.rel());
+        } else
+            return;
+    }
+#endif
+
+#ifdef __linux__
+    AutoCloseFD pathFd = ::openat(dirFd, path.rel_c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
+    if (!pathFd)
+        throw SysError(
+            "opening '%s' relative to parent directory to get an O_PATH file descriptor (fchmodat2 is unsupported)",
+            path.rel());
+
+    struct ::stat st;
+    /* Possible since https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
+    if (::fstat(pathFd.get(), &st) == -1)
+        throw SysError("statting '%s' relative to parent directory via O_PATH file descriptor", path.rel());
+
+    if (S_ISLNK(st.st_mode))
+        throw SysError(EOPNOTSUPP, "can't change mode of symlink '%s' relative to parent directory", path.rel());
+
+    static std::atomic_flag dontHaveProc{};
+    if (!dontHaveProc.test()) {
+        static const CanonPath selfProcFd = CanonPath("/proc/self/fd");
+
+        auto selfProcFdPath = selfProcFd / std::to_string(pathFd.get());
+        if (int res = ::chmod(selfProcFdPath.c_str(), mode); res == -1) {
+            if (errno == ENOENT)
+                dontHaveProc.test_and_set();
+            else
+                throw SysError("chmod '%s' ('%s' relative to parent directory)", selfProcFdPath, path);
+        } else
+            return;
+    }
+
+    static std::atomic<bool> warned = false;
+    warnOnce(warned, "kernel doesn't support fchmodat2 and procfs isn't mounted, falling back to fchmodat");
+#endif
+
+    int res = ::fchmodat(
+        dirFd,
+        path.rel_c_str(),
+        mode,
+#if defined(__APPLE__) || defined(__FreeBSD__)
+        AT_SYMLINK_NOFOLLOW
+#else
+        0
+#endif
+    );
+
+    if (res == -1)
+        throw SysError("fchmodat '%s' relative to parent directory", path.rel());
+}
 
 static Descriptor
 openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)

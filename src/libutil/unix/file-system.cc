@@ -139,10 +139,15 @@ static void _deletePath(
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
-        if ((st.st_mode & PERM_MASK) != PERM_MASK) {
-            if (fchmodat(parentfd, name.c_str(), st.st_mode | PERM_MASK, 0) == -1)
-                throw SysError("chmod %1%", path);
-        }
+        if ((st.st_mode & PERM_MASK) != PERM_MASK)
+            try {
+                unix::fchmodatTryNoFollow(parentfd, CanonPath(name), st.st_mode | PERM_MASK);
+            } catch (SysError & e) {
+                e.addTrace({}, "while making directory %1% accessible for deletion", path);
+                if (e.errNo == EOPNOTSUPP)
+                    e.addTrace({}, "%1% is now a symlink, expected directory", path);
+                throw;
+            }
 
         int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
