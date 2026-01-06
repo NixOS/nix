@@ -40,7 +40,7 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(Strings & args);
-    bool isMasterRunning();
+    bool isMasterRunning(Path socketPath);
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
     Path startMaster();
