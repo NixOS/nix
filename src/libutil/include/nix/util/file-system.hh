@@ -294,8 +294,12 @@ void moveFile(const Path & src, const Path & dst);
  * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
+ *
+ * If contents is set, always create a regular file, even if the source is a
+ * link.
  */
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete);
+void copyFile(
+    const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
 
 /**
  * Automatic cleanup of resources.
