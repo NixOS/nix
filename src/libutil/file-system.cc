@@ -465,31 +465,29 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
     this->recursive = recursive;
 }
 
+void AutoDelete::deletePath()
+{
+    if (del) {
+        if (recursive)
+            nix::deletePath(_path);
+        else
+            std::filesystem::remove(_path);
+        cancel();
+    }
+}
+
 AutoDelete::~AutoDelete()
 {
     try {
-        if (del) {
-            if (recursive)
-                deletePath(_path);
-            else {
-                std::filesystem::remove(_path);
-            }
-        }
+        deletePath();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoDelete::cancel()
+void AutoDelete::cancel() noexcept
 {
     del = false;
-}
-
-void AutoDelete::reset(const std::filesystem::path & p, bool recursive)
-{
-    _path = p;
-    this->recursive = recursive;
-    del = true;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -500,7 +498,7 @@ AutoUnmount::AutoUnmount()
 {
 }
 
-AutoUnmount::AutoUnmount(Path & p)
+AutoUnmount::AutoUnmount(const std::filesystem::path & p)
     : path(p)
     , del(true)
 {
@@ -509,19 +507,25 @@ AutoUnmount::AutoUnmount(Path & p)
 AutoUnmount::~AutoUnmount()
 {
     try {
-        if (del) {
-            if (unmount(path.c_str(), 0) < 0) {
-                throw SysError("Failed to unmount path %1%", path);
-            }
-        }
+        unmount();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoUnmount::cancel()
+void AutoUnmount::cancel() noexcept
 {
     del = false;
+}
+
+void AutoUnmount::unmount()
+{
+    if (del) {
+        if (::unmount(path.c_str(), 0) < 0) {
+            throw SysError("Failed to unmount path %1%", PathFmt(path));
+        }
+    }
+    cancel();
 }
 #endif
 
