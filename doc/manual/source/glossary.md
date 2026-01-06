@@ -136,7 +136,7 @@
 
   > **Example**
   >
-  > `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+  > `/nix/store/jf6gn2dzna4nmsfbdxsd7kwhsk6gnnlr-git-2.38.1`
 
   See [Store Path](@docroot@/store/store-path.md) for details.
 

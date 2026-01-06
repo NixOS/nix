@@ -53,8 +53,8 @@ readonly PROFILE_NIX_FILE_FISH="$NIX_ROOT/var/nix/profiles/default/etc/profile.d
 
 readonly NIX_INSTALLED_NIX="@nix@"
 readonly NIX_INSTALLED_CACERT="@cacert@"
-#readonly NIX_INSTALLED_NIX="/nix/store/j8dbv5w6jl34caywh2ygdy88knx1mdf7-nix-2.3.6"
-#readonly NIX_INSTALLED_CACERT="/nix/store/7dxhzymvy330i28ii676fl1pqwcahv2f-nss-cacert-3.49.2"
+#readonly NIX_INSTALLED_NIX="/nix/store/byi37zv50wnfrpp4d81z3spswd5zva37-nix-2.3.6"
+#readonly NIX_INSTALLED_CACERT="/nix/store/7pi45g541xa8ahwgpbpy7ggsl0xj1jj6-nss-cacert-3.49.2"
 EXTRACTED_NIX_PATH="$(dirname "$0")"
 readonly EXTRACTED_NIX_PATH
 

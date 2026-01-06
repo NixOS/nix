@@ -143,14 +143,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             arbitrary substitutions. For example, running
 
             ```
-            nix-store -r /nix/store/kmwd1hq55akdb9sc7l3finr175dajlby-hello-2.10
+            nix-store -r /nix/store/lrs9qfm60jcgsk83qhyypj3m4jqsgdid-hello-2.10
             ```
 
             in the above `runCommand` script would be disallowed, as this could
             lead to derivations with hidden dependencies or breaking
             reproducibility by relying on the current state of the Nix store. An
             exception would be if
-            `/nix/store/kmwd1hq55akdb9sc7l3finr175dajlby-hello-2.10` were
+            `/nix/store/lrs9qfm60jcgsk83qhyypj3m4jqsgdid-hello-2.10` were
             already in the build inputs or built by a previous recursive Nix
             call.
         )",

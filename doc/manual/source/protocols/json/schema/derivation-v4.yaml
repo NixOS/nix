@@ -94,8 +94,8 @@ properties:
           >
           > ```json
           > "srcs": [
-          >   "47y241wqdhac3jm5l7nv0x4975mb1975-separate-debug-info.sh",
-          >   "56d0w71pjj9bdr363ym3wj1zkwyqq97j-fix-pop-var-context-error.patch"
+          >   "b8nwz167km1yciqpwzjj24f8jcy8pq1h-separate-debug-info.sh",
+          >   "ihzmilr413r8fb3ah30yjnhlb18c1laz-fix-pop-var-context-error.patch"
           > ]
           > ```
         items:
@@ -140,7 +140,7 @@ properties:
     description: |
       Absolute path of the program used to perform the build.
       Typically this is the `bash` shell
-      (e.g. `/nix/store/r3j288vpmczbl500w6zz89gyfa4nr0b1-bash-4.4-p23/bin/bash`).
+      (e.g. `/nix/store/p4xlj4imjbnm4v0x5jf4qysvyjjlgq1d-bash-4.4-p23/bin/bash`).
 
   args:
     type: array

@@ -11,7 +11,7 @@ R""(
 * Get the build log of a specific store path:
 
   ```console
-  # nix log /nix/store/lmngj4wcm9rkv3w4dfhzhcyij3195hiq-thunderbird-52.2.1
+  # nix log /nix/store/vaph2hfdmnipqr90v6g5mcdn8h5p5iss-thunderbird-52.2.1
   ```
 
 * Get a build log from a specific binary cache:

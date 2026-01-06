@@ -66,7 +66,7 @@ This release has the following new features:
 
             nix copy --to ssh://machine nixpkgs.hello
 
-            nix copy --to ssh://machine /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
+            nix copy --to ssh://machine /nix/store/qbhyj3blxpw2i6pb7c6grc9185nbnpvy-hello-2.10
 
             nix copy --to ssh://machine '(with import <nixpkgs> {}; hello)'
 
@@ -187,7 +187,7 @@ This release has the following new features:
         former is primarily useful in conjunction with remote stores,
         e.g.
 
-            nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
+            nix ls-store --store https://cache.nixos.org/ -lR /nix/store/qbhyj3blxpw2i6pb7c6grc9185nbnpvy-hello-2.10
 
         lists the contents of path in a binary cache.
 

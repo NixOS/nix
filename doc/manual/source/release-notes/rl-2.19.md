@@ -45,7 +45,7 @@
     ```json5
     [
       {
-        "path": "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15",
+        "path": "/nix/store/fvqsvk65d38p8qqir371ii0hyqxvjcw6-bash-5.2-p15",
         "valid": true,
         // ...
       },
@@ -60,7 +60,7 @@
 
     ```json5
     {
-      "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15": {
+      "/nix/store/fvqsvk65d38p8qqir371ii0hyqxvjcw6-bash-5.2-p15": {
         // ...
       },
       "/nix/store/wffw7l0alvs3iw94cbgi1gmmbmw99sqb-home-manager-path": null,

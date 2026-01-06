@@ -182,7 +182,7 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
     /* path is not a path, but a full relative or absolute
        URL, e.g. we've seen in the wild NARINFO files have a URL
        field which is
-       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
+       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=wvx0nans273vb7b0cjlplsmr2z905hwd`
        (note the query param) and that gets passed here. */
     auto result = parseURLRelative(path, cacheUriWithTrailingSlash);
 

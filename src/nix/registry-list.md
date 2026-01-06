@@ -7,7 +7,7 @@ R""(
   ```console
   # nix registry list
   user   flake:dwarffs github:edolstra/dwarffs/d181d714fd36eb06f4992a1997cd5601e26db8f5
-  system flake:nixpkgs path:/nix/store/fxl9mrm5xvzam0lxi9ygdmksskx4qq8s-source?lastModified=1605220118&narHash=sha256-Und10ixH1WuW0XHYMxxuHRohKYb45R%2fT8CwZuLd2D2Q=&rev=3090c65041104931adda7625d37fa874b2b5c124
+  system flake:nixpkgs path:/nix/store/jschy88crdk7jqqbk1p2b4l1c9gljl9b-source?lastModified=1605220118&narHash=sha256-Und10ixH1WuW0XHYMxxuHRohKYb45R%2fT8CwZuLd2D2Q=&rev=3090c65041104931adda7625d37fa874b2b5c124
   global flake:blender-bin github:edolstra/nix-warez?dir=blender
   global flake:dwarffs github:edolstra/dwarffs
   …

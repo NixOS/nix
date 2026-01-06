@@ -34,12 +34,12 @@ String context elements come in different forms:
     > [`builtins.storePath`] creates a string with a single constant string context element:
     >
     > ```nix
-    > builtins.getContext (builtins.storePath "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10")
+    > builtins.getContext (builtins.storePath "/nix/store/ikwkxz4wwlp2g1428n7dy729cg1d9hin-hello-2.10")
     > ```
     > evaluates to
     > ```nix
     > {
-    >   "/nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10" = {
+    >   "/nix/store/ikwkxz4wwlp2g1428n7dy729cg1d9hin-hello-2.10" = {
     >     path = true;
     >   };
     > }
