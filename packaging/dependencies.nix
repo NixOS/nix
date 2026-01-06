@@ -40,6 +40,7 @@ scope: {
     postInstall =
       lib.replaceStrings [ "lowdown.so.1" "lowdown.1.dylib" ] [ "lowdown.so.2" "lowdown.2.dylib" ]
         (prevAttrs.postInstall or "");
+    patches = [ ];
   });
 
   # TODO: Remove this when https://github.com/NixOS/nixpkgs/pull/442682 is included in a stable release
