@@ -40,10 +40,10 @@ private:
     Sync<State> state_;
 
     void addCommonSSHOpts(OsStrings & args);
-    bool isMasterRunning();
+    bool isMasterRunning(std::filesystem::path socketPath);
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
-    std::filesystem::path startMaster();
+    std::optional<std::filesystem::path> startMaster();
 #endif
 
 public:
