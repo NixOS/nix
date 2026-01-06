@@ -87,6 +87,10 @@ sources = files(
   'xml-writer.cc',
 )
 
+if host_machine.system() != 'windows'
+  subdir('unix')
+endif
+
 include_dirs = [ include_directories('.') ]
 
 
