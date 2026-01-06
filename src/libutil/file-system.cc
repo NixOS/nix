@@ -448,16 +448,21 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
     this->recursive = recursive;
 }
 
+void AutoDelete::deletePath()
+{
+    if (del) {
+        if (recursive)
+            nix::deletePath(_path);
+        else
+            std::filesystem::remove(_path);
+        cancel();
+    }
+}
+
 AutoDelete::~AutoDelete()
 {
     try {
-        if (del) {
-            if (recursive)
-                deletePath(_path);
-            else {
-                std::filesystem::remove(_path);
-            }
-        }
+        deletePath();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
@@ -483,7 +488,7 @@ AutoUnmount::AutoUnmount()
 {
 }
 
-AutoUnmount::AutoUnmount(Path & p)
+AutoUnmount::AutoUnmount(std::filesystem::path & p)
     : path(p)
     , del(true)
 {

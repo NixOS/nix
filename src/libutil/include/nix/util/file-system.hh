@@ -322,6 +322,17 @@ public:
     AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
+    /**
+     * Delete the file the path points to, and cancel this `AutoDelete`,
+     * so deletion is not attempted a second time by the destructor.
+     *
+     * The destructor calls this ignoring any exception.
+     */
+    void deletePath();
+
+    /**
+     * Cancel the pending deletion
+     */
     void cancel();
 
     void reset(const std::filesystem::path & p, bool recursive = true);
@@ -493,11 +504,11 @@ private:
 #ifdef __FreeBSD__
 class AutoUnmount
 {
-    Path path;
+    std::filesystem::path path;
     bool del;
 public:
     AutoUnmount();
-    AutoUnmount(Path &);
+    AutoUnmount(std::filesystem::path &);
     AutoUnmount(const AutoUnmount &) = delete;
 
     AutoUnmount(AutoUnmount && other) noexcept
