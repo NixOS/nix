@@ -90,7 +90,7 @@ SSHMaster::SSHMaster(
     checkValidAuthority(authority);
 }
 
-void SSHMaster::addCommonSSHOpts(OsStrings & args)
+void SSHMaster::addCommonSSHOpts(OsStrings & args, std::optional<std::filesystem::path> socketPath)
 {
     auto sshArgs = getNixSshOpts();
     args.insert(args.end(), sshArgs.begin(), sshArgs.end());
@@ -114,15 +114,15 @@ void SSHMaster::addCommonSSHOpts(OsStrings & args)
     // the remote session won't be garbled if the local command is slow.
     args.push_back(OS_STR("-oPermitLocalCommand=yes"));
     args.push_back(OS_STR("-oLocalCommand=echo started"));
+    args.insert(args.end(), {OS_STR("-S"), socketPath ? socketPath->native() : OS_STR("none")});
 }
 
 bool SSHMaster::isMasterRunning(std::filesystem::path socketPath)
 {
     assert(useMaster);
 
-    OsStrings args = {
-        OS_STR("-O"), OS_STR("check"), string_to_os_string(hostnameAndUser), OS_STR("-S"), socketPath.string()};
-    addCommonSSHOpts(args);
+    OsStrings args = {OS_STR("-O"), OS_STR("check"), string_to_os_string(hostnameAndUser)};
+    addCommonSSHOpts(args, socketPath);
 
     auto res = runProgram(RunOptions{.program = "ssh", .args = std::move(args), .mergeStderrToStdout = true});
     return res.first == 0;
@@ -187,8 +187,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
 
             if (!fakeSSH) {
                 args = {"ssh", hostnameAndUser.c_str(), "-x"};
-                addCommonSSHOpts(args);
-                args.insert(args.end(), {"-S", socketPath ? socketPath->string() : "none"});
+                addCommonSSHOpts(args, socketPath);
                 if (verbosity >= lvlChatty)
                     args.push_back("-v");
                 args.splice(args.end(), std::move(extraSshArgs));
@@ -263,10 +262,10 @@ std::optional<std::filesystem::path> SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
+            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N"};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
-            addCommonSSHOpts(args);
+            addCommonSSHOpts(args, state->socketPath);
             auto env = createSSHEnv();
             nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
 
