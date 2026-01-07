@@ -124,7 +124,7 @@ void scanForReferencesDeep(
         case SourceAccessor::tFifo:
         case SourceAccessor::tUnknown:
         default:
-            throw Error("file '%s' has an unsupported type", path.abs());
+            throw Error("file '%s' has an unsupported type", accessor.showPath(path));
         }
     };
 

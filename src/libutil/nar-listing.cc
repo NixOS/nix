@@ -157,7 +157,8 @@ static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPat
     case SourceAccessor::Type::tSocket:
     case SourceAccessor::Type::tFifo:
     case SourceAccessor::Type::tUnknown:
-        assert(false); // cannot happen for NARs
+    default:
+        throw Error("file '%s' has an unsupported type", accessor.showPath(path));
     }
 }
 
