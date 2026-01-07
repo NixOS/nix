@@ -89,7 +89,7 @@ SSHMaster::SSHMaster(
     checkValidAuthority(authority);
 }
 
-void SSHMaster::addCommonSSHOpts(Strings & args)
+void SSHMaster::addCommonSSHOpts(Strings & args, Path socketPath)
 {
     auto sshArgs = getNixSshOpts();
     args.insert(args.end(), sshArgs.begin(), sshArgs.end());
@@ -113,14 +113,15 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
     // the remote session won't be garbled if the local command is slow.
     args.push_back("-oPermitLocalCommand=yes");
     args.push_back("-oLocalCommand=echo started");
+    args.insert(args.end(), {"-S", socketPath});
 }
 
 bool SSHMaster::isMasterRunning(Path socketPath)
 {
     assert(useMaster);
 
-    Strings args = {"-O", "check", hostnameAndUser, "-S", socketPath};
-    addCommonSSHOpts(args);
+    Strings args = {"-O", "check", hostnameAndUser};
+    addCommonSSHOpts(args, socketPath);
 
     auto res = runProgram(RunOptions{.program = "ssh", .args = args, .mergeStderrToStdout = true});
     return res.first == 0;
@@ -185,8 +186,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 
             if (!fakeSSH) {
                 args = {"ssh", hostnameAndUser.c_str(), "-x"};
-                addCommonSSHOpts(args);
-                args.insert(args.end(), {"-S", socketPath});
+                addCommonSSHOpts(args, socketPath);
                 if (verbosity >= lvlChatty)
                     args.push_back("-v");
                 args.splice(args.end(), std::move(extraSshArgs));
@@ -261,10 +261,10 @@ Path SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
+            Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N"};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
-            addCommonSSHOpts(args);
+            addCommonSSHOpts(args, state->socketPath);
             auto env = createSSHEnv();
             nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
 
