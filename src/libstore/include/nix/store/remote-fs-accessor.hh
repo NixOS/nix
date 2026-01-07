@@ -15,13 +15,13 @@ class RemoteFSAccessor : public SourceAccessor
 
     bool requireValidPath;
 
-    Path cacheDir;
+    std::optional<std::filesystem::path> cacheDir;
 
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
     friend struct BinaryCacheStore;
 
-    Path makeCacheFile(std::string_view hashPart, const std::string & ext);
+    std::filesystem::path makeCacheFile(std::string_view hashPart, const std::string & ext);
 
     ref<SourceAccessor> addToCache(std::string_view hashPart, std::string && nar);
 
@@ -33,7 +33,7 @@ public:
     std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
 
     RemoteFSAccessor(
-        ref<Store> store, bool requireValidPath = true, const /* FIXME: use std::optional */ Path & cacheDir = "");
+        ref<Store> store, bool requireValidPath = true, std::optional<std::filesystem::path> cacheDir = {});
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
