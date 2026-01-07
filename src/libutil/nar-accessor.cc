@@ -332,6 +332,8 @@ static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPat
     case SourceAccessor::Type::tUnknown:
         assert(false); // cannot happen for NARs
     }
+
+    return ListNarResult<deep>{};
 }
 
 NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
