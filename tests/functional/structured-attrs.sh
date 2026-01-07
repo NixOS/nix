@@ -53,7 +53,7 @@ nix derivation show "$hacky" | jq --exit-status '.derivations."'"$(basename "$ha
 
 # Test warning for non-object exportReferencesGraph in structured attrs
 # shellcheck disable=SC2016
-expectStderr 0 nix-build --expr '
+expectStderr 0 nix-build --no-out-link --expr '
   with import ./config.nix;
   mkDerivation {
     name = "export-graph-non-object";
