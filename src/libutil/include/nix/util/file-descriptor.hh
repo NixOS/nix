@@ -257,6 +257,17 @@ namespace unix {
  */
 Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
 
+/**
+ * Try to change the mode of file named by \ref path relative to the parent directory denoted by \ref dirFd.
+ *
+ * @note When on linux without fchmodat2 support and without procfs mounted falls back to fchmodat without
+ * AT_SYMLINK_NOFOLLOW, since it's the best we can do without failing.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
+
 } // namespace unix
 #endif
 
