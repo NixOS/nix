@@ -4,6 +4,7 @@
 
 #include <map>
 #include <stack>
+#include <utility>
 
 #include <nlohmann/json.hpp>
 
@@ -333,7 +334,7 @@ static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPat
         assert(false); // cannot happen for NARs
     }
 
-    return ListNarResult<deep>{};
+    std::unreachable();
 }
 
 NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
