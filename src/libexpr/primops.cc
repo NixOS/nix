@@ -5453,4 +5453,38 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
     evalFile(derivationInternal, *vDerivation);
 }
 
+static void prim_derivationOf(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    NixStringContext context;
+    auto s = state.coerceToString(pos, *args[0], context,
+        "while evaluating the argument passed to builtins.derivationOf",
+        false, false).toOwned();
+
+    for (auto & c : context) {
+        if (auto * b = std::get_if<NixStringContextElem::Built>(&c.raw)) {
+            v.mkString(state.store->printStorePath(b->drvPath->getBaseStorePath()), state.mem);
+            return;
+        }
+        if (auto * d = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
+            v.mkString(state.store->printStorePath(d->drvPath), state.mem);
+            return;
+        }
+    }
+
+    // No deriver found
+    state.error<EvalError>("'%s' has no derivation in its context", s)
+        .atPos(pos)
+        .debugThrow();
+}
+
+static RegisterPrimOp primop_derivationOf({
+    .name = "derivationOf",
+    .args = {"s"},
+    .doc = R"(
+      Return the store path of the derivation that produces the given output path.
+      The string must have a derivation in its string context.
+    )",
+    .fun = prim_derivationOf,
+});
+
 } // namespace nix
