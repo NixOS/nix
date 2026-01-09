@@ -22,22 +22,16 @@ rm -rf "${rootRepo}" "${subRepo}" "$TEST_HOME"/.cache/nix
 export XDG_CONFIG_HOME=$TEST_HOME/.config
 git config --global protocol.file.allow always
 
-initGitRepo() {
-    git init "$1"
-    git -C "$1" config user.email "foobar@example.com"
-    git -C "$1" config user.name "Foobar"
-}
-
 addGitContent() {
     echo "lorem ipsum" > "$1"/content
     git -C "$1" add content
     git -C "$1" commit -m "Initial commit"
 }
 
-initGitRepo "$subRepo"
+createGitRepo "$subRepo"
 addGitContent "$subRepo"
 
-initGitRepo "$rootRepo"
+createGitRepo "$rootRepo"
 
 git -C "$rootRepo" submodule init
 git -C "$rootRepo" submodule add "$subRepo" sub
@@ -199,19 +193,19 @@ test_submodule_nested() {
   local repoB=$TEST_ROOT/submodule_nested/b
   local repoC=$TEST_ROOT/submodule_nested/c
 
-  rm -rf "$repoA" "$repoB" "$repoC" "$TEST_HOME"/.cache/nix
+  rm -rf "$TEST_HOME"/.cache/nix
 
-  initGitRepo "$repoC"
+  createGitRepo "$repoC"
   touch "$repoC"/inside-c
   git -C "$repoC" add inside-c
   addGitContent "$repoC"
 
-  initGitRepo "$repoB"
+  createGitRepo "$repoB"
   git -C "$repoB" submodule add "$repoC" c
   git -C "$repoB" add c
   addGitContent "$repoB"
 
-  initGitRepo "$repoA"
+  createGitRepo "$repoA"
   git -C "$repoA" submodule add "$repoB" b
   git -C "$repoA" add b
   addGitContent "$repoA"

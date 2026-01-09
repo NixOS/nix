@@ -7,13 +7,6 @@ source common.sh
 
 repo="$TEST_ROOT/scratch"
 
-initRepo () {
-    git init "$repo" --object-format="$hashAlgo"
-
-    git -C "$repo" config user.email "you@example.com"
-    git -C "$repo" config user.name "Your Name"
-}
-
 # Compare Nix's and git's implementation of git hashing
 try () {
     local expected="$1"
