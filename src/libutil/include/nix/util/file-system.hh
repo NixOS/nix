@@ -165,6 +165,13 @@ std::filesystem::path readLink(const std::filesystem::path & path);
 Descriptor openDirectory(const std::filesystem::path & path);
 
 /**
+ * Open a `Descriptor` with read-only access to the given file.
+ *
+ * @note For directories use @ref openDirectory.
+ */
+Descriptor openFileReadonly(const std::filesystem::path & path);
+
+/**
  * Read the contents of a file into a string.
  */
 std::string readFile(const Path & path);

@@ -27,6 +27,11 @@ Descriptor openDirectory(const std::filesystem::path & path)
     return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
 }
 
+Descriptor openFileReadonly(const std::filesystem::path & path)
+{
+    return open(path.c_str(), O_RDONLY | O_CLOEXEC);
+}
+
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
