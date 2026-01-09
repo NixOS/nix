@@ -27,6 +27,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef _WIN32
+#  include <errhandlingapi.h>
+#endif
 
 namespace nix {
 
@@ -288,25 +291,6 @@ public:
     }
 };
 
-#ifdef _WIN32
-namespace windows {
-class WinError;
-}
-#endif
-
-/**
- * Convenience alias for when we use a `errno`-based error handling
- * function on Unix, and `GetLastError()`-based error handling on on
- * Windows.
- */
-using NativeSysError =
-#ifdef _WIN32
-    windows::WinError
-#else
-    SysError
-#endif
-    ;
-
 /**
  * Throw an exception for the purpose of checking that exception
  * handling works; see 'initLibUtil()'.
@@ -325,5 +309,68 @@ void panic(std::string_view msg);
  * @note: This assumes that the logger is operational
  */
 [[gnu::noinline, gnu::cold, noreturn]] void unreachable(std::source_location loc = std::source_location::current());
+
+#ifdef _WIN32
+
+namespace windows {
+
+/**
+ * Windows Error type.
+ *
+ * Unless you need to catch a specific error number, don't catch this in
+ * portable code. Catch `SystemError` instead.
+ */
+class WinError : public SystemError
+{
+public:
+    DWORD lastError;
+
+    /**
+     * Construct using the explicitly-provided error number.
+     * `FormatMessageA` will be used to try to add additional
+     * information to the message.
+     */
+    template<typename... Args>
+    WinError(DWORD lastError, const Args &... args)
+        : SystemError("")
+        , lastError(lastError)
+    {
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), renderError(lastError));
+    }
+
+    /**
+     * Construct using `GetLastError()` and the ambient "last error".
+     *
+     * Be sure to not perform another last-error-modifying operation
+     * before calling this constructor!
+     */
+    template<typename... Args>
+    WinError(const Args &... args)
+        : WinError(GetLastError(), args...)
+    {
+    }
+
+private:
+
+    std::string renderError(DWORD lastError);
+};
+
+} // namespace windows
+
+#endif
+
+/**
+ * Convenience alias for when we use a `errno`-based error handling
+ * function on Unix, and `GetLastError()`-based error handling on on
+ * Windows.
+ */
+using NativeSysError =
+#ifdef _WIN32
+    windows::WinError
+#else
+    SysError
+#endif
+    ;
 
 } // namespace nix

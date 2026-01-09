@@ -2,7 +2,6 @@
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
-#include "nix/util/windows-error.hh"
 #include "nix/util/file-path.hh"
 
 #include <fileapi.h>

@@ -1,5 +1,4 @@
 #include "nix/util/file-system.hh"
-#include "nix/util/windows-error.hh"
 #include "nix/util/logging.hh"
 
 namespace nix {

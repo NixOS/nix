@@ -10,7 +10,6 @@
 #  include <poll.h>
 #else
 #  include <ioapiset.h>
-#  include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {
