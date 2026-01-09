@@ -36,10 +36,10 @@ PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
 {
-    auto dumpContents = [&](const CanonPath & path) {
+    auto dumpContents = [&sink](SourceAccessor & accessor, const CanonPath & path) {
         sink << "contents";
         std::optional<uint64_t> size;
-        readFile(path, sink, [&](uint64_t _size) {
+        accessor.readFile(path, sink, [&](uint64_t _size) {
             size = _size;
             sink << _size;
         });
@@ -49,10 +49,10 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
 
     sink << narVersionMagic1;
 
-    [&, &this_(*this)](this const auto & dump, const CanonPath & path) -> void {
+    [&sink, &filter, &dumpContents](this const auto & dump, SourceAccessor & accessor, const CanonPath & path) -> void {
         checkInterrupt();
 
-        auto st = this_.lstat(path);
+        auto st = accessor.lstat(path);
 
         sink << "(";
 
@@ -60,7 +60,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             sink << "type" << "regular";
             if (st.isExecutable)
                 sink << "executable" << "";
-            dumpContents(path);
+            dumpContents(accessor, path);
         }
 
         else if (st.type == tDirectory) {
@@ -69,7 +69,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             /* If we're on a case-insensitive system like macOS, undo
                the case hack applied by restorePath(). */
             StringMap unhacked;
-            for (auto & i : this_.readDirectory(path))
+            for (auto & i : accessor.readDirectory(path))
                 if (archiveSettings.useCaseHack) {
                     std::string name(i.first);
                     size_t pos = i.first.find(caseHackSuffix);
@@ -83,22 +83,24 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
                 } else
                     unhacked.emplace(i.first, i.first);
 
-            for (auto & i : unhacked)
-                if (filter((path / i.first).abs())) {
-                    sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path / i.second);
-                    sink << ")";
-                }
+            accessor.readDirectory(path, [&](SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath) {
+                for (auto & i : unhacked)
+                    if (filter((path / i.first).abs())) {
+                        sink << "entry" << "(" << "name" << i.first << "node";
+                        dump(subdirAccessor, subdirRelPath / i.second);
+                        sink << ")";
+                    }
+            });
         }
 
         else if (st.type == tSymlink)
-            sink << "type" << "symlink" << "target" << this_.readLink(path);
+            sink << "type" << "symlink" << "target" << accessor.readLink(path);
 
         else
             throw Error("file '%s' has an unsupported type", path);
 
         sink << ")";
-    }(path);
+    }(*this, path);
 }
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)

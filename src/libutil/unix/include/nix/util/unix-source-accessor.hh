@@ -123,6 +123,8 @@ class UnixDirectorySourceAccessor : public UnixSourceAccessorBase
 
     std::function<void(AutoCloseFD, CanonPath)> makeDirFdCallback();
 
+    AutoCloseFD openSubdirectory(const CanonPath & path);
+
 public:
     UnixDirectorySourceAccessor(
         AutoCloseFD fd_, CanonPath rootPath_, bool trackLastModified, unsigned dirFdCacheSize = 128)
@@ -151,6 +153,10 @@ public:
     void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
+
+    void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override;
 
     std::string readLink(const CanonPath & path) override;
 };

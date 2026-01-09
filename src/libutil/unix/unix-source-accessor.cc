@@ -147,7 +147,7 @@ try {
     throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
-SourceAccessor::DirEntries UnixDirectorySourceAccessor::readDirectory(const CanonPath & path)
+AutoCloseFD UnixDirectorySourceAccessor::openSubdirectory(const CanonPath & path)
 try {
     AutoCloseFD dirFdOwning;
 
@@ -157,7 +157,8 @@ try {
         if (!dirFdOwning)
             throw SysError("opening directory '%s'", showPath(path));
     } else {
-        dirFdOwning = openFileEnsureBeneathNoSymlinks(fd.get(), path, O_DIRECTORY | O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        dirFdOwning = openFileEnsureBeneathNoSymlinks(
+            fd.get(), path, O_DIRECTORY | O_RDONLY | O_NOFOLLOW | O_CLOEXEC, 0, makeDirFdCallback());
         if (!dirFdOwning) {
             if (errno == ENOTDIR)
                 throw NotADirectory("'%s' is not a directory", showPath(path));
@@ -165,6 +166,14 @@ try {
         }
     }
 
+    return dirFdOwning;
+} catch (SymlinkNotAllowed & e) {
+    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+SourceAccessor::DirEntries UnixDirectorySourceAccessor::readDirectory(const CanonPath & path)
+try {
+    AutoCloseFD dirFdOwning = openSubdirectory(path);
     AutoCloseDir dir(::fdopendir(dirFdOwning.get()));
     if (!dir)
         throw SysError("opening directory '%s'", showPath(path));
@@ -215,6 +224,15 @@ try {
     return entries;
 } catch (SymlinkNotAllowed & e) {
     throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+void UnixDirectorySourceAccessor::readDirectory(
+    const CanonPath & dirPath,
+    std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback)
+{
+    auto fd = openSubdirectory(dirPath);
+    UnixDirectorySourceAccessor accessor{std::move(fd), rootPath / dirPath, trackLastModified, /*dirFdCacheSize=*/0};
+    callback(accessor, CanonPath::root);
 }
 
 std::string UnixDirectorySourceAccessor::readLink(const CanonPath & path)
