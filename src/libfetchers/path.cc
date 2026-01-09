@@ -165,7 +165,6 @@ struct PathInputScheme : InputScheme
 
         // To prevent `fetchToStore()` copying the path again to Nix
         // store, pre-create an entry in the fetcher cache.
-        auto info = store.queryPathInfo(*storePath);
         accessor->fingerprint =
             fmt("path:%s", store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
         settings.getCache()->upsert(
