@@ -1,6 +1,5 @@
 #ifdef _WIN32
 #  include <ioapiset.h>
-#  include "nix/util/windows-error.hh"
 
 #  include "nix/util/logging.hh"
 #  include "nix/util/util.hh"

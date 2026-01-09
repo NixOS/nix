@@ -13,7 +13,6 @@
 
 #ifdef _WIN32
 #  include <fileapi.h>
-#  include "nix/util/windows-error.hh"
 #else
 #  include <poll.h>
 #endif

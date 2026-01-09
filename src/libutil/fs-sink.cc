@@ -7,7 +7,6 @@
 #ifdef _WIN32
 #  include <fileapi.h>
 #  include "nix/util/file-path.hh"
-#  include "nix/util/windows-error.hh"
 #endif
 
 #include "util-config-private.hh"

@@ -10,7 +10,6 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/util.hh"
-#include "nix/util/windows-error.hh"
 
 #include <cerrno>
 #include <cstdlib>
