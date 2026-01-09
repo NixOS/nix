@@ -85,11 +85,11 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(makeAbsPath(path).string());
 }
 
+using Cache = boost::concurrent_flat_map<Path, std::optional<PosixStat>>;
+static Cache cache;
+
 std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    using Cache = boost::concurrent_flat_map<Path, std::optional<PosixStat>>;
-    static Cache cache;
-
     // Note: we convert std::filesystem::path to Path because the
     // former is not hashable on libc++.
     Path absPath = makeAbsPath(path).string();
@@ -104,6 +104,11 @@ std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path
     cache.emplace(std::move(absPath), st);
 
     return st;
+}
+
+void PosixSourceAccessor::invalidateCache(const CanonPath & path)
+{
+    cache.erase(makeAbsPath(path).string());
 }
 
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
