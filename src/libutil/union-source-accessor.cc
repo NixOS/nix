@@ -35,14 +35,18 @@ struct UnionSourceAccessor : SourceAccessor
     DirEntries readDirectory(const CanonPath & path) override
     {
         DirEntries result;
+        bool exists = false;
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
             if (!st)
                 continue;
+            exists = true;
             for (auto & entry : accessor->readDirectory(path))
                 // Don't override entries from previous accessors.
                 result.insert(entry);
         }
+        if (!exists)
+            throw FileNotFound("path '%s' does not exist", showPath(path));
         return result;
     }
 
