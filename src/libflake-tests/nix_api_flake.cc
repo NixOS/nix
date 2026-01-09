@@ -377,6 +377,7 @@ TEST_F(nix_api_store_test, nix_api_load_flake_with_flags)
     assert_ctx_ok();
     ASSERT_EQ("Claire", helloStr);
 
+    nix_locked_flake_free(lockedFlake);
     nix_flake_reference_parse_flags_free(parseFlags);
     nix_flake_lock_flags_free(lockFlags);
     nix_flake_reference_free(flakeReference);
