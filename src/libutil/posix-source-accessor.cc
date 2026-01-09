@@ -3,7 +3,6 @@
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/memory-source-accessor.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/signals.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
@@ -499,15 +498,6 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool 
 PosixSourceAccessor::PosixSourceAccessor()
     : PosixSourceAccessor(std::filesystem::path{})
 {
-}
-
-SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path, bool trackLastModified)
-{
-    std::filesystem::path path2 = absPath(path);
-    return {
-        make_ref<PosixSourceAccessor>(path2.root_path(), trackLastModified),
-        CanonPath{path2.relative_path().string()},
-    };
 }
 
 std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
