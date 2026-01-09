@@ -1703,10 +1703,18 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 [&](const DerivationOutput::CAFixed & dof) {
                     auto & wanted = dof.ca.hash;
 
-                    // Replace the output by a fresh copy of itself to make sure
-                    // that there's no stale file descriptor pointing to it
+                    /* Replace the output by a fresh copy of itself to make sure
+                       that there's no stale file descriptor pointing to it.
+                       IMPORTANT: Copying and deletion must be done in a race-free manner, thus
+                       we are using the source accessor and sink here, since they are implemented
+                       the most robustly. DO NOT USE copyFile here. */
+
                     std::filesystem::path tmpOutput = actualPath.native() + ".tmp";
-                    copyFile(actualPath, tmpOutput, true);
+                    auto accessor = makeFSSourceAccessor(actualPath);
+                    auto copySink = RestoreSink(/*startFsync=*/settings.fsyncStorePaths);
+                    copySink.dstPath = tmpOutput;
+                    copyRecursive(*accessor, /*sourcePath=*/CanonPath::root, copySink, /*destPath=*/CanonPath::root);
+                    deletePath(actualPath);
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
