@@ -23,10 +23,22 @@ Descriptor openDirectory(const std::filesystem::path & path)
         path.c_str(),
         GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-        NULL,
+        /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS,
-        NULL);
+        /*hTemplateFile=*/nullptr);
+}
+
+Descriptor openFileReadonly(const std::filesystem::path & path)
+{
+    return CreateFileW(
+        path.c_str(),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_DELETE,
+        /*lpSecurityAttributes=*/nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        /*hTemplateFile=*/nullptr);
 }
 
 std::filesystem::path defaultTempDir()
