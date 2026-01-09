@@ -4,6 +4,7 @@
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
 
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -85,7 +86,19 @@ ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
     auto conn = make_ref<Connection>();
 
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = nix::connect(config->path);
+    try {
+        conn->fd = nix::connect(config->path);
+    } catch (SysError & e) {
+        if (e.errNo == ECONNREFUSED || e.errNo == ENOENT)
+            throw Error(
+                "cannot connect to daemon at '%1%': %2%.\n"
+                "The daemon socket exists but the daemon is not running.\n"
+                "You can start it with: nix daemon\n"
+                "Or use '--store local' to bypass the daemon.",
+                config->path,
+                e.what());
+        throw;
+    }
 
     conn->from.fd = conn->fd.get();
     conn->to.fd = conn->fd.get();
