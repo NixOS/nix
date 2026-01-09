@@ -250,12 +250,18 @@ namespace unix {
  *
  * @param flags O_* flags
  * @param mode Mode for O_{CREAT,TMPFILE}
+ * @param dirFdCallback Callback invoked that gets the ownership of an intermediate directory fd.
  *
  * @pre path.isRoot() is false
  *
  * @throws SymlinkNotAllowed if any path components
  */
-Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+Descriptor openFileEnsureBeneathNoSymlinks(
+    Descriptor dirFd,
+    const CanonPath & path,
+    int flags,
+    mode_t mode = 0,
+    std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback = nullptr);
 
 /**
  * Try to change the mode of file named by \ref path relative to the parent directory denoted by \ref dirFd.
