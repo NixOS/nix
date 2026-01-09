@@ -38,7 +38,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         if (!namePart)
             namePart = baseNameOf(path);
 
-        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
+        auto sourcePath = makeFSSourceAccessor(makeParentCanonical(path));
 
         auto storePath = dryRun ? store->computeStorePath(*namePart, sourcePath, caMethod, hashAlgo, {}).first
                                 : store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
