@@ -1077,8 +1077,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        auto accessor = getFSAccessor(false);
-                        CanonPath path{info.path.to_string()};
+                        SourcePath sourcePath = requireStoreObjectAccessor(info.path, /*requireValidPath=*/false);
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
                         switch (fim) {
@@ -1088,12 +1087,12 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                                 specified.hash.algo,
                                 std::string{info.path.hashPart()},
                             };
-                            dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
+                            dumpPath(sourcePath, caSink, (FileSerialisationMethod) fim);
                             h = caSink.finish().hash;
                             break;
                         }
                         case FileIngestionMethod::Git:
-                            h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
+                            h = git::dumpHash(specified.hash.algo, sourcePath).hash;
                             break;
                         }
                         ContentAddress{
