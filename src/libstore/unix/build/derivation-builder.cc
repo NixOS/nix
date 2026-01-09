@@ -1638,12 +1638,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     HashModuloSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
-                        {getFSSourceAccessor(), CanonPath(actualPath.native())}, caSink, (FileSerialisationMethod) fim);
+                        {makeFSSourceAccessor(actualPath), CanonPath::root}, caSink, (FileSerialisationMethod) fim);
                     return caSink.finish().hash;
                 }
                 case FileIngestionMethod::Git: {
-                    return git::dumpHash(outputHash.hashAlgo, {getFSSourceAccessor(), CanonPath(actualPath.native())})
-                        .hash;
+                    return git::dumpHash(outputHash.hashAlgo, {makeFSSourceAccessor(actualPath), CanonPath::root}).hash;
                 }
                 }
                 assert(false);
@@ -1665,7 +1664,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
             {
                 HashResult narHashAndSize = hashPath(
-                    {getFSSourceAccessor(), CanonPath(actualPath.native())},
+                    {makeFSSourceAccessor(actualPath), CanonPath::root},
                     FileSerialisationMethod::NixArchive,
                     HashAlgorithm::SHA256);
                 newInfo0.narHash = narHashAndSize.hash;
@@ -1689,7 +1688,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                             std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                     rewriteOutput(outputRewrites);
                     HashResult narHashAndSize = hashPath(
-                        {getFSSourceAccessor(), CanonPath(actualPath.native())},
+                        {makeFSSourceAccessor(actualPath), CanonPath::root},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
                     ValidPathInfo newInfo0{requiredFinalPath, {store, narHashAndSize.hash}};
