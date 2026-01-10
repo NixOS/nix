@@ -1,6 +1,7 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/error.hh"
 
 #include <map>
 #include <stack>
@@ -263,17 +264,11 @@ ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes
     return make_ref<NarAccessor>(source, getNarBytes);
 }
 
-GetNarBytes seekableGetNarBytes(const Path & path)
+GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
 {
-    AutoCloseFD fd = toDescriptor(open(
-        path.c_str(),
-        O_RDONLY
-#ifdef O_CLOEXEC
-            | O_CLOEXEC
-#endif
-        ));
+    AutoCloseFD fd = openFileReadonly(path);
     if (!fd)
-        throw SysError("opening NAR cache file '%s'", path);
+        throw NativeSysError("opening NAR cache file '%s'", path);
 
     return [inner = seekableGetNarBytes(fd.get()), fd = make_ref<AutoCloseFD>(std::move(fd))](
                uint64_t offset, uint64_t length) { return inner(offset, length); };

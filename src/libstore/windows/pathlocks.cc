@@ -7,7 +7,6 @@
 #  include <errhandlingapi.h>
 #  include <fileapi.h>
 #  include <windows.h>
-#  include "nix/util/windows-error.hh"
 
 namespace nix {
 

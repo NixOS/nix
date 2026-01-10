@@ -4,6 +4,7 @@
 #include "nix/util/memory-source-accessor.hh"
 
 #include <functional>
+#include <filesystem>
 
 #include <nlohmann/json_fwd.hpp>
 
@@ -30,7 +31,7 @@ using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
 /**
  * The canonical GetNarBytes function for a seekable Source.
  */
-GetNarBytes seekableGetNarBytes(const Path & path);
+GetNarBytes seekableGetNarBytes(const std::filesystem::path & path);
 
 GetNarBytes seekableGetNarBytes(Descriptor fd);
 

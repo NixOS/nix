@@ -21,7 +21,9 @@ RemoteFSAccessor::RemoteFSAccessor(
 std::filesystem::path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
 {
     assert(cacheDir);
-    return (*cacheDir / hashPart) + "." + ext;
+    auto res = (*cacheDir / hashPart);
+    res.concat(concatStrings(".", ext));
+    return res;
 }
 
 ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::string && nar)
