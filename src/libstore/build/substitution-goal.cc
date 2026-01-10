@@ -29,20 +29,21 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 
 Goal::Done PathSubstitutionGoal::doneSuccess(BuildResult::Success::Status status)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-    };
-    return amDone(ecSuccess);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+        });
 }
 
 Goal::Done PathSubstitutionGoal::doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg)
 {
     debug(errorMsg);
-    buildResult.inner = BuildResult::Failure{
-        .status = status,
-        .errorMsg = std::move(errorMsg),
-    };
-    return amDone(result);
+    return Goal::doneFailure(
+        result,
+        BuildResult::Failure{
+            .status = status,
+            .errorMsg = std::move(errorMsg),
+        });
 }
 
 Goal::Co PathSubstitutionGoal::init()
