@@ -268,7 +268,7 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
 {
     AutoCloseFD fd = openFileReadonly(path);
     if (!fd)
-        throw NativeSysError("opening NAR cache file '%s'", path);
+        throw NativeSysError("opening NAR cache file %s", path);
 
     return [inner = seekableGetNarBytes(fd.get()), fd = make_ref<AutoCloseFD>(std::move(fd))](
                uint64_t offset, uint64_t length) { return inner(offset, length); };
