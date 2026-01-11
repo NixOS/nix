@@ -30,6 +30,12 @@ std::optional<OsString> getEnvOs(const OsString & key);
 std::optional<std::string> getEnvNonEmpty(const std::string & key);
 
 /**
+ * Like `getEnvNonEmpty`, but using `OsString` to avoid coercions.
+ * Returns nullopt if the env variable is not set or set to "".
+ */
+std::optional<OsString> getEnvOsNonEmpty(const OsString & key);
+
+/**
  * Get the entire environment.
  */
 StringMap getEnv();

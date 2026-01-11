@@ -59,6 +59,7 @@ sources += files(
   'processes.cc',
   'signals.cc',
   'users.cc',
+  'xdg-dirs.cc',
 )
 
 subdir('include/nix/util')
