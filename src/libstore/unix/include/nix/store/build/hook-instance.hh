@@ -5,6 +5,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/processes.hh"
 
+#include <functional>
+
 namespace nix {
 
 /**
@@ -49,6 +51,12 @@ struct HookInstance
     FdSink sink;
 
     std::map<ActivityId, Activity> activities;
+
+    /**
+     * Callback to run when the hook process is killed in the destructor.
+     * Used to call `Worker::childTerminated`.
+     */
+    std::function<void()> onKillChild;
 
     HookInstance();
 

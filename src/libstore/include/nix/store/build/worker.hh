@@ -295,8 +295,20 @@ public:
      * false if there is no sense in waking up goals that are sleeping
      * because they can't run yet (e.g., there is no free build slot,
      * or the hook would still say `postpone`).
+     *
+     * This overload requires `goal` to point to a fully constructed,
+     * valid goal object, as it calls `goal->jobCategory()`.
      */
     void childTerminated(Goal * goal, bool wakeSleepers = true);
+
+    /**
+     * Unregisters a running child process, like the other overload.
+     *
+     * This overload only uses `goal` as a pointer for comparison with
+     * weak goal references, so it is safe to call from destructors
+     * where the goal object may be partially destroyed.
+     */
+    void childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers = true);
 
     /**
      * Put `goal` to sleep until a build slot becomes available (which

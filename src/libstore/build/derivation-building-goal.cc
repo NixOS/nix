@@ -417,6 +417,10 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 #else
     std::unique_ptr<HookInstance> hook = std::move(worker.hook);
 
+    /* Set up callback so childTerminated is called if the hook is
+       destroyed (e.g., during failure cascades). */
+    hook->onKillChild = [this]() { worker.childTerminated(this, JobCategory::Build); };
+
     try {
         hook->machineName = readLine(hook->fromHook.readSide.get());
     } catch (Error & e) {
@@ -688,7 +692,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 
                 void childTerminated() override
                 {
-                    goal.worker.childTerminated(&goal);
+                    goal.worker.childTerminated(&goal, JobCategory::Build);
                 }
 
                 void openLogFile() override
@@ -790,8 +794,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             if (output->fd == builder->builderOut.get()) {
                 logSize += output->data.size();
                 if (settings.maxLogSize && logSize > settings.maxLogSize) {
-                    if (builder->killChild())
-                        worker.childTerminated(this);
+                    builder->killChild();
                     co_return doneFailureLogTooLong(*buildLog);
                 }
                 (*buildLog)(output->data);
@@ -802,8 +805,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             buildLog->flush();
             break;
         } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-            if (builder->killChild())
-                worker.childTerminated(this);
+            builder->killChild();
             co_return doneFailure(std::move(*timeout));
         }
     }
