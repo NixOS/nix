@@ -102,9 +102,9 @@ Goal::Co DerivationTrampolineGoal::init()
             ecFailed,
             BuildResult::Failure{
                 .status = BuildResult::Failure::DependencyFailed,
-                .errorMsg = fmt("cannot build missing derivation '%s'", drvReq->to_string(worker.store)),
+                .errorMsg = fmt("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)),
             },
-            Error("cannot build missing derivation '%s'", drvReq->to_string(worker.store)));
+            Error("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)));
     }
 
     StorePath drvPath = resolveDerivedPath(worker.store, *drvReq);

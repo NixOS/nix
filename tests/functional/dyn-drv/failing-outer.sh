@@ -41,5 +41,5 @@ out=$(nix build --impure --no-link --expr '
   builtins.outputOf failingProducer.outPath "out"
 ' 2>&1) || true
 
-# The error message must NOT be empty - it should mention the missing derivation
-echo "$out" | grepQuiet "cannot build missing derivation"
+# The error message must NOT be empty - it should mention the failed derivation
+echo "$out" | grepQuiet "failed to obtain derivation of"
