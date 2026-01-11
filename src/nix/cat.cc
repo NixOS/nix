@@ -52,7 +52,7 @@ struct CmdCatStore : StoreCommand, MixCat
 
 struct CmdCatNar : StoreCommand, MixCat
 {
-    Path narPath;
+    std::filesystem::path narPath;
 
     std::string path;
 
@@ -76,9 +76,9 @@ struct CmdCatNar : StoreCommand, MixCat
 
     void run(ref<Store> store) override
     {
-        AutoCloseFD fd = toDescriptor(open(narPath.c_str(), O_RDONLY));
+        AutoCloseFD fd = openFileReadonly(narPath);
         if (!fd)
-            throw SysError("opening NAR file '%s'", narPath);
+            throw NativeSysError("opening NAR file %s", narPath);
         auto source = FdSource{fd.get()};
 
         struct CatRegularFileSink : NullFileSystemObjectSink
