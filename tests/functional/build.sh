@@ -158,14 +158,14 @@ printf "" | nix build --no-link --stdin --json | jq --exit-status '. == []'
 printf "%s\n" "$drv^*" | nix build --no-link --stdin --json | jq --exit-status '.[0]|has("drvPath")'
 
 # --keep-going and FOD
-out="$(nix build -f fod-failing.nix -L 2>&1)" && status=0 || status=$?
+out="$(nix build -f fod-failing.nix -j1 -L 2>&1)" && status=0 || status=$?
 test "$status" = 1
-# one "hash mismatch" error, one "build of ... failed"
-test "$(<<<"$out" grep -cE '^error:')" = 2
+# Only the hash mismatch error for the first failing goal (x1).
+# The other goals (x2, x3, x4) are cancelled and not reported as failures.
+test "$(<<<"$out" grep -cE '^error:')" = 1
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x3\\.drv'"
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
-<<<"$out" grepQuiet -E "error: build of '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out', '.*-x[1-4]\\.drv\\^out' failed"
 
 out="$(nix build -f fod-failing.nix -L x1 x2 x3 --keep-going 2>&1)" && status=0 || status=$?
 test "$status" = 1
