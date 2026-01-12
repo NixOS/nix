@@ -3,6 +3,7 @@
 #include "nix/util/error.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/position.hh"
 
@@ -104,14 +105,15 @@ static std::string indent(std::string_view indentFirst, std::string_view indentR
     bool first = true;
 
     while (!s.empty()) {
-        auto end = s.find('\n');
         if (!first)
             res += "\n";
-        res += chomp(std::string(first ? indentFirst : indentRest) + std::string(s.substr(0, end)));
+        auto split = splitOnce(s, '\n');
+        auto line = split ? split->first : s;
+        res += rtrim(std::string(first ? indentFirst : indentRest) + std::string(line));
         first = false;
-        if (end == s.npos)
+        if (!split)
             break;
-        s = s.substr(end + 1);
+        s = split->second;
     }
 
     return res;
@@ -411,7 +413,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         oss << "Did you mean " << suggestions.trim() << "?" << std::endl;
     }
 
-    out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
+    out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), rtrim(oss.str()));
 
     return out;
 }

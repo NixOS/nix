@@ -63,7 +63,7 @@ void CanonPath::pop()
 bool CanonPath::isWithin(const CanonPath & parent) const
 {
     return !(
-        path.size() < parent.path.size() || path.substr(0, parent.path.size()) != parent.path
+        path.size() < parent.path.size() || !path.starts_with(parent.path)
         || (parent.path.size() > 1 && path.size() > parent.path.size() && path[parent.path.size()] != '/'));
 }
 

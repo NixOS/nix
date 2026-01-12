@@ -8,6 +8,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/split.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
@@ -409,7 +410,7 @@ bool isAllowedURI(std::string_view uri, const Strings & allowedUris)
     for (auto & prefix : allowedUris) {
         if (uri == prefix
             // Allow access to subdirectories of the prefix.
-            || (uri.size() > prefix.size() && prefix.size() > 0 && hasPrefix(uri, prefix)
+            || (uri.size() > prefix.size() && !prefix.empty() && uri.starts_with(prefix)
                 && (
                     // Allow access to subdirectories of the prefix.
                     prefix[prefix.size() - 1] == '/'
@@ -439,7 +440,7 @@ void EvalState::checkURI(const std::string & uri)
         return;
     }
 
-    if (hasPrefix(uri, "file://")) {
+    if (uri.starts_with("file://")) {
         if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri.substr(7)));
         return;
@@ -458,7 +459,7 @@ Value * EvalState::addConstant(const std::string & name, Value & v, Constant inf
 
 void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 {
-    auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
+    auto name2 = name.starts_with("__") ? name.substr(2) : name;
 
     constantInfos.push_back({name2, info});
 
@@ -531,7 +532,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     }
 
     auto envName = symbols.create(primOp.name);
-    if (hasPrefix(primOp.name, "__"))
+    if (primOp.name.starts_with("__"))
         primOp.name = primOp.name.substr(2);
 
     Value * v = allocValue();
@@ -683,7 +684,7 @@ void printEnvBindings(const SymbolTable & st, const StaticEnv & se, const Env & 
         // for the top level, don't print the double underscore ones;
         // they are in builtins.
         for (auto & i : se.vars)
-            if (!hasPrefix(st[i.first], "__"))
+            if (!std::string_view{st[i.first]}.starts_with("__"))
                 std::cout << st[i.first] << " ";
         std::cout << ANSI_NORMAL;
         std::cout << std::endl;
@@ -3181,7 +3182,7 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
             accessor->checkAccess(res.path);
     }
 
-    if (hasPrefix(path, "nix/"))
+    if (path.starts_with("nix/"))
         return {corepkgsFS, CanonPath(path.substr(3))};
 
     error<ThrownError>(
@@ -3218,9 +3219,9 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         }
     }
 
-    if (auto colPos = value.find(':'); colPos != value.npos) {
-        auto scheme = value.substr(0, colPos);
-        auto rest = value.substr(colPos + 1);
+    if (auto split = splitOnce(value, ':')) {
+        std::string scheme{split->first};
+        auto rest = split->second;
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
             auto res = (*hook)(*this, rest);
             if (res)

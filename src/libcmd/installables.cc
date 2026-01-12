@@ -21,6 +21,7 @@
 #include "nix/util/url.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/store/build-result.hh"
+#include "nix/util/split.hh"
 
 #include <regex>
 #include <queue>
@@ -40,7 +41,7 @@ void completeFlakeInputAttrPath(
     for (auto & flakeRef : flakeRefs) {
         auto flake = flake::getFlake(*evalState, flakeRef, fetchers::UseRegistries::All);
         for (auto & input : flake.inputs)
-            if (hasPrefix(input.first, prefix))
+            if (input.first.starts_with(prefix))
                 completions.add(input.first);
     }
 }
@@ -282,7 +283,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             auto sep = prefix_.rfind('.');
             std::string searchWord;
             if (sep != std::string::npos) {
-                searchWord = prefix_.substr(sep + 1, std::string::npos);
+                searchWord = prefix_.substr(sep + 1);
                 prefix_ = prefix_.substr(0, sep);
             } else {
                 searchWord = prefix_;
@@ -298,7 +299,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
             if (v2.type() == nAttrs) {
                 for (auto & i : *v2.attrs()) {
                     std::string_view name = state->symbols[i.name];
-                    if (name.find(searchWord) == 0) {
+                    if (name.starts_with(searchWord)) {
                         if (prefix_ == "")
                             completions.add(std::string(name));
                         else
@@ -331,19 +332,16 @@ void completeFlakeRefWithFragment(
     /* Look for flake output attributes that match the
        prefix. */
     try {
-        auto hash = prefix.find('#');
-        if (hash == std::string::npos) {
+        if (auto split = splitOnce(prefix, '#'); !split) {
             completeFlakeRef(completions, evalState->store, prefix);
         } else {
             completions.setType(AddCompletions::Type::Attrs);
 
-            auto fragment = prefix.substr(hash + 1);
+            auto fragment = split->second;
             std::string prefixRoot = "";
-            if (fragment.starts_with(".")) {
-                fragment = fragment.substr(1);
+            if (stripPrefix(fragment, "."))
                 prefixRoot = ".";
-            }
-            auto flakeRefS = std::string(prefix.substr(0, hash));
+            auto flakeRefS = std::string(split->first);
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
             auto flakeRef =
@@ -368,7 +366,7 @@ void completeFlakeRefWithFragment(
                 auto attrPath = AttrPath::parse(*evalState, attrPathS);
 
                 std::string lastAttr;
-                if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
+                if (!attrPath.empty() && !attrPathS.ends_with(".")) {
                     lastAttr = evalState->symbols[attrPath.back()];
                     attrPath.pop_back();
                 }
@@ -378,7 +376,7 @@ void completeFlakeRefWithFragment(
                     continue;
 
                 for (auto & attr2 : (*attr)->getAttrs()) {
-                    if (hasPrefix(evalState->symbols[attr2], lastAttr)) {
+                    if (std::string_view{evalState->symbols[attr2]}.starts_with(lastAttr)) {
                         auto attrPath2 = (*attr)->getAttrPath(attr2);
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
@@ -418,12 +416,12 @@ void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::strin
     for (auto & registry : fetchers::getRegistries(fetchSettings, *store)) {
         for (auto & entry : registry->entries) {
             auto from = entry.from.to_string();
-            if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
+            if (!prefix.starts_with("flake:") && from.starts_with("flake:")) {
                 std::string from2(from, 6);
-                if (hasPrefix(from2, prefix))
+                if (from2.starts_with(prefix))
                     completions.add(from2);
             } else {
-                if (hasPrefix(from, prefix))
+                if (from.starts_with(prefix))
                     completions.add(from);
             }
         }

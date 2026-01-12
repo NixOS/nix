@@ -195,7 +195,7 @@ struct ExprString : Expr
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
-        if (sv.size() == 0) {
+        if (sv.empty()) {
             v.mkStringNoCopy(""_sds);
             return;
         }

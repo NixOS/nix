@@ -164,7 +164,7 @@ static DownloadTarballResult downloadTarball_(
 
     /* Note: if the download is cached, `importTarball()` will receive
        no data, which causes it to import an empty tarball. */
-    auto archive = !url.path.empty() && hasSuffix(toLower(url.path.back()), ".zip") ? ({
+    auto archive = !url.path.empty() && toLower(url.path.back()).ends_with(".zip") ? ({
         /* In streaming mode, libarchive doesn't handle
            symlinks in zip files correctly (#10649). So write
            the entire file to disk so libarchive can access it
@@ -178,7 +178,7 @@ static DownloadTarballResult downloadTarball_(
         }
         TarArchive{path};
     })
-                                                                                    : TarArchive{*source};
+                                                                                   : TarArchive{*source};
     auto tarballCache = settings.getTarballCache();
     auto parseSink = tarballCache->getFileSystemObjectSink();
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
@@ -237,9 +237,8 @@ struct CurlInputScheme : InputScheme
         if (url.path.empty())
             return false;
         const auto & path = url.path.back();
-        return hasSuffix(path, ".zip") || hasSuffix(path, ".tar") || hasSuffix(path, ".tgz")
-               || hasSuffix(path, ".tar.gz") || hasSuffix(path, ".tar.xz") || hasSuffix(path, ".tar.bz2")
-               || hasSuffix(path, ".tar.zst");
+        return path.ends_with(".zip") || path.ends_with(".tar") || path.ends_with(".tgz") || path.ends_with(".tar.gz")
+               || path.ends_with(".tar.xz") || path.ends_with(".tar.bz2") || path.ends_with(".tar.zst");
     }
 
     virtual bool isValidURL(const ParsedURL & url, bool requireTree) const = 0;

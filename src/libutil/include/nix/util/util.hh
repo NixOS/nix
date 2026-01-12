@@ -4,6 +4,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/ascii.hh"
 #include "nix/util/strings.hh"
 
 #include <filesystem>
@@ -66,11 +67,34 @@ inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char 
 }
 
 /**
- * Remove trailing whitespace from a string.
- *
- * \todo return std::string_view.
+ * Remove trailing whitespace from a string, returning a new string.
+ */
+std::string rtrim(std::string_view s, std::string_view whitespace = " \n\r\t");
+
+/**
+ * Deprecated alias for `rtrim`.
  */
 std::string chomp(std::string_view s);
+
+/**
+ * Remove leading whitespace from a string, returning a new string.
+ */
+std::string ltrim(std::string_view s, std::string_view whitespace = " \n\r\t");
+
+/**
+ * Remove trailing whitespace from a string view, returning a view of the original.
+ */
+std::string_view rtrimView(std::string_view s, std::string_view whitespace = " \n\r\t");
+
+/**
+ * Remove leading whitespace from a string view, returning a view of the original.
+ */
+std::string_view ltrimView(std::string_view s, std::string_view whitespace = " \n\r\t");
+
+/**
+ * Remove leading and trailing whitespace from a string view, returning a view of the original.
+ */
+std::string_view trimView(std::string_view s, std::string_view whitespace = " \n\r\t");
 
 /**
  * Remove whitespace from the start and end of a string.
@@ -182,14 +206,40 @@ T readLittleEndian(unsigned char * p)
 }
 
 /**
- * @return true iff `s` starts with `prefix`.
+ * Remove a prefix from a string in-place.
+ *
+ * @return true iff the prefix was present and removed.
  */
-bool hasPrefix(std::string_view s, std::string_view prefix);
+bool stripPrefix(std::string & s, std::string_view prefix);
 
 /**
- * @return true iff `s` ends in `suffix`.
+ * Remove a prefix from a string_view in-place (by shrinking it).
+ *
+ * @return true iff the prefix was present and removed.
  */
-bool hasSuffix(std::string_view s, std::string_view suffix);
+bool stripPrefix(std::string_view & s, std::string_view prefix);
+
+/**
+ * Remove a suffix from a string in-place.
+ *
+ * @return true iff the suffix was present and removed.
+ */
+bool stripSuffix(std::string & s, std::string_view suffix);
+
+/**
+ * Remove a suffix from a string_view in-place (by shrinking it).
+ *
+ * @return true iff the suffix was present and removed.
+ */
+bool stripSuffix(std::string_view & s, std::string_view suffix);
+
+/**
+ * Strip repeated trailing characters.
+ *
+ * The string_view overload returns a view of the original.
+ */
+std::string_view stripTrailing(std::string_view s, char c);
+void stripTrailing(std::string & s, char c);
 
 /**
  * Convert a string to lower case.
@@ -352,16 +402,6 @@ std::optional<typename T::value_type> pop(T & c)
     auto v = std::move(c.front());
     c.pop();
     return v;
-}
-
-/**
- * Append items to a container. TODO: remove this once we can use
- * C++23's `append_range()`.
- */
-template<class C, typename T>
-void append(C & c, std::initializer_list<T> l)
-{
-    c.insert(c.end(), l.begin(), l.end());
 }
 
 template<typename T>

@@ -10,6 +10,7 @@
 #include "nix/util/unix-domain-socket.hh"
 
 #include <atomic>
+#include <ranges>
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <iostream>
@@ -287,10 +288,10 @@ struct JSONLogger : Logger
 
         if (loggerSettings.showTrace.get() && !ei.traces.empty()) {
             nlohmann::json traces = nlohmann::json::array();
-            for (auto iter = ei.traces.rbegin(); iter != ei.traces.rend(); ++iter) {
+            for (const auto & trace : std::ranges::reverse_view(ei.traces)) {
                 nlohmann::json stackFrame;
-                stackFrame["raw_msg"] = iter->hint.str();
-                to_json(stackFrame, iter->pos);
+                stackFrame["raw_msg"] = trace.hint.str();
+                to_json(stackFrame, trace.pos);
                 traces.push_back(stackFrame);
             }
 
@@ -399,7 +400,7 @@ static Logger::Fields getFields(nlohmann::json & json)
 
 std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::string_view source)
 {
-    if (!hasPrefix(msg, "@nix "))
+    if (!msg.starts_with("@nix "))
         return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));

@@ -205,7 +205,7 @@ static git_packbuilder_progress PACKBUILDER_PROGRESS_CHECK_INTERRUPT = &packBuil
 
 static void initRepoAtomically(std::filesystem::path & path, GitRepo::Options options)
 {
-    if (pathExists(path.string()))
+    if (pathExists(path))
         return;
 
     if (!options.create)
@@ -328,8 +328,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         checkInterrupt();
 
         std::string repo_path = std::string(git_repository_path(repo.get()));
-        while (!repo_path.empty() && repo_path.back() == '/')
-            repo_path.pop_back();
+        stripTrailing(repo_path, '/');
         std::string pack_dir_path = repo_path + "/objects/pack";
 
         // TODO (performance): could the indexing be done in a separate thread?
@@ -492,7 +491,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         std::vector<Submodule> result;
 
         for (auto & [key, value] : entries) {
-            if (!hasSuffix(key, ".path"))
+            if (!key.ends_with(".path"))
                 continue;
             std::string key2(key, 0, key.size() - 5);
             auto path = CanonPath(value);
@@ -548,7 +547,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         /* Get submodule info. */
         auto modulesFile = path / ".gitmodules";
-        if (pathExists(modulesFile.string()))
+        if (pathExists(modulesFile))
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
@@ -618,8 +617,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto dir = this->path;
         Strings gitArgs{"-C", dir.string(), "--git-dir", ".", "fetch", "--progress", "--force"};
         if (shallow)
-            append(gitArgs, {"--depth", "1"});
-        append(gitArgs, {std::string("--"), url, refspec});
+            gitArgs.insert(gitArgs.end(), {"--depth", "1"});
+        gitArgs.insert(gitArgs.end(), {"--", url, refspec});
 
         auto status = runProgram(RunOptions{.program = "git", .args = gitArgs, .isInteractive = true}).first;
 

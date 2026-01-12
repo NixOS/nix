@@ -5,11 +5,14 @@
 #include "nix/util/types.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/util/git.hh"
+#include "nix/util/util.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "nix/util/ascii.hh"
+#include "nix/util/split.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -492,14 +495,17 @@ struct GitLabInputScheme : GitArchiveInputScheme
         // If the <TYPE> is unrecognized, this will fall back to
         // treating this simply has <HDRNAME>:<HDRVAL>.  See
         // https://docs.gitlab.com/12.10/ee/api/README.html#authentication
-        auto fldsplit = token.find_first_of(':');
+        auto split = splitOnce(token, ':');
+        if (!split)
+            return std::nullopt;
+
         // n.b. C++20 would allow: if (token.starts_with("OAuth2:")) ...
-        if ("OAuth2" == token.substr(0, fldsplit))
-            return std::make_pair("Authorization", fmt("Bearer %s", token.substr(fldsplit + 1)));
-        if ("PAT" == token.substr(0, fldsplit))
-            return std::make_pair("Private-token", token.substr(fldsplit + 1));
-        warn("Unrecognized GitLab token type %s", token.substr(0, fldsplit));
-        return std::make_pair(token.substr(0, fldsplit), token.substr(fldsplit + 1));
+        if ("OAuth2" == split->first)
+            return std::make_pair("Authorization", fmt("Bearer %s", split->second));
+        if ("PAT" == split->first)
+            return std::make_pair("Private-token", std::string(split->second));
+        warn("Unrecognized GitLab token type %s", split->first);
+        return std::make_pair(std::string(split->first), std::string(split->second));
     }
 
     RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
@@ -522,7 +528,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         if (json.is_array() && json.size() >= 1 && json[0]["id"] != nullptr) {
             return RefInfo{.rev = Hash::parseAny(std::string(json[0]["id"]), HashAlgorithm::SHA1)};
         }
-        if (json.is_array() && json.size() == 0) {
+        if (json.is_array() && json.empty()) {
             throw Error("No commits returned by GitLab API -- does the git ref really exist?");
         } else {
             throw Error("Unexpected response received from GitLab: %s", json);

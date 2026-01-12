@@ -57,7 +57,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
                     std::map<std::string, Config::SettingInfo> settings;
                     globalConfig.getSettings(settings);
                     for (auto & s : settings)
-                        if (hasPrefix(s.first, prefix))
+                        if (s.first.starts_with(prefix))
                             completions.add(s.first, fmt("Set the `%s` setting.", s.first));
                 }
             },

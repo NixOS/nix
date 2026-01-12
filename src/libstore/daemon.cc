@@ -257,7 +257,7 @@ struct ClientSettings
                 for (auto & s : ss)
                     if (trusted.count(s))
                         subs.push_back(s);
-                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
+                    else if (!s.ends_with('/') && trusted.count(s + "/"))
                         subs.push_back(s + "/");
                     else
                         warn(

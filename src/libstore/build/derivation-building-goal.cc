@@ -890,7 +890,7 @@ static void runPostBuildHook(
     StringMap hookEnvironment = getEnv();
 
     hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
+    hookEnvironment.emplace("OUT_PATHS", rtrim(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
     hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
 
     struct LogSink : Sink
@@ -1006,7 +1006,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
             }();
             if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
                 ;
-            else if (s.substr(0, 2) == "# ") {
+            else if (s.starts_with("# ")) {
                 reply = s.substr(2);
                 break;
             } else {
@@ -1030,7 +1030,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 
     } catch (SysError & e) {
         if (e.errNo == EPIPE) {
-            printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
+            printError("build hook died unexpectedly: %s", rtrim(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
             return rpDecline;
         } else

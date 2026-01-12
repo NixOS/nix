@@ -2,6 +2,7 @@
 
 #include "nix/util/file-system.hh"
 #include "nix/util/base-n.hh"
+#include "nix/util/split.hh"
 #include "nix/util/util.hh"
 #include <sodium.h>
 
@@ -9,10 +10,10 @@ namespace nix {
 
 BorrowedCryptoValue BorrowedCryptoValue::parse(std::string_view s)
 {
-    size_t colon = s.find(':');
-    if (colon == std::string::npos || colon == 0)
+    auto split = splitOnce(s, ':');
+    if (!split || split->first.empty())
         return {"", ""};
-    return {s.substr(0, colon), s.substr(colon + 1)};
+    return {split->first, split->second};
 }
 
 Key::Key(std::string_view s, bool sensitiveValue)

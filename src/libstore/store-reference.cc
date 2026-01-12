@@ -13,10 +13,10 @@ static bool isNonUriPath(const std::string & spec)
 {
     return
         // is not a URL
-        spec.find("://") == std::string::npos
+        !spec.contains("://")
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
-        && spec.find("/") != std::string::npos;
+        && spec.contains("/");
 }
 
 std::string StoreReference::render(bool withParams) const
@@ -175,10 +175,9 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
 {
     auto uri(uri_);
     StoreReference::Params params;
-    auto q = uri.find('?');
-    if (q != std::string::npos) {
-        params = decodeQuery(uri.substr(q + 1), /*lenient=*/true);
-        uri = uri_.substr(0, q);
+    if (auto split = splitOnce(uri_, '?')) {
+        params = decodeQuery(split->second, /*lenient=*/true);
+        uri.assign(split->first);
     }
     return {uri, params};
 }

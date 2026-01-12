@@ -861,7 +861,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
             return {};
 
         const char * s = (const char *) sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0);
-        if (s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0)
+        if (s && std::string_view{s}.starts_with(prefix))
             return parseStorePath(s);
         return {};
     });

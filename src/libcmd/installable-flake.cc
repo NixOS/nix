@@ -28,8 +28,7 @@ namespace nix {
 std::vector<std::string> InstallableFlake::getActualAttrPaths()
 {
     std::vector<std::string> res;
-    if (attrPaths.size() == 1 && attrPaths.front().starts_with(".")) {
-        attrPaths.front().erase(0, 1);
+    if (attrPaths.size() == 1 && stripPrefix(attrPaths.front(), ".")) {
         res.push_back(attrPaths.front());
         return res;
     }
@@ -179,7 +178,7 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
         }
     }
 
-    if (res.size() == 0)
+    if (res.empty())
         throw Error(suggestions, "flake '%s' does not provide attribute %s", flakeRef, showAttrPaths(attrPaths));
 
     return res;

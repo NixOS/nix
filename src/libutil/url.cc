@@ -415,9 +415,9 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 ParsedURL fixGitURL(std::string url)
 {
     std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
+    if (!url.starts_with("/") && std::regex_match(url, scpRegex))
         url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
+    if (!url.starts_with("file:") && !url.starts_with("git+file:") && url.find("://") == std::string::npos)
         return ParsedURL{
             .scheme = "file",
             .authority = ParsedURL::Authority{},

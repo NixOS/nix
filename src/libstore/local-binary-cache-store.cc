@@ -85,7 +85,7 @@ protected:
         for (auto & entry : DirectoryIterator{config->binaryCacheDir}) {
             checkInterrupt();
             auto name = entry.path().filename().string();
-            if (name.size() != 40 || !hasSuffix(name, ".narinfo"))
+            if (name.size() != 40 || !name.ends_with(".narinfo"))
                 continue;
             paths.insert(parseStorePath(storeDir + "/" + name.substr(0, name.size() - 8) + "-" + MissingName));
         }

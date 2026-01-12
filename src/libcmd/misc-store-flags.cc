@@ -5,7 +5,7 @@ namespace nix::flag {
 static void hashFormatCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
     for (auto & format : hashFormats) {
-        if (hasPrefix(format, prefix)) {
+        if (std::string_view{format}.starts_with(prefix)) {
             completions.add(format);
         }
     }
@@ -37,7 +37,7 @@ Args::Flag hashFormatOpt(std::string && longName, std::optional<HashFormat> * oh
 static void hashAlgoCompleter(AddCompletions & completions, size_t index, std::string_view prefix)
 {
     for (auto & algo : hashAlgorithms)
-        if (hasPrefix(algo, prefix))
+        if (std::string_view{algo}.starts_with(prefix))
             completions.add(algo);
 }
 

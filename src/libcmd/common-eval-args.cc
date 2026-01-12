@@ -14,8 +14,9 @@
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/cmd/compatibility-settings.hh"
-#include "nix/expr/eval-settings.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -169,7 +170,7 @@ Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
                                 : state.rootPath(".")));
                 },
                 [&](const AutoArgString & arg) { v->mkString(arg.s, state.mem); },
-                [&](const AutoArgFile & arg) { v->mkString(readFile(arg.path.string()), state.mem); },
+                [&](const AutoArgFile & arg) { v->mkString(readFile(arg.path), state.mem); },
                 [&](const AutoArgStdin & arg) { v->mkString(readFile(STDIN_FILENO), state.mem); }},
             arg);
         res.insert(state.symbols.create(name), v);
@@ -185,7 +186,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
         return state.storePath(storePath);
     }
 
-    else if (hasPrefix(s, "flake:")) {
+    if (s.starts_with("flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
         auto [accessor, lockedRef] =
@@ -196,14 +197,13 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
         return state.storePath(storePath);
     }
 
-    else if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
+    if (s.size() > 2 && s.at(0) == '<' && s.at(s.size() - 1) == '>') {
         // Should perhaps be a `CanonPath`?
         std::string p(s.substr(1, s.size() - 2));
         return state.findFile(p);
     }
 
-    else
-        return state.rootPath(absPath(std::filesystem::path{s}, baseDir).string());
+    return state.rootPath(absPath(std::filesystem::path{s}, baseDir).string());
 }
 
 } // namespace nix

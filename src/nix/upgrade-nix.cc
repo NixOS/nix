@@ -122,7 +122,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         printInfo("found Nix in %s", where);
 
-        if (hasPrefix(where.string(), "/run/current-system"))
+        if (where.string().starts_with("/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
 
         auto profileDir = where.parent_path();

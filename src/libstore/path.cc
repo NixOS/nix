@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/store/store-dir-config.hh"
+#include "nix/util/ascii.hh"
 #include "nix/util/json-utils.hh"
 
 namespace nix {
@@ -28,8 +29,8 @@ void checkName(std::string_view name)
         }
     }
     for (auto c : name)
-        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '+' || c == '-'
-              || c == '.' || c == '_' || c == '?' || c == '='))
+        if (!(isAsciiAlpha(c) || isAsciiDigit(c) || c == '+' || c == '-' || c == '.' || c == '_' || c == '?'
+              || c == '='))
             throw BadStorePathName("name '%s' contains illegal character '%s'", name, c);
 }
 
@@ -48,7 +49,7 @@ StorePath::StorePath(std::string_view _baseName)
     if (baseName.size() < HashLen + 1)
         throw BadStorePath("'%s' is too short to be a valid store path", baseName);
     for (auto c : hashPart())
-        if (c == 'e' || c == 'o' || c == 'u' || c == 't' || !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')))
+        if (c == 'e' || c == 'o' || c == 'u' || c == 't' || !(isAsciiDigit(c) || (c >= 'a' && c <= 'z')))
             throw BadStorePath("store path '%s' contains illegal base-32 character '%s'", baseName, c);
     checkPathName(baseName, name());
 }
@@ -61,7 +62,7 @@ StorePath::StorePath(const Hash & hash, std::string_view _name)
 
 bool StorePath::isDerivation() const noexcept
 {
-    return hasSuffix(name(), drvExtension);
+    return name().ends_with(drvExtension);
 }
 
 void StorePath::requireDerivation() const

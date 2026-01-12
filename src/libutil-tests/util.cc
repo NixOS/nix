@@ -4,6 +4,7 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/base-n.hh"
+#include "nix/util/split.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
@@ -15,38 +16,216 @@ namespace nix {
 /* ----------- tests for util.hh --------------------------------------------*/
 
 /* ----------------------------------------------------------------------------
- * hasPrefix
+ * stripPrefix / stripSuffix / stripTrailing
  * --------------------------------------------------------------------------*/
 
-TEST(hasPrefix, emptyStringHasNoPrefix)
+TEST(stripPrefix, removesPrefix)
 {
-    ASSERT_FALSE(hasPrefix("", "foo"));
+    // Arrange
+    std::string s = "foobar";
+
+    // Act
+    auto removed = stripPrefix(s, "foo");
+
+    // Assert
+    ASSERT_TRUE(removed);
+    ASSERT_EQ(s, "bar");
 }
 
-TEST(hasPrefix, emptyStringIsAlwaysPrefix)
+TEST(stripPrefix, noOpWhenMissing)
 {
-    ASSERT_TRUE(hasPrefix("foo", ""));
-    ASSERT_TRUE(hasPrefix("jshjkfhsadf", ""));
+    // Arrange
+    std::string s = "foobar";
+
+    // Act
+    auto removed = stripPrefix(s, "baz");
+
+    // Assert
+    ASSERT_FALSE(removed);
+    ASSERT_EQ(s, "foobar");
 }
 
-TEST(hasPrefix, trivialCase)
+TEST(stripPrefix, stringViewOverloadShrinks)
 {
-    ASSERT_TRUE(hasPrefix("foobar", "foo"));
+    // Arrange
+    std::string_view s = "foobar";
+
+    // Act
+    auto removed = stripPrefix(s, "foo");
+
+    // Assert
+    ASSERT_TRUE(removed);
+    ASSERT_EQ(s, "bar");
+}
+
+TEST(stripPrefix, stringViewOverloadNoOpWhenMissing)
+{
+    // Arrange
+    std::string_view s = "foobar";
+
+    // Act
+    auto removed = stripPrefix(s, "baz");
+
+    // Assert
+    ASSERT_FALSE(removed);
+    ASSERT_EQ(s, "foobar");
+}
+
+TEST(stripSuffix, removesSuffix)
+{
+    // Arrange
+    std::string s = "foobar";
+
+    // Act
+    auto removed = stripSuffix(s, "bar");
+
+    // Assert
+    ASSERT_TRUE(removed);
+    ASSERT_EQ(s, "foo");
+}
+
+TEST(stripSuffix, stringViewOverloadShrinks)
+{
+    // Arrange
+    std::string_view s = "foo.tar.gz";
+
+    // Act
+    auto removed = stripSuffix(s, ".gz");
+
+    // Assert
+    ASSERT_TRUE(removed);
+    ASSERT_EQ(s, "foo.tar");
+}
+
+TEST(stripTrailing, removesRepeatedTrailingCharacters)
+{
+    // Arrange
+    std::string_view s = "foo///";
+
+    // Act
+    auto res = stripTrailing(s, '/');
+
+    // Assert
+    ASSERT_EQ(res, "foo");
+}
+
+TEST(stripTrailing, stringOverloadMutatesInPlace)
+{
+    // Arrange
+    std::string s = "foo///";
+
+    // Act
+    stripTrailing(s, '/');
+
+    // Assert
+    ASSERT_EQ(s, "foo");
 }
 
 /* ----------------------------------------------------------------------------
- * hasSuffix
+ * trimView helpers
  * --------------------------------------------------------------------------*/
 
-TEST(hasSuffix, emptyStringHasNoSuffix)
+TEST(rtrimView, trimsTrailingWithoutAllocating)
 {
-    ASSERT_FALSE(hasSuffix("", "foo"));
+    // Arrange
+    std::string_view s = " \tfoo \n";
+
+    // Act
+    auto res = rtrimView(s);
+
+    // Assert
+    ASSERT_EQ(res, " \tfoo");
+    ASSERT_EQ(res.data(), s.data());
 }
 
-TEST(hasSuffix, trivialCase)
+TEST(ltrimView, trimsLeadingWithoutAllocating)
 {
-    ASSERT_TRUE(hasSuffix("foo", "foo"));
-    ASSERT_TRUE(hasSuffix("foobar", "bar"));
+    // Arrange
+    std::string_view s = " \tfoo \n";
+
+    // Act
+    auto res = ltrimView(s);
+
+    // Assert
+    ASSERT_EQ(res, "foo \n");
+    ASSERT_EQ(res.data(), s.data() + 2);
+}
+
+TEST(trimView, trimsWithoutAllocating)
+{
+    // Arrange
+    std::string_view s = " \tfoo \n";
+
+    // Act
+    auto res = trimView(s);
+
+    // Assert
+    ASSERT_EQ(res, "foo");
+}
+
+TEST(trimView, customWhitespaceSet)
+{
+    // Arrange
+    std::string_view s = "__foo---";
+
+    // Act
+    auto leftTrimmed = ltrimView(s, "_");
+    auto rightTrimmed = rtrimView(leftTrimmed, "-");
+
+    // Assert
+    ASSERT_EQ(rightTrimmed, "foo");
+}
+
+/* ----------------------------------------------------------------------------
+ * splitOnce
+ * --------------------------------------------------------------------------*/
+
+TEST(splitOnce, returnsPrefixAndSuffixViews)
+{
+    // Arrange
+    std::string_view s = "foo/bar";
+
+    // Act
+    auto split = splitOnce(s, '/');
+
+    // Assert
+    ASSERT_TRUE(split);
+    ASSERT_EQ(split->first, "foo");
+    ASSERT_EQ(split->second, "bar");
+    ASSERT_EQ(split->first.data(), s.data());
+    ASSERT_EQ(split->second.data(), s.data() + 4);
+}
+
+TEST(splitOnce, returnsNulloptWhenMissing)
+{
+    // Arrange
+    std::string_view s = "foobar";
+
+    // Act
+    auto split = splitOnce(s, '/');
+
+    // Assert
+    ASSERT_FALSE(split);
+}
+
+TEST(splitOnce, handlesLeadingAndTrailingSeparators)
+{
+    // Arrange
+    std::string_view s1 = "/foo";
+    std::string_view s2 = "foo/";
+
+    // Act
+    auto split1 = splitOnce(s1, '/');
+    auto split2 = splitOnce(s2, '/');
+
+    // Assert
+    ASSERT_TRUE(split1);
+    ASSERT_EQ(split1->first, "");
+    ASSERT_EQ(split1->second, "foo");
+
+    ASSERT_TRUE(split2);
+    ASSERT_EQ(split2->first, "foo");
+    ASSERT_EQ(split2->second, "");
 }
 
 /* ----------------------------------------------------------------------------
@@ -291,21 +470,34 @@ TEST(trim, removesWhitespace)
 }
 
 /* ----------------------------------------------------------------------------
- * chomp
+ * ltrim / rtrim
  * --------------------------------------------------------------------------*/
 
-TEST(chomp, emptyString)
+TEST(rtrim, emptyString)
 {
-    ASSERT_EQ(chomp(""), "");
+    ASSERT_EQ(rtrim(""), "");
 }
 
-TEST(chomp, removesWhitespace)
+TEST(rtrim, removesWhitespace)
 {
-    ASSERT_EQ(chomp("foo"), "foo");
-    ASSERT_EQ(chomp("foo "), "foo");
-    ASSERT_EQ(chomp(" foo "), " foo");
-    ASSERT_EQ(chomp(" foo bar baz  "), " foo bar baz");
-    ASSERT_EQ(chomp("\t foo bar baz\n"), "\t foo bar baz");
+    ASSERT_EQ(rtrim("foo"), "foo");
+    ASSERT_EQ(rtrim("foo "), "foo");
+    ASSERT_EQ(rtrim(" foo "), " foo");
+    ASSERT_EQ(rtrim(" foo bar baz  "), " foo bar baz");
+    ASSERT_EQ(rtrim("\t foo bar baz\n"), "\t foo bar baz");
+}
+
+TEST(ltrim, emptyString)
+{
+    ASSERT_EQ(ltrim(""), "");
+}
+
+TEST(ltrim, removesWhitespace)
+{
+    ASSERT_EQ(ltrim("foo"), "foo");
+    ASSERT_EQ(ltrim(" foo"), "foo");
+    ASSERT_EQ(ltrim(" foo "), "foo ");
+    ASSERT_EQ(ltrim("\t foo bar baz\n"), "foo bar baz\n");
 }
 
 /* ----------------------------------------------------------------------------

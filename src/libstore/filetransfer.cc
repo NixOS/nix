@@ -6,6 +6,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/split.hh"
 
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
@@ -272,12 +273,12 @@ struct curlFileTransfer : public FileTransfer
                 appendCurrentUrl();
             } else {
 
-                auto i = line.find(':');
-                if (i != std::string::npos) {
-                    std::string name = toLower(trim(line.substr(0, i)));
+                if (auto split = splitOnce(line, ':')) {
+                    std::string name = toLower(trim(split->first));
+                    std::string value = trim(split->second);
 
                     if (name == "etag") {
-                        result.etag = trim(line.substr(i + 1));
+                        result.etag = std::move(value);
                         /* Hack to work around a GitHub bug: it sends
                            ETags, but ignores If-None-Match. So if we get
                            the expected ETag on a 200 response, then shut
@@ -292,9 +293,9 @@ struct curlFileTransfer : public FileTransfer
                     }
 
                     else if (name == "content-encoding")
-                        encoding = trim(line.substr(i + 1));
+                        encoding = std::move(value);
 
-                    else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
+                    else if (name == "accept-ranges" && toLower(value) == "bytes")
                         acceptRanges = true;
 
                     else if (name == "link" || name == "x-amz-meta-link") {
@@ -349,7 +350,7 @@ struct curlFileTransfer : public FileTransfer
         static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr) noexcept
         try {
             if (type == CURLINFO_TEXT)
-                vomit("curl: %s", chomp(std::string(data, size)));
+                vomit("curl: %s", rtrim(std::string(data, size)));
             return 0;
         } catch (...) {
             /* Swallow the exception. Nothing left to do. */
@@ -1128,7 +1129,7 @@ FileTransferError::FileTransferError(
     // to print different messages for different verbosity levels. For now
     // we add some heuristics for detecting when we want to show the response.
     if (response && (response->size() < 1024 || response->find("<html>") != std::string::npos))
-        err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
+        err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), rtrim(*response));
     else
         err.msg = hf;
 }

@@ -32,7 +32,7 @@ Strings EvalSettings::parseNixPath(const std::string & s)
 
         if (*p == ':') {
             auto prefix = std::string(start2, s.end());
-            if (EvalSettings::isPseudoUrl(prefix) || hasPrefix(prefix, "flake:")) {
+            if (EvalSettings::isPseudoUrl(prefix) || prefix.starts_with("flake:")) {
                 ++p;
                 while (p != s.end() && *p != ':')
                     ++p;
@@ -79,7 +79,7 @@ Strings EvalSettings::getDefaultNixPath()
 
 bool EvalSettings::isPseudoUrl(std::string_view s)
 {
-    if (s.compare(0, 8, "channel:") == 0)
+    if (s.starts_with("channel:"))
         return true;
     size_t pos = s.find("://");
     if (pos == std::string::npos)
@@ -91,7 +91,7 @@ bool EvalSettings::isPseudoUrl(std::string_view s)
 
 std::string EvalSettings::resolvePseudoUrl(std::string_view url)
 {
-    if (hasPrefix(url, "channel:"))
+    if (url.starts_with("channel:"))
         return "https://channels.nixos.org/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
     else
         return std::string(url);

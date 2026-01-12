@@ -655,7 +655,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
            exclusive lock before deleting them. */
-        if (baseName.find("tmp-", 0) == 0) {
+        if (baseName.starts_with("tmp-")) {
             AutoCloseFD tmpDirFd = openDirectory(realPath);
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
                 debug("skipping locked tempdir '%s'", realPath);

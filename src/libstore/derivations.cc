@@ -10,10 +10,12 @@
 #include "nix/util/strings-inline.hh"
 #include "nix/util/json-utils.hh"
 
+#include <algorithm>
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <ranges>
 
 namespace nix {
 
@@ -103,7 +105,7 @@ bool DerivationType::isImpure() const
 
 bool BasicDerivation::isBuiltin() const
 {
-    return builder.substr(0, 8) == "builtin:";
+    return builder.starts_with("builtin:");
 }
 
 static auto infoForDerivation(Store & store, const Derivation & drv)
@@ -203,9 +205,8 @@ constexpr struct Escapes
 /* Read string `s' from stream `str'. */
 static void expect(StringViewStream & str, std::string_view s)
 {
-    if (!str.remaining.starts_with(s))
+    if (!stripPrefix(str.remaining, s))
         throw FormatError("expected string '%1%'", s);
-    str.remaining.remove_prefix(s.size());
 }
 
 static void expect(StringViewStream & str, char c)
@@ -267,7 +268,7 @@ static BackedStringView parseString(StringViewStream & str)
 
 static void validatePath(std::string_view s)
 {
-    if (s.size() == 0 || s[0] != '/')
+    if (s.empty() || s[0] != '/')
         throw FormatError("bad path '%1%' in derivation", s);
 }
 
@@ -624,11 +625,7 @@ static void unparseDerivedPathMapNode(
  */
 static bool hasDynamicDrvDep(const Derivation & drv)
 {
-    return std::find_if(
-               drv.inputDrvs.map.begin(),
-               drv.inputDrvs.map.end(),
-               [](auto & kv) { return !kv.second.childMap.empty(); })
-           != drv.inputDrvs.map.end();
+    return std::ranges::any_of(drv.inputDrvs.map, [](const auto & kv) { return !kv.second.childMap.empty(); });
 }
 
 std::string Derivation::unparse(
@@ -776,7 +773,7 @@ std::string Derivation::unparse(
 // FIXME: remove
 bool isDerivation(std::string_view fileName)
 {
-    return hasSuffix(fileName, drvExtension);
+    return fileName.ends_with(drvExtension);
 }
 
 std::string outputPathName(std::string_view drvName, OutputNameView outputName)

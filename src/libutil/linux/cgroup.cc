@@ -42,7 +42,7 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile)
         if (!std::regex_match(line, match, regex))
             throw Error("invalid line '%s' in '%s'", line, cgroupFile);
 
-        std::string name = hasPrefix(std::string(match[2]), "name=") ? std::string(match[2], 5) : match[2];
+        std::string name = std::string(match[2]).starts_with("name=") ? std::string(match[2], 5) : match[2];
         cgroups.insert_or_assign(name, match[3]);
     }
 
@@ -58,14 +58,14 @@ CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
     if (pathExists(cpustatPath)) {
         for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
             std::string_view userPrefix = "user_usec ";
-            if (hasPrefix(line, userPrefix)) {
+            if (line.starts_with(userPrefix)) {
                 auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
                 if (n)
                     stats.cpuUser = std::chrono::microseconds(*n);
             }
 
             std::string_view systemPrefix = "system_usec ";
-            if (hasPrefix(line, systemPrefix)) {
+            if (line.starts_with(systemPrefix)) {
                 auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
                 if (n)
                     stats.cpuSystem = std::chrono::microseconds(*n);

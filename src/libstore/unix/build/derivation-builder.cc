@@ -19,7 +19,9 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
+#include "nix/util/split.hh"
 
+#include <algorithm>
 #include <queue>
 
 #include <sys/un.h>
@@ -460,7 +462,7 @@ void handleDiffHook(
                 throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
 
             if (diffRes.second != "")
-                printError(chomp(diffRes.second));
+                printError(rtrimView(diffRes.second));
         } catch (Error & error) {
             ErrorInfo ei = error.info();
             // FIXME: wrap errors.
@@ -854,10 +856,11 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
        host file system. */
     PathsInChroot pathsInChroot = defaultPathsInChroot;
 
-    if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
+    auto sandboxBuildDir = tmpDirInSandbox();
+    if (store.storeDir.starts_with(sandboxBuildDir.native())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
-    pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
+    pathsInChroot[sandboxBuildDir] = {.source = tmpDir};
 
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
@@ -910,11 +913,11 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 if (line == "") {
                     state = stBegin;
                 } else {
-                    auto p = line.find('=');
-                    if (p == std::string::npos)
+                    if (auto split = splitOnce(line, '=')) {
+                        pathsInChroot[std::string(split->first)] = {.source = std::string(split->second)};
+                    } else {
                         pathsInChroot[line] = {.source = line};
-                    else
-                        pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
+                    }
                 }
             }
         }
@@ -1009,9 +1012,9 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 throw;
             }
         }();
-        if (msg.substr(0, 1) == "\2")
+        if (msg.starts_with('\2'))
             break;
-        if (msg.substr(0, 1) == "\1") {
+        if (msg.starts_with('\1')) {
             FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
@@ -1531,7 +1534,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             [](auto & sorted) { return sorted; }},
         topoSortResult);
 
-    std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
+    std::ranges::reverse(sortedOutputNames);
 
     OutputPathMap finalOutputs;
 

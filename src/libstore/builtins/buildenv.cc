@@ -68,9 +68,9 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
          * Python package brings its own
          * `$out/lib/pythonX.Y/site-packages/easy-install.pth'.)
          */
-        if (hasSuffix(srcFile, "/propagated-build-inputs") || hasSuffix(srcFile, "/nix-support")
-            || hasSuffix(srcFile, "/perllocal.pod") || hasSuffix(srcFile, "/info/dir") || hasSuffix(srcFile, "/log")
-            || hasSuffix(srcFile, "/manifest.nix") || hasSuffix(srcFile, "/manifest.json"))
+        if (srcFile.ends_with("/propagated-build-inputs") || srcFile.ends_with("/nix-support")
+            || srcFile.ends_with("/perllocal.pod") || srcFile.ends_with("/info/dir") || srcFile.ends_with("/log")
+            || srcFile.ends_with("/manifest.nix") || srcFile.ends_with("/manifest.json"))
             continue;
 
         else if (S_ISDIR(srcSt.st_mode)) {
@@ -151,7 +151,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      * user. Process in priority order to reduce unnecessary
      * symlink/unlink steps.
      */
-    std::sort(pkgs.begin(), pkgs.end(), [](const Package & a, const Package & b) {
+    std::ranges::sort(pkgs, [](const Package & a, const Package & b) {
         return a.priority < b.priority || (a.priority == b.priority && a.path < b.path);
     });
     for (const auto & pkg : pkgs)

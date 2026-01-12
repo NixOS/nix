@@ -13,6 +13,7 @@
 #  include "run.hh"
 #endif
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <sstream>
@@ -203,7 +204,7 @@ struct BuildEnvironment
             return *arr;
         } else if (auto assoc = std::get_if<Associative>(&value)) {
             Array assocKeys;
-            std::for_each(assoc->begin(), assoc->end(), [&](auto & n) { assocKeys.push_back(n.first); });
+            std::ranges::for_each(*assoc, [&](const auto & n) { assocKeys.push_back(n.first); });
             return assocKeys;
         } else
             throw Error("bash variable is not a string or array");
@@ -480,7 +481,7 @@ struct Common : InstallableCommand, MixProfile
     StorePath getShellOutPath(ref<Store> store, ref<Installable> installable)
     {
         auto path = installable->getStorePath();
-        if (path && hasSuffix(path->to_string(), "-env"))
+        if (path && path->to_string().ends_with("-env"))
             return *path;
         else {
             auto drvs = Installable::toDerivations(store, {installable});

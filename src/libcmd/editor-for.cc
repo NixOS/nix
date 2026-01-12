@@ -1,6 +1,11 @@
 #include "nix/cmd/editor-for.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/source-path.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/types.hh"
+
+#include <cstdint>
 
 namespace nix {
 
@@ -12,8 +17,7 @@ Strings editorFor(const SourcePath & file, uint32_t line)
     auto editor = getEnv("EDITOR").value_or("cat");
     auto args = tokenizeString<Strings>(editor);
     if (line > 0
-        && (editor.find("emacs") != std::string::npos || editor.find("nano") != std::string::npos
-            || editor.find("vim") != std::string::npos || editor.find("kak") != std::string::npos))
+        && (editor.contains("emacs") || editor.contains("nano") || editor.contains("vim") || editor.contains("kak")))
         args.push_back(fmt("+%d", line));
     args.push_back(path->string());
     return args;

@@ -1,4 +1,5 @@
 #include "nix/util/util.hh"
+#include "nix/util/split.hh"
 #include "nix/expr/value/context.hh"
 
 #include <optional>
@@ -11,15 +12,15 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
 
     auto parseRest = [&](this auto & parseRest) -> SingleDerivedPath {
         // Case on whether there is a '!'
-        size_t index = s.find("!");
-        if (index == std::string_view::npos) {
+        auto split = splitOnce(s, '!');
+        if (!split) {
             return SingleDerivedPath::Opaque{
                 .path = StorePath{s},
             };
         } else {
-            std::string output{s.substr(0, index)};
+            std::string output{split->first};
             // Advance string to parse after the '!'
-            s = s.substr(index + 1);
+            s = split->second;
             auto drv = make_ref<SingleDerivedPath>(parseRest());
             drvRequireExperiment(*drv, xpSettings);
             return SingleDerivedPath::Built{
@@ -29,7 +30,7 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
         }
     };
 
-    if (s.size() == 0) {
+    if (s.empty()) {
         throw BadNixStringContextElem(s0, "String context element should never be an empty string");
     }
 
@@ -39,7 +40,7 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
         s = s.substr(1);
 
         // Find *second* '!'
-        if (s.find("!") == std::string_view::npos) {
+        if (!s.contains('!')) {
             throw BadNixStringContextElem(s0, "String content element beginning with '!' should have a second '!'");
         }
 
@@ -52,7 +53,7 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
     }
     default: {
         // Ensure no '!'
-        if (s.find("!") != std::string_view::npos) {
+        if (s.contains('!')) {
             throw BadNixStringContextElem(
                 s0, "String content element not beginning with '!' should not have a second '!'");
         }

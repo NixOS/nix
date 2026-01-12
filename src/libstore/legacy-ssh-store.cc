@@ -81,7 +81,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
             tee.drainInto(nullSink);
         }
         throw Error(
-            "'nix-store --serve' protocol mismatch from '%s', got '%s'", config->authority.host, chomp(saved.s));
+            "'nix-store --serve' protocol mismatch from '%s', got '%s'", config->authority.host, rtrimView(saved.s));
     } catch (EndOfFile & e) {
         throw Error("cannot connect to '%1%'", config->authority.host);
     }

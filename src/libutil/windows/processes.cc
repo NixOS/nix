@@ -102,7 +102,7 @@ std::optional<Path> getProgramInterpreter(const Path & program)
     // These extensions are automatically handled by Windows and don't require an interpreter.
     static constexpr const char * exts[] = {".exe", ".cmd", ".bat"};
     for (const auto ext : exts) {
-        if (hasSuffix(program, ext)) {
+        if (program.ends_with(ext)) {
             return {};
         }
     }

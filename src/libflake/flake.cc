@@ -847,7 +847,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                             bool lockFileExists = pathExists(outputLockFilePath);
 
-                            auto s = chomp(diff);
+                            auto s = rtrim(diff);
                             if (lockFileExists) {
                                 if (s.empty())
                                     warn("updating lock file %s", outputLockFilePath);
@@ -892,7 +892,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                     throw Error(
                         "cannot write modified lock file of flake '%s' (use '--no-write-lock-file' to ignore)", topRef);
             } else {
-                warn("not writing modified lock file of flake '%s':\n%s", topRef, chomp(diff));
+                warn("not writing modified lock file of flake '%s':\n%s", topRef, rtrim(diff));
                 flake.forceDirty = true;
             }
         }

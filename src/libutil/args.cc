@@ -6,7 +6,9 @@
 #include "nix/util/users.hh"
 #include "nix/util/json-utils.hh"
 
+#include <cctype>
 #include <fstream>
+#include <ranges>
 #include <string>
 #include <regex>
 #ifndef _WIN32
@@ -299,7 +301,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 static const std::string commentChars("#/\\%@*-(");
                 std::string shebangContent;
                 while (std::getline(stream, line) && !line.empty() && commentChars.find(line[0]) != std::string::npos) {
-                    line = chomp(line);
+                    line = rtrim(line);
 
                     std::smatch match;
                     // We match one space after `nix` so that we preserve indentation.
@@ -312,8 +314,8 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 }
                 cmdline.push_back(script);
                 commandBaseDir = dirOf(script);
-                for (auto pos = savedArgs.begin(); pos != savedArgs.end(); pos++)
-                    cmdline.push_back(*pos);
+                for (auto & savedArg : savedArgs)
+                    cmdline.push_back(savedArg);
             }
         } catch (SystemError &) {
         }
@@ -325,12 +327,13 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
 
         /* Expand compound dash options (i.e., `-qlf' -> `-q -l -f',
            `-j3` -> `-j 3`). */
-        if (!dashDash && arg.length() > 2 && arg[0] == '-' && arg[1] != '-' && isalpha(arg[1])) {
+        if (!dashDash && arg.length() > 2 && arg[0] == '-' && arg[1] != '-'
+            && std::isalpha(static_cast<unsigned char>(arg[1]))) {
             *pos = (std::string) "-" + arg[1];
             auto next = pos;
             ++next;
             for (unsigned int j = 2; j < arg.length(); j++)
-                if (isalpha(arg[j]))
+                if (std::isalpha(static_cast<unsigned char>(arg[j])))
                     cmdline.insert(next, (std::string) "-" + arg[j]);
                 else {
                     cmdline.insert(next, std::string(arg, j));
@@ -342,7 +345,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
         if (!dashDash && arg == "--") {
             dashDash = true;
             ++pos;
-        } else if (!dashDash && std::string(arg, 0, 1) == "-") {
+        } else if (!dashDash && !arg.empty() && arg.front() == '-') {
             if (!processFlag(pos, cmdline.end()))
                 throw UsageError("unrecognised flag '%1%'", arg);
         } else {
@@ -421,10 +424,11 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return true;
     };
 
-    if (std::string(*pos, 0, 2) == "--") {
+    if (pos->starts_with("--")) {
         if (auto prefix = rootArgs.needsCompletion(*pos)) {
             for (auto & [name, flag] : longFlags) {
-                if (!hiddenCategories.count(flag->category) && hasPrefix(name, std::string(*prefix, 2))) {
+                auto namePrefix = prefix->starts_with("--") ? prefix->substr(2) : *prefix;
+                if (!hiddenCategories.count(flag->category) && name.starts_with(namePrefix)) {
                     if (auto & f = flag->experimentalFeature)
                         rootArgs.flagExperimentalFeatures.insert(*f);
                     rootArgs.completions->add("--" + name, flag->description);
@@ -438,7 +442,7 @@ bool Args::processFlag(Strings::iterator & pos, Strings::iterator end)
         return process("--" + i->first, *i->second);
     }
 
-    if (std::string(*pos, 0, 1) == "-" && pos->size() == 2) {
+    if (pos->size() == 2 && (*pos)[0] == '-') {
         auto c = (*pos)[1];
         auto i = shortFlags.find(c);
         if (i == shortFlags.end())
@@ -632,7 +636,7 @@ MultiCommand::MultiCommand(std::string_view commandName, const Commands & comman
          }},
          .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
              for (auto & [name, command] : commands)
-                 if (hasPrefix(name, prefix))
+                 if (name.starts_with(prefix))
                      completions.add(name);
          }}});
 
@@ -699,8 +703,8 @@ Strings::iterator MultiCommand::rewriteArgs(Strings & args, Strings::iterator po
         warn("'%s' is a deprecated alias for '%s'", arg, concatStringsSep(" ", info.replacement));
     }
     pos = args.erase(pos);
-    for (auto j = info.replacement.rbegin(); j != info.replacement.rend(); ++j)
-        pos = args.insert(pos, *j);
+    for (auto & j : std::ranges::reverse_view(info.replacement))
+        pos = args.insert(pos, j);
     aliasUsed = true;
     return pos;
 }
