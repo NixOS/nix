@@ -5460,18 +5460,30 @@ static void prim_derivationOf(EvalState & state, const PosIdx pos, Value ** args
         "while evaluating the argument passed to builtins.derivationOf",
         false, false).toOwned();
 
-    for (auto & c : context) {
-        if (auto * b = std::get_if<NixStringContextElem::Built>(&c.raw)) {
-            v.mkString(state.store->printStorePath(b->drvPath->getBaseStorePath()), state.mem);
-            return;
-        }
-        if (auto * d = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
-            v.mkString(state.store->printStorePath(d->drvPath), state.mem);
-            return;
-        }
+    if (context.empty()) {
+        state.error<EvalError>("'%s' has no derivation in its context", s)
+            .atPos(pos)
+            .debugThrow();
     }
 
-    // No deriver found
+    if (context.size() > 1) {
+        state.error<EvalError>("'%s' has more than one item in its context", s)
+            .atPos(pos)
+            .debugThrow();
+    }
+
+    // we have exactly one context item.
+    auto & c = *context.begin();
+    if (auto * b = std::get_if<NixStringContextElem::Built>(&c.raw)) {
+        v.mkString(state.store->printStorePath(b->drvPath->getBaseStorePath()), state.mem);
+        return;
+    }
+    if (auto * d = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
+        v.mkString(state.store->printStorePath(d->drvPath), state.mem);
+        return;
+    }
+
+    // Context item exists but is not a derivation
     state.error<EvalError>("'%s' has no derivation in its context", s)
         .atPos(pos)
         .debugThrow();
