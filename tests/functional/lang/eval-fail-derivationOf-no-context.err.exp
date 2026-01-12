@@ -5,4 +5,4 @@ error:
              | ^
             2|
 
-       error: 'foo' has no derivation in its context
+       error: 'foo' is not a valid store path

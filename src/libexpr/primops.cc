@@ -5460,6 +5460,12 @@ static void prim_derivationOf(EvalState & state, const PosIdx pos, Value ** args
         "while evaluating the argument passed to builtins.derivationOf",
         false, false).toOwned();
 
+    if (!state.store->isStorePath(s)) {
+        state.error<EvalError>("'%s' is not a valid store path", s)
+            .atPos(pos)
+            .debugThrow();
+    }
+
     if (context.empty()) {
         state.error<EvalError>("'%s' has no derivation in its context", s)
             .atPos(pos)
