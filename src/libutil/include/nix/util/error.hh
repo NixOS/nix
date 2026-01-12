@@ -240,9 +240,39 @@ MakeError(UsageError, Error);
 MakeError(UnimplementedError, Error);
 
 /**
- * To use in catch-blocks.
+ * To use in catch-blocks. Provides a convenience method to get the portable
+ * std::error_code. Use when you want to catch and check an error condition like
+ * no_such_file_or_directory (ENOENT) without ifdefs.
  */
-MakeError(SystemError, Error);
+class SystemError : public Error
+{
+    std::error_code errorCode;
+
+public:
+    template<typename... Args>
+    SystemError(std::errc posixErrNo, Args &&... args)
+        : Error(std::forward<Args>(args)...)
+        , errorCode(std::make_error_code(posixErrNo))
+    {
+    }
+
+    template<typename... Args>
+    SystemError(std::error_code errorCode, Args &&... args)
+        : Error(std::forward<Args>(args)...)
+        , errorCode(errorCode)
+    {
+    }
+
+    const std::error_code ec() const &
+    {
+        return errorCode;
+    }
+
+    bool is(std::errc e) const
+    {
+        return errorCode == e;
+    }
+};
 
 /**
  * POSIX system error, created using `errno`, `strerror` friends.
@@ -271,7 +301,7 @@ public:
      */
     template<typename... Args>
     SysError(int errNo, const Args &... args)
-        : SystemError("")
+        : SystemError(static_cast<std::errc>(errNo), "")
         , errNo(errNo)
     {
         auto hf = HintFmt(args...);
@@ -332,7 +362,7 @@ public:
      */
     template<typename... Args>
     WinError(DWORD lastError, const Args &... args)
-        : SystemError("")
+        : SystemError(std::error_code(lastError, std::system_category()), "")
         , lastError(lastError)
     {
         auto hf = HintFmt(args...);
