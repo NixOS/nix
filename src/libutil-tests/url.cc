@@ -112,19 +112,13 @@ TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
     EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, scpLikeNoUserParsesPoorly)
+TEST(FixGitURLTestSuite, rejectScpLikeNoUser)
 {
-    // SCP-like URL (no user)
-
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
-    EXPECT_EQ(
-        fixGitURL("github.com:owner/repo.git"),
-        (ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = {"github.com:owner", "repo.git"},
-        }));
+    // SCP-like URL without user. Proper support can be implemented, but this is
+    // a deceptively deep feature - study existing implementations carefully.
+    EXPECT_THAT(
+        []() { fixGitURL("github.com:owner/repo.git"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("SCP-like URL")));
 }
 
 TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
@@ -136,37 +130,24 @@ TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
             testing::HasSubstrIgnoreANSIMatcher("file:// URL 'file://var/repos/x' has unexpected authority 'var'")));
 }
 
-TEST(FixGitURLTestSuite, scpLikePathLeadingSlashParsesPoorly)
+TEST(FixGitURLTestSuite, rejectScpLikeNoUserLeadingSlash)
 {
-    // SCP-like URL (no user)
-
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
-    EXPECT_EQ(
-        fixGitURL("github.com:/owner/repo.git"),
-        (ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = {"github.com:", "owner", "repo.git"},
-        }));
+    EXPECT_THAT(
+        []() { fixGitURL("github.com:/owner/repo.git"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("SCP-like URL")));
 }
 
-TEST(FixGitURLTestSuite, relativePathParsesPoorly)
+TEST(FixGitURLTestSuite, relativePath)
 {
-    // Relative path (becomes file:// absolute)
-
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
+    // Relative path - parsed as file path without authority
+    auto parsed = fixGitURL("relative/repo");
     EXPECT_EQ(
-        fixGitURL("relative/repo"),
+        parsed,
         (ParsedURL{
             .scheme = "file",
-            .authority =
-                ParsedURL::Authority{
-                    .hostType = ParsedURL::Authority::HostType::Name,
-                    .host = "",
-                },
-            .path = {"relative", "repo"}}));
+            .path = {"relative", "repo"},
+        }));
+    EXPECT_EQ(parsed.to_string(), "file:relative/repo");
 }
 
 struct ParseURLSuccessCase
