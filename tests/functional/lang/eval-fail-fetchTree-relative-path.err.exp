@@ -7,4 +7,4 @@ error:
 
        … while fetching the input 'file:./relative-path.tar.gz'
 
-       error: tarball 'file:./relative-path.tar.gz' uses a relative path. Relative paths are not supported because the base directory is undefined. Use an absolute path instead.
+       error: tarball 'file:./relative-path.tar.gz' must use an absolute path. The 'file' scheme does not support relative paths.
