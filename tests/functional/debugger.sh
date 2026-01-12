@@ -13,3 +13,13 @@ echo ":env" | expect 1 nix eval --debugger --expr '
 ' >debugger-test-out
 grep -P 'with: .*a' debugger-test-out
 grep -P 'static: .*x' debugger-test-out
+
+# Test that debugger triggers on fetchTree errors and can access let bindings
+out=$(echo -e "args\n:quit" | expect 1 nix eval --debugger --impure --expr '
+  let
+    args = { type = "git"; url = "nonexistent-repo"; };
+  in
+  builtins.fetchTree args
+' 2>/dev/null)
+[[ "$out" == *'"git"'* ]] || fail "debugger should print args.type"
+[[ "$out" == *'"nonexistent-repo"'* ]] || fail "debugger should print args.url"
