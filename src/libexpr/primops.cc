@@ -21,6 +21,7 @@
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <nlohmann/json.hpp>
 
 #include <sys/types.h>
@@ -31,6 +32,8 @@
 #include <cstring>
 #include <sstream>
 #include <regex>
+#include <utility>
+#include <variant>
 
 #ifndef _WIN32
 #  include <dlfcn.h>
@@ -783,7 +786,203 @@ struct CompareValues
     }
 };
 
-typedef std::list<Value *, gc_allocator<Value *>> ValueList;
+namespace {
+
+struct GenericClosureKeyTracker
+{
+    EvalState & state;
+    size_t reserveHint;
+
+    CompareValues cmp;
+
+    /* Used to provide error traces when a key can't be compared against the existing set of keys. */
+    Value * diagnosticKey = nullptr;
+    Value * diagnosticElem = nullptr;
+
+    struct StringKeyHash
+    {
+        size_t operator()(const Value * v) const noexcept
+        {
+            return StringViewHash{}(v->string_view());
+        }
+    };
+
+    struct StringKeyEq
+    {
+        bool operator()(const Value * a, const Value * b) const noexcept
+        {
+            return a->string_view() == b->string_view();
+        }
+    };
+
+    struct PathKeyHash
+    {
+        size_t operator()(const Value * v) const noexcept
+        {
+            return StringViewHash{}(v->pathStrView());
+        }
+    };
+
+    struct PathKeyEq
+    {
+        bool operator()(const Value * a, const Value * b) const noexcept
+        {
+            return a->pathStrView() == b->pathStrView();
+        }
+    };
+
+    struct IntKeyHash
+    {
+        size_t operator()(const Value * v) const noexcept
+        {
+            return std::hash<decltype(v->integer().value)>{}(v->integer().value);
+        }
+    };
+
+    struct IntKeyEq
+    {
+        bool operator()(const Value * a, const Value * b) const noexcept
+        {
+            return a->integer().value == b->integer().value;
+        }
+    };
+
+    using KeyAlloc = traceable_allocator<Value *>;
+    using StringKeySet = boost::unordered_flat_set<Value *, StringKeyHash, StringKeyEq, KeyAlloc>;
+    using PathKeySet = boost::unordered_flat_set<Value *, PathKeyHash, PathKeyEq, KeyAlloc>;
+
+    using KeyToElemAlloc = traceable_allocator<std::pair<Value * const, Value *>>;
+    using IntKeyToElem = boost::unordered_flat_map<Value *, Value *, IntKeyHash, IntKeyEq, KeyToElemAlloc>;
+
+    using FallbackKeyToElem = std::map<Value *, Value *, CompareValues>;
+
+    using KeyTrackerState = std::variant<std::monostate, StringKeySet, PathKeySet, IntKeyToElem, FallbackKeyToElem>;
+    KeyTrackerState keyToElem;
+
+    GenericClosureKeyTracker(EvalState & state, size_t reserveHint)
+        : state(state)
+        , reserveHint(reserveHint)
+        , cmp(state, noPos, "")
+    {
+    }
+
+    bool insert(Value * key, Value * elem)
+    {
+        const auto keyType = key->type();
+
+        switch (keyToElem.index()) {
+        case 0: { // std::monostate
+            diagnosticKey = key;
+            diagnosticElem = elem;
+            if (keyType == nString) {
+                auto & keys = keyToElem.emplace<StringKeySet>();
+                keys.reserve(reserveHint);
+                return keys.emplace(key).second;
+            }
+            if (keyType == nPath) {
+                auto & keys = keyToElem.emplace<PathKeySet>();
+                keys.reserve(reserveHint);
+                return keys.emplace(key).second;
+            }
+            if (keyType == nInt) {
+                auto & keys = keyToElem.emplace<IntKeyToElem>();
+                keys.reserve(reserveHint);
+                return keys.emplace(key, elem).second;
+            }
+            auto & keys = keyToElem.emplace<FallbackKeyToElem>(cmp);
+            return insertFallbackKey(keys, key, elem);
+        }
+
+        case 1: { // StringKeySet
+            if (keyType == nString)
+                return std::get<StringKeySet>(keyToElem).emplace(key).second;
+            throwCompareError(key, elem);
+        }
+
+        case 2: { // PathKeySet
+            if (keyType == nPath)
+                return std::get<PathKeySet>(keyToElem).emplace(key).second;
+            throwCompareError(key, elem);
+        }
+
+        case 3: { // IntKeyToElem
+            auto & keys = std::get<IntKeyToElem>(keyToElem);
+            if (keyType == nInt)
+                return keys.emplace(key, elem).second;
+            if (keyType == nFloat) {
+                auto & fallback = promoteIntKeysToFallback();
+                return insertFallbackKey(fallback, key, elem);
+            }
+            throwCompareError(key, elem);
+        }
+
+        case 4: { // FallbackKeyToElem
+            return insertFallbackKey(std::get<FallbackKeyToElem>(keyToElem), key, elem);
+        }
+        }
+
+        unreachable();
+    }
+
+private:
+    void addCompareTraces(Error & err, Value * elem, Value * otherElem)
+    {
+        // Traces are printed in reverse order; pre-swap them.
+        err.addTrace(nullptr, "with element %s", ValuePrinter(state, *otherElem, errorPrintOptions));
+        err.addTrace(nullptr, "while comparing element %s", ValuePrinter(state, *elem, errorPrintOptions));
+    }
+
+    [[noreturn]] void throwCompareError(Value * key, Value * elem)
+    {
+        try {
+            cmp(key, diagnosticKey);
+        } catch (Error & err) {
+            addCompareTraces(err, elem, diagnosticElem);
+            throw;
+        }
+        unreachable();
+    }
+
+    FallbackKeyToElem & promoteIntKeysToFallback()
+    {
+        auto intKeys = std::move(std::get<IntKeyToElem>(keyToElem));
+        auto & fallback = keyToElem.emplace<FallbackKeyToElem>(cmp);
+
+        for (auto & [existingKey, existingElem] : intKeys)
+            fallback.insert({existingKey, existingElem});
+        return fallback;
+    }
+
+    bool insertFallbackKey(FallbackKeyToElem & fallback, Value * key, Value * elem)
+    {
+        try {
+            auto [it, inserted] = fallback.insert({key, elem});
+            return inserted;
+        } catch (Error & err) {
+            // Try to find which element we're comparing against
+            Value * otherElem = nullptr;
+            for (auto & [otherKey, otherKeyElem] : fallback) {
+                try {
+                    cmp(key, otherKey);
+                } catch (Error &) {
+                    // Found the element we're comparing against
+                    otherElem = otherKeyElem;
+                    break;
+                }
+            }
+            if (otherElem) {
+                addCompareTraces(err, elem, otherElem);
+            } else {
+                // Couldn't find the specific element, just show current
+                err.addTrace(
+                    nullptr, "while checking key of element %s", ValuePrinter(state, *elem, errorPrintOptions));
+            }
+            throw;
+        }
+    }
+};
+
+} // namespace
 
 static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
@@ -798,14 +997,16 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
         noPos,
         "while evaluating the 'startSet' attribute passed as argument to builtins.genericClosure");
 
-    ValueList workSet;
-    for (auto elem : startSet->value->listView())
-        workSet.push_back(elem);
-
-    if (startSet->value->listSize() == 0) {
+    const auto startSetSize = startSet->value->listSize();
+    if (startSetSize == 0) {
         v = *startSet->value;
         return;
     }
+
+    ValueVector workQueue;
+    workQueue.reserve(startSetSize);
+    for (auto elem : startSet->value->listView())
+        workQueue.push_back(elem);
 
     /* Get the operator. */
     auto op = state.getAttr(
@@ -814,15 +1015,15 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
         *op->value, noPos, "while evaluating the 'operator' attribute passed as argument to builtins.genericClosure");
 
     /* Construct the closure by applying the operator to elements of
-       `workSet', adding the result to `workSet', continuing until
+       `workQueue', adding the result to `workQueue', continuing until
        no new elements are found. */
-    ValueList res;
-    // Track which element each key came from
-    auto cmp = CompareValues(state, noPos, "");
-    std::map<Value *, Value *, decltype(cmp)> keyToElem(cmp);
-    while (!workSet.empty()) {
-        Value * e = *(workSet.begin());
-        workSet.pop_front();
+    ValueVector res;
+    res.reserve(startSetSize);
+
+    GenericClosureKeyTracker keys(state, startSetSize);
+
+    for (size_t head = 0; head < workQueue.size(); ++head) {
+        Value * e = std::exchange(workQueue[head], nullptr);
 
         try {
             state.forceAttrs(*e, noPos, "");
@@ -840,32 +1041,8 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
         }
         state.forceValue(*key->value, noPos);
 
-        try {
-            auto [it, inserted] = keyToElem.insert({key->value, e});
-            if (!inserted)
-                continue;
-        } catch (Error & err) {
-            // Try to find which element we're comparing against
-            Value * otherElem = nullptr;
-            for (auto & [otherKey, elem] : keyToElem) {
-                try {
-                    cmp(key->value, otherKey);
-                } catch (Error &) {
-                    // Found the element we're comparing against
-                    otherElem = elem;
-                    break;
-                }
-            }
-            if (otherElem) {
-                // Traces are printed in reverse order; pre-swap them.
-                err.addTrace(nullptr, "with element %s", ValuePrinter(state, *otherElem, errorPrintOptions));
-                err.addTrace(nullptr, "while comparing element %s", ValuePrinter(state, *e, errorPrintOptions));
-            } else {
-                // Couldn't find the specific element, just show current
-                err.addTrace(nullptr, "while checking key of element %s", ValuePrinter(state, *e, errorPrintOptions));
-            }
-            throw;
-        }
+        if (!keys.insert(key->value, e))
+            continue;
         res.push_back(e);
 
         /* Call the `operator' function with `e' as argument. */
@@ -881,7 +1058,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
             for (auto elem : newElements.listView()) {
                 state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator`
                                                 // passed to builtins.genericClosure");
-                workSet.push_back(elem);
+                workQueue.push_back(elem);
             }
         } catch (Error & err) {
             err.addTrace(
