@@ -163,6 +163,8 @@ static void fetchTree(
                     .debugThrow();
 
         input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
+        if (!input.scheme)
+            state.error<EvalError>("unsupported input type '%s'", *type).atPos(pos).debugThrow();
     } else {
         auto url = state
                        .coerceToString(
