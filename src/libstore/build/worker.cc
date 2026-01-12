@@ -162,7 +162,9 @@ template<typename G>
 static bool
 removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
 {
-    return removeGoal(goal, node.value) || removeGoal(goal, node.childMap);
+    bool valueKeep = removeGoal(goal, node.value);
+    bool childMapKeep = removeGoal(goal, node.childMap);
+    return valueKeep || childMapKeep;
 }
 
 void Worker::removeGoal(GoalPtr goal)
@@ -246,12 +248,17 @@ void Worker::childStarted(
 
 void Worker::childTerminated(Goal * goal, bool wakeSleepers)
 {
+    childTerminated(goal, goal->jobCategory(), wakeSleepers);
+}
+
+void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers)
+{
     auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
 
     if (i->inBuildSlot) {
-        switch (goal->jobCategory()) {
+        switch (jobCategory) {
         case JobCategory::Substitution:
             assert(nrSubstitutions > 0);
             nrSubstitutions--;

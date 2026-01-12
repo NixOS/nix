@@ -6,7 +6,6 @@
 #ifdef _WIN32
 #  include <winnt.h>
 #  include <fileapi.h>
-#  include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {

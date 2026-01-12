@@ -7,7 +7,6 @@
 #ifdef _WIN32
 #  include <fileapi.h>
 #  include "nix/util/file-path.hh"
-#  include "nix/util/windows-error.hh"
 #endif
 
 #include "util-config-private.hh"
@@ -127,10 +126,17 @@ void RestoreSink::createDirectory(const CanonPath & path)
 #endif
 };
 
-struct RestoreRegularFile : CreateRegularFileSink
+struct RestoreRegularFile : CreateRegularFileSink, FdSink
 {
     AutoCloseFD fd;
     bool startFsync = false;
+
+    RestoreRegularFile(bool startFSync_, AutoCloseFD fd_)
+        : FdSink(fd_.get())
+        , fd(std::move(fd_))
+        , startFsync(startFSync_)
+    {
+    }
 
     ~RestoreRegularFile()
     {
@@ -142,7 +148,6 @@ struct RestoreRegularFile : CreateRegularFileSink
             fd.startFsync();
     }
 
-    void operator()(std::string_view data) override;
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
@@ -151,9 +156,8 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
 {
     auto p = append(dstPath, path);
 
-    RestoreRegularFile crf;
-    crf.startFsync = startFsync;
-    crf.fd =
+    auto crf = RestoreRegularFile(
+        startFsync,
 #ifdef _WIN32
         CreateFileW(
             p.c_str(),
@@ -166,17 +170,18 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
 #else
         [&]() {
             /* O_EXCL together with O_CREAT ensures symbolic links in the last
-              component are not followed. */
+               component are not followed. */
             constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
             if (!dirFd)
                 return ::open(p.c_str(), flags, 0666);
             return unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, flags, 0666);
-        }();
+        }()
 #endif
-        ;
+    );
     if (!crf.fd)
         throw NativeSysError("creating file '%1%'", p);
     func(crf);
+    crf.flush();
 }
 
 void RestoreRegularFile::isExecutable()
@@ -208,11 +213,6 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
             throw SysError("preallocating file of %1% bytes", len);
     }
 #endif
-}
-
-void RestoreRegularFile::operator()(std::string_view data)
-{
-    writeFull(fd.get(), data);
 }
 
 void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)

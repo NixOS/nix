@@ -126,7 +126,7 @@ struct CmdLsStore : StoreCommand, MixLs
 
 struct CmdLsNar : Command, MixLs
 {
-    Path narPath;
+    std::filesystem::path narPath;
 
     std::string path;
 
@@ -150,9 +150,9 @@ struct CmdLsNar : Command, MixLs
 
     void run() override
     {
-        AutoCloseFD fd = toDescriptor(open(narPath.c_str(), O_RDONLY));
+        AutoCloseFD fd = openFileReadonly(narPath);
         if (!fd)
-            throw SysError("opening NAR file '%s'", narPath);
+            throw NativeSysError("opening NAR file %s", narPath);
         auto source = FdSource{fd.get()};
         list(makeLazyNarAccessor(source, seekableGetNarBytes(fd.get())), CanonPath{path});
     }

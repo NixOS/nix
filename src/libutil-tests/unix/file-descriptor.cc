@@ -64,9 +64,12 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     EXPECT_THROW(open("a/absolute_symlink/c/d", O_RDONLY), SymlinkNotAllowed);
     EXPECT_THROW(open("a/relative_symlink/c", O_RDONLY), SymlinkNotAllowed);
     EXPECT_THROW(open("a/b/c/d", O_RDONLY), SymlinkNotAllowed);
+#ifndef __CYGWIN__
+    // this returns ELOOP on cygwin when O_NOFOLLOW is used
     EXPECT_EQ(open("a/broken_symlink", O_CREAT | O_WRONLY | O_EXCL, 0666), INVALID_DESCRIPTOR);
     /* Sanity check, no symlink shenanigans and behaves the same as regular openat with O_EXCL | O_CREAT. */
     EXPECT_EQ(errno, EEXIST);
+#endif
     EXPECT_THROW(open("a/absolute_symlink/broken_symlink", O_CREAT | O_WRONLY | O_EXCL, 0666), SymlinkNotAllowed);
     EXPECT_EQ(open("c/d/regular/a", O_RDONLY), INVALID_DESCRIPTOR);
     EXPECT_EQ(open("c/d/regular", O_RDONLY | O_DIRECTORY), INVALID_DESCRIPTOR);

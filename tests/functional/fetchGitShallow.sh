@@ -6,9 +6,7 @@ source common.sh
 requireGit
 
 # Create a test repo with multiple commits for all our tests
-git init "$TEST_ROOT/shallow-parent"
-git -C "$TEST_ROOT/shallow-parent" config user.email "foobar@example.com"
-git -C "$TEST_ROOT/shallow-parent" config user.name "Foobar"
+createGitRepo "$TEST_ROOT/shallow-parent"
 
 # Add several commits to have history
 echo "{ outputs = _: {}; }" > "$TEST_ROOT/shallow-parent/flake.nix"

@@ -252,21 +252,15 @@ Path readLink(const Path & path)
 
 std::string readFile(const Path & path)
 {
-    AutoCloseFD fd = toDescriptor(open(
-        path.c_str(),
-        O_RDONLY
-#ifdef O_CLOEXEC
-            | O_CLOEXEC
-#endif
-        ));
-    if (!fd)
-        throw SysError("opening file '%1%'", path);
-    return readFile(fd.get());
+    return readFile(std::filesystem::path(path));
 }
 
 std::string readFile(const std::filesystem::path & path)
 {
-    return readFile(os_string_to_string(PathViewNG{path}));
+    AutoCloseFD fd = openFileReadonly(path);
+    if (!fd)
+        throw NativeSysError("opening file %1%", path);
+    return readFile(fd.get());
 }
 
 void readFile(const Path & path, Sink & sink, bool memory_map)
@@ -285,15 +279,9 @@ void readFile(const Path & path, Sink & sink, bool memory_map)
     }
 
     // Stream the file instead if memory-mapping fails or is disabled.
-    AutoCloseFD fd = toDescriptor(open(
-        path.c_str(),
-        O_RDONLY
-#ifdef O_CLOEXEC
-            | O_CLOEXEC
-#endif
-        ));
+    AutoCloseFD fd = openFileReadonly(std::filesystem::path(path));
     if (!fd)
-        throw SysError("opening file '%s'", path);
+        throw NativeSysError("opening file %s", path);
     drainFD(fd.get(), sink);
 }
 
