@@ -67,6 +67,14 @@ Derivations can declare some infrequently used optional attributes.
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
     will have no effect.
 
+    > **Warning**
+    >
+    > Attributes of the derivation whose type is `string`, `int`, `float`, or `null`
+    > remain declared as environment variables when sourcing `$NIX_ATTRS_SH_FILE`
+    > but are no longer exported.
+    > When using `stdenv.mkDerivation` from Nixpkgs,
+    > you can move them into the `env` attrset to keep exporting them.
+
 ## Output checks
 
 See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
