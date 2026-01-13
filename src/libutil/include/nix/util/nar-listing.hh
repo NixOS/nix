@@ -35,6 +35,11 @@ using NarListing = fso::VariantT<NarListingRegularFile, true>;
 using ShallowNarListing = fso::VariantT<NarListingRegularFile, false>;
 
 /**
+ * Parse a NAR from a Source and return its listing structure.
+ */
+NarListing parseNarListing(Source & source);
+
+/**
  * Return a deep structured representation of the contents of a NAR (except file
  * contents), recursively listing all children.
  */

@@ -1,47 +1,8 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
-#include "nix/util/archive.hh"
 #include "nix/util/error.hh"
 
-#include <map>
-#include <stack>
-
 namespace nix {
-
-struct NarMemberConstructor : CreateRegularFileSink
-{
-private:
-
-    NarListing & narMember;
-
-    uint64_t & pos;
-
-public:
-
-    NarMemberConstructor(NarListing & nm, uint64_t & pos)
-        : narMember(nm)
-        , pos(pos)
-    {
-    }
-
-    void isExecutable() override
-    {
-        auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-        if (reg)
-            reg->executable = true;
-    }
-
-    void preallocateContents(uint64_t size) override
-    {
-        auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-        if (reg) {
-            reg->contents.fileSize = size;
-            reg->contents.narOffset = pos;
-        }
-    }
-
-    void operator()(std::string_view data) override {}
-};
 
 struct NarAccessor : public SourceAccessor
 {
@@ -51,102 +12,22 @@ struct NarAccessor : public SourceAccessor
 
     NarListing root;
 
-    struct NarIndexer : FileSystemObjectSink, Source
-    {
-        NarAccessor & acc;
-        Source & source;
-
-        std::stack<NarListing *> parents;
-
-        bool isExec = false;
-
-        uint64_t pos = 0;
-
-        NarIndexer(NarAccessor & acc, Source & source)
-            : acc(acc)
-            , source(source)
-        {
-        }
-
-        NarListing & createMember(const CanonPath & path, NarListing member)
-        {
-            size_t level = 0;
-            for (auto _ : path) {
-                (void) _;
-                ++level;
-            }
-
-            while (parents.size() > level)
-                parents.pop();
-
-            if (parents.empty()) {
-                acc.root = std::move(member);
-                parents.push(&acc.root);
-                return acc.root;
-            } else {
-                auto * parentDir = std::get_if<NarListing::Directory>(&parents.top()->raw);
-                if (!parentDir)
-                    throw Error("NAR file missing parent directory of path '%s'", path);
-                auto result = parentDir->entries.emplace(*path.baseName(), std::move(member));
-                parents.push(&result.first->second);
-                return result.first->second;
-            }
-        }
-
-        void createDirectory(const CanonPath & path) override
-        {
-            createMember(path, NarListing::Directory{});
-        }
-
-        void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
-        {
-            auto & nm = createMember(
-                path,
-                NarListing::Regular{
-                    .executable = false,
-                    .contents =
-                        NarListingRegularFile{
-                            .fileSize = 0,
-                            .narOffset = pos,
-                        },
-                });
-            NarMemberConstructor nmc{nm, pos};
-            nmc.skipContents = true; /* Don't care about contents. */
-            func(nmc);
-        }
-
-        void createSymlink(const CanonPath & path, const std::string & target) override
-        {
-            createMember(path, NarListing::Symlink{.target = target});
-        }
-
-        size_t read(char * data, size_t len) override
-        {
-            auto n = source.read(data, len);
-            pos += n;
-            return n;
-        }
-    };
-
     NarAccessor(std::string && _nar)
         : nar(_nar)
     {
         StringSource source(*nar);
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
+        root = parseNarListing(source);
     }
 
     NarAccessor(Source & source)
     {
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
+        root = parseNarListing(source);
     }
 
     NarAccessor(Source & source, GetNarBytes getNarBytes)
         : getNarBytes(std::move(getNarBytes))
     {
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
+        root = parseNarListing(source);
     }
 
     NarAccessor(NarListing && listing, GetNarBytes getNarBytes)

@@ -1,6 +1,126 @@
 #include "nix/util/nar-listing.hh"
+#include "nix/util/archive.hh"
+#include "nix/util/error.hh"
+
+#include <stack>
 
 namespace nix {
+
+NarListing parseNarListing(Source & source)
+{
+    struct NarMemberConstructor : CreateRegularFileSink
+    {
+    private:
+
+        NarListing & narMember;
+
+        uint64_t & pos;
+
+    public:
+
+        NarMemberConstructor(NarListing & nm, uint64_t & pos)
+            : narMember(nm)
+            , pos(pos)
+        {
+        }
+
+        void isExecutable() override
+        {
+            auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
+            if (reg)
+                reg->executable = true;
+        }
+
+        void preallocateContents(uint64_t size) override
+        {
+            auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
+            if (reg) {
+                reg->contents.fileSize = size;
+                reg->contents.narOffset = pos;
+            }
+        }
+
+        void operator()(std::string_view data) override {}
+    };
+
+    struct NarIndexer : FileSystemObjectSink, Source
+    {
+        std::optional<NarListing> root;
+        Source & source;
+
+        std::stack<NarListing *> parents;
+
+        uint64_t pos = 0;
+
+        NarIndexer(Source & source)
+            : source(source)
+        {
+        }
+
+        NarListing & createMember(const CanonPath & path, NarListing member)
+        {
+            size_t level = 0;
+            for (auto _ : path) {
+                (void) _;
+                ++level;
+            }
+
+            while (parents.size() > level)
+                parents.pop();
+
+            if (parents.empty()) {
+                root = std::move(member);
+                parents.push(&*root);
+                return *root;
+            } else {
+                auto * parentDir = std::get_if<NarListing::Directory>(&parents.top()->raw);
+                if (!parentDir)
+                    throw Error("NAR file missing parent directory of path '%s'", path);
+                auto result = parentDir->entries.emplace(*path.baseName(), std::move(member));
+                parents.push(&result.first->second);
+                return result.first->second;
+            }
+        }
+
+        void createDirectory(const CanonPath & path) override
+        {
+            createMember(path, NarListing::Directory{});
+        }
+
+        void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
+        {
+            auto & nm = createMember(
+                path,
+                NarListing::Regular{
+                    .executable = false,
+                    .contents =
+                        NarListingRegularFile{
+                            .fileSize = 0,
+                            .narOffset = pos,
+                        },
+                });
+            NarMemberConstructor nmc{nm, pos};
+            nmc.skipContents = true; /* Don't care about contents. */
+            func(nmc);
+        }
+
+        void createSymlink(const CanonPath & path, const std::string & target) override
+        {
+            createMember(path, NarListing::Symlink{.target = target});
+        }
+
+        size_t read(char * data, size_t len) override
+        {
+            auto n = source.read(data, len);
+            pos += n;
+            return n;
+        }
+    };
+
+    NarIndexer indexer(source);
+    parseDump(indexer, indexer);
+    return std::move(*indexer.root);
+}
 
 template<bool deep>
 using ListNarResult = std::conditional_t<deep, NarListing, ShallowNarListing>;
