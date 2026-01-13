@@ -54,6 +54,7 @@ deps_private += gtest
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'binary-cache-store.cc',
   'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
