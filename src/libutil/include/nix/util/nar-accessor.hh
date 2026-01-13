@@ -6,8 +6,6 @@
 #include <functional>
 #include <filesystem>
 
-#include <nlohmann/json_fwd.hpp>
-
 namespace nix {
 
 struct Source;
@@ -34,14 +32,6 @@ using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
 GetNarBytes seekableGetNarBytes(const std::filesystem::path & path);
 
 GetNarBytes seekableGetNarBytes(Descriptor fd);
-
-ref<SourceAccessor> makeLazyNarAccessor(const nlohmann::json & listing, GetNarBytes getNarBytes);
-
-/**
- * Creates a NAR accessor from a given stream and a GetNarBytes getter.
- * @param source Consumed eagerly. References to it are not persisted in the resulting SourceAccessor.
- */
-ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
 
 struct NarListingRegularFile
 {
@@ -85,5 +75,13 @@ NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path);
 ShallowNarListing listNarShallow(SourceAccessor & accessor, const CanonPath & path);
 
 // All json_avoids_null and JSON_IMPL covered by generic templates in memory-source-accessor.hh
+
+ref<SourceAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes);
+
+/**
+ * Creates a NAR accessor from a given stream and a GetNarBytes getter.
+ * @param source Consumed eagerly. References to it are not persisted in the resulting SourceAccessor.
+ */
+ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
 
 } // namespace nix

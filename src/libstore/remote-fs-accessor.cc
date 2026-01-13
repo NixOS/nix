@@ -60,9 +60,9 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
 
         if (nix::pathExists(cacheFile)) {
             try {
-                auto listing = nix::readFile(listingFile);
-                auto listingJson = nlohmann::json::parse(listing);
-                return cacheAccessor(makeLazyNarAccessor(listingJson, seekableGetNarBytes(cacheFile)));
+                return cacheAccessor(makeLazyNarAccessor(
+                    nlohmann::json::parse(nix::readFile(listingFile)).template get<NarListing>(),
+                    seekableGetNarBytes(cacheFile)));
             } catch (SystemError &) {
             }
 
