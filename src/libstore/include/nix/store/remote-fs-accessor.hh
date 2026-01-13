@@ -33,9 +33,6 @@ class RemoteFSAccessor : public SourceAccessor
 
     std::filesystem::path makeCacheFile(const Hash & narHash, const std::string & ext);
 
-    ref<SourceAccessor>
-    addToCache(const std::filesystem::path & cacheFile, const std::filesystem::path & listingFile, std::string && nar);
-
 public:
 
     /**

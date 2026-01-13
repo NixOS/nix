@@ -27,32 +27,6 @@ std::filesystem::path RemoteFSAccessor::makeCacheFile(const Hash & narHash, cons
     return res;
 }
 
-ref<SourceAccessor> RemoteFSAccessor::addToCache(
-    const std::filesystem::path & cacheFile, const std::filesystem::path & listingFile, std::string && nar)
-{
-    if (!cacheFile.empty()) {
-        try {
-            /* FIXME: do this asynchronously. */
-            writeFile(cacheFile, nar);
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-    }
-
-    auto narAccessor = makeNarAccessor(std::move(nar));
-
-    if (!listingFile.empty()) {
-        try {
-            nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
-            writeFile(listingFile, j.dump());
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-    }
-
-    return narAccessor;
-}
-
 std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
 {
     auto [storePath, restPath] = store->toStorePath(store->storeDir + path.abs());
@@ -76,11 +50,15 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
         return accessor;
     };
 
-    std::filesystem::path cacheFile, listingFile;
+    auto getNar = [&]() {
+        StringSink sink;
+        store->narFromPath(storePath, sink);
+        return std::move(sink.s);
+    };
 
     if (cacheDir) {
-        cacheFile = makeCacheFile(info->narHash, "nar");
-        listingFile = makeCacheFile(info->narHash, "ls");
+        auto cacheFile = makeCacheFile(info->narHash, "nar");
+        auto listingFile = makeCacheFile(info->narHash, "ls");
 
         if (nix::pathExists(cacheFile)) {
             try {
@@ -95,11 +73,29 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
             } catch (SystemError &) {
             }
         }
+
+        auto nar = getNar();
+
+        try {
+            /* FIXME: do this asynchronously. */
+            writeFile(cacheFile, nar);
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+
+        auto narAccessor = makeNarAccessor(std::move(nar));
+
+        try {
+            nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
+            writeFile(listingFile, j.dump());
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+
+        return cacheAccessor(narAccessor);
     }
 
-    StringSink sink;
-    store->narFromPath(storePath, sink);
-    return cacheAccessor(addToCache(cacheFile, listingFile, std::move(sink.s)));
+    return cacheAccessor(makeNarAccessor(getNar()));
 }
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
