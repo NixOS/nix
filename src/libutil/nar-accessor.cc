@@ -4,13 +4,18 @@
 
 namespace nix {
 
-struct NarAccessor : public SourceAccessor
+struct NarAccessorImpl : NarAccessor
 {
     NarListing root;
 
     GetNarBytes getNarBytes;
 
-    NarAccessor(std::string && nar)
+    const NarListing & getListing() const override
+    {
+        return root;
+    }
+
+    NarAccessorImpl(std::string && nar)
         : root{[&nar]() {
             StringSource source(nar);
             return parseNarListing(source);
@@ -20,18 +25,18 @@ struct NarAccessor : public SourceAccessor
     {
     }
 
-    NarAccessor(Source & source)
+    NarAccessorImpl(Source & source)
         : root{parseNarListing(source)}
     {
     }
 
-    NarAccessor(Source & source, GetNarBytes getNarBytes)
+    NarAccessorImpl(Source & source, GetNarBytes getNarBytes)
         : root{parseNarListing(source)}
         , getNarBytes{std::move(getNarBytes)}
     {
     }
 
-    NarAccessor(NarListing && listing, GetNarBytes getNarBytes)
+    NarAccessorImpl(NarListing && listing, GetNarBytes getNarBytes)
         : root{std::move(listing)}
         , getNarBytes{std::move(getNarBytes)}
     {
@@ -127,24 +132,24 @@ struct NarAccessor : public SourceAccessor
     }
 };
 
-ref<SourceAccessor> makeNarAccessor(std::string && nar)
+ref<NarAccessor> makeNarAccessor(std::string && nar)
 {
-    return make_ref<NarAccessor>(std::move(nar));
+    return make_ref<NarAccessorImpl>(std::move(nar));
 }
 
-ref<SourceAccessor> makeNarAccessor(Source & source)
+ref<NarAccessor> makeNarAccessor(Source & source)
 {
-    return make_ref<NarAccessor>(source);
+    return make_ref<NarAccessorImpl>(source);
 }
 
-ref<SourceAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes)
+ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes)
 {
-    return make_ref<NarAccessor>(std::move(listing), getNarBytes);
+    return make_ref<NarAccessorImpl>(std::move(listing), getNarBytes);
 }
 
-ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
+ref<NarAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
 {
-    return make_ref<NarAccessor>(source, getNarBytes);
+    return make_ref<NarAccessorImpl>(source, getNarBytes);
 }
 
 GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)

@@ -84,7 +84,7 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
         auto narAccessor = makeNarAccessor(std::move(nar));
 
         try {
-            nlohmann::json j = listNarDeep(*narAccessor, CanonPath::root);
+            nlohmann::json j = narAccessor->getListing();
             writeFile(listingFile, j.dump());
         } catch (...) {
             ignoreExceptionExceptInterrupt();

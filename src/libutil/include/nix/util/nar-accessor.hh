@@ -11,12 +11,23 @@ namespace nix {
 struct Source;
 
 /**
+ * A SourceAccessor for NAR files that provides access to the listing structure.
+ */
+struct NarAccessor : SourceAccessor
+{
+    /**
+     * Get the NAR listing structure.
+     */
+    virtual const NarListing & getListing() const = 0;
+};
+
+/**
  * Return an object that provides access to the contents of a NAR
  * file.
  */
-ref<SourceAccessor> makeNarAccessor(std::string && nar);
+ref<NarAccessor> makeNarAccessor(std::string && nar);
 
-ref<SourceAccessor> makeNarAccessor(Source & source);
+ref<NarAccessor> makeNarAccessor(Source & source);
 
 /**
  * Create a NAR accessor from a NAR listing (in the format produced by
@@ -33,12 +44,12 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path);
 
 GetNarBytes seekableGetNarBytes(Descriptor fd);
 
-ref<SourceAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes);
+ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes);
 
 /**
  * Creates a NAR accessor from a given stream and a GetNarBytes getter.
  * @param source Consumed eagerly. References to it are not persisted in the resulting SourceAccessor.
  */
-ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
+ref<NarAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
 
 } // namespace nix
