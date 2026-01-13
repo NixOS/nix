@@ -5,6 +5,7 @@
 
 #include <map>
 #include <stack>
+#include <utility>
 
 namespace nix {
 
@@ -331,6 +332,8 @@ static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPat
     case SourceAccessor::Type::tUnknown:
         assert(false); // cannot happen for NARs
     }
+
+    unreachable();
 }
 
 NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
