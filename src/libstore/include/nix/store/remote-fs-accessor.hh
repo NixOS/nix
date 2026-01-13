@@ -31,8 +31,6 @@ class RemoteFSAccessor : public SourceAccessor
 
     friend struct BinaryCacheStore;
 
-    std::filesystem::path makeCacheFile(const Hash & narHash, const std::string & ext);
-
 public:
 
     /**
