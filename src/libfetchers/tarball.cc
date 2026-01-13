@@ -114,6 +114,12 @@ static DownloadTarballResult downloadTarball_(
     // it is not in fact a tarball.
     if (url.scheme == "file") {
         std::filesystem::path localPath = renderUrlPathEnsureLegal(url.path);
+        if (!localPath.is_absolute()) {
+            throw Error(
+                "tarball '%s' must use an absolute path. "
+                "The 'file' scheme does not support relative paths.",
+                url);
+        }
         if (!exists(localPath)) {
             throw Error("tarball '%s' does not exist.", localPath);
         }
