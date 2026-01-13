@@ -334,7 +334,7 @@ static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPat
         assert(false); // cannot happen for NARs
     }
 
-    std::unreachable();
+    unreachable();
 }
 
 NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
