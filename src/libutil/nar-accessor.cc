@@ -6,33 +6,34 @@ namespace nix {
 
 struct NarAccessor : public SourceAccessor
 {
-    std::optional<const std::string> nar;
+    NarListing root;
 
     GetNarBytes getNarBytes;
 
-    NarListing root;
-
-    NarAccessor(std::string && _nar)
-        : nar(_nar)
+    NarAccessor(std::string && nar)
+        : root{[&nar]() {
+            StringSource source(nar);
+            return parseNarListing(source);
+        }()}
+        , getNarBytes{
+              [nar = std::move(nar)](uint64_t offset, uint64_t length) { return std::string{nar, offset, length}; }}
     {
-        StringSource source(*nar);
-        root = parseNarListing(source);
     }
 
     NarAccessor(Source & source)
+        : root{parseNarListing(source)}
     {
-        root = parseNarListing(source);
     }
 
     NarAccessor(Source & source, GetNarBytes getNarBytes)
-        : getNarBytes(std::move(getNarBytes))
+        : root{parseNarListing(source)}
+        , getNarBytes{std::move(getNarBytes)}
     {
-        root = parseNarListing(source);
     }
 
     NarAccessor(NarListing && listing, GetNarBytes getNarBytes)
-        : getNarBytes(getNarBytes)
-        , root{listing}
+        : root{std::move(listing)}
+        , getNarBytes{std::move(getNarBytes)}
     {
     }
 
@@ -112,11 +113,8 @@ struct NarAccessor : public SourceAccessor
         if (!reg)
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
-        if (getNarBytes)
-            return getNarBytes(*reg->contents.narOffset, *reg->contents.fileSize);
-
-        assert(nar);
-        return std::string(*nar, *reg->contents.narOffset, *reg->contents.fileSize);
+        assert(getNarBytes);
+        return getNarBytes(*reg->contents.narOffset, *reg->contents.fileSize);
     }
 
     std::string readLink(const CanonPath & path) override
