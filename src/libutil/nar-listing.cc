@@ -12,32 +12,27 @@ NarListing parseNarListing(Source & source)
     {
     private:
 
-        NarListing & narMember;
+        NarListing::Regular & regular;
 
         uint64_t & pos;
 
     public:
 
-        NarMemberConstructor(NarListing & nm, uint64_t & pos)
-            : narMember(nm)
+        NarMemberConstructor(NarListing::Regular & reg, uint64_t & pos)
+            : regular(reg)
             , pos(pos)
         {
         }
 
         void isExecutable() override
         {
-            auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-            if (reg)
-                reg->executable = true;
+            regular.executable = true;
         }
 
         void preallocateContents(uint64_t size) override
         {
-            auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-            if (reg) {
-                reg->contents.fileSize = size;
-                reg->contents.narOffset = pos;
-            }
+            regular.contents.fileSize = size;
+            regular.contents.narOffset = pos;
         }
 
         void operator()(std::string_view data) override {}
@@ -99,7 +94,9 @@ NarListing parseNarListing(Source & source)
                             .narOffset = pos,
                         },
                 });
-            NarMemberConstructor nmc{nm, pos};
+            /* We know the downcast will succeed because we just added this */
+            auto & reg = std::get<NarListing::Regular>(nm.raw);
+            NarMemberConstructor nmc{reg, pos};
             nmc.skipContents = true; /* Don't care about contents. */
             func(nmc);
         }
