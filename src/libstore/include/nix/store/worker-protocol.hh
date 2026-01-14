@@ -161,8 +161,8 @@ enum struct WorkerProto::Op : uint64_t {
     QuerySubstitutablePathInfo = 21,
     QueryDerivationOutputs = 22, // obsolete
     QueryAllValidPaths = 23,
-    QueryFailedPaths = 24,
-    ClearFailedPaths = 25,
+    // QueryFailedPaths = 24, // removed
+    // ClearFailedPaths = 25, // removed
     QueryPathInfo = 26,
     // ImportPaths = 27, // removed
     QueryDerivationOutputNames = 28, // obsolete

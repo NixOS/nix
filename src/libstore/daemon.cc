@@ -988,10 +988,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryFailedPaths:
-    case WorkerProto::Op::ClearFailedPaths:
-        throw Error("Removed operation %1%", op);
-
     default:
         throw Error("invalid operation %1%", op);
     }
