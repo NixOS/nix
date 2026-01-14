@@ -69,7 +69,7 @@ struct curlFileTransfer : public FileTransfer
         curlFileTransfer & fileTransfer;
         FileTransferRequest request;
         FileTransferResult result;
-        Activity act;
+        std::unique_ptr<Activity> _act;
         bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
@@ -124,12 +124,6 @@ struct curlFileTransfer : public FileTransfer
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
-            , act(*logger,
-                  lvlTalkative,
-                  actFileTransfer,
-                  fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
-                  {request.uri.to_string()},
-                  request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
                 if (errorSink) {
@@ -325,9 +319,29 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
         }
 
+        /**
+         * Lazily start an `Activity`. We don't do this in the `TransferItem` constructor to avoid showing downloads
+         * that are only enqueued but not actually started.
+         */
+        Activity & act()
+        {
+            if (!_act) {
+                _act = std::make_unique<Activity>(
+                    *logger,
+                    lvlTalkative,
+                    actFileTransfer,
+                    fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
+                    Logger::Fields{request.uri.to_string()},
+                    request.parentAct);
+                // Reset the start time to when we actually started the download.
+                startTime = std::chrono::steady_clock::now();
+            }
+            return *_act;
+        }
+
         int progressCallback(curl_off_t dltotal, curl_off_t dlnow) noexcept
         try {
-            act.progress(dlnow, dltotal);
+            act().progress(dlnow, dltotal);
             return getInterrupted();
         } catch (nix::Interrupted &) {
             assert(getInterrupted());
@@ -402,6 +416,13 @@ struct curlFileTransfer : public FileTransfer
         static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
             return ((TransferItem *) clientp)->seekCallback(offset, origin);
+        }
+
+        static int resolverCallbackWrapper(void *, void *, void * clientp) noexcept
+        {
+            // Create the `Activity` associated with this download.
+            ((TransferItem *) clientp)->act();
+            return 0;
         }
 
         void unpause()
@@ -516,6 +537,11 @@ struct curlFileTransfer : public FileTransfer
             }
 #endif
 
+            // This seems to be the earliest libcurl callback that signals that the download is happening, so we can
+            // call act().
+            curl_easy_setopt(req, CURLOPT_RESOLVER_START_FUNCTION, resolverCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_RESOLVER_START_DATA, this);
+
             result.data.clear();
             result.bodySize = 0;
         }
@@ -564,7 +590,7 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 304 && result.etag == "")
                     result.etag = request.expectedETag;
 
-                act.progress(result.bodySize, result.bodySize);
+                act().progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
             }
