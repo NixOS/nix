@@ -715,6 +715,8 @@ struct curlFileTransfer : public FileTransfer
 
     std::thread workerThread;
 
+    const size_t maxQueueSize = fileTransferSettings.httpConnections.get() * 5;
+
     curlFileTransfer()
         : mt19937(rd())
     {
@@ -820,6 +822,13 @@ struct curlFileTransfer : public FileTransfer
             {
                 auto state(state_.lock());
                 while (!state->incoming.empty()) {
+                    /* Limit the number of active curl handles, since curl doesn't scale well. */
+                    if (items.size() + incoming.size() >= maxQueueSize) {
+                        auto t = now + std::chrono::milliseconds(100);
+                        if (nextWakeup == std::chrono::steady_clock::time_point() || t < nextWakeup)
+                            nextWakeup = t;
+                        break;
+                    }
                     auto item = state->incoming.top();
                     if (item->embargo <= now) {
                         incoming.push_back(item);
