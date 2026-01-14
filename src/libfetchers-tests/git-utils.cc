@@ -14,6 +14,7 @@
 
 #include <git2/blob.h>
 #include <git2/tree.h>
+#include <fstream>
 
 namespace nix {
 
@@ -172,6 +173,259 @@ TEST_F(GitUtilsTest, peel_reference)
 
     git_signature_free(sig);
     git_repository_free(rawRepo);
+}
+
+// ============================================================================
+// Tests for odbOnly mode (Phase 2)
+// ============================================================================
+
+TEST_F(GitUtilsTest, odbOnly_opens_repository)
+{
+    // First create some content in the repo
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    // Create a blob
+    git_oid blob_oid;
+    const char * blob_content = "test content";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+
+    git_repository_free(rawRepo);
+
+    // Now open with odbOnly=true (must use .git directory)
+    auto gitDir = tmpDir / ".git";
+    auto repo = GitRepo::openRepo(gitDir, {.odbOnly = true});
+    ASSERT_NE(&*repo, nullptr);
+
+    // Should be able to check if object exists
+    char sha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(sha, sizeof(sha), &blob_oid);
+    auto hash = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
+    ASSERT_TRUE(repo->hasObject(hash));
+}
+
+TEST_F(GitUtilsTest, odbOnly_fails_without_objects_dir)
+{
+    // Create a path that doesn't have a git objects directory
+    auto nonExistentPath = tmpDir / "nonexistent";
+
+    ASSERT_THROW(
+        GitRepo::openRepo(nonExistentPath, {.odbOnly = true}),
+        Error);
+}
+
+TEST_F(GitUtilsTest, odbOnly_accesses_objects_directly)
+{
+    // Create a repo and verify odbOnly can access its objects directly
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    // Create a blob
+    git_oid blob_oid;
+    const char * blob_content = "test content for odbOnly direct access";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+
+    // Create a tree with the blob
+    git_treebuilder * builder = nullptr;
+    ASSERT_EQ(git_treebuilder_new(&builder, rawRepo, nullptr), 0);
+    ASSERT_EQ(git_treebuilder_insert(nullptr, builder, "test.txt", &blob_oid, GIT_FILEMODE_BLOB), 0);
+
+    git_oid treeOid;
+    ASSERT_EQ(git_treebuilder_write(&treeOid, builder), 0);
+    git_treebuilder_free(builder);
+
+    git_repository_free(rawRepo);
+
+    // Open with odbOnly and verify we can access objects
+    auto gitDir = tmpDir / ".git";
+    auto repo = GitRepo::openRepo(gitDir, {.odbOnly = true});
+    ASSERT_NE(&*repo, nullptr);
+
+    // Verify blob exists
+    char blobSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(blobSha, sizeof(blobSha), &blob_oid);
+    auto blobHash = Hash::parseNonSRIUnprefixed(blobSha, HashAlgorithm::SHA1);
+    ASSERT_TRUE(repo->hasObject(blobHash));
+
+    // Verify tree exists
+    char treeSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(treeSha, sizeof(treeSha), &treeOid);
+    auto treeHash = Hash::parseNonSRIUnprefixed(treeSha, HashAlgorithm::SHA1);
+    ASSERT_TRUE(repo->hasObject(treeHash));
+}
+
+// ============================================================================
+// Tests for getSubtreeSha (Phase 2)
+// ============================================================================
+
+TEST_F(GitUtilsTest, getSubtreeSha_finds_entry)
+{
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    // Create a blob for file content
+    git_oid blob_oid;
+    const char * blob_content = "file content";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+
+    // Create inner tree (subdir)
+    git_treebuilder * innerBuilder = nullptr;
+    ASSERT_EQ(git_treebuilder_new(&innerBuilder, rawRepo, nullptr), 0);
+    ASSERT_EQ(git_treebuilder_insert(nullptr, innerBuilder, "file.txt", &blob_oid, GIT_FILEMODE_BLOB), 0);
+
+    git_oid innerTreeOid;
+    ASSERT_EQ(git_treebuilder_write(&innerTreeOid, innerBuilder), 0);
+    git_treebuilder_free(innerBuilder);
+
+    // Create outer tree with subdir
+    git_treebuilder * outerBuilder = nullptr;
+    ASSERT_EQ(git_treebuilder_new(&outerBuilder, rawRepo, nullptr), 0);
+    ASSERT_EQ(git_treebuilder_insert(nullptr, outerBuilder, "subdir", &innerTreeOid, GIT_FILEMODE_TREE), 0);
+
+    git_oid outerTreeOid;
+    ASSERT_EQ(git_treebuilder_write(&outerTreeOid, outerBuilder), 0);
+    git_treebuilder_free(outerBuilder);
+
+    git_repository_free(rawRepo);
+
+    // Now test getSubtreeSha
+    auto repo = openRepo();
+
+    char outerSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(outerSha, sizeof(outerSha), &outerTreeOid);
+    auto outerHash = Hash::parseNonSRIUnprefixed(outerSha, HashAlgorithm::SHA1);
+
+    char innerSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(innerSha, sizeof(innerSha), &innerTreeOid);
+    auto expectedInnerHash = Hash::parseNonSRIUnprefixed(innerSha, HashAlgorithm::SHA1);
+
+    auto resultHash = repo->getSubtreeSha(outerHash, "subdir");
+    ASSERT_EQ(resultHash, expectedInnerHash);
+}
+
+TEST_F(GitUtilsTest, getSubtreeSha_missing_entry_throws)
+{
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    // Create empty tree
+    git_treebuilder * builder = nullptr;
+    ASSERT_EQ(git_treebuilder_new(&builder, rawRepo, nullptr), 0);
+
+    // Add a dummy entry so tree isn't empty
+    git_oid blob_oid;
+    const char * blob_content = "x";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+    ASSERT_EQ(git_treebuilder_insert(nullptr, builder, "existing", &blob_oid, GIT_FILEMODE_BLOB), 0);
+
+    git_oid treeOid;
+    ASSERT_EQ(git_treebuilder_write(&treeOid, builder), 0);
+    git_treebuilder_free(builder);
+    git_repository_free(rawRepo);
+
+    auto repo = openRepo();
+
+    char sha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(sha, sizeof(sha), &treeOid);
+    auto treeHash = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
+
+    ASSERT_THROW(repo->getSubtreeSha(treeHash, "nonexistent"), Error);
+}
+
+// ============================================================================
+// Tests for getCommitTree (Phase 2)
+// ============================================================================
+
+TEST_F(GitUtilsTest, getCommitTree_returns_root_tree)
+{
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    // Create a blob
+    git_oid blob_oid;
+    const char * blob_content = "content";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+
+    // Create a tree
+    git_treebuilder * builder = nullptr;
+    ASSERT_EQ(git_treebuilder_new(&builder, rawRepo, nullptr), 0);
+    ASSERT_EQ(git_treebuilder_insert(nullptr, builder, "file.txt", &blob_oid, GIT_FILEMODE_BLOB), 0);
+
+    git_oid treeOid;
+    ASSERT_EQ(git_treebuilder_write(&treeOid, builder), 0);
+    git_treebuilder_free(builder);
+
+    git_tree * tree = nullptr;
+    ASSERT_EQ(git_tree_lookup(&tree, rawRepo, &treeOid), 0);
+
+    // Create a commit
+    git_signature * sig = nullptr;
+    ASSERT_EQ(git_signature_now(&sig, "test", "test@example.com"), 0);
+
+    git_oid commitOid;
+    ASSERT_EQ(git_commit_create_v(&commitOid, rawRepo, "HEAD", sig, sig, nullptr, "test commit", tree, 0), 0);
+
+    git_signature_free(sig);
+    git_tree_free(tree);
+    git_repository_free(rawRepo);
+
+    // Now test getCommitTree
+    auto repo = openRepo();
+
+    char commitSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(commitSha, sizeof(commitSha), &commitOid);
+    auto commitHash = Hash::parseNonSRIUnprefixed(commitSha, HashAlgorithm::SHA1);
+
+    char treeSha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(treeSha, sizeof(treeSha), &treeOid);
+    auto expectedTreeHash = Hash::parseNonSRIUnprefixed(treeSha, HashAlgorithm::SHA1);
+
+    auto resultHash = repo->getCommitTree(commitHash);
+    ASSERT_EQ(resultHash, expectedTreeHash);
+}
+
+TEST_F(GitUtilsTest, getCommitTree_invalid_sha_throws)
+{
+    auto repo = openRepo();
+
+    // Use a SHA that doesn't exist
+    auto invalidHash = Hash::parseNonSRIUnprefixed(
+        "0000000000000000000000000000000000000000", HashAlgorithm::SHA1);
+
+    ASSERT_THROW(repo->getCommitTree(invalidHash), Error);
+}
+
+// ============================================================================
+// Tests for hasObject
+// ============================================================================
+
+TEST_F(GitUtilsTest, hasObject_returns_true_for_existing)
+{
+    git_repository * rawRepo = nullptr;
+    ASSERT_EQ(git_repository_open(&rawRepo, tmpDir.string().c_str()), 0);
+
+    git_oid blob_oid;
+    const char * blob_content = "test";
+    ASSERT_EQ(git_blob_create_from_buffer(&blob_oid, rawRepo, blob_content, strlen(blob_content)), 0);
+    git_repository_free(rawRepo);
+
+    auto repo = openRepo();
+
+    char sha[GIT_OID_SHA1_HEXSIZE + 1];
+    git_oid_tostr(sha, sizeof(sha), &blob_oid);
+    auto hash = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
+
+    ASSERT_TRUE(repo->hasObject(hash));
+}
+
+TEST_F(GitUtilsTest, hasObject_returns_false_for_missing)
+{
+    auto repo = openRepo();
+
+    auto missingHash = Hash::parseNonSRIUnprefixed(
+        "0000000000000000000000000000000000000000", HashAlgorithm::SHA1);
+
+    ASSERT_FALSE(repo->hasObject(missingHash));
 }
 
 TEST(GitUtils, isLegalRefName)

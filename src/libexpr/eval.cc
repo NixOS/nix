@@ -24,7 +24,9 @@
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/fetchers/tarball.hh"
 #include "nix/fetchers/input-cache.hh"
+#include "nix/fetchers/git-utils.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/processes.hh"
 #include "nix/store/async-path-writer.hh"
 #include "nix/expr/parallel-eval.hh"
 
@@ -33,6 +35,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <sstream>
 #include <cstring>
@@ -330,6 +333,7 @@ EvalState::EvalState(
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , regexCache(makeRegexCache())
+    , worldTreeShaCache(make_ref<decltype(worldTreeShaCache)::element_type>())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
     , baseEnv(**baseEnvP)
@@ -420,6 +424,531 @@ void EvalState::allowAndSetStorePathString(const StorePath & storePath, Value & 
     allowPath(storePath);
 
     mkStorePathString(storePath, v);
+}
+
+ref<GitRepo> EvalState::getWorldRepo() const
+{
+    std::call_once(worldRepoFlag, [this]() {
+        auto gitDir = settings.tectonixGitDir.get();
+        if (gitDir.empty())
+            throw Error("--tectonix-git-dir must be specified to use tectonix builtins");
+
+        // Expand ~ to home directory
+        if (hasPrefix(gitDir, "~/"))
+            gitDir = getHome() + gitDir.substr(1);
+
+        worldRepo = GitRepo::openRepo(std::filesystem::path(gitDir), {.bare = true, .odbOnly = true});
+        debug("opened world repo at %s", gitDir);
+    });
+    return *worldRepo;
+}
+
+ref<SourceAccessor> EvalState::getWorldGitAccessor() const
+{
+    std::call_once(worldGitAccessorFlag, [this]() {
+        auto sha = settings.tectonixGitSha.get();
+        if (sha.empty())
+            throw Error("--tectonix-git-sha must be specified to use tectonix builtins");
+
+        auto repo = getWorldRepo();
+        auto hash = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
+
+        if (!repo->hasObject(hash))
+            throw Error("tectonix-git-sha '%s' not found in repository", sha);
+
+        // Validate that the SHA is a commit by trying to get its tree.
+        // This gives a clear error if someone accidentally passes a tree or blob SHA.
+        try {
+            repo->getCommitTree(hash);
+        } catch (Error & e) {
+            throw Error("tectonix-git-sha '%s' does not appear to be a valid commit: %s", sha, e.what());
+        }
+
+        // exportIgnore=false: The world accessor is used for path validation and tree SHA
+        // computation, where we need to see all files. Zone accessors (mountZoneByTreeSha,
+        // getZoneStorePath) use exportIgnore=true to honor .gitattributes for actual content.
+        GitAccessorOptions opts{.exportIgnore = false, .smudgeLfs = false};
+        worldGitAccessor = repo->getAccessor(hash, opts, "world");
+        debug("created world accessor at commit %s", sha);
+    });
+    return *worldGitAccessor;
+}
+
+std::optional<ref<SourceAccessor>> EvalState::getWorldCheckoutAccessor() const
+{
+    if (!isTectonixSourceAvailable())
+        return std::nullopt;
+
+    std::call_once(worldCheckoutAccessorFlag, [this]() {
+        // Use the global filesystem accessor with the checkout path as root
+        worldCheckoutAccessor = getFSSourceAccessor();
+    });
+    return *worldCheckoutAccessor;
+}
+
+bool EvalState::isTectonixSourceAvailable() const
+{
+    return !settings.tectonixCheckoutPath.get().empty();
+}
+
+// Helper to normalize zone paths: strip leading // prefix
+// Zone paths in manifest have // prefix (e.g., //areas/tools/dev)
+// Filesystem operations need paths without // (e.g., areas/tools/dev)
+static std::string normalizeZonePath(std::string_view zonePath)
+{
+    std::string path(zonePath);
+    if (hasPrefix(path, "//"))
+        path = path.substr(2);
+    return path;
+}
+
+// Helper to sanitize zone path for use in store path names.
+// Store paths only allow: a-zA-Z0-9 and +-._?=
+// Replaces / with - and any other invalid chars with _
+static std::string sanitizeZoneNameForStore(std::string_view zonePath)
+{
+    auto zone = normalizeZonePath(zonePath);
+    std::string result;
+    result.reserve(zone.size());
+    for (char c : zone) {
+        if (c == '/') {
+            result += '-';
+        } else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') ||
+                   (c >= 'A' && c <= 'Z') || c == '+' || c == '-' ||
+                   c == '.' || c == '_' || c == '?' || c == '=') {
+            result += c;
+        } else {
+            result += '_';
+        }
+    }
+    return result;
+}
+
+Hash EvalState::getWorldTreeSha(std::string_view worldPath) const
+{
+    auto path = normalizeZonePath(worldPath);
+
+    // Check cache first
+    if (auto cached = getConcurrent(*worldTreeShaCache, path)) {
+        debug("getWorldTreeSha cache hit for '%s'", path);
+        return *cached;
+    }
+
+    // Compute by walking from root
+    auto repo = getWorldRepo();
+    auto sha = settings.tectonixGitSha.get();
+    auto commitSha = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
+
+    // Get the root tree SHA from the commit
+    auto rootTreeSha = repo->getCommitTree(commitSha);
+
+    // Walk path components, caching intermediate results
+    Hash currentSha = rootTreeSha;
+    std::string currentPath;
+
+    // Reuse cached accessor for path validation
+    auto accessor = getWorldGitAccessor();
+
+    for (auto & component : tokenizeString<std::vector<std::string>>(path, "/")) {
+        if (component.empty()) continue;
+        if (component == ".." || component == ".")
+            throw Error("invalid path component '%s' in world path '%s'", component, worldPath);
+
+        std::string nextPath = currentPath.empty() ? component : currentPath + "/" + component;
+
+        // Check if this level is cached
+        if (auto cached = getConcurrent(*worldTreeShaCache, nextPath)) {
+            currentSha = *cached;
+            currentPath = nextPath;
+            continue;
+        }
+
+        // Need to compute: get tree entry for this component
+        auto fullPath = CanonPath("/" + nextPath);
+        auto stat = accessor->maybeLstat(fullPath);
+
+        if (!stat || stat->type != SourceAccessor::Type::tDirectory)
+            throw Error("path '%s' does not exist or is not a directory in world", nextPath);
+
+        // Get the tree SHA for this subtree
+        currentSha = repo->getSubtreeSha(currentSha, component);
+
+        // Cache this level. Note: concurrent threads may compute and insert the same
+        // path simultaneously. This is benign because they will compute the same SHA
+        // (deterministic from git tree), so either insertion succeeds or finds an
+        // equivalent value. We use try_emplace which is atomic for concurrent_flat_map.
+        worldTreeShaCache->try_emplace(nextPath, currentSha);
+        currentPath = nextPath;
+    }
+
+    debug("getWorldTreeSha computed '%s' -> %s", path, currentSha.gitRev());
+    return currentSha;
+}
+
+const std::set<std::string> & EvalState::getTectonixSparseCheckoutRoots() const
+{
+    std::call_once(tectonixSparseCheckoutRootsFlag, [this]() {
+        if (isTectonixSourceAvailable()) {
+            auto checkoutPath = settings.tectonixCheckoutPath.get();
+
+            // Read .git to find the actual git directory
+            // It can be either a directory or a file containing "gitdir: <path>"
+            auto dotGitPath = std::filesystem::path(checkoutPath) / ".git";
+            std::filesystem::path gitDir;
+
+            if (std::filesystem::is_directory(dotGitPath)) {
+                gitDir = dotGitPath;
+            } else if (std::filesystem::is_regular_file(dotGitPath)) {
+                auto gitdirContent = readFile(dotGitPath.string());
+                // Parse "gitdir: <path>\n"
+                if (hasPrefix(gitdirContent, "gitdir: ")) {
+                    auto path = trim(gitdirContent.substr(8));
+                    gitDir = std::filesystem::path(path);
+                    // Handle relative paths
+                    if (gitDir.is_relative())
+                        gitDir = std::filesystem::path(checkoutPath) / gitDir;
+                }
+            }
+
+            if (!gitDir.empty()) {
+                // Read sparse-checkout-roots
+                auto sparseRootsPath = gitDir / "info" / "sparse-checkout-roots";
+                if (std::filesystem::exists(sparseRootsPath)) {
+                    auto content = readFile(sparseRootsPath.string());
+                    for (auto & line : tokenizeString<std::vector<std::string>>(content, "\n")) {
+                        auto trimmed = trim(line);
+                        if (!trimmed.empty())
+                            tectonixSparseCheckoutRoots.insert(std::string(trimmed));
+                    }
+                }
+            }
+        }
+    });
+    return tectonixSparseCheckoutRoots;
+}
+
+const std::map<std::string, bool> & EvalState::getTectonixDirtyZones() const
+{
+    std::call_once(tectonixDirtyZonesFlag, [this]() {
+        if (!isTectonixSourceAvailable())
+            return;
+
+        // Get sparse checkout roots (zone IDs)
+        auto & sparseRoots = getTectonixSparseCheckoutRoots();
+        if (sparseRoots.empty())
+            return;
+
+        // Get manifest (uses cached parsed JSON)
+        const nlohmann::json * manifest;
+        try {
+            manifest = &getManifestJson();
+        } catch (nlohmann::json::parse_error & e) {
+            warn("failed to parse manifest for dirty zone detection: %s", e.what());
+            return;
+        } catch (Error &) {
+            // Manifest file not available (e.g., not in world repo)
+            return;
+        }
+
+        // Build map of zone ID -> zone path for sparse roots only
+        std::map<std::string, std::string> zoneIdToPath;
+        for (auto & [path, value] : manifest->items()) {
+            if (!value.contains("id") || !value.at("id").is_string()) {
+                warn("zone '%s' in manifest has missing or non-string 'id' field", path);
+                continue;
+            }
+            auto & id = value.at("id").get_ref<const std::string &>();
+            if (sparseRoots.count(id))
+                zoneIdToPath[id] = path;
+        }
+
+        // Initialize all sparse-checked-out zones as not dirty
+        for (auto & [zoneId, zonePath] : zoneIdToPath) {
+            tectonixDirtyZones[zonePath] = false;
+        }
+
+        // Get dirty files via git status with -z for NUL-separated output
+        // This handles filenames with special characters correctly
+        auto checkoutPath = settings.tectonixCheckoutPath.get();
+        std::string gitStatusOutput;
+        try {
+            gitStatusOutput = runProgram("git", true, {"-C", checkoutPath, "status", "--porcelain", "-z"});
+        } catch (ExecError & e) {
+            // If git status fails, treat all zones as clean (fallback)
+            // This ensures call_once completes and we don't retry with partial state
+            warn("failed to get git status for dirty zone detection in '%s': %s; treating all zones as clean", checkoutPath, e.what());
+            return;
+        }
+
+        // Parse NUL-separated output
+        // Format with -z: XY SP path NUL [orig-path NUL for renames/copies]
+        size_t pos = 0;
+        while (pos < gitStatusOutput.size()) {
+            // Find the next NUL
+            auto nulPos = gitStatusOutput.find('\0', pos);
+            if (nulPos == std::string::npos)
+                break;
+
+            auto entry = gitStatusOutput.substr(pos, nulPos - pos);
+            pos = nulPos + 1;
+
+            // Git porcelain format: "XY PATH" where XY is 2-char status, then space, then path
+            // Minimum valid entry is "X  P" (4 chars): status + space + 1-char path
+            if (entry.size() < 4) continue;
+
+            // XY is first 2 chars, then space, then path
+            char xy0 = entry[0];
+            std::string rawPath = entry.substr(3);
+
+            // Collect paths to check - destination path is always included
+            std::vector<std::string> pathsToCheck;
+            pathsToCheck.push_back("/" + rawPath);
+
+            // For renames (R) and copies (C), also process the original path
+            // Both source and destination zones should be marked dirty
+            if (xy0 == 'R' || xy0 == 'C') {
+                auto nextNul = gitStatusOutput.find('\0', pos);
+                if (nextNul != std::string::npos) {
+                    auto origPath = gitStatusOutput.substr(pos, nextNul - pos);
+                    pathsToCheck.push_back("/" + origPath);
+                    pos = nextNul + 1;
+                }
+            }
+
+            // Find which zone(s) these files belong to
+            for (const auto & filePath : pathsToCheck) {
+                for (auto & [zonePath, dirty] : tectonixDirtyZones) {
+                    // Normalize zone path for comparison with git status output
+                    // filePath is "/areas/..." and zonePath is "//areas/..."
+                    auto normalized = "/" + normalizeZonePath(zonePath);
+
+                    if (hasPrefix(filePath, normalized + "/") || filePath == normalized) {
+                        tectonixDirtyZones[zonePath] = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        size_t dirtyCount = 0;
+        for (const auto & [_, dirty] : tectonixDirtyZones)
+            if (dirty) dirtyCount++;
+        debug("computed dirty zones: %d of %d zones are dirty", dirtyCount, tectonixDirtyZones.size());
+    });
+    return tectonixDirtyZones;
+}
+
+// Path to the tectonix manifest file within the world repository
+static constexpr std::string_view TECTONIX_MANIFEST_PATH = "/.meta/manifest.json";
+
+const std::string & EvalState::getManifestContent() const
+{
+    // Cached for the lifetime of evaluation. This is intentional: evaluation is
+    // bound to a specific git SHA (tectonix-git-sha), so the manifest content is
+    // immutable for this EvalState instance.
+    std::call_once(tectonixManifestFlag, [this]() {
+        auto fullPath = CanonPath(TECTONIX_MANIFEST_PATH);
+
+        // In source-available mode, check checkout first
+        if (isTectonixSourceAvailable()) {
+            auto checkoutAccessor = getWorldCheckoutAccessor();
+            if (checkoutAccessor) {
+                auto checkoutPath = settings.tectonixCheckoutPath.get();
+                auto checkoutFullPath = CanonPath(checkoutPath + fullPath.abs());
+                if ((*checkoutAccessor)->pathExists(checkoutFullPath)) {
+                    tectonixManifestContent = (*checkoutAccessor)->readFile(checkoutFullPath);
+                    debug("loaded manifest from checkout: %s", checkoutFullPath);
+                    return;
+                }
+            }
+        }
+
+        // Fall back to git
+        auto accessor = getWorldGitAccessor();
+        if (!accessor->pathExists(fullPath))
+            throw Error("manifest.json does not exist at %s in world", TECTONIX_MANIFEST_PATH);
+
+        tectonixManifestContent = accessor->readFile(fullPath);
+        debug("loaded manifest from git at %s", fullPath);
+    });
+    return tectonixManifestContent;
+}
+
+const nlohmann::json & EvalState::getManifestJson() const
+{
+    std::call_once(tectonixManifestJsonFlag, [this]() {
+        tectonixManifestJson = std::make_unique<nlohmann::json>(
+            nlohmann::json::parse(getManifestContent()));
+    });
+    return *tectonixManifestJson;
+}
+
+StorePath EvalState::getZoneStorePath(std::string_view zonePath)
+{
+    // Check dirty status using original zonePath (with // prefix) since
+    // tectonixDirtyZones keys come directly from manifest with // prefix
+    bool isDirty = false;
+    if (isTectonixSourceAvailable()) {
+        auto & dirtyZones = getTectonixDirtyZones();
+        auto it = dirtyZones.find(std::string(zonePath));
+        isDirty = it != dirtyZones.end() && it->second;
+    }
+
+    if (isDirty) {
+        debug("getZoneStorePath: %s is dirty, using checkout", zonePath);
+        return getZoneFromCheckout(zonePath);
+    }
+
+    // Clean zone: get tree SHA
+    auto treeSha = getWorldTreeSha(zonePath);
+
+    if (!settings.lazyTrees) {
+        debug("getZoneStorePath: %s clean, eager copy from git (tree %s)", zonePath, treeSha.gitRev());
+        // Eager mode: immediate copy from git ODB
+        auto repo = getWorldRepo();
+        // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
+        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+        auto accessor = repo->getAccessor(treeSha, opts, "zone");
+
+        std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
+        auto storePath = fetchToStore(
+            fetchSettings, *store,
+            SourcePath(accessor, CanonPath::root),
+            FetchMode::Copy, name);
+
+        allowPath(storePath);
+        return storePath;
+    }
+
+    debug("getZoneStorePath: %s clean, lazy mount (tree %s)", zonePath, treeSha.gitRev());
+    return mountZoneByTreeSha(treeSha, zonePath);
+}
+
+StorePath EvalState::mountZoneByTreeSha(const Hash & treeSha, std::string_view zonePath)
+{
+    // Double-checked locking pattern for concurrent zone mounting:
+    // 1. Read lock check (fast path - allows concurrent readers)
+    {
+        auto cache = tectonixZoneCache_.readLock();
+        auto it = cache->find(treeSha);
+        if (it != cache->end()) {
+            debug("zone cache hit for tree %s", treeSha.gitRev());
+            return it->second;
+        }
+    } // Read lock released
+
+    // 2. Write lock check (catch races between read unlock and write lock)
+    {
+        auto cache = tectonixZoneCache_.lock();
+        auto it = cache->find(treeSha);
+        if (it != cache->end()) {
+            debug("zone cache hit for tree %s (after lock upgrade)", treeSha.gitRev());
+            return it->second;
+        }
+    } // Write lock released - expensive work happens without holding lock
+
+    // 3. Perform expensive git operations without holding lock.
+    // This allows concurrent mounts of different zones. Multiple threads may
+    // race to mount the same zone, but we check again before inserting.
+    auto repo = getWorldRepo();
+    // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
+    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+    auto accessor = repo->getAccessor(treeSha, opts, "zone");
+
+    // Generate name from zone path (sanitized for store path requirements)
+    std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
+
+    // Create virtual store path
+    auto storePath = StorePath::random(name);
+
+    // 4. Re-acquire write lock and check again before mounting
+    auto cache = tectonixZoneCache_.lock();
+    auto it = cache->find(treeSha);
+    if (it != cache->end()) {
+        // Another thread mounted while we were working - use their result
+        debug("zone cache hit for tree %s (after work)", treeSha.gitRev());
+        return it->second;
+    }
+
+    // Mount accessor at this path first, then allow the path.
+    // This order ensures we don't leave allowed paths without mounts on exception.
+    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+    allowPath(storePath);
+
+    // Insert into cache (we hold the lock, so this will succeed)
+    cache->emplace(treeSha, storePath);
+
+    debug("mounted zone %s (tree %s) at %s",
+          zonePath, treeSha.gitRev(), store->printStorePath(storePath));
+
+    return storePath;
+}
+
+StorePath EvalState::getZoneFromCheckout(std::string_view zonePath)
+{
+    auto zone = normalizeZonePath(zonePath);
+    std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
+    auto checkoutPath = settings.tectonixCheckoutPath.get();
+    auto fullPath = std::filesystem::path(checkoutPath) / zone;
+
+    if (!settings.lazyTrees) {
+        // Eager mode: immediate copy from checkout
+        auto checkoutAccessor = getWorldCheckoutAccessor();
+        if (!checkoutAccessor)
+            throw Error("checkout accessor not available for dirty zone '%s'", zonePath);
+
+        auto storePath = fetchToStore(
+            fetchSettings, *store,
+            SourcePath(*checkoutAccessor, CanonPath(checkoutPath + "/" + zone)),
+            FetchMode::Copy, name);
+
+        allowPath(storePath);
+        return storePath;
+    }
+
+    // Lazy mode: check cache first with read lock (fast path)
+    {
+        auto cache = tectonixCheckoutZoneCache_.readLock();
+        auto it = cache->find(std::string(zonePath));
+        if (it != cache->end()) {
+            debug("checkout zone cache hit for %s", zonePath);
+            return it->second;
+        }
+    }
+
+    // Not in cache - acquire write lock and check again (double-checked locking)
+    // This prevents duplicate mounts when multiple threads race
+    auto cache = tectonixCheckoutZoneCache_.lock();
+    auto it = cache->find(std::string(zonePath));
+    if (it != cache->end()) {
+        debug("checkout zone cache hit for %s (after lock)", zonePath);
+        return it->second;
+    }
+
+    // Still not cached: create accessor and mount while holding the lock
+    if (!std::filesystem::exists(fullPath))
+        throw Error("zone '%s' not found in checkout at '%s'", zonePath, fullPath.string());
+
+    // Note: This mounts the live checkout directory, meaning files are read on-demand
+    // during evaluation. If the checkout is modified mid-evaluation, behavior is
+    // undefined. This is analogous to normal file reads and acceptable for local
+    // development workflows where dirty zones are being actively worked on.
+    debug("mounting live checkout for dirty zone %s - modifications during evaluation may cause undefined behavior", zonePath);
+    auto accessor = makeFSSourceAccessor(fullPath);
+
+    // Create virtual store path
+    auto storePath = StorePath::random(name);
+
+    // Mount accessor at this path first, then allow the path.
+    // This order ensures we don't leave allowed paths without mounts on exception.
+    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+    allowPath(storePath);
+
+    // Insert into cache (we hold the lock, so this will succeed)
+    cache->emplace(std::string(zonePath), storePath);
+
+    debug("mounted checkout zone %s at %s", zonePath, store->printStorePath(storePath));
+    return storePath;
 }
 
 inline static bool isJustSchemePrefix(std::string_view prefix)

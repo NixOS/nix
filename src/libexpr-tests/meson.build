@@ -20,6 +20,7 @@ deps_private_maybe_subproject = [
   dependency('nix-expr'),
   dependency('nix-expr-c'),
   dependency('nix-expr-test-support'),
+  dependency('nix-fetchers'),
 ]
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
@@ -35,6 +36,12 @@ deps_private += gtest
 
 gmock = dependency('gmock')
 deps_private += gmock
+
+libgit2 = dependency('libgit2')
+deps_private += libgit2
+
+nlohmann_json = dependency('nlohmann_json')
+deps_private += nlohmann_json
 
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
@@ -58,6 +65,7 @@ sources = files(
   'nix_api_value_internal.cc',
   'primops.cc',
   'search-path.cc',
+  'tectonix.cc',
   'trivial.cc',
   'value/context.cc',
   'value/print.cc',

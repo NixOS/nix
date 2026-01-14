@@ -399,6 +399,41 @@ struct EvalSettings : Config
 
           Note that enabling the debugger (`--debugger`) disables multi-threaded evaluation.
         )"};
+
+    Setting<std::string> tectonixGitDir{
+        this,
+        "",
+        "tectonix-git-dir",
+        R"(
+          Path to the git directory for tectonix builtins (e.g., `~/world/git`).
+
+          This enables the tectonix builtins (`builtins.unsafeTectonixInternalTreeSha`, `builtins.unsafeTectonixInternalTree`,
+          `builtins.unsafeTectonixInternalZoneSrc`, `builtins.unsafeTectonixInternalZone`, `builtins.unsafeTectonixInternalManifest`)
+          which provide native access to files from a git repository during Nix evaluation.
+        )"};
+
+    Setting<std::string> tectonixGitSha{
+        this,
+        "",
+        "tectonix-git-sha",
+        R"(
+          Git commit SHA to use for tectonix builtins.
+
+          This specifies the commit to read from when using tectonix builtins.
+          Typically set to HEAD of the repository.
+        )"};
+
+    Setting<std::string> tectonixCheckoutPath{
+        this,
+        "",
+        "tectonix-checkout-path",
+        R"(
+          Path to checkout directory for source-available mode.
+
+          When set, uncommitted files in the checkout are preferred over git content
+          for tectonix builtins. This enables local development workflows where changes
+          are visible before committing.
+        )"};
 };
 
 /**

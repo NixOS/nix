@@ -108,6 +108,13 @@ static void initLibGit2()
     std::call_once(initialized, []() {
         if (git_libgit2_init() < 0)
             throw Error("initialising libgit2: %s", git_error_last()->message);
+
+        // Register support for additional git extensions.
+        // This allows opening repos with extensions that libgit2 doesn't natively support,
+        // as long as we don't actually need the extension's functionality.
+        // "refstorage" is used by reftables - we can ignore it since we only access objects by SHA.
+        const char * extensions[] = { "refstorage" };
+        git_libgit2_opts(GIT_OPT_SET_EXTENSIONS, extensions, 1);
     });
 }
 
@@ -264,6 +271,29 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         , options(_options)
     {
         initLibGit2();
+
+        if (options.odbOnly) {
+            /* Open only the object database, bypassing full repository validation.
+               This is useful for repositories with unsupported extensions like reftables.
+               We create a fake repository wrapping the ODB for API compatibility. */
+
+            git_odb * rawOdb = nullptr;
+            if (git_odb_open(&rawOdb, (path / "objects").string().c_str()))
+                throw Error("opening Git object database %s: %s", path / "objects", git_error_last()->message);
+
+            // Use RAII to ensure cleanup on any exception path
+            ObjectDb odb(rawOdb);
+
+            if (git_repository_wrap_odb(Setter(repo), odb.get()))
+                throw Error("wrapping Git object database: %s", git_error_last()->message);
+
+            // wrap_odb took ownership on success, release from unique_ptr to prevent double-free
+            odb.release();
+
+            // odbOnly mode is strictly read-only: no mempack backend, no write support.
+            // Attempting to write objects in this mode will fail.
+            return;
+        }
 
         initRepoAtomically(path, options);
         if (git_repository_open(Setter(repo), path.string().c_str()))
@@ -595,6 +625,34 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return true;
     }
 
+    Hash getSubtreeSha(const Hash & treeSha, const std::string & entryName) override
+    {
+        git_tree * tree = nullptr;
+        auto oid = hashToOID(treeSha);
+
+        if (git_tree_lookup(&tree, *this, &oid))
+            throw Error("looking up tree %s: %s", treeSha.gitRev(), git_error_last()->message);
+
+        Finally freeTree([&]() { git_tree_free(tree); });
+
+        auto entry = git_tree_entry_byname(tree, entryName.c_str());
+        if (!entry)
+            throw Error("entry '%s' not found in tree %s", entryName, treeSha.gitRev());
+
+        if (git_tree_entry_type(entry) != GIT_OBJECT_TREE)
+            throw Error("'%s' in tree %s is not a directory", entryName, treeSha.gitRev());
+
+        return toHash(*git_tree_entry_id(entry));
+    }
+
+    Hash getCommitTree(const Hash & commitSha) override
+    {
+        auto oid = hashToOID(commitSha);
+        auto obj = lookupObject(*this, oid);
+        auto tree = peelObject<Object>(obj.get(), GIT_OBJECT_TREE);
+        return toHash(*git_object_id(tree.get()));
+    }
+
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore.
      */
@@ -856,7 +914,9 @@ struct GitSourceAccessor : SourceAccessor
             return Stat{.type = tSymlink};
 
         else if (mode == GIT_FILEMODE_COMMIT)
-            // Treat submodules as an empty directory.
+            // Submodules appear as commits (GIT_FILEMODE_COMMIT) in the parent tree.
+            // We report them as directories so listing works, but they appear empty
+            // since we don't recursively fetch submodule content.
             return Stat{.type = tDirectory};
 
         else
@@ -876,8 +936,18 @@ struct GitSourceAccessor : SourceAccessor
 
                     for (size_t n = 0; n < count; ++n) {
                         auto entry = git_tree_entry_byindex(tree.get(), n);
+                        auto mode = git_tree_entry_filemode(entry);
+                        std::optional<Type> type;
+                        if (mode == GIT_FILEMODE_TREE)
+                            type = Type::tDirectory;
+                        else if (mode == GIT_FILEMODE_BLOB || mode == GIT_FILEMODE_BLOB_EXECUTABLE)
+                            type = Type::tRegular;
+                        else if (mode == GIT_FILEMODE_LINK)
+                            type = Type::tSymlink;
+                        else if (mode == GIT_FILEMODE_COMMIT)
+                            type = Type::tDirectory; // submodule (appears empty, see lstat() comment)
                         // FIXME: add to cache
-                        res.emplace(std::string(git_tree_entry_name(entry)), DirEntry{});
+                        res.emplace(std::string(git_tree_entry_name(entry)), type);
                     }
 
                     return res;

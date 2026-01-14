@@ -24,8 +24,12 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <map>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <functional>
 
 namespace nix {
@@ -52,6 +56,7 @@ enum RepairFlag : bool;
 struct MemorySourceAccessor;
 struct MountedSourceAccessor;
 struct AsyncPathWriter;
+struct GitRepo;
 
 namespace eval_cache {
 class EvalCache;
@@ -513,6 +518,61 @@ private:
      */
     const ref<RegexCache> regexCache;
 
+    /** Lazy-initialized git repository for world builtins (thread-safe via once_flag) */
+    mutable std::once_flag worldRepoFlag;
+    mutable std::optional<ref<GitRepo>> worldRepo;
+
+    /** Lazy-initialized source accessor for world git content (thread-safe via once_flag) */
+    mutable std::once_flag worldGitAccessorFlag;
+    mutable std::optional<ref<SourceAccessor>> worldGitAccessor;
+
+    /** Lazy-initialized source accessor for world checkout (thread-safe via once_flag) */
+    mutable std::once_flag worldCheckoutAccessorFlag;
+    mutable std::optional<ref<SourceAccessor>> worldCheckoutAccessor;
+
+    /** Cache: world path → tree SHA (lazy computed, cached at each path level) */
+    const ref<boost::concurrent_flat_map<std::string, Hash>> worldTreeShaCache;
+
+    /** Lazy-initialized set of zone IDs in sparse checkout (thread-safe via once_flag) */
+    mutable std::once_flag tectonixSparseCheckoutRootsFlag;
+    mutable std::set<std::string> tectonixSparseCheckoutRoots;
+
+    /** Lazy-initialized map of zone path → dirty status (thread-safe via once_flag) */
+    mutable std::once_flag tectonixDirtyZonesFlag;
+    mutable std::map<std::string, bool> tectonixDirtyZones;
+
+    /** Cached manifest content (thread-safe via once_flag) */
+    mutable std::once_flag tectonixManifestFlag;
+    mutable std::string tectonixManifestContent;
+
+    /** Cached parsed manifest JSON (thread-safe via once_flag) */
+    mutable std::once_flag tectonixManifestJsonFlag;
+    mutable std::unique_ptr<nlohmann::json> tectonixManifestJson;
+
+    /**
+     * Cache tree SHA → virtual store path for lazy zone mounts.
+     * Thread-safe for eval-cores > 1.
+     */
+    mutable SharedSync<std::map<Hash, StorePath>> tectonixZoneCache_;
+
+    /**
+     * Cache zone path → virtual store path for lazy checkout zone mounts.
+     * Thread-safe for eval-cores > 1.
+     */
+    mutable SharedSync<std::map<std::string, StorePath>> tectonixCheckoutZoneCache_;
+
+    /**
+     * Mount a zone by tree SHA, returning a (potentially virtual) store path.
+     * Caches by tree SHA for deduplication across world revisions.
+     */
+    StorePath mountZoneByTreeSha(const Hash & treeSha, std::string_view zonePath);
+
+    /**
+     * Get zone store path from checkout (for dirty zones).
+     * With lazy-trees enabled, mounts lazily and caches by zone path.
+     */
+    StorePath getZoneFromCheckout(std::string_view zonePath);
+
 public:
 
     /**
@@ -543,6 +603,52 @@ public:
     {
         return lookupPath;
     }
+
+    /** Get the world git repository, initializing lazily */
+    ref<GitRepo> getWorldRepo() const;
+
+    /**
+     * Get accessor for world git content at worldSha.
+     *
+     * exportIgnore policy for tectonix accessors:
+     * - World accessor (getWorldGitAccessor): exportIgnore=false
+     *   Used for path validation and tree SHA computation; needs to see all files
+     * - Zone accessors (mountZoneByTreeSha, getZoneStorePath): exportIgnore=true
+     *   Used for actual zone content; honors .gitattributes for filtered output
+     * - Raw tree accessor (__unsafeTectonixInternalTree): exportIgnore=false
+     *   Low-level access by SHA; provides unfiltered content
+     */
+    ref<SourceAccessor> getWorldGitAccessor() const;
+
+    /** Get accessor for world checkout (only in source-available mode) */
+    std::optional<ref<SourceAccessor>> getWorldCheckoutAccessor() const;
+
+    /** Get tree SHA for a world path, with lazy caching */
+    Hash getWorldTreeSha(std::string_view worldPath) const;
+
+    /** Check if we're in source-available mode */
+    bool isTectonixSourceAvailable() const;
+
+    /** Get set of zone IDs in sparse checkout (source-available mode only) */
+    const std::set<std::string> & getTectonixSparseCheckoutRoots() const;
+
+    /** Get map of zone path → dirty status (only for sparse-checked-out zones) */
+    const std::map<std::string, bool> & getTectonixDirtyZones() const;
+
+    /** Get cached manifest content (thread-safe, lazy-loaded) */
+    const std::string & getManifestContent() const;
+
+    /** Get cached parsed manifest JSON (thread-safe, lazy-loaded) */
+    const nlohmann::json & getManifestJson() const;
+
+    /**
+     * Get a zone's store path, handling dirty detection and lazy mounting.
+     *
+     * For clean zones with lazy-trees enabled: mounts accessor lazily
+     * For dirty zones: currently eager-copies from checkout (extension point)
+     * For lazy-trees disabled: eager-copies from git
+     */
+    StorePath getZoneStorePath(std::string_view zonePath);
 
     /**
      * Return a `SourcePath` that refers to `path` in the root

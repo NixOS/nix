@@ -220,6 +220,7 @@ subdir('flakes')
 subdir('git')
 subdir('git-hashing')
 subdir('local-overlay-store')
+subdir('tectonix')
 
 foreach suite : suites
   workdir = suite['workdir']
