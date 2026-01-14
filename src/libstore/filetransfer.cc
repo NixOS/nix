@@ -419,10 +419,12 @@ struct curlFileTransfer : public FileTransfer
         }
 
         static int resolverCallbackWrapper(void *, void *, void * clientp) noexcept
-        {
+        try {
             // Create the `Activity` associated with this download.
             ((TransferItem *) clientp)->act();
             return 0;
+        } catch (...) {
+            return 1;
         }
 
         void unpause()
