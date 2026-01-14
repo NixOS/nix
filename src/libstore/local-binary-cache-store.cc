@@ -71,8 +71,8 @@ protected:
     {
         try {
             readFile(config->binaryCacheDir + "/" + path, sink);
-        } catch (SysError & e) {
-            if (e.errNo == ENOENT)
+        } catch (SystemError & e) {
+            if (e.is(std::errc::no_such_file_or_directory))
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
             throw;
         }

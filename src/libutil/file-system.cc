@@ -540,7 +540,21 @@ std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const
 AutoCloseFD createAnonymousTempFile()
 {
     AutoCloseFD fd;
-#ifdef O_TMPFILE
+
+#ifdef _WIN32
+    auto path = makeTempPath(defaultTempDir(), "nix-anonymous");
+    fd = CreateFileW(
+        path.c_str(),
+        GENERIC_READ | GENERIC_WRITE,
+        /*dwShareMode=*/0,
+        /*lpSecurityAttributes=*/nullptr,
+        CREATE_NEW,
+        FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
+        /*hTemplateFile=*/nullptr);
+    if (!fd)
+        throw windows::WinError("creating temporary file %1%", path);
+#else
+#  ifdef O_TMPFILE
     static std::atomic_flag tmpfileUnsupported{};
     if (!tmpfileUnsupported.test()) /* Try with O_TMPFILE first. */ {
         /* Use O_EXCL, because the file is never supposed to be linked into filesystem. */
@@ -555,14 +569,14 @@ AutoCloseFD createAnonymousTempFile()
             return fd; /* Successfully created. */
         }
     }
-#endif
+#  endif
     auto [fd2, path] = createTempFile("nix-anonymous");
     if (!fd2)
         throw SysError("creating temporary file '%s'", path);
     fd = std::move(fd2);
-#ifndef _WIN32
     unlink(requireCString(path)); /* We only care about the file descriptor. */
 #endif
+
     return fd;
 }
 
@@ -571,7 +585,6 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix)
     Path tmpl(defaultTempDir().string() + "/" + prefix + ".XXXXXX");
     // Strictly speaking, this is UB, but who cares...
     // FIXME: use O_TMPFILE.
-    // FIXME: Windows should use FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE
     AutoCloseFD fd = toDescriptor(mkstemp((char *) tmpl.c_str()));
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);

@@ -417,12 +417,24 @@ ParsedURL fixGitURL(std::string url)
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
         url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos)
-        return ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = splitString<std::vector<std::string>>(url, "/"),
-        };
+    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos) {
+        auto path = splitString<std::vector<std::string>>(url, "/");
+        // Reject SCP-like URLs without user (e.g., "github.com:path") - colon in first component
+        if (!path.empty() && path[0].find(':') != std::string::npos)
+            throw BadURL("SCP-like URL '%s' is not supported; use SSH URL syntax instead (ssh://...)", url);
+        // Absolute paths get an empty authority (file:///path), relative paths get none (file:path)
+        if (hasPrefix(url, "/"))
+            return ParsedURL{
+                .scheme = "file",
+                .authority = ParsedURL::Authority{},
+                .path = path,
+            };
+        else
+            return ParsedURL{
+                .scheme = "file",
+                .path = path,
+            };
+    }
     auto parsed = parseURL(url);
     // Drop the superfluous "git+" from the scheme.
     auto scheme = parseUrlScheme(parsed.scheme);

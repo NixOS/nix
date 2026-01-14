@@ -11,7 +11,17 @@ class RemoteFSAccessor : public SourceAccessor
 {
     ref<Store> store;
 
-    std::map<std::string, ref<SourceAccessor>> nars;
+    /**
+     * Map from store path hash part to NAR hash. Used to then look up
+     * in `nars`. The indirection allows avoiding opening multiple
+     * redundant NAR accessors for the same NAR.
+     */
+    std::map<std::string, Hash, std::less<>> narHashes;
+
+    /**
+     * Map from NAR hash to NAR accessor.
+     */
+    std::map<Hash, ref<SourceAccessor>> nars;
 
     bool requireValidPath;
 
@@ -20,10 +30,6 @@ class RemoteFSAccessor : public SourceAccessor
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
     friend struct BinaryCacheStore;
-
-    std::filesystem::path makeCacheFile(std::string_view hashPart, const std::string & ext);
-
-    ref<SourceAccessor> addToCache(std::string_view hashPart, std::string && nar);
 
 public:
 
