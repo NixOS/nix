@@ -497,10 +497,7 @@ public:
     /**
      * Query which of the given paths have substitutes.
      */
-    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths)
-    {
-        return {};
-    };
+    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths);
 
     /**
      * Query substitute info (i.e. references, derivers and download
