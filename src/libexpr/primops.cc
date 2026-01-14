@@ -5481,11 +5481,16 @@ static void prim_derivationOf(EvalState & state, const PosIdx pos, Value ** args
     // we have exactly one context item.
     auto & c = *context.begin();
     if (auto * b = std::get_if<NixStringContextElem::Built>(&c.raw)) {
-        v.mkString(state.store->printStorePath(b->drvPath->getBaseStorePath()), state.mem);
+        auto drvPath = b->drvPath->getBaseStorePath();
+        v.mkString(state.store->printStorePath(drvPath),
+                   NixStringContext{NixStringContextElem::Opaque{.path = drvPath}},
+                   state.mem);
         return;
     }
     if (auto * d = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
-        v.mkString(state.store->printStorePath(d->drvPath), state.mem);
+        v.mkString(state.store->printStorePath(d->drvPath),
+                   NixStringContext{NixStringContextElem::Opaque{.path = d->drvPath}},
+                   state.mem);
         return;
     }
 
