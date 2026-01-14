@@ -339,17 +339,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::HasSubstitutes: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        StorePathSet paths; // FIXME
-        paths.insert(path);
-        auto res = store->querySubstitutablePaths(paths);
-        logger->stopWork();
-        conn.to << (res.count(path) != 0);
-        break;
-    }
-
     case WorkerProto::Op::QuerySubstitutablePaths: {
         auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
