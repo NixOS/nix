@@ -348,15 +348,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryPathHash: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        auto hash = store->queryPathInfo(path)->narHash;
-        logger->stopWork();
-        conn.to << hash.to_string(HashFormat::Base16, false);
-        break;
-    }
-
     case WorkerProto::Op::QueryReferences:
     case WorkerProto::Op::QueryReferrers:
     case WorkerProto::Op::QueryValidDerivers:

@@ -142,8 +142,8 @@ struct WorkerProto
 
 enum struct WorkerProto::Op : uint64_t {
     IsValidPath = 1,
-    // HasSubstitutes = 3, //  removed
-    QueryPathHash = 4,   // obsolete
+    // HasSubstitutes = 3, // removed
+    // QueryPathHash = 4, // removed
     QueryReferences = 5, // obsolete
     QueryReferrers = 6,
     AddToStore = 7,
