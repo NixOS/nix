@@ -348,17 +348,13 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryReferences:
     case WorkerProto::Op::QueryReferrers:
     case WorkerProto::Op::QueryValidDerivers:
     case WorkerProto::Op::QueryDerivationOutputs: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         StorePathSet paths;
-        if (op == WorkerProto::Op::QueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
-                paths.insert(i);
-        else if (op == WorkerProto::Op::QueryReferrers)
+        if (op == WorkerProto::Op::QueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == WorkerProto::Op::QueryValidDerivers)
             paths = store->queryValidDerivers(path);
