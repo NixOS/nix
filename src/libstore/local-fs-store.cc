@@ -109,6 +109,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
         if (!pathExists(absPath))
             return nullptr;
     }
+    bumpLastUsageTime(path);
     return std::make_shared<PosixSourceAccessor>(std::move(absPath));
 }
 
