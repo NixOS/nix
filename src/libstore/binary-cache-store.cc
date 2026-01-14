@@ -147,7 +147,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
        write the compressed NAR to disk), into a HashSink (to get the
        NAR hash), and into a NarAccessor (to get the NAR listing). */
     HashSink fileHashSink{HashAlgorithm::SHA256};
-    std::shared_ptr<SourceAccessor> narAccessor;
+    std::shared_ptr<NarAccessor> narAccessor;
     HashSink narHashSink{HashAlgorithm::SHA256};
     {
         FdSink fileSink(fdTemp.get());
@@ -205,7 +205,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     if (config.writeNARListing) {
         nlohmann::json j = {
             {"version", 1},
-            {"root", listNarDeep(*narAccessor, CanonPath::root)},
+            {"root", narAccessor->getListing()},
         };
 
         upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");

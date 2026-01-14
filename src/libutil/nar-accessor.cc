@@ -1,157 +1,44 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
-#include "nix/util/archive.hh"
 #include "nix/util/error.hh"
-
-#include <map>
-#include <stack>
 
 namespace nix {
 
-struct NarMemberConstructor : CreateRegularFileSink
+struct NarAccessorImpl : NarAccessor
 {
-private:
-
-    NarListing & narMember;
-
-    uint64_t & pos;
-
-public:
-
-    NarMemberConstructor(NarListing & nm, uint64_t & pos)
-        : narMember(nm)
-        , pos(pos)
-    {
-    }
-
-    void isExecutable() override
-    {
-        auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-        if (reg)
-            reg->executable = true;
-    }
-
-    void preallocateContents(uint64_t size) override
-    {
-        auto * reg = std::get_if<NarListing::Regular>(&narMember.raw);
-        if (reg) {
-            reg->contents.fileSize = size;
-            reg->contents.narOffset = pos;
-        }
-    }
-
-    void operator()(std::string_view data) override {}
-};
-
-struct NarAccessor : public SourceAccessor
-{
-    std::optional<const std::string> nar;
+    NarListing root;
 
     GetNarBytes getNarBytes;
 
-    NarListing root;
-
-    struct NarIndexer : FileSystemObjectSink, Source
+    const NarListing & getListing() const override
     {
-        NarAccessor & acc;
-        Source & source;
-
-        std::stack<NarListing *> parents;
-
-        bool isExec = false;
-
-        uint64_t pos = 0;
-
-        NarIndexer(NarAccessor & acc, Source & source)
-            : acc(acc)
-            , source(source)
-        {
-        }
-
-        NarListing & createMember(const CanonPath & path, NarListing member)
-        {
-            size_t level = 0;
-            for (auto _ : path) {
-                (void) _;
-                ++level;
-            }
-
-            while (parents.size() > level)
-                parents.pop();
-
-            if (parents.empty()) {
-                acc.root = std::move(member);
-                parents.push(&acc.root);
-                return acc.root;
-            } else {
-                auto * parentDir = std::get_if<NarListing::Directory>(&parents.top()->raw);
-                if (!parentDir)
-                    throw Error("NAR file missing parent directory of path '%s'", path);
-                auto result = parentDir->entries.emplace(*path.baseName(), std::move(member));
-                parents.push(&result.first->second);
-                return result.first->second;
-            }
-        }
-
-        void createDirectory(const CanonPath & path) override
-        {
-            createMember(path, NarListing::Directory{});
-        }
-
-        void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
-        {
-            auto & nm = createMember(
-                path,
-                NarListing::Regular{
-                    .executable = false,
-                    .contents =
-                        NarListingRegularFile{
-                            .fileSize = 0,
-                            .narOffset = pos,
-                        },
-                });
-            NarMemberConstructor nmc{nm, pos};
-            nmc.skipContents = true; /* Don't care about contents. */
-            func(nmc);
-        }
-
-        void createSymlink(const CanonPath & path, const std::string & target) override
-        {
-            createMember(path, NarListing::Symlink{.target = target});
-        }
-
-        size_t read(char * data, size_t len) override
-        {
-            auto n = source.read(data, len);
-            pos += n;
-            return n;
-        }
-    };
-
-    NarAccessor(std::string && _nar)
-        : nar(_nar)
-    {
-        StringSource source(*nar);
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
+        return root;
     }
 
-    NarAccessor(Source & source)
+    NarAccessorImpl(std::string && nar)
+        : root{[&nar]() {
+            StringSource source(nar);
+            return parseNarListing(source);
+        }()}
+        , getNarBytes{
+              [nar = std::move(nar)](uint64_t offset, uint64_t length) { return std::string{nar, offset, length}; }}
     {
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
     }
 
-    NarAccessor(Source & source, GetNarBytes getNarBytes)
-        : getNarBytes(std::move(getNarBytes))
+    NarAccessorImpl(Source & source)
+        : root{parseNarListing(source)}
     {
-        NarIndexer indexer(*this, source);
-        parseDump(indexer, indexer);
     }
 
-    NarAccessor(NarListing && listing, GetNarBytes getNarBytes)
-        : getNarBytes(getNarBytes)
-        , root{listing}
+    NarAccessorImpl(Source & source, GetNarBytes getNarBytes)
+        : root{parseNarListing(source)}
+        , getNarBytes{std::move(getNarBytes)}
+    {
+    }
+
+    NarAccessorImpl(NarListing && listing, GetNarBytes getNarBytes)
+        : root{std::move(listing)}
+        , getNarBytes{std::move(getNarBytes)}
     {
     }
 
@@ -231,11 +118,8 @@ struct NarAccessor : public SourceAccessor
         if (!reg)
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
-        if (getNarBytes)
-            return getNarBytes(*reg->contents.narOffset, *reg->contents.fileSize);
-
-        assert(nar);
-        return std::string(*nar, *reg->contents.narOffset, *reg->contents.fileSize);
+        assert(getNarBytes);
+        return getNarBytes(*reg->contents.narOffset, *reg->contents.fileSize);
     }
 
     std::string readLink(const CanonPath & path) override
@@ -248,24 +132,24 @@ struct NarAccessor : public SourceAccessor
     }
 };
 
-ref<SourceAccessor> makeNarAccessor(std::string && nar)
+ref<NarAccessor> makeNarAccessor(std::string && nar)
 {
-    return make_ref<NarAccessor>(std::move(nar));
+    return make_ref<NarAccessorImpl>(std::move(nar));
 }
 
-ref<SourceAccessor> makeNarAccessor(Source & source)
+ref<NarAccessor> makeNarAccessor(Source & source)
 {
-    return make_ref<NarAccessor>(source);
+    return make_ref<NarAccessorImpl>(source);
 }
 
-ref<SourceAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes)
+ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes)
 {
-    return make_ref<NarAccessor>(std::move(listing), getNarBytes);
+    return make_ref<NarAccessorImpl>(std::move(listing), getNarBytes);
 }
 
-ref<SourceAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
+ref<NarAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
 {
-    return make_ref<NarAccessor>(source, getNarBytes);
+    return make_ref<NarAccessorImpl>(source, getNarBytes);
 }
 
 GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
@@ -289,58 +173,6 @@ GetNarBytes seekableGetNarBytes(Descriptor fd)
 
         return buf;
     };
-}
-
-template<bool deep>
-using ListNarResult = std::conditional_t<deep, NarListing, ShallowNarListing>;
-
-template<bool deep>
-static ListNarResult<deep> listNarImpl(SourceAccessor & accessor, const CanonPath & path)
-{
-    auto st = accessor.lstat(path);
-
-    switch (st.type) {
-    case SourceAccessor::Type::tRegular:
-        return typename ListNarResult<deep>::Regular{
-            .executable = st.isExecutable,
-            .contents =
-                NarListingRegularFile{
-                    .fileSize = st.fileSize,
-                    .narOffset = st.narOffset && *st.narOffset ? st.narOffset : std::nullopt,
-                },
-        };
-    case SourceAccessor::Type::tDirectory: {
-        typename ListNarResult<deep>::Directory dir;
-        for (const auto & [name, type] : accessor.readDirectory(path)) {
-            if constexpr (deep) {
-                dir.entries.emplace(name, listNarImpl<true>(accessor, path / name));
-            } else {
-                dir.entries.emplace(name, fso::Opaque{});
-            }
-        }
-        return dir;
-    }
-    case SourceAccessor::Type::tSymlink:
-        return typename ListNarResult<deep>::Symlink{
-            .target = accessor.readLink(path),
-        };
-    case SourceAccessor::Type::tBlock:
-    case SourceAccessor::Type::tChar:
-    case SourceAccessor::Type::tSocket:
-    case SourceAccessor::Type::tFifo:
-    case SourceAccessor::Type::tUnknown:
-        assert(false); // cannot happen for NARs
-    }
-}
-
-NarListing listNarDeep(SourceAccessor & accessor, const CanonPath & path)
-{
-    return listNarImpl<true>(accessor, path);
-}
-
-ShallowNarListing listNarShallow(SourceAccessor & accessor, const CanonPath & path)
-{
-    return listNarImpl<false>(accessor, path);
 }
 
 } // namespace nix
