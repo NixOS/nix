@@ -1,5 +1,6 @@
 sources += files(
   'build/child.cc',
+  'build/darwin-codesign.cc',
   'build/derivation-builder.cc',
   'build/hook-instance.cc',
   'pathlocks.cc',

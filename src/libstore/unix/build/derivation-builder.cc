@@ -52,6 +52,10 @@
 #  include "nix/util/url.hh"
 #endif
 
+#ifdef __APPLE__
+#  include "darwin-codesign.hh"
+#endif
+
 namespace nix {
 
 struct NotDeterministic : BuildError
@@ -1630,6 +1634,16 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         actualPath);
             }
             rewriteOutput(outputRewrites);
+
+#ifdef __APPLE__
+            /* On macOS, zero out code signatures before computing the CA hash.
+               Code signatures contain non-deterministic data (timestamps, UUIDs)
+               that would cause hash mismatches. After hashing and moving to the
+               final location, we'll re-sign the binaries.
+               See: https://github.com/NixOS/nix/issues/6065 */
+            zeroMachOCodeSignaturesRecursively(actualPath);
+#endif
+
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart{scratchPath->hashPart()};
             auto got = [&] {
@@ -1779,6 +1793,16 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 movePath(actualPath, destPath);
             }
         }
+
+#ifdef __APPLE__
+        /* On macOS, re-sign Mach-O binaries after moving to their final location.
+           We zeroed the code signatures earlier for deterministic hashing, so now
+           we need to restore valid signatures for the binaries to be executable.
+           See: https://github.com/NixOS/nix/issues/6065 */
+        if (newInfo.ca && buildMode != bmCheck) {
+            signMachOBinariesRecursively(store.toRealPath(finalDestPath));
+        }
+#endif
 
         if (buildMode == bmCheck) {
             /* Check against already registered outputs */
