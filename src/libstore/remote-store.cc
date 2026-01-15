@@ -19,6 +19,8 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 
+#include <boost/context/detail/exception.hpp>
+
 #ifndef _WIN32
 #  include <sys/socket.h>
 #endif
@@ -155,6 +157,28 @@ void RemoteStore::ConnectionHandle::processStderr(Sink * sink, Source * source, 
 RemoteStore::ConnectionHandle RemoteStore::getConnection()
 {
     return ConnectionHandle(connections->get());
+}
+
+void RemoteStore::withConnection(std::function<void(ConnectionHandle &, bool & forcedUnwindOk)> fun)
+{
+    std::optional<ConnectionHandle> conn(getConnection());
+    bool forcedUnwindOk = false;
+
+    try {
+        return fun(*conn, forcedUnwindOk);
+    } catch (boost::context::detail::forced_unwind &) {
+        /* This exception gets thrown when a coroutine gets destroyed.
+           ConnectionHandle interprets any in-flight exceptions (that are not
+           daemonException) as failures. To avoid marking a connection as bad
+           (and restarting it) in such cases, we explicitly destroy the handle
+           here while no exceptions are in flight iff the callback signals that
+           it's ok to do so. It is necessary to avoid cases when a coroutine gets
+           abandoned and not run to completion (the exception is always thrown
+           to clean up the coroutine stack) to avoid desyncing the connection. */
+        if (!conn->daemonException && forcedUnwindOk)
+            conn.reset();
+        throw;
+    }
 }
 
 void RemoteStore::setOptions()
@@ -819,8 +843,16 @@ void RemoteStore::shutdownConnections()
 
 void RemoteStore::narFromPath(const StorePath & path, Sink & sink)
 {
-    auto conn(getConnection());
-    conn->narFromPath(*this, &conn.daemonException, path, [&](Source & source) { copyNAR(conn->from, sink); });
+    withConnection([&](ConnectionHandle & conn, bool & forcedUnwindOk) {
+        conn->narFromPath(*this, &conn.daemonException, path, [&](Source & source) {
+            copyNAR(conn->from, sink);
+            /* Do not mark the connection as bad if we are run as a stackful coroutine. ConnectionHandle considers
+               all exceptions (when daemonException is unset) as a legitimate error and marks the connection as bad.
+               Only do this when the coroutine has run to completion to avoid falsely keeping connections alive when
+               the coroutine gets abandoned. */
+            forcedUnwindOk = true;
+        });
+    });
 }
 
 ref<RemoteFSAccessor> RemoteStore::getRemoteFSAccessor(bool requireValidPath)

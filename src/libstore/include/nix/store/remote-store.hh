@@ -183,6 +183,14 @@ protected:
 
     ConnectionHandle getConnection();
 
+    /**
+     * Like \ref getConnection, this acquires a ConnectionHandle for the remote,
+     * but this catches any boost::context::detail::forced_unwind exceptions to
+     * avoid marking the connection as bad. Use this when working with code that
+     * might be run as a stackful coroutine.
+     */
+    void withConnection(std::function<void(ConnectionHandle &, bool & forcedUnwindOk)>);
+
     friend struct ConnectionHandle;
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
