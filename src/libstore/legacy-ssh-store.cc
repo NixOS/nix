@@ -153,7 +153,9 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
              << (info.deriver ? printStorePath(*info.deriver) : "")
              << info.narHash.to_string(HashFormat::Base16, false);
     ServeProto::write(*this, *conn, info.references);
-    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca);
+    conn->to << info.registrationTime << info.narSize << info.ultimate;
+    ServeProto::write(*this, *conn, info.sigs);
+    conn->to << renderContentAddress(info.ca);
     try {
         copyNAR(source, conn->to);
     } catch (...) {

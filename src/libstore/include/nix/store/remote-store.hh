@@ -140,7 +140,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
         unsupported("repairPath");
     }
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 

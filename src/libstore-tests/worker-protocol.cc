@@ -164,8 +164,8 @@ VERSIONED_CHARACTERIZATION_TEST(
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                 .signatures =
                     {
-                        "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-                        "qwer:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
                     },
             },
             {
@@ -186,8 +186,8 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
                 .signatures =
                     {
-                        "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-                        "qwer:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
                     },
             },
             {
@@ -547,11 +547,10 @@ VERSIONED_CHARACTERIZATION_TEST(
             };
             info.registrationTime = 23423;
             info.narSize = 34878;
-            info.sigs =
-                {
-                    "fake-sig-1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-                    "fake-sig-2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-                },
+            info.sigs = {
+                Signature{.keyName = "fake-sig-1", .sig = std::string(64, '\0')},
+                Signature{.keyName = "fake-sig-2", .sig = std::string(64, '\0')},
+            };
             info;
         }),
         ({

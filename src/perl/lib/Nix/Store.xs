@@ -156,7 +156,7 @@ StoreWrapper::queryPathInfo(char * path, int base32)
             XPUSHs(sv_2mortal(newRV((SV *) refs)));
             AV * sigs = newAV();
             for (auto & i : info->sigs)
-                av_push(sigs, newSVpv(i.c_str(), 0));
+                av_push(sigs, newSVpv(i.to_string().c_str(), 0));
             XPUSHs(sv_2mortal(newRV((SV *) sigs)));
         } catch (Error & e) {
             croak("%s", e.what());
@@ -301,7 +301,7 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-            auto sig = SecretKey(secretKey_).signDetached(msg);
+            auto sig = SecretKey(secretKey_).signDetached(msg).to_string();
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
         } catch (Error & e) {
             croak("%s", e.what());

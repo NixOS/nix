@@ -15,8 +15,10 @@ PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
         return PathInfoJsonFormat::V1;
     case 2:
         return PathInfoJsonFormat::V2;
+    case 3:
+        return PathInfoJsonFormat::V3;
     default:
-        throw Error("unsupported path info JSON format version %d; supported versions are 1 and 2", version);
+        throw Error("unsupported path info JSON format version %d; supported versions are 1, 2 and 3", version);
     }
 }
 
@@ -129,7 +131,7 @@ size_t ValidPathInfo::checkSignatures(const StoreDirConfig & store, const Public
 }
 
 bool ValidPathInfo::checkSignature(
-    const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const
+    const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -213,7 +215,8 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
 
         auto & sigsObj = jsonObject["signatures"] = json::array();
         for (auto & sig : sigs)
-            sigsObj.push_back(sig);
+            sigsObj.push_back(
+                format == PathInfoJsonFormat::V3 ? static_cast<json>(sig) : static_cast<json>(sig.to_string()));
     }
 
     return jsonObject;
@@ -237,7 +240,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
             else if (format == PathInfoJsonFormat::V1)
                 return store->storeDir;
             else
-                throw Error("'storeDir' field is required in path info JSON format version 2");
+                throw Error("'storeDir' field is required in path info JSON format version 2 and later");
         }(),
         [&] {
             return format == PathInfoJsonFormat::V1 ? Hash::parseSRI(getString(valueAt(json, "narHash")))
@@ -286,8 +289,13 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
     if (auto * rawUltimate = optionalValueAt(json, "ultimate"))
         res.ultimate = getBoolean(*rawUltimate);
 
-    if (auto * rawSignatures = optionalValueAt(json, "signatures"))
-        res.sigs = getStringSet(*rawSignatures);
+    if (auto * rawSignatures = optionalValueAt(json, "signatures")) {
+        if (format == PathInfoJsonFormat::V3) {
+            res.sigs = *rawSignatures;
+        } else {
+            res.sigs = Signature::parseMany(getStringList(*rawSignatures));
+        }
+    }
 
     return res;
 }
@@ -315,7 +323,7 @@ UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json 
 
 void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
 {
-    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V2);
+    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V3);
 }
 
 ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)

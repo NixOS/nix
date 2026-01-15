@@ -13,6 +13,7 @@ class StorePath;
 struct ContentAddress;
 struct DrvOutput;
 struct Realisation;
+struct Signature;
 
 /**
  * Shared serializers between the worker protocol, serve protocol, and a
@@ -72,6 +73,8 @@ template<>
 DECLARE_COMMON_SERIALISER(DrvOutput);
 template<>
 DECLARE_COMMON_SERIALISER(Realisation);
+template<>
+DECLARE_COMMON_SERIALISER(Signature);
 
 #define COMMA_ ,
 template<typename T>

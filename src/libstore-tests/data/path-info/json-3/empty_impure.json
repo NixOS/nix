@@ -1,0 +1,12 @@
+{
+  "ca": null,
+  "deriver": null,
+  "narHash": "sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=",
+  "narSize": 0,
+  "references": [],
+  "registrationTime": null,
+  "signatures": [],
+  "storeDir": "/nix/store",
+  "ultimate": false,
+  "version": 3
+}
