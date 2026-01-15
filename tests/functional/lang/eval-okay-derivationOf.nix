@@ -1,8 +1,8 @@
 let
-  drv = derivation {
+  pkg = derivation {
     name = "test";
     builder = "/bin/false";
     system = "x86_64-linux";
   };
 in
-builtins.derivationOf drv.outPath == drv.drvPath
+builtins.derivationOf pkg == drv.drvPath
