@@ -40,119 +40,32 @@ bool isMachOBinary(const std::filesystem::path & path)
 }
 
 /**
- * Process a single Mach-O slice (non-fat binary or one slice of a fat binary).
- * Returns true if a code signature was zeroed.
+ * Remove the code signature from a Mach-O binary using codesign --remove-signature.
+ * This properly removes the signature structure so the binary can be re-signed later.
+ *
+ * Previously we tried to zero the signature bytes manually, but this left the
+ * LC_CODE_SIGNATURE load command pointing to zeroed data, creating an unparseable
+ * signature blob that codesign -f -s - could not replace.
  */
-static bool zeroMachOSliceSignature(void * base, size_t size, size_t offset)
+void removeMachOCodeSignature(const std::filesystem::path & path)
 {
-    if (size < sizeof(mach_header))
-        return false;
+    if (!isMachOBinary(path))
+        return;
 
-    auto * header = reinterpret_cast<mach_header *>(static_cast<char *>(base) + offset);
+    try {
+        auto result = runProgram(RunOptions{
+            .program = "/usr/bin/codesign",
+            .args = {"--remove-signature", path.string()},
+        });
 
-    bool is64 = false;
-    bool swap = false;
-    uint32_t magic = header->magic;
-
-    if (magic == MH_MAGIC) {
-        is64 = false;
-        swap = false;
-    } else if (magic == MH_MAGIC_64) {
-        is64 = true;
-        swap = false;
-    } else if (magic == MH_CIGAM) {
-        is64 = false;
-        swap = true;
-    } else if (magic == MH_CIGAM_64) {
-        is64 = true;
-        swap = true;
-    } else {
-        return false;
-    }
-
-    uint32_t ncmds = swap ? __builtin_bswap32(header->ncmds) : header->ncmds;
-    uint32_t headerSize = is64 ? sizeof(mach_header_64) : sizeof(mach_header);
-
-    if (offset + headerSize > size)
-        return false;
-
-    auto * cmd = reinterpret_cast<load_command *>(static_cast<char *>(base) + offset + headerSize);
-
-    for (uint32_t i = 0; i < ncmds; i++) {
-        uint32_t cmdType = swap ? __builtin_bswap32(cmd->cmd) : cmd->cmd;
-        uint32_t cmdSize = swap ? __builtin_bswap32(cmd->cmdsize) : cmd->cmdsize;
-
-        if (cmdType == LC_CODE_SIGNATURE) {
-            auto * sigCmd = reinterpret_cast<linkedit_data_command *>(cmd);
-            uint32_t dataoff = swap ? __builtin_bswap32(sigCmd->dataoff) : sigCmd->dataoff;
-            uint32_t datasize = swap ? __builtin_bswap32(sigCmd->datasize) : sigCmd->datasize;
-
-            // Zero out the signature data
-            if (offset + dataoff + datasize <= size) {
-                memset(static_cast<char *>(base) + offset + dataoff, 0, datasize);
-                debug("zeroed %u bytes of code signature at offset %u", datasize, dataoff);
-                return true;
-            }
+        if (!statusOk(result.first)) {
+            debug("codesign --remove-signature failed for %s: %s", path, result.second);
+        } else {
+            debug("removed code signature from %s", path);
         }
-
-        cmd = reinterpret_cast<load_command *>(reinterpret_cast<char *>(cmd) + cmdSize);
+    } catch (std::exception & e) {
+        debug("failed to remove signature from %s: %s", path, e.what());
     }
-
-    return false;
-}
-
-void zeroMachOCodeSignature(const std::filesystem::path & path)
-{
-    auto st = maybeLstat(path.c_str());
-    if (!st || !S_ISREG(st->st_mode))
-        return;
-
-    int fd = open(path.c_str(), O_RDWR);
-    if (fd == -1) {
-        debug("cannot open %s for code signature zeroing: %s", path, strerror(errno));
-        return;
-    }
-
-    auto cleanup = [&]() { close(fd); };
-
-    size_t fileSize = st->st_size;
-    if (fileSize < sizeof(uint32_t)) {
-        cleanup();
-        return;
-    }
-
-    void * mapped = mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (mapped == MAP_FAILED) {
-        debug("cannot mmap %s: %s", path, strerror(errno));
-        cleanup();
-        return;
-    }
-
-    auto unmapCleanup = [&]() {
-        munmap(mapped, fileSize);
-        cleanup();
-    };
-
-    uint32_t magic = *static_cast<uint32_t *>(mapped);
-
-    if (magic == FAT_MAGIC || magic == FAT_CIGAM) {
-        // Fat binary - process each slice
-        bool swap = (magic == FAT_CIGAM);
-        auto * fatHeader = static_cast<fat_header *>(mapped);
-        uint32_t nfat = swap ? __builtin_bswap32(fatHeader->nfat_arch) : fatHeader->nfat_arch;
-
-        auto * arch = reinterpret_cast<fat_arch *>(fatHeader + 1);
-        for (uint32_t i = 0; i < nfat; i++) {
-            uint32_t archOffset = swap ? __builtin_bswap32(arch[i].offset) : arch[i].offset;
-            zeroMachOSliceSignature(mapped, fileSize, archOffset);
-        }
-    } else if (magic == MH_MAGIC || magic == MH_MAGIC_64 ||
-               magic == MH_CIGAM || magic == MH_CIGAM_64) {
-        // Single-arch binary
-        zeroMachOSliceSignature(mapped, fileSize, 0);
-    }
-
-    unmapCleanup();
 }
 
 void signMachOBinary(const std::filesystem::path & path)
@@ -179,7 +92,7 @@ void signMachOBinary(const std::filesystem::path & path)
     }
 }
 
-void zeroMachOCodeSignaturesRecursively(const std::filesystem::path & path)
+void removeMachOCodeSignaturesRecursively(const std::filesystem::path & path)
 {
     auto st = maybeLstat(path.c_str());
     if (!st)
@@ -187,11 +100,11 @@ void zeroMachOCodeSignaturesRecursively(const std::filesystem::path & path)
 
     if (S_ISREG(st->st_mode)) {
         if (isMachOBinary(path)) {
-            zeroMachOCodeSignature(path);
+            removeMachOCodeSignature(path);
         }
     } else if (S_ISDIR(st->st_mode)) {
         for (auto & entry : std::filesystem::directory_iterator(path)) {
-            zeroMachOCodeSignaturesRecursively(entry.path());
+            removeMachOCodeSignaturesRecursively(entry.path());
         }
     }
     // Skip symlinks - they don't contain code signatures

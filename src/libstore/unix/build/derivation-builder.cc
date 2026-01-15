@@ -1662,7 +1662,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                that would cause hash mismatches. After hashing and moving to the
                final location, we'll re-sign the binaries.
                See: https://github.com/NixOS/nix/issues/6065 */
-            zeroMachOCodeSignaturesRecursively(actualPath);
+            removeMachOCodeSignaturesRecursively(actualPath);
 #endif
 
             /* FIXME optimize and deduplicate with addToStore */

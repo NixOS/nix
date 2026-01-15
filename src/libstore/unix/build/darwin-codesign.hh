@@ -14,17 +14,18 @@ namespace nix {
 bool isMachOBinary(const std::filesystem::path & path);
 
 /**
- * Zero out the code signature section in a Mach-O binary.
+ * Remove the code signature from a Mach-O binary using codesign --remove-signature.
  * This is used before computing content-addressed hashes to ensure
  * deterministic hashing (code signatures contain timestamps and other
  * non-deterministic data).
  *
- * The signature section is zeroed in-place. The file can be re-signed
- * afterwards using signMachOBinary().
+ * Unlike zeroing the signature bytes in-place (which corrupts the signature
+ * structure and makes re-signing impossible), this properly removes the
+ * LC_CODE_SIGNATURE load command and truncates the signature blob.
  *
  * Does nothing if the file is not a Mach-O binary or has no code signature.
  */
-void zeroMachOCodeSignature(const std::filesystem::path & path);
+void removeMachOCodeSignature(const std::filesystem::path & path);
 
 /**
  * Re-sign a Mach-O binary with an ad-hoc signature.
@@ -39,10 +40,10 @@ void zeroMachOCodeSignature(const std::filesystem::path & path);
 void signMachOBinary(const std::filesystem::path & path);
 
 /**
- * Recursively walk a directory and zero code signatures in all Mach-O binaries.
+ * Recursively walk a directory and remove code signatures from all Mach-O binaries.
  * Used before computing CA hashes.
  */
-void zeroMachOCodeSignaturesRecursively(const std::filesystem::path & path);
+void removeMachOCodeSignaturesRecursively(const std::filesystem::path & path);
 
 /**
  * Recursively walk a directory and re-sign all Mach-O binaries.
