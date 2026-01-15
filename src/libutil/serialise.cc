@@ -412,7 +412,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
             }
 
             if (cur.empty()) {
-                if (hasCoro) {
+                if (hasCoro && *coro) {
                     (*coro)();
                 }
                 if (*coro) {
@@ -426,6 +426,16 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
 
             size_t n = cur.copy(data, len);
             cur.remove_prefix(n);
+
+            /* This is necessary to ensure that the coroutine gets resumed
+               after the consumer has finished reading the Source. Otherwise the
+               coroutine is always abandoned (i.e. it is always destroyed when
+               suspended). */
+            if (cur.empty() && coro && *coro) {
+                (*coro)();
+                if (*coro)
+                    cur = coro->get();
+            }
 
             return n;
         }
