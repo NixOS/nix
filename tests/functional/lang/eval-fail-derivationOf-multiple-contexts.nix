@@ -10,6 +10,6 @@ let
     system = "x86_64-linux";
   };
   # Create a string with multiple context items by concatenating paths from different derivations
-  multipleContexts = "${drv1.outPath} ${drv2.outPath}";
+  multipleContexts = "${drv1.outPath}${drv2.outPath}";
 in
 builtins.derivationOf multipleContexts

@@ -1,0 +1,8 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-no-context-store-path.nix:1:1:
+            1| builtins.derivationOf "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-test"
+             | ^
+            2|
+
+       error: '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-test' has no derivation in its context
