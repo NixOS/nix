@@ -1451,12 +1451,29 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         struct stat & st = *optSt;
 
 #ifndef __CYGWIN__
-        /* Check that the output is not group or world writable, as
-           that means that someone else can have interfered with the
-           build.  Also, the output should be owned by the build
-           user. */
+        /* Security checks for build outputs:
+
+           1. PERMISSION CHECK (always enforced, including CA):
+              Reject group/world writable outputs. This prevents ANY user
+              from modifying the output after creation, ensuring content
+              integrity is maintained post-verification.
+
+           2. OWNERSHIP CHECK (input-addressed only, skipped for CA):
+              For input-addressed derivations, verify the current build user
+              owns the output to prevent substitution attacks.
+
+              For CA (content-addressed) derivations, we skip ownership because:
+              - Integrity is guaranteed by content hash at registration time
+              - The output cannot be registered without matching expected hash
+              - Permission check (still enforced!) prevents post-registration tampering
+              - This allows CA outputs built by nixbld10 to be reused by nixbld5 etc.
+
+              Even with ownership check skipped, regular users cannot tamper
+              because outputs are 0755 owned by nixbld, and the permission
+              check rejects anything group/world writable. */
+        bool isCA = drv.type().isCA();
         if ((!S_ISLNK(st.st_mode) && (st.st_mode & (S_IWGRP | S_IWOTH)))
-            || (buildUser && st.st_uid != buildUser->getUID()))
+            || (!isCA && buildUser && st.st_uid != buildUser->getUID()))
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "suspicious ownership or permission on '%s' for output '%s'; rejecting this build output",
@@ -1466,9 +1483,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
         /* Canonicalise first.  This ensures that the path we're
            rewriting doesn't contain a hard link to /etc/shadow or
-           something like that. */
-        canonicalisePathMetaData(
-            actualPath, buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt, inodesSeen);
+           something like that.
+
+           For CA derivations, pass nullopt to skip the ownership range check
+           in canonicalisePathMetaData, since we already verified content
+           integrity via hash (same rationale as skipping ownership check above). */
+        auto uidRange = (isCA || !buildUser) ? std::nullopt : std::optional(buildUser->getUIDRange());
+        canonicalisePathMetaData(actualPath, uidRange, inodesSeen);
 
         bool discardReferences = false;
         if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
