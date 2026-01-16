@@ -30,19 +30,6 @@ scope: {
         NIX_CFLAGS_COMPILE = "-DINITIAL_MARK_STACK_SIZE=1048576";
       });
 
-  lowdown = pkgs.lowdown.overrideAttrs (prevAttrs: rec {
-    version = "2.0.2";
-    src = pkgs.fetchurl {
-      url = "https://kristaps.bsd.lv/lowdown/snapshots/lowdown-${version}.tar.gz";
-      hash = "sha512-cfzhuF4EnGmLJf5EGSIbWqJItY3npbRSALm+GarZ7SMU7Hr1xw0gtBFMpOdi5PBar4TgtvbnG4oRPh+COINGlA==";
-    };
-    nativeBuildInputs = prevAttrs.nativeBuildInputs ++ [ pkgs.buildPackages.bmake ];
-    postInstall =
-      lib.replaceStrings [ "lowdown.so.1" "lowdown.1.dylib" ] [ "lowdown.so.2" "lowdown.2.dylib" ]
-        (prevAttrs.postInstall or "");
-    patches = [ ];
-  });
-
   # TODO: Remove this when https://github.com/NixOS/nixpkgs/pull/442682 is included in a stable release
   toml11 =
     if lib.versionAtLeast pkgs.toml11.version "4.4.0" then
