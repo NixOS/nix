@@ -134,6 +134,11 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     void collectGarbage(const GCOptions & options, GCResults & results) override {}
 
+    void deleteBuildTrace(const DrvOutput & id) override
+    {
+        unsupported("deleteBuildTrace");
+    }
+
     void addSignatures(const StorePath & storePath, const StringSet & sigs) override
     {
         unsupported("addSignatures");
@@ -281,9 +286,18 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
 
     for (auto & result : results) {
         if (auto * successP = result.tryGetSuccess()) {
-            for (auto & [outputName, output] : successP->builtOutputs) {
-                newPaths.insert(output.outPath);
-                newRealisations.insert(output);
+            if (auto * pathBuilt = std::get_if<DerivedPathBuilt>(&result.path)) {
+                // TODO ugly extra IO
+                auto drvPath = resolveDerivedPath(*next, *pathBuilt->drvPath);
+                for (auto & [outputName, output] : successP->builtOutputs) {
+                    newPaths.insert(output.outPath);
+                    newRealisations.insert(
+                        {output,
+                         {
+                             .drvPath = drvPath,
+                             .outputName = outputName,
+                         }});
+                }
             }
         }
     }

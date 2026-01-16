@@ -194,8 +194,10 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
     if (ex) {
         if (!preserveException && !waiters.empty())
             logError(ex->info());
-        else
+        else {
+            logErrorInfo(lvlDebug, ex->info());
             this->ex = std::move(*ex);
+        }
     }
 
     for (auto & i : waiters) {
