@@ -9,9 +9,12 @@
 #include <unistd.h>
 #include <poll.h>
 
+#if defined(__linux__)
+#  include <sys/syscall.h> /* pull __NR_* definitions */
+#endif
+
 #if defined(__linux__) && defined(__NR_openat2)
 #  define HAVE_OPENAT2 1
-#  include <sys/syscall.h>
 #  include <linux/openat2.h>
 #else
 #  define HAVE_OPENAT2 0
@@ -399,7 +402,7 @@ Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPa
 {
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
     assert(!path.isRoot());
-#ifdef __linux__
+#if HAVE_OPENAT2
     auto maybeFd = linux::openat2(
         dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
     if (maybeFd) {
