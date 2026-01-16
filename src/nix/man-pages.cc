@@ -8,7 +8,7 @@ namespace nix {
 
 std::filesystem::path getNixManDir()
 {
-    return canonPath(NIX_MAN_DIR);
+    return canonPath(std::filesystem::path{NIX_MAN_DIR});
 }
 
 void showManPage(const std::string & name)

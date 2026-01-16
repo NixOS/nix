@@ -147,6 +147,11 @@ Path canonPath(PathView path, bool resolveSymlinks)
     return ret;
 }
 
+std::filesystem::path canonPath(const std::filesystem::path & path, bool resolveSymlinks)
+{
+    return {canonPath(path.string(), resolveSymlinks)};
+}
+
 Path dirOf(const PathView path)
 {
     Path::size_type pos = OsPathTrait<char>::rfindPathSep(path);

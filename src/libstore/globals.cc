@@ -35,6 +35,10 @@
 #  include <sys/sysctl.h>
 #endif
 
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 #include "store-config-private.hh"
 
 namespace nix {
@@ -45,6 +49,25 @@ namespace nix {
    appropriately.  (This wouldn't work on the socket itself since it
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
+
+/**
+ * Helper to resolve the NIX_CONF_DIR at runtime on Windows.
+ * On Windows, NIX_CONF_DIR is not defined at compile time, so we determine
+ * the path at runtime using the Windows known folders API (FOLDERID_ProgramData).
+ * This allows Nix to work correctly regardless of which drive Windows is installed on.
+ */
+static std::filesystem::path resolveNixConfDir()
+{
+#ifdef _WIN32
+#  ifdef NIX_CONF_DIR
+    // On Windows, NIX_CONF_DIR should not be defined at compile time
+#    error "NIX_CONF_DIR should not be defined on Windows"
+#  endif
+    return windows::known_folders::getProgramData() / "nix";
+#else
+    return NIX_CONF_DIR;
+#endif
+}
 
 Settings settings;
 
@@ -62,7 +85,9 @@ Settings::Settings()
     , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
     , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixConfDir(canonPath(getEnvOsNonEmpty(OS_STR("NIX_CONF_DIR"))
+                               .transform([](auto && s) { return std::filesystem::path(s); })
+                               .value_or(resolveNixConfDir())))
     , nixUserConfFiles(getUserConfigFiles())
     , nixDaemonSocketFile(
           canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))

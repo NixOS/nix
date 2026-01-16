@@ -300,6 +300,8 @@ MixDefaultProfile::MixDefaultProfile()
     profile = getDefaultProfile().string();
 }
 
+static constexpr auto environmentVariablesCategory = "Options that change environment variables";
+
 MixEnvironment::MixEnvironment()
     : ignoreEnvironment(false)
 {

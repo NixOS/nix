@@ -3,79 +3,74 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
 
+#ifndef _WIN32
+#  include "unix/xdg-dirs.hh"
+#else
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 namespace nix {
 
 std::filesystem::path getCacheDir()
 {
     auto dir = getEnv("NIX_CACHE_HOME");
-    if (dir) {
+    if (dir)
         return *dir;
-    } else {
-        auto xdgDir = getEnv("XDG_CACHE_HOME");
-        if (xdgDir) {
-            return std::filesystem::path{*xdgDir} / "nix";
-        } else {
-            return getHome() / ".cache" / "nix";
-        }
-    }
+#ifndef _WIN32
+    return unix::xdg::getCacheHome() / "nix";
+#else
+    return windows::known_folders::getLocalAppData() / "nix" / "cache";
+#endif
 }
 
 std::filesystem::path getConfigDir()
 {
     auto dir = getEnv("NIX_CONFIG_HOME");
-    if (dir) {
+    if (dir)
         return *dir;
-    } else {
-        auto xdgDir = getEnv("XDG_CONFIG_HOME");
-        if (xdgDir) {
-            return std::filesystem::path{*xdgDir} / "nix";
-        } else {
-            return getHome() / ".config" / "nix";
-        }
-    }
+#ifndef _WIN32
+    return unix::xdg::getConfigHome() / "nix";
+#else
+    return windows::known_folders::getRoamingAppData() / "nix" / "config";
+#endif
 }
 
 std::vector<std::filesystem::path> getConfigDirs()
 {
     std::filesystem::path configHome = getConfigDir();
-    auto configDirs = getEnv("XDG_CONFIG_DIRS").value_or("/etc/xdg");
-    auto tokens = tokenizeString<std::vector<std::string>>(configDirs, ":");
     std::vector<std::filesystem::path> result;
     result.push_back(configHome);
-    for (auto & token : tokens) {
-        result.push_back(std::filesystem::path{token} / "nix");
+#ifndef _WIN32
+    auto xdgConfigDirs = unix::xdg::getConfigDirs();
+    for (auto & dir : xdgConfigDirs) {
+        result.push_back(dir / "nix");
     }
+#endif
     return result;
 }
 
 std::filesystem::path getDataDir()
 {
     auto dir = getEnv("NIX_DATA_HOME");
-    if (dir) {
+    if (dir)
         return *dir;
-    } else {
-        auto xdgDir = getEnv("XDG_DATA_HOME");
-        if (xdgDir) {
-            return std::filesystem::path{*xdgDir} / "nix";
-        } else {
-            return getHome() / ".local" / "share" / "nix";
-        }
-    }
+#ifndef _WIN32
+    return unix::xdg::getDataHome() / "nix";
+#else
+    return windows::known_folders::getLocalAppData() / "nix" / "data";
+#endif
 }
 
 std::filesystem::path getStateDir()
 {
     auto dir = getEnv("NIX_STATE_HOME");
-    if (dir) {
+    if (dir)
         return *dir;
-    } else {
-        auto xdgDir = getEnv("XDG_STATE_HOME");
-        if (xdgDir) {
-            return std::filesystem::path{*xdgDir} / "nix";
-        } else {
-            return getHome() / ".local" / "state" / "nix";
-        }
-    }
+#ifndef _WIN32
+    return unix::xdg::getStateHome() / "nix";
+#else
+    return windows::known_folders::getLocalAppData() / "nix" / "state";
+#endif
 }
 
 std::filesystem::path createNixStateDir()
