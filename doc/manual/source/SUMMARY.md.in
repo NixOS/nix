@@ -135,6 +135,7 @@
   - [Serving Tarball Flakes](protocols/tarball-fetcher.md)
   - [Store Path Specification](protocols/store-path.md)
   - [Nix Archive (NAR) Format](protocols/nix-archive/index.md)
+  - [Nix Cache Info Format](protocols/nix-cache-info.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
 - [C API](c-api.md)
 - [Glossary](glossary.md)
