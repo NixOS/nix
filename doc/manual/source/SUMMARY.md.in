@@ -136,6 +136,7 @@
   - [Store Path Specification](protocols/store-path.md)
   - [Nix Archive (NAR) Format](protocols/nix-archive/index.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
+  - [Nix32 Encoding](protocols/nix32.md)
 - [C API](c-api.md)
 - [Glossary](glossary.md)
 - [Development](development/index.md)
