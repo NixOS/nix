@@ -68,5 +68,11 @@ else
   unset -f check_nix_profiles
 fi
 
-export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
-unset NIX_LINK NIX_LINK_NEW
+# Prepend Nix bin dirs to PATH, after removing any duplicates
+USER_NIX_BIN="$NIX_LINK/bin"
+SYS_NIX_BIN="@localstatedir@/nix/profiles/default/bin"
+PATH=":$PATH:"
+PATH=$(printf '%s' "$PATH" | sed "s|:$USER_NIX_BIN:|:|g; s|:$SYS_NIX_BIN:|:|g")
+PATH=$(printf '%s' "$PATH" | sed "s|^:||; s|:$||")
+export PATH="$USER_NIX_BIN:$SYS_NIX_BIN${PATH:+:"$PATH"}"
+unset USER_NIX_BIN SYS_NIX_BIN NIX_LINK NIX_LINK_NEW
