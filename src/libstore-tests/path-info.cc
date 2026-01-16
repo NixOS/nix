@@ -66,7 +66,10 @@ static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
         };
         info.registrationTime = 23423;
         info.ultimate = true;
-        info.sigs = {"asdf", "qwer"};
+        info.sigs = {
+            "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+            "qwer:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+        };
     }
     return info;
 }
