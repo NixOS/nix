@@ -75,6 +75,15 @@ Strings getStringList(const nlohmann::json & value);
 StringMap getStringMap(const nlohmann::json & value);
 StringSet getStringSet(const nlohmann::json & value);
 
+template<typename T>
+static inline std::optional<T> ptrToOwned(const nlohmann::json * ptr)
+{
+    if (ptr)
+        return std::optional{*ptr};
+    else
+        return std::nullopt;
+}
+
 } // namespace nix
 
 namespace nlohmann {
@@ -113,14 +122,5 @@ struct adl_serializer<std::optional<T>>
             json = nullptr;
     }
 };
-
-template<typename T>
-static inline std::optional<T> ptrToOwned(const json * ptr)
-{
-    if (ptr)
-        return std::optional{*ptr};
-    else
-        return std::nullopt;
-}
 
 } // namespace nlohmann
