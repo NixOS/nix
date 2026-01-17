@@ -44,8 +44,8 @@ public:
     void operator=(AutoCloseFD pid);
 #endif
     ~Pid();
-    int kill();
-    int wait();
+    int kill(bool allowInterrupts = true);
+    int wait(bool allowInterrupts = true);
 
     // TODO: Implement for Windows
 #ifndef _WIN32
