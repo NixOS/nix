@@ -532,6 +532,16 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
     nix_store_free(store);
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info_json)
+{
+    std::string pathInfoJson;
+    auto ret = nix_store_query_path_info_json(ctx, store, outPath, 2, OBSERVE_STRING(pathInfoJson));
+    assert_ctx_ok();
+    ASSERT_EQ(NIX_OK, ret);
+    // JSON should be non-empty string
+    ASSERT_TRUE(pathInfoJson.size() > 0);
+}
+
 TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_with_outputs)
 {
     // Test closure computation with include_outputs on a derivation path
