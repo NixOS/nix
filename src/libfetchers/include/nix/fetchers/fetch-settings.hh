@@ -129,6 +129,20 @@ struct Settings : public Config
         true,
         Xp::Flakes};
 
+    Setting<unsigned int> fetchLockTimeout{
+        this,
+        0,
+        "fetch-lock-timeout",
+        R"(
+          The timeout (in seconds) for acquiring inter-process fetch locks.
+          When multiple Nix processes try to fetch the same resource simultaneously,
+          they use file-based locking to ensure only one process downloads while
+          others wait. This setting controls how long a process will wait for
+          the lock before timing out with an error.
+
+          A value of 0 means no timeout (wait indefinitely).
+        )"};
+
     ref<Cache> getCache() const;
 
     ref<GitRepo> getTarballCache() const;

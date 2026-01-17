@@ -346,6 +346,7 @@ sources = files(
   'store-dir-config.cc',
   'store-reference.cc',
   'store-registration.cc',
+  'substitution-lock.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',
   'worker-protocol.cc',

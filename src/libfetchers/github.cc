@@ -1,5 +1,6 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/cache-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
@@ -294,53 +295,74 @@ struct GitArchiveInputScheme : InputScheme
         Cache::Key treeHashKey{"gitRevToTreeHash", {{"rev", rev->gitRev()}}};
         Cache::Key lastModifiedKey{"gitRevToLastModified", {{"rev", rev->gitRev()}}};
 
-        if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
-            if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
-                auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
-                auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
-                if (settings.getTarballCache()->hasObject(treeHash))
-                    return {std::move(input), TarballInfo{.treeHash = treeHash, .lastModified = (time_t) lastModified}};
-                else
-                    debug("Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
+        /* Helper to check cache and return result if found. */
+        auto checkCacheForResult = [&]() -> std::optional<std::pair<Input, TarballInfo>> {
+            if (auto treeHashAttrs = cache->lookup(treeHashKey)) {
+                if (auto lastModifiedAttrs = cache->lookup(lastModifiedKey)) {
+                    auto treeHash = getRevAttr(*treeHashAttrs, "treeHash");
+                    auto lastModified = getIntAttr(*lastModifiedAttrs, "lastModified");
+                    if (settings.getTarballCache()->hasObject(treeHash))
+                        return std::pair{
+                            std::move(input), TarballInfo{.treeHash = treeHash, .lastModified = (time_t) lastModified}};
+                    else
+                        debug(
+                            "Git tree with hash '%s' has disappeared from the cache, refetching...", treeHash.gitRev());
+                }
             }
-        }
+            return std::nullopt;
+        };
 
-        /* Stream the tarball into the tarball cache. */
-        auto url = getDownloadUrl(settings, input);
+        /* Fast path: check cache without lock. */
+        if (auto result = checkCacheForResult())
+            return *result;
 
-        auto source = sinkToSource([&](Sink & sink) {
-            FileTransferRequest req(url.url);
-            req.headers = url.headers;
-            getFileTransfer()->download(std::move(req), sink);
-        });
+        /* Slow path: use locked fetch to prevent duplicate downloads.
+           Use null byte as separator to avoid potential collisions. */
+        return withFetchLock(
+            std::string("gitarchive\0", 11) + rev->gitRev(),
+            settings.fetchLockTimeout.get(),
+            [&]() -> std::optional<std::pair<Input, TarballInfo>> {
+                /* Double-check: another process may have populated the cache. */
+                return checkCacheForResult();
+            },
+            [&]() -> std::pair<Input, TarballInfo> {
+                /* Stream the tarball into the tarball cache. */
+                auto url = getDownloadUrl(settings, input);
 
-        auto act = std::make_unique<Activity>(
-            *logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", input.to_string()));
+                auto source = sinkToSource([&](Sink & sink) {
+                    FileTransferRequest req(url.url);
+                    req.headers = url.headers;
+                    getFileTransfer()->download(std::move(req), sink);
+                });
 
-        TarArchive archive{*source};
-        auto tarballCache = settings.getTarballCache();
-        auto parseSink = tarballCache->getFileSystemObjectSink();
-        auto lastModified = unpackTarfileToSink(archive, *parseSink);
-        auto tree = parseSink->flush();
+                auto act = std::make_unique<Activity>(
+                    *logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", input.to_string()));
 
-        act.reset();
+                TarArchive archive{*source};
+                auto tarballCache = settings.getTarballCache();
+                auto parseSink = tarballCache->getFileSystemObjectSink();
+                auto lastModified = unpackTarfileToSink(archive, *parseSink);
+                auto tree = parseSink->flush();
 
-        TarballInfo tarballInfo{
-            .treeHash = tarballCache->dereferenceSingletonDirectory(tree), .lastModified = lastModified};
+                act.reset();
 
-        cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
-        cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
+                TarballInfo tarballInfo{
+                    .treeHash = tarballCache->dereferenceSingletonDirectory(tree), .lastModified = lastModified};
+
+                cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
+                cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});
 
 #if 0
-        if (upstreamTreeHash != tarballInfo.treeHash)
-            warn(
-                "Git tree hash mismatch for revision '%s' of '%s': "
-                "expected '%s', got '%s'. "
-                "This can happen if the Git repository uses submodules.",
-                rev->gitRev(), input.to_string(), upstreamTreeHash->gitRev(), tarballInfo.treeHash.gitRev());
+                if (upstreamTreeHash != tarballInfo.treeHash)
+                    warn(
+                        "Git tree hash mismatch for revision '%s' of '%s': "
+                        "expected '%s', got '%s'. "
+                        "This can happen if the Git repository uses submodules.",
+                        rev->gitRev(), input.to_string(), upstreamTreeHash->gitRev(), tarballInfo.treeHash.gitRev());
 #endif
 
-        return {std::move(input), tarballInfo};
+                return {std::move(input), tarballInfo};
+            });
     }
 
     std::pair<ref<SourceAccessor>, Input>
