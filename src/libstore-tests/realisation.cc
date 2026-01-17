@@ -57,6 +57,15 @@ Realisation simple{
     },
 };
 
+Realisation withSignature = [&] {
+    auto r = simple;
+    // FIXME actually sign properly
+    r.signatures = {
+        Signature{.keyName = "asdfasdfasdf", .sig = std::string(64, '\0')},
+    };
+    return r;
+}();
+
 INSTANTIATE_TEST_SUITE_P(
     RealisationJSON,
     RealisationJsonTest,
@@ -66,15 +75,8 @@ INSTANTIATE_TEST_SUITE_P(
             simple,
         },
         std::pair{
-            "with-signature",
-            [&] {
-                auto r = simple;
-                // FIXME actually sign properly
-                r.signatures = {
-                    "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-                };
-                return r;
-            }(),
+            "with-signature-structured",
+            withSignature,
         }));
 
 /**
@@ -85,6 +87,14 @@ INSTANTIATE_TEST_SUITE_P(
 TEST_F(RealisationTest, dependent_realisations_from_json)
 {
     readJsonTest("with-dependent-realisations", simple);
+}
+
+/**
+ * Old signature format (string) should still be parseable.
+ */
+TEST_F(RealisationTest, with_signature_from_json)
+{
+    readJsonTest("with-signature", withSignature);
 }
 
 } // namespace nix

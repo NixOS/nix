@@ -123,11 +123,11 @@ struct CmdVerify : StorePathsCommand
 
                     else {
 
-                        StringSet sigsSeen;
+                        std::set<Signature> sigsSeen;
                         size_t actualSigsNeeded = std::max(sigsNeeded, (size_t) 1);
                         size_t validSigs = 0;
 
-                        auto doSigs = [&](StringSet sigs) {
+                        auto doSigs = [&](std::set<Signature> sigs) {
                             for (const auto & sig : sigs) {
                                 if (!sigsSeen.insert(sig).second)
                                     continue;

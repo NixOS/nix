@@ -277,7 +277,7 @@ public:
                 if (!queryNAR.isNull(9))
                     narInfo->deriver = StorePath(queryNAR.getStr(9));
                 for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
-                    narInfo->sigs.insert(sig);
+                    narInfo->sigs.insert(Signature::parse(sig));
                 narInfo->ca = ContentAddress::parseOpt(queryNAR.getStr(11));
 
                 return {oValid, narInfo};
@@ -337,8 +337,9 @@ public:
                         narInfo && narInfo->fileHash)(
                         narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)(info->narHash.to_string(
                         HashFormat::Nix32, true))(info->narSize)(concatStringsSep(" ", info->shortRefs()))(
-                        info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)(
-                        concatStringsSep(" ", info->sigs))(renderContentAddress(info->ca))(time(0))
+                        info->deriver ? std::string(info->deriver->to_string()) : "",
+                        (bool) info->deriver)(concatStringsSep(" ", Signature::toStrings(info->sigs)))(
+                        renderContentAddress(info->ca))(time(0))
                     .exec();
 
             } else {

@@ -22,6 +22,8 @@ enum class PathInfoJsonFormat {
     V1 = 1,
     /// New format with structured hashes and store path base names
     V2 = 2,
+    /// New format with structured signatures
+    V3 = 3,
 };
 
 /**
@@ -102,7 +104,7 @@ struct UnkeyedValidPathInfo
      */
     bool ultimate = false;
 
-    StringSet sigs; // note: not necessarily verified
+    std::set<Signature> sigs;
 
     /**
      * If non-empty, an assertion that the path is content-addressed,
@@ -200,7 +202,7 @@ struct ValidPathInfo : virtual UnkeyedValidPathInfo
     /**
      * Verify a single signature.
      */
-    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const;
 
     /**
      * References as store path basenames, including a self reference if it has one.

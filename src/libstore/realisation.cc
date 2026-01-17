@@ -38,7 +38,7 @@ void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
 }
 
 bool UnkeyedRealisation::checkSignature(
-    const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const
+    const DrvOutput & key, const PublicKeys & publicKeys, const Signature & sig) const
 {
     return verifyDetached(fingerprint(key), sig, publicKeys);
 }
@@ -86,21 +86,33 @@ UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & js
 {
     auto json = getObject(json0);
 
-    StringSet signatures;
-    if (auto signaturesOpt = optionalValueAt(json, "signatures"))
-        signatures = *signaturesOpt;
+    std::set<Signature> signatures;
+    if (auto signaturesOpt = optionalValueAt(json, "signatures")) {
+        for (auto & sig : getArray(*signaturesOpt)) {
+            // Handle both old string format and new structured format
+            if (sig.is_string())
+                signatures.insert(Signature::parse(getString(sig)));
+            else
+                signatures.insert(sig);
+        }
+    }
 
     return UnkeyedRealisation{
         .outPath = valueAt(json, "outPath"),
-        .signatures = signatures,
+        .signatures = std::move(signatures),
     };
 }
 
 void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedRealisation & r)
 {
+    // Serialize signatures as strings to preserve wire protocol compatibility
+    json::array_t signaturesJson;
+    for (const auto & sig : r.signatures)
+        signaturesJson.push_back(sig.to_string());
+
     json = {
         {"outPath", r.outPath},
-        {"signatures", r.signatures},
+        {"signatures", std::move(signaturesJson)},
         // back-compat
         {"dependentRealisations", json::object()},
     };

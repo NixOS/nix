@@ -1066,7 +1066,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.deriver = store->parseStorePath(deriver);
             info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
             in >> info.registrationTime >> info.narSize >> info.ultimate;
-            info.sigs = readStrings<StringSet>(in);
+            info.sigs = ServeProto::Serialise<std::set<Signature>>::read(*store, rconn);
             info.ca = ContentAddress::parseOpt(readString(in));
 
             if (info.narSize == 0)
