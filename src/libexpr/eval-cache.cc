@@ -159,6 +159,21 @@ struct AttrDb
         }
     }
 
+    /**
+     * Common helper for simple attribute setters.
+     *
+     * Inserts a single attribute row with the given type and value(s).
+     * The variadic args are forwarded to the SQLite bind chain.
+     */
+    template<typename... Args>
+    [[nodiscard]] std::expected<AttrId, CacheError> setAttr(AttrKey key, AttrType type, Args &&... args)
+    {
+        return doSQLiteWrite([&](auto & state) {
+            state->insertAttribute.use()(key.first)(symbols[key.second])(type)(std::forward<Args>(args)...).exec();
+            return state->db.getLastInsertedRowId();
+        });
+    }
+
     [[nodiscard]] std::expected<AttrId, CacheError> setAttrs(AttrKey key, const std::vector<Symbol> & attrs)
     {
         return doSQLiteWrite([&](auto & state) {
@@ -199,61 +214,37 @@ struct AttrDb
 
     [[nodiscard]] std::expected<AttrId, CacheError> setBool(AttrKey key, bool b)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Bool) (b ? 1 : 0).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Bool, b ? 1 : 0);
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setInt(AttrKey key, int n)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Int) (n).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Int, n);
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setListOfStrings(AttrKey key, const std::vector<std::string> & l)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute
-                .use()(key.first)(symbols[key.second])(
-                    AttrType::ListOfStrings) (dropEmptyInitThenConcatStringsSep("\t", l))
-                .exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::ListOfStrings, dropEmptyInitThenConcatStringsSep("\t", l));
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setPlaceholder(AttrKey key)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Placeholder) (0, false).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Placeholder, 0, false);
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setMissing(AttrKey key)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Missing) (0, false).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Missing, 0, false);
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setMisc(AttrKey key)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Misc) (0, false).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Misc, 0, false);
     }
 
     [[nodiscard]] std::expected<AttrId, CacheError> setFailed(AttrKey key)
     {
-        return doSQLiteWrite([&](auto & state) {
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Failed) (0, false).exec();
-            return state->db.getLastInsertedRowId();
-        });
+        return setAttr(key, AttrType::Failed, 0, false);
     }
 
     /**
@@ -392,15 +383,10 @@ AttrKey AttrCursor::getKey()
         return {0, root->state.s.epsilon};
     if (!parent->first->cachedValue) {
         auto result = root->db->getAttr(parent->first->getKey());
-        if (result) {
-            if (*result) {
-                parent->first->cachedValue = *result;
-            } else {
-                // Not found in cache - set placeholder with AttrId=0
-                parent->first->cachedValue = {{0, placeholder_t()}};
-            }
+        if (result && *result) {
+            parent->first->cachedValue = *result;
         } else {
-            // Database error - set placeholder to avoid crash (graceful degradation)
+            // Not found in cache or database error - use placeholder
             parent->first->cachedValue = {{0, placeholder_t()}};
         }
     }
@@ -478,24 +464,38 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type() == nString) {
+        switch (v.type()) {
+        case nString:
             if (auto id = root->db->setString(getKey(), v.string_view(), v.context()))
                 cachedValue = {*id, string_t{std::string(v.string_view()), {}}};
-        } else if (v.type() == nPath) {
+            break;
+        case nPath: {
             auto path = v.path().path;
             if (auto id = root->db->setString(getKey(), path.abs()))
                 cachedValue = {*id, string_t{path.abs(), {}}};
-        } else if (v.type() == nBool) {
+            break;
+        }
+        case nBool:
             if (auto id = root->db->setBool(getKey(), v.boolean()))
                 cachedValue = {*id, v.boolean()};
-        } else if (v.type() == nInt) {
+            break;
+        case nInt:
             if (auto id = root->db->setInt(getKey(), v.integer().value))
                 cachedValue = {*id, int_t{v.integer()}};
-        } else if (v.type() == nAttrs) {
-            ; // FIXME: do something?
-        } else {
+            break;
+        case nAttrs:
+            // FIXME: do something?
+            break;
+        case nThunk:
+        case nFailed:
+        case nFloat:
+        case nNull:
+        case nList:
+        case nFunction:
+        case nExternal:
             if (auto id = root->db->setMisc(getKey()))
                 cachedValue = {*id, misc_t()};
+            break;
         }
     }
 
