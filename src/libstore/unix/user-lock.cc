@@ -90,8 +90,13 @@ struct SimpleUserLock : UserLock
             debug("trying user '%s'", i);
 
             struct passwd * pw = getpwnam(i.c_str());
-            if (!pw)
-                throw Error("the user '%s' in the group '%s' does not exist", i, settings.buildUsersGroup);
+            if (!pw) {
+                printError("error: the user '%s' in the group '%s' does not exist", i, settings.buildUsersGroup);
+#if __APPLE__
+                printError("note: If you are using macOS 15.0 Sequoia or newer, you may need to run this script: https://github.com/NixOS/nix/blob/master/scripts/sequoia-nixbld-user-migration.sh");
+#endif
+               continue;
+           }
 
             auto fnUserLock = fmt("%s/userpool/%s", settings.nixStateDir, pw->pw_uid);
 
