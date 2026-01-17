@@ -44,8 +44,9 @@ bool isCacheFileWithinTtl(time_t now, const struct stat & st)
 
 std::filesystem::path getCachePath(std::string_view key, bool shallow)
 {
-    return getCacheDir() / "gitv3"
-           / (hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : ""));
+    auto name =
+        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : "");
+    return getCacheDir() / "gitv3" / std::move(name);
 }
 
 // Returns the name of the HEAD branch.

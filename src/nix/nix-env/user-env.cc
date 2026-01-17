@@ -16,15 +16,15 @@
 
 namespace nix {
 
-PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
+PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & userEnv)
 {
     PackageInfos elems;
-    if (pathExists(userEnv + "/manifest.json"))
+    if (pathExists(userEnv / "manifest.json"))
         throw Error("profile '%s' is incompatible with 'nix-env'; please use 'nix profile' instead", userEnv);
-    auto manifestFile = userEnv + "/manifest.nix";
+    auto manifestFile = userEnv / "manifest.nix";
     if (pathExists(manifestFile)) {
         Value v;
-        state.evalFile(state.rootPath(CanonPath(manifestFile)).resolveSymlinks(), v);
+        state.evalFile(state.rootPath(CanonPath(std::filesystem::weakly_canonical(manifestFile).string())), v);
         Bindings & bindings = Bindings::emptyBindings;
         getDerivations(state, v, "", bindings, elems, false);
     }
@@ -32,7 +32,11 @@ PackageInfos queryInstalled(EvalState & state, const Path & userEnv)
 }
 
 bool createUserEnv(
-    EvalState & state, PackageInfos & elems, const Path & profile, bool keepDerivations, const std::string & lockToken)
+    EvalState & state,
+    PackageInfos & elems,
+    const std::filesystem::path & profile,
+    bool keepDerivations,
+    const std::string & lockToken)
 {
     /* Build the components in the user environment, if they don't
        exist already. */

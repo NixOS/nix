@@ -27,10 +27,6 @@
 // FIXME is this supposed to be private or not?
 #include "flake-command.hh"
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 using namespace nix::flake;
 using json = nlohmann::json;
@@ -855,7 +851,7 @@ static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
-    Path destDir;
+    std::filesystem::path destDir;
 
     const LockFlags lockFlags{.writeLockFile = false};
 
@@ -881,7 +877,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
 
     void run(nix::ref<nix::Store> store) override
     {
-        auto flakeDir = absPath(destDir);
+        auto flakeDir = std::filesystem::weakly_canonical(destDir);
 
         auto evalState = getEvalState();
 
@@ -960,7 +956,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         }(templateDir, flakeDir);
 
         if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
-            Strings args = {"-C", flakeDir, "add", "--intent-to-add", "--force", "--"};
+            Strings args = {"-C", flakeDir.string(), "add", "--intent-to-add", "--force", "--"};
             for (auto & s : changedFiles)
                 args.emplace_back(s.string());
             runProgram("git", true, args);

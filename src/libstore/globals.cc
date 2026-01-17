@@ -5,6 +5,7 @@
 #include "nix/util/args.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
+#include "nix/util/executable-path.hh"
 #include "nix/util/signals.hh"
 
 #include <algorithm>
@@ -124,7 +125,7 @@ void loadConfFile(AbstractConfig & config)
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        applyConfigFile(*file);
+        applyConfigFile(file->string());
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -133,19 +134,19 @@ void loadConfFile(AbstractConfig & config)
     }
 }
 
-std::vector<Path> getUserConfigFiles()
+std::vector<std::filesystem::path> getUserConfigFiles()
 {
     // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
-    auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
+    auto nixConfFiles = getEnvOs(OS_STR("NIX_USER_CONF_FILES"));
     if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
+        return ExecutablePath::parse(*nixConfFiles).directories;
     }
 
     // Use the paths specified by the XDG spec
-    std::vector<Path> files;
+    std::vector<std::filesystem::path> files;
     auto dirs = getConfigDirs();
     for (auto & dir : dirs) {
-        files.insert(files.end(), (dir / "nix.conf").string());
+        files.insert(files.end(), dir / "nix.conf");
     }
     return files;
 }

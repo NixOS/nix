@@ -70,7 +70,7 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(std::filesystem::path{getNixDefExpr()} / "channels");
+    add(getNixDefExpr() / "channels");
     add(rootChannelsDir() / "nixpkgs", "nixpkgs");
     add(rootChannelsDir());
 

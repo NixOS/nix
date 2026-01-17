@@ -106,7 +106,7 @@ public:
     /**
      * A list of user configuration files to load.
      */
-    std::vector<Path> nixUserConfFiles;
+    std::vector<std::filesystem::path> nixUserConfFiles;
 
     /**
      * File name of the socket the daemon listens to.
@@ -1458,7 +1458,7 @@ extern Settings settings;
 void loadConfFile(AbstractConfig & config);
 
 // Used by the Settings constructor
-std::vector<Path> getUserConfigFiles();
+std::vector<std::filesystem::path> getUserConfigFiles();
 
 /**
  * The version of Nix itself.

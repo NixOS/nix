@@ -42,7 +42,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     /* If /nix doesn't exist, there is no daemon socket, and
                        we're not root, then automatically set up a chroot
                        store in ~/.local/share/nix/root. */
-                    auto chrootStore = getDataDir() + "/root";
+                    auto chrootStore = getDataDir() / "root";
                     if (!pathExists(chrootStore)) {
                         try {
                             createDirs(chrootStore);
@@ -52,7 +52,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                         warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
                     } else
                         debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                    return make_ref<LocalStore::Config>("local", chrootStore, params);
+                    return make_ref<LocalStore::Config>("local", chrootStore.string(), params);
                 }
 #endif
                 else

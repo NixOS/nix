@@ -153,7 +153,7 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
                         store2->addPermRoot(storePath, (getCacheDir() / "flake-registry.json").string());
                     return {store.requireStoreObjectAccessor(storePath)};
                 } else {
-                    return SourcePath{getFSSourceAccessor(), CanonPath{path}}.resolveSymlinks();
+                    return SourcePath{makeFSSourceAccessor(path)}.resolveSymlinks();
                 }
             }(),
             Registry::Global);
