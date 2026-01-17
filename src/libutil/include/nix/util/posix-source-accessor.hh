@@ -78,6 +78,8 @@ public:
         return trackLastModified ? std::optional{mtime} : std::nullopt;
     }
 
+    void invalidateCache(const CanonPath & path) override;
+
 private:
 
     /**
