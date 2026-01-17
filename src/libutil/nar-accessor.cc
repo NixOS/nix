@@ -1,6 +1,7 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/error.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 
@@ -164,12 +165,35 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
 
 GetNarBytes seekableGetNarBytes(Descriptor fd)
 {
-    return [fd](uint64_t offset, uint64_t length) {
-        if (lseek(fd, offset, SEEK_SET) == -1)
-            throw SysError("seeking in file");
+    return [fd](uint64_t offset_, uint64_t left) {
+        std::string buf(left, 0);
 
-        std::string buf(length, 0);
-        readFull(fd, buf.data(), length);
+        off_t offset = offset_;
+        std::string::size_type pos = 0;
+
+        while (left) {
+            checkInterrupt();
+#ifdef _WIN32
+            OVERLAPPED ov = {};
+            ov.Offset = static_cast<DWORD>(offset);
+            ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
+            DWORD n;
+            if (!ReadFile(fd, buf.data() + pos, static_cast<DWORD>(std::min(left, uint64_t{MAXDWORD})), &n, &ov))
+                throw nix::windows::WinError("reading %1% NAR bytes at offset %2%", left, offset);
+            if (n == 0)
+                throw EndOfFile("unexpected end-of-file");
+#else
+            ssize_t n = pread(fd, buf.data() + pos, left, offset);
+            if (n == 0)
+                throw EndOfFile("unexpected end-of-file");
+            if (n == -1 && errno != EINTR)
+                throw SysError("reading %1% NAR bytes at offset %2%", left, offset);
+#endif
+            assert(static_cast<uint64_t>(n) <= left);
+            pos += n;
+            offset += n;
+            left -= n;
+        }
 
         return buf;
     };
