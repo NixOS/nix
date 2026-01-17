@@ -500,8 +500,27 @@ protected:
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
+     *
+     * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
+     * `buildResult` is set correctly.
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
+
+    /**
+     * Signals successful completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     */
+    Done doneSuccess(BuildResult::Success success);
+
+    /**
+     * Signals failed completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     *
+     * @param result The exit code (ecFailed or ecNoSubstituters)
+     * @param failure The failure details including status and error message
+     * @param ex Optional exception to store/log
+     */
+    Done doneFailure(ExitCode result, BuildResult::Failure failure, std::optional<Error> ex = {});
 
 public:
     virtual void cleanup() {}
