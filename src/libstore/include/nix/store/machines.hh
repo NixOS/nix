@@ -12,6 +12,8 @@ struct Machine;
 
 typedef std::vector<Machine> Machines;
 
+typedef std::map<std::string, unsigned long> FeatureCount;
+
 struct Machine
 {
 
@@ -21,7 +23,9 @@ struct Machine
     const unsigned int maxJobs;
     const float speedFactor;
     const StringSet supportedFeatures;
+    const FeatureCount supportedFeaturesCount;
     const StringSet mandatoryFeatures;
+    const FeatureCount mandatoryFeaturesCount;
     const std::string sshPublicHostKey;
     bool enabled = true;
 
@@ -77,6 +81,11 @@ struct Machine
      * the same format.
      */
     static Machines parseConfig(const StringSet & defaultSystems, const std::string & config);
+
+    /**
+     * Count the number of each feature specified in a feature string.
+     */
+    static FeatureCount countFeatures(const StringSet & features);
 };
 
 /**
