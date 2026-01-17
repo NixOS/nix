@@ -7,6 +7,8 @@
 
 namespace nix {
 
+struct NarCache;
+
 class RemoteFSAccessor : public SourceAccessor
 {
     ref<Store> store;
@@ -25,7 +27,7 @@ class RemoteFSAccessor : public SourceAccessor
 
     bool requireValidPath;
 
-    std::optional<std::filesystem::path> cacheDir;
+    std::shared_ptr<NarCache> narCache;
 
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
@@ -38,8 +40,7 @@ public:
      */
     std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
 
-    RemoteFSAccessor(
-        ref<Store> store, bool requireValidPath = true, std::optional<std::filesystem::path> cacheDir = {});
+    RemoteFSAccessor(ref<Store> store, bool requireValidPath = true, std::shared_ptr<NarCache> narCache = {});
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 

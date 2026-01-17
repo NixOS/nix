@@ -1,21 +1,14 @@
 #include <nlohmann/json.hpp>
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/util/nar-accessor.hh"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include "nix/store/nar-cache.hh"
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(
-    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir_)
+RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, std::shared_ptr<NarCache> narCache)
     : store(store)
     , requireValidPath(requireValidPath)
-    , cacheDir(std::move(cacheDir_))
+    , narCache(std::move(narCache))
 {
-    if (cacheDir)
-        createDirs(*cacheDir);
 }
 
 std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
@@ -47,48 +40,22 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
         return std::move(sink.s);
     };
 
-    if (cacheDir) {
-        auto makeCacheFile = [&](const std::string & ext) {
-            auto res = *cacheDir / info->narHash.to_string(HashFormat::Nix32, false);
-            res += ".";
-            res += ext;
-            return res;
-        };
+    if (narCache) {
+        if (auto listingData = narCache->getNarListing(info->narHash))
+            return cacheAccessor(makeLazyNarAccessor(
+                nlohmann::json::parse(*listingData).template get<NarListing>(), narCache->getNarBytes(info->narHash)));
 
-        auto cacheFile = makeCacheFile("nar");
-        auto listingFile = makeCacheFile("ls");
-
-        if (nix::pathExists(cacheFile)) {
-            try {
-                return cacheAccessor(makeLazyNarAccessor(
-                    nlohmann::json::parse(nix::readFile(listingFile)).template get<NarListing>(),
-                    seekableGetNarBytes(cacheFile)));
-            } catch (SystemError &) {
-            }
-
-            try {
-                return cacheAccessor(makeNarAccessor(nix::readFile(cacheFile)));
-            } catch (SystemError &) {
-            }
-        }
+        if (auto nar = narCache->getNar(info->narHash))
+            return cacheAccessor(makeNarAccessor(std::move(*nar)));
 
         auto nar = getNar();
 
-        try {
-            /* FIXME: do this asynchronously. */
-            writeFile(cacheFile, nar);
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
+        StringSource source{nar};
+        narCache->upsertNar(info->narHash, source);
 
         auto narAccessor = makeNarAccessor(std::move(nar));
 
-        try {
-            nlohmann::json j = narAccessor->getListing();
-            writeFile(listingFile, j.dump());
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
+        narCache->upsertNarListing(info->narHash, nlohmann::json(narAccessor->getListing()).dump());
 
         return cacheAccessor(narAccessor);
     }
