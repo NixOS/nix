@@ -35,7 +35,7 @@ ref<NarAccessor> makeNarAccessor(Source & source);
  * readFile() method of the accessor to get the contents of files
  * inside the NAR.
  */
-using GetNarBytes = std::function<std::string(uint64_t, uint64_t)>;
+using GetNarBytes = std::function<void(uint64_t, uint64_t, Sink &)>;
 
 /**
  * The canonical GetNarBytes function for a seekable Source.
