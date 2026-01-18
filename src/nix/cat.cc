@@ -18,7 +18,9 @@ struct MixCat : virtual Args
             throw Error("path '%1%' is not a regular file", path.abs());
         logger->stop();
 
-        writeFull(getStandardOutput(), accessor->readFile(path));
+        FdSink output{getStandardOutput()};
+        accessor->readFile(path, output);
+        output.flush();
     }
 };
 
