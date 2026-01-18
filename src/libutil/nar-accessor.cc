@@ -174,36 +174,12 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
 
 GetNarBytes seekableGetNarBytes(Descriptor fd)
 {
-    return [fd](uint64_t offset_, uint64_t left, Sink & sink) {
-        std::array<char, 64 * 1024> buf;
-
-        off_t offset = offset_;
-
-        while (left) {
-            checkInterrupt();
-            auto limit = std::min<decltype(buf)::size_type>(left, buf.size());
-#ifdef _WIN32
-            OVERLAPPED ov = {};
-            ov.Offset = static_cast<DWORD>(offset);
-            ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
-            DWORD n;
-            if (!ReadFile(fd, buf.data(), static_cast<DWORD>(limit), &n, &ov))
-                throw nix::windows::WinError("reading %1% NAR bytes at offset %2%", left, offset);
-#else
-            ssize_t n = pread(fd, buf.data(), limit, offset);
-            if (n == -1) {
-                if (errno == EINTR)
-                    continue;
-                throw SysError("reading %1% NAR bytes at offset %2%", left, offset);
-            }
-#endif
-            if (n == 0)
-                throw EndOfFile("unexpected end-of-file");
-            assert(static_cast<uint64_t>(n) <= left);
-            sink(std::string_view(buf.data(), n));
-            offset += n;
-            left -= n;
-        }
+    return [fd](uint64_t offset, uint64_t length, Sink & sink) {
+        if (offset >= std::numeric_limits<off_t>::max()) /* Just in case off_t is not 64 bits. */
+            throw Error("can't read %1% NAR bytes from offset %2%: offset too big", length, offset);
+        if (length >= std::numeric_limits<size_t>::max()) /* Just in case size_t is 32 bits. */
+            throw Error("can't read %1% NAR bytes from offset %2%: length is too big", length, offset);
+        copyFdRange(fd, static_cast<off_t>(offset), static_cast<size_t>(length), sink);
     };
 }
 

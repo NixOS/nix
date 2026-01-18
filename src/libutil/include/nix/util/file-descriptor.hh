@@ -68,6 +68,15 @@ static inline int fromDescriptorReadOnly(Descriptor fd)
 std::string readFile(Descriptor fd);
 
 /**
+ * Read \ref nbytes starting at \ref offset from a seekable file into a sink.
+ *
+ * @throws SystemError if fd is not seekable or any operation fails
+ * @throws Interrupted if the operation was interrupted
+ * @throws EndOfFile if an EOF was reached before reading \ref nbytes
+ */
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink);
+
+/**
  * Wrappers around read()/write() that read/write exactly the
  * requested number of bytes.
  */
