@@ -62,7 +62,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * targets of symlinks should only occasionally be done, and only
      * with care.
      */
-    virtual std::string readFile(const CanonPath & path);
+    std::string readFile(const CanonPath & path);
 
     /**
      * Write the contents of a file as a sink. `sizeCallback` must be

@@ -108,10 +108,10 @@ SourceAccessor::DirEntries RemoteFSAccessor::readDirectory(const CanonPath & pat
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const CanonPath & path)
+void RemoteFSAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     auto res = fetch(path);
-    return res.first->readFile(res.second);
+    res.first->readFile(res.second, sink, sizeCallback);
 }
 
 std::string RemoteFSAccessor::readLink(const CanonPath & path)
