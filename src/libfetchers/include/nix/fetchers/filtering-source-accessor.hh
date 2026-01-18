@@ -34,7 +34,7 @@ struct FilteringSourceAccessor : SourceAccessor
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
 
-    std::string readFile(const CanonPath & path) override;
+    using SourceAccessor::readFile;
 
     void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
 

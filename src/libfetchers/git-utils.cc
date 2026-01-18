@@ -766,7 +766,7 @@ struct GitSourceAccessor : SourceAccessor
     {
     }
 
-    std::string readBlob(const CanonPath & path, bool symlink)
+    void readBlob(const CanonPath & path, bool symlink, Sink & sink, std::function<void(uint64_t)> sizeCallback)
     {
         auto state(state_.lock());
 
@@ -785,16 +785,22 @@ struct GitSourceAccessor : SourceAccessor
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
                 }
-                return s.s;
+                sizeCallback(s.s.size());
+                StringSource source{s.s};
+                source.drainInto(sink);
+                return;
             }
         }
 
-        return std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+        auto view = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+        sizeCallback(view.size());
+        StringSource source{view};
+        source.drainInto(sink);
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
     {
-        return readBlob(path, false);
+        return readBlob(path, false, sink, sizeCallback);
     }
 
     bool pathExists(const CanonPath & path) override
@@ -861,7 +867,9 @@ struct GitSourceAccessor : SourceAccessor
 
     std::string readLink(const CanonPath & path) override
     {
-        return readBlob(path, true);
+        StringSink s;
+        readBlob(path, true, s, [&](uint64_t size) { s.s.reserve(size); });
+        return std::move(s.s);
     }
 
     /**

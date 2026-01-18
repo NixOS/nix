@@ -33,6 +33,8 @@ public:
 
     void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
 
+    using SourceAccessor::readFile;
+
     bool pathExists(const CanonPath & path) override;
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;

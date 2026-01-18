@@ -1,6 +1,7 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/error.hh"
+#include "nix/util/signals.hh"
 
 namespace nix {
 
@@ -20,8 +21,16 @@ struct NarAccessorImpl : NarAccessor
             StringSource source(nar);
             return parseNarListing(source);
         }()}
-        , getNarBytes{
-              [nar = std::move(nar)](uint64_t offset, uint64_t length) { return std::string{nar, offset, length}; }}
+        , getNarBytes{[nar = std::move(nar)](uint64_t offset, uint64_t length, Sink & sink) {
+            if (offset > nar.size() || length > nar.size() - offset)
+                throw Error(
+                    "reading invalid NAR bytes range: requested %1% bytes at offset %2%, but NAR has size %3%",
+                    length,
+                    offset,
+                    nar.size());
+            StringSource source(std::string_view(nar.data() + offset, length));
+            source.drainInto(sink);
+        }}
     {
     }
 
@@ -111,7 +120,7 @@ struct NarAccessorImpl : NarAccessor
         return res;
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
     {
         auto & i = get(path);
         auto * reg = std::get_if<NarListing::Regular>(&i.raw);
@@ -119,7 +128,8 @@ struct NarAccessorImpl : NarAccessor
             throw Error("path '%1%' inside NAR file is not a regular file", path);
 
         assert(getNarBytes);
-        return getNarBytes(*reg->contents.narOffset, *reg->contents.fileSize);
+        sizeCallback(reg->contents.fileSize.value());
+        return getNarBytes(reg->contents.narOffset.value(), reg->contents.fileSize.value(), sink);
     }
 
     std::string readLink(const CanonPath & path) override
@@ -159,19 +169,17 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
         throw NativeSysError("opening NAR cache file %s", path);
 
     return [inner = seekableGetNarBytes(fd.get()), fd = make_ref<AutoCloseFD>(std::move(fd))](
-               uint64_t offset, uint64_t length) { return inner(offset, length); };
+               uint64_t offset, uint64_t length, Sink & sink) { return inner(offset, length, sink); };
 }
 
 GetNarBytes seekableGetNarBytes(Descriptor fd)
 {
-    return [fd](uint64_t offset, uint64_t length) {
-        if (lseek(fd, offset, SEEK_SET) == -1)
-            throw SysError("seeking in file");
-
-        std::string buf(length, 0);
-        readFull(fd, buf.data(), length);
-
-        return buf;
+    return [fd](uint64_t offset, uint64_t length, Sink & sink) {
+        if (offset >= std::numeric_limits<off_t>::max()) /* Just in case off_t is not 64 bits. */
+            throw Error("can't read %1% NAR bytes from offset %2%: offset too big", length, offset);
+        if (length >= std::numeric_limits<size_t>::max()) /* Just in case size_t is 32 bits. */
+            throw Error("can't read %1% NAR bytes from offset %2%: length is too big", length, offset);
+        copyFdRange(fd, static_cast<off_t>(offset), static_cast<size_t>(length), sink);
     };
 }
 
