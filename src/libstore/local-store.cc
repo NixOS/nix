@@ -234,8 +234,8 @@ LocalStore::LocalStore(ref<const Config> config)
         Path globalLockPath = dbDir + "/big-lock";
         try {
             globalLock = openLockFile(globalLockPath.c_str(), true);
-        } catch (SysError & e) {
-            if (e.errNo == EACCES || e.errNo == EPERM) {
+        } catch (SystemError & e) {
+            if (e.is(std::errc::permission_denied) || e.is(std::errc::operation_not_permitted)) {
                 e.addTrace(
                     {},
                     "This command may have been run as non-root in a single-user Nix installation,\n"

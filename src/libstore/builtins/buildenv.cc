@@ -33,8 +33,8 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
 
     try {
         srcFiles = DirectoryIterator{srcDir};
-    } catch (SysError & e) {
-        if (e.errNo == ENOTDIR) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::not_a_directory)) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
@@ -54,8 +54,8 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         try {
             if (stat(srcFile.c_str(), &srcSt) == -1)
                 throw SysError("getting status of '%1%'", srcFile);
-        } catch (SysError & e) {
-            if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
+        } catch (SystemError & e) {
+            if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory)) {
                 warn("skipping dangling symlink '%s'", dstFile);
                 continue;
             }
@@ -141,8 +141,8 @@ void buildProfile(const Path & out, Packages && pkgs)
                      readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
-        } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+        } catch (SystemError & e) {
+            if (!e.is(std::errc::no_such_file_or_directory) && !e.is(std::errc::not_a_directory))
                 throw;
         }
     };
