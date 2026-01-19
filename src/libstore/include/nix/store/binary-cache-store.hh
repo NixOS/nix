@@ -19,7 +19,13 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
     using StoreConfig::StoreConfig;
 
     const Setting<std::string> compression{
-        this, "xz", "compression", "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
+        this,
+        "xz",
+        "compression",
+        R"(
+          NAR compression method. One of: `xz`, `bzip2`, `gzip`, `zstd`, `none`, `br`, `compress`, `grzip`, `lrzip`, `lz4`, `lzip`, `lzma` or `lzop`.
+          To use a particular compression method Nix has to be built with a version of libarchive that natively supports that compression algorithm.
+        )"};
 
     const Setting<bool> writeNARListing{
         this, false, "write-nar-listing", "Whether to write a JSON file that lists the files in each NAR."};
