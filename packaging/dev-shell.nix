@@ -1,6 +1,6 @@
 {
   lib,
-  devFlake,
+  preCommitHooksFor,
 }:
 
 let
@@ -119,7 +119,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
   let
     stdenv = pkgs.nixDependencies2.stdenv;
     buildCanExecuteHost = stdenv.buildPlatform.canExecute stdenv.hostPlatform;
-    modular = devFlake.getSystem stdenv.buildPlatform.system;
+    modular = preCommitHooksFor stdenv.buildPlatform.system;
     transformFlag =
       prefix: flag:
       assert builtins.isString flag;
@@ -229,6 +229,9 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       # Make bash completion work.
       XDG_DATA_DIRS+=:$out/share
 
+      # Add pre-commit hooks
+      ${(preCommitHooksFor stdenv.buildPlatform.system).shellHook}
+
       # Make the default phases do the right thing.
       # FIXME: this wouldn't be needed if the ninja package set buildPhase() instead of $buildPhase.
       # FIXME: mesonConfigurePhase shouldn't cd to the build directory. It would be better to pass '-C <dir>' to ninja.
@@ -271,7 +274,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     env = {
       # For `make format`, to work without installing pre-commit
       _NIX_PRE_COMMIT_HOOKS_CONFIG = "${(pkgs.formats.yaml { }).generate "pre-commit-config.yaml"
-        modular.pre-commit.settings.rawConfig
+        modular.config.rawConfig
       }";
     }
     // lib.optionalAttrs stdenv.hostPlatform.isLinux {
@@ -317,8 +320,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
           ) pkgs.buildPackages.mesonEmulatorHook
           ++ [
             pkgs.buildPackages.gnused
-            modular.pre-commit.settings.package
-            (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
+            pkgs.buildPackages.pre-commit
             pkgs.buildPackages.nixfmt-rfc-style
             pkgs.buildPackages.shellcheck
             pkgs.buildPackages.include-what-you-use
