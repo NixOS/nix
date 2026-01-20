@@ -565,7 +565,7 @@ std::shared_ptr<SourceAccessor> BinaryCacheStore::getFSAccessor(const StorePath 
     return getRemoteFSAccessor(requireValidPath)->accessObject(storePath);
 }
 
-void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     /* Note: this is inherently racy since there is no locking on
        binary caches. In particular, with S3 this unreliable, even

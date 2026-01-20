@@ -754,7 +754,7 @@ public:
      * Add signatures to the specified store path. The signatures are
      * not verified.
      */
-    virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
+    virtual void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
     {
         unsupported("addSignatures");
     }

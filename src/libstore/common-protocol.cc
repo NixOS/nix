@@ -6,6 +6,7 @@
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/signature/local-keys.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -97,6 +98,17 @@ void CommonProto::Serialise<std::optional<ContentAddress>>::write(
     const StoreDirConfig & store, CommonProto::WriteConn conn, const std::optional<ContentAddress> & caOpt)
 {
     conn.to << (caOpt ? renderContentAddress(*caOpt) : "");
+}
+
+Signature CommonProto::Serialise<Signature>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
+{
+    return Signature::parse(readString(conn.from));
+}
+
+void CommonProto::Serialise<Signature>::write(
+    const StoreDirConfig & store, CommonProto::WriteConn conn, const Signature & sig)
+{
+    conn.to << sig.to_string();
 }
 
 } // namespace nix

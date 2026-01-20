@@ -78,7 +78,7 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
             if (value != "unknown-deriver")
                 deriver = StorePath(value);
         } else if (name == "Sig")
-            sigs.insert(value);
+            sigs.insert(Signature::parse(value));
         else if (name == "CA") {
             if (ca)
                 throw corrupt("extra CA");
@@ -124,7 +124,7 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
 
     for (const auto & sig : sigs)
-        res += "Sig: " + sig + "\n";
+        res += "Sig: " + sig.to_string() + "\n";
 
     if (ca)
         res += "CA: " + renderContentAddress(*ca) + "\n";

@@ -29,7 +29,7 @@ struct Signer
      * signature](https://en.wikipedia.org/wiki/Detached_signature),
      * i.e. just the signature itself without a copy of the signed data.
      */
-    virtual std::string signDetached(std::string_view data) const = 0;
+    virtual Signature signDetached(std::string_view data) const = 0;
 
     /**
      * View the public key associated with this `Signer`.
@@ -48,7 +48,7 @@ struct LocalSigner : Signer
 {
     LocalSigner(SecretKey && privateKey);
 
-    std::string signDetached(std::string_view s) const override;
+    Signature signDetached(std::string_view s) const override;
 
     const PublicKey & getPublicKey() override;
 
