@@ -1,21 +1,21 @@
-{{#include build-trace-entry-v2-fixed.md}}
+{{#include build-trace-entry-v3-fixed.md}}
 
 ## Examples
 
 ### Simple build trace entry
 
 ```json
-{{#include schema/build-trace-entry-v2/simple.json}}
+{{#include schema/build-trace-entry-v3/simple.json}}
 ```
 
 ### Build trace entry with signature
 
 ```json
-{{#include schema/build-trace-entry-v2/with-signature.json}}
+{{#include schema/build-trace-entry-v3/with-structured-signature.json}}
 ```
 
 <!--
 ## Raw Schema
 
-[JSON Schema for Build Trace Entry v1](schema/build-trace-entry-v2.json)
+[JSON Schema for Build Trace Entry v1](schema/build-trace-entry-v3.json)
 -->

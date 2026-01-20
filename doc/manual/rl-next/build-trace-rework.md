@@ -40,7 +40,7 @@ no longer need to implement the derivation hash modulo algorithm.
     },
     "value": {
       "outPath": "xyz...-foo",
-      "signatures": ["..."]
+      "signatures": [{ "keyName": "cache.example.com-1", "sig": "..." }]
     }
   }
   ```
@@ -63,6 +63,12 @@ Non-CA builds are unaffected.
 
 Stable code paths do use the realization fields (`BuildResult::Success::builtOutputs`), but only the output name and outpath parts of that.
 For older protocols, we can fake enough of the realisation format to provide those two parts forthat map, which keeps operations like `--print-output-paths` working.
+
+### Structured signatures
+
+[Signatures](@docroot@/protocols/json/signature.md) in JSON formats are now represented as structured objects with `keyName` and `sig` fields, rather than colon-separated strings.
+`nix path-info --json --json-format 3` opts into the new version for this command.
+JSON parsing accepts both the old string format and new structured format for backwards compatibility.
 
 ### Impact
 
