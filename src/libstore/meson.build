@@ -35,6 +35,7 @@ configdata_pub.set_quoted(
 
 deps_private_maybe_subproject = []
 deps_public_maybe_subproject = [
+  dependency('nix-roots'),
   dependency('nix-util'),
 ]
 subdir('nix-meson-build-support/subprojects')
@@ -262,14 +263,6 @@ if host_machine.system() != 'windows'
   configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
 endif
 configdata_priv.set_quoted('NIX_MAN_DIR', mandir)
-
-lsof = find_program('lsof', required : false)
-configdata_priv.set_quoted(
-  'LSOF',
-  lsof.found() ? lsof.full_path()
-  # Just look up on the PATH
-: 'lsof',
-)
 
 config_priv_h = configure_file(
   configuration : configdata_priv,

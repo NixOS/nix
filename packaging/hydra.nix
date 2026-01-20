@@ -59,6 +59,7 @@ let
         "nix-flake-tests"
         "nix-main"
         "nix-main-c"
+        "nix-roots"
         "nix-cmd"
         "nix-cli"
         "nix-functional-tests"

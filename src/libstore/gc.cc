@@ -1,3 +1,4 @@
+#include "nix/roots/roots.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
@@ -215,235 +216,36 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
     }
 }
 
-void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, Roots & roots)
-{
-    auto foundRoot = [&](const Path & path, const Path & target) {
-        try {
-            auto storePath = toStorePath(target).first;
-            if (isValidPath(storePath))
-                roots[std::move(storePath)].emplace(path);
-            else
-                printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
-        } catch (BadStorePath &) {
-        }
-    };
-
-    try {
-
-        if (type == std::filesystem::file_type::unknown)
-            type = std::filesystem::symlink_status(path).type();
-
-        if (type == std::filesystem::file_type::directory) {
-            for (auto & i : DirectoryIterator{path}) {
-                checkInterrupt();
-                findRoots(i.path().string(), i.symlink_status().type(), roots);
-            }
-        }
-
-        else if (type == std::filesystem::file_type::symlink) {
-            Path target = readLink(path);
-            if (isInStore(target))
-                foundRoot(path, target);
-
-            /* Handle indirect roots. */
-            else {
-                target = absPath(target, dirOf(path));
-                if (!pathExists(target)) {
-                    if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
-                        printInfo("removing stale link from '%1%' to '%2%'", path, target);
-                        unlink(path.c_str());
-                    }
-                } else {
-                    if (!std::filesystem::is_symlink(target))
-                        return;
-                    Path target2 = readLink(target);
-                    if (isInStore(target2))
-                        foundRoot(target, target2);
-                }
-            }
-        }
-
-        else if (type == std::filesystem::file_type::regular) {
-            auto storePath = maybeParseStorePath(storeDir + "/" + std::string(baseNameOf(path)));
-            if (storePath && isValidPath(*storePath))
-                roots[std::move(*storePath)].emplace(path);
-        }
-
-    }
-
-    catch (std::filesystem::filesystem_error & e) {
-        /* We only ignore permanent failures. */
-        if (e.code() == std::errc::permission_denied || e.code() == std::errc::no_such_file_or_directory
-            || e.code() == std::errc::not_a_directory)
-            printInfo("cannot read potential root '%1%'", path);
-        else
-            throw;
-    }
-
-    catch (SystemError & e) {
-        /* We only ignore permanent failures. */
-        if (e.is(std::errc::permission_denied) || e.is(std::errc::no_such_file_or_directory)
-            || e.is(std::errc::not_a_directory))
-            printInfo("cannot read potential root '%1%'", path);
-        else
-            throw;
-    }
-}
-
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
+    const roots_tracer::TracerConfig opts{
+        .storeDir = std::filesystem::path(storeDir), .stateDir = std::filesystem::path(config->stateDir.get())};
+
+    roots_tracer::UncheckedRoots profile;
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(config->stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    roots_tracer::findRoots(opts, config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, profile);
+    roots_tracer::findRoots(opts, config->stateDir + "/profiles", std::filesystem::file_type::unknown, profile);
+
+    for (auto & [target, links] : profile) {
+        if (!isInStore(target))
+            continue;
+        try {
+            auto path = toStorePath(target).first;
+            if (!isValidPath(path))
+                continue;
+            debug("got additional root '%1%'", printStorePath(path));
+            // No need to censor these roots, profiles are publicly readable
+            roots[path].insert(links.begin(), links.end());
+        } catch (BadStorePath &) {
+        }
+    }
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
        the set of roots (to prevent them from being garbage collected). */
-    findRuntimeRoots(roots, censor);
-}
-
-Roots LocalStore::findRoots(bool censor)
-{
-    Roots roots;
-    findRootsNoTemp(roots, censor);
-
-    findTempRoots(roots, censor);
-
-    return roots;
-}
-
-/**
- * Key is a mere string because cannot has path with macOS's libc++
- */
-typedef boost::unordered_flat_map<
-    std::string,
-    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
-    StringViewHash,
-    std::equal_to<>>
-    UncheckedRoots;
-
-static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
-{
-    std::filesystem::path buf;
-    try {
-        buf = std::filesystem::read_symlink(file);
-    } catch (std::filesystem::filesystem_error & e) {
-        if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::permission_denied
-            || e.code() == std::errc::no_such_process)
-            return;
-        throw;
-    }
-    if (buf.is_absolute())
-        roots[buf.string()].emplace(file.string());
-}
-
-static std::string quoteRegexChars(const std::string & raw)
-{
-    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
-    return boost::regex_replace(raw, specialRegex, R"(\$&)");
-}
-
-#ifdef __linux__
-static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
-{
-    try {
-        roots[readFile(path)].emplace(path.string());
-    } catch (SystemError & e) {
-        if (!e.is(std::errc::no_such_file_or_directory) && !e.is(std::errc::permission_denied))
-            throw;
-    }
-}
-#endif
-
-void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
-{
-    UncheckedRoots unchecked;
-
-    auto procDir = AutoCloseDir{opendir("/proc")};
-    if (procDir) {
-        struct dirent * ent;
-        static const auto digitsRegex = boost::regex(R"(^\d+$)");
-        static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
-        while (errno = 0, ent = readdir(procDir.get())) {
-            checkInterrupt();
-            if (boost::regex_match(ent->d_name, digitsRegex)) {
-                try {
-                    readProcLink(fmt("/proc/%s/exe", ent->d_name), unchecked);
-                    readProcLink(fmt("/proc/%s/cwd", ent->d_name), unchecked);
-
-                    auto fdStr = fmt("/proc/%s/fd", ent->d_name);
-                    auto fdDir = AutoCloseDir(opendir(fdStr.c_str()));
-                    if (!fdDir) {
-                        if (errno == ENOENT || errno == EACCES)
-                            continue;
-                        throw SysError("opening %1%", fdStr);
-                    }
-                    struct dirent * fd_ent;
-                    while (errno = 0, fd_ent = readdir(fdDir.get())) {
-                        if (fd_ent->d_name[0] != '.')
-                            readProcLink(fmt("%s/%s", fdStr, fd_ent->d_name), unchecked);
-                    }
-                    if (errno) {
-                        if (errno == ESRCH)
-                            continue;
-                        throw SysError("iterating /proc/%1%/fd", ent->d_name);
-                    }
-                    fdDir.reset();
-
-                    std::filesystem::path mapFile = fmt("/proc/%s/maps", ent->d_name);
-                    auto mapLines = tokenizeString<std::vector<std::string>>(readFile(mapFile.string()), "\n");
-                    for (const auto & line : mapLines) {
-                        auto match = boost::smatch{};
-                        if (boost::regex_match(line, match, mapRegex))
-                            unchecked[match[1]].emplace(mapFile.string());
-                    }
-
-                    auto envFile = fmt("/proc/%s/environ", ent->d_name);
-                    auto envString = readFile(envFile);
-                    auto env_end = boost::sregex_iterator{};
-                    for (auto i = boost::sregex_iterator{envString.begin(), envString.end(), storePathRegex};
-                         i != env_end;
-                         ++i)
-                        unchecked[i->str()].emplace(envFile);
-                } catch (SystemError & e) {
-                    if (errno == ENOENT || errno == EACCES || errno == ESRCH)
-                        continue;
-                    throw;
-                }
-            }
-        }
-        if (errno)
-            throw SysError("iterating /proc");
-    }
-
-#if !defined(__linux__)
-    // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
-    // See: https://github.com/NixOS/nix/issues/3011
-    // Because of this we disable lsof when running the tests.
-    if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
-        try {
-            boost::regex lsofRegex(R"(^n(/.*)$)");
-            auto lsofLines =
-                tokenizeString<std::vector<std::string>>(runProgram(LSOF, true, {"-n", "-w", "-F", "n"}), "\n");
-            for (const auto & line : lsofLines) {
-                boost::smatch match;
-                if (boost::regex_match(line, match, lsofRegex))
-                    unchecked[match[1].str()].emplace("{lsof}");
-            }
-        } catch (ExecError & e) {
-            /* lsof not installed, lsof failed */
-        }
-    }
-#endif
-
-#ifdef __linux__
-    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
-    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
-#endif
-
-    for (auto & [target, links] : unchecked) {
+    roots_tracer::UncheckedRoots runtime;
+    findRuntimeRoots(opts, runtime, censor);
+    for (auto & [target, links] : runtime) {
         if (!isInStore(target))
             continue;
         try {
@@ -458,6 +260,16 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
         } catch (BadStorePath &) {
         }
     }
+}
+
+Roots LocalStore::findRoots(bool censor)
+{
+    Roots roots;
+    findRootsNoTemp(roots, censor);
+
+    findTempRoots(roots, censor);
+
+    return roots;
 }
 
 struct GCLimitReached

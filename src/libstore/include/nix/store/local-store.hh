@@ -434,11 +434,7 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    void findRoots(const Path & path, std::filesystem::file_type type, Roots & roots);
-
     void findRootsNoTemp(Roots & roots, bool censor);
-
-    void findRuntimeRoots(Roots & roots, bool censor);
 
     std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 

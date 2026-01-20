@@ -14,6 +14,7 @@ project(
 
 # Internal Libraries
 subproject('libutil')
+subproject('libroots')
 subproject('libstore')
 subproject('libfetchers')
 subproject('libexpr')
