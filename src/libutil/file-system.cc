@@ -236,9 +236,9 @@ bool pathAccessible(const std::filesystem::path & path)
 {
     try {
         return pathExists(path.string());
-    } catch (SysError & e) {
+    } catch (SystemError & e) {
         // swallow EPERM
-        if (e.errNo == EPERM)
+        if (e.is(std::errc::operation_not_permitted))
             return false;
         throw;
     }

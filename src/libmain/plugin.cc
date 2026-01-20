@@ -83,8 +83,8 @@ void initPlugins()
                 checkInterrupt();
                 pluginFiles.emplace_back(ent.path());
             }
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
+        } catch (SystemError & e) {
+            if (!e.is(std::errc::not_a_directory))
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }

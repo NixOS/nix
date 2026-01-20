@@ -377,10 +377,10 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     }
                 }
                 conn.processStderr();
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 /* Daemon closed while we were sending the path. Probably OOM
                   or I/O error. */
-                if (e.errNo == EPIPE)
+                if (e.is(std::errc::broken_pipe))
                     try {
                         conn.processStderr();
                     } catch (EndOfFile & e) {
