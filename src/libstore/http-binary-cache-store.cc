@@ -4,6 +4,8 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/args.hh"
 
 namespace nix {
 
@@ -88,6 +90,15 @@ std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const 
         return config->logCompression;
     else
         return std::nullopt;
+}
+
+HttpVersion HttpBinaryCacheStore::getHttpVersion()
+{
+    // Check filetransfer settings for backwards compatibility
+    if (config->httpVersion == HttpVersion::None && !fileTransferSettings.enableHttp2) {
+        return HttpVersion::Http1_1;
+    }
+    return config->httpVersion;
 }
 
 void HttpBinaryCacheStore::maybeDisable()
@@ -195,7 +206,9 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    auto req = FileTransferRequest(result);
+    req.httpVersion = getHttpVersion();
+    return req;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
@@ -274,6 +287,111 @@ ref<Store> HttpBinaryCacheStore::Config::openStore() const
         ref{// FIXME we shouldn't actually need a mutable config
             std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
 }
+
+template<>
+HttpVersion BaseSetting<HttpVersion>::parse(const std::string & str) const
+{
+    if (str == "none")
+        return HttpVersion::None;
+    else if (str == "http1.1")
+        return HttpVersion::Http1_1;
+    else if (str == "http2")
+        return HttpVersion::Http2;
+    else if (str == "http2-prior-knowledge")
+        return HttpVersion::Http2PriorKnowledge;
+    else if (str == "http3")
+        return HttpVersion::Http3;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<>
+struct BaseSetting<HttpVersion>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<>
+std::string BaseSetting<HttpVersion>::to_string() const
+{
+    if (value == HttpVersion::None)
+        return "none";
+    else if (value == HttpVersion::Http1_1)
+        return "http1.1";
+    else if (value == HttpVersion::Http2)
+        return "http2";
+    else if (value == HttpVersion::Http2PriorKnowledge)
+        return "http2-prior-knowledge";
+    else if (value == HttpVersion::Http3)
+        return "http3";
+    else
+        unreachable();
+}
+
+template<>
+bool BaseSetting<HttpVersion>::isAppendable()
+{
+    return trait::appendable;
+}
+
+template<>
+void BaseSetting<HttpVersion>::appendOrSet(HttpVersion newValue, bool append)
+{
+    assert(!append);
+
+    value = std::move(newValue);
+}
+
+template<>
+void BaseSetting<HttpVersion>::set(const std::string & str, bool append)
+{
+    if (experimentalFeatureSettings.isEnabled(experimentalFeature))
+        appendOrSet(parse(str), append);
+    else {
+        assert(experimentalFeature);
+        warn(
+            "Ignoring setting '%s' because experimental feature '%s' is not enabled",
+            name,
+            showExperimentalFeature(*experimentalFeature));
+    }
+}
+
+template<>
+void BaseSetting<HttpVersion>::convertToArg(Args & args, const std::string & category)
+{
+    args.addFlag({
+        .longName = name,
+        .aliases = aliases,
+        .description = fmt("Set the `%s` setting.", name),
+        .category = category,
+        .labels = {"value"},
+        .handler = {[this](std::string s) {
+            overridden = true;
+            set(s);
+        }},
+        .experimentalFeature = experimentalFeature,
+    });
+}
+
+template<>
+std::map<std::string, nlohmann::json> BaseSetting<HttpVersion>::toJSONObject() const
+{
+    auto obj = AbstractSetting::toJSONObject();
+    obj.emplace("value", value);
+    obj.emplace("defaultValue", defaultValue);
+    obj.emplace("documentDefault", documentDefault);
+    return obj;
+}
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    HttpVersion,
+    {
+        {HttpVersion::None, "none"},
+        {HttpVersion::Http1_1, "http1.1"},
+        {HttpVersion::Http2, "http2"},
+        {HttpVersion::Http2PriorKnowledge, "http2-prior-knowledge"},
+        {HttpVersion::Http3, "http3"},
+    });
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;
 

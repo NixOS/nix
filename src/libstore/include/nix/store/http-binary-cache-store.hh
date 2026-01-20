@@ -37,6 +37,17 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
           (e.g. `brotli`).
         )"};
 
+    const Setting<HttpVersion> httpVersion{this, HttpVersion::None, "http-version", R"(
+        The HTTP version to use. This maps to the HTTP versions supported by
+        [libcurl](https://curl.se/libcurl/c/CURLOPT_HTTP_VERSION.html). Accepted values are:
+        `none`, `http1.1`, `http2`, `http2-prior-knowledge`, `http3`. The default 
+        value can be globally downgraded to `http1-1` by setting [`http2 = false`](@docroot@/command-ref/conf-file.md#conf-http2).
+        
+        > **Note**
+        > 
+        > HTTPv3 has not been tested, but is included here for completion and
+        > to allow for experimentation.)"};
+
     static const std::string name()
     {
         return "HTTP Binary Cache Store";
@@ -74,6 +85,8 @@ public:
 protected:
 
     std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
+
+    HttpVersion getHttpVersion();
 
     void maybeDisable();
 
@@ -114,5 +127,11 @@ protected:
 
     std::optional<TrustedFlag> isTrustedClient() override;
 };
+
+template<>
+HttpVersion BaseSetting<HttpVersion>::parse(const std::string & str) const;
+
+template<>
+std::string BaseSetting<HttpVersion>::to_string() const;
 
 } // namespace nix

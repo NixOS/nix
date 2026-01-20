@@ -459,10 +459,7 @@ struct curlFileTransfer : public FileTransfer
                  + (fileTransferSettings.userAgentSuffix != "" ? " " + fileTransferSettings.userAgentSuffix.get() : ""))
                     .c_str());
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
-            if (fileTransferSettings.enableHttp2)
-                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
-            else
-                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+            curl_easy_setopt(req, CURLOPT_HTTP_VERSION, curlHttpVersion(request.httpVersion));
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, TransferItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
@@ -1168,6 +1165,29 @@ FileTransferError::FileTransferError(
         err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
+}
+
+long curlHttpVersion(HttpVersion httpVersion)
+{
+    switch (httpVersion) {
+    case HttpVersion::None:
+        return CURL_HTTP_VERSION_NONE;
+    case HttpVersion::Http1_1:
+        return CURL_HTTP_VERSION_1_1;
+    case HttpVersion::Http2:
+        return CURL_HTTP_VERSION_2_0;
+    case HttpVersion::Http2PriorKnowledge:
+#if LIBCURL_VERSION_NUM >= 0x073100
+        return CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+#endif
+    case HttpVersion::Http3:
+#if LIBCURL_VERSION_NUM >= 0x074200
+        return CURL_HTTP_VERSION_3;
+#endif
+    default:
+        // If we get here somehow, let curl decide
+        return CURL_HTTP_VERSION_NONE;
+    }
 }
 
 } // namespace nix
