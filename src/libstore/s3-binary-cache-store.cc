@@ -148,7 +148,9 @@ void S3BinaryCacheStore::upsertFile(
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
             CompressedSource compressed(source, *compressionMethod);
-            Headers headers = {{"Content-Encoding", *compressionMethod}};
+            /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
+             */
+            Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
             doUpload(compressed, compressed.size(), std::move(headers));
         } else {
             doUpload(source, sizeHint, std::nullopt);

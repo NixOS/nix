@@ -69,8 +69,7 @@ struct ArchiveDecompressionSource : Source
     }
 };
 
-/* These strings are a part of the public API in store parameters and such. Do not change!
-   Happens to match enum names. */
+/* Happens to match enum names. */
 #define NIX_FOR_EACH_LA_ALGO(MACRO) \
     MACRO(bzip2)                    \
     MACRO(compress)                 \
@@ -319,38 +318,6 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
-/* Parses a *compression* method into the corresponding enum. This is only used
-   in the *compression* case and user interface. Content-Encoding should not use
-   these. */
-static CompressionAlgo parseNixCompressionAlgoString(std::string_view method)
-{
-    static const std::unordered_map<std::string_view, CompressionAlgo> lookupTable = {
-        {"none", CompressionAlgo::none},
-        {"br", CompressionAlgo::brotli},
-#define NIX_DEF_LA_ALGO_NAME(algo) {#algo, CompressionAlgo::algo},
-        NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_NAME)
-#undef NIX_DEF_LA_ALGO_NAME
-    };
-
-    if (auto it = lookupTable.find(method); it != lookupTable.end())
-        return it->second;
-
-    static const StringSet allNames = [&]() {
-        StringSet res;
-        for (auto & [name, _] : lookupTable)
-            res.emplace(name);
-        return res;
-    }();
-
-    throw UnknownCompressionMethod(
-        Suggestions::bestMatches(allNames, method), "unknown compression method '%s'", method);
-}
-
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
-{
-    return makeCompressionSink(parseNixCompressionAlgoString(method), nextSink, parallel, level);
-}
-
 ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel, int level)
 {
     switch (method) {
@@ -367,7 +334,7 @@ ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink
     unreachable();
 }
 
-std::string compress(const std::string & method, std::string_view in, const bool parallel, int level)
+std::string compress(CompressionAlgo method, std::string_view in, const bool parallel, int level)
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel, level);

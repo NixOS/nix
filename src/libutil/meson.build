@@ -125,6 +125,8 @@ sources = [ config_priv_h ] + files(
   'base-n.cc',
   'base-nix-32.cc',
   'canon-path.cc',
+  'compression-algo.cc',
+  'compression-settings.cc',
   'compression.cc',
   'compute-levels.cc',
   'config-global.cc',

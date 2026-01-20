@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/signature/local-keys.hh"
+#include "nix/util/compression-settings.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/log-store.hh"
 
@@ -18,9 +18,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{
+    const Setting<CompressionAlgo> compression{
         this,
-        "xz",
+        CompressionAlgo::xz,
         "compression",
         R"(
           NAR compression method. One of: `xz`, `bzip2`, `gzip`, `zstd`, `none`, `br`, `compress`, `grzip`, `lrzip`, `lz4`, `lzip`, `lzma` or `lzop`.

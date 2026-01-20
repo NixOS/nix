@@ -21,14 +21,15 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     ParsedURL cacheUri;
 
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
+    const Setting<std::optional<CompressionAlgo>> narinfoCompression{
+        this, std::nullopt, "narinfo-compression", "Compression method for `.narinfo` files."};
 
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
+    const Setting<std::optional<CompressionAlgo>> lsCompression{
+        this, std::nullopt, "ls-compression", "Compression method for `.ls` files."};
 
-    const Setting<std::string> logCompression{
+    const Setting<std::optional<CompressionAlgo>> logCompression{
         this,
-        "",
+        std::nullopt,
         "log-compression",
         R"(
           Compression method for `log/*` files. It is recommended to
@@ -72,7 +73,7 @@ public:
 
 protected:
 
-    std::optional<std::string> getCompressionMethod(const std::string & path);
+    std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
     void maybeDisable();
 

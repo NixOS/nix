@@ -308,7 +308,7 @@ void StringSource::skip(size_t len)
     pos += len;
 }
 
-CompressedSource::CompressedSource(RestartableSource & source, const std::string & compressionMethod)
+CompressedSource::CompressedSource(RestartableSource & source, CompressionAlgo compressionMethod)
     : compressedData([&]() {
         StringSink sink;
         auto compressionSink = makeCompressionSink(compressionMethod, sink);

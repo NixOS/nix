@@ -1564,7 +1564,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
 
-    writeFile(tmpFile, compress("bzip2", log));
+    writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
 
     std::filesystem::rename(tmpFile, logPath);
 }
