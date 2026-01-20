@@ -7,14 +7,9 @@ namespace nix {
  * compress / decompress
  * --------------------------------------------------------------------------*/
 
-TEST(compress, compressWithUnknownMethod)
-{
-    ASSERT_THROW(compress("invalid-method", "something-to-compress"), UnknownCompressionMethod);
-}
-
 TEST(compress, noneMethodDoesNothingToTheInput)
 {
-    auto o = compress("none", "this-is-a-test");
+    auto o = compress(CompressionAlgo::none, "this-is-a-test");
 
     ASSERT_EQ(o, "this-is-a-test");
 }
@@ -43,7 +38,7 @@ TEST(decompress, decompressXzCompressed)
 {
     auto method = "xz";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(method, str));
+    auto o = decompress(method, compress(CompressionAlgo::xz, str));
 
     ASSERT_EQ(o, str);
 }
@@ -52,7 +47,7 @@ TEST(decompress, decompressBzip2Compressed)
 {
     auto method = "bzip2";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(method, str));
+    auto o = decompress(method, compress(CompressionAlgo::bzip2, str));
 
     ASSERT_EQ(o, str);
 }
@@ -61,7 +56,7 @@ TEST(decompress, decompressBrCompressed)
 {
     auto method = "br";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(method, str));
+    auto o = decompress(method, compress(CompressionAlgo::brotli, str));
 
     ASSERT_EQ(o, str);
 }
@@ -82,7 +77,7 @@ TEST(makeCompressionSink, noneSinkDoesNothingToInput)
 {
     StringSink strSink;
     auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto sink = makeCompressionSink("none", strSink);
+    auto sink = makeCompressionSink(CompressionAlgo::none, strSink);
     (*sink)(inputString);
     sink->finish();
 
@@ -94,7 +89,7 @@ TEST(makeCompressionSink, compressAndDecompress)
     StringSink strSink;
     auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto decompressionSink = makeDecompressionSink("bzip2", strSink);
-    auto sink = makeCompressionSink("bzip2", *decompressionSink);
+    auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
 
     (*sink)(inputString);
     sink->finish();

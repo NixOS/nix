@@ -18,6 +18,8 @@ headers = files(
   'chunked-vector.hh',
   'closure.hh',
   'comparator.hh',
+  'compression-algo.hh',
+  'compression-settings.hh',
   'compression.hh',
   'compute-levels.hh',
   'config-global.hh',

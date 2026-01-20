@@ -4,6 +4,7 @@
 #include <memory>
 #include <type_traits>
 
+#include "nix/util/compression-algo.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
@@ -290,7 +291,7 @@ struct CompressedSource : RestartableSource
 {
 private:
     std::string compressedData;
-    std::string compressionMethod;
+    CompressionAlgo compressionMethod;
     StringSource stringSource;
 
 public:
@@ -298,9 +299,9 @@ public:
      * Compress a RestartableSource using the specified compression method.
      *
      * @param source The source data to compress
-     * @param compressionMethod The compression method to use (e.g., "xz", "br")
+     * @param compressionMethod The compression method to use
      */
-    CompressedSource(RestartableSource & source, const std::string & compressionMethod);
+    CompressedSource(RestartableSource & source, CompressionAlgo compressionMethod);
 
     size_t read(char * data, size_t len) override
     {
@@ -315,11 +316,6 @@ public:
     uint64_t size() const
     {
         return compressedData.size();
-    }
-
-    std::string_view getCompressionMethod() const
-    {
-        return compressionMethod;
     }
 };
 

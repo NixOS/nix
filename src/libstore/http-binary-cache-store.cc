@@ -78,13 +78,13 @@ void HttpBinaryCacheStore::init()
     }
 }
 
-std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
+std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
 {
-    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+    if (hasSuffix(path, ".narinfo") && config->narinfoCompression.get())
         return config->narinfoCompression;
-    else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+    else if (hasSuffix(path, ".ls") && config->lsCompression.get())
         return config->lsCompression;
-    else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+    else if (hasPrefix(path, "log/") && config->logCompression.get())
         return config->logCompression;
     else
         return std::nullopt;
@@ -160,7 +160,9 @@ void HttpBinaryCacheStore::upsertFile(
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
             CompressedSource compressed(source, *compressionMethod);
-            Headers headers = {{"Content-Encoding", *compressionMethod}};
+            /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
+             */
+            Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
             upload(path, compressed, compressed.size(), mimeType, std::move(headers));
         } else {
             upload(path, source, sizeHint, mimeType, std::nullopt);
