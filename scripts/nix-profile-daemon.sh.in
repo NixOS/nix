@@ -34,7 +34,7 @@ if [ -z "${XDG_DATA_DIRS-}" ]; then
 fi
 # Append Nix share dirs to XDG_DATA_DIRS, after removing any duplicates
 USER_NIX_SHARE="$NIX_LINK/share"
-SYS_NIX_SHARE="/nix/var/nix/profiles/default/share"
+SYS_NIX_SHARE="@localstatedir@/nix/profiles/default/share"
 XDG_DATA_DIRS=":$XDG_DATA_DIRS:" # wrap in ':'s for ease of processing
 XDG_DATA_DIRS=$(printf '%s' "$XDG_DATA_DIRS" | sed "s|:$USER_NIX_SHARE:|:|g; s|:$SYS_NIX_SHARE:|:|g")
 XDG_DATA_DIRS=$(printf '%s' "$XDG_DATA_DIRS" | sed "s|^:||; s|:$||") # unwrap ':'s
