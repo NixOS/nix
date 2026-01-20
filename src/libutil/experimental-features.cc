@@ -311,7 +311,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enables support for external builders / sandbox providers.
         )",
-        .trackingUrl = "",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/62",
     },
     {
         .tag = Xp::BLAKE3Hashes,
@@ -319,7 +319,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enables support for BLAKE3 hashes.
         )",
-        .trackingUrl = "",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
     },
 }};
 
