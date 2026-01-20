@@ -41,9 +41,11 @@ Pid::Pid(pid_t pid)
 }
 
 Pid::~Pid()
-{
+try {
     if (pid != -1)
-        kill();
+        kill(/*allowInterrupts=*/false);
+} catch (...) {
+    ignoreExceptionInDestructor();
 }
 
 void Pid::operator=(pid_t pid)
@@ -59,7 +61,7 @@ Pid::operator pid_t()
     return pid;
 }
 
-int Pid::kill()
+int Pid::kill(bool allowInterrupts)
 {
     assert(pid != -1);
 
@@ -78,10 +80,10 @@ int Pid::kill()
             logError(SysError("killing process %d", pid).info());
     }
 
-    return wait();
+    return wait(allowInterrupts);
 }
 
-int Pid::wait()
+int Pid::wait(bool allowInterrupts)
 {
     assert(pid != -1);
     while (1) {
@@ -93,7 +95,8 @@ int Pid::wait()
         }
         if (errno != EINTR)
             throw SysError("cannot get exit status of PID %d", pid);
-        checkInterrupt();
+        if (allowInterrupts)
+            checkInterrupt();
     }
 }
 
