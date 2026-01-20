@@ -36,7 +36,7 @@
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
-        "version": 2
+        "version": 3
       }
     },
     "w0yjpwh59kpbyc7hz9jgmi44r9br908i-dep-drv-out": {
@@ -58,7 +58,7 @@
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
-        "version": 2
+        "version": 3
       }
     }
   },

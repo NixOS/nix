@@ -37,7 +37,7 @@ properties:
           - contents
         properties:
           info:
-            "$ref": "./store-object-info-v2.yaml#/$defs/impure"
+            "$ref": "./store-object-info-v3.yaml#/$defs/impure"
             title: Store Object Info
             description: |
               Metadata about the [store object](@docroot@/store/store-object.md) including hash, size, references, etc.

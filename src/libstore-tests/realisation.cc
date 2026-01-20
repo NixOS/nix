@@ -54,6 +54,20 @@ Realisation simple{
     },
 };
 
+Realisation withSignature{
+    {
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+        .signatures =
+            {
+                Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+            },
+    },
+    {
+        .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
+        .outputName = "foo",
+    },
+};
+
 INSTANTIATE_TEST_SUITE_P(
     RealisationJSON,
     RealisationJsonTest,
@@ -63,15 +77,16 @@ INSTANTIATE_TEST_SUITE_P(
             simple,
         },
         std::pair{
-            "with-signature",
-            [&] {
-                auto r = simple;
-                // FIXME actually sign properly
-                r.signatures = {
-                    Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
-                };
-                return r;
-            }(),
+            "with-signature-structured",
+            withSignature,
         }));
+
+/**
+ * Old signature format (string) should still be parseable.
+ */
+TEST_F(RealisationTest, with_signature_from_json)
+{
+    readJsonTest("with-signature", withSignature);
+}
 
 } // namespace nix

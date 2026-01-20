@@ -30,7 +30,7 @@
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
-        "version": 2
+        "version": 3
       }
     }
   },
