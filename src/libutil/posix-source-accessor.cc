@@ -55,27 +55,11 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::fun
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
 
-    auto st = nix::fstat(fromDescriptorReadOnly(fd.get()));
+    auto size = getFileSize(fd.get());
 
-    sizeCallback(st.st_size);
+    sizeCallback(size);
 
-    off_t left = st.st_size;
-
-    std::array<unsigned char, 64 * 1024> buf;
-    while (left) {
-        checkInterrupt();
-        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("reading from file '%s'", showPath(path));
-        } else if (rd == 0)
-            throw SysError("unexpected end-of-file reading '%s'", showPath(path));
-        else {
-            assert(rd <= left);
-            sink({(char *) buf.data(), (size_t) rd});
-            left -= rd;
-        }
-    }
+    drainFD(fd.get(), sink, {.expectedSize = size});
 }
 
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
