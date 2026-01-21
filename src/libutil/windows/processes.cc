@@ -52,7 +52,7 @@ void Pid::operator=(AutoCloseFD pid)
 }
 
 // TODO: Implement (not needed for process spawning yet)
-int Pid::kill()
+int Pid::kill(bool allowInterrupts)
 {
     assert(pid.get() != INVALID_DESCRIPTOR);
 
@@ -61,7 +61,7 @@ int Pid::kill()
     throw UnimplementedError("Pid::kill unimplemented");
 }
 
-int Pid::wait()
+int Pid::wait(bool allowInterrupts)
 {
     // https://github.com/nix-windows/nix/blob/windows-meson/src/libutil/util.cc#L1938
     assert(pid.get() != INVALID_DESCRIPTOR);
