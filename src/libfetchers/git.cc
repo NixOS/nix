@@ -72,10 +72,10 @@ std::optional<std::string> readHead(const std::filesystem::path & path)
     if (const auto parseResult = git::parseLsRemoteLine(line); parseResult && parseResult->reference == "HEAD") {
         switch (parseResult->kind) {
         case git::LsRemoteRefLine::Kind::Symbolic:
-            debug("resolved HEAD ref '%s' for repo '%s'", parseResult->target, path);
+            debug("resolved HEAD ref '%s' for repo %s", parseResult->target, PathFmt(path));
             break;
         case git::LsRemoteRefLine::Kind::Object:
-            debug("resolved HEAD rev '%s' for repo '%s'", parseResult->target, path);
+            debug("resolved HEAD rev '%s' for repo %s", parseResult->target, PathFmt(path));
             break;
         }
         return parseResult->target;
@@ -753,9 +753,10 @@ struct GitInputScheme : InputScheme
                     "\n"
                     "git -C %2% add \"%1%\"",
                     path.rel(),
-                    repoPath);
+                    PathFmt(repoPath));
             else
-                return RestrictedPathError("Path '%s' does not exist in Git repository %s.", path.rel(), repoPath);
+                return RestrictedPathError(
+                    "Path '%s' does not exist in Git repository %s.", path.rel(), PathFmt(repoPath));
         };
     }
 
@@ -848,7 +849,7 @@ struct GitInputScheme : InputScheme
                     if (!input.getRev())
                         setWriteTime(localRefFile, now, now);
                 } catch (Error & e) {
-                    warn("could not update mtime for file %s: %s", localRefFile, e.info().msg);
+                    warn("could not update mtime for file %s: %s", PathFmt(localRefFile), e.info().msg);
                 }
                 if (!originalRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());

@@ -88,7 +88,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 args.insert(args.end(), jsonFile);
 
                 if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into %1%", tmpDir);
+                    throw SysError("changing into %1%", PathFmt(tmpDir));
 
                 chownToBuilder(topTmpDir);
 
@@ -97,7 +97,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
 
-                throw SysError("executing %s", externalBuilder.program);
+                throw SysError("executing %s", PathFmt(externalBuilder.program));
             } catch (...) {
                 handleChildException(true);
                 _exit(1);

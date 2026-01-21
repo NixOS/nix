@@ -64,21 +64,21 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         /* Clean up the chroot directory automatically. */
         autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
 
-        printMsg(lvlChatty, "setting up chroot environment in %1%", chrootParentDir);
+        printMsg(lvlChatty, "setting up chroot environment in %1%", PathFmt(chrootParentDir));
 
         if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create %s", chrootRootDir);
+            throw SysError("cannot create %s", PathFmt(chrootRootDir));
 
         chrootRootDir = chrootParentDir / "root";
 
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
-            throw SysError("cannot create %1%", chrootRootDir);
+            throw SysError("cannot create %1%", PathFmt(chrootRootDir));
 
         if (buildUser
             && chown(
                    chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID())
                    == -1)
-            throw SysError("cannot change ownership of %1%", chrootRootDir);
+            throw SysError("cannot change ownership of %1%", PathFmt(chrootRootDir));
 
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
@@ -122,7 +122,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         chmod_(chrootStoreDir, 01775);
 
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of %1%", chrootStoreDir);
+            throw SysError("cannot change ownership of %1%", PathFmt(chrootStoreDir));
 
         pathsInChroot = getPathsInSandbox();
 
@@ -193,7 +193,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         if (pathExists(target)) {
             // There is a similar debug message in doBind, so only run it in this block to not have double messages.
-            debug("bind-mounting %s -> %s", target, source);
+            debug("bind-mounting %s -> %s", PathFmt(target), PathFmt(source));
             throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
         }
 

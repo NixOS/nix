@@ -67,7 +67,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         if (profileDir == "")
             profileDir = getProfileDir(store);
 
-        printInfo("upgrading Nix in profile %s", profileDir);
+        printInfo("upgrading Nix in profile %s", PathFmt(profileDir));
 
         auto storePath = getLatestNix(store);
 
@@ -100,7 +100,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                 *logger,
                 lvlInfo,
                 actUnknown,
-                fmt("installing '%s' into profile %s...", store->printStorePath(storePath), profileDir));
+                fmt("installing '%s' into profile %s...", store->printStorePath(storePath), PathFmt(profileDir)));
 
             // FIXME: don't call an external process.
             runProgram(
@@ -120,7 +120,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             throw Error("couldn't figure out how Nix is installed, so I can't upgrade it");
         const auto & where = whereOpt->parent_path();
 
-        printInfo("found Nix in %s", where);
+        printInfo("found Nix in %s", PathFmt(where));
 
         if (hasPrefix(where.string(), "/run/current-system"))
             throw Error("Nix on NixOS must be upgraded via 'nixos-rebuild'");
@@ -132,17 +132,17 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
                && std::filesystem::is_symlink(profileDir))
             profileDir = readLink(profileDir.string());
 
-        printInfo("found profile %s", profileDir);
+        printInfo("found profile %s", PathFmt(profileDir));
 
         Path userEnv = canonPath(profileDir.string(), true);
 
         if (std::filesystem::exists(profileDir / "manifest.json"))
             throw Error(
                 "directory %s is managed by 'nix profile' and currently cannot be upgraded by 'nix upgrade-nix'",
-                profileDir);
+                PathFmt(profileDir));
 
         if (!std::filesystem::exists(profileDir / "manifest.nix"))
-            throw Error("directory %s does not appear to be part of a Nix profile", profileDir);
+            throw Error("directory %s does not appear to be part of a Nix profile", PathFmt(profileDir));
 
         if (!store->isValidPath(store->parseStorePath(userEnv)))
             throw Error("directory '%s' is not in the Nix store", userEnv);

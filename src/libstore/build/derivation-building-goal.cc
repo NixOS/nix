@@ -721,7 +721,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                             worker.store.toStorePath(i.second.source.string()).first, closure);
                 } catch (InvalidPath & e) {
                 } catch (Error & e) {
-                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    e.addTrace({}, "while processing sandbox path %s", PathFmt(i.second.source));
                     throw;
                 }
             for (auto & i : closure) {

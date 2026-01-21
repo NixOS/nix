@@ -114,7 +114,7 @@ std::tuple<StorePath, Hash> prefetchFile(
 
             AutoCloseFD fd = toDescriptor(open(tmpFile.string().c_str(), O_WRONLY | O_CREAT | O_EXCL, mode));
             if (!fd)
-                throw SysError("creating temporary file '%s'", tmpFile);
+                throw SysError("creating temporary file %s", PathFmt(tmpFile));
 
             FdSink sink(fd.get());
 

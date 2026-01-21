@@ -125,11 +125,11 @@ static void setupSeccomp()
 
 static void doBind(const std::filesystem::path & source, const std::filesystem::path & target, bool optional = false)
 {
-    debug("bind mounting %1% to %2%", source, target);
+    debug("bind mounting %1% to %2%", PathFmt(source), PathFmt(target));
 
     auto bindMount = [&]() {
         if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-            throw SysError("bind mount from %1% to %2% failed", source, target);
+            throw SysError("bind mount from %1% to %2% failed", PathFmt(source), PathFmt(target));
     };
 
     auto maybeSt = maybeLstat(source);
@@ -137,7 +137,7 @@ static void doBind(const std::filesystem::path & source, const std::filesystem::
         if (optional)
             return;
         else
-            throw SysError("getting attributes of path %1%", source);
+            throw SysError("getting attributes of path %1%", PathFmt(source));
     }
     auto st = *maybeSt;
 
@@ -231,7 +231,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 throw Error("cannot determine the cgroups file system");
             auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
             if (!pathExists(rootCgroupPath))
-                throw Error("expected cgroup directory '%s'", rootCgroupPath);
+                throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
 
             static std::atomic<unsigned int> counter{0};
 
@@ -239,7 +239,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                      / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
                                   : fmt("nix-build-pid-%d-%d", getpid(), counter++));
 
-            debug("using cgroup %s", *cgroup);
+            debug("using cgroup %s", PathFmt(*cgroup));
 
             /* When using a build user, record the cgroup we used for that
                user so that if we got interrupted previously, we can kill
@@ -269,7 +269,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         if (cgroup) {
             if (mkdir(cgroup->c_str(), 0755) != 0)
-                throw SysError("creating cgroup %s", *cgroup);
+                throw SysError("creating cgroup %s", PathFmt(*cgroup));
             chownToBuilder(*cgroup);
             chownToBuilder(*cgroup / "cgroup.procs");
             chownToBuilder(*cgroup / "cgroup.threads");
@@ -493,7 +493,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         /* Bind-mount chroot directory to itself, to treat it as a
            different filesystem from /, as needed for pivot_root. */
         if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
-            throw SysError("unable to bind mount %1%", chrootRootDir);
+            throw SysError("unable to bind mount %1%", PathFmt(chrootRootDir));
 
         /* Bind-mount the sandbox's Nix store onto itself so that
            we can mark it as a "shared" subtree, allowing bind
@@ -506,10 +506,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
 
         if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
-            throw SysError("unable to bind mount the Nix store", chrootStoreDir);
+            throw SysError("unable to bind mount the Nix store at %1%", PathFmt(chrootStoreDir));
 
         if (mount(0, chrootStoreDir.c_str(), 0, MS_SHARED, 0) == -1)
-            throw SysError("unable to make %s shared", chrootStoreDir);
+            throw SysError("unable to make %s shared", PathFmt(chrootStoreDir));
 
         /* Set up a nearly empty /dev, unless the user asked to
            bind-mount the host /dev. */
@@ -663,16 +663,16 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         /* Do the chroot(). */
         if (chdir(chrootRootDir.c_str()) == -1)
-            throw SysError("cannot change directory to %1%", chrootRootDir);
+            throw SysError("cannot change directory to %1%", PathFmt(chrootRootDir));
 
         if (mkdir("real-root", 0500) == -1)
             throw SysError("cannot create real-root directory");
 
         if (pivot_root(".", "real-root") == -1)
-            throw SysError("cannot pivot old root directory onto %1%", chrootRootDir / "real-root");
+            throw SysError("cannot pivot old root directory onto %1%", PathFmt(chrootRootDir / "real-root"));
 
         if (chroot(".") == -1)
-            throw SysError("cannot change root directory to %1%", chrootRootDir);
+            throw SysError("cannot change root directory to %1%", PathFmt(chrootRootDir));
 
         if (umount2("real-root", MNT_DETACH) == -1)
             throw SysError("cannot unmount real root filesystem");

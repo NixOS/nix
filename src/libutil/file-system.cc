@@ -42,7 +42,7 @@ DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
     } catch (const std::filesystem::filesystem_error & e) {
         // **Catch filesystem_error and throw SysError**
         // Adapt the error message as needed for SysError
-        throw SysError("cannot read directory %s", p);
+        throw SysError("cannot read directory %s", PathFmt(p));
     }
 }
 
@@ -55,7 +55,7 @@ DirectoryIterator & DirectoryIterator::operator++()
         // Try to get path info if possible, might fail if iterator is bad
         try {
             if (it_ != std::filesystem::directory_iterator{}) {
-                throw SysError("cannot read directory past %s: %s", it_->path(), ec.message());
+                throw SysError("cannot read directory past %s: %s", PathFmt(it_->path()), ec.message());
             }
         } catch (...) {
             throw SysError("cannot read directory");
@@ -264,7 +264,7 @@ std::string readFile(const std::filesystem::path & path)
 {
     AutoCloseFD fd = openFileReadonly(path);
     if (!fd)
-        throw NativeSysError("opening file %1%", path);
+        throw NativeSysError("opening file %1%", PathFmt(path));
     return readFile(fd.get());
 }
 
@@ -396,7 +396,7 @@ void recursiveSync(const Path & path)
             } else if (std::filesystem::is_regular_file(st)) {
                 AutoCloseFD fd = toDescriptor(open(entry.path().string().c_str(), O_RDONLY, 0));
                 if (!fd)
-                    throw SysError("opening file '%1%'", entry.path());
+                    throw SysError("opening file %1%", PathFmt(entry.path()));
                 fd.fsync();
             }
         }
@@ -407,7 +407,7 @@ void recursiveSync(const Path & path)
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
         AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
         if (!fd)
-            throw SysError("opening directory '%1%'", *dir);
+            throw SysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
     }
 }
@@ -533,12 +533,12 @@ std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const
                "wheel", then "tar" will fail to unpack archives that
                have the setgid bit set on directories. */
             if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
-                throw SysError("setting group of directory '%1%'", tmpDir);
+                throw SysError("setting group of directory %1%", PathFmt(tmpDir));
 #endif
             return tmpDir;
         }
         if (errno != EEXIST)
-            throw SysError("creating directory '%1%'", tmpDir);
+            throw SysError("creating directory %1%", PathFmt(tmpDir));
     }
 }
 
@@ -557,7 +557,7 @@ AutoCloseFD createAnonymousTempFile()
         FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,
         /*hTemplateFile=*/nullptr);
     if (!fd)
-        throw windows::WinError("creating temporary file %1%", path);
+        throw windows::WinError("creating temporary file %1%", PathFmt(path));
 #else
 #  ifdef O_TMPFILE
     static std::atomic_flag tmpfileUnsupported{};
@@ -626,7 +626,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists)
                 continue;
-            throw SysError("creating symlink %1% -> %2%", tmp, target);
+            throw SysError("creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
         }
 
         try {
@@ -634,7 +634,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists)
                 continue;
-            throw SysError("renaming %1% to %2%", tmp, link);
+            throw SysError("renaming %1% to %2%", PathFmt(tmp), PathFmt(link));
         }
 
         break;
@@ -667,7 +667,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
             copyFile(entry, to / entry.path().filename(), andDelete);
         }
     } else {
-        throw Error("file %s has an unsupported type", from);
+        throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
     setWriteTime(to, lstat(from.string().c_str()));
@@ -735,7 +735,7 @@ std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
         }
         return std::filesystem::canonical(parent) / path.filename();
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("canonicalising parent path of '%1%'", path);
+        throw SysError("canonicalising parent path of %1%", PathFmt(path));
     }
 }
 

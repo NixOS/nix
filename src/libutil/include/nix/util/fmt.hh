@@ -3,6 +3,7 @@
 
 #include <boost/format.hpp>
 #include <string>
+#include <filesystem>
 #include "nix/util/ansicolor.hh"
 
 namespace nix {
@@ -27,6 +28,8 @@ inline void formatHelper(F & f)
 template<class F, typename T, typename... Args>
 inline void formatHelper(F & f, const T & x, const Args &... args)
 {
+    static_assert(!std::is_same_v<std::remove_cvref_t<T>, std::filesystem::path>);
+    static_assert(!(std::is_same_v<std::remove_cvref_t<Args>, std::filesystem::path> || ...));
     // Interpolate one argument and then recurse.
     formatHelper(f % x, args...);
 }
@@ -103,10 +106,35 @@ struct Magenta
     const T & value;
 };
 
+/**
+ * All std::filesystem::path values must be wrapped in this class when formatting via HintFmt
+ * or fmt(). This avoids accidentail double-quoting due to the standard operator<< implementation
+ * for std::filesystem::path.
+ */
+struct PathFmt
+{
+    explicit PathFmt(const std::filesystem::path & p)
+    {
+#ifdef _WIN32
+        auto s = p.u8string();
+        value = std::string(reinterpret_cast<const char *>(s.data()), s.size());
+#else
+        value = p.string();
+#endif
+    }
+
+    std::string value;
+};
+
 template<class T>
 std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 {
     return out << ANSI_WARNING << y.value << ANSI_NORMAL;
+}
+
+inline std::ostream & operator<<(std::ostream & out, const PathFmt & y)
+{
+    return out << "\"" << y.value << "\"";
 }
 
 /**
@@ -175,9 +203,12 @@ public:
     HintFmt(boost::format && fmt, const Args &... args)
         : fmt(std::move(fmt))
     {
+        static_assert(!(std::is_same_v<std::remove_cvref_t<Args>, std::filesystem::path> || ...));
         setExceptions(fmt);
         formatHelper(*this, args...);
     }
+
+    HintFmt & operator%(const std::filesystem::path & value) = delete;
 
     template<class T>
     HintFmt & operator%(const T & value)

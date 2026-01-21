@@ -152,7 +152,7 @@ struct CmdLsNar : Command, MixLs
     {
         AutoCloseFD fd = openFileReadonly(narPath);
         if (!fd)
-            throw NativeSysError("opening NAR file %s", narPath);
+            throw NativeSysError("opening NAR file %s", PathFmt(narPath));
         auto source = FdSource{fd.get()};
         list(makeLazyNarAccessor(source, seekableGetNarBytes(fd.get())), CanonPath{path});
     }
