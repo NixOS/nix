@@ -140,7 +140,7 @@ struct ProfileManifest
                 sOriginalUrl = "originalUrl";
                 break;
             default:
-                throw Error("profile manifest '%s' has unsupported version %d", manifestPath, version);
+                throw Error("profile manifest %s has unsupported version %d", PathFmt(manifestPath), version);
             }
 
             auto elems = json["elements"];

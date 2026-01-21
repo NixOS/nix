@@ -187,9 +187,9 @@ LocalStore::LocalStore(ref<const Config> config)
         while (path != root) {
             if (std::filesystem::is_symlink(path))
                 throw Error(
-                    "the path '%1%' is a symlink; "
+                    "the path %1% is a symlink; "
                     "this is not allowed for the Nix store and its parent directories",
-                    path);
+                    PathFmt(path));
             path = path.parent_path();
         }
     }
@@ -1301,15 +1301,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of %s", name);
+            printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
                 hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError("link %s was modified! expected hash %s, got '%s'", link.path(), name, hash);
+                printError(
+                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
                 if (repair) {
                     std::filesystem::remove(link.path());
-                    printInfo("removed link %s", link.path());
+                    printInfo("removed link %s", PathFmt(link.path()));
                 } else {
                     errors = true;
                 }

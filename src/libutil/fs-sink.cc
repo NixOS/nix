@@ -87,7 +87,7 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
         unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 
     if (!dirSink.dirFd)
-        throw SysError("opening directory '%s'", dirSink.dstPath.string());
+        throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
 
     callback(dirSink, CanonPath::root);
 }
@@ -101,10 +101,10 @@ void RestoreSink::createDirectory(const CanonPath & path)
     if (dirFd) {
         if (path.isRoot())
             /* Trying to create a directory that we already have a file descriptor for. */
-            throw Error("path '%s' already exists", p.string());
+            throw Error("path %s already exists", PathFmt(p));
 
         if (::mkdirat(dirFd.get(), path.rel_c_str(), 0777) == -1)
-            throw SysError("creating directory '%s'", p.string());
+            throw SysError("creating directory %s", PathFmt(p));
 
         return;
     }
@@ -121,7 +121,7 @@ void RestoreSink::createDirectory(const CanonPath & path)
            directory. */
         dirFd = open(p.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
         if (!dirFd)
-            throw SysError("creating directory '%1%'", p.string());
+            throw SysError("creating directory %1%", PathFmt(p));
     }
 #endif
 };
@@ -179,7 +179,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
 #endif
     );
     if (!crf.fd)
-        throw NativeSysError("creating file '%1%'", p);
+        throw NativeSysError("creating file %1%", PathFmt(p));
     func(crf);
     crf.flush();
 }
@@ -221,7 +221,7 @@ void RestoreSink::createSymlink(const CanonPath & path, const std::string & targ
 #ifndef _WIN32
     if (dirFd) {
         if (::symlinkat(requireCString(target), dirFd.get(), path.rel_c_str()) == -1)
-            throw SysError("creating symlink from '%1%' -> '%2%'", p.string(), target);
+            throw SysError("creating symlink from %1% -> '%2%'", PathFmt(p), target);
         return;
     }
 #endif

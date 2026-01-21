@@ -77,9 +77,9 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
         if (fd) {
             struct statfs fs;
             if (fstatfs(fd.get(), &fs))
-                throw SysError("statfs() on '%s'", shmFile);
+                throw SysError("statfs() on %s", PathFmt(shmFile));
             if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
-                throw SysError("fsync() on '%s'", shmFile);
+                throw SysError("fsync() on %s", PathFmt(shmFile));
         }
     } catch (...) {
         throw;
@@ -98,7 +98,7 @@ SQLite::SQLite(const std::filesystem::path & path, SQLiteOpenMode mode)
     int ret = sqlite3_open_v2(uri.c_str(), &db, SQLITE_OPEN_URI | flags, vfs);
     if (ret != SQLITE_OK) {
         const char * err = sqlite3_errstr(ret);
-        throw Error("cannot open SQLite database '%s': %s", path, err);
+        throw Error("cannot open SQLite database %s: %s", PathFmt(path), err);
     }
 
     if (sqlite3_busy_timeout(db, 60 * 60 * 1000) != SQLITE_OK)

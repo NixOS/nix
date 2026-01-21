@@ -56,7 +56,7 @@ void setWriteTime(
         },
     };
     if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", path);
+        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path));
 #else
     struct timeval times[2] = {
         {
@@ -114,7 +114,7 @@ static void _deletePath(
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT)
             return;
-        throw SysError("getting status of %1%", path);
+        throw SysError("getting status of %1%", PathFmt(path));
     }
 
     if (!S_ISDIR(st.st_mode)) {
@@ -148,18 +148,18 @@ static void _deletePath(
             try {
                 unix::fchmodatTryNoFollow(parentfd, CanonPath(name), st.st_mode | PERM_MASK);
             } catch (SysError & e) {
-                e.addTrace({}, "while making directory %1% accessible for deletion", path);
+                e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
-                    e.addTrace({}, "%1% is now a symlink, expected directory", path);
+                    e.addTrace({}, "%1% is now a symlink, expected directory", PathFmt(path));
                 throw;
             }
 
         int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
-            throw SysError("opening directory %1%", path);
+            throw SysError("opening directory %1%", PathFmt(path));
         AutoCloseDir dir(fdopendir(fd));
         if (!dir)
-            throw SysError("opening directory %1%", path);
+            throw SysError("opening directory %1%", PathFmt(path));
 
         struct dirent * dirent;
         while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -170,7 +170,7 @@ static void _deletePath(
             _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex MOUNTEDPATHS_ARG);
         }
         if (errno)
-            throw SysError("reading directory %1%", path);
+            throw SysError("reading directory %1%", PathFmt(path));
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
@@ -178,7 +178,7 @@ static void _deletePath(
         if (errno == ENOENT)
             return;
         try {
-            throw SysError("cannot unlink %1%", path);
+            throw SysError("cannot unlink %1%", PathFmt(path));
         } catch (...) {
             if (!ex)
                 ex = std::current_exception();
@@ -197,7 +197,7 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     if (!dirfd) {
         if (errno == ENOENT)
             return;
-        throw SysError("opening directory %s", path.parent_path());
+        throw SysError("opening directory %s", PathFmt(path.parent_path()));
     }
 
     std::exception_ptr ex;

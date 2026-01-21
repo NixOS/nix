@@ -209,14 +209,14 @@ static void initRepoAtomically(std::filesystem::path & path, GitRepo::Options op
         return;
 
     if (!options.create)
-        throw Error("Git repository %s does not exist.", path);
+        throw Error("Git repository %s does not exist.", PathFmt(path));
 
     std::filesystem::path tmpDir = createTempDir(path.parent_path());
     AutoDelete delTmpDir(tmpDir, true);
     Repository tmpRepo;
 
     if (git_repository_init(Setter(tmpRepo), tmpDir.string().c_str(), options.bare))
-        throw Error("creating Git repository %s: %s", path, git_error_last()->message);
+        throw Error("creating Git repository %s: %s", PathFmt(path), git_error_last()->message);
     try {
         std::filesystem::rename(tmpDir, path);
     } catch (std::filesystem::filesystem_error & e) {
@@ -226,7 +226,7 @@ static void initRepoAtomically(std::filesystem::path & path, GitRepo::Options op
             || e.code() == std::errc::directory_not_empty) {
             return;
         } else
-            throw SysError("moving temporary git repository from %s to %s", tmpDir, path);
+            throw SysError("moving temporary git repository from %s to %s", PathFmt(tmpDir), PathFmt(path));
     }
     // we successfully moved the repository, so the temporary directory no longer exists.
     delTmpDir.cancel();
@@ -266,7 +266,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         initRepoAtomically(path, options);
         if (git_repository_open(Setter(repo), path.string().c_str()))
-            throw Error("opening Git repository %s: %s", path, git_error_last()->message);
+            throw Error("opening Git repository %s: %s", PathFmt(path), git_error_last()->message);
 
         ObjectDb odb;
         if (options.packfilesOnly) {

@@ -273,7 +273,7 @@ void Fetch::fetch(
                       + "/" + pointer->oid;
     std::filesystem::path cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
-        debug("using cache entry %s -> %s", key, cachePath);
+        debug("using cache entry %s -> %s", key, PathFmt(cachePath));
         sink(readFile(cachePath));
         return;
     }
@@ -301,7 +301,7 @@ void Fetch::fetch(
         sizeCallback(size);
         downloadToSink(ourl, authHeader, sink, sha256, size);
 
-        debug("creating cache entry %s -> %s", key, cachePath);
+        debug("creating cache entry %s -> %s", key, PathFmt(cachePath));
         if (!pathExists(cachePath.parent_path()))
             createDirs(cachePath.parent_path());
         writeFile(cachePath, sink.s);
