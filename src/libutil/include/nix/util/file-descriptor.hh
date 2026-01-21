@@ -277,6 +277,14 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
 
+/*
+ * Read a symlink relative to a directory file descriptor.
+ *
+ * @throws SysError on any I/O errors.
+ * @throws Interrupted if interrupted. SysError::errNo can never be EINTR.
+ */
+std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
+
 } // namespace unix
 #endif
 

@@ -437,4 +437,20 @@ Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPa
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
 }
 
+std::string unix::readLinkAt(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    std::vector<char> buf;
+    for (ssize_t bufSize = PATH_MAX / 4; true; bufSize += bufSize / 2) {
+        checkInterrupt();
+        buf.resize(bufSize);
+        ssize_t rlSize = ::readlinkat(dirFd, path.rel_c_str(), buf.data(), bufSize);
+        if (rlSize == -1)
+            throw SysError("reading symbolic link '%1%'", path);
+        else if (rlSize < bufSize)
+            return {buf.data(), static_cast<std::size_t>(rlSize)};
+    }
+}
+
 } // namespace nix
