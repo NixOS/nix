@@ -27,7 +27,7 @@ void MuxablePipePollState::iterate(
         assert(fdPollStatusId);
         assert(*fdPollStatusId < pollStatus.size());
         if (pollStatus.at(*fdPollStatusId).revents) {
-            ssize_t rd = ::read(fromDescriptorReadOnly(k), buffer.data(), buffer.size());
+            ssize_t rd = ::read(k, buffer.data(), buffer.size());
             // FIXME: is there a cleaner way to handle pt close
             // than EIO? Is this even standard?
             if (rd == 0 || (rd == -1 && errno == EIO)) {

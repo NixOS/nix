@@ -18,18 +18,84 @@ void writeLine(Descriptor fd, std::string s)
     writeFull(fd, s);
 }
 
-std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
+std::string readFile(Descriptor fd)
+{
+    auto size = getFileSize(fd);
+    // We can't rely on size being correct, most files in /proc have a nominal size of 0
+    return drainFD(fd, {.size = size, .expected = false});
+}
+
+void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts)
+{
+#ifndef _WIN32
+    // silence GCC maybe-uninitialized warning in finally
+    int saved = 0;
+
+    if (!opts.block) {
+        saved = fcntl(fd, F_GETFL);
+        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
+            throw SysError("making file descriptor non-blocking");
+    }
+
+    Finally finally([&]() {
+        if (!opts.block) {
+            if (fcntl(fd, F_SETFL, saved) == -1)
+                throw SysError("making file descriptor blocking");
+        }
+    });
+#endif
+
+    size_t bytesRead = 0;
+    std::array<std::byte, 64 * 1024> buf;
+    while (1) {
+        checkInterrupt();
+
+        size_t toRead = buf.size();
+        if (opts.expectedSize) {
+            size_t remaining = *opts.expectedSize - bytesRead;
+            if (remaining == 0)
+                break;
+            toRead = std::min(toRead, remaining);
+        }
+
+        size_t n;
+        try {
+            n = read(fd, std::span(buf.data(), toRead));
+        } catch (SystemError & e) {
+#ifndef _WIN32
+            if (!opts.block
+                && (e.is(std::errc::resource_unavailable_try_again) || e.is(std::errc::operation_would_block)))
+                break;
+#endif
+            if (e.is(std::errc::interrupted))
+                continue;
+            throw;
+        }
+
+        if (n == 0) {
+            if (opts.expectedSize && bytesRead < *opts.expectedSize)
+                throw EndOfFile("unexpected end-of-file");
+            break;
+        }
+
+        bytesRead += n;
+        sink(std::string_view(reinterpret_cast<const char *>(buf.data()), n));
+    }
+}
+
+std::string drainFD(Descriptor fd, DrainFdOpts opts)
 {
     // the parser needs two extra bytes to append terminating characters, other users will
     // not care very much about the extra memory.
+    size_t reserveSize = opts.expected ? 0 : opts.size;
     StringSink sink(reserveSize + 2);
-#ifdef _WIN32
-    // non-blocking is not supported this way on Windows
-    assert(block);
-    drainFD(fd, sink);
-#else
-    drainFD(fd, sink, block);
+    DrainFdSinkOpts sinkOpts{
+        .expectedSize = opts.expected ? std::optional<size_t>(opts.size) : std::nullopt,
+#ifndef _WIN32
+        .block = opts.block,
 #endif
+    };
+    drainFD(fd, sink, sinkOpts);
     return std::move(sink.s);
 }
 

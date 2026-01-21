@@ -68,10 +68,7 @@ void LocalStore::createTempRootsFile()
 
         /* Check whether the garbage collector didn't get in our
            way. */
-        struct stat st;
-        if (fstat(fromDescriptorReadOnly(fdTempRoots->get()), &st) == -1)
-            throw SysError("statting '%1%'", fnTempRoots);
-        if (st.st_size == 0)
+        if (getFileSize(fdTempRoots->get()) == 0)
             break;
 
         /* The garbage collector deleted this file before we could get
