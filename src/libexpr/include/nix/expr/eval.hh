@@ -1003,6 +1003,12 @@ public:
     realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
 
     /**
+     * Coerce `v` to a path and realise it, i.e. build anything in the value's string context using `realiseContext()`.
+     */
+    SourcePath realisePath(
+        const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full);
+
+    /**
      * Realise the given string with context, and return the string with outputs instead of downstream output
      * placeholders.
      * @param[in] str the string to realise
