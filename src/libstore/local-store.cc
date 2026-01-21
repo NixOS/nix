@@ -619,7 +619,8 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
                 state->stmts->UpdateRealisedOutput
-                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.strHash())(info.id.outputName)
+                    .use()(concatStringsSep(" ", Signature::toStrings(combinedSignatures)))(info.id.strHash())(
+                        info.id.outputName)
                     .exec();
             } else {
                 throw Error(
@@ -634,7 +635,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
         } else {
             state->stmts->RegisterRealisedOutput
                 .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
-                    concatStringsSep(" ", info.signatures))
+                    concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
     });
@@ -659,7 +660,8 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
             info.registrationTime == 0 ? time(0) : info.registrationTime)(
             info.deriver ? printStorePath(*info.deriver) : "",
             (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
-            concatStringsSep(" ", info.sigs), !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
+            concatStringsSep(" ", Signature::toStrings(info.sigs)),
+            !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -737,7 +739,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 6);
     if (s)
-        info->sigs = tokenizeString<StringSet>(s, " ");
+        info->sigs = Signature::parseMany(tokenizeString<StringSet>(s, " "));
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
     if (s)
@@ -757,7 +759,8 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo
         .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(
-            info.ultimate ? 1 : 0, info.ultimate)(concatStringsSep(" ", info.sigs), !info.sigs.empty())(
+            info.ultimate ? 1 : 0,
+            info.ultimate)(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())(
             renderContentAddress(info.ca), (bool) info.ca)(printStorePath(info.path))
         .exec();
 }
@@ -1485,7 +1488,7 @@ void LocalStore::vacuumDB()
     _state->lock()->db.exec("vacuum");
 }
 
-void LocalStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     retrySQLite<void>([&]() {
         auto state(_state->lock());
@@ -1516,7 +1519,7 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
         {realisationDbId,
          UnkeyedRealisation{
              .outPath = outputPath,
-             .signatures = signatures,
+             .signatures = Signature::parseMany(signatures),
          }}};
 }
 

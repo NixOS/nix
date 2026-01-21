@@ -38,7 +38,7 @@ void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
 }
 
 bool UnkeyedRealisation::checkSignature(
-    const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const
+    const DrvOutput & key, const PublicKeys & publicKeys, const Signature & sig) const
 {
     return verifyDetached(fingerprint(key), sig, publicKeys);
 }
@@ -86,13 +86,13 @@ UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & js
 {
     auto json = getObject(json0);
 
-    StringSet signatures;
-    if (auto signaturesOpt = optionalValueAt(json, "signatures"))
-        signatures = *signaturesOpt;
-
     return UnkeyedRealisation{
         .outPath = valueAt(json, "outPath"),
-        .signatures = signatures,
+        .signatures = [&] -> std::set<Signature> {
+            if (auto signaturesOpt = optionalValueAt(json, "signatures"))
+                return *signaturesOpt;
+            return {};
+        }(),
     };
 }
 

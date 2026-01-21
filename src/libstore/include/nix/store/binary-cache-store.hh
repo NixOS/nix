@@ -211,7 +211,7 @@ public:
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath &, bool requireValidPath = true) override;
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 

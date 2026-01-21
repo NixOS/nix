@@ -129,7 +129,7 @@ size_t ValidPathInfo::checkSignatures(const StoreDirConfig & store, const Public
 }
 
 bool ValidPathInfo::checkSignature(
-    const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const
+    const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -211,9 +211,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
 
         jsonObject["ultimate"] = ultimate;
 
-        auto & sigsObj = jsonObject["signatures"] = json::array();
-        for (auto & sig : sigs)
-            sigsObj.push_back(sig);
+        jsonObject["signatures"] = sigs;
     }
 
     return jsonObject;
@@ -287,7 +285,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
         res.ultimate = getBoolean(*rawUltimate);
 
     if (auto * rawSignatures = optionalValueAt(json, "signatures"))
-        res.sigs = getStringSet(*rawSignatures);
+        res.sigs = *rawSignatures;
 
     return res;
 }
