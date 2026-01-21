@@ -905,6 +905,26 @@ public:
           `fetchTarball`, and `fetchurl` respect this TTL.
         )"};
 
+    Setting<unsigned int> substitutionLockTimeout{
+        this,
+        0,
+        "substitution-lock-timeout",
+        R"(
+          Timeout in seconds for acquiring substitution locks. When multiple
+          processes try to substitute the same store path simultaneously, a
+          file-based lock is used to coordinate them. This prevents duplicate
+          downloads from binary caches.
+
+          The value `0` (the default) means to wait indefinitely for the lock.
+          A non-zero value specifies the maximum number of seconds to wait
+          before throwing an error. This can be useful to detect deadlocks or
+          stuck processes.
+
+          This setting is primarily useful when running many parallel Nix
+          processes (e.g., with `nix-eval-jobs`) to prevent them from
+          duplicating large downloads.
+        )"};
+
     Setting<bool> requireSigs{
         this,
         true,

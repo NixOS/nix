@@ -2,6 +2,7 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/cache-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
@@ -827,31 +828,64 @@ struct GitInputScheme : InputScheme
 
             if (doFetch) {
                 bool shallow = getShallowAttr(input);
-                try {
-                    auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
-                                    : input.getRev()                  ? input.getRev()->gitRev()
-                                    : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
-                                    : ref == "HEAD"                   ? "HEAD:HEAD"
-                                                                      : fmt("%1%:%1%", "refs/heads/" + ref);
 
-                    repo->fetch(repoUrl.to_string(), fetchRef, shallow);
-                } catch (Error & e) {
-                    if (!std::filesystem::exists(localRefFile))
-                        throw;
-                    logError(e.info());
-                    warn(
-                        "could not update local clone of Git repository '%s'; continuing with the most recent version",
-                        repoInfo.locationToArg());
-                }
+                /* Use inter-process locking to prevent duplicate fetches.
+                   Use null bytes as separators to avoid collisions with URLs
+                   that might contain our separator characters. */
+                auto lockIdentity =
+                    std::string("git\0", 4) + repoUrl.to_string() + (shallow ? std::string("\0shallow", 8) : "");
 
-                try {
-                    if (!input.getRev())
-                        setWriteTime(localRefFile, now, now);
-                } catch (Error & e) {
-                    warn("could not update mtime for file %s: %s", localRefFile, e.info().msg);
-                }
-                if (!originalRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
-                    warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
+                /* Helper to re-check if fetch is still needed after acquiring lock. */
+                auto recheckDoFetch = [&]() -> bool {
+                    if (auto rev = input.getRev()) {
+                        return !repo->hasObject(*rev);
+                    } else if (getAllRefsAttr(input)) {
+                        return true;
+                    } else {
+                        struct stat st;
+                        return stat(localRefFile.string().c_str(), &st) != 0 || !isCacheFileWithinTtl(now, st);
+                    }
+                };
+
+                withFetchLock(
+                    lockIdentity,
+                    settings.fetchLockTimeout.get(),
+                    /* checkCache: return true (wrapped in optional) if already fetched */
+                    [&]() -> std::optional<bool> {
+                        if (!recheckDoFetch())
+                            return true;     /* Already fetched by another process */
+                        return std::nullopt; /* Still need to fetch */
+                    },
+                    /* doFetch: perform the actual fetch */
+                    [&]() -> bool {
+                        try {
+                            auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
+                                            : input.getRev()                  ? input.getRev()->gitRev()
+                                            : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
+                                            : ref == "HEAD"                   ? "HEAD:HEAD"
+                                                                              : fmt("%1%:%1%", "refs/heads/" + ref);
+
+                            repo->fetch(repoUrl.to_string(), fetchRef, shallow);
+                        } catch (Error & e) {
+                            if (!std::filesystem::exists(localRefFile))
+                                throw;
+                            logError(e.info());
+                            warn(
+                                "could not update local clone of Git repository '%s'; continuing with the most recent version",
+                                repoInfo.locationToArg());
+                        }
+
+                        try {
+                            if (!input.getRev())
+                                setWriteTime(localRefFile, now, now);
+                        } catch (Error & e) {
+                            warn("could not update mtime for file %s: %s", localRefFile, e.info().msg);
+                        }
+                        if (!originalRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
+                            warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
+
+                        return true;
+                    });
             }
 
             if (auto rev = input.getRev()) {

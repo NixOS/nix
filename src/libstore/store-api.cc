@@ -18,6 +18,7 @@
 // `addMultipleToStore`.
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
+#include "nix/store/substitution-lock-impl.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -892,54 +893,68 @@ void copyStorePath(
     if (!repair && dstStore.isValidPath(storePath))
         return;
 
-    const auto & srcCfg = srcStore.config;
-    const auto & dstCfg = dstStore.config;
-    auto storePathS = srcStore.printStorePath(storePath);
-    Activity act(
-        *logger,
-        lvlInfo,
-        actCopyPath,
-        makeCopyPathMessage(srcCfg, dstCfg, storePathS),
-        {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
-    PushActivity pact(act.id);
-
-    auto info = srcStore.queryPathInfo(storePath);
-
-    uint64_t total = 0;
-
-    // recompute store path on the chance dstStore does it differently
-    if (info->ca && info->references.empty()) {
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->path =
-            dstStore.makeFixedOutputPathFromCA(info->path.name(), info->contentAddressWithReferences().value());
-        if (dstStore.storeDir == srcStore.storeDir)
-            assert(info->path == info2->path);
-        info = info2;
-    }
-
-    if (info->ultimate) {
-        auto info2 = make_ref<ValidPathInfo>(*info);
-        info2->ultimate = false;
-        info = info2;
-    }
-
-    auto source = sinkToSource(
-        [&](Sink & sink) {
-            LambdaSink progressSink([&](std::string_view data) {
-                total += data.size();
-                act.progress(total, info->narSize);
-            });
-            TeeSink tee{sink, progressSink};
-            srcStore.narFromPath(storePath, tee);
+    /* Use file-based locking to prevent multiple processes from downloading
+       the same store path simultaneously. This is particularly important for
+       parallel builds (e.g., nix-eval-jobs) where many processes may try to
+       substitute the same paths at once. */
+    withSubstitutionLock(
+        storePath.hashPart(),
+        settings.substitutionLockTimeout.get(),
+        [&]() -> bool {
+            /* Double-check after acquiring lock - another process may have
+               completed the substitution while we were waiting. */
+            return !repair && dstStore.isValidPath(storePath);
         },
         [&]() {
-            throw EndOfFile(
-                "NAR for '%s' fetched from '%s' is incomplete",
-                srcStore.printStorePath(storePath),
-                srcStore.config.getHumanReadableURI());
-        });
+            const auto & srcCfg = srcStore.config;
+            const auto & dstCfg = dstStore.config;
+            auto storePathS = srcStore.printStorePath(storePath);
+            Activity act(
+                *logger,
+                lvlInfo,
+                actCopyPath,
+                makeCopyPathMessage(srcCfg, dstCfg, storePathS),
+                {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
+            PushActivity pact(act.id);
 
-    dstStore.addToStore(*info, *source, repair, checkSigs);
+            auto info = srcStore.queryPathInfo(storePath);
+
+            uint64_t total = 0;
+
+            // recompute store path on the chance dstStore does it differently
+            if (info->ca && info->references.empty()) {
+                auto info2 = make_ref<ValidPathInfo>(*info);
+                info2->path =
+                    dstStore.makeFixedOutputPathFromCA(info->path.name(), info->contentAddressWithReferences().value());
+                if (dstStore.storeDir == srcStore.storeDir)
+                    assert(info->path == info2->path);
+                info = info2;
+            }
+
+            if (info->ultimate) {
+                auto info2 = make_ref<ValidPathInfo>(*info);
+                info2->ultimate = false;
+                info = info2;
+            }
+
+            auto source = sinkToSource(
+                [&](Sink & sink) {
+                    LambdaSink progressSink([&](std::string_view data) {
+                        total += data.size();
+                        act.progress(total, info->narSize);
+                    });
+                    TeeSink tee{sink, progressSink};
+                    srcStore.narFromPath(storePath, tee);
+                },
+                [&]() {
+                    throw EndOfFile(
+                        "NAR for '%s' fetched from '%s' is incomplete",
+                        srcStore.printStorePath(storePath),
+                        srcStore.config.getHumanReadableURI());
+                });
+
+            dstStore.addToStore(*info, *source, repair, checkSigs);
+        });
 }
 
 std::map<StorePath, StorePath> copyPaths(

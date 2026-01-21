@@ -3,6 +3,7 @@
   buildPackages,
   stdenv,
   mkMesonExecutable,
+  writableTmpDirAsHomeHook,
 
   nix-expr,
   nix-expr-c,
@@ -55,6 +56,7 @@ mkMesonExecutable (finalAttrs: {
         runCommand "${finalAttrs.pname}-run"
           {
             meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
+            buildInputs = [ writableTmpDirAsHomeHook ];
           }
           (
             lib.optionalString stdenv.hostPlatform.isWindows ''

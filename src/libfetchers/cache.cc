@@ -1,14 +1,62 @@
 #include "nix/fetchers/cache.hh"
+#include "nix/fetchers/cache-impl.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/users.hh"
+#include "nix/util/logging.hh"
 #include "nix/store/sqlite.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/hash.hh"
 
+#include <chrono>
+#include <filesystem>
+#include <mutex>
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
+
+/**
+ * Clean up stale lock files older than maxAge.
+ * This prevents accumulation of lock files after crashes.
+ * Errors are ignored since cleanup is an optimization.
+ */
+static void
+cleanupStaleLockFiles(const std::filesystem::path & lockDir, std::chrono::hours maxAge = std::chrono::hours(24))
+{
+    try {
+        auto now = std::filesystem::file_time_type::clock::now();
+        for (auto & entry : std::filesystem::directory_iterator(lockDir)) {
+            try {
+                if (entry.path().extension() == ".lock") {
+                    auto mtime = entry.last_write_time();
+                    auto age = now - mtime;
+                    if (age > maxAge) {
+                        debug("removing stale lock file '%s'", entry.path().string());
+                        std::filesystem::remove(entry.path());
+                    }
+                }
+            } catch (...) {
+                /* Ignore errors for individual files - may be in use */
+            }
+        }
+    } catch (...) {
+        /* Ignore errors during cleanup - not critical */
+    }
+}
+
+Path getFetchLockPath(std::string_view identity)
+{
+    static std::once_flag fetchLockDirCreated;
+    auto lockDir = getCacheDir() + "/fetch-locks";
+    std::call_once(fetchLockDirCreated, [&]() {
+        createDirs(lockDir);
+        /* Periodically clean up stale lock files on startup */
+        cleanupStaleLockFiles(lockDir);
+    });
+    auto hash = hashString(HashAlgorithm::SHA256, identity);
+    return lockDir + "/" + hash.to_string(HashFormat::Nix32, false) + ".lock";
+}
 
 static const char * schema = R"sql(
 
@@ -147,6 +195,26 @@ struct CacheImpl : Cache
     {
         auto res = lookupStorePath(std::move(key), store);
         return res && !res->expired ? res : std::nullopt;
+    }
+
+    std::optional<ResultWithStorePath> lookupOrFetch(
+        Key key, Store & store, std::function<std::pair<Attrs, StorePath>()> fetcher, unsigned int lockTimeout) override
+    {
+        auto keyStr = fmt("%s:%s", key.first, attrsToJSON(key.second).dump());
+
+        return withFetchLock(
+            keyStr,
+            lockTimeout,
+            [&]() -> std::optional<std::optional<ResultWithStorePath>> {
+                if (auto cached = lookupStorePathWithTTL(key, store))
+                    return cached;
+                return std::nullopt;
+            },
+            [&]() -> std::optional<ResultWithStorePath> {
+                auto [attrs, storePath] = fetcher();
+                upsert(key, store, attrs, storePath);
+                return lookupStorePath(key, store);
+            });
     }
 };
 
