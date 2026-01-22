@@ -407,7 +407,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
     return res;
 }
 
-Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
 {
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
     assert(!path.isRoot());
@@ -423,7 +423,7 @@ Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPa
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
 }
 
-std::string unix::readLinkAt(Descriptor dirFd, const CanonPath & path)
+OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
 {
     assert(!path.isRoot());
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
