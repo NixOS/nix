@@ -29,6 +29,8 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include "store-config-private.hh"
 
@@ -860,6 +862,15 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
+    /* Add the jobserver FIFO to sandbox paths if jobserver is enabled */
+    if (settings.useJobserver && !jobserverFifoPath.empty()) {
+        struct stat st;
+        if (stat(jobserverFifoPath.c_str(), &st) == 0 && S_ISFIFO(st.st_mode)) {
+            pathsInChroot[jobserverFifoPath] = {.source = jobserverFifoPath};
+            printMsg(lvlDebug, "adding jobserver FIFO %s to sandbox paths", jobserverFifoPath);
+        }
+    }
+
     PathSet allowedPaths = settings.allowedImpureHostPrefixes;
 
     /* This works like the above, except on a per-derivation level */
@@ -1048,6 +1059,21 @@ void DerivationBuilderImpl::initEnv()
 
     /* The maximum number of cores to utilize for parallel building. */
     env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
+
+    /* GNU Make Jobserver Protocol Support
+     * Set MAKEFLAGS to enable jobserver for build processes. */
+    if (settings.useJobserver && !jobserverFifoPath.empty()) {
+        struct stat st;
+        if (stat(jobserverFifoPath.c_str(), &st) == 0 && S_ISFIFO(st.st_mode)) {
+            // Append to existing MAKEFLAGS (preserve any existing flags)
+            auto it = env.find("MAKEFLAGS");
+            std::string makeflags = (it != env.end() && !it->second.empty()) ? it->second + " " : "";
+            makeflags += fmt("--jobserver-auth=fifo:%s -j", jobserverFifoPath);
+            env["MAKEFLAGS"] = makeflags;
+
+            printMsg(lvlDebug, "jobserver: set MAKEFLAGS for build %s", store.printStorePath(drvPath));
+        }
+    }
 
     /* Write the final environment. Note that this is intentionally
        *not* `drv.env`, because we've desugared things like like
