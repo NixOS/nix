@@ -305,9 +305,10 @@ void printVersion(const std::string & programName)
         std::cout << "System type: " << settings.thisSystem << "\n";
         std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
-        std::cout << "System configuration file: " << (settings.nixConfDir / "nix.conf").string() << "\n";
+        std::cout << "System configuration file: " << (bootstrapSettings.nixConfDir / "nix.conf") << "\n";
         std::cout << "User configuration files: "
-                  << os_string_to_string(ExecutablePath{.directories = settings.nixUserConfFiles}.render()) << "\n";
+                  << os_string_to_string(ExecutablePath{.directories = bootstrapSettings.nixUserConfFiles}.render())
+                  << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
     }

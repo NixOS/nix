@@ -92,7 +92,7 @@ void Registry::remove(const Input & input)
 
 static std::filesystem::path getSystemRegistryPath()
 {
-    return settings.nixConfDir / "registry.json";
+    return bootstrapSettings.nixConfDir / "registry.json";
 }
 
 static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
