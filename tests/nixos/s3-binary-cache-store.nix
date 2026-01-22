@@ -229,6 +229,47 @@ in
 
           print("✓ Credential provider created once and cached")
 
+      @setup_s3()
+      def test_aws_log_integration(bucket):
+          """Test that AWS SDK logs are properly routed through Nix logger"""
+          print("\n=== Testing AWS Log Integration ===")
+
+          store_url = make_s3_url(bucket)
+
+          # With default verbosity, AWS noise should NOT appear
+          # All AWS messages are demoted to lvlDebug or lvlVomit
+          output_default = server.succeed(
+              f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['A']} 2>&1"
+          )
+
+          if "(aws:" in output_default:
+              print("Output at default verbosity:")
+              print(output_default)
+              raise Exception("Found AWS noise at default verbosity")
+
+          print("  ✓ Default verbosity filters AWS noise")
+
+          # With --debug (lvlDebug), we should see AWS messages with (aws:subject) prefix
+          output_debug = server.succeed(
+              f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' {PKGS['B']} 2>&1"
+          )
+
+          # Check for the (aws:subject) prefix format
+          if "(aws:" not in output_debug:
+              print("Output at --debug verbosity:")
+              print(output_debug)
+              raise Exception("Expected to see (aws:subject) prefix in debug output")
+
+          print("  ✓ Debug output shows AWS messages with (aws:subject) prefix")
+
+          # Should also see Nix's own credential provider creation message
+          if "creating new AWS credential provider" not in output_debug:
+              print("Debug output:")
+              print(output_debug)
+              raise Exception("Expected to see credential provider creation at debug level")
+
+          print("  ✓ Debug verbosity shows credential provider messages")
+
       @setup_s3(populate_bucket=[PKGS['A']])
       def test_fetchurl_basic(bucket):
           """Test builtins.fetchurl works with s3:// URLs"""
@@ -909,6 +950,7 @@ in
 
       # Run tests (each gets isolated bucket via decorator)
       test_credential_caching()
+      test_aws_log_integration()
       test_fetchurl_basic()
       test_error_message_formatting()
       test_fork_credential_preresolution()
