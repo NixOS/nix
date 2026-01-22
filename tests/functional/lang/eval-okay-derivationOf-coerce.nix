@@ -5,4 +5,4 @@ let
     system = "x86_64-linux";
   };
 in
-builtins.derivationOf pkg.outPath == drv.drvPath
+builtins.derivationOf pkg.outPath == pkg.drvPath

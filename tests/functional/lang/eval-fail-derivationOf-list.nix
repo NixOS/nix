@@ -1,1 +1,4 @@
-builtins.derivationOf [ "foo" "bar" ]
+builtins.derivationOf [
+  "foo"
+  "bar"
+]
