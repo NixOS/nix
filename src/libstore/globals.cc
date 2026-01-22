@@ -74,8 +74,7 @@ Settings settings;
 static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
-    : nixPrefix(NIX_PREFIX)
-    , nixStore(
+    : nixStore(
 #ifndef _WIN32
           // On Windows `/nix/store` is not a canonical path, but we dont'
           // want to deal with that yet.

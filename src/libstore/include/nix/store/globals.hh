@@ -79,8 +79,6 @@ public:
 
     static unsigned int getDefaultCores();
 
-    Path nixPrefix;
-
     /**
      * The directory where we store sources and derived files.
      */
