@@ -213,7 +213,6 @@ prefix = get_option('prefix')
 # it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
-  'datadir',
   'mandir',
   'libdir',
   'includedir',
@@ -253,7 +252,6 @@ endif
 # (which is the default for store-dir, localstatedir, and log-dir).
 configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
 configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
 # On Windows, NIX_CONF_DIR is determined at runtime using the Windows known
