@@ -83,8 +83,8 @@ void initPlugins()
                 checkInterrupt();
                 pluginFiles.emplace_back(ent.path());
             }
-        } catch (SysError & e) {
-            if (e.errNo != ENOTDIR)
+        } catch (SystemError & e) {
+            if (!e.is(std::errc::not_a_directory))
                 throw;
             pluginFiles.emplace_back(pluginFile);
         }
@@ -95,7 +95,7 @@ void initPlugins()
 #ifndef _WIN32 // TODO implement via DLL loading on Windows
             void * handle = dlopen(file.c_str(), RTLD_LAZY | RTLD_LOCAL);
             if (!handle)
-                throw Error("could not dynamically open plugin file '%s': %s", file, dlerror());
+                throw Error("could not dynamically open plugin file %s: %s", PathFmt(file), dlerror());
 
             /* Older plugins use a statically initialized object to run their code.
                Newer plugins can also export nix_plugin_entry() */
@@ -103,7 +103,7 @@ void initPlugins()
             if (nix_plugin_entry)
                 nix_plugin_entry();
 #else
-            throw Error("could not dynamically open plugin file '%s'", file);
+            throw Error("could not dynamically open plugin file %s", PathFmt(file));
 #endif
         }
     }

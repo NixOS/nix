@@ -115,10 +115,10 @@ restart:
             *fdRootsSocket = createUnixDomainSocket();
             try {
                 nix::connect(toSocket(fdRootsSocket->get()), socketPath);
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 /* The garbage collector may have exited or not
                    created the socket yet, so we need to restart. */
-                if (e.errNo == ECONNREFUSED || e.errNo == ENOENT) {
+                if (e.is(std::errc::connection_refused) || e.is(std::errc::no_such_file_or_directory)) {
                     debug("GC socket connection refused: %s", e.msg());
                     fdRootsSocket->close();
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -135,10 +135,10 @@ restart:
             readFull(fdRootsSocket->get(), &c, 1);
             assert(c == '1');
             debug("got ack for GC root '%s'", printStorePath(path));
-        } catch (SysError & e) {
+        } catch (SystemError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
-            if (e.errNo == EPIPE || e.errNo == ECONNRESET) {
+            if (e.is(std::errc::broken_pipe) || e.is(std::errc::connection_reset)) {
                 debug("GC socket disconnected");
                 fdRootsSocket->close();
                 goto restart;
@@ -280,9 +280,10 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             throw;
     }
 
-    catch (SysError & e) {
+    catch (SystemError & e) {
         /* We only ignore permanent failures. */
-        if (e.errNo == EACCES || e.errNo == ENOENT || e.errNo == ENOTDIR)
+        if (e.is(std::errc::permission_denied) || e.is(std::errc::no_such_file_or_directory)
+            || e.is(std::errc::not_a_directory))
             printInfo("cannot read potential root '%1%'", path);
         else
             throw;
@@ -347,8 +348,8 @@ static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & r
 {
     try {
         roots[readFile(path)].emplace(path.string());
-    } catch (SysError & e) {
-        if (e.errNo != ENOENT && e.errNo != EACCES)
+    } catch (SystemError & e) {
+        if (!e.is(std::errc::no_such_file_or_directory) && !e.is(std::errc::permission_denied))
             throw;
     }
 }

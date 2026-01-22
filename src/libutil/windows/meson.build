@@ -4,6 +4,7 @@ sources += files(
   'file-descriptor.cc',
   'file-path.cc',
   'file-system.cc',
+  'known-folders.cc',
   'muxable-pipe.cc',
   'os-string.cc',
   'processes.cc',

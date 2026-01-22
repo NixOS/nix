@@ -471,6 +471,40 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
     }
 }
 
+StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
+{
+    if (!settings.useSubstitutes)
+        return StorePathSet();
+
+    StorePathSet remaining;
+    for (auto & i : paths)
+        remaining.insert(i);
+
+    StorePathSet res;
+
+    for (auto & sub : getDefaultSubstituters()) {
+        if (remaining.empty())
+            break;
+        if (sub->storeDir != storeDir)
+            continue;
+        if (!sub->config.wantMassQuery)
+            continue;
+
+        auto valid = sub->queryValidPaths(remaining);
+
+        StorePathSet remaining2;
+        for (auto & path : remaining)
+            if (valid.count(path))
+                res.insert(path);
+            else
+                remaining2.insert(path);
+
+        std::swap(remaining, remaining2);
+    }
+
+    return res;
+}
+
 bool Store::isValidPath(const StorePath & storePath)
 {
     auto res = pathInfoCache->lock()->get(storePath);

@@ -232,8 +232,6 @@ public:
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
-
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
     bool realisationIsUntrusted(const Realisation &) override;
 
@@ -370,7 +368,7 @@ public:
 
     void vacuumDB();
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     /**
      * If free disk space in /nix/store if below minFree, delete

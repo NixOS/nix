@@ -103,7 +103,7 @@ static void removeFile(const std::filesystem::path & path)
     try {
         std::filesystem::remove(path);
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("removing file '%1%'", path);
+        throw SysError("removing file %1%", PathFmt(path));
     }
 }
 
@@ -141,7 +141,7 @@ void deleteGenerations(
     auto [gens, curGen] = findGenerations(profile);
 
     if (gensToDelete.count(*curGen))
-        throw Error("cannot delete current version of profile %1%'", profile);
+        throw Error("cannot delete current version of profile %1%", PathFmt(profile));
 
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number))
@@ -282,7 +282,7 @@ void switchGeneration(const std::filesystem::path & profile, std::optional<Gener
 
 void lockProfile(PathLocks & lock, const std::filesystem::path & profile)
 {
-    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
+    lock.lockPaths({profile}, fmt("waiting for lock on profile %1%", PathFmt(profile)));
     lock.setDeletion(true);
 }
 

@@ -14,7 +14,7 @@ void setWriteTime(
     // doesn't support access time just modification time.
     //
     // System clock vs File clock issues also make that annoying.
-    warn("Changing file times is not yet implemented on Windows, path is %s", path);
+    warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
 Descriptor openDirectory(const std::filesystem::path & path)
@@ -55,7 +55,7 @@ void deletePath(const std::filesystem::path & path)
     std::error_code ec;
     std::filesystem::remove_all(path, ec);
     if (ec && ec != std::errc::no_such_file_or_directory)
-        throw SysError(ec.default_error_condition().value(), "recursively deleting %1%", path);
+        throw SysError(ec.default_error_condition().value(), "recursively deleting %1%", PathFmt(path));
 }
 
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)

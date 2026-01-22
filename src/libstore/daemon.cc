@@ -339,17 +339,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::HasSubstitutes: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        StorePathSet paths; // FIXME
-        paths.insert(path);
-        auto res = store->querySubstitutablePaths(paths);
-        logger->stopWork();
-        conn.to << (res.count(path) != 0);
-        break;
-    }
-
     case WorkerProto::Op::QuerySubstitutablePaths: {
         auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
@@ -359,26 +348,13 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryPathHash: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        auto hash = store->queryPathInfo(path)->narHash;
-        logger->stopWork();
-        conn.to << hash.to_string(HashFormat::Base16, false);
-        break;
-    }
-
-    case WorkerProto::Op::QueryReferences:
     case WorkerProto::Op::QueryReferrers:
     case WorkerProto::Op::QueryValidDerivers:
     case WorkerProto::Op::QueryDerivationOutputs: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         StorePathSet paths;
-        if (op == WorkerProto::Op::QueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
-                paths.insert(i);
-        else if (op == WorkerProto::Op::QueryReferrers)
+        if (op == WorkerProto::Op::QueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == WorkerProto::Op::QueryValidDerivers)
             paths = store->queryValidDerivers(path);
@@ -885,7 +861,7 @@ static void performOp(
 
     case WorkerProto::Op::AddSignatures: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        StringSet sigs = readStrings<StringSet>(conn.from);
+        auto sigs = WorkerProto::Serialise<std::set<Signature>>::read(*store, rconn);
         logger->startWork();
         store->addSignatures(path, sigs);
         logger->stopWork();
@@ -910,7 +886,7 @@ static void performOp(
         info.deriver = std::move(deriver);
         info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         conn.from >> info.registrationTime >> info.narSize >> info.ultimate;
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(*store, rconn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
         conn.from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
@@ -1011,10 +987,6 @@ static void performOp(
         conn.to << 1;
         break;
     }
-
-    case WorkerProto::Op::QueryFailedPaths:
-    case WorkerProto::Op::ClearFailedPaths:
-        throw Error("Removed operation %1%", op);
 
     default:
         throw Error("invalid operation %1%", op);

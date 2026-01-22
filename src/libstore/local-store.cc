@@ -187,9 +187,9 @@ LocalStore::LocalStore(ref<const Config> config)
         while (path != root) {
             if (std::filesystem::is_symlink(path))
                 throw Error(
-                    "the path '%1%' is a symlink; "
+                    "the path %1% is a symlink; "
                     "this is not allowed for the Nix store and its parent directories",
-                    path);
+                    PathFmt(path));
             path = path.parent_path();
         }
     }
@@ -234,8 +234,8 @@ LocalStore::LocalStore(ref<const Config> config)
         Path globalLockPath = dbDir + "/big-lock";
         try {
             globalLock = openLockFile(globalLockPath.c_str(), true);
-        } catch (SysError & e) {
-            if (e.errNo == EACCES || e.errNo == EPERM) {
+        } catch (SystemError & e) {
+            if (e.is(std::errc::permission_denied) || e.is(std::errc::operation_not_permitted)) {
                 e.addTrace(
                     {},
                     "This command may have been run as non-root in a single-user Nix installation,\n"
@@ -619,7 +619,8 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
                 state->stmts->UpdateRealisedOutput
-                    .use()(concatStringsSep(" ", combinedSignatures))(info.id.strHash())(info.id.outputName)
+                    .use()(concatStringsSep(" ", Signature::toStrings(combinedSignatures)))(info.id.strHash())(
+                        info.id.outputName)
                     .exec();
             } else {
                 throw Error(
@@ -634,7 +635,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
         } else {
             state->stmts->RegisterRealisedOutput
                 .use()(info.id.strHash())(info.id.outputName)(printStorePath(info.outPath))(
-                    concatStringsSep(" ", info.signatures))
+                    concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
     });
@@ -659,7 +660,8 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
             info.registrationTime == 0 ? time(0) : info.registrationTime)(
             info.deriver ? printStorePath(*info.deriver) : "",
             (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
-            concatStringsSep(" ", info.sigs), !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
+            concatStringsSep(" ", Signature::toStrings(info.sigs)),
+            !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -737,7 +739,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 6);
     if (s)
-        info->sigs = tokenizeString<StringSet>(s, " ");
+        info->sigs = Signature::parseMany(tokenizeString<StringSet>(s, " "));
 
     s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
     if (s)
@@ -757,7 +759,8 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo
         .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(
-            info.ultimate ? 1 : 0, info.ultimate)(concatStringsSep(" ", info.sigs), !info.sigs.empty())(
+            info.ultimate ? 1 : 0,
+            info.ultimate)(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())(
             renderContentAddress(info.ca), (bool) info.ca)(printStorePath(info.path))
         .exec();
 }
@@ -865,40 +868,6 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
             return parseStorePath(s);
         return {};
     });
-}
-
-StorePathSet LocalStore::querySubstitutablePaths(const StorePathSet & paths)
-{
-    if (!settings.useSubstitutes)
-        return StorePathSet();
-
-    StorePathSet remaining;
-    for (auto & i : paths)
-        remaining.insert(i);
-
-    StorePathSet res;
-
-    for (auto & sub : getDefaultSubstituters()) {
-        if (remaining.empty())
-            break;
-        if (sub->storeDir != storeDir)
-            continue;
-        if (!sub->config.wantMassQuery)
-            continue;
-
-        auto valid = sub->queryValidPaths(remaining);
-
-        StorePathSet remaining2;
-        for (auto & path : remaining)
-            if (valid.count(path))
-                res.insert(path);
-            else
-                remaining2.insert(path);
-
-        std::swap(remaining, remaining2);
-    }
-
-    return res;
 }
 
 void LocalStore::registerValidPath(const ValidPathInfo & info)
@@ -1335,15 +1304,16 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
         for (auto & link : DirectoryIterator{linksDir}) {
             checkInterrupt();
             auto name = link.path().filename();
-            printMsg(lvlTalkative, "checking contents of %s", name);
+            printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
             std::string hash =
                 hashPath(makeFSSourceAccessor(link.path()), FileIngestionMethod::NixArchive, HashAlgorithm::SHA256)
                     .first.to_string(HashFormat::Nix32, false);
             if (hash != name.string()) {
-                printError("link %s was modified! expected hash %s, got '%s'", link.path(), name, hash);
+                printError(
+                    "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
                 if (repair) {
                     std::filesystem::remove(link.path());
-                    printInfo("removed link %s", link.path());
+                    printInfo("removed link %s", PathFmt(link.path()));
                 } else {
                     errors = true;
                 }
@@ -1518,7 +1488,7 @@ void LocalStore::vacuumDB()
     _state->lock()->db.exec("vacuum");
 }
 
-void LocalStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     retrySQLite<void>([&]() {
         auto state(_state->lock());
@@ -1549,7 +1519,7 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
         {realisationDbId,
          UnkeyedRealisation{
              .outPath = outputPath,
-             .signatures = signatures,
+             .signatures = Signature::parseMany(signatures),
          }}};
 }
 
@@ -1598,7 +1568,7 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
 
-    writeFile(tmpFile, compress("bzip2", log));
+    writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
 
     std::filesystem::rename(tmpFile, logPath);
 }

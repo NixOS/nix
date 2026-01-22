@@ -21,6 +21,14 @@ std::optional<std::string> getEnvNonEmpty(const std::string & key)
     return value;
 }
 
+std::optional<OsString> getEnvOsNonEmpty(const OsString & key)
+{
+    auto value = getEnvOs(key);
+    if (value == OS_STR(""))
+        return {};
+    return value;
+}
+
 StringMap getEnv()
 {
     StringMap env;

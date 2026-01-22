@@ -137,9 +137,9 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
                 if (i.first != i.second.source)
                     throw Error(
-                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
-                        i.first,
-                        i.second.source);
+                        "can't map %1% to %2%: mismatched impure paths not supported on Darwin",
+                        PathFmt(i.first),
+                        PathFmt(i.second.source));
 
                 std::string path = i.first;
                 auto optSt = maybeLstat(path.c_str());

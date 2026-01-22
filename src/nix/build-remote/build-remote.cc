@@ -264,8 +264,8 @@ static int main_build_remote(int argc, char ** argv)
             };
             try {
                 setUpdateLock(storeUri);
-            } catch (SysError & e) {
-                if (e.errNo != ENAMETOOLONG)
+            } catch (SystemError & e) {
+                if (!e.is(std::errc::filename_too_long))
                     throw;
                 // Try again hashing the store URL so we have a shorter path
                 auto h = hashString(HashAlgorithm::MD5, storeUri);

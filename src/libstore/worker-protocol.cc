@@ -300,7 +300,7 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
     conn.from >> info.registrationTime >> info.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
         conn.from >> info.ultimate;
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
     return info;
@@ -314,7 +314,9 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     WorkerProto::write(store, conn, pathInfo.references);
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
-        conn.to << pathInfo.ultimate << pathInfo.sigs << renderContentAddress(pathInfo.ca);
+        conn.to << pathInfo.ultimate;
+        WorkerProto::write(store, conn, pathInfo.sigs);
+        conn.to << renderContentAddress(pathInfo.ca);
     }
 }
 

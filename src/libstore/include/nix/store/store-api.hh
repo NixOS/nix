@@ -497,10 +497,7 @@ public:
     /**
      * Query which of the given paths have substitutes.
      */
-    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths)
-    {
-        return {};
-    };
+    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths);
 
     /**
      * Query substitute info (i.e. references, derivers and download
@@ -757,7 +754,7 @@ public:
      * Add signatures to the specified store path. The signatures are
      * not verified.
      */
-    virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
+    virtual void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
     {
         unsupported("addSignatures");
     }

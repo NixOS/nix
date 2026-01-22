@@ -70,7 +70,9 @@ INSTANTIATE_TEST_SUITE_P(
             [&] {
                 auto r = simple;
                 // FIXME actually sign properly
-                r.signatures = {"asdfasdfasdf"};
+                r.signatures = {
+                    Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                };
                 return r;
             }(),
         }));

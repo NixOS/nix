@@ -157,24 +157,20 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     return res;
 }
 
-static SourcePath realisePath(
-    EvalState & state,
-    const PosIdx pos,
-    Value & v,
-    std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full)
+SourcePath EvalState::realisePath(const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks)
 {
     NixStringContext context;
 
-    auto path = state.coerceToPath(noPos, v, context, "while realising the context of a path");
+    auto path = coerceToPath(noPos, v, context, "while realising the context of a path");
 
     try {
-        if (!context.empty() && path.accessor == state.rootFS) {
-            auto rewrites = state.realiseContext(context);
+        if (!context.empty() && path.accessor == rootFS) {
+            auto rewrites = realiseContext(context);
             path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
-        e.addTrace(state.positions[pos], "while realising the context of path '%s'", path);
+        e.addTrace(positions[pos], "while realising the context of path '%s'", path);
         throw;
     }
 }
@@ -294,7 +290,7 @@ static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path,
    argument. */
 static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = realisePath(state, pos, vPath, std::nullopt);
+    auto path = state.realisePath(pos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
     // FIXME
@@ -447,7 +443,7 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 /* Load a ValueInitializer from a DSO and return whatever it initializes */
 void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
 
     std::string sym(
         state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -1971,7 +1967,7 @@ static void prim_pathExists(EvalState & state, const PosIdx pos, Value ** args, 
             arg.type() == nString && (arg.string_view().ends_with("/") || arg.string_view().ends_with("/."));
 
         auto symlinkResolution = mustBeDir ? SymlinkResolution::Full : SymlinkResolution::Ancestors;
-        auto path = realisePath(state, pos, arg, symlinkResolution);
+        auto path = state.realisePath(pos, arg, symlinkResolution);
 
         auto st = path.maybeLstat();
         auto exists = st && (!mustBeDir || st->type == SourceAccessor::tDirectory);
@@ -2078,7 +2074,7 @@ static RegisterPrimOp primop_dirOf({
 /* Return the contents of a file as a string. */
 static void prim_readFile(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
     auto s = path.readFile();
     if (s.find((char) 0) != std::string::npos)
         state.error<EvalError>("the contents of the file '%1%' cannot be represented as a Nix string", path)
@@ -2313,7 +2309,7 @@ static void prim_hashFile(EvalState & state, const PosIdx pos, Value ** args, Va
     if (!ha)
         state.error<EvalError>("unknown hash algorithm '%1%'", algo).atPos(pos).debugThrow();
 
-    auto path = realisePath(state, pos, *args[1]);
+    auto path = state.realisePath(pos, *args[1]);
 
     v.mkString(hashString(*ha, path.readFile()).to_string(HashFormat::Base16, false), state.mem);
 }
@@ -2365,7 +2361,7 @@ static const Value & fileTypeToString(EvalState & state, SourceAccessor::Type ty
 
 static void prim_readFileType(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0], std::nullopt);
+    auto path = state.realisePath(pos, *args[0], std::nullopt);
     /* Retrieve the directory entry type and stringize it. */
     v = fileTypeToString(state, path.lstat().type);
 }
@@ -2383,7 +2379,7 @@ static RegisterPrimOp primop_readFileType({
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = realisePath(state, pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0]);
 
     // Retrieve directory entries for all nodes in a directory.
     // This is similar to `getFileType` but is optimized to reduce system calls

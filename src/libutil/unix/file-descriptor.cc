@@ -8,10 +8,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
+#include <span>
+
+#if defined(__linux__)
+#  include <sys/syscall.h> /* pull __NR_* definitions */
+#endif
 
 #if defined(__linux__) && defined(__NR_openat2)
 #  define HAVE_OPENAT2 1
-#  include <sys/syscall.h>
 #  include <linux/openat2.h>
 #else
 #  define HAVE_OPENAT2 0
@@ -161,6 +165,14 @@ void drainFD(int fd, Sink & sink, bool block)
         else
             sink({reinterpret_cast<char *>(buf.data()), (size_t) rd});
     }
+}
+
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
+{
+    ssize_t n = pread(fd, buffer.data(), buffer.size(), offset);
+    if (n == -1)
+        throw SysError("pread of %1% bytes at offset %2%", buffer.size(), offset);
+    return static_cast<size_t>(n);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -399,7 +411,7 @@ Descriptor unix::openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPa
 {
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
     assert(!path.isRoot());
-#ifdef __linux__
+#if HAVE_OPENAT2
     auto maybeFd = linux::openat2(
         dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
     if (maybeFd) {

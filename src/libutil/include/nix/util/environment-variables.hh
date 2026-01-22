@@ -13,8 +13,6 @@
 
 namespace nix {
 
-static constexpr auto environmentVariablesCategory = "Options that change environment variables";
-
 /**
  * @return an environment variable.
  */
@@ -30,6 +28,12 @@ std::optional<OsString> getEnvOs(const OsString & key);
  * variable is set to ""
  */
 std::optional<std::string> getEnvNonEmpty(const std::string & key);
+
+/**
+ * Like `getEnvNonEmpty`, but using `OsString` to avoid coercions.
+ * Returns nullopt if the env variable is not set or set to "".
+ */
+std::optional<OsString> getEnvOsNonEmpty(const OsString & key);
 
 /**
  * Get the entire environment.

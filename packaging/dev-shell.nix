@@ -300,7 +300,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             lib.filter (x: !isInternal x) (
               lib.lists.concatMap (
                 # Nix manual has a build-time dependency on nix, but we
-                # don't want to do a native build just to enter the ross
+                # don't want to do a native build just to enter the cross
                 # dev shell.
                 #
                 # TODO: think of a more principled fix for this.

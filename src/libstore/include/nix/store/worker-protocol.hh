@@ -142,9 +142,9 @@ struct WorkerProto
 
 enum struct WorkerProto::Op : uint64_t {
     IsValidPath = 1,
-    HasSubstitutes = 3,
-    QueryPathHash = 4,   // obsolete
-    QueryReferences = 5, // obsolete
+    // HasSubstitutes = 3, // removed
+    // QueryPathHash = 4, // removed
+    // QueryReferences = 5, // removed
     QueryReferrers = 6,
     AddToStore = 7,
     AddTextToStore = 8, // obsolete since 1.25, Nix 3.0. Use WorkerProto::Op::AddToStore
@@ -161,8 +161,8 @@ enum struct WorkerProto::Op : uint64_t {
     QuerySubstitutablePathInfo = 21,
     QueryDerivationOutputs = 22, // obsolete
     QueryAllValidPaths = 23,
-    QueryFailedPaths = 24,
-    ClearFailedPaths = 25,
+    // QueryFailedPaths = 24, // removed
+    // ClearFailedPaths = 25, // removed
     QueryPathInfo = 26,
     // ImportPaths = 27, // removed
     QueryDerivationOutputNames = 28, // obsolete

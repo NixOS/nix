@@ -721,7 +721,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                             worker.store.toStorePath(i.second.source.string()).first, closure);
                 } catch (InvalidPath & e) {
                 } catch (Error & e) {
-                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    e.addTrace({}, "while processing sandbox path %s", PathFmt(i.second.source));
                     throw;
                 }
             for (auto & i : closure) {
@@ -1028,8 +1028,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         else if (reply != "accept")
             throw Error("bad hook reply '%s'", reply);
 
-    } catch (SysError & e) {
-        if (e.errNo == EPIPE) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::broken_pipe)) {
             printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
             return rpDecline;

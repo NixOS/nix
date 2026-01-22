@@ -71,6 +71,13 @@ absPath(const std::filesystem::path & path, const std::filesystem::path * dir = 
  */
 Path canonPath(PathView path, bool resolveSymlinks = false);
 
+static inline Path canonPath(const Path & path, bool resolveSymlinks = false)
+{
+    return canonPath(PathView{path}, resolveSymlinks);
+}
+
+std::filesystem::path canonPath(const std::filesystem::path & path, bool resolveSymlinks = false);
+
 /**
  * @return The directory part of the given canonical path, i.e.,
  * everything before the final `/`.  If the path is the root or an

@@ -27,8 +27,8 @@
     ],
     "registrationTime": null,
     "signatures": [
-      "fake-sig-1",
-      "fake-sig-2"
+      "fake-sig-1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "fake-sig-2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
     ],
     "storeDir": "/nix/store",
     "ultimate": false,

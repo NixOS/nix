@@ -68,6 +68,29 @@ static inline int fromDescriptorReadOnly(Descriptor fd)
 std::string readFile(Descriptor fd);
 
 /**
+ * Platform-specific positioned read into a buffer.
+ *
+ * Thin wrapper around pread (Unix) or ReadFile with OVERLAPPED (Windows).
+ * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ *
+ * @param fd The file descriptor to read from (must be seekable)
+ * @param offset The offset to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer);
+
+/**
+ * Read \ref nbytes starting at \ref offset from a seekable file into a sink.
+ *
+ * @throws SystemError if fd is not seekable or any operation fails
+ * @throws Interrupted if the operation was interrupted
+ * @throws EndOfFile if an EOF was reached before reading \ref nbytes
+ */
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink);
+
+/**
  * Wrappers around read()/write() that read/write exactly the
  * requested number of bytes.
  */
