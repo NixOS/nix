@@ -1,4 +1,5 @@
 #include "nix/store/tests/https-store.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <thread>
 
@@ -80,13 +81,13 @@ void HttpsBinaryCacheStoreTest::SetUp()
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     /* FIXME: Don't use global settings. Tests are not run concurrently, so this is fine for now. */
-    oldCaCert = settings.caFile;
-    settings.caFile = caCert.string();
+    oldCaCert = fileTransferSettings.caFile;
+    fileTransferSettings.caFile = caCert.string();
 }
 
 void HttpsBinaryCacheStoreTest::TearDown()
 {
-    settings.caFile = oldCaCert;
+    fileTransferSettings.caFile = oldCaCert;
     serverPid.kill();
     delTmpDir.reset();
 }

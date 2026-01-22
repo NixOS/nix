@@ -19,6 +19,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <queue>
 
@@ -1253,6 +1254,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
+            .hashedMirrors = settings.hashedMirrors,
             .tmpDirInSandbox = tmpDirInSandbox(),
 #if NIX_WITH_AWS_AUTH
             .awsCredentials = args.awsCredentials,
@@ -1261,15 +1263,16 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
             try {
-                ctx.netrcData = readFile(settings.netrcFile);
+                ctx.netrcData = readFile(fileTransferSettings.netrcFile);
             } catch (SystemError &) {
             }
 
-            if (auto & caFile = settings.caFile.get())
+            if (auto & caFile = fileTransferSettings.caFile.get()) {
                 try {
                     ctx.caFileData = readFile(*caFile);
                 } catch (SystemError &) {
                 }
+            }
         }
 
         enterChroot();
@@ -1329,8 +1332,9 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         execBuilder(args, envStrs);
 
         throw SysError("executing '%1%'", drv.builder);
+    }
 
-    } catch (...) {
+    catch (...) {
         handleChildException(sendException);
         _exit(1);
     }
