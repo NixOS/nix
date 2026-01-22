@@ -175,7 +175,7 @@ struct LogFile
     AutoCloseFD fd;
     std::shared_ptr<BufferedSink> fileSink, sink;
 
-    LogFile(Store & store, const StorePath & drvPath);
+    LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings);
     ~LogFile();
 };
 
@@ -451,7 +451,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath);
+    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -635,7 +635,9 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     std::unique_ptr<BuildLog> buildLog;
     std::unique_ptr<LogFile> logFile;
 
-    auto openLogFile = [&]() { logFile = std::make_unique<LogFile>(worker.store, drvPath); };
+    auto openLogFile = [&]() {
+        logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+    };
 
     auto closeLogFile = [&]() { logFile.reset(); };
 
@@ -1041,9 +1043,9 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 #endif
 }
 
-LogFile::LogFile(Store & store, const StorePath & drvPath)
+LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings)
 {
-    if (!settings.keepLog)
+    if (!logSettings.keepLog)
         return;
 
     auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
@@ -1052,11 +1054,11 @@ LogFile::LogFile(Store & store, const StorePath & drvPath)
     if (auto localStore = dynamic_cast<LocalStore *>(&store))
         logDir = localStore->config->logDir;
     else
-        logDir = settings.nixLogDir;
+        logDir = logSettings.nixLogDir;
     Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), settings.compressLog ? ".bz2" : "");
+    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
 
     fd = toDescriptor(open(
         logFileName.c_str(),
@@ -1071,7 +1073,7 @@ LogFile::LogFile(Store & store, const StorePath & drvPath)
 
     fileSink = std::make_shared<FdSink>(fd.get());
 
-    if (settings.compressLog)
+    if (logSettings.compressLog)
         sink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *fileSink));
     else
         sink = fileSink;
