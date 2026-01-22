@@ -140,6 +140,7 @@ LocalStore::LocalStore(ref<const Config> config)
     createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = config->stateDir + "/gcroots";
+    const auto & gcSettings = settings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         replaceSymlink(profilesDir, gcRootsDir + "/profiles");
@@ -200,7 +201,7 @@ LocalStore::LocalStore(ref<const Config> config)
        before doing a garbage collection. */
     try {
         struct stat st;
-        if (stat(reservedPath.c_str(), &st) == -1 || st.st_size != settings.reservedSize) {
+        if (stat(reservedPath.c_str(), &st) == -1 || st.st_size != gcSettings.reservedSize) {
             AutoCloseFD fd = toDescriptor(open(
                 reservedPath.c_str(),
                 O_WRONLY | O_CREAT
@@ -211,16 +212,16 @@ LocalStore::LocalStore(ref<const Config> config)
                 0600));
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
-            res = posix_fallocate(fd.get(), 0, settings.reservedSize);
+            res = posix_fallocate(fd.get(), 0, gcSettings.reservedSize);
 #endif
             if (res == -1) {
-                writeFull(fd.get(), std::string(settings.reservedSize, 'X'));
+                writeFull(fd.get(), std::string(gcSettings.reservedSize, 'X'));
                 [[gnu::unused]] auto res2 =
 
 #ifdef _WIN32
                     SetEndOfFile(fd.get())
 #else
-                    ftruncate(fd.get(), settings.reservedSize)
+                    ftruncate(fd.get(), gcSettings.reservedSize)
 #endif
                     ;
             }
@@ -436,6 +437,11 @@ LocalStore::~LocalStore()
     } catch (...) {
         ignoreExceptionInDestructor();
     }
+}
+
+const GCSettings & LocalStoreConfig::getGCSettings() const
+{
+    return settings.getGCSettings();
 }
 
 StoreReference LocalStoreConfig::getReference() const
