@@ -562,7 +562,7 @@ ref<SourceAccessor> BinaryCacheStore::getFSAccessor(bool requireValidPath)
 
 std::shared_ptr<SourceAccessor> BinaryCacheStore::getFSAccessor(const StorePath & storePath, bool requireValidPath)
 {
-    return getRemoteFSAccessor(requireValidPath)->accessObject(storePath);
+    return static_cast<ref<SourceAccessor>>(getRemoteFSAccessor(requireValidPath)->accessObject(storePath));
 }
 
 void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
