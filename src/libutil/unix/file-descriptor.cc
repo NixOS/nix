@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
+#include <span>
 
 #if defined(__linux__)
 #  include <sys/syscall.h> /* pull __NR_* definitions */
@@ -166,27 +167,12 @@ void drainFD(int fd, Sink & sink, bool block)
     }
 }
 
-void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
 {
-    auto left = nbytes;
-    std::array<char, 64 * 1024> buf;
-
-    while (left) {
-        checkInterrupt();
-        auto limit = std::min<decltype(buf)::size_type>(left, buf.size());
-        ssize_t n = pread(fd, buf.data(), limit, offset);
-        if (n == -1) {
-            if (errno == EINTR)
-                continue;
-            throw SysError("pread of %1% bytes at offset %2%", left, offset);
-        }
-        if (n == 0)
-            throw EndOfFile("unexpected end-of-file");
-        assert(static_cast<size_t>(n) <= left);
-        sink(std::string_view(buf.data(), n));
-        offset += n;
-        left -= n;
-    }
+    ssize_t n = pread(fd, buffer.data(), buffer.size(), offset);
+    if (n == -1)
+        throw SysError("pread of %1% bytes at offset %2%", buffer.size(), offset);
+    return static_cast<size_t>(n);
 }
 
 //////////////////////////////////////////////////////////////////////

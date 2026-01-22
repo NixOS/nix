@@ -4,6 +4,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-path.hh"
 
+#include <span>
+
 #include <fileapi.h>
 #include <error.h>
 #include <namedpipeapi.h>
@@ -99,28 +101,16 @@ void drainFD(HANDLE handle, Sink & sink /*, bool block*/)
     }
 }
 
-void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
 {
-    auto left = nbytes;
-    std::array<char, 64 * 1024> buf;
-
-    while (left) {
-        checkInterrupt();
-        auto limit = std::min<decltype(buf)::size_type>(left, buf.size());
-        OVERLAPPED ov = {};
-        ov.Offset = static_cast<DWORD>(offset);
-        if constexpr (sizeof(offset) > 4) /* We don't build with 32 bit off_t, but let's be safe. */
-            ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
-        DWORD n;
-        if (!ReadFile(fd, buf.data(), static_cast<DWORD>(limit), &n, &ov))
-            throw nix::windows::WinError("ReadFile of %1% bytes at offset %2%", left, offset);
-        if (n == 0)
-            throw EndOfFile("unexpected end-of-file");
-        assert(static_cast<size_t>(n) <= left);
-        sink(std::string_view(buf.data(), n));
-        offset += n;
-        left -= n;
-    }
+    OVERLAPPED ov = {};
+    ov.Offset = static_cast<DWORD>(offset);
+    if constexpr (sizeof(offset) > 4) /* We don't build with 32 bit off_t, but let's be safe. */
+        ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
+    DWORD n;
+    if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov))
+        throw WinError("ReadFile of %1% bytes at offset %2%", buffer.size(), offset);
+    return static_cast<size_t>(n);
 }
 
 //////////////////////////////////////////////////////////////////////
