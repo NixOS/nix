@@ -450,6 +450,11 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
 
             if (request.data) {
+                // Restart the source to ensure it's at the beginning.
+                // This is necessary for retries, where the source was
+                // already consumed by a previous attempt.
+                request.data->source->restart();
+
                 if (request.method == HttpMethod::Post) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->sizeHint);
