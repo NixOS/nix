@@ -458,7 +458,8 @@ static void handleDiffHook(
                 .gid = gid,
                 .chdir = "/"});
         if (!statusOk(diffRes.first))
-            throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
+            throw ExecError(
+                diffRes.first, "diff-hook program %s %2%", PathFmt(diffHook), statusToString(diffRes.first));
 
         if (diffRes.second != "")
             printError(chomp(diffRes.second));
@@ -1263,10 +1264,11 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
             } catch (SystemError &) {
             }
 
-            try {
-                ctx.caFileData = readFile(settings.caFile);
-            } catch (SystemError &) {
-            }
+            if (auto & caFile = settings.caFile.get())
+                try {
+                    ctx.caFileData = readFile(*caFile);
+                } catch (SystemError &) {
+                }
         }
 
         enterChroot();
