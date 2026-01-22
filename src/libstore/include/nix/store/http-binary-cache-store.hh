@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/types.hh"
 #include "nix/util/url.hh"
 #include "nix/store/binary-cache-store.hh"
 #include "nix/store/filetransfer.hh"
@@ -35,6 +36,23 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
           Compression method for `log/*` files. It is recommended to
           use a compression method supported by most web browsers
           (e.g. `brotli`).
+        )"};
+
+    const Setting<StringMap> httpHeaders{
+        this,
+        {},
+        "http-headers",
+        R"(
+          Extra headers to append to all HTTP requests. Accepts a string
+          with header keys and values separated by `=` (e.g. `foo=bar`). Multiple headers 
+          should be separated by a space. May be URL encoded. For example:
+
+          ```bash
+          $ nix path-info \
+                --store http://cache.nixos.org?http-headers=foo=bar ...
+          $ nix path-info \
+                --store http://cache.nixos.org?http-headers=foo%3Dbar%20baz%3Dquux ...
+          ```
         )"};
 
     static const std::string name()
