@@ -24,8 +24,8 @@ inputs:
     description: "Github token"
     required: true
   use_cache:
-    description: "Whether to setup magic-nix-cache"
-    default: true
+    description: "Whether to setup github actions cache (not implemented currently)"
+    default: false
     required: false
 runs:
   using: "composite"
@@ -122,10 +122,3 @@ runs:
         source-url: ${{ inputs.experimental-installer-version != 'latest' && 'https://artifacts.nixos.org/experimental-installer/tag/${{ inputs.experimental-installer-version }}/${{ env.EXPERIMENTAL_INSTALLER_ARTIFACT }}' || '' }}
         nix-package-url: ${{ inputs.dogfood == 'true' && steps.download-nix-installer.outputs.tarball-path || (inputs.tarball_url || '') }}
         extra-conf: ${{ inputs.extra_nix_config }}
-    - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 # v13
-      if: ${{ inputs.use_cache == 'true' }}
-      with:
-        diagnostic-endpoint: ''
-        use-flakehub: false
-        use-gha-cache: true
-        source-revision: 93bcd50961a03a468b29fac9d96b7efd037cb507 # main
