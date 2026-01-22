@@ -901,12 +901,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                accounting.  */
         }
 
-        auto st = stat(linksDir);
         int64_t overhead =
 #ifdef _WIN32
             0
 #else
-            st.st_blocks * 512ULL
+            [&] {
+                auto st = stat(linksDir);
+                return st.st_blocks * 512ULL;
+            }()
 #endif
             ;
 

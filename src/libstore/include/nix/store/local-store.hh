@@ -40,7 +40,7 @@ private:
     /**
       Input for computing the build directory. See `getBuildDir()`.
      */
-    Setting<std::optional<Path>> buildDir{
+    Setting<std::optional<std::filesystem::path>> buildDir{
         this,
         std::nullopt,
         "build-dir",
@@ -67,7 +67,7 @@ private:
             See also the global [`build-dir`](@docroot@/command-ref/conf-file.md#conf-build-dir) setting.
         )"};
 public:
-    Path getBuildDir() const;
+    std::filesystem::path getBuildDir() const;
 };
 
 struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,

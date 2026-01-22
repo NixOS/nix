@@ -317,7 +317,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 
     //  Otherwise, create and bind to a Unix domain socket.
     else {
-        createDirs(dirOf(settings.nixDaemonSocketFile));
+        createDirs(settings.nixDaemonSocketFile.parent_path());
         fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
     }
 

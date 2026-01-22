@@ -5,6 +5,7 @@
 #include "nix/util/args.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
+#include "nix/util/executable-path.hh"
 #include "nix/util/signals.hh"
 
 #include <algorithm>
@@ -90,9 +91,24 @@ Settings::Settings()
     , nixConfDir(canonPath(getEnvOsNonEmpty(OS_STR("NIX_CONF_DIR"))
                                .transform([](auto && s) { return std::filesystem::path(s); })
                                .value_or(resolveNixConfDir())))
-    , nixUserConfFiles(getUserConfigFiles())
-    , nixDaemonSocketFile(
-          canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+    , nixUserConfFiles([] {
+        // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
+        auto nixConfFiles = getEnvOs(OS_STR("NIX_USER_CONF_FILES"));
+        if (nixConfFiles.has_value()) {
+            return ExecutablePath::parse(*nixConfFiles).directories;
+        }
+
+        // Use the paths specified by the XDG spec
+        std::vector<std::filesystem::path> files;
+        auto dirs = getConfigDirs();
+        for (auto & dir : dirs) {
+            files.insert(files.end(), dir / "nix.conf");
+        }
+        return files;
+    }())
+    , nixDaemonSocketFile(canonPath(getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))
+                                        .transform([](auto && s) { return std::filesystem::path(s); })
+                                        .value_or(nixStateDir / DEFAULT_SOCKET_PATH)))
 {
 #ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";
@@ -151,30 +167,13 @@ void loadConfFile(AbstractConfig & config)
 
     auto files = settings.nixUserConfFiles;
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        applyConfigFile(*file);
+        applyConfigFile(file->string());
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
     if (nixConfEnv.has_value()) {
         config.applyConfig(nixConfEnv.value(), "NIX_CONFIG");
     }
-}
-
-std::vector<Path> getUserConfigFiles()
-{
-    // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
-    auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
-    if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
-    }
-
-    // Use the paths specified by the XDG spec
-    std::vector<Path> files;
-    auto dirs = getConfigDirs();
-    for (auto & dir : dirs) {
-        files.insert(files.end(), (dir / "nix.conf").string());
-    }
-    return files;
 }
 
 unsigned int Settings::getDefaultCores()
@@ -276,7 +275,7 @@ bool Settings::isWSL1()
 #endif
 }
 
-Path Settings::getDefaultSSLCertFile()
+std::filesystem::path Settings::getDefaultSSLCertFile()
 {
     for (auto & fn :
          {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})

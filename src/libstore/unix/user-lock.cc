@@ -217,11 +217,11 @@ struct AutoUserLock : UserLock
 std::unique_ptr<UserLock> acquireUserLock(const std::string & userGroup, uid_t nrIds, bool useUserNamespace)
 {
     if (auto * uidSettings = settings.getAutoAllocateUidSettings()) {
-        auto userPoolDir = std::filesystem::path{settings.nixStateDir} / "userpool2";
+        auto userPoolDir = settings.nixStateDir / "userpool2";
         createDirs(userPoolDir);
         return AutoUserLock::acquire(userPoolDir, userGroup, nrIds, useUserNamespace, *uidSettings);
     } else {
-        auto userPoolDir = std::filesystem::path{settings.nixStateDir} / "userpool";
+        auto userPoolDir = settings.nixStateDir / "userpool";
         createDirs(userPoolDir);
         return SimpleUserLock::acquire(userPoolDir, userGroup);
     }
