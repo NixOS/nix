@@ -68,6 +68,13 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      */
     virtual ~BasicClientConnection();
 
+    /**
+     * A description of the remote store, used to populate the machine
+     * field for build activities forwarded from the remote daemon.
+     * When empty, build activities are forwarded without modification.
+     */
+    std::string remoteDescription;
+
     virtual void closeWrite() = 0;
 
     std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);

@@ -84,6 +84,14 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
+            // For actBuild activities, the second field (index 1) is the machine name.
+            // When builds are executed locally on the remote daemon, this field is empty.
+            // If we have a remoteDescription set, fill in the empty machine name so that
+            // consumers (like nix-output-monitor) can identify which remote host is building.
+            if (type == actBuild && !remoteDescription.empty() && fields.size() > 1
+                && fields[1].type == Logger::Field::tString && fields[1].s.empty()) {
+                fields[1].s = remoteDescription;
+            }
             logger->startActivity(act, lvl, type, s, fields, parent);
         }
 
