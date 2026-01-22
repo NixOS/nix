@@ -512,8 +512,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
-            if (settings.caFile != "")
-                curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
+            if (auto & caFile = settings.caFile.get())
+                curl_easy_setopt(req, CURLOPT_CAINFO, caFile->c_str());
 
 #if !defined(_WIN32)
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
