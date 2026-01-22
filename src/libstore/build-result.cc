@@ -75,6 +75,11 @@ static BuildResult::Failure::Status failureStatusFromString(std::string_view str
     throw Error("unknown built result failure status '%s'", str);
 }
 
+[[noreturn]] void BuildResult::Failure::rethrow() const
+{
+    throw BuildError(status, "%s", errorMsg);
+}
+
 } // namespace nix
 
 namespace nlohmann {
