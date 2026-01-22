@@ -507,6 +507,7 @@ template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
 template class BaseSetting<std::filesystem::path>;
 template class BaseSetting<std::optional<std::filesystem::path>>;
+template class BaseSetting<std::optional<std::string>>;
 
 PathSetting::PathSetting(
     Config * options,

@@ -30,7 +30,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     auto storeConfig = std::visit(
         overloaded{
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
-                auto stateDir = getOr(params, "state", settings.nixStateDir);
+                auto stateDir = getOr(params, "state", settings.nixStateDir.string());
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
                 else if (pathExists(settings.nixDaemonSocketFile))
