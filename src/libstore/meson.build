@@ -251,7 +251,6 @@ endif
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
-configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
 configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
