@@ -86,8 +86,6 @@ public:
      */
     Path nixStore;
 
-    Path nixDataDir; /* !!! fix */
-
     /**
      * The directory where we log various operations.
      */
