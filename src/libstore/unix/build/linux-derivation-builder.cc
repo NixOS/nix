@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #  include "nix/store/personality.hh"
+#  include "nix/store/filetransfer.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
 #  include "nix/util/logging.hh"
@@ -556,7 +557,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (pathExists(path))
                     ss.push_back(path);
 
-            if (auto & caFile = settings.caFile.get()) {
+            if (auto & caFile = fileTransferSettings.caFile.get()) {
                 if (pathExists(*caFile))
                     pathsInChroot.try_emplace(
                         "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile->native(), true), true);
