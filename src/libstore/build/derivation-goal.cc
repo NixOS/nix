@@ -312,7 +312,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
     }
 
-    co_return amDone(g->exitCode, g->ex);
+    co_return amDone(g->exitCode);
 }
 
 Goal::Co DerivationGoal::repairClosure()
@@ -501,13 +501,7 @@ Goal::Done DerivationGoal::doneFailure(BuildError ex)
 
     worker.updateProgress();
 
-    return Goal::doneFailure(
-        ecFailed,
-        BuildResult::Failure{
-            .status = ex.status,
-            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-        },
-        std::move(ex));
+    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix

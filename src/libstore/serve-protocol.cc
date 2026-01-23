@@ -18,13 +18,16 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
 {
     BuildResult res;
     BuildResult::Success success;
-    BuildResult::Failure failure;
+
+    // Temp variables for failure fields since BuildError uses methods
+    std::string errorMsg;
+    bool isNonDeterministic = false;
 
     auto status = ServeProto::Serialise<BuildResultStatus>::read(store, {conn.from});
-    conn.from >> failure.errorMsg;
+    conn.from >> errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
+        conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
@@ -38,8 +41,11 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
                 return std::move(success);
             },
             [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
-                failure.status = s;
-                return std::move(failure);
+                return BuildResult::Failure{{
+                    .status = s,
+                    .msg = HintFmt(std::move(errorMsg)),
+                    .isNonDeterministic = isNonDeterministic,
+                }};
             },
         },
         status);
@@ -70,7 +76,7 @@ void ServeProto::Serialise<BuildResult>::write(
         overloaded{
             [&](const BuildResult::Failure & failure) {
                 ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
-                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+                common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
                 ServeProto::write(store, {conn.to}, BuildResultStatus{success.status});

@@ -159,7 +159,7 @@ public:
     }
 
     /** The error message without "error: " prefixed to it. */
-    std::string message()
+    std::string message() const
     {
         return err.msg.str();
     }

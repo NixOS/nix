@@ -189,14 +189,14 @@ Goal::Done Goal::doneSuccess(BuildResult::Success success)
     return amDone(ecSuccess);
 }
 
-Goal::Done Goal::doneFailure(ExitCode result, BuildResult::Failure failure, std::optional<Error> ex)
+Goal::Done Goal::doneFailure(ExitCode result, BuildResult::Failure failure)
 {
     assert(result == ecFailed || result == ecNoSubstituters);
     buildResult.inner = std::move(failure);
-    return amDone(result, std::move(ex));
+    return amDone(result);
 }
 
-Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
+Goal::Done Goal::amDone(ExitCode result)
 {
     trace("done");
     assert(top_co);
@@ -204,11 +204,15 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
 
-    if (ex) {
-        if (!preserveException && !waiters.empty())
-            logError(ex->info());
-        else
-            this->ex = std::move(*ex);
+    // Log the failure if we have one and shouldn't preserve it.
+    // Only log for actual failures (ecFailed), not for ecNoSubstituters
+    // which indicates "couldn't substitute, will try building" - that's
+    // expected behavior, not an error.
+    if (result == ecFailed) {
+        if (auto * failure = buildResult.tryGetFailure()) {
+            if (!preserveException && !waiters.empty())
+                logError(failure->info());
+        }
     }
 
     for (auto & i : waiters) {

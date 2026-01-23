@@ -18,13 +18,13 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     worker.run(goals);
 
     StringSet failed;
-    std::optional<Error> ex;
+    BuildResult::Failure * failure = nullptr;
     for (auto & i : goals) {
-        if (i->ex) {
-            if (ex)
-                logError(i->ex->info());
+        if (auto * f = i->buildResult.tryGetFailure()) {
+            if (failure)
+                logError(f->info());
             else
-                ex = std::move(i->ex);
+                failure = f;
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
@@ -34,12 +34,12 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         }
     }
 
-    if (failed.size() == 1 && ex) {
-        ex->withExitStatus(worker.failingExitStatus());
-        throw std::move(*ex);
+    if (failed.size() == 1 && failure) {
+        failure->withExitStatus(worker.failingExitStatus());
+        throw *failure;
     } else if (!failed.empty()) {
-        if (ex)
-            logError(ex->info());
+        if (failure)
+            logError(failure->info());
         throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
@@ -88,10 +88,11 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         worker.run(Goals{goal});
         return goal->buildResult;
     } catch (Error & e) {
-        return BuildResult{.inner{BuildResult::Failure{
-            .status = BuildResult::Failure::MiscFailure,
-            .errorMsg = e.msg(),
-        }}};
+        return BuildResult{
+            .inner = BuildResult::Failure{{
+                .status = BuildResult::Failure::MiscFailure,
+                .msg = e.msg(),
+            }}};
     };
 }
 
@@ -108,12 +109,8 @@ void Store::ensurePath(const StorePath & path)
     worker.run(goals);
 
     if (goal->exitCode != Goal::ecSuccess) {
-        if (goal->ex) {
-            goal->ex->withExitStatus(worker.failingExitStatus());
-            throw std::move(*goal->ex);
-        } else
-            throw Error(
-                worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+        goal->buildResult.tryThrowBuildError();
+        throw Error(worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
 

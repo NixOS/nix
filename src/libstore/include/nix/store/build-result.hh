@@ -7,6 +7,8 @@
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/json-impls.hh"
 
 namespace nix {
@@ -50,6 +52,70 @@ enum struct BuildResultFailureStatus : uint8_t {
     HashMismatch,
 };
 
+/**
+ * Denotes a permanent build failure.
+ *
+ * This is both an exception type (inherits from Error) and serves as
+ * the failure variant in BuildResult::inner.
+ */
+struct BuildError : public Error
+{
+    using Status = BuildResultFailureStatus;
+    using enum Status;
+
+    Status status = MiscFailure;
+
+    /**
+     * If timesBuilt > 1, whether some builds did not produce the same
+     * result. (Note that 'isNonDeterministic = false' does not mean
+     * the build is deterministic, just that we don't have evidence of
+     * non-determinism.)
+     */
+    bool isNonDeterministic = false;
+
+public:
+    /**
+     * Variadic constructor for throwing with format strings.
+     * Delegates to the string constructor after formatting.
+     */
+    template<typename... Args>
+    BuildError(Status status, const Args &... args)
+        : Error(args...)
+        , status{status}
+    {
+    }
+
+    struct Args
+    {
+        Status status;
+        HintFmt msg;
+        bool isNonDeterministic = false;
+    };
+
+    /**
+     * Constructor taking a pre-formatted error message.
+     * Also used for deserialization.
+     */
+    BuildError(Args args)
+        : Error(std::move(args.msg))
+        , status{args.status}
+        , isNonDeterministic{args.isNonDeterministic}
+
+    {
+    }
+
+    /**
+     * Default constructor for deserialization.
+     */
+    BuildError()
+        : Error("")
+    {
+    }
+
+    bool operator==(const BuildError &) const noexcept;
+    std::strong_ordering operator<=>(const BuildError &) const noexcept;
+};
+
 struct BuildResult
 {
     struct Success
@@ -68,33 +134,10 @@ struct BuildResult
         std::strong_ordering operator<=>(const BuildResult::Success &) const noexcept;
     };
 
-    struct Failure
-    {
-        using Status = enum BuildResultFailureStatus;
-        using enum Status;
-        Status status = MiscFailure;
-
-        /**
-         * Information about the error if the build failed.
-         *
-         * @todo This should be an entire ErrorInfo object, not just a
-         * string, for richer information.
-         */
-        std::string errorMsg;
-
-        /**
-         * If timesBuilt > 1, whether some builds did not produce the same
-         * result. (Note that 'isNonDeterministic = false' does not mean
-         * the build is deterministic, just that we don't have evidence of
-         * non-determinism.)
-         */
-        bool isNonDeterministic = false;
-
-        bool operator==(const BuildResult::Failure &) const noexcept;
-        std::strong_ordering operator<=>(const BuildResult::Failure &) const noexcept;
-
-        [[noreturn]] void rethrow() const;
-    };
+    /**
+     * Failure is now an alias for BuildError.
+     */
+    using Failure = BuildError;
 
     std::variant<Success, Failure> inner = Failure{};
 
@@ -119,6 +162,19 @@ struct BuildResult
     }
 
     /**
+     * Throw the build error if this result represents a failure.
+     * Optionally set the exit status on the error before throwing.
+     */
+    void tryThrowBuildError(std::optional<unsigned int> exitStatus = std::nullopt)
+    {
+        if (auto * failure = tryGetFailure()) {
+            if (exitStatus)
+                failure->withExitStatus(*exitStatus);
+            throw *failure;
+        }
+    }
+
+    /**
      * How many times this build was performed.
      */
     unsigned int timesBuilt = 0;
@@ -136,20 +192,6 @@ struct BuildResult
 
     bool operator==(const BuildResult &) const noexcept;
     std::strong_ordering operator<=>(const BuildResult &) const noexcept;
-};
-
-/**
- * denotes a permanent build failure
- */
-struct BuildError : public Error
-{
-    BuildResult::Failure::Status status;
-
-    BuildError(BuildResult::Failure::Status status, auto &&... args)
-        : Error{args...}
-        , status{status}
-    {
-    }
 };
 
 /**
