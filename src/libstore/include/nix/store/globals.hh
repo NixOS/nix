@@ -143,7 +143,42 @@ struct GCSettings : public virtual Config
     };
 };
 
-class Settings : public virtual Config, private GCSettings
+struct LogFileSettings : public virtual Config
+{
+    /**
+     * The directory where we log various operations.
+     */
+    const Path nixLogDir;
+
+protected:
+    LogFileSettings();
+
+public:
+    Setting<bool> keepLog{
+        this,
+        true,
+        "keep-build-log",
+        R"(
+          If set to `true` (the default), Nix writes the build log of a
+          derivation (i.e. the standard output and error of its builder) to
+          the directory `/nix/var/log/nix/drvs`. The build log can be
+          retrieved using the command `nix-store -l path`.
+        )",
+        {"build-keep-log"}};
+
+    Setting<bool> compressLog{
+        this,
+        true,
+        "compress-build-log",
+        R"(
+          If set to `true` (the default), build logs written to
+          `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
+          Otherwise, they are not compressed.
+        )",
+        {"build-compress-log"}};
+};
+
+class Settings : public virtual Config, private GCSettings, private LogFileSettings
 {
 
     StringSet getDefaultSystemFeatures();
@@ -171,17 +206,25 @@ public:
         return *this;
     }
 
+    /**
+     * Get the log file settings.
+     */
+    LogFileSettings & getLogFileSettings()
+    {
+        return *this;
+    }
+
+    const LogFileSettings & getLogFileSettings() const
+    {
+        return *this;
+    }
+
     static unsigned int getDefaultCores();
 
     /**
      * The directory where we store sources and derived files.
      */
     Path nixStore;
-
-    /**
-     * The directory where we log various operations.
-     */
-    Path nixLogDir;
 
     /**
      * The directory where state is stored.
@@ -655,29 +698,6 @@ public:
         "impersonate-linux-26",
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
-
-    Setting<bool> keepLog{
-        this,
-        true,
-        "keep-build-log",
-        R"(
-          If set to `true` (the default), Nix writes the build log of a
-          derivation (i.e. the standard output and error of its builder) to
-          the directory `/nix/var/log/nix/drvs`. The build log can be
-          retrieved using the command `nix-store -l path`.
-        )",
-        {"build-keep-log"}};
-
-    Setting<bool> compressLog{
-        this,
-        true,
-        "compress-build-log",
-        R"(
-          If set to `true` (the default), build logs written to
-          `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
-          Otherwise, they are not compressed.
-        )",
-        {"build-compress-log"}};
 
     Setting<unsigned long> maxLogSize{
         this,
