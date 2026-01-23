@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/build-result.hh"
+#include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
@@ -44,22 +45,22 @@ INSTANTIATE_TEST_SUITE_P(
         std::pair{
             "not-deterministic",
             BuildResult{
-                .inner{BuildResult::Failure{
+                .inner{BuildResult::Failure{{
                     .status = BuildResult::Failure::NotDeterministic,
-                    .errorMsg = "no idea why",
+                    .msg = HintFmt("no idea why"),
                     .isNonDeterministic = false, // Note: This field is separate from the status
-                }},
+                }}},
                 .timesBuilt = 1,
             },
         },
         std::pair{
             "output-rejected",
             BuildResult{
-                .inner{BuildResult::Failure{
+                .inner{BuildResult::Failure{{
                     .status = BuildResult::Failure::OutputRejected,
-                    .errorMsg = "no idea why",
+                    .msg = HintFmt("no idea why"),
                     .isNonDeterministic = false,
-                }},
+                }}},
                 .timesBuilt = 3,
                 .startTime = 30,
                 .stopTime = 50,

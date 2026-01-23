@@ -208,13 +208,16 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
 {
     BuildResult res;
     BuildResult::Success success;
-    BuildResult::Failure failure;
+
+    // Temp variables for failure fields since BuildError uses methods
+    std::string errorMsg;
+    bool isNonDeterministic = false;
 
     auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, {conn.from});
-    conn.from >> failure.errorMsg;
+    conn.from >> errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
-        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
+        conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
     }
     if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
@@ -233,8 +236,11 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
                 return std::move(success);
             },
             [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
-                failure.status = s;
-                return std::move(failure);
+                return BuildResult::Failure{{
+                    .status = s,
+                    .msg = HintFmt(std::move(errorMsg)),
+                    .isNonDeterministic = isNonDeterministic,
+                }};
             },
         },
         status);
@@ -270,7 +276,7 @@ void WorkerProto::Serialise<BuildResult>::write(
         overloaded{
             [&](const BuildResult::Failure & failure) {
                 WorkerProto::write(store, {conn.to}, BuildResultStatus{failure.status});
-                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+                common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
                 WorkerProto::write(store, {conn.to}, BuildResultStatus{success.status});

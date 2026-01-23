@@ -504,7 +504,7 @@ protected:
      * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
      * `buildResult` is set correctly.
      */
-    Done amDone(ExitCode result, std::optional<Error> ex = {});
+    Done amDone(ExitCode result);
 
     /**
      * Signals successful completion of the goal.
@@ -518,15 +518,14 @@ protected:
      *
      * @param result The exit code (ecFailed or ecNoSubstituters)
      * @param failure The failure details including status and error message
-     * @param ex Optional exception to store/log
      */
-    Done doneFailure(ExitCode result, BuildResult::Failure failure, std::optional<Error> ex = {});
+    Done doneFailure(ExitCode result, BuildResult::Failure failure);
 
 public:
     virtual void cleanup() {}
 
     /**
-     * Hack to say that this goal should not log `ex`, but instead keep
+     * Hack to say that this goal should not log the failure, but instead keep
      * it around. Set by a waitee which sees itself as the designated
      * continuation of this goal, responsible for reporting its
      * successes or failures.
@@ -534,12 +533,7 @@ public:
      * @todo this is yet another not-nice hack in the goal system that
      * we ought to get rid of. See #11927
      */
-    bool preserveException = false;
-
-    /**
-     * Exception containing an error message, if any.
-     */
-    std::optional<Error> ex;
+    bool preserveFailure = false;
 
     Goal(Worker & worker, Co init)
         : worker(worker)

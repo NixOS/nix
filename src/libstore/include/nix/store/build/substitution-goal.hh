@@ -41,10 +41,6 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
-    Done doneSuccess(BuildResult::Success::Status status);
-
-    Done doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg);
-
 public:
     PathSubstitutionGoal(
         const StorePath & storePath,
