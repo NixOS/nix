@@ -408,9 +408,26 @@ AutoCloseFD LocalStore::openGCLock()
     return toDescriptor(fdGCLock);
 }
 
-void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
+void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
-    deletePath(path, bytesFreed);
+    try {
+        deletePath(path, bytesFreed);
+    } catch (SystemError & e) {
+        if (config->ignoreGcDeleteFailure) {
+            logWarning(
+                {.msg = HintFmt(
+                     isKnownPath ? "ignoring failure to remove store path '%1%': %2%"
+                                 : "ignoring failure to remove garbage in store directory '%1%': %2%",
+                     path,
+                     e.info().msg)});
+        } else {
+            e.addTrace(
+                {},
+                isKnownPath ? "While deleting store path '%1%'" : "While deleting garbage in store directory '%1%'",
+                path);
+            throw;
+        }
+    }
 }
 
 LocalStore::~LocalStore()
