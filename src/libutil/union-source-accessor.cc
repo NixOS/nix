@@ -90,6 +90,12 @@ struct UnionSourceAccessor : SourceAccessor
         }
         return {path, std::nullopt};
     }
+
+    void invalidateCache(const CanonPath & path) override
+    {
+        for (auto & accessor : accessors)
+            accessor->invalidateCache(path);
+    }
 };
 
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors)
