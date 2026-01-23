@@ -303,6 +303,14 @@ bool handleJSONLogMessage(
 extern Verbosity verbosity;
 
 /**
+ * Thread-local variable holding the machine/store origin for log
+ * messages currently being forwarded from a remote store connection.
+ * Logger implementations can check this to annotate output with
+ * the originating machine.
+ */
+extern thread_local std::string currentOriginMachine;
+
+/**
  * Print a message with the standard ErrorInfo format.
  * In general, use these 'log' macros for reporting problems that may require user
  * intervention or that need more explanation.  Use the 'print' macros for more

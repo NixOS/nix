@@ -221,7 +221,9 @@ public:
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
-            if (machineName != "")
+            if (machineName.empty())
+                machineName = currentOriginMachine;
+            if (!machineName.empty())
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
 
             // Used to be curRound and nrRounds, but the

@@ -2,6 +2,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 
@@ -39,6 +40,10 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
         to.flush();
 
     std::exception_ptr ex;
+
+    auto prevOriginMachine = std::move(currentOriginMachine);
+    currentOriginMachine = remoteDescription;
+    Finally restoreOrigin([&] { currentOriginMachine = std::move(prevOriginMachine); });
 
     while (true) {
 
@@ -84,14 +89,6 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
-            // For actBuild activities, the second field (index 1) is the machine name.
-            // When builds are executed locally on the remote daemon, this field is empty.
-            // If we have a remoteDescription set, fill in the empty machine name so that
-            // consumers (like nix-output-monitor) can identify which remote host is building.
-            if (type == actBuild && !remoteDescription.empty() && fields.size() > 1
-                && fields[1].type == Logger::Field::tString && fields[1].s.empty()) {
-                fields[1].s = remoteDescription;
-            }
             logger->startActivity(act, lvl, type, s, fields, parent);
         }
 

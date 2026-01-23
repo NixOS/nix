@@ -69,9 +69,10 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
     virtual ~BasicClientConnection();
 
     /**
-     * A description of the remote store, used to populate the machine
-     * field for build activities forwarded from the remote daemon.
-     * When empty, build activities are forwarded without modification.
+     * A description of the remote store (e.g. "ssh-ng://host" or "daemon").
+     * Used to set the originMachine for all log messages and activities
+     * forwarded from the remote daemon, so that consumers can identify
+     * the source of each message.
      */
     std::string remoteDescription;
 

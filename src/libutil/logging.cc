@@ -150,6 +150,8 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
+thread_local std::string currentOriginMachine;
+
 void writeToStderr(std::string_view s)
 {
     try {
@@ -236,6 +238,12 @@ struct JSONLogger : Logger
                 unreachable();
     }
 
+    void addOrigin(nlohmann::json & json)
+    {
+        if (!currentOriginMachine.empty())
+            json["originMachine"] = currentOriginMachine;
+    }
+
     struct State
     {
         bool enabled = true;
@@ -270,6 +278,7 @@ struct JSONLogger : Logger
         json["action"] = "msg";
         json["level"] = lvl;
         json["msg"] = s;
+        addOrigin(json);
         write(json);
     }
 
@@ -297,6 +306,7 @@ struct JSONLogger : Logger
             json["trace"] = traces;
         }
 
+        addOrigin(json);
         write(json);
     }
 
@@ -316,6 +326,7 @@ struct JSONLogger : Logger
         json["text"] = s;
         json["parent"] = parent;
         addFields(json, fields);
+        addOrigin(json);
         write(json);
     }
 
@@ -324,6 +335,7 @@ struct JSONLogger : Logger
         nlohmann::json json;
         json["action"] = "stop";
         json["id"] = act;
+        addOrigin(json);
         write(json);
     }
 
@@ -334,6 +346,7 @@ struct JSONLogger : Logger
         json["id"] = act;
         json["type"] = type;
         addFields(json, fields);
+        addOrigin(json);
         write(json);
     }
 };
