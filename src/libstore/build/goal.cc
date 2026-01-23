@@ -133,6 +133,19 @@ Co Goal::await(Goals new_waitees)
     co_return Return{};
 }
 
+Goal::Done Goal::doneSuccess(BuildResult::Success success)
+{
+    buildResult.inner = std::move(success);
+    return amDone(ecSuccess);
+}
+
+Goal::Done Goal::doneFailure(ExitCode result, BuildResult::Failure failure, std::optional<Error> ex)
+{
+    assert(result == ecFailed || result == ecNoSubstituters);
+    buildResult.inner = std::move(failure);
+    return amDone(result, std::move(ex));
+}
+
 Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 {
     trace("done");

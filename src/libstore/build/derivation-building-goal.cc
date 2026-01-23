@@ -1176,11 +1176,6 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = std::move(builtOutputs),
-    };
-
     mcRunningBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -1188,16 +1183,15 @@ Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status stat
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = std::move(builtOutputs),
+        });
 }
 
 Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcRunningBuilds.reset();
 
     if (ex.status == BuildResult::Failure::TimedOut)
@@ -1209,7 +1203,13 @@ Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(
+        ecFailed,
+        BuildResult::Failure{
+            .status = ex.status,
+            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+        },
+        std::move(ex));
 }
 
 } // namespace nix
