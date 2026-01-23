@@ -725,10 +725,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
            in multithreaded programs. So we do this in a
            child process.*/
         Pid child(startProcess([&]() {
-            if (usingUserNamespace && (setns(sandboxUserNamespace.get(), 0) == -1))
+            if (usingUserNamespace && (setns(sandboxUserNamespace.get(), CLONE_NEWUSER) == -1))
                 throw SysError("entering sandbox user namespace");
 
-            if (setns(sandboxMountNamespace.get(), 0) == -1)
+            if (setns(sandboxMountNamespace.get(), CLONE_NEWNS) == -1)
                 throw SysError("entering sandbox mount namespace");
 
             doBind(source, target);
