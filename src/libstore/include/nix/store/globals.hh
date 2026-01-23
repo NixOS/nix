@@ -62,7 +62,88 @@ const uint32_t maxIdsPerBuild =
 #endif
     ;
 
-class Settings : public Config
+struct GCSettings : public virtual Config
+{
+    Setting<off_t> reservedSize{
+        this,
+        8 * 1024 * 1024,
+        "gc-reserved-space",
+        "Amount of reserved disk space for the garbage collector.",
+    };
+
+    Setting<bool> keepOutputs{
+        this,
+        false,
+        "keep-outputs",
+        R"(
+          If `true`, the garbage collector keeps the outputs of
+          non-garbage derivations. If `false` (default), outputs are
+          deleted unless they are GC roots themselves (or reachable from other
+          roots).
+
+          In general, outputs must be registered as roots separately. However,
+          even if the output of a derivation is registered as a root, the
+          collector still deletes store paths that are used only at build
+          time (e.g., the C compiler, or source tarballs downloaded from the
+          network). To prevent it from doing so, set this option to `true`.
+        )",
+        {"gc-keep-outputs"},
+    };
+
+    Setting<bool> keepDerivations{
+        this,
+        true,
+        "keep-derivations",
+        R"(
+          If `true` (default), the garbage collector keeps the derivations
+          from which non-garbage store paths were built. If `false`, they are
+          deleted unless explicitly registered as a root (or reachable from
+          other roots).
+
+          Keeping derivation around is useful for querying and traceability
+          (e.g., it allows you to ask with what dependencies or options a
+          store path was built), so by default this option is on. Turn it off
+          to save a bit of disk space (or a lot if `keep-outputs` is also
+          turned on).
+        )",
+        {"gc-keep-derivations"},
+    };
+
+    Setting<uint64_t> minFree{
+        this,
+        0,
+        "min-free",
+        R"(
+          When free disk space in `/nix/store` drops below `min-free` during a
+          build, Nix performs a garbage-collection until `max-free` bytes are
+          available or there is no more garbage. A value of `0` (the default)
+          disables this feature.
+        )",
+    };
+
+    // n.b. this is deliberately int64 max rather than uint64 max because
+    // this goes through the Nix language JSON parser and thus needs to be
+    // representable in Nix language integers.
+    Setting<uint64_t> maxFree{
+        this,
+        std::numeric_limits<int64_t>::max(),
+        "max-free",
+        R"(
+          When a garbage collection is triggered by the `min-free` option, it
+          stops as soon as `max-free` bytes are available. The default is
+          infinity (i.e. delete all garbage).
+        )",
+    };
+
+    Setting<uint64_t> minFreeCheckInterval{
+        this,
+        5,
+        "min-free-check-interval",
+        "Number of seconds between checking free disk space.",
+    };
+};
+
+class Settings : public virtual Config, private GCSettings
 {
 
     StringSet getDefaultSystemFeatures();
@@ -76,6 +157,19 @@ class Settings : public Config
 public:
 
     Settings();
+
+    /**
+     * Get the GC settings.
+     */
+    GCSettings & getGCSettings()
+    {
+        return *this;
+    }
+
+    const GCSettings & getGCSettings() const
+    {
+        return *this;
+    }
 
     static unsigned int getDefaultCores();
 
@@ -427,9 +521,6 @@ public:
           This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
-    Setting<off_t> reservedSize{
-        this, 8 * 1024 * 1024, "gc-reserved-space", "Amount of reserved disk space for the garbage collector."};
-
     Setting<bool> fsyncMetadata{
         this,
         true,
@@ -600,42 +691,6 @@ public:
         {"build-max-log-size"}};
 
     Setting<unsigned int> pollInterval{this, 5, "build-poll-interval", "How often (in seconds) to poll for locks."};
-
-    Setting<bool> gcKeepOutputs{
-        this,
-        false,
-        "keep-outputs",
-        R"(
-          If `true`, the garbage collector keeps the outputs of
-          non-garbage derivations. If `false` (default), outputs are
-          deleted unless they are GC roots themselves (or reachable from other
-          roots).
-
-          In general, outputs must be registered as roots separately. However,
-          even if the output of a derivation is registered as a root, the
-          collector still deletes store paths that are used only at build
-          time (e.g., the C compiler, or source tarballs downloaded from the
-          network). To prevent it from doing so, set this option to `true`.
-        )",
-        {"gc-keep-outputs"}};
-
-    Setting<bool> gcKeepDerivations{
-        this,
-        true,
-        "keep-derivations",
-        R"(
-          If `true` (default), the garbage collector keeps the derivations
-          from which non-garbage store paths were built. If `false`, they are
-          deleted unless explicitly registered as a root (or reachable from
-          other roots).
-
-          Keeping derivation around is useful for querying and traceability
-          (e.g., it allows you to ask with what dependencies or options a
-          store path was built), so by default this option is on. Turn it off
-          to save a bit of disk space (or a lot if `keep-outputs` is also
-          turned on).
-        )",
-        {"gc-keep-derivations"}};
 
     Setting<bool> autoOptimiseStore{
         this,
@@ -1251,32 +1306,6 @@ public:
           `http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae`
           first. If it is not available there, it tries the original URI.
         )"};
-
-    Setting<uint64_t> minFree{
-        this,
-        0,
-        "min-free",
-        R"(
-          When free disk space in `/nix/store` drops below `min-free` during a
-          build, Nix performs a garbage-collection until `max-free` bytes are
-          available or there is no more garbage. A value of `0` (the default)
-          disables this feature.
-        )"};
-
-    Setting<uint64_t> maxFree{// n.b. this is deliberately int64 max rather than uint64 max because
-                              // this goes through the Nix language JSON parser and thus needs to be
-                              // representable in Nix language integers.
-                              this,
-                              std::numeric_limits<int64_t>::max(),
-                              "max-free",
-                              R"(
-          When a garbage collection is triggered by the `min-free` option, it
-          stops as soon as `max-free` bytes are available. The default is
-          infinity (i.e. delete all garbage).
-        )"};
-
-    Setting<uint64_t> minFreeCheckInterval{
-        this, 5, "min-free-check-interval", "Number of seconds between checking free disk space."};
 
     Setting<size_t> narBufferSize{
         this, 32 * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};
