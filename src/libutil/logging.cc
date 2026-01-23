@@ -78,7 +78,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, const std::string & machine = "") override
     {
         if (lvl > verbosity)
             return;
@@ -130,13 +130,14 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        const std::string & machine = "") override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") override
     {
         if (type == resBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
@@ -149,8 +150,6 @@ public:
 };
 
 Verbosity verbosity = lvlInfo;
-
-thread_local std::string currentOriginMachine;
 
 void writeToStderr(std::string_view s)
 {
@@ -238,10 +237,10 @@ struct JSONLogger : Logger
                 unreachable();
     }
 
-    void addOrigin(nlohmann::json & json)
+    void addOrigin(nlohmann::json & json, const std::string & machine)
     {
-        if (!currentOriginMachine.empty())
-            json["originMachine"] = currentOriginMachine;
+        if (!machine.empty())
+            json["originMachine"] = machine;
     }
 
     struct State
@@ -272,13 +271,13 @@ struct JSONLogger : Logger
         }
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, const std::string & machine = "") override
     {
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = lvl;
         json["msg"] = s;
-        addOrigin(json);
+        addOrigin(json, machine);
         write(json);
     }
 
@@ -306,7 +305,6 @@ struct JSONLogger : Logger
             json["trace"] = traces;
         }
 
-        addOrigin(json);
         write(json);
     }
 
@@ -316,7 +314,8 @@ struct JSONLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        const std::string & machine = "") override
     {
         nlohmann::json json;
         json["action"] = "start";
@@ -326,27 +325,27 @@ struct JSONLogger : Logger
         json["text"] = s;
         json["parent"] = parent;
         addFields(json, fields);
-        addOrigin(json);
+        addOrigin(json, machine);
         write(json);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act, const std::string & machine = "") override
     {
         nlohmann::json json;
         json["action"] = "stop";
         json["id"] = act;
-        addOrigin(json);
+        addOrigin(json, machine);
         write(json);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") override
     {
         nlohmann::json json;
         json["action"] = "result";
         json["id"] = act;
         json["type"] = type;
         addFields(json, fields);
-        addOrigin(json);
+        addOrigin(json, machine);
         write(json);
     }
 };

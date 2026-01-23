@@ -168,7 +168,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, const std::string & machine = "") override
     {
         if (lvl > verbosity)
             return;
@@ -202,7 +202,8 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        const std::string & machine = "") override
     {
         auto state(state_.lock());
 
@@ -222,7 +223,7 @@ public:
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName.empty())
-                machineName = currentOriginMachine;
+                machineName = machine;
             if (!machineName.empty())
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
 
@@ -280,7 +281,7 @@ public:
         return false;
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act, const std::string & machine = "") override
     {
         auto state(state_.lock());
 
@@ -302,7 +303,8 @@ public:
         update(*state);
     }
 
-    void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
+    void result(
+        ActivityId act, ResultType type, const std::vector<Field> & fields, const std::string & machine = "") override
     {
         auto state(state_.lock());
 

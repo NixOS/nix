@@ -41,10 +41,6 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
 
     std::exception_ptr ex;
 
-    auto prevOriginMachine = std::move(currentOriginMachine);
-    currentOriginMachine = remoteDescription;
-    Finally restoreOrigin([&] { currentOriginMachine = std::move(prevOriginMachine); });
-
     while (true) {
 
         if (!block && !from.hasData())
@@ -80,7 +76,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
         }
 
         else if (msg == STDERR_NEXT)
-            printError(chomp(readString(from)));
+            logger->log(lvlError, chomp(readString(from)), remoteDescription);
 
         else if (msg == STDERR_START_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
@@ -89,19 +85,19 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
-            logger->startActivity(act, lvl, type, s, fields, parent);
+            logger->startActivity(act, lvl, type, s, fields, parent, remoteDescription);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
-            logger->stopActivity(act);
+            logger->stopActivity(act, remoteDescription);
         }
 
         else if (msg == STDERR_RESULT) {
             auto act = readNum<ActivityId>(from);
             auto type = (ResultType) readInt(from);
             auto fields = readFields(from);
-            logger->result(act, type, fields);
+            logger->result(act, type, fields, remoteDescription);
         }
 
         else if (msg == STDERR_LAST) {

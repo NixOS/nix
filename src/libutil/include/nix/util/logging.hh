@@ -129,7 +129,12 @@ public:
         return false;
     }
 
-    virtual void log(Verbosity lvl, std::string_view s) = 0;
+    /**
+     * @param machine The origin machine for messages forwarded from
+     * a remote store connection (e.g. "ssh-ng://host"). Empty for
+     * locally-generated messages.
+     */
+    virtual void log(Verbosity lvl, std::string_view s, const std::string & machine = "") = 0;
 
     void log(std::string_view s)
     {
@@ -152,11 +157,12 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) {};
+        ActivityId parent,
+        const std::string & machine = "") {};
 
-    virtual void stopActivity(ActivityId act) {};
+    virtual void stopActivity(ActivityId act, const std::string & machine = "") {};
 
-    virtual void result(ActivityId act, ResultType type, const Fields & fields) {};
+    virtual void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") {};
 
     virtual void writeToStdout(std::string_view s);
 
@@ -301,14 +307,6 @@ bool handleJSONLogMessage(
  * suppress msgs > this
  */
 extern Verbosity verbosity;
-
-/**
- * Thread-local variable holding the machine/store origin for log
- * messages currently being forwarded from a remote store connection.
- * Logger implementations can check this to annotate output with
- * the originating machine.
- */
-extern thread_local std::string currentOriginMachine;
 
 /**
  * Print a message with the standard ErrorInfo format.
