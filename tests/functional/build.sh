@@ -224,9 +224,17 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
     mkdir -p "$fifoDir"
     mkfifo "$fifoDir/fifo"
     chmod a+rw "$fifoDir/fifo"
+    # When using a separate test store, we need sandbox-paths to access
+    # the system store (where bash/coreutils live). On NixOS, the test
+    # uses the system store directly, so this isn't needed (and would
+    # conflict with input paths).
+    sandboxPathsArg=()
+    if ! isTestOnNixOS; then
+        sandboxPathsArg=(--option sandbox-paths "/nix/store")
+    fi
     out="$(nix flake check ./cancelled-builds --impure -L -j2 \
         --option sandbox true \
-        --option sandbox-paths "${NIX_STORE:-/nix/store}" \
+        "${sandboxPathsArg[@]}" \
         --option sandbox-build-dir /build-tmp \
         --option extra-sandbox-paths "/cancelled-builds-fifo=$fifoDir" \
         2>&1)" && status=0 || status=$?
@@ -245,10 +253,14 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
     mkdir -p "$fifoDir"
     mkfifo "$fifoDir/fifo"
     chmod a+rw "$fifoDir/fifo"
+    sandboxPathsArg=()
+    if ! isTestOnNixOS; then
+        sandboxPathsArg=(--option sandbox-paths "/nix/store")
+    fi
     system=$(nix eval --raw --impure --expr builtins.currentSystem)
     out="$(nix build --impure -L -j2 \
         --option sandbox true \
-        --option sandbox-paths "${NIX_STORE:-/nix/store}" \
+        "${sandboxPathsArg[@]}" \
         --option sandbox-build-dir /build-tmp \
         --option extra-sandbox-paths "/cancelled-builds-fifo=$fifoDir" \
         "./cancelled-builds#checks.$system.slow" \
