@@ -15,6 +15,7 @@
 #include <unistd.h>
 #ifdef _WIN32
 #  include <windef.h>
+#  include <wchar.h>
 #endif
 
 #include <functional>
@@ -111,15 +112,30 @@ bool isInDir(const std::filesystem::path & path, const std::filesystem::path & d
 bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
+ * `struct stat` is not 64-bit everywhere on Windows.
+ */
+using PosixStat =
+#ifdef _WIN32
+    struct ::__stat64
+#else
+    struct ::stat
+#endif
+    ;
+
+/**
  * Get status of `path`.
  */
-struct stat stat(const Path & path);
-struct stat lstat(const Path & path);
+PosixStat lstat(const std::filesystem::path & path);
+/**
+ * Get status of `path` following symlinks.
+ */
+PosixStat stat(const std::filesystem::path & path);
 /**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
  */
-std::optional<struct stat> maybeLstat(const Path & path);
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path);
+std::optional<PosixStat> maybeStat(const std::filesystem::path & path);
 
 /**
  * @return true iff the given path exists.
@@ -260,9 +276,9 @@ void setWriteTime(
     std::optional<bool> isSymlink = std::nullopt);
 
 /**
- * Convenience wrapper that takes all arguments from the `struct stat`.
+ * Convenience wrapper that takes all arguments from the `PosixStat`.
  */
-void setWriteTime(const std::filesystem::path & path, const struct stat & st);
+void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
 
 /**
  * Create a symlink.

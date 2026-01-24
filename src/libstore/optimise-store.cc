@@ -169,7 +169,7 @@ void LocalStore::optimisePath_(
 
     /* Maybe delete the link, if it has been corrupted. */
     if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
-        auto stLink = lstat(linkPath.string());
+        auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size || (repair && hash != ({
                                                            hashPath(
                                                                makeFSSourceAccessor(linkPath),
@@ -215,7 +215,7 @@ void LocalStore::optimisePath_(
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = lstat(linkPath.string());
+    auto stLink = lstat(linkPath);
 
     if (st.st_ino == stLink.st_ino) {
         debug("%1% is already linked to %2%", PathFmt(path), PathFmt(linkPath));

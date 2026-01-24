@@ -189,7 +189,7 @@ void RestoreRegularFile::isExecutable()
     // Windows doesn't have a notion of executable file permissions we
     // care about here, right?
 #ifndef _WIN32
-    struct stat st;
+    PosixStat st;
     if (fstat(fd.get(), &st) == -1)
         throw SysError("fstat");
     if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)

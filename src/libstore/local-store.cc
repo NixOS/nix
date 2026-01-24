@@ -167,9 +167,7 @@ LocalStore::LocalStore(ref<const Config> config)
             printError(
                 "warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
         else if (!config->readOnly) {
-            struct stat st;
-            if (stat(config->realStoreDir.get().c_str(), &st))
-                throw SysError("getting attributes of path '%1%'", config->realStoreDir);
+            auto st = stat(config->realStoreDir.get());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
@@ -200,8 +198,8 @@ LocalStore::LocalStore(ref<const Config> config)
        needed, we reserve some dummy space that we can free just
        before doing a garbage collection. */
     try {
-        struct stat st;
-        if (stat(reservedPath.c_str(), &st) == -1 || st.st_size != gcSettings.reservedSize) {
+        auto st = maybeStat(reservedPath);
+        if (!st || st->st_size != gcSettings.reservedSize) {
             AutoCloseFD fd = toDescriptor(open(
                 reservedPath.c_str(),
                 O_WRONLY | O_CREAT

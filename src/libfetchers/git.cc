@@ -37,7 +37,7 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-bool isCacheFileWithinTtl(time_t now, const struct stat & st)
+bool isCacheFileWithinTtl(time_t now, const PosixStat & st)
 {
     return st.st_mtime + static_cast<time_t>(settings.tarballTtl) > now;
 }
@@ -113,11 +113,11 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
     std::filesystem::path headRefFile = cacheDir / "HEAD";
 
     time_t now = time(0);
-    struct stat st;
+    auto st = maybeStat(headRefFile);
     std::optional<std::string> cachedRef;
-    if (stat(headRefFile.string().c_str(), &st) == 0) {
+    if (st) {
         cachedRef = readHead(cacheDir);
-        if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, st)) {
+        if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, *st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
         }
@@ -819,10 +819,10 @@ struct GitInputScheme : InputScheme
                 if (getAllRefsAttr(input)) {
                     doFetch = true;
                 } else {
-                    /* If the local ref is older than ‘tarball-ttl’ seconds, do a
+                    /* If the local ref is older than 'tarball-ttl' seconds, do a
                        git fetch to update the local ref to the remote ref. */
-                    struct stat st;
-                    doFetch = stat(localRefFile.string().c_str(), &st) != 0 || !isCacheFileWithinTtl(now, st);
+                    auto st = maybeStat(localRefFile);
+                    doFetch = !st || !isCacheFileWithinTtl(now, *st);
                 }
             }
 

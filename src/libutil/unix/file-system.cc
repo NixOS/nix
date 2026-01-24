@@ -110,7 +110,7 @@ static void _deletePath(
     std::string name(path.filename());
     assert(name != "." && name != ".." && !name.empty());
 
-    struct stat st;
+    PosixStat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT)
             return;
