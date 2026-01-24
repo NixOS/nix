@@ -174,8 +174,7 @@ LocalStore::LocalStore(ref<const Config> config)
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
                     throw SysError("changing ownership of path '%1%'", config->realStoreDir);
-                if (chmod(config->realStoreDir.get().c_str(), perm) == -1)
-                    throw SysError("changing permissions on path '%1%'", config->realStoreDir);
+                chmod(config->realStoreDir.get(), perm);
             }
         }
     }

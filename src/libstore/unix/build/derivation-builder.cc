@@ -570,12 +570,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     return builtOutputs;
 }
 
-static void chmod_(const std::filesystem::path & path, mode_t mode)
-{
-    if (chmod(path.c_str(), mode) == -1)
-        throw SysError("setting permissions on %s", PathFmt(path));
-}
-
 /* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
    it's a directory and we're not root (to be able to update the
    directory's parent link ".."). */
@@ -586,12 +580,12 @@ static void movePath(const std::filesystem::path & src, const std::filesystem::p
     bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
 
     if (changePerm)
-        chmod_(src, st.st_mode | S_IWUSR);
+        chmod(src, st.st_mode | S_IWUSR);
 
     std::filesystem::rename(src, dst);
 
     if (changePerm)
-        chmod_(dst, st.st_mode);
+        chmod(dst, st.st_mode);
 }
 
 static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
@@ -824,8 +818,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     std::string slaveName = getPtsName(builderOut.get());
 
     if (buildUser) {
-        if (chmod(slaveName.c_str(), 0600))
-            throw SysError("changing mode of pseudoterminal slave");
+        chmod(slaveName, 0600);
 
         if (chown(slaveName.c_str(), buildUser->getUID(), 0))
             throw SysError("changing owner of pseudoterminal slave");
@@ -1926,14 +1919,14 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
          * This hardens against an attack which smuggles a file descriptor
          * to make use of the temporary directory.
          */
-        chmod(topTmpDir.c_str(), 0000);
+        chmod(topTmpDir, 0000);
 
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
         if (settings.keepFailed && !force && !drv.isBuiltin()) {
             printError("note: keeping build directory %s", PathFmt(tmpDir));
-            chmod(topTmpDir.c_str(), 0755);
-            chmod(tmpDir.c_str(), 0755);
+            chmod(topTmpDir, 0755);
+            chmod(tmpDir, 0755);
         } else
             deletePath(topTmpDir);
         topTmpDir = "";

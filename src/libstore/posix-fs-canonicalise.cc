@@ -24,8 +24,7 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
         bool isDir = S_ISDIR(st.st_mode);
         if ((mode != 0444 || isDir) && mode != 0555) {
             mode = (st.st_mode & S_IFMT) | 0444 | (st.st_mode & S_IXUSR || isDir ? 0111 : 0);
-            if (chmod(path.c_str(), mode) == -1)
-                throw SysError("changing mode of '%1%' to %2$o", path, mode);
+            chmod(path, mode);
         }
     }
 
