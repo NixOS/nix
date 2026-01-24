@@ -54,6 +54,15 @@ std::pair<std::filesystem::path, AutoDelete> setupBuildChroot(const BuildChrootP
             "feature 'uid-range' requires the setting '%s' to be enabled",
             settings.getLocalSettings().autoAllocateUids.name);
 
+    /* Declare the build user's group so that programs get a consistent
+       view of the system (e.g., "id -gn"). */
+    writeFile(
+        chrootRootDir / "etc" / "group",
+        fmt("root:x:0:\n"
+            "nixbld:!:%1%:\n"
+            "nogroup:x:65534:\n",
+            params.getSandboxGid()));
+
     /* Create /etc/hosts with localhost entry. */
     if (params.isSandboxed)
         writeFile(chrootRootDir / "etc" / "hosts", "127.0.0.1 localhost\n::1 localhost\n");

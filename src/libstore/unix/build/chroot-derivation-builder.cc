@@ -64,6 +64,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
             .buildUser = buildUser.get(),
             .storeDir = store.storeDir,
             .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
+            .getSandboxGid = [this]() { return sandboxGid(); },
         };
 
         // Create the chroot
