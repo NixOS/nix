@@ -1,0 +1,78 @@
+#include "chroot.hh"
+#include "nix/util/file-system.hh"
+/* note: This is only used for the setting name in the error message. We should
+   not regress on this functionality being global-settings free */
+#include "nix/store/globals.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/error.hh"
+#include "nix/store/user-lock.hh"
+
+namespace nix {
+
+std::pair<std::filesystem::path, AutoDelete> setupBuildChroot(const BuildChrootParams & params)
+{
+    /* Create a temporary directory in which we set up the chroot
+       environment using bind-mounts.  We put it in the Nix store
+       so that the build outputs can be moved efficiently from the
+       chroot to their final location. */
+    auto & chrootParentDir = params.chrootParentDir;
+    deletePath(chrootParentDir);
+
+    /* Clean up the chroot directory automatically. */
+    AutoDelete autoDelChroot{chrootParentDir};
+
+    printMsg(lvlChatty, "setting up chroot environment in %1%", PathFmt(chrootParentDir));
+
+    createDir(chrootParentDir, 0700);
+
+    std::filesystem::path chrootRootDir = chrootParentDir / "root";
+
+    createDir(chrootRootDir, params.buildUser && params.buildUser->getUIDCount() != 1 ? 0755 : 0750);
+
+    if (params.buildUser)
+        chown(
+            chrootRootDir,
+            params.buildUser->getUIDCount() != 1 ? params.buildUser->getUID() : 0,
+            params.buildUser->getGID());
+
+    /* Create a writable /tmp in the chroot.  Many builders need
+       this.  (Of course they should really respect $TMPDIR
+       instead.) */
+    std::filesystem::path chrootTmpDir = chrootRootDir / "tmp";
+    createDirs(chrootTmpDir);
+    chmod(chrootTmpDir, 01777);
+
+    /* Create a /etc/passwd with entries for the build user and the
+       nobody account.  The latter is kind of a hack to support
+       Samba-in-QEMU. */
+    createDirs(chrootRootDir / "etc");
+    if (params.useUidRange)
+        params.chownToBuilder(chrootRootDir / "etc");
+
+    if (params.useUidRange && (!params.buildUser || params.buildUser->getUIDCount() < 65536))
+        throw Error(
+            "feature 'uid-range' requires the setting '%s' to be enabled",
+            settings.getLocalSettings().autoAllocateUids.name);
+
+    /* Create /etc/hosts with localhost entry. */
+    if (params.isSandboxed)
+        writeFile(chrootRootDir / "etc" / "hosts", "127.0.0.1 localhost\n::1 localhost\n");
+
+    /* Make the closure of the inputs available in the chroot,
+       rather than the whole Nix store.  This prevents any access
+       to undeclared dependencies.  Directories are bind-mounted,
+       while other inputs are hard-linked (since only directories
+       can be bind-mounted).  !!! As an extra security
+       precaution, make the fake Nix store only writable by the
+       build user. */
+    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(params.storeDir).relative_path();
+    createDirs(chrootStoreDir);
+    chmod(chrootStoreDir, 01775);
+
+    if (params.buildUser)
+        chown(chrootStoreDir, 0, params.buildUser->getGID());
+
+    return {std::move(chrootRootDir), std::move(autoDelChroot)};
+}
+
+} // namespace nix

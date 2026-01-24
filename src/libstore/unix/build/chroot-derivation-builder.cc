@@ -1,5 +1,7 @@
 #if defined(__linux__) || defined(__FreeBSD__)
 
+#  include "chroot.hh"
+
 namespace nix {
 
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
@@ -11,14 +13,14 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     }
 
     /**
-     * The root of the chroot environment.
+     * The chroot root directory.
      */
     std::filesystem::path chrootRootDir;
 
     /**
-     * RAII object to delete the chroot directory.
+     * RAII cleanup for the chroot directory.
      */
-    std::shared_ptr<AutoDelete> autoDelChroot;
+    std::optional<AutoDelete> autoDelChroot;
 
     PathsInChroot pathsInChroot;
 
@@ -54,65 +56,22 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
     void prepareSandbox() override
     {
-        /* Create a temporary directory in which we set up the chroot
-           environment using bind-mounts.  We put it in the Nix store
-           so that the build outputs can be moved efficiently from the
-           chroot to their final location. */
-        auto chrootParentDir = store.toRealPath(drvPath);
-        chrootParentDir += ".chroot";
-        deletePath(chrootParentDir);
+        // Set up chroot parameters
+        BuildChrootParams params{
+            .chrootParentDir = store.toRealPath(drvPath) + ".chroot",
+            .useUidRange = drvOptions.useUidRange(drv),
+            .isSandboxed = derivationType.isSandboxed(),
+            .buildUser = buildUser.get(),
+            .storeDir = store.storeDir,
+            .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
+        };
 
-        /* Clean up the chroot directory automatically. */
-        autoDelChroot = std::make_shared<AutoDelete>(chrootParentDir);
+        // Create the chroot
+        auto [rootDir, cleanup] = setupBuildChroot(params);
+        chrootRootDir = std::move(rootDir);
+        autoDelChroot.emplace(std::move(cleanup));
 
-        printMsg(lvlChatty, "setting up chroot environment in %1%", PathFmt(chrootParentDir));
-
-        createDir(chrootParentDir, 0700);
-
-        chrootRootDir = chrootParentDir / "root";
-
-        createDir(chrootRootDir, buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750);
-
-        if (buildUser)
-            chown(chrootRootDir, buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID());
-
-        /* Create a writable /tmp in the chroot.  Many builders need
-           this.  (Of course they should really respect $TMPDIR
-           instead.) */
-        std::filesystem::path chrootTmpDir = chrootRootDir / "tmp";
-        createDirs(chrootTmpDir);
-        chmod(chrootTmpDir, 01777);
-
-        /* Create a /etc/passwd with entries for the build user and the
-           nobody account.  The latter is kind of a hack to support
-           Samba-in-QEMU. */
-        createDirs(chrootRootDir / "etc");
-        if (drvOptions.useUidRange(drv))
-            chownToBuilder(chrootRootDir / "etc");
-
-        if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
-            throw Error(
-                "feature 'uid-range' requires the setting '%s' to be enabled",
-                store.config->getLocalSettings().autoAllocateUids.name);
-
-        /* Create /etc/hosts with localhost entry. */
-        if (derivationType.isSandboxed())
-            writeFile(chrootRootDir / "etc" / "hosts", "127.0.0.1 localhost\n::1 localhost\n");
-
-        /* Make the closure of the inputs available in the chroot,
-           rather than the whole Nix store.  This prevents any access
-           to undeclared dependencies.  Directories are bind-mounted,
-           while other inputs are hard-linked (since only directories
-           can be bind-mounted).  !!! As an extra security
-           precaution, make the fake Nix store only writable by the
-           build user. */
-        std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
-        createDirs(chrootStoreDir);
-        chmod(chrootStoreDir, 01775);
-
-        if (buildUser)
-            chown(chrootStoreDir, 0, buildUser->getGID());
-
+        // Start with the default sandbox paths
         pathsInChroot = getPathsInSandbox();
 
         for (auto & i : inputPaths) {
