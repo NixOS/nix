@@ -158,14 +158,15 @@ sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
 s3_aws_auth = get_option('s3-aws-auth')
-aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
+aws_crt_cpp = dependency(
+  'aws-crt-cpp',
+  required : s3_aws_auth,
+  method : 'cmake',
+  modules : [ 'AWS::aws-crt-cpp' ],
+)
 
 if s3_aws_auth.enabled()
   deps_other += aws_crt_cpp
-  aws_c_common = cxx.find_library('aws-c-common', required : true)
-  deps_other += aws_c_common
-  aws_c_auth = cxx.find_library('aws-c-auth', required : true)
-  deps_other += aws_c_auth
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
