@@ -448,16 +448,21 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
     this->recursive = recursive;
 }
 
+void AutoDelete::deletePath()
+{
+    if (del) {
+        if (recursive)
+            nix::deletePath(_path);
+        else
+            std::filesystem::remove(_path);
+        cancel();
+    }
+}
+
 AutoDelete::~AutoDelete()
 {
     try {
-        if (del) {
-            if (recursive)
-                deletePath(_path);
-            else {
-                std::filesystem::remove(_path);
-            }
-        }
+        deletePath();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
@@ -483,7 +488,7 @@ AutoUnmount::AutoUnmount()
 {
 }
 
-AutoUnmount::AutoUnmount(Path & p)
+AutoUnmount::AutoUnmount(std::filesystem::path & p)
     : path(p)
     , del(true)
 {
@@ -646,7 +651,7 @@ void setWriteTime(const std::filesystem::path & path, const struct stat & st)
     setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }
 
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete)
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents)
 {
     auto fromStatus = std::filesystem::symlink_status(from);
 
@@ -659,8 +664,14 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     }
 
     if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
-        std::filesystem::copy(
-            from, to, std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+        if (contents) {
+            std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
+        } else {
+            std::filesystem::copy(
+                from,
+                to,
+                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+        }
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {

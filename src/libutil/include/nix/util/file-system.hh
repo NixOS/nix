@@ -294,8 +294,12 @@ void moveFile(const Path & src, const Path & dst);
  * `true`, then also remove `oldPath` (making this equivalent to `moveFile`, but
  * with the guaranty that the destination will be “fresh”, with no stale inode
  * or file descriptor pointing to it).
+ *
+ * If contents is set, always create a regular file, even if the source is a
+ * link.
  */
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete);
+void copyFile(
+    const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents = false);
 
 /**
  * Automatic cleanup of resources.
@@ -322,6 +326,17 @@ public:
     AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
+    /**
+     * Delete the file the path points to, and cancel this `AutoDelete`,
+     * so deletion is not attempted a second time by the destructor.
+     *
+     * The destructor calls this ignoring any exception.
+     */
+    void deletePath();
+
+    /**
+     * Cancel the pending deletion
+     */
     void cancel();
 
     void reset(const std::filesystem::path & p, bool recursive = true);
@@ -493,11 +508,11 @@ private:
 #ifdef __FreeBSD__
 class AutoUnmount
 {
-    Path path;
+    std::filesystem::path path;
     bool del;
 public:
     AutoUnmount();
-    AutoUnmount(Path &);
+    AutoUnmount(std::filesystem::path &);
     AutoUnmount(const AutoUnmount &) = delete;
 
     AutoUnmount(AutoUnmount && other) noexcept

@@ -5,6 +5,7 @@
 
   unixtools,
   darwin,
+  freebsd,
 
   nix-util,
   boost,
@@ -16,6 +17,7 @@
   sqlite,
 
   busybox-sandbox-shell ? null,
+  pkgsStatic,
 
   # Configuration Options
 
@@ -65,6 +67,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+  ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
   ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
@@ -79,6 +82,9 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+  ]
+  ++ lib.optionals stdenv.hostPlatform.isFreeBSD [
+    (lib.mesonOption "sandbox-shell" "${pkgsStatic.bash}/bin/bash")
   ];
 
   meta = {
