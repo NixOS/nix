@@ -179,8 +179,15 @@ struct DerivationBuilder : RestrictionContext
     virtual bool killChild() = 0;
 };
 
+struct DerivationBuilderDeleter
+{
+    void operator()(DerivationBuilder * builder) noexcept;
+};
+
+using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter>;
+
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
+DerivationBuilderUnique makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 #endif
 
