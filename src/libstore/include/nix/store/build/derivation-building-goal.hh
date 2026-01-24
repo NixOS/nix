@@ -5,6 +5,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
+#include "nix/store/build/derivation-builder.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
@@ -89,7 +90,7 @@ private:
      */
     std::unique_ptr<HookInstance> hook;
 
-    std::unique_ptr<DerivationBuilder> builder;
+    DerivationBuilderUnique builder;
 #endif
 
     BuildMode buildMode;
