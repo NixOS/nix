@@ -17,7 +17,7 @@ void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 
     int exit = DeleteFileW(path.c_str());
     if (exit == 0)
-        warn("%s: &s", path, std::to_string(GetLastError()));
+        warn("%s: %s", PathFmt(path), std::to_string(GetLastError()));
 }
 
 void PathLocks::unlock()
@@ -27,9 +27,9 @@ void PathLocks::unlock()
             deleteLockFile(i.second, i.first);
 
         if (CloseHandle(i.first) == -1)
-            printError("error (ignored): cannot close lock file on %1%", i.second);
+            printError("error (ignored): cannot close lock file on %1%", PathFmt(i.second));
 
-        debug("lock released on %1%", i.second);
+        debug("lock released on %1%", PathFmt(i.second));
     }
 
     fds.clear();
@@ -46,7 +46,7 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
         FILE_ATTRIBUTE_NORMAL | FILE_FLAG_POSIX_SEMANTICS,
         NULL);
     if (desc.get() == INVALID_HANDLE_VALUE)
-        warn("%s: %s", path, std::to_string(GetLastError()));
+        warn("%s: %s", PathFmt(path), std::to_string(GetLastError()));
 
     return desc;
 }
@@ -110,7 +110,7 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
         checkInterrupt();
         std::filesystem::path lockPath = path;
         lockPath += L".lock";
-        debug("locking path %1%", path);
+        debug("locking path %1%", PathFmt(path));
 
         AutoCloseFD fd;
 
@@ -127,13 +127,13 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
                 }
             }
 
-            debug("lock acquired on %1%", lockPath);
+            debug("lock acquired on %1%", PathFmt(lockPath));
 
             struct _stat st;
             if (_fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
-                throw SysError("statting lock file %1%", lockPath);
+                throw SysError("statting lock file %1%", PathFmt(lockPath));
             if (st.st_size != 0)
-                debug("open lock file %1% has become stale", lockPath);
+                debug("open lock file %1% has become stale", PathFmt(lockPath));
             else
                 break;
         }

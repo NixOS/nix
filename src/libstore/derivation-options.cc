@@ -21,76 +21,53 @@ static std::optional<std::string>
 getStringAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
 {
     if (parsed) {
-        auto i = parsed->structuredAttrs.find(name);
-        if (i == parsed->structuredAttrs.end())
-            return {};
-        else {
-            if (!i->second.is_string())
-                throw Error("attribute '%s' of must be a string", name);
-            return i->second.get<std::string>();
-        }
+        if (auto * i = get(parsed->structuredAttrs, name))
+            try {
+                return getString(*i);
+            } catch (Error & e) {
+                e.addTrace({}, "while parsing attribute \"%s\"", name);
+                throw;
+            }
     } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return {};
-        else
-            return i->second;
+        if (auto * i = get(env, name))
+            return *i;
     }
+    return {};
 }
 
 static bool getBoolAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name, bool def)
 {
     if (parsed) {
-        auto i = parsed->structuredAttrs.find(name);
-        if (i == parsed->structuredAttrs.end())
-            return def;
-        else {
-            if (!i->second.is_boolean())
-                throw Error("attribute '%s' must be a Boolean", name);
-            return i->second.get<bool>();
-        }
-    } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return def;
-        else
-            return i->second == "1";
-    }
-}
-
-static std::optional<Strings>
-getStringsAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
-{
-    if (parsed) {
-        auto i = parsed->structuredAttrs.find(name);
-        if (i == parsed->structuredAttrs.end())
-            return {};
-        else {
-            if (!i->second.is_array())
-                throw Error("attribute '%s' must be a list of strings", name);
-            auto & a = getArray(i->second);
-            Strings res;
-            for (auto j = a.begin(); j != a.end(); ++j) {
-                if (!j->is_string())
-                    throw Error("attribute '%s' must be a list of strings", name);
-                res.push_back(j->get<std::string>());
+        if (auto * i = get(parsed->structuredAttrs, name))
+            try {
+                return getBoolean(*i);
+            } catch (Error & e) {
+                e.addTrace({}, "while parsing attribute \"%s\"", name);
+                throw;
             }
-            return res;
-        }
     } else {
-        auto i = env.find(name);
-        if (i == env.end())
-            return {};
-        else
-            return tokenizeString<Strings>(i->second);
+        if (auto * i = get(env, name))
+            return *i == "1";
     }
+    return def;
 }
 
 static std::optional<StringSet>
 getStringSetAttr(const StringMap & env, const StructuredAttrs * parsed, const std::string & name)
 {
-    auto ss = getStringsAttr(env, parsed, name);
-    return ss ? (std::optional{StringSet{ss->begin(), ss->end()}}) : (std::optional<StringSet>{});
+    if (parsed) {
+        if (auto * i = get(parsed->structuredAttrs, name))
+            try {
+                return getStringSet(*i);
+            } catch (Error & e) {
+                e.addTrace({}, "while parsing attribute \"%s\"", name);
+                throw;
+            }
+    } else {
+        if (auto * i = get(env, name))
+            return tokenizeString<StringSet>(*i);
+    }
+    return {};
 }
 
 template<typename Inputs>
@@ -233,26 +210,21 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                 std::map<std::string, OutputChecks<SingleDerivedPath>> res;
                 if (auto * outputChecks = get(structuredAttrs, "outputChecks")) {
                     for (auto & [outputName, output_] : getObject(*outputChecks)) {
-                        OutputChecks<SingleDerivedPath> checks;
-
                         auto & output = getObject(output_);
-
-                        if (auto maxSize = get(output, "maxSize"))
-                            checks.maxSize = maxSize->get<uint64_t>();
-
-                        if (auto maxClosureSize = get(output, "maxClosureSize"))
-                            checks.maxClosureSize = maxClosureSize->get<uint64_t>();
 
                         auto get_ =
                             [&](const std::string & name) -> std::optional<std::set<DrvRef<SingleDerivedPath>>> {
-                            if (auto i = get(output, name)) {
-                                std::set<DrvRef<SingleDerivedPath>> res;
-                                for (auto j = i->begin(); j != i->end(); ++j) {
-                                    if (!j->is_string())
-                                        throw Error("attribute '%s' must be a list of strings", name);
-                                    res.insert(parseRef(j->get<std::string>()));
+                            if (auto * i = get(output, name)) {
+                                try {
+                                    std::set<DrvRef<SingleDerivedPath>> res;
+                                    for (auto & s : getStringList(*i))
+                                        res.insert(parseRef(s));
+                                    return res;
+                                } catch (Error & e) {
+                                    e.addTrace(
+                                        {}, "while parsing attribute 'outputChecks.\"%s\".%s'", outputName, name);
+                                    throw;
                                 }
-                                return res;
                             }
                             return {};
                         };
@@ -260,18 +232,8 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                         res.insert_or_assign(
                             outputName,
                             OutputChecks<SingleDerivedPath>{
-                                .maxSize = [&]() -> std::optional<uint64_t> {
-                                    if (auto maxSize = get(output, "maxSize"))
-                                        return maxSize->get<uint64_t>();
-                                    else
-                                        return std::nullopt;
-                                }(),
-                                .maxClosureSize = [&]() -> std::optional<uint64_t> {
-                                    if (auto maxClosureSize = get(output, "maxClosureSize"))
-                                        return maxClosureSize->get<uint64_t>();
-                                    else
-                                        return std::nullopt;
-                                }(),
+                                .maxSize = ptrToOwned<uint64_t>(get(output, "maxSize")),
+                                .maxClosureSize = ptrToOwned<uint64_t>(get(output, "maxClosureSize")),
                                 .allowedReferences = get_("allowedReferences"),
                                 .disallowedReferences =
                                     get_("disallowedReferences").value_or(std::set<DrvRef<SingleDerivedPath>>{}),
@@ -307,13 +269,13 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                 std::map<std::string, bool> res;
 
                 if (parsed) {
-                    auto & structuredAttrs = parsed->structuredAttrs;
-
-                    if (auto * udr = get(structuredAttrs, "unsafeDiscardReferences")) {
-                        for (auto & [outputName, output] : getObject(*udr)) {
-                            if (!output.is_boolean())
-                                throw Error("attribute 'unsafeDiscardReferences.\"%s\"' must be a Boolean", outputName);
-                            res.insert_or_assign(outputName, output.get<bool>());
+                    if (auto * udr = get(parsed->structuredAttrs, "unsafeDiscardReferences")) {
+                        try {
+                            for (auto & [outputName, output] : getObject(*udr))
+                                res.insert_or_assign(outputName, getBoolean(output));
+                        } catch (Error & e) {
+                            e.addTrace({}, "while parsing attribute 'unsafeDiscardReferences'");
+                            throw;
                         }
                     }
                 }
@@ -340,7 +302,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                 std::map<std::string, std::set<SingleDerivedPath>> ret;
 
                 if (parsed) {
-                    auto * e = optionalValueAt(parsed->structuredAttrs, "exportReferencesGraph");
+                    auto * e = get(parsed->structuredAttrs, "exportReferencesGraph");
                     if (!e)
                         return ret;
                     if (!e->is_object()) {
@@ -595,8 +557,8 @@ DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDeri
         .outputChecks = [&]() -> OutputChecksVariant<SingleDerivedPath> {
             auto outputChecks = getObject(valueAt(json, "outputChecks"));
 
-            auto forAllOutputsOpt = optionalValueAt(outputChecks, "forAllOutputs");
-            auto perOutputOpt = optionalValueAt(outputChecks, "perOutput");
+            auto forAllOutputsOpt = get(outputChecks, "forAllOutputs");
+            auto perOutputOpt = get(outputChecks, "perOutput");
 
             if (forAllOutputsOpt && !perOutputOpt) {
                 return static_cast<OutputChecks<SingleDerivedPath>>(*forAllOutputsOpt);

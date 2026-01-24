@@ -1,36 +1,96 @@
-#include "nix/util/signature/local-keys.hh"
-
-#include "nix/util/file-system.hh"
-#include "nix/util/base-n.hh"
-#include "nix/util/util.hh"
+#include <nlohmann/json.hpp>
+#include <ranges>
 #include <sodium.h>
+
+#include "nix/util/base-n.hh"
+#include "nix/util/signature/local-keys.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
-BorrowedCryptoValue BorrowedCryptoValue::parse(std::string_view s)
+namespace {
+
+/**
+ * Parse a colon-separated string where the second part is Base64-encoded.
+ *
+ * @param s The string to parse in the format `<name>:<base64-data>`.
+ * @param typeName Name of the type being parsed (for error messages).
+ * @return A pair of (name, decoded-data).
+ */
+std::pair<std::string, std::string> parseColonBase64(std::string_view s, std::string_view typeName)
 {
     size_t colon = s.find(':');
     if (colon == std::string::npos || colon == 0)
-        return {"", ""};
-    return {s.substr(0, colon), s.substr(colon + 1)};
+        throw FormatError("%s is corrupt", typeName);
+
+    auto name = std::string(s.substr(0, colon));
+    auto data = base64::decode(s.substr(colon + 1));
+
+    if (name.empty() || data.empty())
+        throw FormatError("%s is corrupt", typeName);
+
+    return {std::move(name), std::move(data)};
+}
+
+/**
+ * Serialize a name and data to a colon-separated string with Base64 encoding.
+ *
+ * @param name The name part.
+ * @param data The raw data to be Base64-encoded.
+ * @return A string in the format `<name>:<base64-data>`.
+ */
+std::string serializeColonBase64(std::string_view name, std::string_view data)
+{
+    return std::string(name) + ":" + base64::encode(std::as_bytes(std::span<const char>{data.data(), data.size()}));
+}
+
+} // anonymous namespace
+
+Signature Signature::parse(std::string_view s)
+{
+    auto [keyName, sig] = parseColonBase64(s, "signature");
+    return Signature{
+        .keyName = std::move(keyName),
+        .sig = std::move(sig),
+    };
+}
+
+std::string Signature::to_string() const
+{
+    return serializeColonBase64(keyName, sig);
+}
+
+template<typename Container>
+std::set<Signature> Signature::parseMany(const Container & sigStrs)
+{
+    auto parsed = sigStrs | std::views::transform([](const auto & s) { return Signature::parse(s); });
+    return std::set<Signature>(parsed.begin(), parsed.end());
+}
+
+template std::set<Signature> Signature::parseMany(const Strings &);
+template std::set<Signature> Signature::parseMany(const StringSet &);
+
+Strings Signature::toStrings(const std::set<Signature> & sigs)
+{
+    Strings res;
+    for (const auto & sig : sigs) {
+        res.push_back(sig.to_string());
+    }
+
+    return res;
 }
 
 Key::Key(std::string_view s, bool sensitiveValue)
 {
-    auto ss = BorrowedCryptoValue::parse(s);
-
-    name = ss.name;
-    key = ss.payload;
-
     try {
-        if (name == "" || key == "")
-            throw FormatError("key is corrupt");
-
-        key = base64::decode(key);
+        auto [parsedName, parsedKey] = parseColonBase64(s, "key");
+        name = std::move(parsedName);
+        key = std::move(parsedKey);
     } catch (Error & e) {
         std::string extra;
         if (!sensitiveValue)
-            extra = fmt(" with raw value '%s'", key);
+            extra = fmt(" with raw value '%s'", s);
         e.addTrace({}, "while decoding key named '%s'%s", name, extra);
         throw;
     }
@@ -38,7 +98,7 @@ Key::Key(std::string_view s, bool sensitiveValue)
 
 std::string Key::to_string() const
 {
-    return name + ":" + base64::encode(std::as_bytes(std::span<const char>{key}));
+    return serializeColonBase64(name, key);
 }
 
 SecretKey::SecretKey(std::string_view s)
@@ -48,12 +108,15 @@ SecretKey::SecretKey(std::string_view s)
         throw Error("secret key is not valid");
 }
 
-std::string SecretKey::signDetached(std::string_view data) const
+Signature SecretKey::signDetached(std::string_view data) const
 {
     unsigned char sig[crypto_sign_BYTES];
     unsigned long long sigLen;
     crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
-    return name + ":" + base64::encode(std::as_bytes(std::span<const unsigned char>(sig, sigLen)));
+    return Signature{
+        .keyName = name,
+        .sig = std::string((char *) sig, sigLen),
+    };
 }
 
 PublicKey SecretKey::toPublicKey() const
@@ -80,41 +143,47 @@ PublicKey::PublicKey(std::string_view s)
         throw Error("public key is not valid");
 }
 
-bool PublicKey::verifyDetached(std::string_view data, std::string_view sig) const
+bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) const
 {
-    auto ss = BorrowedCryptoValue::parse(sig);
-
-    if (ss.name != std::string_view{name})
+    if (sig.keyName != name)
         return false;
 
-    return verifyDetachedAnon(data, ss.payload);
+    return verifyDetachedAnon(data, sig);
 }
 
-bool PublicKey::verifyDetachedAnon(std::string_view data, std::string_view sig) const
+bool PublicKey::verifyDetachedAnon(std::string_view data, const Signature & sig) const
 {
-    std::string sig2;
-    try {
-        sig2 = base64::decode(sig);
-    } catch (Error & e) {
-        e.addTrace({}, "while decoding signature '%s'", sig);
-    }
-    if (sig2.size() != crypto_sign_BYTES)
+    if (sig.sig.size() != crypto_sign_BYTES)
         throw Error("signature is not valid");
 
     return crypto_sign_verify_detached(
-               (unsigned char *) sig2.data(), (unsigned char *) data.data(), data.size(), (unsigned char *) key.data())
+               (unsigned char *) sig.sig.data(),
+               (unsigned char *) data.data(),
+               data.size(),
+               (unsigned char *) key.data())
            == 0;
 }
 
-bool verifyDetached(std::string_view data, std::string_view sig, const PublicKeys & publicKeys)
+bool verifyDetached(std::string_view data, const Signature & sig, const PublicKeys & publicKeys)
 {
-    auto ss = BorrowedCryptoValue::parse(sig);
-
-    auto key = publicKeys.find(std::string(ss.name));
+    auto key = publicKeys.find(sig.keyName);
     if (key == publicKeys.end())
         return false;
 
-    return key->second.verifyDetachedAnon(data, ss.payload);
+    return key->second.verifyDetachedAnon(data, sig);
 }
 
 } // namespace nix
+
+namespace nlohmann {
+void adl_serializer<Signature>::to_json(json & j, const Signature & s)
+{
+    j = s.to_string();
+}
+
+Signature adl_serializer<Signature>::from_json(const json & j)
+{
+    return Signature::parse(getString(j));
+}
+
+} // namespace nlohmann

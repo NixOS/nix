@@ -31,7 +31,7 @@ A store path is rendered to a file system path as the concatenation of
 
 - [Store directory](#store-directory) (typically `/nix/store`)
 - Path separator (`/`)
-- Digest rendered in a custom variant of [Base32](https://en.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+- Digest rendered in [Nix32](@docroot@/protocols/nix32.md), a variant of base-32 (20 hash bytes become 32 ASCII characters)
 - Hyphen (`-`)
 - Name
 

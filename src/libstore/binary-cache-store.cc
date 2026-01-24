@@ -165,18 +165,18 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 
     auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->compression = config.compression;
+    narInfo->compression = config.compression.to_string(); // FIXME: Make NarInfo use CompressionAlgo
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
     narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
-                   + (config.compression == "xz"      ? ".xz"
-                      : config.compression == "bzip2" ? ".bz2"
-                      : config.compression == "zstd"  ? ".zst"
-                      : config.compression == "lzip"  ? ".lzip"
-                      : config.compression == "lz4"   ? ".lz4"
-                      : config.compression == "br"    ? ".br"
-                                                      : "");
+                   + (config.compression == CompressionAlgo::xz       ? ".xz"
+                      : config.compression == CompressionAlgo::bzip2  ? ".bz2"
+                      : config.compression == CompressionAlgo::zstd   ? ".zst"
+                      : config.compression == CompressionAlgo::lzip   ? ".lzip"
+                      : config.compression == CompressionAlgo::lz4    ? ".lz4"
+                      : config.compression == CompressionAlgo::brotli ? ".br"
+                                                                      : "");
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(
@@ -565,7 +565,7 @@ std::shared_ptr<SourceAccessor> BinaryCacheStore::getFSAccessor(const StorePath 
     return getRemoteFSAccessor(requireValidPath)->accessObject(storePath);
 }
 
-void BinaryCacheStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     /* Note: this is inherently racy since there is no locking on
        binary caches. In particular, with S3 this unreliable, even

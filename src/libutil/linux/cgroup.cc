@@ -40,7 +40,7 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile)
         static std::regex regex("([0-9]+):([^:]*):(.*)");
         std::smatch match;
         if (!std::regex_match(line, match, regex))
-            throw Error("invalid line '%s' in '%s'", line, cgroupFile);
+            throw Error("invalid line '%s' in %s", line, PathFmt(cgroupFile));
 
         std::string name = hasPrefix(std::string(match[2]), "name=") ? std::string(match[2], 5) : match[2];
         cgroups.insert_or_assign(name, match[3]);
@@ -84,7 +84,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     auto procsFile = cgroup / "cgroup.procs";
 
     if (!pathExists(procsFile))
-        throw Error("'%s' is not a cgroup", cgroup);
+        throw Error("%s is not a cgroup", PathFmt(cgroup));
 
     /* Use the fast way to kill every process in a cgroup, if
        available. */
@@ -112,7 +112,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
             break;
 
         if (round > 20)
-            throw Error("cannot kill cgroup '%s'", cgroup);
+            throw Error("cannot kill cgroup %s", PathFmt(cgroup));
 
         for (auto & pid_s : pids) {
             pid_t pid;
@@ -130,12 +130,12 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
             }
             // FIXME: pid wraparound
             if (kill(pid, SIGKILL) == -1 && errno != ESRCH)
-                throw SysError("killing member %d of cgroup '%s'", pid, cgroup);
+                throw SysError("killing member %d of cgroup %s", pid, PathFmt(cgroup));
         }
 
         auto sleep = std::chrono::milliseconds((int) std::pow(2.0, std::min(round, 10)));
         if (sleep.count() > 100)
-            printError("waiting for %d ms for cgroup '%s' to become empty", sleep.count(), cgroup);
+            printError("waiting for %d ms for cgroup %s to become empty", sleep.count(), PathFmt(cgroup));
         std::this_thread::sleep_for(sleep);
         round++;
     }
@@ -145,7 +145,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
         stats = getCgroupStats(cgroup);
 
     if (rmdir(cgroup.c_str()) == -1)
-        throw SysError("deleting cgroup %s", cgroup);
+        throw SysError("deleting cgroup %s", PathFmt(cgroup));
 
     return stats;
 }

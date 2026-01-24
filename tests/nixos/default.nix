@@ -197,6 +197,8 @@ in
 
   functional_symlinked-home = runNixOSTest ./functional/symlinked-home.nix;
 
+  functional_unprivileged-daemon = runNixOSTest ./functional/unprivileged-daemon.nix;
+
   user-sandboxing = runNixOSTest ./user-sandboxing;
 
   s3-binary-cache-store = runNixOSTest ./s3-binary-cache-store.nix;

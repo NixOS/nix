@@ -503,7 +503,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 args.insert(p);
 
         StorePathSet referrers;
-        store->computeFSClosure(args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
+        auto & gcSettings = settings.getGCSettings();
+        store->computeFSClosure(args, referrers, true, gcSettings.keepOutputs, gcSettings.keepDerivations);
 
         auto & gcStore = require<GcStore>(*store);
         Roots roots = gcStore.findRoots(false);
@@ -909,7 +910,7 @@ static void opServe(Strings opFlags, Strings opArgs)
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
         verbosity = lvlError;
-        settings.keepLog = false;
+        settings.getLogFileSettings().keepLog = false;
         settings.useSubstitutes = false;
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
@@ -1066,7 +1067,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.deriver = store->parseStorePath(deriver);
             info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
             in >> info.registrationTime >> info.narSize >> info.ultimate;
-            info.sigs = readStrings<StringSet>(in);
+            info.sigs = ServeProto::Serialise<std::set<Signature>>::read(*store, rconn);
             info.ca = ContentAddress::parseOpt(readString(in));
 
             if (info.narSize == 0)

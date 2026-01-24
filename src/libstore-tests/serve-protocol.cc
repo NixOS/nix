@@ -109,7 +109,11 @@ VERSIONED_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
+                .signatures =
+                    {
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
@@ -127,7 +131,11 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
+                .signatures =
+                    {
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
@@ -321,8 +329,8 @@ VERSIONED_CHARACTERIZATION_TEST(
             info.narSize = 34878;
             info.sigs =
                 {
-                    "fake-sig-1",
-                    "fake-sig-2",
+                    Signature{.keyName = "fake-sig-1", .sig = std::string(64, '\0')},
+                    Signature{.keyName = "fake-sig-2", .sig = std::string(64, '\0')},
                 },
             static_cast<UnkeyedValidPathInfo>(std::move(info));
         }),

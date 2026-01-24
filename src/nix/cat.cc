@@ -18,7 +18,9 @@ struct MixCat : virtual Args
             throw Error("path '%1%' is not a regular file", path.abs());
         logger->stop();
 
-        writeFull(getStandardOutput(), accessor->readFile(path));
+        FdSink output{getStandardOutput()};
+        accessor->readFile(path, output);
+        output.flush();
     }
 };
 
@@ -78,7 +80,7 @@ struct CmdCatNar : StoreCommand, MixCat
     {
         AutoCloseFD fd = openFileReadonly(narPath);
         if (!fd)
-            throw NativeSysError("opening NAR file %s", narPath);
+            throw NativeSysError("opening NAR file %s", PathFmt(narPath));
         auto source = FdSource{fd.get()};
 
         struct CatRegularFileSink : NullFileSystemObjectSink

@@ -9,6 +9,7 @@
   nix-util,
   boost,
   curl,
+  aws-c-common,
   aws-crt-cpp,
   libseccomp,
   nlohmann_json,
@@ -24,7 +25,7 @@
 
   withAWS ?
     # Default is this way because there have been issues building this dependency
-    stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
+    lib.meta.availableOn stdenv.hostPlatform aws-c-common,
 }:
 
 let

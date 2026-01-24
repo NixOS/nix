@@ -465,20 +465,6 @@ UnkeyedRealisation DerivationGoal::assertPathValidity()
 
 Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = {{
-            wantedOutput,
-            {
-                std::move(builtOutput),
-                DrvOutput{
-                    .drvHash = outputHash,
-                    .outputName = wantedOutput,
-                },
-            },
-        }},
-    };
-
     mcExpectedBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -486,16 +472,24 @@ Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, Unke
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = {{
+                wantedOutput,
+                {
+                    std::move(builtOutput),
+                    DrvOutput{
+                        .drvHash = outputHash,
+                        .outputName = wantedOutput,
+                    },
+                },
+            }},
+        });
 }
 
 Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcExpectedBuilds.reset();
 
     if (ex.status == BuildResult::Failure::TimedOut)
@@ -507,7 +501,13 @@ Goal::Done DerivationGoal::doneFailure(BuildError ex)
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(
+        ecFailed,
+        BuildResult::Failure{
+            .status = ex.status,
+            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+        },
+        std::move(ex));
 }
 
 } // namespace nix

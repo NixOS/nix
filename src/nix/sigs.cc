@@ -61,7 +61,7 @@ struct CmdCopySigs : StorePathsCommand
 
             auto info = store->queryPathInfo(storePath);
 
-            StringSet newSigs;
+            std::set<Signature> newSigs;
 
             for (auto & store2 : substituters) {
                 try {

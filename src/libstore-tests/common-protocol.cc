@@ -138,7 +138,11 @@ CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
+                .signatures =
+                    {
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
@@ -154,7 +158,11 @@ READ_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
+                .signatures =
+                    {
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+                    },
             },
             {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),

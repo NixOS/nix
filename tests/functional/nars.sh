@@ -114,7 +114,7 @@ if (( unicodeTestCode == 1 )); then
     # If the command failed (MacOS or ZFS + normalization), checks that it failed
     # with the expected "already exists" error, and that this is the same
     # behavior as `touch`
-    echo "$unicodeTestOut" | grepQuiet "creating directory '.*/out/â': File exists"
+    echo "$unicodeTestOut" | grepQuiet "creating directory \".*/out/â\": File exists"
 
     (( touchFilesCount == 1 ))
 elif (( unicodeTestCode == 0 )); then

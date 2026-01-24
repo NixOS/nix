@@ -134,7 +134,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     void collectGarbage(const GCOptions & options, GCResults & results) override {}
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override
     {
         unsupported("addSignatures");
     }

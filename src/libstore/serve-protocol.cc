@@ -93,7 +93,7 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
         if (!s.empty())
             info.narHash = Hash::parseAnyPrefixed(s);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = ServeProto::Serialise<std::set<Signature>>::read(store, conn);
     }
 
     return info;
@@ -108,8 +108,10 @@ void ServeProto::Serialise<UnkeyedValidPathInfo>::write(
     // !!! Maybe we want compression?
     conn.to << info.narSize // downloadSize, lie a little
             << info.narSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 4)
-        conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca) << info.sigs;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 4) {
+        conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca);
+        ServeProto::write(store, conn, info.sigs);
+    }
 }
 
 ServeProto::BuildOptions

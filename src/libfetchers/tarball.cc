@@ -121,14 +121,15 @@ static DownloadTarballResult downloadTarball_(
                 url);
         }
         if (!exists(localPath)) {
-            throw Error("tarball '%s' does not exist.", localPath);
+            throw Error("tarball %s does not exist.", PathFmt(localPath));
         }
         if (is_directory(localPath)) {
             if (exists(localPath / ".git")) {
                 throw Error(
-                    "tarball '%s' is a git repository, not a tarball. Please use `git+file` as the scheme.", localPath);
+                    "tarball %s is a git repository, not a tarball. Please use `git+file` as the scheme.",
+                    PathFmt(localPath));
             }
-            throw Error("tarball '%s' is a directory, not a file.", localPath);
+            throw Error("tarball %s is a directory, not a file.", PathFmt(localPath));
         }
     }
 

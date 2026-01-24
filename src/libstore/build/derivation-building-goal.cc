@@ -175,7 +175,7 @@ struct LogFile
     AutoCloseFD fd;
     std::shared_ptr<BufferedSink> fileSink, sink;
 
-    LogFile(Store & store, const StorePath & drvPath);
+    LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings);
     ~LogFile();
 };
 
@@ -451,7 +451,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath);
+    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -635,7 +635,9 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     std::unique_ptr<BuildLog> buildLog;
     std::unique_ptr<LogFile> logFile;
 
-    auto openLogFile = [&]() { logFile = std::make_unique<LogFile>(worker.store, drvPath); };
+    auto openLogFile = [&]() {
+        logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+    };
 
     auto closeLogFile = [&]() { logFile.reset(); };
 
@@ -721,7 +723,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                             worker.store.toStorePath(i.second.source.string()).first, closure);
                 } catch (InvalidPath & e) {
                 } catch (Error & e) {
-                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    e.addTrace({}, "while processing sandbox path %s", PathFmt(i.second.source));
                     throw;
                 }
             for (auto & i : closure) {
@@ -1028,8 +1030,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         else if (reply != "accept")
             throw Error("bad hook reply '%s'", reply);
 
-    } catch (SysError & e) {
-        if (e.errNo == EPIPE) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::broken_pipe)) {
             printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
             return rpDecline;
@@ -1041,9 +1043,9 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 #endif
 }
 
-LogFile::LogFile(Store & store, const StorePath & drvPath)
+LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings)
 {
-    if (!settings.keepLog)
+    if (!logSettings.keepLog)
         return;
 
     auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
@@ -1052,11 +1054,11 @@ LogFile::LogFile(Store & store, const StorePath & drvPath)
     if (auto localStore = dynamic_cast<LocalStore *>(&store))
         logDir = localStore->config->logDir;
     else
-        logDir = settings.nixLogDir;
+        logDir = logSettings.nixLogDir;
     Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), settings.compressLog ? ".bz2" : "");
+    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
 
     fd = toDescriptor(open(
         logFileName.c_str(),
@@ -1071,7 +1073,7 @@ LogFile::LogFile(Store & store, const StorePath & drvPath)
 
     fileSink = std::make_shared<FdSink>(fd.get());
 
-    if (settings.compressLog)
+    if (logSettings.compressLog)
         sink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *fileSink));
     else
         sink = fileSink;
@@ -1184,11 +1186,6 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = std::move(builtOutputs),
-    };
-
     mcRunningBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -1196,16 +1193,15 @@ Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status stat
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = std::move(builtOutputs),
+        });
 }
 
 Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcRunningBuilds.reset();
 
     if (ex.status == BuildResult::Failure::TimedOut)
@@ -1217,7 +1213,13 @@ Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(
+        ecFailed,
+        BuildResult::Failure{
+            .status = ex.status,
+            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+        },
+        std::move(ex));
 }
 
 } // namespace nix

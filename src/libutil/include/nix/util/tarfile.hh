@@ -37,8 +37,6 @@ struct TarArchive
 
 int getArchiveFilterCodeByName(const std::string & method);
 
-void unpackTarfile(Source & source, const std::filesystem::path & destDir);
-
 void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem::path & destDir);
 
 time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink);

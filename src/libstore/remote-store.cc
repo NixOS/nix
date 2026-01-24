@@ -58,8 +58,13 @@ RemoteStore::RemoteStore(const Config & config)
 
 ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 {
-    if (failed)
+    if (failed) {
+        checkInterrupt();
+        /* Throw Interrupted instead of the following error to silence pesky
+           warning messages that ThreadPool prints on shutdown if other threads
+           failed. */
         throw Error("opening a connection to remote store '%s' previously failed", config.getHumanReadableURI());
+    }
     try {
         return openConnection();
     } catch (...) {
@@ -377,10 +382,10 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     }
                 }
                 conn.processStderr();
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 /* Daemon closed while we were sending the path. Probably OOM
                   or I/O error. */
-                if (e.errNo == EPIPE)
+                if (e.is(std::errc::broken_pipe))
                     try {
                         conn.processStderr();
                     } catch (EndOfFile & e) {
@@ -437,8 +442,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
     WorkerProto::write(*this, *conn, info.deriver);
     conn->to << info.narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(*this, *conn, info.references);
-    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca)
-             << repair << !checkSigs;
+    conn->to << info.registrationTime << info.narSize << info.ultimate;
+    WorkerProto::write(*this, *conn, info.sigs);
+    conn->to << renderContentAddress(info.ca) << repair << !checkSigs;
 
     if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
         conn.withFramedSink([&](Sink & sink) { copyNAR(source, sink); });
@@ -733,12 +739,12 @@ bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
     return readInt(conn->from);
 }
 
-void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void RemoteStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::AddSignatures;
     WorkerProto::write(*this, *conn, storePath);
-    conn->to << sigs;
+    WorkerProto::write(*this, *conn, sigs);
     conn.processStderr();
     readInt(conn->from);
 }

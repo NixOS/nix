@@ -4,6 +4,8 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-path.hh"
 
+#include <span>
+
 #include <fileapi.h>
 #include <error.h>
 #include <namedpipeapi.h>
@@ -97,6 +99,18 @@ void drainFD(HANDLE handle, Sink & sink /*, bool block*/)
             break;
         sink({(char *) buf.data(), (size_t) rd});
     }
+}
+
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
+{
+    OVERLAPPED ov = {};
+    ov.Offset = static_cast<DWORD>(offset);
+    if constexpr (sizeof(offset) > 4) /* We don't build with 32 bit off_t, but let's be safe. */
+        ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
+    DWORD n;
+    if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov))
+        throw WinError("ReadFile of %1% bytes at offset %2%", buffer.size(), offset);
+    return static_cast<size_t>(n);
 }
 
 //////////////////////////////////////////////////////////////////////

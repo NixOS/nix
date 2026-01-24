@@ -12,6 +12,8 @@
 
 #include <numeric>
 
+using namespace std::string_view_literals;
+
 #ifdef _WIN32
 #  define FS_SEP L"\\"
 #  define FS_ROOT L"C:" FS_SEP // Need a mounted one, C drive is likely
@@ -113,10 +115,10 @@ TEST(canonPath, removesDots2)
 
 TEST(canonPath, requiresAbsolutePath)
 {
-    ASSERT_ANY_THROW(canonPath("."));
-    ASSERT_ANY_THROW(canonPath(".."));
-    ASSERT_ANY_THROW(canonPath("../"));
-    ASSERT_DEATH({ canonPath(""); }, "path != \"\"");
+    ASSERT_ANY_THROW(canonPath("."sv));
+    ASSERT_ANY_THROW(canonPath(".."sv));
+    ASSERT_ANY_THROW(canonPath("../"sv));
+    ASSERT_DEATH({ canonPath(""sv); }, "path != \"\"");
 }
 
 /* ----------------------------------------------------------------------------

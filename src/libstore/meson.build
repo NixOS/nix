@@ -213,7 +213,6 @@ prefix = get_option('prefix')
 # it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
-  'datadir',
   'mandir',
   'libdir',
   'includedir',
@@ -241,20 +240,24 @@ endforeach
 
 # sysconfdir doesn't get anything installed to directly, and is only used to
 # tell Nix where to look for nix.conf, so it doesn't get appended to prefix.
-sysconfdir = get_option('sysconfdir')
-if not fs.is_absolute(sysconfdir)
-  sysconfdir = '/' / sysconfdir
+if host_machine.system() != 'windows'
+  sysconfdir = get_option('sysconfdir')
+  if not fs.is_absolute(sysconfdir)
+    sysconfdir = '/' / sysconfdir
+  endif
 endif
 
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
-configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
 configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
-configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
+# On Windows, NIX_CONF_DIR is determined at runtime using the Windows known
+# folders API (FOLDERID_ProgramData), so we don't define it at compile time.
+if host_machine.system() != 'windows'
+  configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
+endif
 configdata_priv.set_quoted('NIX_MAN_DIR', mandir)
 
 lsof = find_program('lsof', required : false)

@@ -178,7 +178,7 @@ void LocalStore::optimisePath_(
                                                                .hash;
                                                        }))) {
             // XXX: Consider overwriting linkPath with our valid version.
-            warn("removing corrupted link %s", linkPath);
+            warn("removing corrupted link %s", PathFmt(linkPath));
             warn(
                 "There may be more corrupted paths."
                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
@@ -201,8 +201,10 @@ void LocalStore::optimisePath_(
                 /* On ext4, that probably means the directory index is
                    full.  When that happens, it's fine to ignore it: we
                    just effectively disable deduplication of this
-                   file.  */
-                printInfo("cannot link %s to '%s': %s", linkPath, path, strerror(errno));
+                   file.
+                   TODO: Get rid of errno, use error code.
+                   */
+                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), path, strerror(errno));
                 return;
             }
 
@@ -216,11 +218,11 @@ void LocalStore::optimisePath_(
     auto stLink = lstat(linkPath.string());
 
     if (st.st_ino == stLink.st_ino) {
-        debug("'%1%' is already linked to %2%", path, linkPath);
+        debug("%1% is already linked to %2%", PathFmt(path), PathFmt(linkPath));
         return;
     }
 
-    printMsg(lvlTalkative, "linking '%1%' to %2%", path, linkPath);
+    printMsg(lvlTalkative, "linking %1% to %2%", PathFmt(path), PathFmt(linkPath));
 
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
@@ -245,7 +247,7 @@ void LocalStore::optimisePath_(
                systems).  This is likely to happen with empty files.
                Just shrug and ignore. */
             if (st.st_size)
-                printInfo("%1% has maximum number of links", linkPath);
+                printInfo("%1% has maximum number of links", PathFmt(linkPath));
             return;
         }
         throw;
@@ -259,14 +261,14 @@ void LocalStore::optimisePath_(
             std::error_code ec;
             remove(tempLink, ec); /* Clean up after ourselves. */
             if (ec)
-                printError("unable to unlink %1%: %2%", tempLink, ec.message());
+                printError("unable to unlink %1%: %2%", PathFmt(tempLink), ec.message());
         }
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
                temporarily increases the st_nlink field before
                decreasing it again.) */
-            debug("%s has reached maximum number of links", linkPath);
+            debug("%s has reached maximum number of links", PathFmt(linkPath));
             return;
         }
         throw;

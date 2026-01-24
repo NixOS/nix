@@ -53,14 +53,16 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
     return cur;
 }
 
-std::string MemorySourceAccessor::readFile(const CanonPath & path)
+void MemorySourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     auto * f = open(path, std::nullopt);
     if (!f)
         throw FileNotFound("file '%s' does not exist", showPath(path));
-    if (auto * r = std::get_if<File::Regular>(&f->raw))
-        return r->contents;
-    else
+    if (auto * r = std::get_if<File::Regular>(&f->raw)) {
+        sizeCallback(r->contents.size());
+        StringSource source{r->contents};
+        source.drainInto(sink);
+    } else
         throw NotARegularFile("file '%s' is not a regular file", showPath(path));
 }
 

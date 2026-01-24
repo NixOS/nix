@@ -54,13 +54,13 @@ struct UnkeyedRealisation
 {
     StorePath outPath;
 
-    StringSet signatures;
+    std::set<Signature> signatures;
 
     std::string fingerprint(const DrvOutput & key) const;
 
     void sign(const DrvOutput & key, const Signer &);
 
-    bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const Signature & sig) const;
 
     size_t checkSignatures(const DrvOutput & key, const PublicKeys & publicKeys) const;
 

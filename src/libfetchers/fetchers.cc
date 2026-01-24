@@ -489,11 +489,11 @@ void InputScheme::clone(
     const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir) const
 {
     if (std::filesystem::exists(destDir))
-        throw Error("cannot clone into existing path %s", destDir);
+        throw Error("cannot clone into existing path %s", PathFmt(destDir));
 
     auto [accessor, input2] = getAccessor(settings, store, input);
 
-    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), destDir));
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
     RestoreSink sink(/*startFsync=*/false);
     sink.dstPath = destDir;
