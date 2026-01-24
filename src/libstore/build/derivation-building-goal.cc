@@ -654,7 +654,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     };
 
     std::unique_ptr<Activity> actLock;
-    std::unique_ptr<DerivationBuilder> builder;
+    DerivationBuilderUnique builder;
     Descriptor builderOut;
 
     // Will continue here while waiting for a build user below
