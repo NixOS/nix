@@ -739,6 +739,19 @@ std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
     }
 }
 
+void chmod(const std::filesystem::path & path, mode_t mode)
+{
+    if (
+#ifdef _WIN32
+        ::_wchmod
+#else
+        ::chmod
+#endif
+        (path.c_str(), mode)
+        == -1)
+        throw SysError("setting permissions on %s", PathFmt(path));
+}
+
 bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
 {
     auto pathString = path.string();
@@ -747,9 +760,7 @@ bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
     if (((prevMode ^ mode) & mask) == 0)
         return false;
 
-    if (chmod(pathString.c_str(), mode) != 0)
-        throw SysError("could not set permissions on '%s' to %o", pathString, mode);
-
+    chmod(path, mode);
     return true;
 }
 

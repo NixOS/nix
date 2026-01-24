@@ -97,8 +97,8 @@ TEST(fchmodatTryNoFollow, works)
         sink.createSymlink(CanonPath("dirlink"), "dir");
     }
 
-    ASSERT_EQ(chmod((tmpDir / "file").c_str(), 0644), 0);
-    ASSERT_EQ(chmod((tmpDir / "dir").c_str(), 0755), 0);
+    ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
+    ASSERT_NO_THROW(chmod(tmpDir / "dir", 0755));
 
     AutoCloseFD dirFd = openDirectory(tmpDir);
     ASSERT_TRUE(dirFd);
@@ -152,7 +152,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
         sink.createSymlink(CanonPath("link"), "file");
     }
 
-    ASSERT_EQ(chmod((tmpDir / "file").c_str(), 0644), 0);
+    ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
 
     Pid pid = startProcess(
         [&] {

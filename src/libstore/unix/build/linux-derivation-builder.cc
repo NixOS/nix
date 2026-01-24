@@ -586,7 +586,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 auto dst = chrootRootDir / i.first.relative_path();
                 createDirs(dst.parent_path());
                 writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
-                chmod_(dst, 0555);
+                chmod(dst, 0555);
             } else
 #  endif
             {
@@ -629,7 +629,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
                 /* Make sure /dev/pts/ptmx is world-writable.  With some
                    Linux versions, it is created with permissions 0.  */
-                chmod_(chrootRootDir / "dev" / "pts" / "ptmx", 0666);
+                chmod(chrootRootDir / "dev" / "pts" / "ptmx", 0666);
             } else {
                 if (errno != EINVAL)
                     throw SysError("mounting /dev/pts");
@@ -640,7 +640,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         /* Make /etc unwritable */
         if (!drvOptions.useUidRange(drv))
-            chmod_(chrootRootDir / "etc", 0555);
+            chmod(chrootRootDir / "etc", 0555);
 
         /* Unshare this mount namespace. This is necessary because
            pivot_root() below changes the root of the mount
