@@ -106,13 +106,14 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     }
 };
 
-std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
+DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler)
 {
-    return std::make_unique<ExternalDerivationBuilder>(store, std::move(miscMethods), std::move(params), handler);
+    return DerivationBuilderUnique(
+        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
 }
 
 } // namespace nix
