@@ -531,6 +531,21 @@ struct curlFileTransfer : public FileTransfer
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
 
+            /* Note that the underlying strings get copied by libcurl, so the path -> string conversion is ok:
+               > The application does not have to keep the string around after setting this option.
+               https://curl.se/libcurl/c/CURLOPT_SSLKEY.html
+               https://curl.se/libcurl/c/CURLOPT_SSLCERT.html */
+
+            if (request.tlsCert) {
+                curl_easy_setopt(req, CURLOPT_SSLCERTTYPE, "PEM");
+                curl_easy_setopt(req, CURLOPT_SSLCERT, request.tlsCert->string().c_str());
+            }
+
+            if (request.tlsKey) {
+                curl_easy_setopt(req, CURLOPT_SSLKEYTYPE, "PEM");
+                curl_easy_setopt(req, CURLOPT_SSLKEY, request.tlsKey->string().c_str());
+            }
+
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 

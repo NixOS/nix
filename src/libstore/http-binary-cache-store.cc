@@ -195,7 +195,23 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    FileTransferRequest request(result);
+
+    /* Only use the specified SSL certificate and private key if the resolved URL names the same
+       authority and uses the same protocol. */
+    if (result.scheme == config->cacheUri.scheme && result.authority == config->cacheUri.authority) {
+        if (const auto & cert = config->tlsCert.get()) {
+            debug("using TLS client certificate %s for '%s'", PathFmt(*cert), request.uri);
+            request.tlsCert = *cert;
+        }
+
+        if (const auto & key = config->tlsKey.get()) {
+            debug("using TLS client key '%s' for '%s'", PathFmt(*key), request.uri);
+            request.tlsKey = *key;
+        }
+    }
+
+    return request;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
