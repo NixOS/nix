@@ -12,7 +12,6 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
-#include <regex>
 
 #include "store-config-private.hh"
 
@@ -110,7 +109,9 @@ void LocalStore::optimisePath_(
        See https://github.com/NixOS/nix/issues/1443 and
        https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
-    if (std::regex_search(path, std::regex("\\.app/Contents/.+$"))) {
+    static constexpr std::string_view appContents = ".app/Contents/";
+    auto pos = path.find(appContents);
+    if (pos != std::string::npos && pos + appContents.size() < path.size()) {
         debug("'%1%' is not allowed to be linked in macOS", path);
         return;
     }
