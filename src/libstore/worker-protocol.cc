@@ -275,7 +275,13 @@ void WorkerProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                WorkerProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                auto status = failure.status;
+                /* If the remote doesn't support the hash-mismatch-status feature,
+                   convert HashMismatch to OutputRejected for backwards compatibility. */
+                if (status == BuildResult::Failure::HashMismatch
+                    && !conn.features.contains(WorkerProto::featureHashMismatchStatus))
+                    status = BuildResult::Failure::OutputRejected;
+                WorkerProto::write(store, {conn.to}, BuildResultStatus{status});
                 common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {

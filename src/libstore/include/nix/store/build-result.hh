@@ -46,9 +46,9 @@ enum struct BuildResultFailureStatus : uint8_t {
     LogLimitExceeded,
     NotDeterministic,
     NoSubstituters,
-    /// A certain type of `OutputRejected`. The protocols do not yet
-    /// know about this one, so change it back to `OutputRejected`
-    /// before serialization.
+    /// A certain type of `OutputRejected`. Requires the
+    /// `hash-mismatch-status` feature; falls back to `OutputRejected`
+    /// when communicating with older remotes.
     HashMismatch,
 };
 
@@ -114,6 +114,62 @@ public:
 
     bool operator==(const BuildError &) const noexcept;
     std::strong_ordering operator<=>(const BuildError &) const noexcept;
+
+    /**
+     * Exit code bits for build failure.
+     *
+     * The exit code is comprised of 0x60, which is the base for any failure,
+     * plus specific bits for the specific failure reasons.
+     *
+     * The specific build failure reasons are:
+     * - 0x04: build failure
+     * - 0x01: timed out
+     * - 0x02: hash mismatch
+     * - 0x08: check mismatch (not deterministic)
+     */
+    static constexpr unsigned int exitCodeFailureBase = 0x60;
+    static constexpr unsigned int exitCodeTimedOut = 0x01;
+    static constexpr unsigned int exitCodeHashMismatch = 0x02;
+    static constexpr unsigned int exitCodeBuildFailure = 0x04;
+    static constexpr unsigned int exitCodeCheckMismatch = 0x08;
+
+    struct ExitStatusFlags
+    {
+        bool buildFailure = false;
+        bool timedOut = false;
+        bool hashMismatch = false;
+        bool checkMismatch = false;
+    };
+
+    /**
+     * Compute the exit status from the given flags.
+     */
+    static unsigned int computeExitStatus(ExitStatusFlags flags)
+    {
+        unsigned int code = exitCodeFailureBase;
+        if (flags.timedOut)
+            code |= exitCodeTimedOut;
+        if (flags.hashMismatch)
+            code |= exitCodeHashMismatch;
+        if (flags.buildFailure)
+            code |= exitCodeBuildFailure;
+        if (flags.checkMismatch)
+            code |= exitCodeCheckMismatch;
+        return code;
+    }
+
+    /**
+     * Compute the exit status for this build failure.
+     */
+    unsigned int exitStatus() const
+    {
+        return computeExitStatus({
+            .buildFailure = status != NotDeterministic,
+            .timedOut = status == TimedOut,
+            .hashMismatch = status == HashMismatch,
+            .checkMismatch = status == NotDeterministic,
+        });
+    }
 };
 
 struct BuildResult

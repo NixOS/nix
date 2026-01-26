@@ -115,8 +115,6 @@ void CommonProto::Serialise<Signature>::write(
  * Mapping from protocol wire values to BuildResultStatus.
  *
  * The array index is the wire value.
- * Note: HashMismatch is not in the protocol; it gets converted
- * to OutputRejected before serialization.
  */
 constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultSuccessStatus::Built,                  // 0
@@ -134,6 +132,7 @@ constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultFailureStatus::NotDeterministic,       // 12
     BuildResultSuccessStatus::ResolvesToAlreadyValid, // 13
     BuildResultFailureStatus::NoSubstituters,         // 14
+    BuildResultFailureStatus::HashMismatch,           // 15 (requires hash-mismatch-status feature)
 };
 
 BuildResultStatus

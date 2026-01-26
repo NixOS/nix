@@ -515,22 +515,16 @@ void Worker::waitForInput()
 
 unsigned int Worker::failingExitStatus()
 {
-    // See API docs in header for explanation
-    unsigned int mask = 0;
     bool buildFailure = permanentFailure || timedOut || hashMismatch;
-    if (buildFailure)
-        mask |= 0x04; // 100
-    if (timedOut)
-        mask |= 0x01; // 101
-    if (hashMismatch)
-        mask |= 0x02; // 102
-    if (checkMismatch) {
-        mask |= 0x08; // 104
-    }
+    if (!buildFailure && !checkMismatch)
+        return 1;
 
-    if (mask)
-        mask |= 0x60;
-    return mask ? mask : 1;
+    return BuildError::computeExitStatus({
+        .buildFailure = buildFailure,
+        .timedOut = timedOut,
+        .hashMismatch = hashMismatch,
+        .checkMismatch = checkMismatch,
+    });
 }
 
 bool Worker::pathContentsGood(const StorePath & path)

@@ -162,14 +162,14 @@ if isDaemonNewer "2.34pre"; then
     # With the fix, cancelled goals are not reported as failures.
     # Use -j1 so only x1 starts and fails; x2, x3, x4 are cancelled.
     out="$(nix build -f fod-failing.nix -j1 -L 2>&1)" && status=0 || status=$?
-    test "$status" = 1
+    test "$status" = 102 # hash mismatch
     # Only the hash mismatch error for x1. Cancelled goals not reported.
     test "$(<<<"$out" grep -cE '^error:')" = 1
     # Regression test: error messages should not be empty (end with just "failed:")
     <<<"$out" grepQuietInverse -E "^error:.*failed: *$"
 else
     out="$(nix build -f fod-failing.nix -L 2>&1)" && status=0 || status=$?
-    test "$status" = 1
+    test "$status" = 102 # hash mismatch
     # At minimum, check that x1 is reported as failing
     <<<"$out" grepQuiet -E "error:.*-x1"
 fi
@@ -187,7 +187,7 @@ test "$(<<<"$out" grep -cE '^error:')" = 4
 <<<"$out" grepQuiet -E "error: build of '.*-x[1-3]\\.drv\\^out', '.*-x[1-3]\\.drv\\^out', '.*-x[1-3]\\.drv\\^out' failed"
 
 out="$(nix build -f fod-failing.nix -L x4 2>&1)" && status=0 || status=$?
-test "$status" = 1
+test "$status" = 100 # build failure
 # Precise number of errors depends on daemon version / goal refactorings
 (( "$(<<<"$out" grep -cE '^error:')" >= 2 ))
 
@@ -202,7 +202,7 @@ fi
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x[23]\\.drv'"
 
 out="$(nix build -f fod-failing.nix -L x4 --keep-going 2>&1)" && status=0 || status=$?
-test "$status" = 1
+test "$status" = 100 # build failure
 # Precise number of errors depends on daemon version / goal refactorings
 (( "$(<<<"$out" grep -cE '^error:')" >= 3 ))
 if isDaemonNewer "2.29pre"; then
@@ -257,7 +257,7 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
         "./cancelled-builds#checks.$system.depends-on-fail" \
         2>&1)" && status=0 || status=$?
     rm -rf "$fifoDir"
-    test "$status" = 1
+    test "$status" = 100 # build failure
     # The error should be for fast-fail, not for cancelled goals
     <<<"$out" grepQuiet -E "Cannot build.*fast-fail"
     # Cancelled goals should NOT appear in error messages

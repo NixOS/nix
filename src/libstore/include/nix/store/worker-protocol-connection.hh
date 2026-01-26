@@ -41,6 +41,7 @@ struct WorkerProto::BasicConnection
         return WorkerProto::ReadConn{
             .from = from,
             .version = protoVersion,
+            .features = features,
         };
     }
 
@@ -57,6 +58,7 @@ struct WorkerProto::BasicConnection
         return WorkerProto::WriteConn{
             .to = to,
             .version = protoVersion,
+            .features = features,
         };
     }
 };
