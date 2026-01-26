@@ -215,7 +215,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(settings.buildUsersGroup, drvOptions.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void prepareUser() override

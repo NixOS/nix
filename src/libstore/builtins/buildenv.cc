@@ -50,17 +50,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         auto srcFile = (std::filesystem::path{srcDir} / name).string();
         auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
-        struct stat srcSt;
-        try {
-            if (stat(srcFile.c_str(), &srcSt) == -1)
-                throw SysError("getting status of '%1%'", srcFile);
-        } catch (SystemError & e) {
-            if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory)) {
-                warn("skipping dangling symlink '%s'", dstFile);
-                continue;
-            }
-            throw;
+        auto srcStOpt = maybeStat(srcFile.c_str());
+        if (!srcStOpt) {
+            warn("skipping dangling symlink '%s'", dstFile);
+            continue;
         }
+        auto & srcSt = *srcStOpt;
 
         /* The files below are special-cased to that they don't show
          * up in user profiles, either because they are useless, or

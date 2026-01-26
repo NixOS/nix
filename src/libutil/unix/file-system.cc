@@ -70,15 +70,15 @@ void setWriteTime(
     };
 #  if HAVE_LUTIMES
     if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", path);
+        throw SysError("changing modification time of %s", PathFmt{path});
 #  else
     bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
 
     if (!isSymlink) {
         if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", path);
+            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
     } else {
-        throw Error("Cannot change modification time of symlink %s", path);
+        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
     }
 #  endif
 #endif
@@ -110,7 +110,7 @@ static void _deletePath(
     std::string name(path.filename());
     assert(name != "." && name != ".." && !name.empty());
 
-    struct stat st;
+    PosixStat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT)
             return;

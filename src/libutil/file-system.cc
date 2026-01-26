@@ -193,39 +193,56 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
     return path == dir || isInDir(path, dir);
 }
 
-struct stat stat(const Path & path)
-{
-    struct stat st;
-    if (stat(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
-    return st;
-}
-
 #ifdef _WIN32
-#  define STAT stat
+#  define STAT _wstat64
+#  define LSTAT _wstat64
 #else
-#  define STAT lstat
+#  define STAT stat
+#  define LSTAT lstat
 #endif
 
-struct stat lstat(const Path & path)
+PosixStat stat(const std::filesystem::path & path)
 {
-    struct stat st;
+    PosixStat st;
     if (STAT(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
+        throw SysError("getting status of %s", PathFmt(path));
     return st;
 }
 
-std::optional<struct stat> maybeLstat(const Path & path)
+PosixStat lstat(const std::filesystem::path & path)
 {
-    std::optional<struct stat> st{std::in_place};
+    PosixStat st;
+    if (LSTAT(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
+}
+
+std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
     if (STAT(path.c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
         else
-            throw SysError("getting status of '%s'", path);
+            throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
 }
+
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
+    if (LSTAT(path.c_str(), &*st)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            st.reset();
+        else
+            throw SysError("getting status of %s", PathFmt(path));
+    }
+    return st;
+}
+
+#undef STAT
+#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -641,7 +658,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void setWriteTime(const std::filesystem::path & path, const struct stat & st)
+void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
 {
     setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }

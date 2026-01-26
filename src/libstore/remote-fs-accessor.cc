@@ -1,21 +1,13 @@
-#include <nlohmann/json.hpp>
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/util/nar-accessor.hh"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 namespace nix {
 
 RemoteFSAccessor::RemoteFSAccessor(
-    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir_)
+    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir)
     : store(store)
+    , narCache(cacheDir)
     , requireValidPath(requireValidPath)
-    , cacheDir(std::move(cacheDir_))
 {
-    if (cacheDir)
-        createDirs(*cacheDir);
 }
 
 std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
@@ -28,72 +20,18 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
 
 std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath & storePath)
 {
-    if (auto * narHash = get(narHashes, storePath.hashPart())) {
-        if (auto * accessor = get(nars, *narHash))
-            return *accessor;
-    }
+    // Check if we already have the NAR hash for this store path
+    if (auto * narHash = get(narHashes, storePath.hashPart()))
+        return narCache.getOrInsert(*narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 
+    // Query the path info to get the NAR hash
     auto info = store->queryPathInfo(storePath);
 
-    auto cacheAccessor = [&](ref<SourceAccessor> accessor) {
-        narHashes.emplace(storePath.hashPart(), info->narHash);
-        nars.emplace(info->narHash, accessor);
-        return accessor;
-    };
+    // Cache the mapping from store path to NAR hash
+    narHashes.emplace(storePath.hashPart(), info->narHash);
 
-    auto getNar = [&]() {
-        StringSink sink;
-        store->narFromPath(storePath, sink);
-        return std::move(sink.s);
-    };
-
-    if (cacheDir) {
-        auto makeCacheFile = [&](const std::string & ext) {
-            auto res = *cacheDir / info->narHash.to_string(HashFormat::Nix32, false);
-            res += ".";
-            res += ext;
-            return res;
-        };
-
-        auto cacheFile = makeCacheFile("nar");
-        auto listingFile = makeCacheFile("ls");
-
-        if (nix::pathExists(cacheFile)) {
-            try {
-                return cacheAccessor(makeLazyNarAccessor(
-                    nlohmann::json::parse(nix::readFile(listingFile)).template get<NarListing>(),
-                    seekableGetNarBytes(cacheFile)));
-            } catch (SystemError &) {
-            }
-
-            try {
-                return cacheAccessor(makeNarAccessor(nix::readFile(cacheFile)));
-            } catch (SystemError &) {
-            }
-        }
-
-        auto nar = getNar();
-
-        try {
-            /* FIXME: do this asynchronously. */
-            writeFile(cacheFile, nar);
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-
-        auto narAccessor = makeNarAccessor(std::move(nar));
-
-        try {
-            nlohmann::json j = narAccessor->getListing();
-            writeFile(listingFile, j.dump());
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-
-        return cacheAccessor(narAccessor);
-    }
-
-    return cacheAccessor(makeNarAccessor(getNar()));
+    // Get or create the NAR accessor
+    return narCache.getOrInsert(info->narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 }
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)

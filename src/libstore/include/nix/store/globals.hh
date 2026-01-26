@@ -178,9 +178,31 @@ public:
         {"build-compress-log"}};
 };
 
-class Settings : public virtual Config, private GCSettings, private LogFileSettings
+struct AutoAllocateUidSettings : public virtual Config
 {
+    Setting<uint32_t> startId{
+        this,
+#ifdef __linux__
+        0x34000000,
+#else
+        56930,
+#endif
+        "start-id",
+        "The first UID and GID to use for dynamic ID allocation."};
 
+    Setting<uint32_t> uidCount{
+        this,
+#ifdef __linux__
+        maxIdsPerBuild * 128,
+#else
+        128,
+#endif
+        "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+};
+
+class Settings : public virtual Config, private AutoAllocateUidSettings, private GCSettings, private LogFileSettings
+{
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -217,6 +239,15 @@ public:
     const LogFileSettings & getLogFileSettings() const
     {
         return *this;
+    }
+
+    /**
+     * Get AutoAllocateUidSettings if auto-allocate-uids is enabled.
+     * @return Pointer to settings if enabled, nullptr otherwise.
+     */
+    const AutoAllocateUidSettings * getAutoAllocateUidSettings() const
+    {
+        return autoAllocateUids ? this : nullptr;
     }
 
     static unsigned int getDefaultCores();
@@ -657,26 +688,6 @@ public:
         {},
         true,
         Xp::AutoAllocateUids};
-
-    Setting<uint32_t> startId{
-        this,
-#ifdef __linux__
-        0x34000000,
-#else
-        56930,
-#endif
-        "start-id",
-        "The first UID and GID to use for dynamic ID allocation."};
-
-    Setting<uint32_t> uidCount{
-        this,
-#ifdef __linux__
-        maxIdsPerBuild * 128,
-#else
-        128,
-#endif
-        "id-count",
-        "The number of UIDs/GIDs to use for dynamic ID allocation."};
 
 #ifdef __linux__
     Setting<bool> useCgroups{
