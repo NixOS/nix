@@ -15,14 +15,14 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
-    static std::unique_ptr<ExternalDerivationBuilder> newIfSupported(
+    static std::unique_ptr<ExternalDerivationBuilder, DerivationBuilderDeleter> newIfSupported(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> & miscMethods, DerivationBuilderParams & params)
     {
         for (auto & handler : settings.externalBuilders.get()) {
             for (auto & system : handler.systems)
                 if (params.drv.platform == system)
-                    return std::make_unique<ExternalDerivationBuilder>(
-                        store, std::move(miscMethods), std::move(params), handler);
+                    return std::unique_ptr<ExternalDerivationBuilder, DerivationBuilderDeleter>(
+                        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
         }
         return {};
     }

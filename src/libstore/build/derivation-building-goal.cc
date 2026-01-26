@@ -717,8 +717,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             {
                 DerivationBuildingGoal & goal;
 
-                DerivationBuildingGoalCallbacks(
-                    DerivationBuildingGoal & goal, std::unique_ptr<DerivationBuilder> & builder)
+                DerivationBuildingGoalCallbacks(DerivationBuildingGoal & goal)
                     : goal{goal}
                 {
                 }
@@ -775,7 +774,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                already be created, so we don't need to create it again. */
             builder = makeDerivationBuilder(
                 *localStoreP,
-                std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
+                std::make_unique<DerivationBuildingGoalCallbacks>(*this),
                 DerivationBuilderParams{
                     .drvPath = drvPath,
                     .buildResult = buildResult,
