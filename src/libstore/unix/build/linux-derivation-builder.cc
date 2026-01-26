@@ -26,6 +26,8 @@
 
 namespace nix {
 
+using namespace nix::linux;
+
 static void setupSeccomp(const LocalSettings & localSettings)
 {
     if (!localSettings.filterSyscalls)

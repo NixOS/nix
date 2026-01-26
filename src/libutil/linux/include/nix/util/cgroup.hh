@@ -8,7 +8,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/canon-path.hh"
 
-namespace nix {
+namespace nix::linux {
 
 std::optional<std::filesystem::path> getCgroupFS();
 
@@ -41,4 +41,4 @@ CanonPath getCurrentCgroup();
  */
 CanonPath getRootCgroup();
 
-} // namespace nix
+} // namespace nix::linux
