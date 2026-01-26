@@ -339,7 +339,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 
 static std::string quoteRegexChars(const std::string & raw)
 {
-    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
+    static const auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])", boost::regex_constants::optimize);
     return boost::regex_replace(raw, specialRegex, R"(\$&)");
 }
 
@@ -362,9 +362,10 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
-        static const auto digitsRegex = boost::regex(R"(^\d+$)");
-        static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        static const auto digitsRegex = boost::regex(R"(^\d+$)", boost::regex_constants::optimize);
+        static const auto mapRegex =
+            boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)", boost::regex_constants::optimize);
+        const auto storePathRegex = boost::regex(quoteRegexChars(storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (boost::regex_match(ent->d_name, digitsRegex)) {
