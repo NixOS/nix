@@ -873,7 +873,7 @@ in
       server.wait_for_unit("minio")
       server.wait_for_unit("network-addresses-eth1.service")
       server.wait_for_open_port(9000)
-      server.succeed(f"mc config host add minio http://localhost:9000 {ACCESS_KEY} {SECRET_KEY} --api s3v4")
+      server.succeed(f"mc alias set minio http://localhost:9000 {ACCESS_KEY} {SECRET_KEY} --api s3v4")
 
       # Run tests (each gets isolated bucket via decorator)
       test_credential_caching()
