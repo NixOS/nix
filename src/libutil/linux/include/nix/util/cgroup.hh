@@ -8,7 +8,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/canon-path.hh"
 
-namespace nix {
+namespace nix::linux {
 
 std::optional<std::filesystem::path> getCgroupFS();
 
@@ -41,4 +41,64 @@ CanonPath getCurrentCgroup();
  */
 CanonPath getRootCgroup();
 
-} // namespace nix
+/**
+ * RAII helper to automatically destroy a cgroup on scope exit.
+ */
+class AutoDestroyCgroup
+{
+    std::filesystem::path cgroupPath;
+
+public:
+    AutoDestroyCgroup() = default;
+
+    AutoDestroyCgroup(std::filesystem::path path);
+
+    AutoDestroyCgroup(const AutoDestroyCgroup &) = delete;
+    AutoDestroyCgroup & operator=(const AutoDestroyCgroup &) = delete;
+
+    AutoDestroyCgroup(AutoDestroyCgroup && other) noexcept
+        : cgroupPath(std::move(other.cgroupPath))
+    {}
+
+    AutoDestroyCgroup & operator=(AutoDestroyCgroup && other) noexcept
+    {
+        swap(*this, other);
+        return *this;
+    }
+
+    friend void swap(AutoDestroyCgroup & lhs, AutoDestroyCgroup & rhs) noexcept
+    {
+        using std::swap;
+        swap(lhs.cgroupPath, rhs.cgroupPath);
+    }
+
+    ~AutoDestroyCgroup() noexcept;
+
+    /**
+     * Destroy the cgroup now and return statistics.
+     * After calling this, the destructor won't do anything.
+     */
+    CgroupStats destroy();
+
+    /**
+     * Cancel the automatic destruction.
+     */
+    void cancel() noexcept { cgroupPath.clear(); }
+
+    /**
+     * Reset to empty state (equivalent to assigning a default-constructed object).
+     */
+    void reset() noexcept { *this = AutoDestroyCgroup(); }
+
+    /**
+     * Get the cgroup path.
+     */
+    const std::filesystem::path & path() const { return cgroupPath; }
+
+    /**
+     * Check if this will destroy a cgroup.
+     */
+    explicit operator bool() const { return !cgroupPath.empty(); }
+};
+
+} // namespace nix::linux

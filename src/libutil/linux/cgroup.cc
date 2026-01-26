@@ -12,8 +12,9 @@
 
 #include <dirent.h>
 #include <mntent.h>
+#include <sys/stat.h>
 
-namespace nix {
+namespace nix::linux {
 
 std::optional<std::filesystem::path> getCgroupFS()
 {
@@ -76,10 +77,16 @@ CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
     return stats;
 }
 
-static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
+static void deleteCgroup(const std::filesystem::path & cgroup)
+{
+    if (rmdir(cgroup.c_str()) == -1)
+        throw SysError("deleting cgroup %s", PathFmt(cgroup));
+}
+
+static void killCgroupProcesses(const std::filesystem::path & cgroup)
 {
     if (!pathExists(cgroup))
-        return {};
+        return;
 
     auto procsFile = cgroup / "cgroup.procs";
 
@@ -98,7 +105,9 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
         checkInterrupt();
         if (entry.symlink_status().type() != std::filesystem::file_type::directory)
             continue;
-        destroyCgroup(cgroup / entry.path().filename(), false);
+        auto childCgroup = cgroup / entry.path().filename();
+        killCgroupProcesses(childCgroup);
+        deleteCgroup(childCgroup);
     }
 
     int round = 1;
@@ -139,20 +148,17 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
         std::this_thread::sleep_for(sleep);
         round++;
     }
-
-    CgroupStats stats;
-    if (returnStats)
-        stats = getCgroupStats(cgroup);
-
-    if (rmdir(cgroup.c_str()) == -1)
-        throw SysError("deleting cgroup %s", PathFmt(cgroup));
-
-    return stats;
 }
 
 CgroupStats destroyCgroup(const std::filesystem::path & cgroup)
 {
-    return destroyCgroup(cgroup, true);
+    if (!pathExists(cgroup))
+        return {};
+
+    killCgroupProcesses(cgroup);
+    CgroupStats stats = getCgroupStats(cgroup);
+    deleteCgroup(cgroup);
+    return stats;
 }
 
 CanonPath getCurrentCgroup()
@@ -174,4 +180,33 @@ CanonPath getRootCgroup()
     return rootCgroup;
 }
 
-} // namespace nix
+AutoDestroyCgroup::AutoDestroyCgroup(std::filesystem::path path)
+    : cgroupPath(std::move(path))
+{
+    if (mkdir(cgroupPath.c_str(), 0755) != 0)
+        throw SysError("creating cgroup %s", PathFmt(cgroupPath));
+}
+
+AutoDestroyCgroup::~AutoDestroyCgroup() noexcept
+{
+    try {
+        if (!cgroupPath.empty()) {
+            killCgroupProcesses(cgroupPath);
+            deleteCgroup(cgroupPath);
+        }
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
+CgroupStats AutoDestroyCgroup::destroy()
+{
+    if (cgroupPath.empty())
+        return {};
+
+    auto stats = destroyCgroup(cgroupPath);
+    cancel();
+    return stats;
+}
+
+} // namespace nix::linux

@@ -177,7 +177,8 @@ static DownloadTarballResult downloadTarball_(
            the entire file to disk so libarchive can access it
            in random-access mode. */
         auto [fdTemp, path] = createTempFile("nix-zipfile");
-        cleanupTemp.reset(path);
+        cleanupTemp.cancel();
+        cleanupTemp = {path};
         debug("downloading '%s' into '%s'...", url, path);
         {
             FdSink sink(fdTemp.get());

@@ -24,6 +24,8 @@
 
 namespace nix {
 
+using namespace nix::linux;
+
 static void setupSeccomp()
 {
     if (!settings.filterSyscalls)
@@ -190,9 +192,14 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     bool usingUserNamespace = true;
 
     /**
-     * The cgroup of the builder, if any.
+     * The cgroup path of the builder, if any.
      */
-    std::optional<std::filesystem::path> cgroup;
+    std::optional<std::filesystem::path> cgroupPath;
+
+    /**
+     * RAII helper to destroy the cgroup.
+     */
+    AutoDestroyCgroup cgroup;
 
     ChrootLinuxDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
@@ -235,11 +242,11 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
             static std::atomic<unsigned int> counter{0};
 
-            cgroup = rootCgroupPath
-                     / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
-                                  : fmt("nix-build-pid-%d-%d", getpid(), counter++));
+            cgroupPath = rootCgroupPath
+                         / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
+                                      : fmt("nix-build-pid-%d-%d", getpid(), counter++));
 
-            debug("using cgroup %s", PathFmt(*cgroup));
+            debug("using cgroup %s", PathFmt(*cgroupPath));
 
             /* When using a build user, record the cgroup we used for that
                user so that if we got interrupted previously, we can kill
@@ -255,7 +262,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                     destroyCgroup(prevCgroup);
                 }
 
-                writeFile(cgroupFile, cgroup->native());
+                writeFile(cgroupFile, cgroupPath->native());
             }
         }
 
@@ -267,13 +274,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     {
         ChrootDerivationBuilder::prepareSandbox();
 
-        if (cgroup) {
-            if (mkdir(cgroup->c_str(), 0755) != 0)
-                throw SysError("creating cgroup %s", PathFmt(*cgroup));
-            chownToBuilder(*cgroup);
-            chownToBuilder(*cgroup / "cgroup.procs");
-            chownToBuilder(*cgroup / "cgroup.threads");
-            // chownToBuilder(*cgroup / "cgroup.subtree_control");
+        if (cgroupPath) {
+            cgroup = AutoDestroyCgroup(*cgroupPath);
+            chownToBuilder(cgroup.path());
+            chownToBuilder(cgroup.path() / "cgroup.procs");
+            chownToBuilder(cgroup.path() / "cgroup.threads");
+            // chownToBuilder(cgroup.path() / "cgroup.subtree_control");
         }
     }
 
@@ -440,8 +446,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         }
 
         /* Move the child into its own cgroup. */
-        if (cgroup)
-            writeFile(*cgroup / "cgroup.procs", fmt("%d", (pid_t) pid));
+        if (cgroupPath)
+            writeFile(*cgroupPath / "cgroup.procs", fmt("%d", (pid_t) pid));
 
         /* Signal the builder that we've updated its user namespace. */
         writeFull(userNamespaceSync.writeSide.get(), "1\n");
@@ -658,7 +664,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         /* Unshare the cgroup namespace. This means
            /proc/self/cgroup will show the child's cgroup as '/'
            rather than whatever it is in the parent. */
-        if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
+        if (cgroupPath && unshare(CLONE_NEWCGROUP) == -1)
             throw SysError("unsharing cgroup namespace");
 
         /* Do the chroot(). */
@@ -704,8 +710,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void killSandbox(bool getStats) override
     {
-        if (cgroup) {
-            auto stats = destroyCgroup(*cgroup);
+        if (cgroupPath) {
+            auto stats = cgroup.destroy();
             if (getStats) {
                 buildResult.cpuUser = stats.cpuUser;
                 buildResult.cpuSystem = stats.cpuSystem;
