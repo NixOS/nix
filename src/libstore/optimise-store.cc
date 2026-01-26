@@ -3,6 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/file-system.hh"
 
 #include <cstdlib>
 #include <cstring>
@@ -20,8 +21,7 @@ namespace nix {
 static void makeWritable(const Path & path)
 {
     auto st = lstat(path);
-    if (chmod(path.c_str(), st.st_mode | S_IWUSR) == -1)
-        throw SysError("changing writability of '%1%'", path);
+    chmod(path, st.st_mode | S_IWUSR);
 }
 
 struct MakeReadOnly

@@ -69,21 +69,23 @@ static std::filesystem::path resolveNixConfDir()
 #endif
 }
 
+LogFileSettings::LogFileSettings()
+    : nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+{
+}
+
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
-    : nixPrefix(NIX_PREFIX)
-    , nixStore(
+    : nixStore(
 #ifndef _WIN32
           // On Windows `/nix/store` is not a canonical path, but we dont'
           // want to deal with that yet.
           canonPath
 #endif
           (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixConfDir(canonPath(getEnvOsNonEmpty(OS_STR("NIX_CONF_DIR"))
                                .transform([](auto && s) { return std::filesystem::path(s); })

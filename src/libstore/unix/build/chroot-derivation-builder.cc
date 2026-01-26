@@ -85,7 +85,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            instead.) */
         std::filesystem::path chrootTmpDir = chrootRootDir / "tmp";
         createDirs(chrootTmpDir);
-        chmod_(chrootTmpDir, 01777);
+        chmod(chrootTmpDir, 01777);
 
         /* Create a /etc/passwd with entries for the build user and the
            nobody account.  The latter is kind of a hack to support
@@ -119,7 +119,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            build user. */
         std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
         createDirs(chrootStoreDir);
-        chmod_(chrootStoreDir, 01775);
+        chmod(chrootStoreDir, 01775);
 
         if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
             throw SysError("cannot change ownership of %1%", PathFmt(chrootStoreDir));

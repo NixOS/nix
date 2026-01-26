@@ -308,7 +308,6 @@ void printVersion(const std::string & programName)
         std::cout << "User configuration files: " << concatStringsSep(":", settings.nixUserConfFiles) << "\n";
         std::cout << "Store directory: " << settings.nixStore << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
-        std::cout << "Data directory: " << settings.nixDataDir << "\n";
     }
     throw Exit();
 }

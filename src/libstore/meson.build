@@ -158,14 +158,15 @@ sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
 s3_aws_auth = get_option('s3-aws-auth')
-aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
+aws_crt_cpp = dependency(
+  'aws-crt-cpp',
+  required : s3_aws_auth,
+  method : 'cmake',
+  modules : [ 'AWS::aws-crt-cpp' ],
+)
 
 if s3_aws_auth.enabled()
   deps_other += aws_crt_cpp
-  aws_c_common = cxx.find_library('aws-c-common', required : true)
-  deps_other += aws_c_common
-  aws_c_auth = cxx.find_library('aws-c-auth', required : true)
-  deps_other += aws_c_auth
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
@@ -213,7 +214,6 @@ prefix = get_option('prefix')
 # it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
-  'datadir',
   'mandir',
   'libdir',
   'includedir',
@@ -251,9 +251,7 @@ endif
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
-configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
 configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
 # On Windows, NIX_CONF_DIR is determined at runtime using the Windows known

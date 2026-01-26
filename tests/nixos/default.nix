@@ -75,21 +75,6 @@ let
       ];
     };
 
-  otherNixes.nix_2_3.setNixPackage =
-    { lib, pkgs, ... }:
-    {
-      imports = [ checkOverrideNixVersion ];
-      nix.package = lib.mkForce (
-        pkgs.nixVersions.nix_2_3.overrideAttrs (o: {
-          meta = o.meta // {
-            # This version shouldn't be used by end-users, but we run tests against
-            # it to ensure we don't break protocol compatibility.
-            knownVulnerabilities = [ ];
-          };
-        })
-      );
-    };
-
   otherNixes.nix_2_13.setNixPackage =
     { lib, pkgs, ... }:
     {
@@ -106,6 +91,14 @@ let
       );
     };
 
+  otherNixes.nix_2_18.setNixPackage =
+    { lib, pkgs, ... }:
+    {
+      imports = [ checkOverrideNixVersion ];
+      nix.package = lib.mkForce (
+        nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_18
+      );
+    };
 in
 
 {
@@ -196,6 +189,8 @@ in
   functional_root = runNixOSTest ./functional/as-root.nix;
 
   functional_symlinked-home = runNixOSTest ./functional/symlinked-home.nix;
+
+  functional_unprivileged-daemon = runNixOSTest ./functional/unprivileged-daemon.nix;
 
   user-sandboxing = runNixOSTest ./user-sandboxing;
 

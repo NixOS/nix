@@ -92,7 +92,7 @@ public:
 
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
 
         state->db.isCache();
 

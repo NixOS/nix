@@ -140,6 +140,7 @@ LocalStore::LocalStore(ref<const Config> config)
     createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = config->stateDir + "/gcroots";
+    const auto & gcSettings = settings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         replaceSymlink(profilesDir, gcRootsDir + "/profiles");
@@ -173,8 +174,7 @@ LocalStore::LocalStore(ref<const Config> config)
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
                     throw SysError("changing ownership of path '%1%'", config->realStoreDir);
-                if (chmod(config->realStoreDir.get().c_str(), perm) == -1)
-                    throw SysError("changing permissions on path '%1%'", config->realStoreDir);
+                chmod(config->realStoreDir.get(), perm);
             }
         }
     }
@@ -200,7 +200,7 @@ LocalStore::LocalStore(ref<const Config> config)
        before doing a garbage collection. */
     try {
         struct stat st;
-        if (stat(reservedPath.c_str(), &st) == -1 || st.st_size != settings.reservedSize) {
+        if (stat(reservedPath.c_str(), &st) == -1 || st.st_size != gcSettings.reservedSize) {
             AutoCloseFD fd = toDescriptor(open(
                 reservedPath.c_str(),
                 O_WRONLY | O_CREAT
@@ -211,16 +211,16 @@ LocalStore::LocalStore(ref<const Config> config)
                 0600));
             int res = -1;
 #if HAVE_POSIX_FALLOCATE
-            res = posix_fallocate(fd.get(), 0, settings.reservedSize);
+            res = posix_fallocate(fd.get(), 0, gcSettings.reservedSize);
 #endif
             if (res == -1) {
-                writeFull(fd.get(), std::string(settings.reservedSize, 'X'));
+                writeFull(fd.get(), std::string(gcSettings.reservedSize, 'X'));
                 [[gnu::unused]] auto res2 =
 
 #ifdef _WIN32
                     SetEndOfFile(fd.get())
 #else
-                    ftruncate(fd.get(), settings.reservedSize)
+                    ftruncate(fd.get(), gcSettings.reservedSize)
 #endif
                     ;
             }
@@ -407,9 +407,26 @@ AutoCloseFD LocalStore::openGCLock()
     return toDescriptor(fdGCLock);
 }
 
-void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed)
+void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
-    deletePath(path, bytesFreed);
+    try {
+        deletePath(path, bytesFreed);
+    } catch (SystemError & e) {
+        if (config->ignoreGcDeleteFailure) {
+            logWarning(
+                {.msg = HintFmt(
+                     isKnownPath ? "ignoring failure to remove store path '%1%': %2%"
+                                 : "ignoring failure to remove garbage in store directory '%1%': %2%",
+                     path,
+                     e.info().msg)});
+        } else {
+            e.addTrace(
+                {},
+                isKnownPath ? "While deleting store path '%1%'" : "While deleting garbage in store directory '%1%'",
+                path);
+            throw;
+        }
+    }
 }
 
 LocalStore::~LocalStore()
@@ -436,6 +453,11 @@ LocalStore::~LocalStore()
     } catch (...) {
         ignoreExceptionInDestructor();
     }
+}
+
+const GCSettings & LocalStoreConfig::getGCSettings() const
+{
+    return settings.getGCSettings();
 }
 
 StoreReference LocalStoreConfig::getReference() const
@@ -481,7 +503,7 @@ void LocalStore::openDB(State & state, bool create)
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                     : create         ? SQLiteOpenMode::Normal
                                      : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", openMode);
+    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls

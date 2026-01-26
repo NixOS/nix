@@ -465,9 +465,11 @@ struct GCLimitReached
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
+    const auto & gcSettings = config->getGCSettings();
+
     bool shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
-    bool gcKeepOutputs = settings.gcKeepOutputs;
-    bool gcKeepDerivations = settings.gcKeepDerivations;
+    bool keepOutputs = gcSettings.keepOutputs;
+    bool keepDerivations = gcSettings.keepDerivations;
 
     boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
 
@@ -491,8 +493,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        (the garbage collector will recurse into deleting the outputs
        or derivers, respectively).  So disable them. */
     if (options.action == GCOptions::gcDeleteSpecific && options.ignoreLiveness) {
-        gcKeepOutputs = false;
-        gcKeepDerivations = false;
+        keepOutputs = false;
+        keepDerivations = false;
     }
 
     if (shouldDelete)
@@ -649,7 +651,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
-    auto deleteFromStore = [&](std::string_view baseName) {
+    auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
         Path path = storeDir + "/" + std::string(baseName);
         Path realPath = config->realStoreDir + "/" + std::string(baseName);
 
@@ -669,7 +671,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed;
-        deleteStorePath(realPath, bytesFreed);
+        deleteStorePath(realPath, bytesFreed, isKnownPath);
 
         results.bytesFreed += bytesFreed;
 
@@ -728,8 +730,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                         *path,
                         closure,
                         /* flipDirection */ false,
-                        gcKeepOutputs,
-                        gcKeepDerivations);
+                        keepOutputs,
+                        keepDerivations);
                     for (auto & p : closure)
                         alive.insert(p);
                 } catch (InvalidPath &) {
@@ -770,7 +772,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                 /* If keep-derivations is set and this is a
                    derivation, then visit the derivation outputs. */
-                if (gcKeepDerivations && path->isDerivation()) {
+                if (keepDerivations && path->isDerivation()) {
                     for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*path))
                         if (maybeOutPath && isValidPath(*maybeOutPath)
                             && queryPathInfo(*maybeOutPath)->deriver == *path)
@@ -778,7 +780,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 }
 
                 /* If keep-outputs is set, then visit the derivers. */
-                if (gcKeepOutputs) {
+                if (keepOutputs) {
                     auto derivers = queryValidDerivers(*path);
                     for (auto & i : derivers)
                         enqueue(i);
@@ -791,7 +793,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (shouldDelete) {
                 try {
                     invalidatePathChecked(path);
-                    deleteFromStore(path.to_string());
+                    deleteFromStore(path.to_string(), true);
                     referrersCache.erase(path);
                 } catch (PathInUse & e) {
                     // If we end up here, it's likely a new occurrence
@@ -842,7 +844,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                     deleteReferrersClosure(*storePath);
                 else
-                    deleteFromStore(name);
+                    deleteFromStore(name, false);
             }
         } catch (GCLimitReached & e) {
         }
@@ -920,6 +922,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 void LocalStore::autoGC(bool sync)
 {
 #if HAVE_STATVFS
+    const auto & gcSettings = config->getGCSettings();
+
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 
     auto getAvail = [this]() -> uint64_t {
@@ -946,14 +950,14 @@ void LocalStore::autoGC(bool sync)
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now < state->lastGCCheck + std::chrono::seconds(settings.minFreeCheckInterval))
+        if (now < state->lastGCCheck + std::chrono::seconds(gcSettings.minFreeCheckInterval))
             return;
 
         auto avail = getAvail();
 
         state->lastGCCheck = now;
 
-        if (avail >= settings.minFree || avail >= settings.maxFree)
+        if (avail >= gcSettings.minFree || avail >= gcSettings.maxFree)
             return;
 
         if (avail > state->availAfterGC * 0.97)
@@ -964,7 +968,7 @@ void LocalStore::autoGC(bool sync)
         std::promise<void> promise;
         future = state->gcFuture = promise.get_future().share();
 
-        std::thread([promise{std::move(promise)}, this, avail, getAvail]() mutable {
+        std::thread([promise{std::move(promise)}, this, avail, getAvail, &gcSettings]() mutable {
             try {
 
                 /* Wake up any threads waiting for the auto-GC to finish. */
@@ -976,7 +980,7 @@ void LocalStore::autoGC(bool sync)
                 });
 
                 GCOptions options;
-                options.maxFreed = settings.maxFree - avail;
+                options.maxFreed = gcSettings.maxFree - avail;
 
                 printInfo("running auto-GC to free %d bytes", options.maxFreed);
 

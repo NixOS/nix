@@ -31,6 +31,8 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
+struct GCSettings;
+
 struct LocalBuildStoreConfig : virtual LocalFSStoreConfig
 {
 
@@ -85,6 +87,11 @@ private:
     bool getDefaultRequireSigs();
 
 public:
+    /**
+     * For now, this just grabs the global GC settings, but by having this method we get ready for these being per-store
+     * settings instead.
+     */
+    const GCSettings & getGCSettings() const;
 
     Setting<bool> requireSigs{
         this,
@@ -109,6 +116,20 @@ public:
           > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
+
+    Setting<bool> ignoreGcDeleteFailure{
+        this,
+        false,
+        "ignore-gc-delete-failure",
+        R"(
+          Whether to ignore failures when deleting items with the garbage collector.
+
+          Normally the garbage collector will fail with an error if the nix daemon cannot delete a file, with this setting such errors will only be printed as warnings.
+        )",
+        {},
+        true,
+        Xp::LocalOverlayStore,
+    };
 
     static const std::string name()
     {
@@ -305,8 +326,11 @@ public:
      * Called by `collectGarbage` to recursively delete a path.
      * The default implementation simply calls `deletePath`, but it can be
      * overridden by stores that wish to provide their own deletion behaviour.
+     *
+     * @param isKnownPath true if this is a known store path, false if it's
+     *        garbage/unknown content found in the store directory
      */
-    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed);
+    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking

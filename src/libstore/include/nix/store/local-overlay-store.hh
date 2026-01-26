@@ -184,7 +184,7 @@ private:
      * Check which layers the store object exists in to try to avoid
      * needing to remount.
      */
-    void deleteStorePath(const Path & path, uint64_t & bytesFreed) override;
+    void deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath) override;
 
     /**
      * Deduplicate by removing store objects from the upper layer that
