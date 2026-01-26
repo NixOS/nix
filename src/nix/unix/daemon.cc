@@ -340,8 +340,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         //  This also sets the root cgroup to the current one.
-        auto rootCgroup = getRootCgroup();
-        auto cgroupFS = getCgroupFS();
+        auto rootCgroup = linux::getRootCgroup();
+        auto cgroupFS = linux::getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
         auto rootCgroupPath = *cgroupFS / rootCgroup.rel();

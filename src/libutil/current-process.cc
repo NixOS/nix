@@ -31,11 +31,11 @@ unsigned int getMaxCPU()
 {
 #ifdef __linux__
     try {
-        auto cgroupFS = getCgroupFS();
+        auto cgroupFS = linux::getCgroupFS();
         if (!cgroupFS)
             return 0;
 
-        auto cpuFile = *cgroupFS / getCurrentCgroup().rel() / "cpu.max";
+        auto cpuFile = *cgroupFS / linux::getCurrentCgroup().rel() / "cpu.max";
 
         auto cpuMax = readFile(cpuFile);
         auto cpuMaxParts = tokenizeString<std::vector<std::string>>(cpuMax, " \n");
