@@ -254,7 +254,7 @@ bool SQLiteStmt::Use::isNull(int col)
 SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;
-    if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
+    if (sqlite3_exec(db, "begin immediate transaction;", 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "starting transaction");
     active = true;
 }
