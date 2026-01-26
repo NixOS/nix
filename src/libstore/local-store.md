@@ -8,6 +8,9 @@ prefixed to other directories such as the Nix store directory. The
 store pseudo-URL `local` denotes a store that uses `/` as its root
 directory.
 
+Use `--store local` to bypass the daemon and access the store directly.
+This can be useful for debugging or when the daemon is not running.
+
 A store that uses a *root* other than `/` is called a *chroot
 store*. With such stores, the store directory is "logically" still
 `/nix/store`, so programs stored in them can only be built and
