@@ -115,8 +115,6 @@ void CommonProto::Serialise<Signature>::write(
  * Mapping from protocol wire values to BuildResultStatus.
  *
  * The array index is the wire value.
- * Note: HashMismatch is not in the protocol; it gets converted
- * to OutputRejected before serialization.
  */
 constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultSuccessStatus::Built,                  // 0
@@ -134,12 +132,14 @@ constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultFailureStatus::NotDeterministic,       // 12
     BuildResultSuccessStatus::ResolvesToAlreadyValid, // 13
     BuildResultFailureStatus::NoSubstituters,         // 14
+    BuildResultFailureStatus::HashMismatch,           // 15 (requires hash-mismatch-status feature)
 };
 
 BuildResultStatus
 CommonProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    auto rawStatus = readNum<uint8_t>(conn.from);
+    // Read as uint64_t for backwards compatibility with older daemons
+    auto rawStatus = readNum<uint64_t>(conn.from);
 
     if (rawStatus >= std::size(buildResultStatusTable))
         throw Error("Invalid BuildResult status %d from remote", rawStatus);
@@ -150,16 +150,10 @@ CommonProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, Co
 void CommonProto::Serialise<BuildResultStatus>::write(
     const StoreDirConfig & store, CommonProto::WriteConn conn, const BuildResultStatus & status)
 {
-    /* See definition, the protocols don't know about `HashMismatch`
-       yet, so change it to `OutputRejected`, which they expect
-       for this case (hash mismatch is a type of output
-       rejection). */
-    if (status == BuildResultStatus{BuildResultFailureStatus::HashMismatch}) {
-        return write(store, conn, BuildResultFailureStatus::OutputRejected);
-    }
     for (auto && [wire, val] : enumerate(buildResultStatusTable))
         if (val == status) {
-            conn.to << uint8_t(wire);
+            // Write as uint64_t for backwards compatibility with older clients
+            conn.to << uint64_t(wire);
             return;
         }
     unreachable();

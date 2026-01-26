@@ -91,6 +91,14 @@ struct WorkerProto
         .minor = 18,
     };
 
+    using Feature = std::string;
+    using FeatureSet = std::set<Feature, std::less<>>;
+
+    /**
+     * Feature for transmitting HashMismatch status instead of OutputRejected.
+     */
+    static constexpr std::string_view featureHashMismatchStatus = "hash-mismatch-status";
+
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
@@ -99,6 +107,7 @@ struct WorkerProto
     {
         Source & from;
         Version version;
+        FeatureSet features = {};
     };
 
     /**
@@ -109,6 +118,7 @@ struct WorkerProto
     {
         Sink & to;
         Version version;
+        FeatureSet features = {};
     };
 
     /**
@@ -165,9 +175,6 @@ struct WorkerProto
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
-
-    using Feature = std::string;
-    using FeatureSet = std::set<Feature, std::less<>>;
 
     static const FeatureSet allFeatures;
 };

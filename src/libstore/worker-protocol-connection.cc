@@ -5,7 +5,9 @@
 
 namespace nix {
 
-const WorkerProto::FeatureSet WorkerProto::allFeatures{};
+const WorkerProto::FeatureSet WorkerProto::allFeatures{
+    std::string{WorkerProto::featureHashMismatchStatus},
+};
 
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {

@@ -75,7 +75,12 @@ void ServeProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                auto status = failure.status;
+                /* ServeProto doesn't have feature negotiation, so always
+                   convert HashMismatch to OutputRejected for compatibility. */
+                if (status == BuildResult::Failure::HashMismatch)
+                    status = BuildResult::Failure::OutputRejected;
+                ServeProto::write(store, {conn.to}, BuildResultStatus{status});
                 common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {

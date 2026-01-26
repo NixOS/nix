@@ -594,7 +594,8 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
         WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
         conn.processStderr();
-        return WorkerProto::Serialise<std::vector<KeyedBuildResult>>::read(*this, *conn);
+        auto results = WorkerProto::Serialise<std::vector<KeyedBuildResult>>::read(*this, *conn);
+        return results;
     } else {
         // Avoid deadlock.
         conn_.reset();

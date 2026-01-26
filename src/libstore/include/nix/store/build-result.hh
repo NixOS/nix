@@ -46,9 +46,9 @@ enum struct BuildResultFailureStatus : uint8_t {
     LogLimitExceeded,
     NotDeterministic,
     NoSubstituters,
-    /// A certain type of `OutputRejected`. The protocols do not yet
-    /// know about this one, so change it back to `OutputRejected`
-    /// before serialization.
+    /// A certain type of `OutputRejected`. Requires the
+    /// `hash-mismatch-status` feature; falls back to `OutputRejected`
+    /// when communicating with older remotes.
     HashMismatch,
 };
 
