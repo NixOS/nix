@@ -4,14 +4,14 @@
 
 #  include <aws/crt/Types.h>
 #  include "nix/store/s3-url.hh"
-#  include "nix/util/finally.hh"
 #  include "nix/util/logging.hh"
-#  include "nix/util/url.hh"
-#  include "nix/util/util.hh"
 
 #  include <aws/crt/Api.h>
 #  include <aws/crt/auth/Credentials.h>
 #  include <aws/crt/io/Bootstrap.h>
+
+// C library headers for SSO provider support
+#  include <aws/auth/credentials.h>
 
 #  include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -29,6 +29,46 @@ AwsAuthError::AwsAuthError(int errorCode)
 }
 
 namespace {
+
+/**
+ * Helper function to wrap a C credentials provider in the C++ interface.
+ * This replicates the static s_CreateWrappedProvider from aws-crt-cpp.
+ */
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createWrappedProvider(
+    aws_credentials_provider * rawProvider, Aws::Crt::Allocator * allocator = Aws::Crt::ApiAllocator())
+{
+    if (rawProvider == nullptr) {
+        return nullptr;
+    }
+
+    auto provider = Aws::Crt::MakeShared<Aws::Crt::Auth::CredentialsProvider>(allocator, rawProvider, allocator);
+    return std::static_pointer_cast<Aws::Crt::Auth::ICredentialsProvider>(provider);
+}
+
+/**
+ * Create an SSO credentials provider using the C library directly.
+ * The C++ wrapper doesn't expose SSO, so we call the C library and wrap the result.
+ * Returns nullptr if SSO provider creation fails (e.g., profile doesn't have SSO config).
+ */
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createSSOProvider(
+    const std::string & profileName,
+    Aws::Crt::Io::ClientBootstrap * bootstrap,
+    Aws::Crt::Io::TlsContext * tlsContext,
+    Aws::Crt::Allocator * allocator = Aws::Crt::ApiAllocator())
+{
+    aws_credentials_provider_sso_options options;
+    AWS_ZERO_STRUCT(options);
+
+    options.bootstrap = bootstrap->GetUnderlyingHandle();
+    options.tls_ctx = tlsContext ? tlsContext->GetUnderlyingHandle() : nullptr;
+    if (!profileName.empty()) {
+        options.profile_name_override = aws_byte_cursor_from_c_str(profileName.c_str());
+    }
+
+    // Create the SSO provider - will return nullptr if SSO isn't configured for this profile
+    // createWrappedProvider handles nullptr gracefully
+    return createWrappedProvider(aws_credentials_provider_new_sso(allocator, &options), allocator);
+}
 
 static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
 {
@@ -91,6 +131,22 @@ public:
             logLevel = Aws::Crt::LogLevel::Warn;
         }
         apiHandle.InitializeLogging(logLevel, stderr);
+
+        // Create a shared TLS context for SSO (required for HTTPS connections)
+        auto allocator = Aws::Crt::ApiAllocator();
+        auto tlsCtxOptions = Aws::Crt::Io::TlsContextOptions::InitDefaultClient(allocator);
+        tlsContext =
+            std::make_shared<Aws::Crt::Io::TlsContext>(tlsCtxOptions, Aws::Crt::Io::TlsMode::CLIENT, allocator);
+        if (!tlsContext || !*tlsContext) {
+            warn("failed to create TLS context for AWS SSO; SSO authentication will be unavailable");
+            tlsContext = nullptr;
+        }
+
+        // Get bootstrap (lives as long as apiHandle)
+        bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
+        if (!bootstrap) {
+            throw AwsAuthError("failed to create AWS client bootstrap");
+        }
     }
 
     AwsCredentials getCredentialsRaw(const std::string & profile);
@@ -111,6 +167,8 @@ public:
 
 private:
     Aws::Crt::ApiHandle apiHandle;
+    std::shared_ptr<Aws::Crt::Io::TlsContext> tlsContext;
+    Aws::Crt::Io::ClientBootstrap * bootstrap;
     boost::concurrent_flat_map<std::string, std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>>
         credentialProviderCache;
 };
@@ -118,23 +176,58 @@ private:
 std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>
 AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
 {
-    debug(
-        "[pid=%d] creating new AWS credential provider for profile '%s'",
-        getpid(),
-        profile.empty() ? "(default)" : profile.c_str());
+    // profileDisplayName is only used for debug logging - SDK uses its default profile
+    // when ProfileNameOverride is not set
+    const char * profileDisplayName = profile.empty() ? "(default)" : profile.c_str();
 
-    if (profile.empty()) {
-        Aws::Crt::Auth::CredentialsProviderChainDefaultConfig config;
-        config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChainDefault(config);
+    debug("[pid=%d] creating new AWS credential provider for profile '%s'", getpid(), profileDisplayName);
+
+    // Build a custom credential chain: Environment → SSO → Profile → IMDS
+    // This works for both default and named profiles, ensuring consistent behavior
+    // including SSO support and proper TLS context for STS-based role assumption.
+    Aws::Crt::Auth::CredentialsProviderChainConfig chainConfig;
+    auto allocator = Aws::Crt::ApiAllocator();
+
+    auto addProviderToChain = [&](std::string_view name, auto createProvider) {
+        if (auto provider = createProvider()) {
+            chainConfig.Providers.push_back(provider);
+            debug("Added AWS %s Credential Provider to chain for profile '%s'", name, profileDisplayName);
+        } else {
+            debug("Skipped AWS %s Credential Provider for profile '%s'", name, profileDisplayName);
+        }
+    };
+
+    // 1. Environment variables (highest priority)
+    addProviderToChain("Environment", [&]() {
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderEnvironment(allocator);
+    });
+
+    // 2. SSO provider (try it, will fail gracefully if not configured)
+    if (tlsContext) {
+        addProviderToChain("SSO", [&]() { return createSSOProvider(profile, bootstrap, tlsContext.get(), allocator); });
+    } else {
+        debug("Skipped AWS SSO Credential Provider for profile '%s': TLS context unavailable", profileDisplayName);
     }
 
-    Aws::Crt::Auth::CredentialsProviderProfileConfig config;
-    config.Bootstrap = Aws::Crt::ApiHandle::GetOrCreateStaticDefaultClientBootstrap();
-    // This is safe because the underlying C library will copy this string
-    // c.f. https://github.com/awslabs/aws-c-auth/blob/main/source/credentials_provider_profile.c#L220
-    config.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
-    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(config);
+    // 3. Profile provider (for static credentials and role_arn/source_profile with STS)
+    addProviderToChain("Profile", [&]() {
+        Aws::Crt::Auth::CredentialsProviderProfileConfig profileConfig;
+        profileConfig.Bootstrap = bootstrap;
+        profileConfig.TlsContext = tlsContext.get();
+        if (!profile.empty()) {
+            profileConfig.ProfileNameOverride = Aws::Crt::ByteCursorFromCString(profile.c_str());
+        }
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
+    });
+
+    // 4. IMDS provider (for EC2 instances, lowest priority)
+    addProviderToChain("IMDS", [&]() {
+        Aws::Crt::Auth::CredentialsProviderImdsConfig imdsConfig;
+        imdsConfig.Bootstrap = bootstrap;
+        return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderImds(imdsConfig, allocator);
+    });
+
+    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
 }
 
 AwsCredentials AwsCredentialProviderImpl::getCredentialsRaw(const std::string & profile)
