@@ -89,6 +89,7 @@ struct ErrorInfo
      * These may be rendered differently, so that users can distinguish them.
      */
     bool isFromExpr = false;
+    bool noIndent = false;
 
     /**
      * Exit status.
