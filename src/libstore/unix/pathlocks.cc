@@ -1,4 +1,5 @@
 #include "nix/store/pathlocks.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/util.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/signals.hh"
@@ -110,7 +111,7 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
 
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
-            struct stat st;
+            PosixStat st;
             if (fstat(fd.get(), &st) == -1)
                 throw SysError("statting lock file %1%", PathFmt(lockPath));
             if (st.st_size != 0)

@@ -51,7 +51,7 @@ void pollFD(int fd, int events)
 
 std::string readFile(int fd)
 {
-    struct stat st;
+    PosixStat st;
     if (fstat(fd, &st) == -1)
         throw SysError("statting file");
 

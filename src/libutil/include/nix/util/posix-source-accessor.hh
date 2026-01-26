@@ -87,7 +87,7 @@ private:
      */
     void assertNoSymlinks(CanonPath path);
 
-    std::optional<struct stat> cachedLstat(const CanonPath & path);
+    std::optional<PosixStat> cachedLstat(const CanonPath & path);
 
     std::filesystem::path makeAbsPath(const CanonPath & path);
 };

@@ -163,7 +163,7 @@ static void update(const StringSet & channelNames)
     runProgram(getNixBin("nix-env").string(), false, envArgs);
 
     // Make the channels appear in nix-env.
-    struct stat st;
+    PosixStat st;
     if (lstat(nixDefExpr.c_str(), &st) == 0) {
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr

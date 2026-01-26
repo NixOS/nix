@@ -68,7 +68,7 @@ void LocalStore::createTempRootsFile()
 
         /* Check whether the garbage collector didn't get in our
            way. */
-        struct stat st;
+        PosixStat st;
         if (fstat(fromDescriptorReadOnly(fdTempRoots->get()), &st) == -1)
             throw SysError("statting '%1%'", fnTempRoots);
         if (st.st_size == 0)
@@ -901,9 +901,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                accounting.  */
         }
 
-        struct stat st;
-        if (stat(linksDir.c_str(), &st) == -1)
-            throw SysError("statting '%1%'", linksDir);
+        auto st = stat(linksDir);
         int64_t overhead =
 #ifdef _WIN32
             0
