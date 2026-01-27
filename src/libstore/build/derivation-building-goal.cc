@@ -396,13 +396,22 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     if (useHook) {
         co_return buildWithHook(
             std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
-    } else {
+    } else if (auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store)) {
         co_return buildLocally(
+            *localStoreP,
             std::move(inputPaths),
             std::move(initialOutputs),
             std::move(drvOptions),
             std::move(outputLocks),
             externalBuilder);
+    } else {
+        throw Error(
+            R"(
+            Unable to build with a primary store that isn't a local store;
+            either pass a different '--store' or enable remote builds.
+
+            For more information check 'man nix.conf' and search for '/machines'.
+            )");
     }
 }
 
@@ -611,6 +620,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 }
 
 Goal::Co DerivationBuildingGoal::buildLocally(
+    LocalStore & localStore,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -618,16 +628,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     const ExternalBuilder * externalBuilder)
 {
     co_await yield();
-
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
-        throw Error(
-            R"(
-            Unable to build with a primary store that isn't a local store;
-            either pass a different '--store' or enable remote builds.
-
-            For more information check 'man nix.conf' and search for '/machines'.
-            )");
-    }
 
 #ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
     throw UnimplementedError("building derivations is not yet implemented on Windows");
@@ -708,9 +708,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 }
             };
 
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
-
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
@@ -756,12 +753,12 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                already be created, so we don't need to create it again. */
             builder = externalBuilder
                           ? makeExternalDerivationBuilder(
-                                *localStoreP,
+                                localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params),
                                 *externalBuilder)
                           : makeDerivationBuilder(
-                                *localStoreP,
+                                localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params));
         }

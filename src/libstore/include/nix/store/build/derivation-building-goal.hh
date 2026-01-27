@@ -2,10 +2,10 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
-#include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
@@ -75,6 +75,7 @@ private:
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
     Co buildLocally(
+        LocalStore & localStore,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
