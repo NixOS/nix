@@ -70,6 +70,30 @@ TEST(decompress, decompressInvalidInputThrowsCompressionError)
 }
 
 /* ----------------------------------------------------------------------------
+ * legacy HTTP Content-Encoding names (RFC 9110)
+ * --------------------------------------------------------------------------*/
+
+TEST(decompress, decompressXGzipCompressed)
+{
+    // Test that x-gzip (legacy HTTP Content-Encoding) works like gzip
+    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+    auto compressedData = compress("gzip", str);
+    auto o = decompress("x-gzip", compressedData);
+
+    ASSERT_EQ(o, str);
+}
+
+TEST(decompress, decompressXBzip2Compressed)
+{
+    // Test that x-bzip2 (legacy HTTP Content-Encoding) works like bzip2
+    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+    auto compressedData = compress("bzip2", str);
+    auto o = decompress("x-bzip2", compressedData);
+
+    ASSERT_EQ(o, str);
+}
+
+/* ----------------------------------------------------------------------------
  * compression sinks
  * --------------------------------------------------------------------------*/
 
