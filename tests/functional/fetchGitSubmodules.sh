@@ -18,9 +18,11 @@ rm -rf "${rootRepo}" "${subRepo}" "$TEST_HOME"/.cache/nix
 # submodule is intentionally local and it's all trusted, so we
 # disable this restriction. Setting it per repo is not sufficient, as
 # the repo-local config does not apply to the commands run from
-# outside the repos by Nix.
-export XDG_CONFIG_HOME=$TEST_HOME/.config
-git config --global protocol.file.allow always
+# outside the repos by Nix. We use environment variables to avoid
+# attempting to write to a read-only system git config.
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=protocol.file.allow
+export GIT_CONFIG_VALUE_0=always
 
 addGitContent() {
     echo "lorem ipsum" > "$1"/content
