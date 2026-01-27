@@ -387,8 +387,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             for (auto & i : drv->outputsAndOptPaths(worker.store)) {
                 if (i.second.second)
                     lockFiles.insert(localStore->toRealPath(*i.second.second));
-                else
-                    lockFiles.insert(localStore->toRealPath(drvPath) + "." + i.first);
+                else {
+                    auto lockPath = localStore->toRealPath(drvPath);
+                    lockPath += "." + i.first;
+                    lockFiles.insert(std::move(lockPath));
+                }
             }
         }
 

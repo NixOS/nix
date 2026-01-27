@@ -66,7 +66,7 @@ OsStrings getNixSshOpts()
 
 SSHMaster::SSHMaster(
     const ParsedURL::Authority & authority,
-    std::string_view keyFile,
+    std::filesystem::path keyFile,
     std::string_view sshPublicHostKey,
     bool useMaster,
     bool compress,
@@ -80,7 +80,7 @@ SSHMaster::SSHMaster(
         return std::move(oss).str();
     }())
     , fakeSSH(authority.to_string() == "localhost")
-    , keyFile(keyFile)
+    , keyFile(std::move(keyFile))
     , sshPublicHostKey(parsePublicHostKey(authority.host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
@@ -96,7 +96,7 @@ void SSHMaster::addCommonSSHOpts(OsStrings & args)
     args.insert(args.end(), sshArgs.begin(), sshArgs.end());
 
     if (!keyFile.empty())
-        args.insert(args.end(), {OS_STR("-i"), string_to_os_string(keyFile)});
+        args.insert(args.end(), {OS_STR("-i"), keyFile.native()});
     if (!sshPublicHostKey.empty()) {
         std::filesystem::path fileName = tmpDir->path() / "host-key";
         writeFile(fileName, authority.host + " " + sshPublicHostKey + "\n");
@@ -151,7 +151,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
 #ifdef _WIN32 // TODO re-enable on Windows, once we can start processes.
     throw UnimplementedError("cannot yet SSH on windows because spawning processes is not yet implemented");
 #else
-    Path socketPath = startMaster();
+    std::filesystem::path socketPath = startMaster();
 
     Pipe in, out;
     in.create();
@@ -185,8 +185,8 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
             if (!fakeSSH) {
                 args = {"ssh", hostnameAndUser.c_str(), "-x"};
                 addCommonSSHOpts(args);
-                if (socketPath != "")
-                    args.insert(args.end(), {"-S", socketPath});
+                if (!socketPath.empty())
+                    args.insert(args.end(), {"-S", socketPath.string()});
                 if (verbosity >= lvlChatty)
                     args.push_back("-v");
                 args.splice(args.end(), std::move(extraSshArgs));
@@ -229,17 +229,17 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
 
-Path SSHMaster::startMaster()
+std::filesystem::path SSHMaster::startMaster()
 {
     if (!useMaster)
-        return "";
+        return {};
 
     auto state(state_.lock());
 
     if (state->sshMaster != INVALID_DESCRIPTOR)
         return state->socketPath;
 
-    state->socketPath = (Path) *tmpDir + "/ssh.sock";
+    state->socketPath = tmpDir->path() / "ssh.sock";
 
     Pipe out;
     out.create();
@@ -261,7 +261,7 @@ Path SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
+            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
             addCommonSSHOpts(args);

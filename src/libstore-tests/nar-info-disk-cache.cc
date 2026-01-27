@@ -26,7 +26,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
 
     {
         auto cache = NarInfoDiskCache::getTest(
-            settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL}, dbPath.string());
+            settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL}, dbPath);
 
         // Set up "background noise" and check that different caches receive different ids
         {
@@ -76,7 +76,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
         // We can't clear the in-memory cache, so we use a new cache object. This is
         // more realistic anyway.
         auto cache2 = NarInfoDiskCache::getTest(
-            settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL}, dbPath.string());
+            settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL}, dbPath);
 
         {
             auto r = cache2->upToDateCacheExists("http://foo");

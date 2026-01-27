@@ -18,7 +18,7 @@ private:
     ParsedURL::Authority authority;
     std::string hostnameAndUser;
     bool fakeSSH;
-    const std::string keyFile;
+    const std::filesystem::path keyFile;
     /**
      * Raw bytes, not Base64 encoding.
      */
@@ -34,7 +34,7 @@ private:
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
         Pid sshMaster;
 #endif
-        Path socketPath;
+        std::filesystem::path socketPath;
     };
 
     Sync<State> state_;
@@ -43,14 +43,14 @@ private:
     bool isMasterRunning();
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
-    Path startMaster();
+    std::filesystem::path startMaster();
 #endif
 
 public:
 
     SSHMaster(
         const ParsedURL::Authority & authority,
-        std::string_view keyFile,
+        std::filesystem::path keyFile,
         std::string_view sshPublicHostKey,
         bool useMaster,
         bool compress,

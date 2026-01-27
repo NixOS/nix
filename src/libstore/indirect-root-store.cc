@@ -2,28 +2,28 @@
 
 namespace nix {
 
-void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
+void IndirectRootStore::makeSymlink(const std::filesystem::path & link, const std::filesystem::path & target)
 {
     /* Create directories up to `gcRoot'. */
-    createDirs(std::filesystem::path(link).parent_path());
+    createDirs(link.parent_path());
 
     /* Create the new symlink. */
-    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), rand());
+    auto tempLink = std::filesystem::path(link) += fmt(".tmp-%1%-%2%", getpid(), rand());
     createSymlink(target, tempLink);
 
     /* Atomically replace the old one. */
     std::filesystem::rename(tempLink, link);
 }
 
-Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
+std::filesystem::path IndirectRootStore::addPermRoot(const StorePath & storePath, const std::filesystem::path & _gcRoot)
 {
-    Path gcRoot(canonPath(_gcRoot).string());
+    auto gcRoot = canonPath(_gcRoot);
 
-    if (isInStore(gcRoot))
+    if (isInStore(gcRoot.string()))
         throw Error(
             "creating a garbage collector root (%1%) in the Nix store is forbidden "
             "(are you running nix-build inside the store?)",
-            gcRoot);
+            PathFmt(gcRoot));
 
     /* Register this root with the garbage collector, if it's
        running. This should be superfluous since the caller should
@@ -34,7 +34,7 @@ Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _g
     /* Don't clobber the link if it already exists and doesn't
        point to the Nix store. */
     if (pathExists(gcRoot) && (!std::filesystem::is_symlink(gcRoot) || !isInStore(readLink(gcRoot).string())))
-        throw Error("cannot create symlink '%1%'; already exists", gcRoot);
+        throw Error("cannot create symlink %1%; already exists", PathFmt(gcRoot));
 
     makeSymlink(gcRoot, printStorePath(storePath));
     addIndirectRoot(gcRoot);

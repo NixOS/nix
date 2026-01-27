@@ -210,11 +210,11 @@ diff -u <(
 ) <(cat << EOF
 error: An existing package already provides the following file:
 
-         $(nix build --no-link --print-out-paths "${flake1Dir}""#default.out")/bin/hello
+         "$(nix build --no-link --print-out-paths "${flake1Dir}""#default.out")/bin/hello"
 
        This is the conflicting file from the new package:
 
-         $(nix build --no-link --print-out-paths "${flake2Dir}""#default.out")/bin/hello
+         "$(nix build --no-link --print-out-paths "${flake2Dir}""#default.out")/bin/hello"
 
        To remove the existing package:
 

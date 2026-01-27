@@ -69,8 +69,8 @@ StoreReference Machine::completeStoreReference() const
     }
 
     if (generic && (generic->scheme == "ssh" || generic->scheme == "ssh-ng")) {
-        if (sshKey != "")
-            storeUri.params["ssh-key"] = sshKey;
+        if (!sshKey.empty())
+            storeUri.params["ssh-key"] = sshKey.string();
         if (sshPublicHostKey != "")
             storeUri.params["base64-ssh-public-host-key"] = sshPublicHostKey;
     }

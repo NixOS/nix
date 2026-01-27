@@ -84,7 +84,8 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
        preventing deadlocks. */
     for (auto & path : paths) {
         checkInterrupt();
-        std::filesystem::path lockPath = path + ".lock";
+        auto lockPath = path;
+        lockPath += ".lock";
 
         debug("locking path %1%", PathFmt(path));
 

@@ -8,14 +8,14 @@
 
 namespace nix {
 
-Path LocalFSStoreConfig::getDefaultStateDir()
+std::filesystem::path LocalFSStoreConfig::getDefaultStateDir()
 {
-    return settings.nixStateDir.string();
+    return settings.nixStateDir;
 }
 
-Path LocalFSStoreConfig::getDefaultLogDir()
+std::filesystem::path LocalFSStoreConfig::getDefaultLogDir()
 {
-    return settings.getLogFileSettings().nixLogDir.string();
+    return settings.getLogFileSettings().nixLogDir;
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
@@ -29,9 +29,7 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
      * manually repeat the same normalization logic.
      */
     , rootDir{makeRootDirSetting(
-          *this,
-          !rootDir.empty() && params.count("root") == 0 ? std::optional<Path>{canonPath(rootDir).string()}
-                                                        : std::nullopt)}
+          *this, !rootDir.empty() && params.count("root") == 0 ? std::optional{canonPath(rootDir)} : std::nullopt)}
 {
 }
 

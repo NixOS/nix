@@ -235,7 +235,7 @@ LocalStore::LocalStore(ref<const Config> config)
     if (!config->readOnly) {
         auto globalLockPath = dbDir / "big-lock";
         try {
-            globalLock = openLockFile(globalLockPath.c_str(), true);
+            globalLock = openLockFile(globalLockPath, true);
         } catch (SystemError & e) {
             if (e.is(std::errc::permission_denied) || e.is(std::errc::operation_not_permitted)) {
                 e.addTrace(
@@ -409,7 +409,7 @@ AutoCloseFD LocalStore::openGCLock()
     return toDescriptor(fdGCLock);
 }
 
-void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath)
+void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
     try {
         deletePath(path, bytesFreed);
@@ -417,15 +417,15 @@ void LocalStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool 
         if (config->ignoreGcDeleteFailure) {
             logWarning(
                 {.msg = HintFmt(
-                     isKnownPath ? "ignoring failure to remove store path '%1%': %2%"
-                                 : "ignoring failure to remove garbage in store directory '%1%': %2%",
-                     path,
+                     isKnownPath ? "ignoring failure to remove store path %1%: %2%"
+                                 : "ignoring failure to remove garbage in store directory %1%: %2%",
+                     PathFmt(path),
                      e.info().msg)});
         } else {
             e.addTrace(
                 {},
-                isKnownPath ? "While deleting store path '%1%'" : "While deleting garbage in store directory '%1%'",
-                path);
+                isKnownPath ? "While deleting store path %1%" : "While deleting garbage in store directory %1%",
+                PathFmt(path));
             throw;
         }
     }

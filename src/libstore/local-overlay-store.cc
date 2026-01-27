@@ -34,9 +34,9 @@ StoreReference LocalOverlayStoreConfig::getReference() const
     };
 }
 
-Path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
+std::filesystem::path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
-    return (upperLayer.get() / path.to_string()).string();
+    return upperLayer.get() / path.to_string();
 }
 
 LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
@@ -205,19 +205,18 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
     remountIfNecessary();
 }
 
-void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath)
+void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
-    auto mergedDir = config->realStoreDir.get().string() + "/";
-    if (path.substr(0, mergedDir.length()) != mergedDir) {
-        warn("local-overlay: unexpected gc path '%s' ", path);
+    if (path.parent_path() != config->realStoreDir.get()) {
+        warn("local-overlay: unexpected gc path %s", PathFmt(path));
         return;
     }
 
-    StorePath storePath = {path.substr(mergedDir.length())};
+    StorePath storePath = {path.filename().string()};
     auto upperPath = config->toUpperPath(storePath);
 
     if (pathExists(upperPath)) {
-        debug("upper exists: %s", path);
+        debug("upper exists: %s", PathFmt(path));
         if (lowerStore->isValidPath(storePath)) {
             debug("lower exists: %s", storePath.to_string());
             // Path also exists in lower store.
