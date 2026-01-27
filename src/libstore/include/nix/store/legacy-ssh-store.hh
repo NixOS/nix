@@ -175,7 +175,8 @@ public:
         StorePathSet & out,
         bool flipDirection = false,
         bool includeOutputs = false,
-        bool includeDerivers = false) override;
+        bool includeDerivers = false,
+        std::function<bool(const StorePath & path)> pathCallback = nullptr) override;
 
     StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
