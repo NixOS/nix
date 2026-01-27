@@ -210,12 +210,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     uid_t sandboxUid()
     {
-        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
+        return usingUserNamespace ? (buildUser ? buildUser->getSandboxedUID() : 1000) : buildUser->getUID();
     }
 
     gid_t sandboxGid() override
     {
-        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0)
+        return usingUserNamespace ? (buildUser ? buildUser->getSandboxedGID() : 100)
                                   : ChrootDerivationBuilder::sandboxGid();
     }
 
@@ -329,6 +329,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         usingUserNamespace = userNamespacesSupported();
 
+        auto existingUserNamespace = (usingUserNamespace && buildUser) ? buildUser->getUserNamespace() : std::nullopt;
+
         Pipe sendPid;
         sendPid.create();
 
@@ -351,11 +353,19 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                             "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
                 }
 
+                /* We can't setns outside the helper, as that would change the daemon's namespace.
+                   We can't setns in the child, since then the new namespaces wouldn't be owned by the user namespace.
+                   Therefore, setns in the helper, between them. */
+                if (existingUserNamespace.has_value()) {
+                    if (setns(existingUserNamespace.value(), CLONE_NEWUSER) == -1)
+                        throw SysError("setns failed for user namespace");
+                }
+
                 ProcessOptions options;
                 options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
                 if (derivationType.isSandboxed())
                     options.cloneFlags |= CLONE_NEWNET;
-                if (usingUserNamespace)
+                if (usingUserNamespace && !existingUserNamespace.has_value())
                     options.cloneFlags |= CLONE_NEWUSER;
 
                 pid_t child = startProcess([this, args = std::move(args)]() { runChild(std::move(args)); }, options);
@@ -400,7 +410,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         pid = string2Int<pid_t>(ss[0]).value();
         auto thisProcPath = procPath / std::to_string(static_cast<pid_t>(pid));
 
-        if (usingUserNamespace) {
+        if (usingUserNamespace && !existingUserNamespace.has_value()) {
             /* Set the UID/GID mapping of the builder's user namespace
                such that the sandbox user maps to the build user, or to
                the calling user (if build users are disabled). */
@@ -414,7 +424,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 writeFile(thisProcPath / "setgroups", "deny");
 
             writeFile(thisProcPath / "gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
-        } else {
+        } else if (!usingUserNamespace) {
             debug("note: not using a user namespace");
             if (!buildUser)
                 throw Error(

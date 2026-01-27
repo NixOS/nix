@@ -128,6 +128,21 @@ const uint32_t maxIdsPerBuild =
 
 struct AutoAllocateUidSettings : public virtual Config
 {
+#ifdef __linux__
+    Setting<bool> useSystemdNsresourced{
+        this,
+        false,
+        "use-systemd-nsresourced",
+        R"(
+          Whether to acquire UIDs for builds from systemd-nsresourced.
+
+          This setting is only effective when `auto-allocate-uids` is enabled.
+        )",
+        {},
+        true,
+        Xp::AutoAllocateUids};
+#endif
+
     Setting<uint32_t> startId{
         this,
 #ifdef __linux__

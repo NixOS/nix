@@ -447,12 +447,10 @@ void unix::sendMessageWithFds(Descriptor sockfd, std::string_view data, std::spa
         cmsg->cmsg_level = SOL_SOCKET;
         cmsg->cmsg_type = SCM_RIGHTS;
 
-        // Copy file descriptors (duplicating them to avoid ownership issues)
+        // Copy file descriptors. Duplicating them shouldn't be needed.
         auto * fdPtr = reinterpret_cast<int *>(CMSG_DATA(cmsg));
         for (size_t i = 0; i < fds.size(); ++i) {
-            fdPtr[i] = dup(fds[i]);
-            if (fdPtr[i] < 0)
-                throw SysError("duplicating file descriptor for sendmsg");
+            fdPtr[i] = fds[i];
         }
     }
 
