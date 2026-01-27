@@ -280,9 +280,6 @@ assert (!(args ? inNixShell));
 EOF
 nix-shell "$TEST_ROOT"/shell-ellipsis.nix --run "true"
 
-# FIXME unclear why this (newly made) test is failing in this case.
-if ! isTestOnNixOS; then
-  # `nix develop` should also work with fixed-output derivations
-  # shellcheck disable=SC2016
-  nix develop -f "$shellDotNix" fixed -c bash -c '[[ -n $stdenv ]]'
-fi
+# `nix develop` should also work with fixed-output derivations
+# shellcheck disable=SC2016
+nix develop -f "$shellDotNix" fixed -c bash -c '[[ $FOO == "was a fixed-output derivation" ]]'
