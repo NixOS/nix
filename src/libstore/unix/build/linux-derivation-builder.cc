@@ -1,5 +1,6 @@
 #ifdef __linux__
 
+#  include "nix/store/globals.hh"
 #  include "nix/store/personality.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
@@ -24,9 +25,9 @@
 
 namespace nix {
 
-static void setupSeccomp()
+static void setupSeccomp(const LocalSettings & localSettings)
 {
-    if (!settings.filterSyscalls)
+    if (!localSettings.filterSyscalls)
         return;
 
 #  if HAVE_SECCOMP
@@ -111,7 +112,7 @@ static void setupSeccomp()
         || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
         throw SysError("unable to add seccomp rule");
 
-    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, settings.allowNewPrivileges ? 0 : 1) != 0)
+    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, localSettings.allowNewPrivileges ? 0 : 1) != 0)
         throw SysError("unable to set 'no new privileges' seccomp attribute");
 
     if (seccomp_load(ctx) != 0)
@@ -161,11 +162,13 @@ struct LinuxDerivationBuilder : virtual DerivationBuilderImpl
 
     void enterChroot() override
     {
-        setupSeccomp();
+        auto & localSettings = store.config->getLocalSettings();
+
+        setupSeccomp(localSettings);
 
         linux::setPersonality({
             .system = drv.platform,
-            .impersonateLinux26 = settings.impersonateLinux26,
+            .impersonateLinux26 = localSettings.impersonateLinux26,
         });
     }
 };
@@ -218,12 +221,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(settings.buildUsersGroup, drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void prepareUser() override
     {
-        if ((buildUser && buildUser->getUIDCount() != 1) || settings.useCgroups) {
+        if ((buildUser && buildUser->getUIDCount() != 1) || store.config->getLocalSettings().useCgroups) {
             experimentalFeatureSettings.require(Xp::Cgroups);
 
             /* If we're running from the daemon, then this will return the
@@ -343,7 +346,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (setgroups(0, 0) == -1) {
                     if (errno != EPERM)
                         throw SysError("setgroups failed");
-                    if (settings.requireDropSupplementaryGroups)
+                    if (store.config->getLocalSettings().requireDropSupplementaryGroups)
                         throw Error(
                             "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
                 }
@@ -427,7 +430,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(),
                 sandboxGid(),
-                settings.sandboxBuildDir));
+                store.config->getLocalSettings().sandboxBuildDir));
 
         /* Save the mount- and user namespace of the child. We have to do this
          *before* the child does a chroot. */
@@ -617,7 +620,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                    (chrootRootDir / "dev" / "shm").c_str(),
                    "tmpfs",
                    0,
-                   fmt("size=%s", settings.sandboxShmSize).c_str())
+                   fmt("size=%s", store.config->getLocalSettings().sandboxShmSize).c_str())
                    == -1)
             throw SysError("mounting /dev/shm");
 

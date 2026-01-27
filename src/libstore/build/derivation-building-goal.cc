@@ -707,7 +707,8 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 }
             };
 
-            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
+            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot =
+                localStore.config->getLocalSettings().sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
             /* Add the closure of store paths to the chroot. */

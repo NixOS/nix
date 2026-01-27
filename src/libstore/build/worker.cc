@@ -406,7 +406,7 @@ void Worker::waitForInput()
     auto nearest = steady_time_point::max(); // nearest deadline
 
     auto localStore = dynamic_cast<LocalStore *>(&store);
-    if (localStore && localStore->config->getGCSettings().minFree.get() != 0)
+    if (localStore && localStore->config->getLocalSettings().getGCSettings().minFree.get() != 0)
         // If we have a local store (and thus are capable of automatically collecting garbage) and configured to do so,
         // periodically wake up to see if we need to run the garbage collector. (See the `autoGC` call site above in
         // this file, also gated on having a local store. when we wake up, we intended to reach that call site.)

@@ -6,7 +6,6 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/realisation.hh"
-#include "nix/store/nar-info.hh"
 #include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
@@ -16,12 +15,9 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
-#include "nix/util/url.hh"
 #include "nix/util/users.hh"
-#include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
-#include <iostream>
 #include <algorithm>
 #include <cstring>
 
@@ -33,7 +29,6 @@
 #include <unistd.h>
 #include <utime.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -74,11 +69,16 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
+const LocalSettings & LocalBuildStoreConfig::getLocalSettings() const
+
+{
+    return settings.getLocalSettings();
+}
+
 Path LocalBuildStoreConfig::getBuildDir() const
 {
-    return settings.buildDir.get().has_value() ? *settings.buildDir.get()
-           : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+    auto & bd = getLocalSettings().buildDir.get();
+    return bd.has_value() ? *bd : buildDir.get().has_value() ? *buildDir.get() : stateDir.get() + "/builds";
 }
 
 ref<Store> LocalStore::Config::openStore() const
@@ -140,7 +140,8 @@ LocalStore::LocalStore(ref<const Config> config)
     createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = config->stateDir + "/gcroots";
-    const auto & gcSettings = settings.getGCSettings();
+    const auto & localSettings = config->getLocalSettings();
+    const auto & gcSettings = localSettings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         replaceSymlink(profilesDir, gcRootsDir + "/profiles");
@@ -159,13 +160,14 @@ LocalStore::LocalStore(ref<const Config> config)
 #ifndef _WIN32
     /* Optionally, create directories and set permissions for a
        multi-user install. */
-    if (isRootUser() && settings.buildUsersGroup != "") {
+    if (isRootUser() && localSettings.buildUsersGroup != "") {
         mode_t perm = 01775;
 
-        struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
+        struct group * gr = getgrnam(localSettings.buildUsersGroup.get().c_str());
         if (!gr)
             printError(
-                "warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+                "warning: the group '%1%' specified in 'build-users-group' does not exist",
+                localSettings.buildUsersGroup);
         else if (!config->readOnly) {
             auto st = stat(config->realStoreDir.get());
 
@@ -179,7 +181,7 @@ LocalStore::LocalStore(ref<const Config> config)
 #endif
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (!settings.allowSymlinkedStore) {
+    if (!localSettings.allowSymlinkedStore) {
         std::filesystem::path path = config->realStoreDir.get();
         std::filesystem::path root = path.root_path();
         while (path != root) {
@@ -453,11 +455,6 @@ LocalStore::~LocalStore()
     }
 }
 
-const GCSettings & LocalStoreConfig::getGCSettings() const
-{
-    return settings.getGCSettings();
-}
-
 StoreReference LocalStoreConfig::getReference() const
 {
     auto params = getQueryParams();
@@ -520,7 +517,7 @@ void LocalStore::openDB(State & state, bool create)
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
        crashes. */
-    std::string syncMode = settings.fsyncMetadata ? "normal" : "off";
+    std::string syncMode = config->getLocalSettings().fsyncMetadata ? "normal" : "off";
     db.exec("pragma synchronous = " + syncMode);
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
@@ -902,7 +899,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
-    if (settings.syncBeforeRegistering)
+    if (config->getLocalSettings().syncBeforeRegistering)
         sync();
 #endif
 
@@ -1027,7 +1024,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 TeeSource wrapperSource{source, hashSink};
 
                 narRead = true;
-                restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
+                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
 
                 auto hashResult = hashSink.finish();
 
@@ -1083,11 +1080,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)});
+                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
-                if (settings.fsyncStorePaths) {
+                if (config->getLocalSettings().fsyncStorePaths) {
                     recursiveSync(realPath);
                     syncParent(realPath);
                 }
@@ -1115,6 +1112,7 @@ StorePath LocalStore::addToStoreFromDump(
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
     TeeSource source{source0, *hashSink};
+    const LocalSettings & localSettings = config->getLocalSettings();
 
     /* Read the source path into memory, but only if it's up to
        narBufferSize bytes. If it's larger, write it to a temporary
@@ -1138,10 +1136,10 @@ StorePath LocalStore::addToStoreFromDump(
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
        or the original source is empty */
-    while (dump.size() < settings.narBufferSize) {
+    while (dump.size() < localSettings.narBufferSize) {
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
-        auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
+        auto want = std::min(chunkSize, localSettings.narBufferSize - oldSize);
         if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
             dumpBuffer.release();
             dumpBuffer.reset((char *) tmp);
@@ -1178,7 +1176,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath.string(), bothSource, dumpMethod, settings.fsyncStorePaths);
+        restorePath(tempPath.string(), bothSource, dumpMethod, localSettings.fsyncStorePaths);
 
         dumpBuffer.reset();
         dump = {};
@@ -1222,7 +1220,7 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, settings.fsyncStorePaths);
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, localSettings.fsyncStorePaths);
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1244,11 +1242,11 @@ StorePath LocalStore::addToStoreFromDump(
             }
 
             canonicalisePathMetaData(
-                realPath, {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)}); // FIXME: merge into restorePath
+                realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
-            if (settings.fsyncStorePaths) {
+            if (localSettings.fsyncStorePaths) {
                 recursiveSync(realPath);
                 syncParent(realPath);
             }
