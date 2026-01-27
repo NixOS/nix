@@ -231,11 +231,29 @@ public:
 
         void next(BindingsCursor cursor) noexcept
         {
-            current = &cursor.get();
-            cursor.increment();
+            while (true) {
+                current = &cursor.get();
+                cursor.increment();
 
-            if (!cursor.empty())
-                push(cursor);
+                if (!cursor.empty())
+                    push(cursor);
+
+                // If not a tombstone, we're done
+                if (current->value != nullptr)
+                    return;
+
+                // Tombstone: skip it and all shadowed entries, then continue to next
+                if (cursorHeap.empty()) {
+                    finished();
+                    return;
+                }
+                auto nextCursor = consumeAllUntilCurrentName();
+                if (!nextCursor) {
+                    finished();
+                    return;
+                }
+                cursor = *nextCursor;
+            }
         }
 
         std::optional<BindingsCursor> consumeAllUntilCurrentName() noexcept
@@ -349,6 +367,7 @@ public:
 
     /**
      * Get attribute by name or nullptr if no such attribute exists.
+     * Attributes with nullptr values (tombstones) are treated as non-existent.
      */
     const Attr * get(Symbol name) const noexcept
     {
@@ -364,8 +383,12 @@ public:
         const Bindings * currentChunk = this;
         while (currentChunk) {
             const Attr * maybeAttr = getInChunk(*currentChunk);
-            if (maybeAttr)
+            if (maybeAttr) {
+                // Tombstone (nullptr value) means the attribute is deleted
+                if (maybeAttr->value == nullptr)
+                    return nullptr;
                 return maybeAttr;
+            }
             currentChunk = currentChunk->baseLayer;
         }
 
@@ -470,10 +493,10 @@ private:
      * If the bindings gets "layered" on top of another we need to recalculate
      * the number of unique attributes in the chain.
      *
-     * This is done by either iterating over the base "layer" and the newly added
-     * attributes and counting duplicates. If the base "layer" is big this approach
-     * is inefficient and we fall back to doing per-element binary search in the base
-     * "layer".
+     * Tombstones (nullptr values) are handled specially:
+     * - A tombstone that shadows a base attr reduces the visible size
+     * - A tombstone that doesn't shadow anything has no effect
+     * - Non-tombstone duplicates don't change the size (they shadow base)
      */
     void finishSizeIfNecessary()
     {
@@ -483,31 +506,43 @@ private:
         auto & base = *bindings->baseLayer;
         auto attrs = std::span(bindings->attrs, bindings->numAttrs);
 
+        // Count tombstones and track how many delete base attrs
+        Bindings::size_type tombstones = 0;
+        Bindings::size_type tombstonesDeletingBase = 0;
+
+        for (const auto & attr : attrs) {
+            if (attr.value == nullptr) {
+                ++tombstones;
+                if (base.get(attr.name))
+                    ++tombstonesDeletingBase;
+            }
+        }
+
+        // Count non-tombstone attrs that shadow base attrs.
+        // Use set_intersection when attrs > base (O(|base| + |attrs|)),
+        // otherwise use per-element lookup (O(|attrs| * log|base|)).
         Bindings::size_type duplicates = 0;
 
-        /* If the base bindings is smaller than the newly added attributes
-           iterate using std::set_intersection to run in O(|base| + |attrs|) =
-           O(|attrs|). Otherwise use an O(|attrs| * log(|base|)) per-attr binary
-           search to check for duplicates. Note that if we are in this code path then
-           |attrs| <= bindingsUpdateLayerRhsSizeThreshold, which 16 by default. We are
-           optimizing for the case when a small attribute set gets "layered" on top of
-           a much larger one. When attrsets are already small it's fine to do a linear
-           scan, but we should avoid expensive iterations over large "base" attrsets. */
         if (attrs.size() > base.size()) {
+            Bindings::size_type matches = 0;
             std::set_intersection(
                 base.begin(),
                 base.end(),
                 attrs.begin(),
                 attrs.end(),
-                boost::make_function_output_iterator([&]([[maybe_unused]] auto && _) { ++duplicates; }));
+                boost::make_function_output_iterator([&]([[maybe_unused]] auto && _) { ++matches; }));
+            // set_intersection counts all matches; exclude tombstones
+            duplicates = matches - tombstonesDeletingBase;
         } else {
             for (const auto & attr : attrs) {
-                if (base.get(attr.name))
+                if (attr.value != nullptr && base.get(attr.name))
                     ++duplicates;
             }
         }
 
-        bindings->numAttrsInChain = base.numAttrsInChain + attrs.size() - duplicates;
+        // Final size = base size + new non-tombstone attrs - deletions from base
+        bindings->numAttrsInChain =
+            base.numAttrsInChain + (attrs.size() - tombstones - duplicates) - tombstonesDeletingBase;
     }
 
 public:
