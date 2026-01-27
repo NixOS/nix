@@ -2379,8 +2379,10 @@ static RegisterPrimOp primop_readFileType({
 /* Read the target of a symlink. */
 static void prim_readSymlink(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = state.realisePath(pos, *args[0], SymlinkResolution::Ancestors);
-    v.mkString(path.readLink(), state.mem);
+    const auto path = state.realisePath(pos, *args[0], SymlinkResolution::Ancestors);
+    const auto target = path.readLink();
+    const auto parent = path.parent();
+    v.mkPath(SourcePath(path.accessor, CanonPath(target, parent.path)), state.mem);
 }
 
 static RegisterPrimOp primop_readSymlink({
