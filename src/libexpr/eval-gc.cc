@@ -125,7 +125,7 @@ void initGC()
 #endif
 
     // NIX_PATH must override the regular setting
-    // See the comment in applyConfig
+    // See the XXX comment in `applyConfig()`
     if (auto nixPathEnv = getEnv("NIX_PATH")) {
         globalConfig.set("nix-path", concatStringsSep(" ", EvalSettings::parseNixPath(nixPathEnv.value())));
     }
