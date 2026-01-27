@@ -63,15 +63,9 @@ void Pid::operator=(pid_t pid)
     killSignal = SIGKILL; // reset signal to default
 }
 
-Pid & Pid::operator=(Pid && other)
+Pid & Pid::operator=(Pid && other) noexcept
 {
-    if (pid != -1)
-        kill(/*allowInterrupts=*/false);
-
-    this->pid = other.release();
-    this->separatePG = other.separatePG;
-    this->killSignal = other.killSignal;
-
+    swap(*this, other);
     return *this;
 }
 
