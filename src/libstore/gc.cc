@@ -40,8 +40,8 @@ static std::string gcRootsDir = "gcroots";
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
-    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", config->stateDir, gcRootsDir, hash));
-    makeSymlink(realRoot, path);
+    auto realRoot = canonPath(config->stateDir.get() / gcRootsDir / "auto" / hash);
+    makeSymlink(realRoot.string(), path);
 }
 
 void LocalStore::createTempRootsFile()
@@ -165,11 +165,11 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
             // those to keep the directory alive.
             continue;
         }
-        Path path = i.path().string();
+        auto path = i.path();
 
         pid_t pid = std::stoi(name);
 
-        debug("reading temporary root file '%1%'", path);
+        debug("reading temporary root file %1%", PathFmt(path));
         AutoCloseFD fd(toDescriptor(open(
             path.c_str(),
 #ifndef _WIN32
@@ -181,14 +181,14 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
             /* It's okay if the file has disappeared. */
             if (errno == ENOENT)
                 continue;
-            throw SysError("opening temporary roots file '%1%'", path);
+            throw SysError("opening temporary roots file %1%", PathFmt(path));
         }
 
         /* Try to acquire a write lock without blocking.  This can
            only succeed if the owning process has died.  In that case
            we don't care about its temporary roots. */
         if (lockFile(fd.get(), ltWrite, false)) {
-            printInfo("removing stale temporary roots file '%1%'", path);
+            printInfo("removing stale temporary roots file %1%", PathFmt(path));
             unlink(path.c_str());
             writeFull(fd.get(), "d");
             continue;
@@ -201,7 +201,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         std::string::size_type pos = 0, end;
 
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
-            Path root(contents, pos, end - pos);
+            std::string root(contents, pos, end - pos);
             debug("got temporary root '%s'", root);
             tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
             pos = end + 1;
@@ -211,13 +211,13 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
 
 void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, Roots & roots)
 {
-    auto foundRoot = [&](const Path & path, const Path & target) {
+    auto foundRoot = [&](const std::filesystem::path & path, const std::filesystem::path & target) {
         try {
-            auto storePath = toStorePath(target).first;
+            auto storePath = toStorePath(target.string()).first;
             if (isValidPath(storePath))
-                roots[std::move(storePath)].emplace(path);
+                roots[std::move(storePath)].emplace(path.string());
             else
-                printInfo("skipping invalid root from '%1%' to '%2%'", path, target);
+                printInfo("skipping invalid root from %1% to %2%", PathFmt(path), PathFmt(target));
         } catch (BadStorePath &) {
         }
     };
@@ -235,24 +235,24 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
         }
 
         else if (type == std::filesystem::file_type::symlink) {
-            Path target = readLink(path);
-            if (isInStore(target))
+            auto target = readLink(path);
+            if (isInStore(target.string()))
                 foundRoot(path, target);
 
             /* Handle indirect roots. */
             else {
                 auto parentPath = std::filesystem::path(path).parent_path();
                 target = absPath(target, &parentPath);
-                if (!pathExists(target)) {
+                if (!pathExists(target.string())) {
                     if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
-                        printInfo("removing stale link from '%1%' to '%2%'", path, target);
+                        printInfo("removing stale link from %1% to %2%", PathFmt(path), PathFmt(target));
                         unlink(path.c_str());
                     }
                 } else {
                     if (!std::filesystem::is_symlink(target))
                         return;
-                    Path target2 = readLink(target);
-                    if (isInStore(target2))
+                    auto target2 = readLink(target);
+                    if (isInStore(target2.string()))
                         foundRoot(target, target2);
                 }
             }
@@ -514,26 +514,26 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
-        Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = (config->realStoreDir.get() / std::string(baseName)).string();
+        auto path = std::filesystem::path{storeDir} / std::string(baseName);
+        auto realPath = config->realStoreDir.get() / std::string(baseName);
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
            exclusive lock before deleting them. */
         if (baseName.find("tmp-", 0) == 0) {
-            AutoCloseFD tmpDirFd = openDirectory(realPath);
+            AutoCloseFD tmpDirFd = openDirectory(realPath.string());
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
-                debug("skipping locked tempdir '%s'", realPath);
+                debug("skipping locked tempdir %s", PathFmt(realPath));
                 return;
             }
         }
 
-        printInfo("deleting '%1%'", path);
+        printInfo("deleting %1%", PathFmt(path));
 
-        results.paths.insert(path);
+        results.paths.insert(path.string());
 
         uint64_t bytesFreed;
-        deleteStorePath(realPath, bytesFreed, isKnownPath);
+        deleteStorePath(realPath.string(), bytesFreed, isKnownPath);
 
         results.bytesFreed += bytesFreed;
 
@@ -744,9 +744,9 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             std::string name = dirent->d_name;
             if (name == "." || name == "..")
                 continue;
-            Path path = linksDir + "/" + name;
+            auto path = linksDir / name;
 
-            auto st = lstat(path);
+            auto st = lstat(path.string());
 
             if (st.st_nlink != 1) {
                 actualSize += st.st_size;
@@ -754,10 +754,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 continue;
             }
 
-            printMsg(lvlTalkative, "deleting unused link '%1%'", path);
+            printMsg(lvlTalkative, "deleting unused link %1%", PathFmt(path));
 
             if (unlink(path.c_str()) == -1)
-                throw SysError("deleting '%1%'", path);
+                throw SysError("deleting %1%", PathFmt(path));
 
             /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */

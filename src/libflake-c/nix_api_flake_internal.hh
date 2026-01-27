@@ -13,7 +13,7 @@ struct nix_flake_settings
 
 struct nix_flake_reference_parse_flags
 {
-    std::optional<nix::Path> baseDirectory;
+    std::optional<std::filesystem::path> baseDirectory;
 };
 
 struct nix_flake_reference
