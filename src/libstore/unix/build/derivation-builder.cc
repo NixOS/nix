@@ -4,7 +4,6 @@
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
 #include "nix/store/path-references.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
@@ -19,8 +18,6 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
-
-#include <queue>
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -235,7 +232,7 @@ protected:
      */
     virtual std::unique_ptr<UserLock> getBuildUser()
     {
-        return acquireUserLock(settings.buildUsersGroup, 1, false);
+        return acquireUserLock(store.config->getLocalSettings().buildUsersGroup, 1, false);
     }
 
     /**
@@ -847,13 +844,14 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     /* Allow a user-configurable set of directories from the
        host file system. */
     PathsInChroot pathsInChroot = defaultPathsInChroot;
+    const LocalSettings & localSettings = store.config->getLocalSettings();
 
     if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
         throw Error("`sandbox-build-dir` must not contain the storeDir");
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
-    PathSet allowedPaths = settings.allowedImpureHostPrefixes;
+    PathSet allowedPaths = localSettings.allowedImpureHostPrefixes;
 
     /* This works like the above, except on a per-derivation level */
     auto impurePaths = drvOptions.impureHostDeps;
@@ -883,13 +881,13 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         pathsInChroot[i] = {i, true};
     }
 
-    if (settings.preBuildHook != "") {
-        printMsg(lvlChatty, "executing pre-build hook '%1%'", settings.preBuildHook);
+    if (localSettings.preBuildHook != "") {
+        printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
 
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
         auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, getPreBuildHookArgs());
+        auto lines = runProgram(localSettings.preBuildHook, false, getPreBuildHookArgs());
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
             auto line = lines.substr(lastPos, nlPos - lastPos);
@@ -1084,7 +1082,7 @@ void DerivationBuilderImpl::initEnv()
        fixed-output derivations is by definition pure (since we
        already know the cryptographic hash of the output). */
     if (!derivationType.isSandboxed()) {
-        auto & impureEnv = settings.impureEnv.get();
+        auto & impureEnv = store.config->getLocalSettings().impureEnv.get();
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
@@ -1782,7 +1780,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (store.isValidPath(newInfo.path)) {
                 ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
-                    auto * diffHook = settings.getDiffHook();
+                    auto * diffHook = store.config->getLocalSettings().getDiffHook();
                     if (diffHook || settings.keepFailed) {
                         auto dst = store.toRealPath(finalDestPath + ".check");
                         deletePath(dst);
@@ -1988,10 +1986,11 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
     bool useSandbox = false;
+    const LocalSettings & localSettings = store.config->getLocalSettings();
 
     /* Are we doing a sandboxed build? */
     {
-        if (settings.sandboxMode == smEnabled) {
+        if (localSettings.sandboxMode == smEnabled) {
             if (params.drvOptions.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
@@ -2005,9 +2004,9 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
                     store.printStorePath(params.drvPath));
 #endif
             useSandbox = true;
-        } else if (settings.sandboxMode == smDisabled)
+        } else if (localSettings.sandboxMode == smDisabled)
             useSandbox = false;
-        else if (settings.sandboxMode == smRelaxed)
+        else if (localSettings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
             useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
     }
@@ -2022,7 +2021,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
 
 #ifdef __linux__
     if (useSandbox && !mountAndPidNamespacesSupported()) {
-        if (!settings.sandboxFallback)
+        if (!localSettings.sandboxFallback)
             throw Error(
                 "this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
         debug("auto-disabling sandboxing because the prerequisite namespaces are not available");

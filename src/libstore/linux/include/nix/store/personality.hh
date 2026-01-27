@@ -5,6 +5,6 @@
 
 namespace nix::linux {
 
-void setPersonality(std::string_view system);
+void setPersonality(std::string_view system, bool impersonateLinux26);
 
 }

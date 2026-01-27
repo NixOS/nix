@@ -44,7 +44,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     {
         /* In a sandbox, for determinism, always use the same temporary
            directory. */
-        return settings.sandboxBuildDir.get();
+        return store.config->getLocalSettings().sandboxBuildDir.get();
     }
 
     virtual gid_t sandboxGid()
@@ -95,7 +95,9 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
             chownToBuilder(chrootRootDir / "etc");
 
         if (drvOptions.useUidRange(drv) && (!buildUser || buildUser->getUIDCount() < 65536))
-            throw Error("feature 'uid-range' requires the setting '%s' to be enabled", settings.autoAllocateUids.name);
+            throw Error(
+                "feature 'uid-range' requires the setting '%s' to be enabled",
+                store.config->getLocalSettings().autoAllocateUids.name);
 
         /* Declare the build user's group so that programs get a consistent
            view of the system (e.g., "id -gn"). */

@@ -31,13 +31,13 @@ int testMainForBuidingPre(int argc, char ** argv)
     //   sandboxBuildDir = /build
     // However, we have a rule that the store dir must not be inside the storeDir, so we need to pick a different
     // sandboxBuildDir.
-    settings.sandboxBuildDir = "/test-build-dir-instead-of-usual-build-dir";
+    settings.getLocalSettings().sandboxBuildDir = "/test-build-dir-instead-of-usual-build-dir";
 #endif
 
 #ifdef __APPLE__
     // Avoid this error, when already running in a sandbox:
     // sandbox-exec: sandbox_apply: Operation not permitted
-    settings.sandboxMode = smDisabled;
+    settings.getLocalSettings().sandboxMode = smDisabled;
     setEnv("_NIX_TEST_NO_SANDBOX", "1");
 #endif
 

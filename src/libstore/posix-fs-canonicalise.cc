@@ -80,7 +80,7 @@ static void canonicalisePathMetaData_(
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (settings.ignoredAcls.get().count(eaName))
+            if (settings.getLocalSettings().ignoredAcls.get().count(eaName))
                 continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);

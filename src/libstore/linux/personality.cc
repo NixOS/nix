@@ -1,5 +1,6 @@
 #include "nix/store/personality.hh"
-#include "nix/store/globals.hh"
+#include "nix/store/config.hh"
+#include "nix/util/error.hh"
 
 #include <sys/utsname.h>
 #include <sys/personality.h>
@@ -8,7 +9,7 @@
 
 namespace nix::linux {
 
-void setPersonality(std::string_view system)
+void setPersonality(std::string_view system, bool impersonateLinux26)
 {
     /* Change the personality to 32-bit if we're doing an
        i686-linux build on an x86_64-linux machine. */
@@ -24,7 +25,7 @@ void setPersonality(std::string_view system)
 
     /* Impersonate a Linux 2.6 machine to get some determinism in
        builds that depend on the kernel version. */
-    if ((system == "i686-linux" || system == "x86_64-linux") && settings.impersonateLinux26) {
+    if ((system == "i686-linux" || system == "x86_64-linux") && impersonateLinux26) {
         int cur = personality(0xffffffff);
         if (cur != -1)
             personality(cur | 0x0020000 /* == UNAME26 */);
