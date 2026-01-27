@@ -3528,6 +3528,50 @@ static RegisterPrimOp primop_mapAttrs({
     .fun = prim_mapAttrs,
 });
 
+static void prim_filterAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.filterAttrs");
+
+    if (args[1]->attrs()->empty()) {
+        v = *args[1];
+        return;
+    }
+
+    state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterAttrs");
+
+    auto attrs = state.buildBindings(args[1]->attrs()->size());
+
+    for (auto & i : *args[1]->attrs()) {
+        Value * vName = Value::toPtr(state.symbols[i.name]);
+        Value * vFun2 = state.allocValue();
+        vFun2->mkApp(args[0], vName);
+        Value res;
+        state.callFunction(*vFun2, *i.value, res, noPos);
+        if (state.forceBool(
+                res, pos, "while evaluating the return value of the filtering function passed to builtins.filterAttrs"))
+            attrs.insert(i.name, i.value);
+    }
+
+    v.mkAttrs(attrs.alreadySorted());
+}
+
+static RegisterPrimOp primop_filterAttrs({
+    .name = "__filterAttrs",
+    .args = {"f", "attrset"},
+    .doc = R"(
+      Return an attribute set consisting of the attributes in *attrset* for which
+      the function *f* returns `true`. The function *f* is called with two arguments:
+      the name of the attribute and the value of the attribute. For example,
+
+      ```nix
+      builtins.filterAttrs (name: value: name == "foo") { foo = 1; bar = 2; }
+      ```
+
+      evaluates to `{ foo = 1; }`.
+    )",
+    .fun = prim_filterAttrs,
+});
+
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     // we will first count how many values are present for each given key.
