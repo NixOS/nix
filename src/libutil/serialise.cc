@@ -138,7 +138,7 @@ size_t BufferedSource::read(char * data, size_t len)
     return n;
 }
 
-std::string BufferedSource::readLine(bool eofOk)
+std::string BufferedSource::readLine(bool eofOk, char terminator)
 {
     if (!buffer)
         buffer = std::make_unique_for_overwrite<char[]>(bufSize);
@@ -148,7 +148,7 @@ std::string BufferedSource::readLine(bool eofOk)
         if (bufPosOut < bufPosIn) {
             auto * start = buffer.get() + bufPosOut;
             auto * end = buffer.get() + bufPosIn;
-            if (auto * newline = static_cast<char *>(memchr(start, '\n', end - start))) {
+            if (auto * newline = static_cast<char *>(memchr(start, terminator, end - start))) {
                 line.append(start, newline - start);
                 bufPosOut = (newline - buffer.get()) + 1;
                 if (bufPosOut == bufPosIn)
