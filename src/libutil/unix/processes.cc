@@ -35,6 +35,14 @@ namespace nix {
 
 Pid::Pid() {}
 
+Pid::Pid(Pid && other) noexcept
+    : pid(other.pid)
+    , separatePG(other.separatePG)
+    , killSignal(other.killSignal)
+{
+    other.release();
+}
+
 Pid::Pid(pid_t pid)
     : pid(pid)
 {
@@ -113,7 +121,12 @@ void Pid::setKillSignal(int signal)
 pid_t Pid::release()
 {
     pid_t p = pid;
+    /* We use the move assignment operator rather than setting the individual fields so we aren't duplicating the
+       default values from the header, which would be hard to keep in sync. If we just used the assignment operator
+       without manually resetting pid first it would kill that process, however, so we do manually reset that one field.
+     */
     pid = -1;
+    *this = Pid();
     return p;
 }
 
