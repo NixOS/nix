@@ -191,7 +191,10 @@ test "$status" = 1
 # Precise number of errors depends on daemon version / goal refactorings
 (( "$(<<<"$out" grep -cE '^error:')" >= 2 ))
 
-if isDaemonNewer "2.29pre"; then
+if isDaemonNewer "2.31"; then
+    <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
+    <<<"$out" grepQuiet -E "Reason: 1 dependency failed."
+elif isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 1 dependency failed."
     <<<"$out" grepQuiet -E "Build failed due to failed dependency"

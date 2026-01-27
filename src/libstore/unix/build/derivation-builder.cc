@@ -439,7 +439,8 @@ private:
     StorePath makeFallbackPath(OutputNameView outputName);
 };
 
-void handleDiffHook(
+static void handleDiffHook(
+    const Path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,
@@ -447,29 +448,25 @@ void handleDiffHook(
     const std::filesystem::path & drvPath,
     const std::filesystem::path & tmpDir)
 {
-    auto & diffHookOpt = settings.diffHook.get();
-    if (diffHookOpt && settings.runDiffHook) {
-        auto & diffHook = *diffHookOpt;
-        try {
-            auto diffRes = runProgram(
-                RunOptions{
-                    .program = diffHook,
-                    .lookupPath = true,
-                    .args = {tryA, tryB, drvPath, tmpDir},
-                    .uid = uid,
-                    .gid = gid,
-                    .chdir = "/"});
-            if (!statusOk(diffRes.first))
-                throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
+    try {
+        auto diffRes = runProgram(
+            RunOptions{
+                .program = diffHook,
+                .lookupPath = true,
+                .args = {tryA, tryB, drvPath, tmpDir},
+                .uid = uid,
+                .gid = gid,
+                .chdir = "/"});
+        if (!statusOk(diffRes.first))
+            throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
 
-            if (diffRes.second != "")
-                printError(chomp(diffRes.second));
-        } catch (Error & error) {
-            ErrorInfo ei = error.info();
-            // FIXME: wrap errors.
-            ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
-            logError(ei);
-        }
+        if (diffRes.second != "")
+            printError(chomp(diffRes.second));
+    } catch (Error & error) {
+        ErrorInfo ei = error.info();
+        // FIXME: wrap errors.
+        ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
+        logError(ei);
     }
 }
 
@@ -1785,18 +1782,22 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (store.isValidPath(newInfo.path)) {
                 ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
-                    if (settings.runDiffHook || settings.keepFailed) {
+                    auto * diffHook = settings.getDiffHook();
+                    if (diffHook || settings.keepFailed) {
                         auto dst = store.toRealPath(finalDestPath + ".check");
                         deletePath(dst);
                         movePath(actualPath, dst);
 
-                        handleDiffHook(
-                            buildUser ? buildUser->getUID() : getuid(),
-                            buildUser ? buildUser->getGID() : getgid(),
-                            finalDestPath,
-                            dst,
-                            store.printStorePath(drvPath),
-                            tmpDir);
+                        if (diffHook) {
+                            handleDiffHook(
+                                *diffHook,
+                                buildUser ? buildUser->getUID() : getuid(),
+                                buildUser ? buildUser->getGID() : getgid(),
+                                finalDestPath,
+                                dst,
+                                store.printStorePath(drvPath),
+                                tmpDir);
+                        }
 
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs from '%s'",

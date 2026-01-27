@@ -1,9 +1,26 @@
+{ nixComponents, ... }:
 {
   name = "fetchers-substitute";
 
   nodes.substituter =
     { pkgs, ... }:
     {
+      # nix-serve is broken while cross-compiling in nixpkgs 25.11. It's been
+      # fixed since, but while we're pinning 25.11 we use this workaround.
+      nixpkgs.overlays = [
+        (final: prev: {
+          nix-serve =
+            final.lib.warnIf (final.lib.versions.majorMinor final.lib.version != "25.11")
+              "remove the hack in fetchers-substitute.nix when updating nixpkgs from 25.11"
+              (
+                prev.nix-serve.override {
+                  nix = prev.nix // {
+                    libs.nix-perl-bindings = nixComponents.nix-perl-bindings;
+                  };
+                }
+              );
+        })
+      ];
       virtualisation.writableStore = true;
 
       nix.settings.extra-experimental-features = [
