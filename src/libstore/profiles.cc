@@ -170,7 +170,7 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
 }
 
 void deleteGenerationsFilter(
-    const std::filestystem::path & profile,
+    const std::filesystem::path & profile,
     std::optional<time_t> olderThan,
     std::optional<GenerationNumber> keepMin,
     std::optional<GenerationNumber> keepMax,
@@ -230,7 +230,7 @@ void deleteGenerationsFilter(
         deleteGeneration2(profile, toDelete->number, dryRun);
 }
 
-void deleteGenerationsGreaterThan(const Path & profile, GenerationNumber max, bool dryRun)
+void deleteGenerationsGreaterThan(const std::filesystem::path & profile, GenerationNumber max, bool dryRun)
 {
     deleteGenerationsFilter(profile, std::nullopt, std::nullopt, std::optional(max), dryRun);
 }
