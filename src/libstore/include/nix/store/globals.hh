@@ -906,6 +906,8 @@ public:
           line.
         )"};
 
+private:
+
     OptionalPathSetting diffHook{
         this,
         std::nullopt,
@@ -937,6 +939,16 @@ public:
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.
         )"};
+
+public:
+
+    const Path * getDiffHook() const
+    {
+        if (!runDiffHook.get()) {
+            return nullptr;
+        }
+        return get(diffHook.get());
+    }
 
     Setting<Strings> trustedPublicKeys{
         this,
