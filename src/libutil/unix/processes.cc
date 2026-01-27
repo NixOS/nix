@@ -35,6 +35,13 @@ namespace nix {
 
 Pid::Pid() {}
 
+Pid::Pid(Pid && other) noexcept
+    : pid(other.release())
+    , separatePG(other.separatePG)
+    , killSignal(other.killSignal)
+{
+}
+
 Pid::Pid(pid_t pid)
     : pid(pid)
 {
@@ -54,6 +61,18 @@ void Pid::operator=(pid_t pid)
         kill();
     this->pid = pid;
     killSignal = SIGKILL; // reset signal to default
+}
+
+Pid & Pid::operator=(Pid && other)
+{
+    if (pid != -1)
+        kill(/*allowInterrupts=*/false);
+
+    this->pid = other.release();
+    this->separatePG = other.separatePG;
+    this->killSignal = other.killSignal;
+
+    return *this;
 }
 
 Pid::operator pid_t()

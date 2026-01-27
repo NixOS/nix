@@ -35,6 +35,10 @@ class Pid
 #endif
 public:
     Pid();
+    Pid(const Pid &) = delete;
+    Pid(Pid && other) noexcept;
+    Pid & operator=(const Pid &) = delete;
+    Pid & operator=(Pid && other);
 #ifndef _WIN32
     Pid(pid_t pid);
     void operator=(pid_t pid);
