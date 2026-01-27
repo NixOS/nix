@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <nlohmann/json_fwd.hpp>
 
 #include "nix/store/build-result.hh"
@@ -43,11 +44,11 @@ struct BuilderFailureError : BuildError
  */
 struct ChrootPath
 {
-    Path source;
+    std::filesystem::path source;
     bool optional = false;
 };
 
-typedef std::map<Path, ChrootPath> PathsInChroot; // maps target path to source path
+typedef std::map<std::filesystem::path, ChrootPath> PathsInChroot; // maps target path to source path
 
 /**
  * Parameters by (mostly) `const` reference for `DerivationBuilder`.
@@ -62,14 +63,14 @@ struct DerivationBuilderParams
     /**
      * The derivation stored at drvPath.
      */
-    const Derivation & drv;
+    const BasicDerivation & drv;
 
     /**
      * The derivation options of `drv`.
      *
      * @todo this should be part of `Derivation`.
      */
-    const DerivationOptions & drvOptions;
+    const DerivationOptions<StorePath> & drvOptions;
 
     // The remainder is state held during the build.
 
@@ -79,7 +80,7 @@ struct DerivationBuilderParams
      */
     const StorePathSet & inputPaths;
 
-    const std::map<std::string, InitialOutput> & initialOutputs;
+    const std::map<std::string, InitialOutput> initialOutputs;
 
     const BuildMode & buildMode;
 
@@ -110,7 +111,7 @@ struct DerivationBuilderCallbacks
     /**
      * Open a log file and a pipe to it.
      */
-    virtual Path openLogFile() = 0;
+    virtual void openLogFile() = 0;
 
     /**
      * Close the log file.
@@ -185,19 +186,26 @@ struct DerivationBuilder : RestrictionContext
 struct ExternalBuilder
 {
     StringSet systems;
-    Path program;
+    std::filesystem::path program;
     std::vector<std::string> args;
 };
 
+struct DerivationBuilderDeleter
+{
+    void operator()(DerivationBuilder * builder) noexcept;
+};
+
+using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter>;
+
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-std::unique_ptr<DerivationBuilder> makeDerivationBuilder(
+DerivationBuilderUnique makeDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 
 /**
  * @param handler Must be chosen such that it supports the given
  * derivation.
  */
-std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
+DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,

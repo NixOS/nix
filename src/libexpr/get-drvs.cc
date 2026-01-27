@@ -168,7 +168,7 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         for (auto elem : outTI->listView()) {
             if (elem->type() != nString)
                 throw errMsg;
-            auto out = outputs.find(elem->c_str());
+            auto out = outputs.find(elem->string_view());
             if (out == outputs.end())
                 throw errMsg;
             result.insert(*out);
@@ -213,6 +213,8 @@ StringSet PackageInfo::queryMetaNames()
 
 bool PackageInfo::checkMeta(Value & v)
 {
+    auto _level = state->addCallDepth(v.determinePos(noPos));
+
     state->forceValue(v, v.determinePos(noPos));
     if (v.type() == nList) {
         for (auto elem : v.listView())
@@ -245,7 +247,7 @@ std::string PackageInfo::queryMetaString(const std::string & name)
     Value * v = queryMeta(name);
     if (!v || v->type() != nString)
         return "";
-    return v->c_str();
+    return std::string{v->string_view()};
 }
 
 NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
@@ -258,7 +260,7 @@ NixInt PackageInfo::queryMetaInt(const std::string & name, NixInt def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            integer meta fields. */
-        if (auto n = string2Int<NixInt::Inner>(v->c_str()))
+        if (auto n = string2Int<NixInt::Inner>(v->string_view()))
             return NixInt{*n};
     }
     return def;
@@ -274,7 +276,7 @@ NixFloat PackageInfo::queryMetaFloat(const std::string & name, NixFloat def)
     if (v->type() == nString) {
         /* Backwards compatibility with before we had support for
            float meta fields. */
-        if (auto n = string2Float<NixFloat>(v->c_str()))
+        if (auto n = string2Float<NixFloat>(v->string_view()))
             return *n;
     }
     return def;
@@ -367,7 +369,26 @@ static std::string addToPath(const std::string & s1, std::string_view s2)
     return s1.empty() ? std::string(s2) : s1 + "." + s2;
 }
 
-static std::regex attrRegex("[A-Za-z_][A-Za-z0-9-_+]*");
+static bool isAttrPathComponent(std::string_view symbol)
+{
+    if (symbol.empty())
+        return false;
+
+    /* [A-Za-z_] */
+    unsigned char first = symbol[0];
+    if (!((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_'))
+        return false;
+
+    /* [A-Za-z0-9-_+]* */
+    for (unsigned char c : symbol.substr(1)) {
+        if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
+            || c == '+')
+            continue;
+        return false;
+    }
+
+    return true;
+}
 
 static void getDerivations(
     EvalState & state,
@@ -378,6 +399,8 @@ static void getDerivations(
     Done & done,
     bool ignoreAssertionFailures)
 {
+    auto _level = state.addCallDepth(vIn.determinePos(noPos));
+
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
 
@@ -400,7 +423,7 @@ static void getDerivations(
             std::string_view symbol{state.symbols[i->name]};
             try {
                 debug("evaluating attribute '%1%'", symbol);
-                if (!std::regex_match(symbol.begin(), symbol.end(), attrRegex))
+                if (!isAttrPathComponent(symbol))
                     continue;
                 std::string pathPrefix2 = addToPath(pathPrefix, symbol);
                 if (combineChannels)

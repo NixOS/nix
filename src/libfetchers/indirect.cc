@@ -44,7 +44,7 @@ struct IndirectInputScheme : InputScheme
 
         // FIXME: forbid query params?
 
-        Input input{settings};
+        Input input{};
         input.attrs.insert_or_assign("type", "indirect");
         input.attrs.insert_or_assign("id", id);
         if (rev)
@@ -60,14 +60,33 @@ struct IndirectInputScheme : InputScheme
         return "indirect";
     }
 
-    StringSet allowedAttrs() const override
+    std::string schemeDescription() const override
     {
-        return {
-            "id",
-            "ref",
-            "rev",
-            "narHash",
+        // TODO
+        return "";
+    }
+
+    const std::map<std::string, AttributeInfo> & allowedAttrs() const override
+    {
+        static const std::map<std::string, AttributeInfo> attrs = {
+            {
+                "id",
+                {},
+            },
+            {
+                "ref",
+                {},
+            },
+            {
+                "rev",
+                {},
+            },
+            {
+                "narHash",
+                {},
+            },
         };
+        return attrs;
     }
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
@@ -76,7 +95,7 @@ struct IndirectInputScheme : InputScheme
         if (!std::regex_match(id, flakeRegex))
             throw BadURL("'%s' is not a valid flake ID", id);
 
-        Input input{settings};
+        Input input{};
         input.attrs = attrs;
         return input;
     }
@@ -106,7 +125,8 @@ struct IndirectInputScheme : InputScheme
         return input;
     }
 
-    std::pair<ref<SourceAccessor>, Input> getAccessor(ref<Store> store, const Input & input) const override
+    std::pair<ref<SourceAccessor>, Input>
+    getAccessor(const Settings & settings, Store & store, const Input & input) const override
     {
         throw Error("indirect input '%s' cannot be fetched directly", input.to_string());
     }

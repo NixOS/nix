@@ -5,6 +5,7 @@
 #include "nix/util/strings-inline.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/error.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
@@ -150,6 +151,16 @@ std::string optionalBracket(std::string_view prefix, std::string_view content, s
     result.append(content);
     result.append(suffix);
     return result;
+}
+
+const char * requireCString(const std::string & s)
+{
+    if (std::memchr(s.data(), '\0', s.size())) [[unlikely]] {
+        using namespace std::string_view_literals;
+        auto str = replaceStrings(s, "\0"sv, "␀"sv);
+        throw Error("string '%s' with null (\\0) bytes used where it's not allowed", str);
+    }
+    return s.c_str();
 }
 
 } // namespace nix

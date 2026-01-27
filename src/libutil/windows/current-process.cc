@@ -1,5 +1,5 @@
 #include "nix/util/current-process.hh"
-#include "nix/util/windows-error.hh"
+#include "nix/util/error.hh"
 #include <cmath>
 
 #ifdef _WIN32

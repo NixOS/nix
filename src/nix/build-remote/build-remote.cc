@@ -264,8 +264,8 @@ static int main_build_remote(int argc, char ** argv)
             };
             try {
                 setUpdateLock(storeUri);
-            } catch (SysError & e) {
-                if (e.errNo != ENAMETOOLONG)
+            } catch (SystemError & e) {
+                if (!e.is(std::errc::filename_too_long))
                     throw;
                 // Try again hashing the store URL so we have a shorter path
                 auto h = hashString(HashAlgorithm::MD5, storeUri);
@@ -322,7 +322,7 @@ static int main_build_remote(int argc, char ** argv)
             //    output ids, which break CA derivations
             if (!drv.inputDrvs.map.empty())
                 drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore->buildDerivation(*drvPath, (const BasicDerivation &) drv);
+            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {

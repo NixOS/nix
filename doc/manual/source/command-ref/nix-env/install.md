@@ -204,7 +204,7 @@ To install a specific [store derivation] (typically created by
 `nix-instantiate`):
 
 ```console
-$ nix-env --install /nix/store/fibjb1bfbpm5mrsxc4mh2d8n37sxh91i-gcc-3.4.3.drv
+$ nix-env --install /nix/store/8la6y31fmm6i4wfmby6avly1wf718xnj-gcc-3.4.3.drv
 ```
 
 To install a specific output path:
@@ -232,7 +232,7 @@ $ nix-env --file '<nixpkgs>' --install --attr hello --dry-run
 (dry run; not doing anything)
 installing ‘hello-2.10’
 this path will be fetched (0.04 MiB download, 0.19 MiB unpacked):
-  /nix/store/wkhdf9jinag5750mqlax6z2zbwhqb76n-hello-2.10
+  /nix/store/ikwkxz4wwlp2g1428n7dy729cg1d9hin-hello-2.10
   ...
 ```
 

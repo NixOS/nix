@@ -86,13 +86,13 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl(Path dbPath = getCacheDir() + "/binary-cache-v7.sqlite")
+    NarInfoDiskCacheImpl(Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
     {
         auto state(_state.lock());
 
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
 
         state->db.isCache();
 
@@ -264,8 +264,8 @@ public:
                     return {oInvalid, 0};
 
                 auto namePart = queryNAR.getStr(1);
-                auto narInfo =
-                    make_ref<NarInfo>(StorePath(hashPart + "-" + namePart), Hash::parseAnyPrefixed(queryNAR.getStr(6)));
+                auto narInfo = make_ref<NarInfo>(
+                    cache.storeDir, StorePath(hashPart + "-" + namePart), Hash::parseAnyPrefixed(queryNAR.getStr(6)));
                 narInfo->url = queryNAR.getStr(2);
                 narInfo->compression = queryNAR.getStr(3);
                 if (!queryNAR.isNull(4))
@@ -277,7 +277,7 @@ public:
                 if (!queryNAR.isNull(9))
                     narInfo->deriver = StorePath(queryNAR.getStr(9));
                 for (auto & sig : tokenizeString<Strings>(queryNAR.getStr(10), " "))
-                    narInfo->sigs.insert(sig);
+                    narInfo->sigs.insert(Signature::parse(sig));
                 narInfo->ca = ContentAddress::parseOpt(queryNAR.getStr(11));
 
                 return {oValid, narInfo};
@@ -337,8 +337,9 @@ public:
                         narInfo && narInfo->fileHash)(
                         narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)(info->narHash.to_string(
                         HashFormat::Nix32, true))(info->narSize)(concatStringsSep(" ", info->shortRefs()))(
-                        info->deriver ? std::string(info->deriver->to_string()) : "", (bool) info->deriver)(
-                        concatStringsSep(" ", info->sigs))(renderContentAddress(info->ca))(time(0))
+                        info->deriver ? std::string(info->deriver->to_string()) : "",
+                        (bool) info->deriver)(concatStringsSep(" ", Signature::toStrings(info->sigs)))(
+                        renderContentAddress(info->ca))(time(0))
                     .exec();
 
             } else {

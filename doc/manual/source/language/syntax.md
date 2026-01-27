@@ -51,7 +51,8 @@ See [String literals](string-literals.md).
 
   Path literals can also include [string interpolation], besides being [interpolated into other expressions].
 
-  [interpolated into other expressions]: ./string-interpolation.md#interpolated-expressions
+  [string interpolation]: ./string-interpolation.md
+  [interpolated into other expressions]: ./string-interpolation.md#interpolated-expression
 
   At least one slash (`/`) must appear *before* any interpolated expression for the result to be recognized as a path.
 
@@ -235,7 +236,7 @@ of object-oriented programming, for example.
 
 ## Recursive sets
 
-Recursive sets are like normal [attribute sets](./types.md#attribute-set), but the attributes can refer to each other.
+Recursive sets are like normal [attribute sets](./types.md#type-attrs), but the attributes can refer to each other.
 
 > *rec-attrset* = `rec {` [ *name* `=` *expr* `;` `]`... `}`
 
@@ -272,7 +273,7 @@ will crash with an `infinite recursion encountered` error message.
 
 A let-expression allows you to define local variables for an expression.
 
-> *let-in* = `let` [ *identifier* = *expr* ]... `in` *expr*
+> *let-in* = `let` [ *identifier* = *expr* `;` ]... `in` *expr*
 
 Example:
 
@@ -285,9 +286,30 @@ in x + y
 
 This evaluates to `"foobar"`.
 
+There is also another, older, syntax for let expressions that should not be used in new code:
+
+> *let* = `let` `{` *identifier* = *expr* `;` [ *identifier* = *expr* `;`]...  `}`
+
+In this form, the attribute set between the `{` `}` is recursive.
+
+One of the attributes must have the special name `body`,
+which is the result of the expression.
+
+Example:
+
+```nix
+let {
+  foo = bar;
+  bar = "baz";
+  body = foo;
+}
+```
+
+This evaluates to "baz".
+
 ## Inheriting attributes
 
-When defining an [attribute set](./types.md#attribute-set) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
+When defining an [attribute set](./types.md#type-attrs) or in a [let-expression](#let-expressions) it is often convenient to copy variables from the surrounding lexical scope (e.g., when you want to propagate attributes).
 This can be shortened using the `inherit` keyword.
 
 Example:

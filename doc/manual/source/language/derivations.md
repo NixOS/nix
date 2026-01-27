@@ -16,7 +16,7 @@ It outputs an attribute set, and produces a [store derivation] as a side effect 
 - [`name`]{#attr-name} ([String](@docroot@/language/types.md#type-string))
 
   A symbolic name for the derivation.
-  See [derivation outputs](@docroot@/store/derivation/index.md#outputs) for what this is affects.
+  See [derivation outputs](@docroot@/store/derivation/outputs/index.md#outputs) for what this is affects.
 
   [store path]: @docroot@/store/store-path.md
 

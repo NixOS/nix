@@ -14,6 +14,22 @@ namespace nix {
 class Store;
 struct StoreDirConfig;
 
+/**
+ * JSON format version for path info output.
+ */
+enum class PathInfoJsonFormat {
+    /// Legacy format with string hashes and full store paths
+    V1 = 1,
+    /// New format with structured hashes and store path base names
+    V2 = 2,
+};
+
+/**
+ * Convert an integer version number to PathInfoJsonFormat.
+ * Throws Error if the version is not supported.
+ */
+PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version);
+
 struct SubstitutablePathInfo
 {
     std::optional<StorePath> deriver;
@@ -38,6 +54,14 @@ using SubstitutablePathInfos = std::map<StorePath, SubstitutablePathInfo>;
  */
 struct UnkeyedValidPathInfo
 {
+    /**
+     * The store directory this store object belongs to.
+     *
+     * This supports relocatable store objects where different objects
+     * may have different store directories.
+     */
+    std::string storeDir;
+
     /**
      * Path to derivation that produced this store object, if known.
      */
@@ -78,7 +102,7 @@ struct UnkeyedValidPathInfo
      */
     bool ultimate = false;
 
-    StringSet sigs; // note: not necessarily verified
+    std::set<Signature> sigs;
 
     /**
      * If non-empty, an assertion that the path is content-addressed,
@@ -94,15 +118,20 @@ struct UnkeyedValidPathInfo
      * path then implies the contents.)
      *
      * Ideally, the content-addressability assertion would just be a Boolean,
-     * and the store path would be computed from the name component, ‘narHash’
-     * and ‘references’. However, we support many types of content addresses.
+     * and the store path would be computed from the name component, 'narHash'
+     * and 'references'. However, we support many types of content addresses.
      */
     std::optional<ContentAddress> ca;
 
     UnkeyedValidPathInfo(const UnkeyedValidPathInfo & other) = default;
 
-    UnkeyedValidPathInfo(Hash narHash)
-        : narHash(narHash) {};
+    UnkeyedValidPathInfo(const StoreDirConfig & store, Hash narHash);
+
+    UnkeyedValidPathInfo(std::string storeDir, Hash narHash)
+        : storeDir(std::move(storeDir))
+        , narHash(std::move(narHash))
+    {
+    }
 
     bool operator==(const UnkeyedValidPathInfo &) const noexcept;
 
@@ -114,14 +143,20 @@ struct UnkeyedValidPathInfo
     virtual ~UnkeyedValidPathInfo() {}
 
     /**
+     * @param store If non-null, store paths are rendered as full paths.
+     *              If null, store paths are rendered as base names.
      * @param includeImpureInfo If true, variable elements such as the
-     * registration time are included.
+     *                          registration time are included.
+     * @param format JSON format version. Version 1 uses string hashes and
+     *               string content addresses. Version 2 uses structured
+     *               hashes and structured content addresses.
      */
-    virtual nlohmann::json toJSON(const StoreDirConfig & store, bool includeImpureInfo, HashFormat hashFormat) const;
-    static UnkeyedValidPathInfo fromJSON(const StoreDirConfig & store, const nlohmann::json & json);
+    virtual nlohmann::json
+    toJSON(const StoreDirConfig * store, bool includeImpureInfo, PathInfoJsonFormat format) const;
+    static UnkeyedValidPathInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
 };
 
-struct ValidPathInfo : UnkeyedValidPathInfo
+struct ValidPathInfo : virtual UnkeyedValidPathInfo
 {
     StorePath path;
 
@@ -165,7 +200,7 @@ struct ValidPathInfo : UnkeyedValidPathInfo
     /**
      * Verify a single signature.
      */
-    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const;
 
     /**
      * References as store path basenames, including a self reference if it has one.
@@ -174,10 +209,14 @@ struct ValidPathInfo : UnkeyedValidPathInfo
 
     ValidPathInfo(StorePath && path, UnkeyedValidPathInfo info)
         : UnkeyedValidPathInfo(info)
-        , path(std::move(path)) {};
+        , path(std::move(path))
+    {
+    }
+
     ValidPathInfo(const StorePath & path, UnkeyedValidPathInfo info)
-        : UnkeyedValidPathInfo(info)
-        , path(path) {};
+        : ValidPathInfo(StorePath{path}, std::move(info))
+    {
+    }
 
     static ValidPathInfo
     makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
@@ -191,3 +230,7 @@ static_assert(std::is_move_constructible_v<ValidPathInfo>);
 using ValidPathInfos = std::map<StorePath, ValidPathInfo>;
 
 } // namespace nix
+
+JSON_IMPL(nix::PathInfoJsonFormat)
+JSON_IMPL(nix::UnkeyedValidPathInfo)
+JSON_IMPL(nix::ValidPathInfo)

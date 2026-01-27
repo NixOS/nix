@@ -2,19 +2,17 @@
 #include "nix/expr/print.hh"
 #include "nix/util/signals.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
 
 namespace nix {
 
 // See: https://github.com/NixOS/nix/issues/9730
-void printAmbiguous(
-    Value & v, const SymbolTable & symbols, std::ostream & str, std::set<const void *> * seen, int depth)
+void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<const void *> * seen, size_t depth)
 {
     checkInterrupt();
 
-    if (depth <= 0) {
-        str << "«too deep»";
-        return;
-    }
+    if (depth > state.settings.maxCallDepth)
+        state.error<StackOverflowError>().atPos(v.determinePos(noPos)).debugThrow();
     switch (v.type()) {
     case nInt:
         str << v.integer();
@@ -36,9 +34,9 @@ void printAmbiguous(
             str << "«repeated»";
         else {
             str << "{ ";
-            for (auto & i : v.attrs()->lexicographicOrder(symbols)) {
-                str << symbols[i->name] << " = ";
-                printAmbiguous(*i->value, symbols, str, seen, depth - 1);
+            for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
+                str << state.symbols[i->name] << " = ";
+                printAmbiguous(state, *i->value, str, seen, depth + 1);
                 str << "; ";
             }
             str << "}";
@@ -54,7 +52,7 @@ void printAmbiguous(
             str << "[ ";
             for (auto v2 : v.listView()) {
                 if (v2)
-                    printAmbiguous(*v2, symbols, str, seen, depth - 1);
+                    printAmbiguous(state, *v2, str, seen, depth + 1);
                 else
                     str << "(nullptr)";
                 str << " ";

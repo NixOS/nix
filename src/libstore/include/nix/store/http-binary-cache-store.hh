@@ -21,20 +21,27 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     ParsedURL cacheUri;
 
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
+    const Setting<std::optional<CompressionAlgo>> narinfoCompression{
+        this, std::nullopt, "narinfo-compression", "Compression method for `.narinfo` files."};
 
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
+    const Setting<std::optional<CompressionAlgo>> lsCompression{
+        this, std::nullopt, "ls-compression", "Compression method for `.ls` files."};
 
-    const Setting<std::string> logCompression{
+    const Setting<std::optional<CompressionAlgo>> logCompression{
         this,
-        "",
+        std::nullopt,
         "log-compression",
         R"(
           Compression method for `log/*` files. It is recommended to
           use a compression method supported by most web browsers
           (e.g. `brotli`).
         )"};
+
+    const Setting<std::optional<std::filesystem::path>> tlsCert{
+        this, std::nullopt, "tls-certificate", "Path to an optional TLS client certificate in PEM format."};
+
+    const Setting<std::optional<std::filesystem::path>> tlsKey{
+        this, std::nullopt, "tls-private-key", "Path to an optional TLS client certificate private key in PEM format."};
 
     static const std::string name()
     {
@@ -72,7 +79,7 @@ public:
 
 protected:
 
-    std::optional<std::string> getCompressionMethod(const std::string & path);
+    std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
     void maybeDisable();
 
@@ -103,18 +110,7 @@ protected:
         RestartableSource & source,
         uint64_t sizeHint,
         std::string_view mimeType,
-        std::optional<std::string_view> contentEncoding);
-
-    /**
-     * Uploads data to the binary cache (CompressedSource overload).
-     *
-     * This overload infers both the size and compression method from the CompressedSource.
-     *
-     * @param path The path in the binary cache to upload to
-     * @param source The compressed source (knows size and compression method)
-     * @param mimeType The MIME type of the content
-     */
-    void upload(std::string_view path, CompressedSource & source, std::string_view mimeType);
+        std::optional<Headers> headers);
 
     void getFile(const std::string & path, Sink & sink) override;
 

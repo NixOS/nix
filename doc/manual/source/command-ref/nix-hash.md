@@ -34,7 +34,7 @@ md5sum`.
   Print the cryptographic hash of the contents of each regular file *path*.
   That is, instead of computing
   the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
-  just [directly hash]((@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
+  just [directly hash](@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
   This requires *path* to resolve to a regular file rather than directory.
   The result is identical to that produced by the GNU commands
   `md5sum` and `sha1sum`.

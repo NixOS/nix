@@ -1,0 +1,83 @@
+{
+  "buildTrace": {
+    "8vEkprm3vQ3BE6JLB8XKfU+AdAwEFOMI/skzyj3pr5I=": {
+      "out": {
+        "dependentRealisations": {},
+        "outPath": "px7apdw6ydm9ynjy5g0bpdcylw3xz2kj-root-drv-out",
+        "signatures": []
+      }
+    }
+  },
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {
+    "px7apdw6ydm9ynjy5g0bpdcylw3xz2kj-root-drv-out": {
+      "contents": {
+        "contents": "I am the root output. I don't reference anything because the other derivation's output is just needed at build time.",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-0mlhg9y1FGb7YsHAsNOmtuW44b8TfoPaNPK6SjVYe5s=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-0mlhg9y1FGb7YsHAsNOmtuW44b8TfoPaNPK6SjVYe5s=",
+        "narSize": 232,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    }
+  },
+  "derivations": {
+    "11yvkl84ashq63ilwc2mi4va41z2disw-root-drv.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {
+          "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+            "dynamicOutputs": {},
+            "outputs": [
+              "out"
+            ]
+          }
+        },
+        "srcs": []
+      },
+      "name": "root-drv",
+      "outputs": {
+        "out": {
+          "hashAlgo": "sha256",
+          "method": "nar"
+        }
+      },
+      "system": "",
+      "version": 4
+    },
+    "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+      "args": [],
+      "builder": "",
+      "env": {},
+      "inputs": {
+        "drvs": {},
+        "srcs": []
+      },
+      "name": "dep-drv",
+      "outputs": {
+        "out": {
+          "hashAlgo": "sha256",
+          "method": "nar"
+        }
+      },
+      "system": "",
+      "version": 4
+    }
+  }
+}

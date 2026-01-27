@@ -215,11 +215,6 @@ struct HashJsonTest : virtual HashTest,
                       ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
 {};
 
-struct HashJsonParseOnlyTest : virtual HashTest,
-                               JsonCharacterizationTest<Hash>,
-                               ::testing::WithParamInterface<std::pair<std::string_view, Hash>>
-{};
-
 struct BLAKE3HashJsonTest : virtual HashTest,
                             BLAKE3HashTest,
                             JsonCharacterizationTest<Hash>,
@@ -238,12 +233,6 @@ TEST_P(HashJsonTest, to_json)
     writeJsonTest(name, value);
 }
 
-TEST_P(HashJsonParseOnlyTest, from_json)
-{
-    auto & [name, expected] = GetParam();
-    readJsonTest(name, expected);
-}
-
 TEST_P(BLAKE3HashJsonTest, from_json)
 {
     auto & [name, expected] = GetParam();
@@ -256,42 +245,25 @@ TEST_P(BLAKE3HashJsonTest, to_json)
     writeJsonTest(name, expected);
 }
 
-// Round-trip tests (from_json + to_json) for base64 format only
-// (to_json always outputs base64)
 INSTANTIATE_TEST_SUITE_P(
     HashJSON,
     HashJsonTest,
     ::testing::Values(
         std::pair{
-            "simple",
+            "sha256",
             hashString(HashAlgorithm::SHA256, "asdf"),
         },
         std::pair{
-            "sha256-base64",
+            "sha512",
             hashString(HashAlgorithm::SHA256, "asdf"),
         }));
 
-// Parse-only tests for non-base64 formats
-// These verify C++ can deserialize other formats correctly
-INSTANTIATE_TEST_SUITE_P(
-    HashJSONParseOnly,
-    HashJsonParseOnlyTest,
-    ::testing::Values(
-        std::pair{
-            "sha256-base16",
-            hashString(HashAlgorithm::SHA256, "asdf"),
-        },
-        std::pair{
-            "sha256-nix32",
-            hashString(HashAlgorithm::SHA256, "asdf"),
-        }));
-
-INSTANTIATE_TEST_SUITE_P(BLAKE3HashJSONParseOnly, BLAKE3HashJsonTest, ([] {
+INSTANTIATE_TEST_SUITE_P(BLAKE3HashJSON, BLAKE3HashJsonTest, ([] {
                              ExperimentalFeatureSettings mockXpSettings;
                              mockXpSettings.set("experimental-features", "blake3-hashes");
                              return ::testing::Values(
                                  std::pair{
-                                     "blake3-base64",
+                                     "blake3",
                                      hashString(HashAlgorithm::BLAKE3, "asdf", mockXpSettings),
                                  });
                          }()));

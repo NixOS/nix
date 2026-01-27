@@ -343,7 +343,7 @@ bool Store::PathInfoCacheValue::isKnownNow()
 
 void Store::invalidatePathInfoCacheFor(const StorePath & path)
 {
-    pathInfoCache->lock()->erase(path.to_string());
+    pathInfoCache->lock()->erase(path);
 }
 
 std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
@@ -454,6 +454,8 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
                         .downloadSize = narInfo ? narInfo->fileSize : 0,
                         .narSize = info->narSize,
                     });
+
+                break; /* We are done. */
             } catch (InvalidPath &) {
             } catch (SubstituterDisabled &) {
             } catch (Error & e) {
@@ -469,9 +471,43 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
     }
 }
 
+StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
+{
+    if (!settings.useSubstitutes)
+        return StorePathSet();
+
+    StorePathSet remaining;
+    for (auto & i : paths)
+        remaining.insert(i);
+
+    StorePathSet res;
+
+    for (auto & sub : getDefaultSubstituters()) {
+        if (remaining.empty())
+            break;
+        if (sub->storeDir != storeDir)
+            continue;
+        if (!sub->config.wantMassQuery)
+            continue;
+
+        auto valid = sub->queryValidPaths(remaining);
+
+        StorePathSet remaining2;
+        for (auto & path : remaining)
+            if (valid.count(path))
+                res.insert(path);
+            else
+                remaining2.insert(path);
+
+        std::swap(remaining, remaining2);
+    }
+
+    return res;
+}
+
 bool Store::isValidPath(const StorePath & storePath)
 {
-    auto res = pathInfoCache->lock()->get(storePath.to_string());
+    auto res = pathInfoCache->lock()->get(storePath);
     if (res && res->isKnownNow()) {
         stats.narInfoReadAverted++;
         return res->didExist();
@@ -483,7 +519,7 @@ bool Store::isValidPath(const StorePath & storePath)
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             pathInfoCache->lock()->upsert(
-                storePath.to_string(),
+                storePath,
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
                                                         : PathInfoCacheValue{.value = res.second});
             return res.first == NarInfoDiskCache::oValid;
@@ -537,7 +573,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
 {
     auto hashPart = std::string(storePath.hashPart());
 
-    auto res = pathInfoCache->lock()->get(storePath.to_string());
+    auto res = pathInfoCache->lock()->get(storePath);
     if (res && res->isKnownNow()) {
         stats.narInfoReadAverted++;
         if (res->didExist())
@@ -551,7 +587,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
         if (res.first != NarInfoDiskCache::oUnknown) {
             stats.narInfoReadAverted++;
             pathInfoCache->lock()->upsert(
-                storePath.to_string(),
+                storePath,
                 res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
                                                         : PathInfoCacheValue{.value = res.second});
             if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
@@ -591,7 +627,7 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 if (diskCache)
                     diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
-                pathInfoCache->lock()->upsert(storePath.to_string(), PathInfoCacheValue{.value = info});
+                pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
 
                 if (!info || !goodStorePath(storePath, info->path)) {
                     stats.narInfoMissing++;
@@ -915,36 +951,21 @@ std::map<StorePath, StorePath> copyPaths(
     SubstituteFlag substitute)
 {
     StorePathSet storePaths;
-    std::set<Realisation> toplevelRealisations;
+    std::vector<const Realisation *> realisations;
     for (auto & path : paths) {
         storePaths.insert(path.path());
         if (auto * realisation = std::get_if<Realisation>(&path.raw)) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
-            toplevelRealisations.insert(*realisation);
+            realisations.push_back(realisation);
         }
     }
 
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
 
     try {
-        // Copy the realisation closure
-        processGraph<Realisation>(
-            Realisation::closure(srcStore, toplevelRealisations),
-            [&](const Realisation & current) -> std::set<Realisation> {
-                std::set<Realisation> children;
-                for (const auto & [drvOutput, _] : current.dependentRealisations) {
-                    auto currentChild = srcStore.queryRealisation(drvOutput);
-                    if (!currentChild)
-                        throw Error(
-                            "incomplete realisation closure: '%s' is a "
-                            "dependency of '%s' but isn't registered",
-                            drvOutput.to_string(),
-                            current.id.to_string());
-                    children.insert({*currentChild, drvOutput});
-                }
-                return children;
-            },
-            [&](const Realisation & current) -> void { dstStore.registerDrvOutput(current, checkSigs); });
+        // Copy the realisations. TODO batch this
+        for (const auto * realisation : realisations)
+            dstStore.registerDrvOutput(*realisation, checkSigs);
     } catch (MissingExperimentalFeature & e) {
         // Don't fail if the remote doesn't support CA derivations is it might
         // not be within our control to change that, and we might still want
@@ -1055,8 +1076,19 @@ void copyClosure(
     if (&srcStore == &dstStore)
         return;
 
-    RealisedPath::Set closure;
-    RealisedPath::closure(srcStore, paths, closure);
+    StorePathSet closure0;
+    for (auto & path : paths) {
+        if (auto * opaquePath = std::get_if<OpaquePath>(&path.raw)) {
+            closure0.insert(opaquePath->path);
+        }
+    }
+
+    StorePathSet closure1;
+    srcStore.computeFSClosure(closure0, closure1);
+
+    RealisedPath::Set closure = paths;
+    for (auto && path : closure1)
+        closure.insert({std::move(path)});
 
     copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
@@ -1095,7 +1127,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
             throw Error("number expected");
         hashGiven = {narHash, *narSize};
     }
-    ValidPathInfo info(store.parseStorePath(path), hashGiven->hash);
+    ValidPathInfo info(store.parseStorePath(path), {store, hashGiven->hash});
     info.narSize = hashGiven->numBytesDigested;
     std::string deriver;
     getline(str, deriver);
@@ -1124,6 +1156,11 @@ std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
         s += "'" + printStorePath(i) + "'";
     }
     return s;
+}
+
+std::string showPaths(const std::set<std::filesystem::path> paths)
+{
+    return concatStringsSep(", ", quoteFSPaths(paths));
 }
 
 std::string showPaths(const PathSet & paths)
@@ -1170,7 +1207,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
         if (resolvedDrv)
-            return writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            return ::nix::writeDerivation(*this, *resolvedDrv, NoRepair, true);
     }
 
     return path;

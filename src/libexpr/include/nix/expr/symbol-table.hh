@@ -3,6 +3,7 @@
 
 #include <memory_resource>
 #include "nix/expr/value.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/util/chunked-vector.hh"
 #include "nix/util/error.hh"
 
@@ -16,7 +17,6 @@ class SymbolValue : protected Value
     friend class SymbolStr;
     friend class SymbolTable;
 
-    uint32_t size_;
     uint32_t idx;
 
     SymbolValue() = default;
@@ -24,7 +24,7 @@ class SymbolValue : protected Value
 public:
     operator std::string_view() const noexcept
     {
-        return {c_str(), size_};
+        return string_view();
     }
 };
 
@@ -96,13 +96,13 @@ class SymbolStr
         SymbolValueStore & store;
         std::string_view s;
         std::size_t hash;
-        std::pmr::polymorphic_allocator<char> & alloc;
+        std::pmr::memory_resource & resource;
 
-        Key(SymbolValueStore & store, std::string_view s, std::pmr::polymorphic_allocator<char> & stringAlloc)
+        Key(SymbolValueStore & store, std::string_view s, std::pmr::memory_resource & stringMemory)
             : store(store)
             , s(s)
             , hash(HashType{}(s))
-            , alloc(stringAlloc)
+            , resource(stringMemory)
         {
         }
     };
@@ -122,14 +122,10 @@ public:
         // for multi-threaded implementations: lock store and allocator here
         const auto & [v, idx] = key.store.add(SymbolValue{});
         if (size == 0) {
-            v.mkStringNoCopy("", nullptr);
+            v.mkStringNoCopy(""_sds, nullptr);
         } else {
-            auto s = key.alloc.allocate(size + 1);
-            memcpy(s, key.s.data(), size);
-            s[size] = '\0';
-            v.mkStringNoCopy(s, nullptr);
+            v.mkStringNoCopy(StringData::make(key.resource, key.s));
         }
-        v.size_ = size;
         v.idx = idx;
         this->s = &v;
     }
@@ -137,6 +133,12 @@ public:
     bool operator==(std::string_view s2) const noexcept
     {
         return *s == s2;
+    }
+
+    [[gnu::always_inline]]
+    const StringData & string_data() const noexcept
+    {
+        return s->string_data();
     }
 
     [[gnu::always_inline]]
@@ -155,13 +157,17 @@ public:
     [[gnu::always_inline]]
     bool empty() const noexcept
     {
-        return s->size_ == 0;
+        auto * p = &s->string_data();
+        // Save a dereference in the sentinel value case
+        if (p == &""_sds)
+            return true;
+        return p->size() == 0;
     }
 
     [[gnu::always_inline]]
     size_t size() const noexcept
     {
-        return s->size_;
+        return s->string_data().size();
     }
 
     [[gnu::always_inline]]
@@ -259,7 +265,6 @@ private:
      * During its lifetime the monotonic buffer holds all strings and nodes, if the symbol set is node based.
      */
     std::pmr::monotonic_buffer_resource buffer;
-    std::pmr::polymorphic_allocator<char> stringAlloc{&buffer};
     SymbolStr::SymbolValueStore store{16};
 
     /**
@@ -282,10 +287,10 @@ public:
         // Most symbols are looked up more than once, so we trade off insertion performance
         // for lookup performance.
         // FIXME: make this thread-safe.
-        return Symbol(*symbols.insert(SymbolStr::Key{store, s, stringAlloc}).first);
+        return Symbol(*symbols.insert(SymbolStr::Key{store, s, buffer}).first);
     }
 
-    std::vector<SymbolStr> resolve(const std::vector<Symbol> & symbols) const
+    std::vector<SymbolStr> resolve(const std::span<const Symbol> & symbols) const
     {
         std::vector<SymbolStr> result;
         result.reserve(symbols.size());

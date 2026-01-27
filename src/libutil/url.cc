@@ -327,8 +327,11 @@ Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath)
         /* This is only really valid for UNIX. Windows has more restrictions. */
         if (comp.contains('/'))
             throw BadURL("URL path component '%s' contains '/', which is not allowed in file names", comp);
-        if (comp.contains(char(0)))
-            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", comp);
+        if (comp.contains(char(0))) {
+            using namespace std::string_view_literals;
+            auto str = replaceStrings(comp, "\0"sv, "␀"sv);
+            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", str);
+        }
     }
 
     return concatStringsSep("/", urlPath);
@@ -409,21 +412,35 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
-ParsedURL fixGitURL(const std::string & url)
+ParsedURL fixGitURL(std::string url)
 {
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        return parseURL(std::regex_replace(url, scpRegex, "ssh://$1@$2/$3"));
-    if (hasPrefix(url, "file:"))
-        return parseURL(url);
-    if (url.find("://") == std::string::npos) {
-        return ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = splitString<std::vector<std::string>>(url, "/"),
-        };
+        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
+    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos) {
+        auto path = splitString<std::vector<std::string>>(url, "/");
+        // Reject SCP-like URLs without user (e.g., "github.com:path") - colon in first component
+        if (!path.empty() && path[0].find(':') != std::string::npos)
+            throw BadURL("SCP-like URL '%s' is not supported; use SSH URL syntax instead (ssh://...)", url);
+        // Absolute paths get an empty authority (file:///path), relative paths get none (file:path)
+        if (hasPrefix(url, "/"))
+            return ParsedURL{
+                .scheme = "file",
+                .authority = ParsedURL::Authority{},
+                .path = path,
+            };
+        else
+            return ParsedURL{
+                .scheme = "file",
+                .path = path,
+            };
     }
-    return parseURL(url);
+    auto parsed = parseURL(url);
+    // Drop the superfluous "git+" from the scheme.
+    auto scheme = parseUrlScheme(parsed.scheme);
+    if (scheme.application == "git")
+        parsed.scheme = scheme.transport;
+    return parsed;
 }
 
 // https://www.rfc-editor.org/rfc/rfc3986#section-3.1

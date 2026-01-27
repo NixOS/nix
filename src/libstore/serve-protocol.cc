@@ -2,6 +2,7 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/util/archive.hh"
@@ -15,30 +16,35 @@ namespace nix {
 
 BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
 {
-    BuildResult status;
+    BuildResult res;
     BuildResult::Success success;
     BuildResult::Failure failure;
 
-    auto rawStatus = readInt(conn.from);
+    auto status = ServeProto::Serialise<BuildResultStatus>::read(store, {conn.from});
     conn.from >> failure.errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.from >> status.timesBuilt >> failure.isNonDeterministic >> status.startTime >> status.stopTime;
+        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
             success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
 
-    if (BuildResult::Success::statusIs(rawStatus)) {
-        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
-        status.inner = std::move(success);
-    } else {
-        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
-        status.inner = std::move(failure);
-    }
+    res.inner = std::visit(
+        overloaded{
+            [&](BuildResult::Success::Status s) -> decltype(res.inner) {
+                success.status = s;
+                return std::move(success);
+            },
+            [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
+                failure.status = s;
+                return std::move(failure);
+            },
+        },
+        status);
 
-    return status;
+    return res;
 }
 
 void ServeProto::Serialise<BuildResult>::write(
@@ -63,11 +69,11 @@ void ServeProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                conn.to << failure.status;
+                ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
                 common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                conn.to << success.status;
+                ServeProto::write(store, {conn.to}, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },
@@ -78,7 +84,7 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
 {
     /* Hash should be set below unless very old `nix-store --serve`.
        Caller should assert that it did set it. */
-    UnkeyedValidPathInfo info{Hash::dummy};
+    UnkeyedValidPathInfo info{store, Hash::dummy};
 
     auto deriver = readString(conn.from);
     if (deriver != "")
@@ -93,7 +99,7 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
         if (!s.empty())
             info.narHash = Hash::parseAnyPrefixed(s);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = ServeProto::Serialise<std::set<Signature>>::read(store, conn);
     }
 
     return info;
@@ -108,8 +114,10 @@ void ServeProto::Serialise<UnkeyedValidPathInfo>::write(
     // !!! Maybe we want compression?
     conn.to << info.narSize // downloadSize, lie a little
             << info.narSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 4)
-        conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca) << info.sigs;
+    if (GET_PROTOCOL_MINOR(conn.version) >= 4) {
+        conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca);
+        ServeProto::write(store, conn, info.sigs);
+    }
 }
 
 ServeProto::BuildOptions

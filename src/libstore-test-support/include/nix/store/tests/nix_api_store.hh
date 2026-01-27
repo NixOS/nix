@@ -41,16 +41,17 @@ protected:
     {
 #ifdef _WIN32
         // no `mkdtemp` with MinGW
-        auto tmpl = nix::defaultTempDir() + "/tests_nix-store.";
+        auto tmpl = nix::defaultTempDir() / "tests_nix-store.";
         for (size_t i = 0; true; ++i) {
-            nixDir = tmpl + std::string{i};
+            nixDir = tmpl.string() + std::to_string(i);
             if (std::filesystem::create_directory(nixDir))
                 break;
         }
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
         // because this is not allowed for a nix store.
-        auto tmpl = nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", true);
+        auto tmpl =
+            nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", std::nullopt, true);
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 

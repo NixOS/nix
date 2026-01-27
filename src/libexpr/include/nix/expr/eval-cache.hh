@@ -4,6 +4,7 @@
 #include "nix/util/sync.hh"
 #include "nix/util/hash.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/attr-path.hh"
 
 #include <functional>
 #include <variant>
@@ -124,9 +125,9 @@ public:
         Value * value = nullptr,
         std::optional<std::pair<AttrId, AttrValue>> && cachedValue = {});
 
-    std::vector<Symbol> getAttrPath() const;
+    AttrPath getAttrPath() const;
 
-    std::vector<Symbol> getAttrPath(Symbol name) const;
+    AttrPath getAttrPath(Symbol name) const;
 
     std::string getAttrPathStr() const;
 
@@ -146,7 +147,7 @@ public:
      * Get an attribute along a chain of attrsets. Note that this does
      * not auto-call functors or functions.
      */
-    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const std::vector<Symbol> & attrPath);
+    OrSuggestions<ref<AttrCursor>> findAlongAttrPath(const AttrPath & attrPath);
 
     std::string getString();
 

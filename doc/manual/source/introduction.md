@@ -8,7 +8,7 @@ stores packages in the _Nix store_, usually the directory
 `/nix/store`, where each package has its own unique subdirectory such
 as
 
-    /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1/
+    /nix/store/q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1/
 
 where `b6gvzjyb2pg0…` is a unique identifier for the package that
 captures all its dependencies (it’s a cryptographic hash of the

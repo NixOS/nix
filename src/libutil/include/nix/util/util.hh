@@ -6,6 +6,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/strings.hh"
 
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <sstream>
@@ -34,15 +35,34 @@ auto concatStrings(Parts &&... parts)
 }
 
 /**
+ * Add quotes around a string.
+ */
+inline std::string quoteString(std::string_view s, char quote = '\'')
+{
+    std::string result;
+    result.reserve(s.size() + 2);
+    result += quote;
+    result += s;
+    result += quote;
+    return result;
+}
+
+/**
  * Add quotes around a collection of strings.
  */
 template<class C>
-Strings quoteStrings(const C & c)
+Strings quoteStrings(const C & c, char quote = '\'')
 {
     Strings res;
     for (auto & s : c)
-        res.push_back("'" + s + "'");
+        res.push_back(quoteString(s, quote));
     return res;
+}
+
+inline Strings quoteFSPaths(const std::set<std::filesystem::path> & paths, char quote = '\'')
+{
+    return paths | std::views::transform([&](const auto & p) { return quoteString(p.string(), quote); })
+           | std::ranges::to<Strings>();
 }
 
 /**
@@ -98,6 +118,42 @@ N string2IntWithUnitPrefix(std::string_view s)
         return *n * multiplier;
     throw UsageError("'%s' is not an integer", s);
 }
+
+// Base also uses 'K', because it should also displayed as KiB => 100 Bytes => 0.1 KiB
+#define NIX_UTIL_SIZE_UNITS               \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Base, 'K')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Kilo, 'K')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Mega, 'M')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Giga, 'G')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Tera, 'T')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Peta, 'P')  \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Exa, 'E')   \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Zetta, 'Z') \
+    NIX_UTIL_DEFINE_SIZE_UNIT(Yotta, 'Y')
+
+enum class SizeUnit {
+#define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) name,
+    NIX_UTIL_SIZE_UNITS
+#undef NIX_UTIL_DEFINE_SIZE_UNIT
+};
+
+constexpr inline auto sizeUnits = std::to_array<SizeUnit>({
+#define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) SizeUnit::name,
+    NIX_UTIL_SIZE_UNITS
+#undef NIX_UTIL_DEFINE_SIZE_UNIT
+});
+
+SizeUnit getSizeUnit(int64_t value);
+
+/**
+ * Returns the unit if all values would be rendered using the same unit
+ * otherwise returns `std::nullopt`.
+ */
+std::optional<SizeUnit> getCommonSizeUnit(std::initializer_list<int64_t> values);
+
+std::string renderSizeWithoutUnit(int64_t value, SizeUnit unit, bool align = false);
+
+char getSizeUnitSuffix(SizeUnit unit);
 
 /**
  * Pretty-print a byte value, e.g. 12433615056 is rendered as `11.6
@@ -192,6 +248,28 @@ std::string stripIndentation(std::string_view s);
  * break.
  */
 std::pair<std::string_view, std::string_view> getLine(std::string_view s);
+
+/**
+ * Get a pointer to the contents of a `std::optional` if it is set, or a
+ * null pointer otherise.
+ *
+ * Const version.
+ */
+template<class T>
+const T * get(const std::optional<T> & opt)
+{
+    return opt ? &*opt : nullptr;
+}
+
+/**
+ * Non-const counterpart of `const T * get(const std::optional<T>)`.
+ * Takes a mutable reference, but returns a mutable pointer.
+ */
+template<class T>
+T * get(std::optional<T> & opt)
+{
+    return opt ? &*opt : nullptr;
+}
 
 /**
  * Get a value for the specified key from an associate container.
@@ -305,6 +383,11 @@ struct MaintainCount
     {
         counter += delta;
     }
+
+    MaintainCount(MaintainCount &&) = delete;
+    MaintainCount(const MaintainCount &) = delete;
+    MaintainCount & operator=(MaintainCount &&) = delete;
+    MaintainCount & operator=(const MaintainCount &) = delete;
 
     ~MaintainCount()
     {

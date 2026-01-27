@@ -1,0 +1,24 @@
+{
+  "entries": {
+    "bar": {
+      "entries": {
+        "baz": {
+          "contents": "good day,\n\u0000\n\tworld!",
+          "executable": true,
+          "type": "regular"
+        },
+        "quux": {
+          "target": "/over/there",
+          "type": "symlink"
+        }
+      },
+      "type": "directory"
+    },
+    "foo": {
+      "contents": "hello\n\u0000\n\tworld!",
+      "executable": false,
+      "type": "regular"
+    }
+  },
+  "type": "directory"
+}

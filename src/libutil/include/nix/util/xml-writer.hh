@@ -50,6 +50,11 @@ public:
         writer.openElement(name, attrs);
     }
 
+    XMLOpenElement(XMLOpenElement &&) = delete;
+    XMLOpenElement(const XMLOpenElement &) = delete;
+    XMLOpenElement & operator=(XMLOpenElement &&) = delete;
+    XMLOpenElement & operator=(const XMLOpenElement &) = delete;
+
     ~XMLOpenElement()
     {
         writer.closeElement();

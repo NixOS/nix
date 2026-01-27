@@ -94,6 +94,8 @@ The underlying source files are located in [`doc/manual/source`](./doc/manual/so
 For small changes you can [use GitHub to edit these files](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
 For larger changes see the [Nix reference manual](https://nix.dev/manual/nix/development/development/contributing.html).
 
+You're encouraged to add line breaks at semantic boundaries, per [sembr](https://sembr.org).
+
 ## Getting help
 
 Whenever you're stuck or do not know how to proceed, you can always ask for help.

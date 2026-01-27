@@ -1,12 +1,13 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/signals.hh"
 
+#include <span>
 #include <fcntl.h>
 #include <unistd.h>
 #ifdef _WIN32
 #  include <winnt.h>
 #  include <fileapi.h>
-#  include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {
@@ -30,6 +31,33 @@ std::string drainFD(Descriptor fd, bool block, const size_t reserveSize)
     drainFD(fd, sink, block);
 #endif
     return std::move(sink.s);
+}
+
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
+{
+    auto left = nbytes;
+    std::array<std::byte, 64 * 1024> buf;
+
+    while (left) {
+        checkInterrupt();
+        auto limit = std::min<size_t>(left, buf.size());
+        /* Should be initialized before we read, because the `catch`
+           block either throws or continues. */
+        size_t n;
+        try {
+            n = readOffset(fd, offset, std::span(buf.data(), limit));
+        } catch (SystemError & e) {
+            if (e.is(std::errc::interrupted))
+                continue;
+            throw;
+        }
+        if (n == 0)
+            throw EndOfFile("unexpected end-of-file");
+        assert(n <= left);
+        sink(std::string_view(reinterpret_cast<const char *>(buf.data()), n));
+        offset += n;
+        left -= n;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////

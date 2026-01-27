@@ -3,6 +3,7 @@
 
 #include "nix/util/source-accessor.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/nar-cache.hh"
 #include "nix/store/store-api.hh"
 
 namespace nix {
@@ -11,19 +12,20 @@ class RemoteFSAccessor : public SourceAccessor
 {
     ref<Store> store;
 
-    std::map<std::string, ref<SourceAccessor>> nars;
+    /**
+     * Map from store path hash part to NAR hash. Used to then look up
+     * in the NAR cache. The indirection allows avoiding opening multiple
+     * redundant NAR accessors for the same NAR.
+     */
+    std::map<std::string, Hash, std::less<>> narHashes;
+
+    NarCache narCache;
 
     bool requireValidPath;
-
-    Path cacheDir;
 
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
     friend struct BinaryCacheStore;
-
-    Path makeCacheFile(std::string_view hashPart, const std::string & ext);
-
-    ref<SourceAccessor> addToCache(std::string_view hashPart, std::string && nar);
 
 public:
 
@@ -33,13 +35,15 @@ public:
     std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
 
     RemoteFSAccessor(
-        ref<Store> store, bool requireValidPath = true, const /* FIXME: use std::optional */ Path & cacheDir = "");
+        ref<Store> store, bool requireValidPath = true, std::optional<std::filesystem::path> cacheDir = {});
 
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
 
-    std::string readFile(const CanonPath & path) override;
+    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
+
+    using SourceAccessor::readFile;
 
     std::string readLink(const CanonPath & path) override;
 };

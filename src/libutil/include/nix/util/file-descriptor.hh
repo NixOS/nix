@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/types.hh"
+#include "nix/util/canon-path.hh"
 #include "nix/util/error.hh"
 
 #ifdef _WIN32
@@ -68,6 +68,29 @@ static inline int fromDescriptorReadOnly(Descriptor fd)
 std::string readFile(Descriptor fd);
 
 /**
+ * Platform-specific positioned read into a buffer.
+ *
+ * Thin wrapper around pread (Unix) or ReadFile with OVERLAPPED (Windows).
+ * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ *
+ * @param fd The file descriptor to read from (must be seekable)
+ * @param offset The offset to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer);
+
+/**
+ * Read \ref nbytes starting at \ref offset from a seekable file into a sink.
+ *
+ * @throws SystemError if fd is not seekable or any operation fails
+ * @throws Interrupted if the operation was interrupted
+ * @throws EndOfFile if an EOF was reached before reading \ref nbytes
+ */
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink);
+
+/**
  * Wrappers around read()/write() that read/write exactly the
  * requested number of bytes.
  */
@@ -76,7 +99,8 @@ void readFull(Descriptor fd, char * buf, size_t count);
 void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
 
 /**
- * Read a line from a file descriptor.
+ * Read a line from an unbuffered file descriptor.
+ * See BufferedSource::readLine for a buffered variant.
  *
  * @param fd The file descriptor to read from
  * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
@@ -203,6 +227,26 @@ void closeOnExec(Descriptor fd);
 } // namespace unix
 #endif
 
+#ifdef __linux__
+namespace linux {
+
+/**
+ * Wrapper around Linux's openat2 syscall introduced in Linux 5.6.
+ *
+ * @see https://man7.org/linux/man-pages/man2/openat2.2.html
+ * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
+v*
+ * @param flags O_* flags
+ * @param mode Mode for O_{CREAT,TMPFILE}
+ * @param resolve RESOLVE_* flags
+ *
+ * @return nullopt if openat2 is not supported by the kernel.
+ */
+std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
+
+} // namespace linux
+#endif
+
 #if defined(_WIN32) && _WIN32_WINNT >= 0x0600
 namespace windows {
 
@@ -212,6 +256,62 @@ std::wstring handleToFileName(Descriptor handle);
 } // namespace windows
 #endif
 
+#ifndef _WIN32
+namespace unix {
+
+/**
+ * Safe(r) function to open \param path file relative to \param dirFd, while
+ * disallowing escaping from a directory and resolving any symlinks in the
+ * process.
+ *
+ * @note When not on Linux or when openat2 is not available this is implemented
+ * via openat single path component traversal. Uses RESOLVE_BENEATH with openat2
+ * or O_RESOLVE_BENEATH.
+ *
+ * @note Since this is Unix-only path is specified as CanonPath, which models
+ * Unix-style paths and ensures that there are no .. or . components.
+ *
+ * @param flags O_* flags
+ * @param mode Mode for O_{CREAT,TMPFILE}
+ *
+ * @pre path.isRoot() is false
+ *
+ * @throws SymlinkNotAllowed if any path components
+ */
+Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+
+/**
+ * Try to change the mode of file named by \ref path relative to the parent directory denoted by \ref dirFd.
+ *
+ * @note When on linux without fchmodat2 support and without procfs mounted falls back to fchmodat without
+ * AT_SYMLINK_NOFOLLOW, since it's the best we can do without failing.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
+
+/*
+ * Read a symlink relative to a directory file descriptor.
+ *
+ * @throws SysError on any I/O errors.
+ * @throws Interrupted if interrupted. SysError::errNo can never be EINTR.
+ */
+std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
+
+} // namespace unix
+#endif
+
 MakeError(EndOfFile, Error);
+
+#ifdef _WIN32
+
+/**
+ * Windows specific replacement for POSIX `lseek` that operates on a `HANDLE` and not
+ * a file descriptor.
+ */
+off_t lseek(Descriptor fd, off_t offset, int whence);
+
+#endif
 
 } // namespace nix

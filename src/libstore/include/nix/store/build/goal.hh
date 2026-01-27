@@ -5,8 +5,17 @@
 #include "nix/store/build-result.hh"
 
 #include <coroutine>
+#include <queue>
+#include <variant>
 
 namespace nix {
+
+struct TimedOut : BuildError
+{
+    time_t maxDuration;
+
+    TimedOut(time_t maxDuration);
+};
 
 /**
  * Forward definition.
@@ -137,6 +146,29 @@ public:
 
         friend Goal;
     };
+
+    /**
+     * Event types for child process communication, delivered via coroutines.
+     */
+    struct ChildOutput
+    {
+        Descriptor fd;
+        std::string data;
+    };
+
+    struct ChildEOF
+    {
+        Descriptor fd;
+    };
+
+    using ChildEvent = std::variant<ChildOutput, ChildEOF, TimedOut>;
+
+    /**
+     * Tag type for `co_await`-ing child events.
+     * Returns a `ChildEvent` when resumed.
+     */
+    struct WaitForChildEvent
+    {};
 
     // forward declaration of promise_type, see below
     struct promise_type;
@@ -276,6 +308,28 @@ public:
          */
         bool alive = true;
 
+        class
+        {
+            /**
+             * Structured queue of child events:
+             * - outputs: stream of data from child
+             * - eof: optional end-of-stream marker
+             * - timeout: optional timeout that flushes/overrides other events
+             */
+            std::queue<ChildOutput> childOutputs;
+            std::optional<ChildEOF> childEOF;
+            std::optional<TimedOut> childTimeout;
+
+        public:
+
+            void pushChildEvent(ChildOutput event);
+            void pushChildEvent(ChildEOF event);
+            void pushChildEvent(TimedOut event);
+            bool hasChildEvent() const;
+            ChildEvent popChildEvent();
+
+        } childEvents;
+
         /**
          * The awaiter used by @ref final_suspend.
          */
@@ -370,12 +424,65 @@ public:
         }
 
         /**
+         * Awaiter for @ref Suspend. Always suspends, but asserts
+         * there are no pending child events (those should be
+         * consumed first via @ref WaitForChildEvent).
+         */
+        struct SuspendAwaiter
+        {
+            promise_type & promise;
+
+            bool await_ready()
+            {
+                assert(!promise.childEvents.hasChildEvent());
+                return false;
+            }
+
+            void await_suspend(handle_type) {}
+
+            void await_resume() {}
+        };
+
+        /**
          * Allows awaiting a @ref Suspend.
          * Always suspends.
          */
-        std::suspend_always await_transform(Suspend)
+        SuspendAwaiter await_transform(Suspend)
         {
-            return {};
+            return SuspendAwaiter{*this};
+        };
+
+        /**
+         * Awaiter for child events. Suspends and returns the
+         * pending child event when resumed.
+         */
+        struct ChildEventAwaiter
+        {
+            handle_type handle;
+
+            bool await_ready()
+            {
+                return handle && handle.promise().childEvents.hasChildEvent();
+            }
+
+            void await_suspend(handle_type h)
+            {
+                handle = h;
+            }
+
+            ChildEvent await_resume()
+            {
+                assert(handle);
+                return handle.promise().childEvents.popChildEvent();
+            }
+        };
+
+        /**
+         * Allows awaiting child events (output, EOF, timeout).
+         */
+        ChildEventAwaiter await_transform(WaitForChildEvent)
+        {
+            return ChildEventAwaiter{handle_type::from_promise(*this)};
         };
     };
 
@@ -393,8 +500,27 @@ protected:
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
+     *
+     * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
+     * `buildResult` is set correctly.
      */
     Done amDone(ExitCode result, std::optional<Error> ex = {});
+
+    /**
+     * Signals successful completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     */
+    Done doneSuccess(BuildResult::Success success);
+
+    /**
+     * Signals failed completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     *
+     * @param result The exit code (ecFailed or ecNoSubstituters)
+     * @param failure The failure details including status and error message
+     * @param ex Optional exception to store/log
+     */
+    Done doneFailure(ExitCode result, BuildResult::Failure failure, std::optional<Error> ex = {});
 
 public:
     virtual void cleanup() {}
@@ -432,15 +558,23 @@ public:
 
     void work();
 
-    virtual void handleChildOutput(Descriptor fd, std::string_view data)
-    {
-        unreachable();
-    }
+    /**
+     * Called by the worker when data is received from a child process.
+     * Stores the event and resumes the coroutine.
+     */
+    void handleChildOutput(Descriptor fd, std::string_view data);
 
-    virtual void handleEOF(Descriptor fd)
-    {
-        unreachable();
-    }
+    /**
+     * Called by the worker when EOF is received from a child process.
+     * Stores the event and resumes the coroutine.
+     */
+    void handleEOF(Descriptor fd);
+
+    /**
+     * Called by the worker when a build times out.
+     * Stores the event and resumes the coroutine.
+     */
+    void timedOut(TimedOut && ex);
 
     void trace(std::string_view s);
 
@@ -448,13 +582,6 @@ public:
     {
         return name;
     }
-
-    /**
-     * Callback in case of a timeout.  It should wake up its waiters,
-     * get rid of any running child processes that are being monitored
-     * by the worker (important!), etc.
-     */
-    virtual void timedOut(Error && ex) = 0;
 
     /**
      * Used for comparisons. The order matters a bit for scheduling. We

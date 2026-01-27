@@ -9,7 +9,7 @@ R""(
   Resolved URL:  github:edolstra/dwarffs
   Locked URL:    github:edolstra/dwarffs/f691e2c991e75edb22836f1dbe632c40324215c5
   Description:   A filesystem that fetches DWARF debug info from the Internet on demand
-  Path:          /nix/store/769s05vjydmc2lcf6b02az28wsa9ixh1-source
+  Path:          /nix/store/vdyf2s1pygcl4y3dn3bm9wy7mnl8hxcv-source
   Revision:      f691e2c991e75edb22836f1dbe632c40324215c5
   Last modified: 2021-01-21 15:41:26
   Inputs:
@@ -40,7 +40,7 @@ R""(
       "type": "indirect"
     },
     "originalUrl": "flake:dwarffs",
-    "path": "/nix/store/hang3792qwdmm2n0d9nsrs5n6bsws6kv-source",
+    "path": "/nix/store/l06r23gw4psl1f547il2hbnwnxaplbaz-source",
     "resolved": {
       "owner": "edolstra",
       "repo": "dwarffs",

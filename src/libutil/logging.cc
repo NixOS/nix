@@ -360,17 +360,17 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
                          ? connect(path)
                          : toDescriptor(open(path.string().c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
     if (!fd)
-        throw SysError("opening log file %1%", path);
+        throw SysError("opening log file %1%", PathFmt(path));
 
     return std::make_unique<JSONFileLogger>(std::move(fd), includeNixPrefix);
 }
 
 void applyJSONLogger()
 {
-    if (!loggerSettings.jsonLogPath.get().empty()) {
+    if (auto & opt = loggerSettings.jsonLogPath.get()) {
         try {
             std::vector<std::unique_ptr<Logger>> loggers;
-            loggers.push_back(makeJSONLogger(std::filesystem::path(loggerSettings.jsonLogPath.get()), false));
+            loggers.push_back(makeJSONLogger(*opt, false));
             try {
                 logger = makeTeeLogger(std::move(logger), std::move(loggers));
             } catch (...) {

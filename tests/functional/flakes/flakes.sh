@@ -252,15 +252,17 @@ nix flake lock "$flake3Dir"
 nix flake update --flake "$flake3Dir" --override-flake flake2 nixpkgs
 [[ -n $(git -C "$flake3Dir" diff master || echo failed) ]]
 
-# Testing the nix CLI
+# Test `nix registry` commands.
 nix registry add flake1 flake3
 [[ $(nix registry list | wc -l) == 5 ]]
+[[ $(nix registry resolve flake1) = "git+file://$percentEncodedFlake3Dir" ]]
 nix registry pin flake1
 [[ $(nix registry list | wc -l) == 5 ]]
 nix registry pin flake1 flake3
 [[ $(nix registry list | wc -l) == 5 ]]
 nix registry remove flake1
 [[ $(nix registry list | wc -l) == 4 ]]
+[[ $(nix registry resolve flake1) = "git+file://$flake1Dir" ]]
 
 # Test 'nix registry list' with a disabled global registry.
 nix registry add user-flake1 git+file://"$flake1Dir"
@@ -369,6 +371,10 @@ tar cfz "$TEST_ROOT"/flake.tar.gz -C "$TEST_ROOT" flake5
 
 nix build -o "$TEST_ROOT"/result file://"$TEST_ROOT"/flake.tar.gz
 
+nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked"
+[[ -e $TEST_ROOT/unpacked/flake.nix ]]
+expectStderr 1 nix flake clone "file://$TEST_ROOT/flake.tar.gz" --dest "$TEST_ROOT/unpacked" | grep 'existing path'
+
 # Building with a tarball URL containing a SRI hash should also work.
 url=$(nix flake metadata --json file://"$TEST_ROOT"/flake.tar.gz | jq -r .url)
 [[ $url =~ sha256- ]]
@@ -389,12 +395,21 @@ nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1
 nix flake lock "$flake3Dir" --override-input flake2/flake1 flake1/master/"$hash1"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash1 ]]
 
+# Test that --override-input with empty input path is rejected (issue #14816).
+expectStderr 1 nix flake lock "$flake3Dir" --override-input '' . | grepQuiet -- "--override-input was passed a zero-length input path, which would refer to the flake itself, not an input"
+
+# Test that deprecated --update-input with empty input path is rejected.
+expectStderr 1 nix flake lock "$flake3Dir" --update-input '' | grepQuiet -- "--update-input was passed a zero-length input path, which would refer to the flake itself, not an input"
+
 # Test --update-input.
 nix flake lock "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") = "$hash1" ]]
 
 nix flake update flake2/flake1 --flake "$flake3Dir"
 [[ $(jq -r .nodes.flake1_2.locked.rev "$flake3Dir/flake.lock") =~ $hash2 ]]
+
+# Test that 'nix flake update' with empty input path is rejected.
+expectStderr 1 nix flake update '' --flake "$flake3Dir" | grepQuiet -- "input path to be updated cannot be zero-length; it would refer to the flake itself, not an input"
 
 # Test updating multiple inputs.
 nix flake lock "$flake3Dir" --override-input flake1 flake1/master/"$hash1"

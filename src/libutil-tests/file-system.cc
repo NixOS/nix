@@ -1,4 +1,5 @@
 #include "nix/util/util.hh"
+#include "nix/util/serialise.hh"
 #include "nix/util/types.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
@@ -10,6 +11,8 @@
 #include <rapidcheck/gtest.h>
 
 #include <numeric>
+
+using namespace std::string_view_literals;
 
 #ifdef _WIN32
 #  define FS_SEP L"\\"
@@ -112,10 +115,10 @@ TEST(canonPath, removesDots2)
 
 TEST(canonPath, requiresAbsolutePath)
 {
-    ASSERT_ANY_THROW(canonPath("."));
-    ASSERT_ANY_THROW(canonPath(".."));
-    ASSERT_ANY_THROW(canonPath("../"));
-    ASSERT_DEATH({ canonPath(""); }, "path != \"\"");
+    ASSERT_ANY_THROW(canonPath("."sv));
+    ASSERT_ANY_THROW(canonPath(".."sv));
+    ASSERT_ANY_THROW(canonPath("../"sv));
+    ASSERT_DEATH({ canonPath(""sv); }, "path != \"\"");
 }
 
 /* ----------------------------------------------------------------------------
@@ -306,16 +309,56 @@ TEST(DirectoryIterator, works)
     auto tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, true);
 
-    nix::writeFile(tmpDir + "/somefile", "");
+    nix::writeFile(tmpDir / "somefile", "");
 
     for (auto path : DirectoryIterator(tmpDir)) {
-        ASSERT_EQ(path.path().string(), tmpDir + "/somefile");
+        ASSERT_EQ(path.path(), tmpDir / "somefile");
     }
 }
 
 TEST(DirectoryIterator, nonexistent)
 {
     ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
+}
+
+/* ----------------------------------------------------------------------------
+ * createAnonymousTempFile
+ * --------------------------------------------------------------------------*/
+
+TEST(createAnonymousTempFile, works)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "test");
+    lseek(fd.get(), 0, SEEK_SET);
+    FdSource source{fd.get()};
+    EXPECT_EQ(source.drain(), "test");
+    lseek(fd.get(), 0, SEEK_END);
+    writeFull(fd.get(), "test");
+    lseek(fd.get(), 0, SEEK_SET);
+    EXPECT_EQ(source.drain(), "testtest");
+}
+
+/* ----------------------------------------------------------------------------
+ * FdSource
+ * --------------------------------------------------------------------------*/
+
+TEST(FdSource, restartWorks)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "hello world");
+    lseek(fd.get(), 0, SEEK_SET);
+    FdSource source{fd.get()};
+    EXPECT_EQ(source.drain(), "hello world");
+    source.restart();
+    EXPECT_EQ(source.drain(), "hello world");
+    EXPECT_EQ(source.drain(), "");
+}
+
+TEST(createTempDir, works)
+{
+    auto tmpDir = createTempDir();
+    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
+    ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
 }
 
 } // namespace nix

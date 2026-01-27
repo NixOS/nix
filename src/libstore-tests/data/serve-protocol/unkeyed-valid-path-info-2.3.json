@@ -1,0 +1,28 @@
+[
+  {
+    "ca": null,
+    "deriver": null,
+    "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "narSize": 34878,
+    "references": [],
+    "registrationTime": null,
+    "signatures": [],
+    "storeDir": "/nix/store",
+    "ultimate": false,
+    "version": 2
+  },
+  {
+    "ca": null,
+    "deriver": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+    "narHash": "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    "narSize": 34878,
+    "references": [
+      "g1w7hyyyy1w7hy3qg1w7hy3qgqqqqy3q-foo.drv"
+    ],
+    "registrationTime": null,
+    "signatures": [],
+    "storeDir": "/nix/store",
+    "ultimate": false,
+    "version": 2
+  }
+]

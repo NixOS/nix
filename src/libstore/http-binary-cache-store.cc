@@ -4,7 +4,6 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
-#include "nix/util/compression.hh"
 
 namespace nix {
 
@@ -79,13 +78,13 @@ void HttpBinaryCacheStore::init()
     }
 }
 
-std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
+std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
 {
-    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+    if (hasSuffix(path, ".narinfo") && config->narinfoCompression.get())
         return config->narinfoCompression;
-    else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+    else if (hasSuffix(path, ".ls") && config->lsCompression.get())
         return config->lsCompression;
-    else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+    else if (hasPrefix(path, "log/") && config->logCompression.get())
         return config->logCompression;
     else
         return std::nullopt;
@@ -121,7 +120,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
 
     try {
         FileTransferRequest request(makeRequest(path));
-        request.method = HttpMethod::HEAD;
+        request.method = HttpMethod::Head;
         getFileTransfer()->download(request);
         return true;
     } catch (FileTransferError & e) {
@@ -139,13 +138,14 @@ void HttpBinaryCacheStore::upload(
     RestartableSource & source,
     uint64_t sizeHint,
     std::string_view mimeType,
-    std::optional<std::string_view> contentEncoding)
+    std::optional<Headers> headers)
 {
     auto req = makeRequest(path);
-    req.method = HttpMethod::PUT;
+    req.method = HttpMethod::Put;
 
-    if (contentEncoding) {
-        req.headers.emplace_back("Content-Encoding", *contentEncoding);
+    if (headers) {
+        req.headers.reserve(req.headers.size() + headers->size());
+        std::ranges::move(std::move(*headers), std::back_inserter(req.headers));
     }
 
     req.data = {sizeHint, source};
@@ -154,18 +154,16 @@ void HttpBinaryCacheStore::upload(
     getFileTransfer()->upload(req);
 }
 
-void HttpBinaryCacheStore::upload(std::string_view path, CompressedSource & source, std::string_view mimeType)
-{
-    upload(path, static_cast<RestartableSource &>(source), source.size(), mimeType, source.getCompressionMethod());
-}
-
 void HttpBinaryCacheStore::upsertFile(
     const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint)
 {
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
             CompressedSource compressed(source, *compressionMethod);
-            upload(path, compressed, mimeType);
+            /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
+             */
+            Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
+            upload(path, compressed, compressed.size(), mimeType, std::move(headers));
         } else {
             upload(path, source, sizeHint, mimeType, std::nullopt);
         }
@@ -186,7 +184,7 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
     /* path is not a path, but a full relative or absolute
        URL, e.g. we've seen in the wild NARINFO files have a URL
        field which is
-       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
+       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=wvx0nans273vb7b0cjlplsmr2z905hwd`
        (note the query param) and that gets passed here. */
     auto result = parseURLRelative(path, cacheUriWithTrailingSlash);
 
@@ -197,7 +195,23 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    FileTransferRequest request(result);
+
+    /* Only use the specified SSL certificate and private key if the resolved URL names the same
+       authority and uses the same protocol. */
+    if (result.scheme == config->cacheUri.scheme && result.authority == config->cacheUri.authority) {
+        if (const auto & cert = config->tlsCert.get()) {
+            debug("using TLS client certificate %s for '%s'", PathFmt(*cert), request.uri);
+            request.tlsCert = *cert;
+        }
+
+        if (const auto & key = config->tlsKey.get()) {
+            debug("using TLS client key '%s' for '%s'", PathFmt(*key), request.uri);
+            request.tlsKey = *key;
+        }
+    }
+
+    return request;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)

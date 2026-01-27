@@ -15,6 +15,7 @@
 #include <unistd.h>
 #ifdef _WIN32
 #  include <windef.h>
+#  include <wchar.h>
 #endif
 
 #include <functional>
@@ -55,7 +56,8 @@ inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool re
     return absPath(PathView{path}, dir, resolveSymlinks);
 }
 
-std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSymlinks = false);
+std::filesystem::path
+absPath(const std::filesystem::path & path, const std::filesystem::path * dir = nullptr, bool resolveSymlinks = false);
 
 /**
  * Canonicalise a path by removing all `.` or `..` components and
@@ -69,6 +71,13 @@ std::filesystem::path absPath(const std::filesystem::path & path, bool resolveSy
  * `resolveSymlinks = true` case).
  */
 Path canonPath(PathView path, bool resolveSymlinks = false);
+
+static inline Path canonPath(const Path & path, bool resolveSymlinks = false)
+{
+    return canonPath(PathView{path}, resolveSymlinks);
+}
+
+std::filesystem::path canonPath(const std::filesystem::path & path, bool resolveSymlinks = false);
 
 /**
  * @return The directory part of the given canonical path, i.e.,
@@ -103,15 +112,30 @@ bool isInDir(const std::filesystem::path & path, const std::filesystem::path & d
 bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir);
 
 /**
+ * `struct stat` is not 64-bit everywhere on Windows.
+ */
+using PosixStat =
+#ifdef _WIN32
+    struct ::__stat64
+#else
+    struct ::stat
+#endif
+    ;
+
+/**
  * Get status of `path`.
  */
-struct stat stat(const Path & path);
-struct stat lstat(const Path & path);
+PosixStat lstat(const std::filesystem::path & path);
+/**
+ * Get status of `path` following symlinks.
+ */
+PosixStat stat(const std::filesystem::path & path);
 /**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
  */
-std::optional<struct stat> maybeLstat(const Path & path);
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path);
+std::optional<PosixStat> maybeStat(const std::filesystem::path & path);
 
 /**
  * @return true iff the given path exists.
@@ -153,9 +177,22 @@ bool pathAccessible(const std::filesystem::path & path);
 Path readLink(const Path & path);
 
 /**
+ * Read the contents (target) of a symbolic link.  The result is not
+ * in any way canonicalised.
+ */
+std::filesystem::path readLink(const std::filesystem::path & path);
+
+/**
  * Open a `Descriptor` with read-only access to the given directory.
  */
 Descriptor openDirectory(const std::filesystem::path & path);
+
+/**
+ * Open a `Descriptor` with read-only access to the given file.
+ *
+ * @note For directories use @ref openDirectory.
+ */
+Descriptor openFileReadonly(const std::filesystem::path & path);
 
 /**
  * Read the contents of a file into a string.
@@ -239,9 +276,9 @@ void setWriteTime(
     std::optional<bool> isSymlink = std::nullopt);
 
 /**
- * Convenience wrapper that takes all arguments from the `struct stat`.
+ * Convenience wrapper that takes all arguments from the `PosixStat`.
  */
-void setWriteTime(const std::filesystem::path & path, const struct stat & st);
+void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
 
 /**
  * Create a symlink.
@@ -286,12 +323,46 @@ class AutoDelete
     bool recursive;
 public:
     AutoDelete();
+
+    AutoDelete(AutoDelete && x) noexcept
+    {
+        _path = std::move(x._path);
+        del = x.del;
+        recursive = x.recursive;
+        x.del = false;
+    }
+
+    AutoDelete & operator=(AutoDelete && x) noexcept
+    {
+        swap(*this, x);
+        return *this;
+    }
+
+    friend void swap(AutoDelete & lhs, AutoDelete & rhs) noexcept
+    {
+        using std::swap;
+        swap(lhs._path, rhs._path);
+        swap(lhs.del, rhs.del);
+        swap(lhs.recursive, rhs.recursive);
+    }
+
     AutoDelete(const std::filesystem::path & p, bool recursive = true);
+    AutoDelete(const AutoDelete &) = delete;
+    AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
-    void cancel();
+    /**
+     * Delete the file the path points to, and cancel this `AutoDelete`,
+     * so deletion is not attempted a second time by the destructor.
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void deletePath();
 
-    void reset(const std::filesystem::path & p, bool recursive = true);
+    /**
+     * Cancel the pending deletion
+     */
+    void cancel() noexcept;
 
     const std::filesystem::path & path() const
     {
@@ -327,7 +398,14 @@ typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
 /**
  * Create a temporary directory.
  */
-Path createTempDir(const Path & tmpRoot = "", const Path & prefix = "nix", mode_t mode = 0755);
+std::filesystem::path
+createTempDir(const std::filesystem::path & tmpRoot = "", const std::string & prefix = "nix", mode_t mode = 0755);
+
+/**
+ * Create an anonymous readable/writable temporary file, returning a file handle.
+ * On UNIX there resulting file isn't linked to any path on the filesystem.
+ */
+AutoCloseFD createAnonymousTempFile();
 
 /**
  * Create a temporary file, returning a file handle and its path.
@@ -336,8 +414,10 @@ std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
 
 /**
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
+ * Uses GetTempPathW on windows which respects TMP, TEMP, USERPROFILE env variables.
+ * Does not resolve symlinks and the returned path might not be directory or exist at all.
  */
-Path defaultTempDir();
+std::filesystem::path defaultTempDir();
 
 /**
  * Interpret `exe` as a location in the ambient file system and return
@@ -351,7 +431,7 @@ bool isExecutableFileAmbient(const std::filesystem::path & exe);
  * The constructed path looks like `<root><suffix>-<pid>-<unique>`. To create a
  * path nested in a directory, provide a suffix starting with `/`.
  */
-Path makeTempPath(const Path & root, const Path & suffix = ".tmp");
+std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix = ".tmp");
 
 /**
  * Used in various places.
@@ -375,6 +455,17 @@ extern PathFilter defaultPathFilter;
  * @return true if permissions changed, false otherwise.
  */
 bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask = S_IRWXU | S_IRWXG | S_IRWXO);
+
+/**
+ * Set permissions on a path, throwing an exception on error.
+ *
+ * @param path Path to the file to change the permissions for.
+ * @param mode New file mode.
+ *
+ * @todo stop using this and start using `fchmodatTryNoFollow` (or a different
+ * wrapper) to avoid TOCTOU issues.
+ */
+void chmod(const std::filesystem::path & path, mode_t mode);
 
 /**
  * @brief A directory iterator that can be used to iterate over the
@@ -451,13 +542,46 @@ private:
 #ifdef __FreeBSD__
 class AutoUnmount
 {
-    Path path;
+    std::filesystem::path path;
     bool del;
 public:
-    AutoUnmount(Path &);
     AutoUnmount();
+    AutoUnmount(const std::filesystem::path &);
+    AutoUnmount(const AutoUnmount &) = delete;
+
+    AutoUnmount(AutoUnmount && other) noexcept
+        : path(std::move(other.path))
+        , del(std::exchange(other.del, false))
+    {
+    }
+
+    AutoUnmount & operator=(AutoUnmount && other) noexcept
+    {
+        swap(*this, other);
+        return *this;
+    }
+
+    friend void swap(AutoUnmount & lhs, AutoUnmount & rhs) noexcept
+    {
+        using std::swap;
+        swap(lhs.path, rhs.path);
+        swap(lhs.del, rhs.del);
+    }
+
     ~AutoUnmount();
-    void cancel();
+
+    /**
+     * Cancel the unmounting
+     */
+    void cancel() noexcept;
+
+    /**
+     * Unmount the mountpoint right away (if it exists), resetting the
+     * `AutoUnmount`
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void unmount();
 };
 #endif
 

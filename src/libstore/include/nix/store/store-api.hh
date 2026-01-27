@@ -310,7 +310,7 @@ protected:
 
     // Note: this is a `ref` to avoid false sharing with immutable
     // bits of `Store`.
-    ref<SharedSync<LRUCache<std::string, PathInfoCacheValue>>> pathInfoCache;
+    ref<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
@@ -497,10 +497,7 @@ public:
     /**
      * Query which of the given paths have substitutes.
      */
-    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths)
-    {
-        return {};
-    };
+    virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths);
 
     /**
      * Query substitute info (i.e. references, derivers and download
@@ -757,7 +754,7 @@ public:
      * Add signatures to the specified store path. The signatures are
      * not verified.
      */
-    virtual void addSignatures(const StorePath & storePath, const StringSet & sigs)
+    virtual void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
     {
         unsupported("addSignatures");
     }
@@ -779,14 +776,19 @@ public:
     Derivation derivationFromPath(const StorePath & drvPath);
 
     /**
+     * Write a derivation to the Nix store, and return its path.
+     */
+    virtual StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair);
+
+    /**
      * Read a derivation (which must already be valid).
      */
-    Derivation readDerivation(const StorePath & drvPath);
+    virtual Derivation readDerivation(const StorePath & drvPath);
 
     /**
      * Read a derivation from a potentially invalid path.
      */
-    Derivation readInvalidDerivation(const StorePath & drvPath);
+    virtual Derivation readInvalidDerivation(const StorePath & drvPath);
 
     /**
      * @param [out] out Place in here the set of all store paths in the
@@ -890,16 +892,6 @@ public:
      */
     virtual std::optional<TrustedFlag> isTrustedClient() = 0;
 
-    virtual Path toRealPath(const Path & storePath)
-    {
-        return storePath;
-    }
-
-    Path toRealPath(const StorePath & storePath)
-    {
-        return toRealPath(printStorePath(storePath));
-    }
-
     /**
      * Synchronises the options of the client with those of the daemon
      * (a no-op when there’s no daemon)
@@ -1001,12 +993,21 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
  */
 std::string showPaths(const PathSet & paths);
 
+/**
+ * Display a set of paths in human-readable form (i.e., between quotes
+ * and separated by commas).
+ */
+std::string showPaths(const std::set<std::filesystem::path> paths);
+
 std::optional<ValidPathInfo>
 decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven = std::nullopt);
 
 const ContentAddress * getDerivationCA(const BasicDerivation & drv);
 
-std::map<DrvOutput, StorePath>
-drvOutputReferences(Store & store, const Derivation & drv, const StorePath & outputPath, Store * evalStore = nullptr);
+template<>
+struct json_avoids_null<TrustedFlag> : std::true_type
+{};
 
 } // namespace nix
+
+JSON_IMPL(nix::TrustedFlag)

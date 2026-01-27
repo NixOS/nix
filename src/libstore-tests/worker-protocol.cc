@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/util/json-utils.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/store/worker-protocol-impl.hh"
@@ -15,6 +16,8 @@
 namespace nix {
 
 const char workerProtoDir[] = "worker-protocol";
+
+static constexpr std::string_view defaultStoreDir = "/nix/store";
 
 struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
 {
@@ -150,9 +153,8 @@ VERSIONED_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
             },
-            DrvOutput{
+            {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 .outputName = "baz",
             },
@@ -160,19 +162,35 @@ VERSIONED_CHARACTERIZATION_TEST(
         Realisation{
             {
                 .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                .signatures = {"asdf", "qwer"},
-                .dependentRealisations =
+                .signatures =
                     {
-                        {
-                            DrvOutput{
-                                .drvHash = Hash::parseSRI("sha256-b4afnqKCO9oWXgYHb9DeQ2berSwOjS27rSd9TxXDc/U="),
-                                .outputName = "quux",
-                            },
-                            StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-                        },
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
                     },
             },
-            DrvOutput{
+            {
+                .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
+                .outputName = "baz",
+            },
+        },
+    }))
+
+VERSIONED_READ_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    realisation_with_deps,
+    "realisation-with-deps",
+    defaultVersion,
+    (std::tuple<Realisation>{
+        Realisation{
+            {
+                .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                .signatures =
+                    {
+                        Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+                        Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+                    },
+            },
+            {
                 .drvHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 .outputName = "baz",
             },
@@ -408,6 +426,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
+                std::string{defaultStoreDir},
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.registrationTime = 23423;
@@ -416,6 +435,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         }),
         ({
             UnkeyedValidPathInfo info{
+                std::string{defaultStoreDir},
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.deriver = StorePath{
@@ -444,6 +464,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -457,6 +478,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -491,6 +513,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -505,6 +528,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
+                    std::string{defaultStoreDir},
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -525,8 +549,8 @@ VERSIONED_CHARACTERIZATION_TEST(
             info.narSize = 34878;
             info.sigs =
                 {
-                    "fake-sig-1",
-                    "fake-sig-2",
+                    Signature{.keyName = "fake-sig-1", .sig = std::string(64, '\0')},
+                    Signature{.keyName = "fake-sig-2", .sig = std::string(64, '\0')},
                 },
             info;
         }),
@@ -632,7 +656,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_30,
     "client-handshake-info_1_30",
@@ -641,7 +665,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         {},
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_33,
     "client-handshake-info_1_33",
@@ -655,7 +679,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_35,
     "client-handshake-info_1_35",
@@ -673,7 +697,7 @@ VERSIONED_CHARACTERIZATION_TEST(
 
 TEST_F(WorkerProtoTest, handshake_log)
 {
-    CharacterizationTest::writeTest("handshake-to-client", [&]() -> std::string {
+    CharacterizationTest::writeTest("handshake-to-client.bin", [&]() -> std::string {
         StringSink toClientLog;
 
         Pipe toClient, toServer;
@@ -734,7 +758,7 @@ struct NullBufferedSink : BufferedSink
 
 TEST_F(WorkerProtoTest, handshake_client_replay)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](std::string toClientLog) {
         NullBufferedSink nullSink;
 
         StringSource in{toClientLog};
@@ -747,7 +771,7 @@ TEST_F(WorkerProtoTest, handshake_client_replay)
 
 TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](std::string toClientLog) {
         for (size_t len = 0; len < toClientLog.size(); ++len) {
             NullBufferedSink nullSink;
             auto substring = toClientLog.substr(0, len);
@@ -765,7 +789,7 @@ TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
 
 TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
 {
-    CharacterizationTest::readTest("handshake-to-client", [&](const std::string toClientLog) {
+    CharacterizationTest::readTest("handshake-to-client.bin", [&](const std::string toClientLog) {
         for (size_t idx = 0; idx < toClientLog.size(); ++idx) {
             // corrupt a copy
             std::string toClientLogCorrupt = toClientLog;

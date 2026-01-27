@@ -45,13 +45,10 @@ perl.pkgs.toPerlModule (
 
     buildInputs = [
       nix-store
-    ]
-    ++ finalAttrs.passthru.externalBuildInputs;
-
-    # Hack for sake of the dev shell
-    passthru.externalBuildInputs = [
       bzip2
       libsodium
+      perlPackages.DBI
+      perlPackages.DBDSQLite
     ];
 
     # `perlPackages.Test2Harness` is marked broken for Darwin
@@ -69,8 +66,6 @@ perl.pkgs.toPerlModule (
       '';
 
     mesonFlags = [
-      (lib.mesonOption "dbi_path" "${perlPackages.DBI}/${perl.libPrefix}")
-      (lib.mesonOption "dbd_sqlite_path" "${perlPackages.DBDSQLite}/${perl.libPrefix}")
       (lib.mesonEnable "tests" finalAttrs.finalPackage.doCheck)
     ];
 
@@ -79,5 +74,9 @@ perl.pkgs.toPerlModule (
     ];
 
     strictDeps = false;
+
+    meta = {
+      platforms = lib.platforms.unix;
+    };
   })
 )

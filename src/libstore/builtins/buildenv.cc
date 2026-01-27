@@ -10,6 +10,12 @@
 
 namespace nix {
 
+RegisterBuiltinBuilder::BuiltinBuilders & RegisterBuiltinBuilder::builtinBuilders()
+{
+    static RegisterBuiltinBuilder::BuiltinBuilders builders;
+    return builders;
+}
+
 namespace {
 
 struct State
@@ -27,8 +33,8 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
 
     try {
         srcFiles = DirectoryIterator{srcDir};
-    } catch (SysError & e) {
-        if (e.errNo == ENOTDIR) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::not_a_directory)) {
             warn("not including '%s' in the user environment because it's not a directory", srcDir);
             return;
         }
@@ -44,17 +50,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         auto srcFile = (std::filesystem::path{srcDir} / name).string();
         auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
-        struct stat srcSt;
-        try {
-            if (stat(srcFile.c_str(), &srcSt) == -1)
-                throw SysError("getting status of '%1%'", srcFile);
-        } catch (SysError & e) {
-            if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
-                warn("skipping dangling symlink '%s'", dstFile);
-                continue;
-            }
-            throw;
+        auto srcStOpt = maybeStat(srcFile.c_str());
+        if (!srcStOpt) {
+            warn("skipping dangling symlink '%s'", dstFile);
+            continue;
         }
+        auto & srcSt = *srcStOpt;
 
         /* The files below are special-cased to that they don't show
          * up in user profiles, either because they are useless, or
@@ -135,8 +136,8 @@ void buildProfile(const Path & out, Packages && pkgs)
                      readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
-        } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+        } catch (SystemError & e) {
+            if (!e.is(std::errc::no_such_file_or_directory) && !e.is(std::errc::not_a_directory))
                 throw;
         }
     };

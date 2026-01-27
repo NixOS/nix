@@ -15,7 +15,7 @@ Path LocalFSStoreConfig::getDefaultStateDir()
 
 Path LocalFSStoreConfig::getDefaultLogDir()
 {
-    return settings.nixLogDir;
+    return settings.getLogFileSettings().nixLogDir;
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)

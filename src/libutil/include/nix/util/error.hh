@@ -27,6 +27,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef _WIN32
+#  include <errhandlingapi.h>
+#endif
 
 namespace nix {
 
@@ -124,24 +127,24 @@ public:
 
     template<typename... Args>
     BaseError(unsigned int status, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .status = status}
+        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .status = status}
     {
     }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, args...)}
+        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}}
     {
     }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .suggestions = sug}
+        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .suggestions = sug}
     {
     }
 
     BaseError(HintFmt hint)
-        : err{.level = lvlError, .msg = hint}
+        : err{.level = lvlError, .msg = hint, .pos = {}}
     {
     }
 
@@ -237,9 +240,39 @@ MakeError(UsageError, Error);
 MakeError(UnimplementedError, Error);
 
 /**
- * To use in catch-blocks.
+ * To use in catch-blocks. Provides a convenience method to get the portable
+ * std::error_code. Use when you want to catch and check an error condition like
+ * no_such_file_or_directory (ENOENT) without ifdefs.
  */
-MakeError(SystemError, Error);
+class SystemError : public Error
+{
+    std::error_code errorCode;
+
+public:
+    template<typename... Args>
+    SystemError(std::errc posixErrNo, Args &&... args)
+        : Error(std::forward<Args>(args)...)
+        , errorCode(std::make_error_code(posixErrNo))
+    {
+    }
+
+    template<typename... Args>
+    SystemError(std::error_code errorCode, Args &&... args)
+        : Error(std::forward<Args>(args)...)
+        , errorCode(errorCode)
+    {
+    }
+
+    const std::error_code ec() const &
+    {
+        return errorCode;
+    }
+
+    bool is(std::errc e) const
+    {
+        return errorCode == e;
+    }
+};
 
 /**
  * POSIX system error, created using `errno`, `strerror` friends.
@@ -268,7 +301,7 @@ public:
      */
     template<typename... Args>
     SysError(int errNo, const Args &... args)
-        : SystemError("")
+        : SystemError(static_cast<std::errc>(errNo), "")
         , errNo(errNo)
     {
         auto hf = HintFmt(args...);
@@ -288,25 +321,6 @@ public:
     }
 };
 
-#ifdef _WIN32
-namespace windows {
-class WinError;
-}
-#endif
-
-/**
- * Convenience alias for when we use a `errno`-based error handling
- * function on Unix, and `GetLastError()`-based error handling on on
- * Windows.
- */
-using NativeSysError =
-#ifdef _WIN32
-    windows::WinError
-#else
-    SysError
-#endif
-    ;
-
 /**
  * Throw an exception for the purpose of checking that exception
  * handling works; see 'initLibUtil()'.
@@ -325,5 +339,68 @@ void panic(std::string_view msg);
  * @note: This assumes that the logger is operational
  */
 [[gnu::noinline, gnu::cold, noreturn]] void unreachable(std::source_location loc = std::source_location::current());
+
+#ifdef _WIN32
+
+namespace windows {
+
+/**
+ * Windows Error type.
+ *
+ * Unless you need to catch a specific error number, don't catch this in
+ * portable code. Catch `SystemError` instead.
+ */
+class WinError : public SystemError
+{
+public:
+    DWORD lastError;
+
+    /**
+     * Construct using the explicitly-provided error number.
+     * `FormatMessageA` will be used to try to add additional
+     * information to the message.
+     */
+    template<typename... Args>
+    WinError(DWORD lastError, const Args &... args)
+        : SystemError(std::error_code(lastError, std::system_category()), "")
+        , lastError(lastError)
+    {
+        auto hf = HintFmt(args...);
+        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), renderError(lastError));
+    }
+
+    /**
+     * Construct using `GetLastError()` and the ambient "last error".
+     *
+     * Be sure to not perform another last-error-modifying operation
+     * before calling this constructor!
+     */
+    template<typename... Args>
+    WinError(const Args &... args)
+        : WinError(GetLastError(), args...)
+    {
+    }
+
+private:
+
+    std::string renderError(DWORD lastError);
+};
+
+} // namespace windows
+
+#endif
+
+/**
+ * Convenience alias for when we use a `errno`-based error handling
+ * function on Unix, and `GetLastError()`-based error handling on on
+ * Windows.
+ */
+using NativeSysError =
+#ifdef _WIN32
+    windows::WinError
+#else
+    SysError
+#endif
+    ;
 
 } // namespace nix

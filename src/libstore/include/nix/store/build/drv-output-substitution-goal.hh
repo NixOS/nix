@@ -14,11 +14,14 @@ namespace nix {
 class Worker;
 
 /**
- * Substitution of a derivation output.
- * This is done in three steps:
- * 1. Fetch the output info from a substituter
- * 2. Substitute the corresponding output path
- * 3. Register the output info
+ * Fetch a `Realisation` (drv ⨯ output name -> output path) from a
+ * substituter.
+ *
+ * If the output store object itself should also be substituted, that is
+ * the responsibility of the caller to do so.
+ *
+ * @todo rename this `BuidlTraceEntryGoal`, which will make sense
+ * especially once `Realisation` is renamed to `BuildTraceEntry`.
  */
 class DrvOutputSubstitutionGoal : public Goal
 {
@@ -31,16 +34,15 @@ class DrvOutputSubstitutionGoal : public Goal
 public:
     DrvOutputSubstitutionGoal(const DrvOutput & id, Worker & worker);
 
+    /**
+     * The realisation corresponding to the given output id.
+     * Will be filled once we can get it.
+     */
+    std::shared_ptr<const UnkeyedRealisation> outputInfo;
+
     Co init();
 
-    void timedOut(Error && ex) override
-    {
-        unreachable();
-    };
-
     std::string key() override;
-
-    void handleEOF(Descriptor fd) override;
 
     JobCategory jobCategory() const override
     {

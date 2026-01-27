@@ -7,27 +7,56 @@
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/util/json-impls.hh"
 
 namespace nix {
+
+/**
+ * Names must be disjoint with `BuildResultFailureStatus`.
+ *
+ * @note Prefer using `BuildResult::Success::Status`, this name is just
+ * for sake of forward declarations.
+ */
+enum struct BuildResultSuccessStatus : uint8_t {
+    Built,
+    Substituted,
+    AlreadyValid,
+    ResolvesToAlreadyValid,
+};
+
+/**
+ * Names must be disjoint with `BuildResultSuccessStatus`.
+ *
+ * @note Prefer using `BuildResult::Failure::Status`, this name is just
+ * for sake of forward declarations.
+ */
+enum struct BuildResultFailureStatus : uint8_t {
+    PermanentFailure,
+    InputRejected,
+    OutputRejected,
+    /// possibly transient
+    TransientFailure,
+    /// no longer used
+    CachedFailure,
+    TimedOut,
+    MiscFailure,
+    DependencyFailed,
+    LogLimitExceeded,
+    NotDeterministic,
+    NoSubstituters,
+    /// A certain type of `OutputRejected`. The protocols do not yet
+    /// know about this one, so change it back to `OutputRejected`
+    /// before serialization.
+    HashMismatch,
+};
 
 struct BuildResult
 {
     struct Success
     {
-        /**
-         * @note This is directly used in the nix-store --serve protocol.
-         * That means we need to worry about compatibility across versions.
-         * Therefore, don't remove status codes, and only add new status
-         * codes at the end of the list.
-         *
-         * Must be disjoint with `Failure::Status`.
-         */
-        enum Status : uint8_t {
-            Built = 0,
-            Substituted = 1,
-            AlreadyValid = 2,
-            ResolvesToAlreadyValid = 13,
-        } status;
+        using Status = enum BuildResultSuccessStatus;
+        using enum Status;
+        Status status;
 
         /**
          * For derivations, a mapping from the names of the wanted outputs
@@ -37,43 +66,13 @@ struct BuildResult
 
         bool operator==(const BuildResult::Success &) const noexcept;
         std::strong_ordering operator<=>(const BuildResult::Success &) const noexcept;
-
-        static bool statusIs(uint8_t status)
-        {
-            return status == Built || status == Substituted || status == AlreadyValid
-                   || status == ResolvesToAlreadyValid;
-        }
     };
 
     struct Failure
     {
-        /**
-         * @note This is directly used in the nix-store --serve protocol.
-         * That means we need to worry about compatibility across versions.
-         * Therefore, don't remove status codes, and only add new status
-         * codes at the end of the list.
-         *
-         * Must be disjoint with `Success::Status`.
-         */
-        enum Status : uint8_t {
-            PermanentFailure = 3,
-            InputRejected = 4,
-            OutputRejected = 5,
-            /// possibly transient
-            TransientFailure = 6,
-            /// no longer used
-            CachedFailure = 7,
-            TimedOut = 8,
-            MiscFailure = 9,
-            DependencyFailed = 10,
-            LogLimitExceeded = 11,
-            NotDeterministic = 12,
-            NoSubstituters = 14,
-            /// A certain type of `OutputRejected`. The protocols do not yet
-            /// know about this one, so change it back to `OutputRejected`
-            /// before serialization.
-            HashMismatch = 15,
-        } status = MiscFailure;
+        using Status = enum BuildResultFailureStatus;
+        using enum Status;
+        Status status = MiscFailure;
 
         /**
          * Information about the error if the build failed.
@@ -94,10 +93,7 @@ struct BuildResult
         bool operator==(const BuildResult::Failure &) const noexcept;
         std::strong_ordering operator<=>(const BuildResult::Failure &) const noexcept;
 
-        [[noreturn]] void rethrow() const
-        {
-            throw Error("%s", errorMsg);
-        }
+        [[noreturn]] void rethrow() const;
     };
 
     std::variant<Success, Failure> inner = Failure{};
@@ -175,3 +171,6 @@ struct KeyedBuildResult : BuildResult
 };
 
 } // namespace nix
+
+JSON_IMPL(nix::BuildResult)
+JSON_IMPL(nix::KeyedBuildResult)

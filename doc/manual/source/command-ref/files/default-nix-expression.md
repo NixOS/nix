@@ -39,11 +39,11 @@ This makes all subscribed channels available as attributes in the default expres
 A symlink that ensures that [`nix-env`] can find the current user's [channels]:
 
 - `~/.nix-defexpr/channels`
-- `$XDG_STATE_HOME/defexpr/channels` if [`use-xdg-base-directories`] is set to `true`.
+- `$XDG_STATE_HOME/nix/defexpr/channels` if [`use-xdg-base-directories`] is set to `true`.
 
 This symlink points to:
 
-- `$XDG_STATE_HOME/profiles/channels` for regular users
+- `$XDG_STATE_HOME/nix/profiles/channels` for regular users
 - `$NIX_STATE_DIR/profiles/per-user/root/channels` for `root`
 
 In a multi-user installation, you may also have `~/.nix-defexpr/channels_root`, which links to the channels of the root user.

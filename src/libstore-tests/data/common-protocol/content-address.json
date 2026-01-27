@@ -1,0 +1,14 @@
+[
+  {
+    "hash": "sha256-+Xc9Ll6mcPltwaewrk/BAQ56Y3G5T//wzhKUc0zrYu0=",
+    "method": "text"
+  },
+  {
+    "hash": "sha1-gGemBoenViNZM3hiwqns/Fgzqwo=",
+    "method": "flat"
+  },
+  {
+    "hash": "sha256-EMIJ+giQ/gLIWoxmPKjno3zHZrxbGymgzGGyZvZBIdM=",
+    "method": "nar"
+  }
+]

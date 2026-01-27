@@ -20,12 +20,11 @@ where
 
 - `store-dir` = the [store directory](@docroot@/store/store-path.md#store-directory)
 
-- `digest` = base-32 representation of the compressed to 160 bits [SHA-256] hash of `fingerprint`
+- `digest` = base-32 representation of the compressed to 160 bits [SHA-256] hash of `fingerprint`.
 
-For the definition of the hash compression algorithm, please refer to the section 5.1 of
-the [Nix thesis](https://edolstra.github.io/pubs/phd-thesis.pdf), which also defines the
-specifics of base-32 encoding. Note that base-32 encoding processes the hash bytestring from
-the end, while base-16 processes in from the beginning.
+  Nix uses a custom base-32 encoding called [Nix32](@docroot@/protocols/nix32.md).
+
+  For the definition of the hash compression algorithm, please refer to section 5.1 of the [Nix thesis](https://edolstra.github.io/pubs/phd-thesis.pdf).
 
 ## Fingerprint
 

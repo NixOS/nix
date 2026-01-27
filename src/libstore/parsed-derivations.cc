@@ -100,7 +100,7 @@ static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePa
 
 nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     Store & store,
-    const DerivationOptions & drvOptions,
+    const DerivationOptions<StorePath> & drvOptions,
     const StorePathSet & inputPaths,
     const DerivationOutputs & outputs) const
 {
@@ -114,8 +114,8 @@ nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, storePaths] : drvOptions.getParsedExportReferencesGraph(store)) {
-        json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, storePaths));
+    for (auto & [key, storePaths] : drvOptions.exportReferencesGraph) {
+        json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, inputPaths));
     }
 
     return json;

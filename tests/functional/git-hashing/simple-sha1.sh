@@ -4,7 +4,7 @@ hashAlgo=sha1
 
 source simple-common.sh
 
-initRepo
+createGitRepo "$repo" "--object-format=$hashAlgo"
 
 # blob
 test0

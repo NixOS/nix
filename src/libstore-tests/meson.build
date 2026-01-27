@@ -54,10 +54,12 @@ deps_private += gtest
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
   'derivation-advanced-attrs.cc',
-  'derivation.cc',
+  'derivation/external-formats.cc',
+  'derivation/invariants.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',
@@ -83,6 +85,7 @@ sources = files(
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol.cc',
+  'worker-substitution.cc',
   'write-derivation.cc',
 )
 
@@ -121,6 +124,7 @@ if get_option('benchmarks')
     'bench-main.cc',
     'derivation-parser-bench.cc',
     'ref-scan-bench.cc',
+    'register-valid-paths-bench.cc',
   )
 
   benchmark_exe = executable(

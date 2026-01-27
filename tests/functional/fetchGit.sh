@@ -12,11 +12,9 @@ repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf "$repo" "${repo}"-tmp "$TEST_HOME"/.cache/nix "$TEST_ROOT"/worktree "$TEST_ROOT"/minimal
+rm -rf "${repo}"-tmp "$TEST_HOME"/.cache/nix "$TEST_ROOT"/worktree "$TEST_ROOT"/minimal
 
-git init "$repo"
-git -C "$repo" config user.email "foobar@example.com"
-git -C "$repo" config user.name "Foobar"
+createGitRepo "$repo"
 
 echo utrecht > "$repo"/hello
 touch "$repo"/.gitignore
@@ -213,8 +211,7 @@ path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = 
 
 # Fetching from a repo with only a specific revision and no branches should
 # not fall back to copying files and record correct revision information. See: #5302
-mkdir "$TEST_ROOT"/minimal
-git -C "$TEST_ROOT"/minimal init
+createGitRepo "$TEST_ROOT"/minimal
 git -C "$TEST_ROOT"/minimal fetch "$repo" "$rev2"
 git -C "$TEST_ROOT"/minimal checkout "$rev2"
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = "$rev2" ]]
@@ -228,6 +225,10 @@ path8=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rep
 rev4=$(git -C "$repo" rev-parse HEAD)
 rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
 [[ $rev4 = "$rev4_nix" ]]
+export _NIX_FORCE_HTTP=1
+rev4_nix=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).rev")
+[[ $rev4 = "$rev4_nix" ]]
+unset _NIX_FORCE_HTTP
 
 # The name argument should be handled
 path9=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; name = \"foo\"; }).outPath")
@@ -263,7 +264,7 @@ rm -rf "$TEST_HOME"/.cache/nix
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a repo without commits
-git init "$repo"
+initGitRepo "$repo"
 git -C "$repo" add hello # need to add at least one file to cause the root of the repo to be visible
 # shellcheck disable=SC2034
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
@@ -271,9 +272,7 @@ path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").ou
 # should succeed for a path with a space
 # regression test for #7707
 repo="$TEST_ROOT/a b"
-git init "$repo"
-git -C "$repo" config user.email "foobar@example.com"
-git -C "$repo" config user.name "Foobar"
+createGitRepo "$repo"
 
 echo utrecht > "$repo/hello"
 touch "$repo/.gitignore"
@@ -285,7 +284,7 @@ path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
 
 # Test a workdir with no commits.
 empty="$TEST_ROOT/empty"
-git init "$empty"
+createGitRepo "$empty"
 
 emptyAttrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHash = \"sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo=\"; rev = \"0000000000000000000000000000000000000000\"; revCount = 0; shortRev = \"0000000\"; submodules = false; }"
 result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")

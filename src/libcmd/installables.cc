@@ -116,7 +116,11 @@ MixFlakeOptions::MixFlakeOptions()
         .labels = {"input-path"},
         .handler = {[&](std::string s) {
             warn("'--update-input' is a deprecated alias for 'flake update' and will be removed in a future version.");
-            lockFlags.inputUpdates.insert(flake::parseInputAttrPath(s));
+            auto path = flake::NonEmptyInputAttrPath::parse(s);
+            if (!path)
+                throw UsageError(
+                    "--update-input was passed a zero-length input path, which would refer to the flake itself, not an input");
+            lockFlags.inputUpdates.insert(*path);
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
@@ -125,14 +129,18 @@ MixFlakeOptions::MixFlakeOptions()
 
     addFlag({
         .longName = "override-input",
-        .description = "Override a specific flake input (e.g. `dwarffs/nixpkgs`). This implies `--no-write-lock-file`.",
+        .description =
+            "Override a specific flake input (e.g. `dwarffs/nixpkgs`). The input path must not be empty. This implies `--no-write-lock-file`.",
         .category = category,
         .labels = {"input-path", "flake-url"},
         .handler = {[&](std::string inputAttrPath, std::string flakeRef) {
             lockFlags.writeLockFile = false;
+            auto path = flake::NonEmptyInputAttrPath::parse(inputAttrPath);
+            if (!path)
+                throw UsageError(
+                    "--override-input was passed a zero-length input path, which would refer to the flake itself, not an input");
             lockFlags.inputOverrides.insert_or_assign(
-                flake::parseInputAttrPath(inputAttrPath),
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()), true));
+                std::move(*path), parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -173,7 +181,7 @@ MixFlakeOptions::MixFlakeOptions()
             auto flake = flake::lockFlake(
                 flakeSettings,
                 *evalState,
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir())),
+                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string()),
                 {.writeLockFile = false});
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
@@ -263,7 +271,7 @@ void SourceExprCommand::completeInstallable(AddCompletions & completions, std::s
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, *file)));
+            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, file->string())));
 
             Value root;
             state->eval(e, root);
@@ -355,9 +363,9 @@ void completeFlakeRefWithFragment(
             attrPathPrefixes.push_back("");
 
             for (auto & attrPathPrefixS : attrPathPrefixes) {
-                auto attrPathPrefix = parseAttrPath(*evalState, attrPathPrefixS);
+                auto attrPathPrefix = AttrPath::parse(*evalState, attrPathPrefixS);
                 auto attrPathS = attrPathPrefixS + std::string(fragment);
-                auto attrPath = parseAttrPath(*evalState, attrPathS);
+                auto attrPath = AttrPath::parse(*evalState, attrPathS);
 
                 std::string lastAttr;
                 if (!attrPath.empty() && !hasSuffix(attrPathS, ".")) {
@@ -375,9 +383,7 @@ void completeFlakeRefWithFragment(
                         /* Strip the attrpath prefix. */
                         attrPath2.erase(attrPath2.begin(), attrPath2.begin() + attrPathPrefix.size());
                         // FIXME: handle names with dots
-                        completions.add(
-                            flakeRefS + "#" + prefixRoot
-                            + concatStringsSep(".", evalState->symbols.resolve(attrPath2)));
+                        completions.add(flakeRefS + "#" + prefixRoot + attrPath2.to_string(*evalState));
                     }
                 }
             }
@@ -386,7 +392,7 @@ void completeFlakeRefWithFragment(
                attrpaths. */
             if (fragment.empty()) {
                 for (auto & attrPath : defaultFlakeAttrPaths) {
-                    auto attr = root->findAlongAttrPath(parseAttrPath(*evalState, attrPath));
+                    auto attr = root->findAlongAttrPath(AttrPath::parse(*evalState, attrPath));
                     if (!attr)
                         continue;
                     completions.add(flakeRefS + "#" + prefixRoot);
@@ -409,7 +415,7 @@ void completeFlakeRef(AddCompletions & completions, ref<Store> store, std::strin
     Args::completeDir(completions, 0, prefix);
 
     /* Look for registry entries that match the prefix. */
-    for (auto & registry : fetchers::getRegistries(fetchSettings, store)) {
+    for (auto & registry : fetchers::getRegistries(fetchSettings, *store)) {
         for (auto & entry : registry->entries) {
             auto from = entry.from.to_string();
             if (!hasPrefix(prefix, "flake:") && hasPrefix(from, "flake:")) {
@@ -465,10 +471,10 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
             state->eval(e, *vFile);
         } else if (file) {
             auto dir = absPath(getCommandBaseDir());
-            state->evalFile(lookupFileArg(*state, *file, &dir), *vFile);
+            state->evalFile(lookupFileArg(*state, file->string(), &dir), *vFile);
         } else {
-            Path dir = absPath(getCommandBaseDir());
-            auto e = state->parseExprFromString(*expr, state->rootPath(dir));
+            auto dir = absPath(getCommandBaseDir());
+            auto e = state->parseExprFromString(*expr, state->rootPath(dir.string()));
             state->eval(e, *vFile);
         }
 
@@ -801,7 +807,8 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
     for (const auto & i : rawInstallables)
-        res.push_back(parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir())).first);
+        res.push_back(
+            parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir()).string()).first);
     return res;
 }
 
@@ -820,7 +827,8 @@ void RawInstallablesCommand::run(ref<Store> store)
 
 std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
 {
-    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir())).first};
+    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir()).string())
+                .first};
 }
 
 void InstallablesCommand::run(ref<Store> store, std::vector<std::string> && rawInstallables)

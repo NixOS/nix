@@ -12,7 +12,7 @@ namespace nix {
  * Note: Various places expect the allocated memory to be zeroed.
  */
 [[gnu::always_inline]]
-inline void * allocBytes(size_t n)
+inline void * EvalMemory::allocBytes(size_t n)
 {
     void * p;
 #if NIX_USE_BOEHMGC
@@ -139,7 +139,7 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
 inline CallDepth EvalState::addCallDepth(const PosIdx pos)
 {
     if (callDepth > settings.maxCallDepth)
-        error<EvalBaseError>("stack overflow; max-call-depth exceeded").atPos(pos).debugThrow();
+        error<StackOverflowError>().atPos(pos).debugThrow();
 
     return CallDepth(callDepth);
 };

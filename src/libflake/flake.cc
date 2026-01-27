@@ -97,7 +97,7 @@ static void parseFlakeInputAttr(EvalState & state, const Attr & attr, fetchers::
 #pragma GCC diagnostic ignored "-Wswitch-enum"
     switch (attr.value->type()) {
     case nString:
-        attrs.emplace(state.symbols[attr.name], attr.value->c_str());
+        attrs.emplace(state.symbols[attr.name], std::string(attr.value->string_view()));
         break;
     case nBool:
         attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
@@ -177,7 +177,7 @@ static FlakeInput parseFlakeInput(
                     parseFlakeInputs(state, attr.value, attr.pos, lockRootAttrPath, flakeDir, false).first;
             } else if (attr.name == sFollows) {
                 expectType(state, nString, *attr.value, attr.pos);
-                auto follows(parseInputAttrPath(attr.value->c_str()));
+                auto follows(parseInputAttrPath(attr.value->string_view()));
                 follows.insert(follows.begin(), lockRootAttrPath.begin(), lockRootAttrPath.end());
                 input.follows = follows;
             } else
@@ -264,7 +264,7 @@ static Flake readFlake(
 
     if (auto description = vInfo.attrs()->get(state.s.description)) {
         expectType(state, nString, *description->value, description->pos);
-        flake.description = description->value->c_str();
+        flake.description = description->value->string_view();
     }
 
     auto sInputs = state.symbols.create("inputs");
@@ -372,7 +372,8 @@ static Flake getFlake(
     const InputAttrPath & lockRootAttrPath)
 {
     // Fetch a lazy tree first.
-    auto cachedInput = state.inputCache->getAccessor(state.store, originalRef.input, useRegistries);
+    auto cachedInput =
+        state.inputCache->getAccessor(state.fetchSettings, *state.store, originalRef.input, useRegistries);
 
     auto subdir = fetchers::maybeGetStrAttr(cachedInput.extraAttrs, "dir").value_or(originalRef.subdir);
     auto resolvedRef = FlakeRef(std::move(cachedInput.resolvedInput), subdir);
@@ -388,7 +389,8 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef.input.attrs.erase("narHash");
-        auto cachedInput2 = state.inputCache->getAccessor(state.store, newLockedRef.input, fetchers::UseRegistries::No);
+        auto cachedInput2 = state.inputCache->getAccessor(
+            state.fetchSettings, *state.store, newLockedRef.input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
@@ -449,9 +451,10 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
             std::optional<InputAttrPath> parentInputAttrPath; // FIXME: rename to inputAttrPathPrefix?
         };
 
-        std::map<InputAttrPath, OverrideTarget> overrides;
-        std::set<InputAttrPath> explicitCliOverrides;
-        std::set<InputAttrPath> overridesUsed, updatesUsed;
+        std::map<NonEmptyInputAttrPath, OverrideTarget> overrides;
+        std::set<NonEmptyInputAttrPath> explicitCliOverrides;
+        std::set<NonEmptyInputAttrPath> overridesUsed;
+        std::set<InputAttrPath> updatesUsed;
         std::map<ref<Node>, SourcePath> nodePaths;
 
         for (auto & i : lockFlags.inputOverrides) {
@@ -508,8 +511,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
             auto addOverrides =
                 [&](this const auto & addOverrides, const FlakeInput & input, const InputAttrPath & prefix) -> void {
                 for (auto & [idOverride, inputOverride] : input.overrides) {
-                    auto inputAttrPath(prefix);
-                    inputAttrPath.push_back(idOverride);
+                    auto inputAttrPath = NonEmptyInputAttrPath::append(prefix, idOverride);
                     if (inputOverride.ref || inputOverride.follows)
                         overrides.emplace(
                             inputAttrPath,
@@ -530,9 +532,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
             /* Check whether this input has overrides for a
                non-existent input. */
             for (auto [inputAttrPath, inputOverride] : overrides) {
-                auto inputAttrPath2(inputAttrPath);
-                auto follow = inputAttrPath2.back();
-                inputAttrPath2.pop_back();
+                auto follow = inputAttrPath.inputName();
+                auto inputAttrPath2 = inputAttrPath.parent();
                 if (inputAttrPath2 == inputAttrPathPrefix && !flakeInputs.count(follow))
                     warn(
                         "input '%s' has an override for a non-existent input '%s'",
@@ -544,8 +545,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                necessary (i.e. if they're new or the flakeref changed
                from what's in the lock file). */
             for (auto & [id, input2] : flakeInputs) {
-                auto inputAttrPath(inputAttrPathPrefix);
-                inputAttrPath.push_back(id);
+                auto nonEmptyInputAttrPath = NonEmptyInputAttrPath::append(inputAttrPathPrefix, id);
+                auto inputAttrPath = nonEmptyInputAttrPath.get();
                 auto inputAttrPathS = printInputAttrPath(inputAttrPath);
                 debug("computing input '%s'", inputAttrPathS);
 
@@ -553,11 +554,11 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                     /* Do we have an override for this input from one of the
                        ancestors? */
-                    auto i = overrides.find(inputAttrPath);
+                    auto i = overrides.find(nonEmptyInputAttrPath);
                     bool hasOverride = i != overrides.end();
-                    bool hasCliOverride = explicitCliOverrides.contains(inputAttrPath);
+                    bool hasCliOverride = explicitCliOverrides.contains(nonEmptyInputAttrPath);
                     if (hasOverride)
-                        overridesUsed.insert(inputAttrPath);
+                        overridesUsed.insert(nonEmptyInputAttrPath);
                     auto input = hasOverride ? i->second.input : input2;
 
                     /* Resolve relative 'path:' inputs relative to
@@ -616,7 +617,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                     updatesUsed.insert(inputAttrPath);
 
-                    if (oldNode && !lockFlags.inputUpdates.count(inputAttrPath))
+                    if (oldNode && !lockFlags.inputUpdates.count(nonEmptyInputAttrPath))
                         if (auto oldLock2 = get(oldNode->inputs, id))
                             if (auto oldLock3 = std::get_if<0>(&*oldLock2))
                                 oldLock = *oldLock3;
@@ -635,10 +636,10 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                         /* If we have this input in updateInputs, then we
                            must fetch the flake to update it. */
-                        auto lb = lockFlags.inputUpdates.lower_bound(inputAttrPath);
+                        auto lb = lockFlags.inputUpdates.lower_bound(nonEmptyInputAttrPath);
 
-                        auto mustRefetch = lb != lockFlags.inputUpdates.end() && lb->size() > inputAttrPath.size()
-                                           && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->begin());
+                        auto mustRefetch = lb != lockFlags.inputUpdates.end() && lb->get().size() > inputAttrPath.size()
+                                           && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->get().begin());
 
                         FlakeInputs fakeInputs;
 
@@ -660,8 +661,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                         // It is possible that the flake has changed,
                                         // so we must confirm all the follows that are in the lock file are also in the
                                         // flake.
-                                        auto overridePath(inputAttrPath);
-                                        overridePath.push_back(i.first);
+                                        auto overridePath =
+                                            NonEmptyInputAttrPath::append(nonEmptyInputAttrPath, i.first);
                                         auto o = overrides.find(overridePath);
                                         // If the override disappeared, we have to refetch the flake,
                                         // since some of the inputs may not be present in the lock file.
@@ -704,7 +705,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                            this input. */
                         debug("creating new input '%s'", inputAttrPathS);
 
-                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked() && !input.ref->input.isRelative())
+                        if (!lockFlags.allowUnlocked && !input.ref->input.isLocked(state.fetchSettings)
+                            && !input.ref->input.isRelative())
                             throw Error("cannot update unlocked flake input '%s' in pure mode", inputAttrPathS);
 
                         /* Note: in case of an --override-input, we use
@@ -714,7 +716,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             nuked the next time we update the lock
                             file. That is, overrides are sticky unless you
                             use --no-write-lock-file. */
-                        auto inputIsOverride = explicitCliOverrides.contains(inputAttrPath);
+                        auto inputIsOverride = explicitCliOverrides.contains(nonEmptyInputAttrPath);
                         auto ref = (input2.ref && inputIsOverride) ? *input2.ref : *input.ref;
 
                         if (input.isFlake) {
@@ -753,7 +755,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                     return {*resolvedPath, *input.ref};
                                 } else {
                                     auto cachedInput = state.inputCache->getAccessor(
-                                        state.store, input.ref->input, useRegistriesInputs);
+                                        state.fetchSettings, *state.store, input.ref->input, useRegistriesInputs);
 
                                     auto lockedRef = FlakeRef(std::move(cachedInput.lockedInput), input.ref->subdir);
 
@@ -848,11 +850,11 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             auto s = chomp(diff);
                             if (lockFileExists) {
                                 if (s.empty())
-                                    warn("updating lock file %s", outputLockFilePath);
+                                    warn("updating lock file %s", PathFmt(outputLockFilePath));
                                 else
-                                    warn("updating lock file %s:\n%s", outputLockFilePath, s);
+                                    warn("updating lock file %s:\n%s", PathFmt(outputLockFilePath), s);
                             } else
-                                warn("creating lock file %s: \n%s", outputLockFilePath, s);
+                                warn("creating lock file %s: \n%s", PathFmt(outputLockFilePath), s);
 
                             std::optional<std::string> commitMessage = std::nullopt;
 
@@ -953,7 +955,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
         auto key = keyMap.find(node);
         assert(key != keyMap.end());
 
-        override.alloc(state.symbols.create("dir")).mkString(CanonPath(subdir).rel());
+        override.alloc(state.symbols.create("dir")).mkString(CanonPath(subdir).rel(), state.mem);
 
         overrides.alloc(state.symbols.create(key->second)).mkAttrs(override);
     }
@@ -963,7 +965,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     Value * vCallFlake = requireInternalFile(state, CanonPath("call-flake.nix"));
 
     auto vLocks = state.allocValue();
-    vLocks->mkString(lockFileStr);
+    vLocks->mkString(lockFileStr, state.mem);
 
     auto vFetchFinalTree = get(state.internalPrimOps, "fetchFinalTree");
     assert(vFetchFinalTree);
@@ -972,7 +974,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     state.callFunction(*vCallFlake, args, vRes, noPos);
 }
 
-std::optional<Fingerprint> LockedFlake::getFingerprint(ref<Store> store, const fetchers::Settings & fetchSettings) const
+std::optional<Fingerprint> LockedFlake::getFingerprint(Store & store, const fetchers::Settings & fetchSettings) const
 {
     if (lockFile.isUnlocked(fetchSettings))
         return std::nullopt;
@@ -1002,7 +1004,7 @@ Flake::~Flake() {}
 ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake)
 {
     auto fingerprint = state.settings.useEvalCache && state.settings.pureEval
-                           ? lockedFlake->getFingerprint(state.store, state.fetchSettings)
+                           ? lockedFlake->getFingerprint(*state.store, state.fetchSettings)
                            : std::nullopt;
     auto rootLoader = [&state, lockedFlake]() {
         /* For testing whether the evaluation cache is

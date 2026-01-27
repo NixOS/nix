@@ -1,5 +1,4 @@
 #include "nix/store/build/worker.hh"
-#include "nix/store/store-open.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
@@ -29,20 +28,21 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
 
 Goal::Done PathSubstitutionGoal::doneSuccess(BuildResult::Success::Status status)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-    };
-    return amDone(ecSuccess);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+        });
 }
 
 Goal::Done PathSubstitutionGoal::doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg)
 {
     debug(errorMsg);
-    buildResult.inner = BuildResult::Failure{
-        .status = status,
-        .errorMsg = std::move(errorMsg),
-    };
-    return amDone(result);
+    return Goal::doneFailure(
+        result,
+        BuildResult::Failure{
+            .status = status,
+            .errorMsg = std::move(errorMsg),
+        });
 }
 
 Goal::Co PathSubstitutionGoal::init()
@@ -60,7 +60,7 @@ Goal::Co PathSubstitutionGoal::init()
         throw Error(
             "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
-    auto subs = settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>();
+    auto subs = worker.getSubstituters();
 
     bool substituterFailed = false;
     std::optional<Error> lastStoresException = std::nullopt;
@@ -258,7 +258,16 @@ Goal::Co PathSubstitutionGoal::tryToRun(
         true,
         false);
 
-    co_await Suspend{};
+    while (true) {
+        auto event = co_await WaitForChildEvent{};
+        if (std::get_if<ChildOutput>(&event)) {
+            // Substitution doesn't process child output
+        } else if (std::get_if<ChildEOF>(&event)) {
+            break;
+        } else if (std::get_if<TimedOut>(&event)) {
+            unreachable(); // Substitution doesn't use timeouts
+        }
+    }
 
     trace("substitute finished");
 
@@ -310,18 +319,13 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     co_return doneSuccess(BuildResult::Success::Substituted);
 }
 
-void PathSubstitutionGoal::handleEOF(Descriptor fd)
-{
-    worker.wakeUp(shared_from_this());
-}
-
 void PathSubstitutionGoal::cleanup()
 {
     try {
         if (thr.joinable()) {
             // FIXME: signal worker thread to quit.
             thr.join();
-            worker.childTerminated(this);
+            worker.childTerminated(this, JobCategory::Substitution);
         }
 
         outPipe.close();

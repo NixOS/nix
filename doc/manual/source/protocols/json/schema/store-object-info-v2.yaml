@@ -1,0 +1,271 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-object-info-v2.json"
+title: Store Object Info v2
+description: |
+  Information about a [store object](@docroot@/store/store-object.md).
+
+  This schema describes the JSON representation of store object metadata as returned by commands like [`nix path-info --json`](@docroot@/command-ref/new-cli/nix3-path-info.md).
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+  ### Field Categories
+
+  Store object information can come in a few different variations.
+
+  Firstly, "impure" fields, which contain non-intrinsic information about the store object, may or may not be included.
+
+  Second, binary cache stores have extra non-intrinsic infomation about the store objects they contain.
+
+  Thirdly, [`nix path-info --json --closure-size`](@docroot@/command-ref/new-cli/nix3-path-info.html#opt-closure-size) can compute some extra information about not just the single store object in question, but the store object and its [closure](@docroot@/glossary.md#gloss-closure).
+
+  The impure and NAR fields are grouped into separate variants below.
+  See their descriptions for additional information.
+  The closure fields however as just included as optional fields, to avoid a combinatorial explosion of variants.
+
+oneOf:
+  - $ref: "#/$defs/base"
+
+  - $ref: "#/$defs/impure"
+
+  - $ref: "#/$defs/narInfo"
+
+$defs:
+  base:
+    title: Store Object Info
+    description: |
+      Basic store object metadata containing only intrinsic properties.
+      This is the minimal set of fields that describe what a store object contains.
+    type: object
+    required:
+      - version
+      - narHash
+      - narSize
+      - references
+      - ca
+      - storeDir
+    properties:
+      version:
+        type: integer
+        const: 2
+        title: Format version (must be 2)
+        description: |
+          Must be `2`.
+          This is a guard that allows us to continue evolving this format.
+          Here is the rough version history:
+
+          - Version 0: `.narinfo` line-oriented format
+
+          - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from `.narinfo` format.
+
+          - Version 2: Use structured JSON type for `ca`
+
+      path:
+        "$ref": "./store-path-v1.yaml"
+        title: Store Path
+        description: |
+          [Store path](@docroot@/store/store-path.md) to the given store object.
+
+          Note: This field may not be present in all contexts, such as when the path is used as the key and the the store object info the value in map.
+
+      narHash:
+        "$ref": "./hash-v1.yaml"
+        title: NAR Hash
+        description: |
+          Hash of the [file system object](@docroot@/store/file-system-object.md) part of the store object when serialized as a [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive).
+
+      narSize:
+        type: integer
+        minimum: 0
+        title: NAR Size
+        description: |
+          Size of the [file system object](@docroot@/store/file-system-object.md) part of the store object when serialized as a [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive).
+
+      references:
+        type: array
+        title: References
+        description: |
+          An array of [store paths](@docroot@/store/store-path.md), possibly including this one.
+        items:
+          "$ref": "./store-path-v1.yaml"
+
+      ca:
+        oneOf:
+          - type: "null"
+            const: null
+          - "$ref": "./content-address-v1.yaml"
+        title: Content Address
+        description: |
+          If the store object is [content-addressed](@docroot@/store/store-object/content-address.md),
+          this is the content address of this store object's file system object, used to compute its store path.
+          Otherwise (i.e. if it is [input-addressed](@docroot@/glossary.md#gloss-input-addressed-store-object)), this is `null`.
+
+      storeDir:
+        type: string
+        title: Store Directory
+        description: |
+          The [store directory](@docroot@/store/store-path.md#store-directory) this store object belongs to (e.g. `/nix/store`).
+    additionalProperties: false
+
+  impure:
+    title: Store Object Info with Impure Fields
+    description: |
+      Store object metadata including impure fields that are not *intrinsic* properties.
+      In other words, the same store object in different stores could have different values for these impure fields.
+    type: object
+    required:
+      - version
+      - narHash
+      - narSize
+      - references
+      - ca
+      - storeDir
+      # impure
+      - deriver
+      - registrationTime
+      - ultimate
+      - signatures
+    properties:
+      version: { $ref: "#/$defs/base/properties/version" }
+      path: { $ref: "#/$defs/base/properties/path" }
+      narHash: { $ref: "#/$defs/base/properties/narHash" }
+      narSize: { $ref: "#/$defs/base/properties/narSize" }
+      references: { $ref: "#/$defs/base/properties/references" }
+      ca: { $ref: "#/$defs/base/properties/ca" }
+      storeDir: { $ref: "#/$defs/base/properties/storeDir" }
+      deriver:
+        oneOf:
+          - "$ref": "./store-path-v1.yaml"
+          - type: "null"
+        title: Deriver
+        description: |
+          If known, the path to the [store derivation](@docroot@/glossary.md#gloss-store-derivation) from which this store object was produced.
+          Otherwise `null`.
+
+          > This is an "impure" field that may not be included in certain contexts.
+
+      registrationTime:
+        type: ["integer", "null"]
+        title: Registration Time
+        description: |
+          If known, when this derivation was added to the store (Unix timestamp).
+          Otherwise `null`.
+
+          > This is an "impure" field that may not be included in certain contexts.
+
+      ultimate:
+        type: boolean
+        title: Ultimate
+        description: |
+          Whether this store object is trusted because we built it ourselves, rather than substituted a build product from elsewhere.
+
+          > This is an "impure" field that may not be included in certain contexts.
+
+      signatures:
+        type: array
+        title: Signatures
+        description: |
+          Signatures claiming that this store object is what it claims to be.
+          Not relevant for [content-addressed](@docroot@/store/store-object/content-address.md) store objects,
+          but useful for [input-addressed](@docroot@/glossary.md#gloss-input-addressed-store-object) store objects.
+
+          > This is an "impure" field that may not be included in certain contexts.
+        items:
+          type: string
+
+      # Computed closure fields
+      closureSize:
+        type: integer
+        minimum: 0
+        title: Closure Size
+        description: |
+          The total size of this store object and every other object in its [closure](@docroot@/glossary.md#gloss-closure).
+
+          > This field is not stored at all, but computed by traversing the other fields across all the store objects in a closure.
+    additionalProperties: false
+
+  narInfo:
+    title: Store Object Info with Impure fields and NAR Info
+    description: |
+      The store object info in the "binary cache" family of Nix store type contain extra information pertaining to *downloads* of the store object in question.
+      (This store info is called "NAR info", since the downloads take the form of [Nix Archives](@docroot@/store/file-system-object/content-address.md#serial-nix-archive, and the metadata is served in a file with a `.narinfo` extension.)
+
+      This download information, being specific to how the store object happens to be stored and transferred, is also considered to be non-intrinsic / impure.
+    type: object
+    required:
+      - version
+      - narHash
+      - narSize
+      - references
+      - ca
+      - storeDir
+      # impure
+      - deriver
+      - registrationTime
+      - ultimate
+      - signatures
+      # nar
+      - url
+      - compression
+      - downloadHash
+      - downloadSize
+    properties:
+      version: { $ref: "#/$defs/base/properties/version" }
+      path: { $ref: "#/$defs/base/properties/path" }
+      narHash: { $ref: "#/$defs/base/properties/narHash" }
+      narSize: { $ref: "#/$defs/base/properties/narSize" }
+      references: { $ref: "#/$defs/base/properties/references" }
+      ca: { $ref: "#/$defs/base/properties/ca" }
+      storeDir: { $ref: "#/$defs/base/properties/storeDir" }
+      deriver: { $ref: "#/$defs/impure/properties/deriver" }
+      registrationTime: { $ref: "#/$defs/impure/properties/registrationTime" }
+      ultimate: { $ref: "#/$defs/impure/properties/ultimate" }
+      signatures: { $ref: "#/$defs/impure/properties/signatures" }
+      closureSize: { $ref: "#/$defs/impure/properties/closureSize" }
+      url:
+        type: string
+        title: URL
+        description: |
+          Where to download a compressed archive of the file system objects of this store object.
+
+          > This is an impure "`.narinfo`" field that may not be included in certain contexts.
+
+      compression:
+        type: string
+        title: Compression
+        description: |
+          The compression format that the archive is in.
+
+          > This is an impure "`.narinfo`" field that may not be included in certain contexts.
+
+      downloadHash:
+        "$ref": "./hash-v1.yaml"
+        title: Download Hash
+        description: |
+          A digest for the compressed archive itself, as opposed to the data contained within.
+
+          > This is an impure "`.narinfo`" field that may not be included in certain contexts.
+
+      downloadSize:
+        type: integer
+        minimum: 0
+        title: Download Size
+        description: |
+          The size of the compressed archive itself.
+
+          > This is an impure "`.narinfo`" field that may not be included in certain contexts.
+
+      closureDownloadSize:
+        type: integer
+        minimum: 0
+        title: Closure Download Size
+        description: |
+          The total size of the compressed archive itself for this object, and the compressed archive of every object in this object's [closure](@docroot@/glossary.md#gloss-closure).
+
+          > This is an impure "`.narinfo`" field that may not be included in certain contexts.
+
+          > This field is not stored at all, but computed by traversing the other fields across all the store objects in a closure.
+    additionalProperties: false

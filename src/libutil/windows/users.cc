@@ -2,7 +2,6 @@
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/windows-error.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -35,12 +34,12 @@ std::string getUserName()
     return name;
 }
 
-Path getHome()
+std::filesystem::path getHome()
 {
-    static Path homeDir = []() {
-        Path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
+    static std::filesystem::path homeDir = []() {
+        std::filesystem::path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
         assert(!homeDir.empty());
-        return canonPath(homeDir);
+        return canonPath(homeDir.string());
     }();
     return homeDir;
 }

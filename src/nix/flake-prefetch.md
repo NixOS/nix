@@ -20,7 +20,7 @@ R""(
   ```console
   # nix flake prefetch dwarffs --json
   {"hash":"sha256-VHg3MYVgQ12LeRSU2PSoDeKlSPD8PYYEFxxwkVVDRd0="
-  ,"storePath":"/nix/store/hang3792qwdmm2n0d9nsrs5n6bsws6kv-source"}
+  ,"storePath":"/nix/store/l06r23gw4psl1f547il2hbnwnxaplbaz-source"}
   ```
 
 # Description

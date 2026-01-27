@@ -134,7 +134,7 @@ struct MixFlakeOptions : virtual Args, EvalCommand
 
 struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
-    std::optional<Path> file;
+    std::optional<std::filesystem::path> file;
     std::optional<std::string> expr;
 
     SourceExprCommand();
@@ -286,11 +286,7 @@ struct RegisterCommand
 {
     typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
 
-    static Commands & commands()
-    {
-        static Commands commands;
-        return commands;
-    }
+    static Commands & commands();
 
     RegisterCommand(std::vector<std::string> && name, std::function<ref<Command>()> command)
     {
@@ -314,7 +310,7 @@ static RegisterCommand registerCommand2(std::vector<std::string> && name)
 
 struct MixProfile : virtual StoreCommand
 {
-    std::optional<Path> profile;
+    std::optional<std::filesystem::path> profile;
 
     MixProfile();
 

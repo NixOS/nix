@@ -15,9 +15,9 @@
 
 namespace nix {
 
-std::optional<Path> getCgroupFS()
+std::optional<std::filesystem::path> getCgroupFS()
 {
-    static auto res = [&]() -> std::optional<Path> {
+    static auto res = [&]() -> std::optional<std::filesystem::path> {
         auto fp = fopen("/proc/mounts", "r");
         if (!fp)
             return std::nullopt;
@@ -32,7 +32,7 @@ std::optional<Path> getCgroupFS()
 }
 
 // FIXME: obsolete, check for cgroup2
-StringMap getCgroups(const Path & cgroupFile)
+StringMap getCgroups(const std::filesystem::path & cgroupFile)
 {
     StringMap cgroups;
 
@@ -40,13 +40,40 @@ StringMap getCgroups(const Path & cgroupFile)
         static std::regex regex("([0-9]+):([^:]*):(.*)");
         std::smatch match;
         if (!std::regex_match(line, match, regex))
-            throw Error("invalid line '%s' in '%s'", line, cgroupFile);
+            throw Error("invalid line '%s' in %s", line, PathFmt(cgroupFile));
 
         std::string name = hasPrefix(std::string(match[2]), "name=") ? std::string(match[2], 5) : match[2];
         cgroups.insert_or_assign(name, match[3]);
     }
 
     return cgroups;
+}
+
+CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
+{
+    CgroupStats stats;
+
+    auto cpustatPath = cgroup / "cpu.stat";
+
+    if (pathExists(cpustatPath)) {
+        for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
+            std::string_view userPrefix = "user_usec ";
+            if (hasPrefix(line, userPrefix)) {
+                auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
+                if (n)
+                    stats.cpuUser = std::chrono::microseconds(*n);
+            }
+
+            std::string_view systemPrefix = "system_usec ";
+            if (hasPrefix(line, systemPrefix)) {
+                auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
+                if (n)
+                    stats.cpuSystem = std::chrono::microseconds(*n);
+            }
+        }
+    }
+
+    return stats;
 }
 
 static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
@@ -57,7 +84,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
     auto procsFile = cgroup / "cgroup.procs";
 
     if (!pathExists(procsFile))
-        throw Error("'%s' is not a cgroup", cgroup);
+        throw Error("%s is not a cgroup", PathFmt(cgroup));
 
     /* Use the fast way to kill every process in a cgroup, if
        available. */
@@ -85,7 +112,7 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
             break;
 
         if (round > 20)
-            throw Error("cannot kill cgroup '%s'", cgroup);
+            throw Error("cannot kill cgroup %s", PathFmt(cgroup));
 
         for (auto & pid_s : pids) {
             pid_t pid;
@@ -103,52 +130,32 @@ static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool retu
             }
             // FIXME: pid wraparound
             if (kill(pid, SIGKILL) == -1 && errno != ESRCH)
-                throw SysError("killing member %d of cgroup '%s'", pid, cgroup);
+                throw SysError("killing member %d of cgroup %s", pid, PathFmt(cgroup));
         }
 
         auto sleep = std::chrono::milliseconds((int) std::pow(2.0, std::min(round, 10)));
         if (sleep.count() > 100)
-            printError("waiting for %d ms for cgroup '%s' to become empty", sleep.count(), cgroup);
+            printError("waiting for %d ms for cgroup %s to become empty", sleep.count(), PathFmt(cgroup));
         std::this_thread::sleep_for(sleep);
         round++;
     }
 
     CgroupStats stats;
-
-    if (returnStats) {
-        auto cpustatPath = cgroup / "cpu.stat";
-
-        if (pathExists(cpustatPath)) {
-            for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cpustatPath), "\n")) {
-                std::string_view userPrefix = "user_usec ";
-                if (hasPrefix(line, userPrefix)) {
-                    auto n = string2Int<uint64_t>(line.substr(userPrefix.size()));
-                    if (n)
-                        stats.cpuUser = std::chrono::microseconds(*n);
-                }
-
-                std::string_view systemPrefix = "system_usec ";
-                if (hasPrefix(line, systemPrefix)) {
-                    auto n = string2Int<uint64_t>(line.substr(systemPrefix.size()));
-                    if (n)
-                        stats.cpuSystem = std::chrono::microseconds(*n);
-                }
-            }
-        }
-    }
+    if (returnStats)
+        stats = getCgroupStats(cgroup);
 
     if (rmdir(cgroup.c_str()) == -1)
-        throw SysError("deleting cgroup %s", cgroup);
+        throw SysError("deleting cgroup %s", PathFmt(cgroup));
 
     return stats;
 }
 
-CgroupStats destroyCgroup(const Path & cgroup)
+CgroupStats destroyCgroup(const std::filesystem::path & cgroup)
 {
     return destroyCgroup(cgroup, true);
 }
 
-std::string getCurrentCgroup()
+CanonPath getCurrentCgroup()
 {
     auto cgroupFS = getCgroupFS();
     if (!cgroupFS)
@@ -158,12 +165,12 @@ std::string getCurrentCgroup()
     auto ourCgroup = ourCgroups[""];
     if (ourCgroup == "")
         throw Error("cannot determine cgroup name from /proc/self/cgroup");
-    return ourCgroup;
+    return CanonPath{ourCgroup};
 }
 
-std::string getRootCgroup()
+CanonPath getRootCgroup()
 {
-    static std::string rootCgroup = getCurrentCgroup();
+    static auto rootCgroup = getCurrentCgroup();
     return rootCgroup;
 }
 

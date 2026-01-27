@@ -35,6 +35,10 @@
 #  include <sys/sysctl.h>
 #endif
 
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 #include "store-config-private.hh"
 
 namespace nix {
@@ -46,23 +50,46 @@ namespace nix {
    must be deleted and recreated on startup.) */
 #define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
 
+/**
+ * Helper to resolve the NIX_CONF_DIR at runtime on Windows.
+ * On Windows, NIX_CONF_DIR is not defined at compile time, so we determine
+ * the path at runtime using the Windows known folders API (FOLDERID_ProgramData).
+ * This allows Nix to work correctly regardless of which drive Windows is installed on.
+ */
+static std::filesystem::path resolveNixConfDir()
+{
+#ifdef _WIN32
+#  ifdef NIX_CONF_DIR
+    // On Windows, NIX_CONF_DIR should not be defined at compile time
+#    error "NIX_CONF_DIR should not be defined on Windows"
+#  endif
+    return windows::known_folders::getProgramData() / "nix";
+#else
+    return NIX_CONF_DIR;
+#endif
+}
+
+LogFileSettings::LogFileSettings()
+    : nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
+{
+}
+
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
-    : nixPrefix(NIX_PREFIX)
-    , nixStore(
+    : nixStore(
 #ifndef _WIN32
           // On Windows `/nix/store` is not a canonical path, but we dont'
           // want to deal with that yet.
           canonPath
 #endif
           (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
     , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
+    , nixConfDir(canonPath(getEnvOsNonEmpty(OS_STR("NIX_CONF_DIR"))
+                               .transform([](auto && s) { return std::filesystem::path(s); })
+                               .value_or(resolveNixConfDir())))
     , nixUserConfFiles(getUserConfigFiles())
     , nixDaemonSocketFile(
           canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
@@ -116,7 +143,7 @@ void loadConfFile(AbstractConfig & config)
         }
     };
 
-    applyConfigFile(settings.nixConfDir + "/nix.conf");
+    applyConfigFile((settings.nixConfDir / "nix.conf").string());
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
@@ -145,7 +172,7 @@ std::vector<Path> getUserConfigFiles()
     std::vector<Path> files;
     auto dirs = getConfigDirs();
     for (auto & dir : dirs) {
-        files.insert(files.end(), dir + "/nix.conf");
+        files.insert(files.end(), (dir / "nix.conf").string());
     }
     return files;
 }
@@ -335,7 +362,16 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
     });
 }
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ChrootPath, source, optional)
+void to_json(nlohmann::json & j, const ChrootPath & cp)
+{
+    j = nlohmann::json{{"source", cp.source.string()}, {"optional", cp.optional}};
+}
+
+void from_json(const nlohmann::json & j, ChrootPath & cp)
+{
+    cp.source = j.at("source").get<std::string>();
+    cp.optional = j.at("optional").get<bool>();
+}
 
 template<>
 PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const
@@ -368,7 +404,9 @@ std::string BaseSetting<PathsInChroot>::to_string() const
 {
     std::vector<std::string> accum;
     for (auto & [name, cp] : value) {
-        std::string s = name == cp.source ? name : name + "=" + cp.source;
+        auto nameStr = name.string();
+        auto sourceStr = cp.source.string();
+        std::string s = name == cp.source ? nameStr : nameStr + "=" + sourceStr;
         if (cp.optional)
             s += "?";
         accum.push_back(std::move(s));
@@ -486,7 +524,7 @@ void initLibStore(bool loadConfig)
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
        to the TMPDIR, in particular in ‘nix-store --serve’. */
-    if (hasPrefix(defaultTempDir(), "/var/folders/"))
+    if (hasPrefix(defaultTempDir().string(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif
 

@@ -243,7 +243,7 @@ static RegisterPrimOp primop_fetchClosure({
       ```nix
       builtins.fetchClosure {
         fromStore = "https://cache.nixos.org";
-        fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
+        fromPath = /nix/store/nph9br6y2dmciy6q3dj3fwk2brdlr4gh-git-2.33.1;
         toPath = /nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1;
       }
       ```
@@ -258,8 +258,8 @@ static RegisterPrimOp primop_fetchClosure({
       use [`nix store make-content-addressed`](@docroot@/command-ref/new-cli/nix3-store-make-content-addressed.md):
 
       ```console
-      # nix store make-content-addressed --from https://cache.nixos.org /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1
-      rewrote '/nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
+      # nix store make-content-addressed --from https://cache.nixos.org /nix/store/nph9br6y2dmciy6q3dj3fwk2brdlr4gh-git-2.33.1
+      rewrote '/nix/store/nph9br6y2dmciy6q3dj3fwk2brdlr4gh-git-2.33.1' to '/nix/store/ldbhlwhh39wha58rm61bkiiwm6j7211j-git-2.33.1'
       ```
 
       Alternatively, set `toPath = ""` and find the correct `toPath` in the error message.
@@ -271,7 +271,7 @@ static RegisterPrimOp primop_fetchClosure({
       ```nix
       builtins.fetchClosure {
         fromStore = "https://cache.nixos.org";
-        fromPath = /nix/store/r2jd6ygnmirm2g803mksqqjm4y39yi6i-git-2.33.1;
+        fromPath = /nix/store/nph9br6y2dmciy6q3dj3fwk2brdlr4gh-git-2.33.1;
         inputAddressed = true;
       }
       ```

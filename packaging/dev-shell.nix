@@ -3,10 +3,118 @@
   devFlake,
 }:
 
+let
+  # Some helper functions
+
+  /**
+    Compute a filtered closure of build inputs.
+
+    Specifically, `buildInputsClosure cond startSet` computes the closure formed
+    by recursive application of `p: filter cond p.buildInputs ++ filter cond p.propagatedBuildInputs`
+    to `startSet`.
+
+    Example:
+    ```nix
+    builtInputsClosure isInternal [ pkg1 pkg2 ]
+    => [ pkg1 pkg3 pkg2 pkg10 ]
+    ```
+
+    Note: order tbd
+
+    Note: `startSet` is *NOT* filtered.
+  */
+  buildInputsClosureCond =
+    cond: startSet:
+    let
+      closure = builtins.genericClosure {
+        startSet = map (d: {
+          key = d.drvPath;
+          value = d;
+        }) startSet;
+        operator =
+          d:
+          let
+            r =
+              map
+                (d': {
+                  key = d'.drvPath;
+                  value = d';
+                })
+                (
+                  lib.filter cond d.value.buildInputs or [ ] ++ lib.filter cond d.value.propagatedBuildInputs or [ ]
+                );
+          in
+          r;
+      };
+    in
+    map (item: item.value) closure;
+
+  /**
+    `[ pkg1 pkg2 ]` -> `{ "...-pkg2.drv" = null; "...-pkg1.drv" = null }`
+
+    Note: fairly arbitrary order (hash based). Use for efficient set membership test only.
+  */
+  byDrvPath =
+    l:
+    lib.listToAttrs (
+      map (c: {
+        name =
+          # Just a lookup key
+          builtins.unsafeDiscardStringContext c.drvPath;
+        value = null;
+      }) l
+    );
+
+  /**
+    Stable dedup.
+
+    Unlike `listToAttrs` -> `attrValues`, this preserves the input ordering,
+    which is more predictable ("deterministic") than e.g. sorting store paths,
+    whose hashes affect the ordering on every change.
+  */
+  # TODO: add to Nixpkgs lib, refer from uniqueStrings
+  dedupByString =
+    key: l:
+    let
+      r =
+        lib.foldl'
+          (
+            a@{ list, set }:
+            elem:
+            let
+              k = builtins.unsafeDiscardStringContext (key elem);
+            in
+            if set ? ${k} then
+              a
+            else
+              let
+                # Note: O(n²) copying. Use linkedLists to concat them in one go at the end.
+                # https://github.com/NixOS/nixpkgs/pull/452088
+                newList = [ elem ] ++ list;
+                newSet = set // {
+                  ${k} = null;
+                };
+              in
+              builtins.seq newList builtins.seq newSet {
+                list = newList;
+                set = newSet;
+              }
+          )
+          {
+            list = [ ];
+            set = { };
+          }
+          l;
+    in
+    r.list;
+
+in
+
 { pkgs }:
 
+# TODO: don't use nix-util for this?
 pkgs.nixComponents2.nix-util.overrideAttrs (
-  attrs:
+  finalAttrs: prevAttrs:
 
   let
     stdenv = pkgs.nixDependencies2.stdenv;
@@ -21,13 +129,96 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       "-D${prefix}:${rest}";
     havePerl = stdenv.buildPlatform == stdenv.hostPlatform && stdenv.hostPlatform.isUnix;
     ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
+
+    availableComponents = lib.filterAttrs (
+      k: v: lib.meta.availableOn pkgs.stdenv.hostPlatform v
+    ) allComponents;
+
+    activeComponents = buildInputsClosureCond isInternal (
+      lib.attrValues (finalAttrs.passthru.config.getComponents availableComponents)
+    );
+
+    allComponents = lib.filterAttrs (k: v: lib.isDerivation v) pkgs.nixComponents2;
+    internalDrvs = byDrvPath (
+      # Drop the attr names (not present in buildInputs anyway)
+      lib.attrValues availableComponents
+      ++ lib.concatMap (c: lib.filter (v: !v.meta.broken) (lib.attrValues (c.tests or { }))) (
+        lib.attrValues availableComponents
+      )
+    );
+
+    isInternal =
+      dep: internalDrvs ? ${builtins.unsafeDiscardStringContext dep.drvPath or "_non-existent_"};
+
+    activeComponentNames = lib.listToAttrs (
+      map (c: {
+        name = c.pname or c.name;
+        value = null;
+      }) activeComponents
+    );
+
+    isActiveComponent = name: activeComponentNames ? ${name};
+
   in
   {
-    pname = "shell-for-" + attrs.pname;
+    pname = "shell-for-nix";
+
+    passthru = {
+      inherit activeComponents;
+
+      # We use this attribute to store non-derivation values like functions and
+      # perhaps other things that are primarily for overriding and not the shell.
+      config = {
+        # Default getComponents
+        getComponents =
+          c:
+          builtins.removeAttrs c (
+            lib.optionals (!havePerl) [ "nix-perl-bindings" ]
+            ++ lib.optionals (!buildCanExecuteHost) [ "nix-manual" ]
+          );
+      };
+
+      /**
+        Produce a devShell for a given set of nix components
+
+        Example:
+
+        ```nix
+        shell.withActiveComponents (c: {
+          inherit (c) nix-util;
+        })
+        ```
+      */
+      withActiveComponents =
+        f2:
+        finalAttrs.finalPackage.overrideAttrs (
+          finalAttrs: prevAttrs: {
+            passthru = prevAttrs.passthru // {
+              config = prevAttrs.passthru.config // {
+                getComponents = f2;
+              };
+            };
+          }
+        );
+
+      small = finalAttrs.finalPackage.withActiveComponents (
+        c:
+        lib.intersectAttrs (lib.genAttrs [
+          "nix-cli"
+          "nix-util-tests"
+          "nix-store-tests"
+          "nix-expr-tests"
+          "nix-fetchers-tests"
+          "nix-flake-tests"
+          "nix-functional-tests"
+          "nix-perl-bindings"
+        ] (_: null)) c
+      );
+    };
 
     # Remove the version suffix to avoid unnecessary attempts to substitute in nix develop
     version = lib.fileContents ../.version;
-    name = attrs.pname;
+    name = finalAttrs.pname;
 
     installFlags = "sysconfdir=$(out)/etc";
     shellHook = ''
@@ -70,9 +261,12 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
 
     # We use this shell with the local checkout, not unpackPhase.
     src = null;
+
     # Workaround https://sourceware.org/pipermail/gdb-patches/2025-October/221398.html
     # Remove when gdb fix is rolled out everywhere.
     separateDebugInfo = false;
+
+    mesonBuildType = "debugoptimized";
 
     env = {
       # For `make format`, to work without installing pre-commit
@@ -85,30 +279,35 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       CXX_LD = "mold";
     };
 
-    mesonFlags =
-      map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
-      ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
-      ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents2.nix-fetchers.mesonFlags)
-      ++ lib.optionals havePerl (
-        map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents2.nix-perl-bindings.mesonFlags)
-      )
-      ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents2.nix-expr.mesonFlags)
-      ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
+    dontUseCmakeConfigure = true;
+
+    mesonFlags = [
+      (lib.mesonBool "json-schema-checks" (isActiveComponent "nix-json-schema-checks"))
+    ]
+    ++ map (transformFlag "libutil") (ignoreCrossFile pkgs.nixComponents2.nix-util.mesonFlags)
+    ++ map (transformFlag "libstore") (ignoreCrossFile pkgs.nixComponents2.nix-store.mesonFlags)
+    ++ map (transformFlag "libfetchers") (ignoreCrossFile pkgs.nixComponents2.nix-fetchers.mesonFlags)
+    ++ lib.optionals havePerl (
+      map (transformFlag "perl") (ignoreCrossFile pkgs.nixComponents2.nix-perl-bindings.mesonFlags)
+    )
+    ++ map (transformFlag "libexpr") (ignoreCrossFile pkgs.nixComponents2.nix-expr.mesonFlags)
+    ++ map (transformFlag "libcmd") (ignoreCrossFile pkgs.nixComponents2.nix-cmd.mesonFlags);
 
     nativeBuildInputs =
       let
         inputs =
-          attrs.nativeBuildInputs or [ ]
-          ++ pkgs.nixComponents2.nix-util.nativeBuildInputs
-          ++ pkgs.nixComponents2.nix-store.nativeBuildInputs
-          ++ pkgs.nixComponents2.nix-fetchers.nativeBuildInputs
-          ++ pkgs.nixComponents2.nix-expr.nativeBuildInputs
-          ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.nativeBuildInputs
-          ++ lib.optionals buildCanExecuteHost pkgs.nixComponents2.nix-manual.externalNativeBuildInputs
-          ++ pkgs.nixComponents2.nix-internal-api-docs.nativeBuildInputs
-          ++ pkgs.nixComponents2.nix-external-api-docs.nativeBuildInputs
-          ++ pkgs.nixComponents2.nix-functional-tests.externalNativeBuildInputs
-          ++ pkgs.nixComponents2.nix-json-schema-checks.externalNativeBuildInputs
+          dedupByString (v: "${v}") (
+            lib.filter (x: !isInternal x) (
+              lib.lists.concatMap (
+                # Nix manual has a build-time dependency on nix, but we
+                # don't want to do a native build just to enter the cross
+                # dev shell.
+                #
+                # TODO: think of a more principled fix for this.
+                c: lib.filter (f: f.pname or null != "nix") c.nativeBuildInputs
+              ) activeComponents
+            )
+          )
           ++ lib.optional (
             !buildCanExecuteHost
             # Hack around https://github.com/nixos/nixpkgs/commit/bf7ad8cfbfa102a90463433e2c5027573b462479
@@ -117,16 +316,14 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             && lib.meta.availableOn stdenv.buildPlatform (stdenv.hostPlatform.emulator pkgs.buildPackages)
           ) pkgs.buildPackages.mesonEmulatorHook
           ++ [
-            pkgs.buildPackages.cmake
             pkgs.buildPackages.gnused
-            pkgs.buildPackages.changelog-d
             modular.pre-commit.settings.package
             (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
             pkgs.buildPackages.nixfmt-rfc-style
             pkgs.buildPackages.shellcheck
             pkgs.buildPackages.include-what-you-use
-            pkgs.buildPackages.gdb
           ]
+          ++ lib.optional stdenv.hostPlatform.isUnix pkgs.buildPackages.gdb
           ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
             lib.hiPrio pkgs.buildPackages.clang-tools
           )
@@ -136,18 +333,22 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
       # from making its way into NIX_CFLAGS_COMPILE.
       lib.filter (p: !lib.hasInfix "separate-debug-info" p) inputs;
 
-    buildInputs = [
-      pkgs.gbenchmark
-    ]
-    ++ attrs.buildInputs or [ ]
-    ++ pkgs.nixComponents2.nix-util.buildInputs
-    ++ pkgs.nixComponents2.nix-store.buildInputs
-    ++ pkgs.nixComponents2.nix-store-tests.externalBuildInputs
-    ++ pkgs.nixComponents2.nix-fetchers.buildInputs
-    ++ pkgs.nixComponents2.nix-expr.buildInputs
-    ++ pkgs.nixComponents2.nix-expr.externalPropagatedBuildInputs
-    ++ pkgs.nixComponents2.nix-cmd.buildInputs
-    ++ lib.optionals havePerl pkgs.nixComponents2.nix-perl-bindings.externalBuildInputs
-    ++ lib.optional havePerl pkgs.perl;
+    propagatedNativeBuildInputs = dedupByString (v: "${v}") (
+      lib.filter (x: !isInternal x) (
+        lib.lists.concatMap (c: c.propagatedNativeBuildInputs) activeComponents
+      )
+    );
+
+    buildInputs =
+      # TODO change Nixpkgs to mark gbenchmark as building on Windows
+      lib.optional stdenv.hostPlatform.isUnix pkgs.gbenchmark
+      ++ dedupByString (v: "${v}") (
+        lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.buildInputs) activeComponents)
+      )
+      ++ lib.optional havePerl pkgs.perl;
+
+    propagatedBuildInputs = dedupByString (v: "${v}") (
+      lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.propagatedBuildInputs) activeComponents)
+    );
   }
 )

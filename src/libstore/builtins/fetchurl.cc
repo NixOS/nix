@@ -4,6 +4,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -65,8 +66,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
         auto executable = ctx.drv.env.find("executable");
         if (executable != ctx.drv.env.end() && executable->second == "1") {
-            if (chmod(storePath.c_str(), 0755) == -1)
-                throw SysError("making '%1%' executable", storePath);
+            chmod(storePath, 0755);
         }
     };
 

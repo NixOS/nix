@@ -19,6 +19,10 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 
+#ifndef _WIN32
+#  include <sys/socket.h>
+#endif
+
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -38,6 +42,8 @@ RemoteStore::RemoteStore(const Config & config)
                       failed = true;
                       throw;
                   }
+                  /* Track the connection FD for shutdownConnections() */
+                  connectionFds.lock()->insert(conn->from.fd);
                   return conn;
               },
               [this](const ref<Connection> & r) {
@@ -52,8 +58,13 @@ RemoteStore::RemoteStore(const Config & config)
 
 ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 {
-    if (failed)
+    if (failed) {
+        checkInterrupt();
+        /* Throw Interrupted instead of the following error to silence pesky
+           warning messages that ThreadPool prints on shutdown if other threads
+           failed. */
         throw Error("opening a connection to remote store '%s' previously failed", config.getHumanReadableURI());
+    }
     try {
         return openConnection();
     } catch (...) {
@@ -371,10 +382,10 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                     }
                 }
                 conn.processStderr();
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 /* Daemon closed while we were sending the path. Probably OOM
                   or I/O error. */
-                if (e.errNo == EPIPE)
+                if (e.is(std::errc::broken_pipe))
                     try {
                         conn.processStderr();
                     } catch (EndOfFile & e) {
@@ -431,8 +442,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
     WorkerProto::write(*this, *conn, info.deriver);
     conn->to << info.narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(*this, *conn, info.references);
-    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca)
-             << repair << !checkSigs;
+    conn->to << info.registrationTime << info.narSize << info.ultimate;
+    WorkerProto::write(*this, *conn, info.sigs);
+    conn->to << renderContentAddress(info.ca) << repair << !checkSigs;
 
     if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
         conn.withFramedSink([&](Sink & sink) { copyNAR(source, sink); });
@@ -493,7 +505,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;
     if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
-        conn->to << info.id.to_string();
+        WorkerProto::write(*this, *conn, info.id);
         conn->to << std::string(info.outPath.to_string());
     } else {
         WorkerProto::write(*this, *conn, info);
@@ -513,7 +525,7 @@ void RemoteStore::queryRealisationUncached(
         }
 
         conn->to << WorkerProto::Op::QueryRealisation;
-        conn->to << id.to_string();
+        WorkerProto::write(*this, *conn, id);
         conn.processStderr();
 
         auto real = [&]() -> std::shared_ptr<const UnkeyedRealisation> {
@@ -694,7 +706,8 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(getConnection());
 
-    conn->to << WorkerProto::Op::CollectGarbage << options.action;
+    conn->to << WorkerProto::Op::CollectGarbage;
+    WorkerProto::write(*this, *conn, options.action);
     WorkerProto::write(*this, *conn, options.pathsToDelete);
     conn->to << options.ignoreLiveness
              << options.maxFreed
@@ -726,12 +739,12 @@ bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
     return readInt(conn->from);
 }
 
-void RemoteStore::addSignatures(const StorePath & storePath, const StringSet & sigs)
+void RemoteStore::addSignatures(const StorePath & storePath, const std::set<Signature> & sigs)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::AddSignatures;
     WorkerProto::write(*this, *conn, storePath);
-    conn->to << sigs;
+    WorkerProto::write(*this, *conn, sigs);
     conn.processStderr();
     readInt(conn->from);
 }
@@ -794,6 +807,20 @@ std::optional<TrustedFlag> RemoteStore::isTrustedClient()
 void RemoteStore::flushBadConnections()
 {
     connections->flushBad();
+}
+
+void RemoteStore::shutdownConnections()
+{
+#ifndef _WIN32
+    auto fds = connectionFds.lock();
+    for (auto fd : *fds) {
+        /* Use shutdown() instead of close() to signal EOF to any blocking
+           reads/writes without actually closing the FD (which would cause
+           issues if the connection is still in use). This breaks circular
+           waits when the client disconnects during long-running operations. */
+        ::shutdown(fromDescriptorReadOnly(fd), SHUT_RDWR);
+    }
+#endif
 }
 
 void RemoteStore::narFromPath(const StorePath & path, Sink & sink)

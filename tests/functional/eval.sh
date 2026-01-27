@@ -39,6 +39,30 @@ nix-instantiate --eval -E 'assert 1 + 2 == 3; true'
 ln -sfn cycle.nix "$TEST_ROOT/cycle.nix"
 (! nix eval --file "$TEST_ROOT/cycle.nix")
 
+# Test that printing deep data structures produces a controlled error.
+# The expression creates a non-cyclic but infinitely deep structure:
+# f returns immediately with a thunk, so Nix call depth stays at 1,
+# but Printer::print recurses on the C++ stack.
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0' --max-call-depth 100 \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Same for builtins.toXML
+expectStderr 1 nix eval --expr 'builtins.toXML (let f = n: { inner = f (n + 1); }; in f 0)' --max-call-depth 100 \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Same for equality comparison (n is not observable, so structures are equal)
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in f 0 == f 1' --max-call-depth 100 \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Same for assert with equality (uses assertEqValues)
+expectStderr 1 nix eval --expr 'let f = n: { inner = f (n + 1); }; in assert f 0 == f 1; true' --max-call-depth 100 \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
+# Same for string coercion with __toString
+# shellcheck disable=SC2016
+expectStderr 1 nix eval --expr 'let f = n: { __toString = _: f (n + 1); }; in "${f 0}"' --max-call-depth 100 \
+  | grepQuiet "stack overflow; max-call-depth exceeded"
+
 # --file and --pure-eval don't mix.
 expectStderr 1 nix eval --pure-eval --file "$TEST_ROOT/cycle.nix" | grepQuiet "not compatible"
 

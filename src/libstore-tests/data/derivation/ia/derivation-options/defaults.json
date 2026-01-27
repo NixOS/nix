@@ -1,0 +1,24 @@
+{
+  "additionalSandboxProfile": "",
+  "allowLocalNetworking": false,
+  "allowSubstitutes": true,
+  "exportReferencesGraph": {},
+  "impureEnvVars": [],
+  "impureHostDeps": [],
+  "noChroot": false,
+  "outputChecks": {
+    "forAllOutputs": {
+      "allowedReferences": null,
+      "allowedRequisites": null,
+      "disallowedReferences": [],
+      "disallowedRequisites": [],
+      "ignoreSelfRefs": true,
+      "maxClosureSize": null,
+      "maxSize": null
+    }
+  },
+  "passAsFile": [],
+  "preferLocalBuild": false,
+  "requiredSystemFeatures": [],
+  "unsafeDiscardReferences": {}
+}

@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -64,9 +65,10 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
-    auto drvOptions = [&]() -> DerivationOptions {
+    auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
-            return DerivationOptions::fromStructuredAttrs(drv->env, drv->structuredAttrs);
+            return derivationOptionsFromStructuredAttrs(
+                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
         } catch (Error & e) {
             e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
             throw;
@@ -99,9 +101,24 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
            through substitutes.  If that doesn't work, we'll build
            them. */
         if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
-            if (!checkResult)
-                waitees.insert(upcast_goal(worker.makeDrvOutputSubstitutionGoal(DrvOutput{outputHash, wantedOutput})));
-            else {
+            if (!checkResult) {
+                DrvOutput id{outputHash, wantedOutput};
+                auto g = worker.makeDrvOutputSubstitutionGoal(id);
+                waitees.insert(g);
+                co_await await(std::move(waitees));
+
+                if (nrFailed == 0) {
+                    waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
+                    co_await await(std::move(waitees));
+
+                    trace("output path substituted");
+
+                    if (nrFailed == 0)
+                        worker.store.registerDrvOutput({*g->outputInfo, id});
+                    else
+                        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
+                }
+            } else {
                 auto * cap = getDerivationCA(*drv);
                 waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
                     checkResult->first.outPath,
@@ -137,7 +154,9 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
         if (buildMode == bmCheck && !allValid)
             throw Error(
-                "some outputs of '%s' are not valid, so checking is not possible",
+                "some outputs of '%s' are not valid, so checking is not possible\n"
+                "Hint: --rebuild and --check error if the derivation was not previously built and cannot be substituted.\n"
+                "      Remove it to perform a fresh build, or use --repair to rewrite missing or corrupted builds in the store.",
                 worker.store.printStorePath(drvPath));
     }
 
@@ -209,11 +228,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                         .outputName = wantedOutput,
                     }};
                 newRealisation.signatures.clear();
-                if (!drv->type().isFixed()) {
-                    auto & drvStore = worker.evalStore.isValidPath(drvPath) ? worker.evalStore : worker.store;
-                    newRealisation.dependentRealisations =
-                        drvOutputReferences(worker.store, *drv, realisation.outPath, &drvStore);
-                }
                 worker.store.signRealisation(newRealisation);
                 worker.store.registerDrvOutput(newRealisation);
             }
@@ -451,20 +465,6 @@ UnkeyedRealisation DerivationGoal::assertPathValidity()
 
 Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = {{
-            wantedOutput,
-            {
-                std::move(builtOutput),
-                DrvOutput{
-                    .drvHash = outputHash,
-                    .outputName = wantedOutput,
-                },
-            },
-        }},
-    };
-
     mcExpectedBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -472,16 +472,24 @@ Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, Unke
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = {{
+                wantedOutput,
+                {
+                    std::move(builtOutput),
+                    DrvOutput{
+                        .drvHash = outputHash,
+                        .outputName = wantedOutput,
+                    },
+                },
+            }},
+        });
 }
 
 Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcExpectedBuilds.reset();
 
     if (ex.status == BuildResult::Failure::TimedOut)
@@ -493,7 +501,13 @@ Goal::Done DerivationGoal::doneFailure(BuildError ex)
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(
+        ecFailed,
+        BuildResult::Failure{
+            .status = ex.status,
+            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
+        },
+        std::move(ex));
 }
 
 } // namespace nix

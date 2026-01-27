@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/types.hh"
+#include "nix/util/source-path.hh"
 #include "nix/fetchers/fetchers.hh"
 
 namespace nix {
@@ -12,8 +13,6 @@ namespace nix::fetchers {
 
 struct Registry
 {
-    const Settings & settings;
-
     enum RegistryType {
         Flag = 0,
         User = 1,
@@ -33,15 +32,14 @@ struct Registry
 
     std::vector<Entry> entries;
 
-    Registry(const Settings & settings, RegistryType type)
-        : settings{settings}
-        , type{type}
+    Registry(RegistryType type)
+        : type{type}
     {
     }
 
-    static std::shared_ptr<Registry> read(const Settings & settings, const Path & path, RegistryType type);
+    static std::shared_ptr<Registry> read(const Settings & settings, const SourcePath & path, RegistryType type);
 
-    void write(const Path & path);
+    void write(const std::filesystem::path & path);
 
     void add(const Input & from, const Input & to, const Attrs & extraAttrs);
 
@@ -52,11 +50,11 @@ typedef std::vector<std::shared_ptr<Registry>> Registries;
 
 std::shared_ptr<Registry> getUserRegistry(const Settings & settings);
 
-std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const Path & p);
+std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p);
 
-Path getUserRegistryPath();
+std::filesystem::path getUserRegistryPath();
 
-Registries getRegistries(const Settings & settings, ref<Store> store);
+Registries getRegistries(const Settings & settings, Store & store);
 
 void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs);
 
@@ -70,6 +68,7 @@ enum class UseRegistries : int {
  * Rewrite a flakeref using the registries. If `filter` is set, only
  * use the registries for which the filter function returns true.
  */
-std::pair<Input, Attrs> lookupInRegistries(ref<Store> store, const Input & input, UseRegistries useRegistries);
+std::pair<Input, Attrs>
+lookupInRegistries(const Settings & settings, Store & store, const Input & input, UseRegistries useRegistries);
 
 } // namespace nix::fetchers

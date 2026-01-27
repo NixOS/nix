@@ -31,6 +31,8 @@ struct OptimiseStats
     uint64_t bytesFreed = 0;
 };
 
+struct GCSettings;
+
 struct LocalBuildStoreConfig : virtual LocalFSStoreConfig
 {
 
@@ -54,13 +56,15 @@ private:
 
             This is also the location where [`--keep-failed`](@docroot@/command-ref/opt-common.md#opt-keep-failed) leaves its files.
 
-            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](#conf-sandbox-build-dir).
+            If Nix runs without sandbox, or if the platform does not support sandboxing with bind mounts (e.g. macOS), then the [`builder`](@docroot@/language/derivations.md#attr-builder)'s environment will contain this directory, instead of the virtual location [`sandbox-build-dir`](@docroot@/command-ref/conf-file.md#conf-sandbox-build-dir).
 
             > **Warning**
             >
             > `build-dir` must not be set to a world-writable directory.
             > Placing temporary build directories in a world-writable place allows other users to access or modify build data that is currently in use.
             > This alone is merely an impurity, but combined with another factor this has allowed malicious derivations to escape the build sandbox.
+
+            See also the global [`build-dir`](@docroot@/command-ref/conf-file.md#conf-build-dir) setting.
         )"};
 public:
     Path getBuildDir() const;
@@ -83,6 +87,11 @@ private:
     bool getDefaultRequireSigs();
 
 public:
+    /**
+     * For now, this just grabs the global GC settings, but by having this method we get ready for these being per-store
+     * settings instead.
+     */
+    const GCSettings & getGCSettings() const;
 
     Setting<bool> requireSigs{
         this,
@@ -107,6 +116,20 @@ public:
           > Using it when the filesystem is writable can cause incorrect query results or corruption errors if the database is changed by another process.
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
+
+    Setting<bool> ignoreGcDeleteFailure{
+        this,
+        false,
+        "ignore-gc-delete-failure",
+        R"(
+          Whether to ignore failures when deleting items with the garbage collector.
+
+          Normally the garbage collector will fail with an error if the nix daemon cannot delete a file, with this setting such errors will only be printed as warnings.
+        )",
+        {},
+        true,
+        Xp::LocalOverlayStore,
+    };
 
     static const std::string name()
     {
@@ -230,8 +253,6 @@ public:
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
-    StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
-
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
     bool realisationIsUntrusted(const Realisation &) override;
 
@@ -305,8 +326,11 @@ public:
      * Called by `collectGarbage` to recursively delete a path.
      * The default implementation simply calls `deletePath`, but it can be
      * overridden by stores that wish to provide their own deletion behaviour.
+     *
+     * @param isKnownPath true if this is a known store path, false if it's
+     *        garbage/unknown content found in the store directory
      */
-    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed);
+    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking
@@ -368,7 +392,7 @@ public:
 
     void vacuumDB();
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     /**
      * If free disk space in /nix/store if below minFree, delete
@@ -418,7 +442,7 @@ private:
 
     uint64_t queryValidPathId(State & state, const StorePath & path);
 
-    uint64_t addValidPath(State & state, const ValidPathInfo & info, bool checkOutputs = true);
+    uint64_t addValidPath(State & state, const ValidPathInfo & info);
 
     void invalidatePath(State & state, const StorePath & path);
 

@@ -8,7 +8,7 @@ Stores are specified using a URL-like syntax. For example, the command
 
 ```console
 # nix path-info --store https://cache.nixos.org/ --json \
-  /nix/store/a7gvj343m05j2s32xcnwr35v31ynlypr-coreutils-9.1
+  /nix/store/1542dip9i7k4f24y6hqgd04hmvid9hr5-coreutils-9.1
 ```
 
 fetches information about a store path in the HTTP binary cache

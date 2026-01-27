@@ -39,28 +39,32 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 
-run_command(
-  'ln',
-  '-s',
-  meson.project_build_root() / '__nothing_link_target',
-  meson.project_build_root() / '__nothing_symlink',
-  # native doesn't allow dangling symlinks, which the tests require
-  env : {'MSYS' : 'winsymlinks:lnk'},
-  check : true,
-)
-can_link_symlink = run_command(
-  'ln',
-  meson.project_build_root() / '__nothing_symlink',
-  meson.project_build_root() / '__nothing_hardlink',
-  check : false,
-).returncode() == 0
-run_command(
-  'rm',
-  '-f',
-  meson.project_build_root() / '__nothing_symlink',
-  meson.project_build_root() / '__nothing_hardlink',
-  check : true,
-)
+can_link_symlink = false
+native_ln = find_program('ln', required : false, native : true)
+if native_ln.found()
+  run_command(
+    native_ln,
+    '-s',
+    meson.project_build_root() / '__nothing_link_target',
+    meson.project_build_root() / '__nothing_symlink',
+    # native doesn't allow dangling symlinks, which the tests require
+    env : {'MSYS' : 'winsymlinks:lnk'},
+    check : true,
+  )
+  can_link_symlink = run_command(
+    native_ln,
+    meson.project_build_root() / '__nothing_symlink',
+    meson.project_build_root() / '__nothing_hardlink',
+    check : false,
+  ).returncode() == 0
+  run_command(
+    'rm',
+    '-f',
+    meson.project_build_root() / '__nothing_symlink',
+    meson.project_build_root() / '__nothing_hardlink',
+    check : true,
+  )
+endif
 summary('can hardlink to symlink', can_link_symlink, bool_yn : true)
 configdata_priv.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 
@@ -114,6 +118,17 @@ boost = dependency(
 deps_other += boost
 
 curl = dependency('libcurl', 'curl', version : '>= 7.75.0')
+if curl.version().version_compare('>=8.16.0') and curl.version().version_compare(
+  '<8.17.0',
+)
+  # Out of precaution, avoid building with libcurl version that suffer from https://github.com/curl/curl/issues/19334.
+  error(
+    'curl @0@ has issues with write pausing, please use libcurl < 8.16 or >= 8.17, see https://github.com/curl/curl/issues/19334'.format(
+      curl.version(),
+    ),
+  )
+endif
+
 deps_private += curl
 
 # seccomp only makes sense on Linux
@@ -143,12 +158,15 @@ sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
 s3_aws_auth = get_option('s3-aws-auth')
-aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
+aws_crt_cpp = dependency(
+  'aws-crt-cpp',
+  required : s3_aws_auth,
+  method : 'cmake',
+  modules : [ 'AWS::aws-crt-cpp' ],
+)
 
 if s3_aws_auth.enabled()
   deps_other += aws_crt_cpp
-  aws_c_common = cxx.find_library('aws-c-common', required : true)
-  deps_other += aws_c_common
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
@@ -196,7 +214,6 @@ prefix = get_option('prefix')
 # it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
-  'datadir',
   'mandir',
   'libdir',
   'includedir',
@@ -224,20 +241,24 @@ endforeach
 
 # sysconfdir doesn't get anything installed to directly, and is only used to
 # tell Nix where to look for nix.conf, so it doesn't get appended to prefix.
-sysconfdir = get_option('sysconfdir')
-if not fs.is_absolute(sysconfdir)
-  sysconfdir = '/' / sysconfdir
+if host_machine.system() != 'windows'
+  sysconfdir = get_option('sysconfdir')
+  if not fs.is_absolute(sysconfdir)
+    sysconfdir = '/' / sysconfdir
+  endif
 endif
 
 # Aside from prefix itself, each of these was made into an absolute path
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
-configdata_priv.set_quoted('NIX_PREFIX', prefix)
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_DATA_DIR', datadir)
 configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
 configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
-configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
+# On Windows, NIX_CONF_DIR is determined at runtime using the Windows known
+# folders API (FOLDERID_ProgramData), so we don't define it at compile time.
+if host_machine.system() != 'windows'
+  configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
+endif
 configdata_priv.set_quoted('NIX_MAN_DIR', mandir)
 
 lsof = find_program('lsof', required : false)
@@ -258,6 +279,7 @@ subdir('nix-meson-build-support/common')
 sources = files(
   'binary-cache-store.cc',
   'build-result.cc',
+  'build/build-log.cc',
   'build/derivation-builder.cc',
   'build/derivation-building-goal.cc',
   'build/derivation-check.cc',
@@ -300,7 +322,6 @@ sources = files(
   'make-content-addressed.cc',
   'misc.cc',
   'names.cc',
-  'nar-accessor.cc',
   'nar-info-disk-cache.cc',
   'nar-info.cc',
   'optimise-store.cc',

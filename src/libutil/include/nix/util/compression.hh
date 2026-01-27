@@ -4,6 +4,7 @@
 #include "nix/util/ref.hh"
 #include "nix/util/types.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/compression-algo.hh"
 
 #include <string>
 
@@ -20,12 +21,10 @@ std::string decompress(const std::string & method, std::string_view in);
 
 std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
 
-std::string compress(const std::string & method, std::string_view in, const bool parallel = false, int level = -1);
+std::string compress(CompressionAlgo method, std::string_view in, const bool parallel = false, int level = -1);
 
 ref<CompressionSink>
-makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel = false, int level = -1);
-
-MakeError(UnknownCompressionMethod, Error);
+makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel = false, int level = -1);
 
 MakeError(CompressionError, Error);
 

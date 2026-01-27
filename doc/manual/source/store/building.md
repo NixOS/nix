@@ -8,13 +8,14 @@
 
 - Once this is done, the derivation is *normalized*, replacing each input deriving path with its store path, which we now know from realising the input.
 
-## Builder Execution
+## Builder Execution {#builder-execution}
 
 The [`builder`](./derivation/index.md#builder) is executed as follows:
 
-- A temporary directory is created under the directory specified by
-  `TMPDIR` (default `/tmp`) where the build will take place. The
+- A temporary directory is created where the build will take place. The
   current directory is changed to this directory.
+
+  See the per-store [`build-dir`](@docroot@/store/types/local-store.md#store-local-store-build-dir) setting for more information.
 
 - The environment is cleared and set to the derivation attributes, as
   specified above.

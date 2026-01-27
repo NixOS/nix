@@ -1,5 +1,6 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/expr/static-string-data.hh"
 
 #include "expr-config-private.hh"
 
@@ -125,7 +126,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
         case toml::value_t::string: {
             auto s = toml::get<std::string_view>(t);
             forceNoNullByte(s);
-            v.mkString(s);
+            v.mkString(s, state.mem);
         } break;
         case toml::value_t::local_datetime:
         case toml::value_t::offset_datetime:
@@ -136,12 +137,12 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
                 normalizeDatetimeFormat(t);
 #endif
                 auto attrs = state.buildBindings(2);
-                attrs.alloc("_type").mkStringNoCopy("timestamp");
+                attrs.alloc("_type").mkStringNoCopy("timestamp"_sds);
                 std::ostringstream s;
                 s << t;
                 auto str = s.view();
                 forceNoNullByte(str);
-                attrs.alloc("value").mkString(str);
+                attrs.alloc("value").mkString(str, state.mem);
                 v.mkAttrs(attrs);
             } else {
                 throw std::runtime_error("Dates and times are not supported");

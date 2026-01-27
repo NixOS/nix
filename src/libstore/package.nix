@@ -9,10 +9,12 @@
   nix-util,
   boost,
   curl,
+  aws-c-common,
   aws-crt-cpp,
   libseccomp,
   nlohmann_json,
   sqlite,
+  cmake, # for resolving aws-crt-cpp dep
 
   busybox-sandbox-shell ? null,
 
@@ -24,7 +26,7 @@
 
   withAWS ?
     # Default is this way because there have been issues building this dependency
-    stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
+    (lib.meta.availableOn stdenv.hostPlatform aws-c-common),
 }:
 
 let
@@ -56,7 +58,8 @@ mkMesonLibrary (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "sql") ./.)
   ];
 
-  nativeBuildInputs = lib.optional embeddedSandboxShell unixtools.hexdump;
+  nativeBuildInputs =
+    lib.optional withAWS cmake ++ lib.optional embeddedSandboxShell unixtools.hexdump;
 
   buildInputs = [
     boost

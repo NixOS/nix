@@ -84,7 +84,7 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         assert(maybeFlakeDir.has_value());
         auto flakeDir = maybeFlakeDir.value();
 
-        Strings programArgs{app.program};
+        Strings programArgs{app.program.string()};
 
         // Propagate arguments from the CLI
         for (auto & i : args) {
@@ -103,7 +103,7 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         execProgramInStore(
             store,
             UseLookupPath::DontUse,
-            app.program,
+            app.program.string(),
             programArgs,
             std::nullopt, // Use default system
             env);
@@ -145,7 +145,7 @@ struct CmdFormatterBuild : MixFormatter, MixOutLinkByDefault
         auto buildables = unresolvedApp.build(evalStore, store);
         createOutLinksMaybe(buildables, store);
 
-        logger->cout("%s", app.program);
+        logger->cout("%s", app.program.string());
     };
 };
 

@@ -12,7 +12,7 @@ namespace nix {
  *
  * See `FileSystemObjectSink::createRegularFile`.
  */
-struct CreateRegularFileSink : Sink
+struct CreateRegularFileSink : virtual Sink
 {
     /**
      * If set to true, the sink will not be called with the contents
@@ -35,6 +35,23 @@ struct FileSystemObjectSink
     virtual ~FileSystemObjectSink() = default;
 
     virtual void createDirectory(const CanonPath & path) = 0;
+
+    using DirectoryCreatedCallback = std::function<void(FileSystemObjectSink & dirSink, const CanonPath & dirRelPath)>;
+
+    /**
+     * Create a directory and invoke a callback with a pair of sink + CanonPath
+     * of the created subdirectory relative to dirSink.
+     *
+     * @note This allows for UNIX RestoreSink implementations to implement
+     * *at-style accessors that always keep an open file descriptor for the
+     * freshly created directory. Use this when it's important to disallow any
+     * intermediate path components from being symlinks.
+     */
+    virtual void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
+    {
+        createDirectory(path);
+        callback(*this, path);
+    }
 
     /**
      * This function in general is no re-entrant. Only one file can be
@@ -82,6 +99,18 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
+#ifndef _WIN32
+    /**
+     * File descriptor for the directory located at dstPath. Used for *at
+     * operations relative to this file descriptor. This sink must *never*
+     * follow intermediate symlinks (starting from dstPath) in case a file
+     * collision is encountered for various reasons like case-insensitivity or
+     * other types on normalization. using appropriate *at system calls and traversing
+     * only one path component at a time ensures that writing is race-free and is
+     * is not susceptible to symlink replacement.
+     */
+    AutoCloseFD dirFd;
+#endif
     bool startFsync = false;
 
     explicit RestoreSink(bool startFsync)
@@ -90,6 +119,10 @@ struct RestoreSink : FileSystemObjectSink
     }
 
     void createDirectory(const CanonPath & path) override;
+
+#ifndef _WIN32
+    void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
+#endif
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 

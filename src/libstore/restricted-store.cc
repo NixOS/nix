@@ -134,7 +134,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     void collectGarbage(const GCOptions & options, GCResults & results) override {}
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override
     {
         unsupported("addSignatures");
     }
@@ -292,7 +292,7 @@ std::vector<KeyedBuildResult> RestrictedStore::buildPathsWithResults(
     next->computeFSClosure(newPaths, closure);
     for (auto & path : closure)
         goal.addDependency(path);
-    for (auto & real : Realisation::closure(*next, newRealisations))
+    for (auto & real : newRealisations)
         goal.addedDrvOutputs.insert(real.id);
 
     return results;

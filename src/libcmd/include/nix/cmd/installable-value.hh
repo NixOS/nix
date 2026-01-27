@@ -17,7 +17,7 @@ class AttrCursor;
 struct App
 {
     std::vector<DerivedPath> context;
-    Path program;
+    std::filesystem::path program;
     // FIXME: add args, sandbox settings, metadata, ...
 };
 

@@ -80,6 +80,12 @@ struct Hash
     static Hash parseAny(std::string_view s, std::optional<HashAlgorithm> optAlgo);
 
     /**
+     * Like `parseAny`, but also returns the format the hash was parsed from.
+     */
+    static std::pair<Hash, HashFormat>
+    parseAnyReturningFormat(std::string_view s, std::optional<HashAlgorithm> optAlgo);
+
+    /**
      * Parse a hash from a string representation like the above, except the
      * type prefix is mandatory is there is no separate argument.
      */
@@ -104,7 +110,8 @@ struct Hash
         HashFormat explicitFormat,
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
-    static Hash parseSRI(std::string_view original);
+    static Hash
+    parseSRI(std::string_view original, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 public:
     /**

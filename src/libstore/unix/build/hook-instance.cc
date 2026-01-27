@@ -69,7 +69,7 @@ HookInstance::HookInstance()
 
         execv(buildHook.native().c_str(), stringsToCharPtrs(args).data());
 
-        throw SysError("executing '%s'", buildHook);
+        throw SysError("executing %s", PathFmt(buildHook));
     });
 
     pid.setSeparatePG(true);
@@ -88,8 +88,11 @@ HookInstance::~HookInstance()
 {
     try {
         toHook.writeSide = -1;
-        if (pid != -1)
+        if (pid != -1) {
             pid.kill();
+            if (onKillChild)
+                onKillChild();
+        }
     } catch (...) {
         ignoreExceptionInDestructor();
     }

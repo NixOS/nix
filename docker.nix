@@ -10,7 +10,7 @@
   tag ? "latest",
   bundleNixpkgs ? true,
   channelName ? "nixpkgs",
-  channelURL ? "https://nixos.org/channels/nixpkgs-unstable",
+  channelURL ? "https://channels.nixos.org/nixpkgs-unstable",
   extraPkgs ? [ ],
   maxLayers ? 70,
   nixConf ? { },

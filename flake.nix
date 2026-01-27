@@ -1,12 +1,12 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05-small";
+  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
 
   inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
   inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
   inputs.flake-compat = {
-    url = "github:edolstra/flake-compat";
+    url = "github:NixOS/flake-compat";
     flake = false;
   };
 
@@ -369,6 +369,7 @@
           # TODO probably should be `nix-cli`
           nix = self.packages.${system}.nix-everything;
           nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
+          nix-manual-manpages-only = nixpkgsFor.${system}.native.nixComponents2.nix-manual-manpages-only;
           nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
           nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
         }
@@ -481,10 +482,10 @@
           open-manual = {
             type = "app";
             program = "${pkgs.writeShellScript "open-nix-manual" ''
-              manual_path="${self.packages.${system}.nix-manual}/share/doc/nix/manual/index.html"
-              if ! ${opener} "$manual_path"; then
+              path="${self.packages.${system}.nix-manual.site}/index.html"
+              if ! ${opener} "$path"; then
                 echo "Failed to open manual with ${opener}. Manual is located at:"
-                echo "$manual_path"
+                echo "$path"
               fi
             ''}";
             meta.description = "Open the Nix manual in your browser";

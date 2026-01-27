@@ -2,11 +2,11 @@
 
 > **Example**
 >
-> `/nix/store/a040m110amc4h71lds2jmr8qrkj2jhxd-git-2.38.1`
+> `/nix/store/jf6gn2dzna4nmsfbdxsd7kwhsk6gnnlr-git-2.38.1`
 >
 > A rendered store path
 
-Nix implements references to [store objects](./index.md#store-object) as *store paths*.
+Nix implements references to [store objects](./store-object.md) as *store paths*.
 
 Think of a store path as an [opaque], [unique identifier]:
 The only way to obtain store path is by adding or building store objects.
@@ -22,7 +22,7 @@ Store paths are pairs of
 
 > **Example**
 >
-> - Digest: `b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z`
+> - Digest: `q06x3jll2yfzckz2bzqak089p43ixkkq`
 > - Name:   `firefox-33.1`
 
 To make store objects accessible to operating system processes, stores have to expose store objects through the file system.
@@ -31,14 +31,14 @@ A store path is rendered to a file system path as the concatenation of
 
 - [Store directory](#store-directory) (typically `/nix/store`)
 - Path separator (`/`)
-- Digest rendered in a custom variant of [Base32](https://en.wikipedia.org/wiki/Base32) (20 arbitrary bytes become 32 ASCII characters)
+- Digest rendered in [Nix32](@docroot@/protocols/nix32.md), a variant of base-32 (20 hash bytes become 32 ASCII characters)
 - Hyphen (`-`)
 - Name
 
 > **Example**
 >
 > ```
->   /nix/store/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1
+>   /nix/store/q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1
 >   |--------| |------------------------------| |----------|
 > store directory            digest                 name
 > ```

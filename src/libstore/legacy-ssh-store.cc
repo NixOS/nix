@@ -3,6 +3,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/remote-store.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-connection.hh"
 #include "nix/store/serve-protocol-impl.hh"
@@ -153,7 +154,9 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
              << (info.deriver ? printStorePath(*info.deriver) : "")
              << info.narHash.to_string(HashFormat::Base16, false);
     ServeProto::write(*this, *conn, info.references);
-    conn->to << info.registrationTime << info.narSize << info.ultimate << info.sigs << renderContentAddress(info.ca);
+    conn->to << info.registrationTime << info.narSize << info.ultimate;
+    ServeProto::write(*this, *conn, info.sigs);
+    conn->to << renderContentAddress(info.ca);
     try {
         copyNAR(source, conn->to);
     } catch (...) {
@@ -241,13 +244,11 @@ void LegacySSHStore::buildPaths(
 
     conn->to.flush();
 
-    auto status = readInt(conn->from);
-    if (!BuildResult::Success::statusIs(status)) {
-        BuildResult::Failure failure{
-            .status = (BuildResult::Failure::Status) status,
-        };
-        conn->from >> failure.errorMsg;
-        throw Error(failure.status, std::move(failure.errorMsg));
+    auto status = CommonProto::Serialise<BuildResultStatus>::read(*this, {conn->from});
+    if (auto * failure = std::get_if<BuildResultFailureStatus>(&status)) {
+        std::string errorMsg;
+        conn->from >> errorMsg;
+        throw BuildError(*failure, std::move(errorMsg));
     }
 }
 

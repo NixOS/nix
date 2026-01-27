@@ -84,6 +84,16 @@ let
       '';
     };
 
+    # Shells should also work with fixed-output derivations
+    fixed = mkDerivation {
+      name = "fixed";
+      FOO = "was a fixed-output derivation";
+      outputHash = "1ixr6yd3297ciyp9im522dfxpqbkhcw0pylkb2aab915278fqaik";
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
+      outputs = [ "out" ];
+    };
+
     # Used by nix-shell -p
     runCommand =
       name: args: buildCommand:
@@ -96,14 +106,16 @@ let
 
     foo = runCommand "foo" { } ''
       mkdir -p $out/bin
-      echo 'echo ${fooContents}' > $out/bin/foo
+      echo '#!${shell}' > $out/bin/foo
+      echo 'echo ${fooContents}' >> $out/bin/foo
       chmod a+rx $out/bin/foo
       ln -s ${shell} $out/bin/bash
     '';
 
     bar = runCommand "bar" { } ''
       mkdir -p $out/bin
-      echo 'echo bar' > $out/bin/bar
+      echo '#!${shell}' > $out/bin/bar
+      echo 'echo bar' >> $out/bin/bar
       chmod a+rx $out/bin/bar
     '';
 
@@ -116,7 +128,8 @@ let
     # ruby "interpreter" that outputs "$@"
     ruby = runCommand "ruby" { } ''
       mkdir -p $out/bin
-      echo 'printf %s "$*"' > $out/bin/ruby
+      echo '#!${shell}' > $out/bin/ruby
+      echo 'printf %s "$*"' >> $out/bin/ruby
       chmod a+rx $out/bin/ruby
     '';
 

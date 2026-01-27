@@ -1,0 +1,55 @@
+{
+  "buildTrace": {},
+  "config": {
+    "store": "/nix/store"
+  },
+  "contents": {
+    "4k79i02avcckr96r97lqnswn75fi1gv7-dependency": {
+      "contents": {
+        "contents": "I am a dependency",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-miJnClL0Ai/HAmX1G/pz7P2TIaeFjP5D/VN1rhYf354=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-miJnClL0Ai/HAmX1G/pz7P2TIaeFjP5D/VN1rhYf354=",
+        "narSize": 136,
+        "references": [],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    },
+    "k09ldq9fvxb6vfwq0cmv6j1jgqx08y1n-main": {
+      "contents": {
+        "contents": "I depend on /nix/store/4k79i02avcckr96r97lqnswn75fi1gv7-dependency",
+        "executable": false,
+        "type": "regular"
+      },
+      "info": {
+        "ca": {
+          "hash": "sha256-CBfMK3HkqiXjpI8HNL1spWD/US4RnQHwI67Ojl50XoQ=",
+          "method": "nar"
+        },
+        "deriver": null,
+        "narHash": "sha256-CBfMK3HkqiXjpI8HNL1spWD/US4RnQHwI67Ojl50XoQ=",
+        "narSize": 184,
+        "references": [
+          "4k79i02avcckr96r97lqnswn75fi1gv7-dependency"
+        ],
+        "registrationTime": null,
+        "signatures": [],
+        "storeDir": "/nix/store",
+        "ultimate": false,
+        "version": 2
+      }
+    }
+  },
+  "derivations": {}
+}

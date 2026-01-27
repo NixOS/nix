@@ -38,10 +38,10 @@ struct CacheImpl : Cache
     {
         auto state(_state.lock());
 
-        auto dbPath = getCacheDir() + "/fetcher-cache-v4.sqlite";
+        auto dbPath = (getCacheDir() / "fetcher-cache-v4.sqlite").string();
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 

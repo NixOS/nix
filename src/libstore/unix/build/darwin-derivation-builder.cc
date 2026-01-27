@@ -3,10 +3,32 @@
 #  include <spawn.h>
 #  include <sys/sysctl.h>
 #  include <sandbox.h>
+#  include <sys/ipc.h>
+#  include <sys/shm.h>
+#  include <sys/msg.h>
+#  include <sys/sem.h>
 
 /* This definition is undocumented but depended upon by all major browsers. */
 extern "C" int
 sandbox_init_with_parameters(const char * profile, uint64_t flags, const char * const parameters[], char ** errorbuf);
+
+/* Darwin IPC structures and constants */
+#  define IPCS_MAGIC 0x00000001
+#  define IPCS_SHM_ITER 0x00000002
+#  define IPCS_SEM_ITER 0x00000020
+#  define IPCS_MSG_ITER 0x00000200
+#  define IPCS_SHM_SYSCTL "kern.sysv.ipcs.shm"
+#  define IPCS_MSG_SYSCTL "kern.sysv.ipcs.msg"
+#  define IPCS_SEM_SYSCTL "kern.sysv.ipcs.sem"
+
+struct IpcsCommand
+{
+    uint32_t ipcs_magic;
+    uint32_t ipcs_op;
+    uint32_t ipcs_cursor;
+    uint32_t ipcs_datalen;
+    void * ipcs_data;
+};
 
 namespace nix {
 
@@ -51,19 +73,19 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
                all have the same parents (the store), and there might be lots of inputs. This isn't
                particularly efficient... I doubt it'll be a bottleneck in practice */
             for (auto & i : pathsInChroot) {
-                Path cur = i.first;
-                while (cur.compare("/") != 0) {
-                    cur = dirOf(cur);
-                    ancestry.insert(cur);
+                std::filesystem::path cur = i.first;
+                while (cur != "/") {
+                    cur = cur.parent_path();
+                    ancestry.insert(cur.native());
                 }
             }
 
             /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
                path component this time, since it's typically /nix/store and we care about that. */
-            Path cur = store.storeDir;
-            while (cur.compare("/") != 0) {
-                ancestry.insert(cur);
-                cur = dirOf(cur);
+            std::filesystem::path cur = store.storeDir;
+            while (cur != "/") {
+                ancestry.insert(cur.native());
+                cur = cur.parent_path();
             }
 
             /* Add all our input paths to the chroot */
@@ -115,9 +137,9 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
                 if (i.first != i.second.source)
                     throw Error(
-                        "can't map '%1%' to '%2%': mismatched impure paths not supported on Darwin",
-                        i.first,
-                        i.second.source);
+                        "can't map %1% to %2%: mismatched impure paths not supported on Darwin",
+                        PathFmt(i.first),
+                        PathFmt(i.second.source));
 
                 std::string path = i.first;
                 auto optSt = maybeLstat(path.c_str());
@@ -152,18 +174,19 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different
            mechanisms to find temporary directories, so we want to open up a broader place for them to put their files,
            if needed. */
-        Path globalTmpDir = canonPath(defaultTempDir(), true);
+        std::filesystem::path globalTmpDir = canonPath(defaultTempDir().native(), true);
 
         /* They don't like trailing slashes on subpath directives */
-        while (!globalTmpDir.empty() && globalTmpDir.back() == '/')
-            globalTmpDir.pop_back();
+        std::string globalTmpDirStr = globalTmpDir.native();
+        while (!globalTmpDirStr.empty() && globalTmpDirStr.back() == '/')
+            globalTmpDirStr.pop_back();
 
         if (getEnv("_NIX_TEST_NO_SANDBOX") != "1") {
             Strings sandboxArgs;
             sandboxArgs.push_back("_NIX_BUILD_TOP");
-            sandboxArgs.push_back(tmpDir);
+            sandboxArgs.push_back(tmpDir.native());
             sandboxArgs.push_back("_GLOBAL_TMP_DIR");
-            sandboxArgs.push_back(globalTmpDir);
+            sandboxArgs.push_back(globalTmpDirStr);
             if (drvOptions.allowLocalNetworking) {
                 sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
                 sandboxArgs.push_back("1");
@@ -203,6 +226,119 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
         posix_spawn(
             NULL, drv.builder.c_str(), NULL, &attrp, stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+
+    /**
+     * Cleans up all System V IPC objects owned by the specified user.
+     *
+     * On Darwin, IPC objects (shared memory segments, message queues, and semaphore)
+     * can persist after the build user's processes are killed, since there are no IPC namespaces
+     * like on Linux. This can exhaust kernel IPC limits over time.
+     *
+     * Uses sysctl to enumerate and remove all IPC objects owned by the given UID.
+     */
+    void cleanupSysVIPCForUser(uid_t uid)
+    {
+        struct IpcsCommand ic;
+        size_t ic_size = sizeof(ic);
+        // IPC ids to cleanup
+        std::vector<int> shm_ids, msg_ids, sem_ids;
+
+        {
+            struct shmid_ds shm_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_SHM_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &shm_ds;
+            ic.ipcs_datalen = sizeof(shm_ds);
+
+            while (true) {
+                memset(&shm_ds, 0, sizeof(shm_ds));
+
+                if (sysctlbyname(IPCS_SHM_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (shm_ds.shm_perm.uid == uid) {
+                    int shmid = shmget(shm_ds.shm_perm._key, 0, 0);
+                    if (shmid != -1) {
+                        shm_ids.push_back(shmid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : shm_ids) {
+            if (shmctl(id, IPC_RMID, NULL) == 0)
+                debug("removed shared memory segment with shmid %d", id);
+        }
+
+        {
+            struct msqid_ds msg_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_MSG_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &msg_ds;
+            ic.ipcs_datalen = sizeof(msg_ds);
+
+            while (true) {
+                memset(&msg_ds, 0, sizeof(msg_ds));
+
+                if (sysctlbyname(IPCS_MSG_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (msg_ds.msg_perm.uid == uid) {
+                    int msgid = msgget(msg_ds.msg_perm._key, 0);
+                    if (msgid != -1) {
+                        msg_ids.push_back(msgid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : msg_ids) {
+            if (msgctl(id, IPC_RMID, NULL) == 0)
+                debug("removed message queue with msgid %d", id);
+        }
+
+        {
+            struct semid_ds sem_ds;
+            ic.ipcs_magic = IPCS_MAGIC;
+            ic.ipcs_op = IPCS_SEM_ITER;
+            ic.ipcs_cursor = 0;
+            ic.ipcs_data = &sem_ds;
+            ic.ipcs_datalen = sizeof(sem_ds);
+
+            while (true) {
+                memset(&sem_ds, 0, sizeof(sem_ds));
+
+                if (sysctlbyname(IPCS_SEM_SYSCTL, &ic, &ic_size, &ic, ic_size) != 0) {
+                    break;
+                }
+
+                if (sem_ds.sem_perm.uid == uid) {
+                    int semid = semget(sem_ds.sem_perm._key, 0, 0);
+                    if (semid != -1) {
+                        sem_ids.push_back(semid);
+                    }
+                }
+            }
+        }
+
+        for (auto id : sem_ids) {
+            if (semctl(id, 0, IPC_RMID) == 0)
+                debug("removed semaphore with semid %d", id);
+        }
+    }
+
+    void killSandbox(bool getStats) override
+    {
+        DerivationBuilderImpl::killSandbox(getStats);
+        if (buildUser) {
+            auto uid = buildUser->getUID();
+            cleanupSysVIPCForUser(uid);
+        }
     }
 };
 

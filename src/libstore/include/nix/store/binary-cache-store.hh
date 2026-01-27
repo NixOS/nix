@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/signature/local-keys.hh"
+#include "nix/util/compression-settings.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/log-store.hh"
 
@@ -18,8 +18,14 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
 {
     using StoreConfig::StoreConfig;
 
-    const Setting<std::string> compression{
-        this, "xz", "compression", "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
+    const Setting<CompressionAlgo> compression{
+        this,
+        CompressionAlgo::xz,
+        "compression",
+        R"(
+          NAR compression method. One of: `xz`, `bzip2`, `gzip`, `zstd`, `none`, `br`, `compress`, `grzip`, `lrzip`, `lz4`, `lzip`, `lzma` or `lzop`.
+          To use a particular compression method Nix has to be built with a version of libarchive that natively supports that compression algorithm.
+        )"};
 
     const Setting<bool> writeNARListing{
         this, false, "write-nar-listing", "Whether to write a JSON file that lists the files in each NAR."};
@@ -38,9 +44,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
     const Setting<std::string> secretKeyFiles{
         this, "", "secret-keys", "List of comma-separated paths to the secret keys used to sign the binary cache."};
 
-    const Setting<Path> localNarCache{
+    const Setting<std::optional<std::filesystem::path>> localNarCache{
         this,
-        "",
+        std::nullopt,
         "local-nar-cache",
         "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
 
@@ -65,7 +71,9 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
  * @note subclasses must implement at least one of the two
  * virtual getFile() methods.
  */
-struct BinaryCacheStore : virtual Store, virtual LogStore
+struct alignas(8) /* Work around ASAN failures on i686-linux. */
+    BinaryCacheStore : virtual Store,
+                       virtual LogStore
 {
     using Config = BinaryCacheStoreConfig;
 
@@ -203,7 +211,7 @@ public:
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath &, bool requireValidPath = true) override;
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 

@@ -70,12 +70,12 @@ struct FileTransferSettings : Config
 
     Setting<size_t> downloadBufferSize{
         this,
-        64 * 1024 * 1024,
+        1 * 1024 * 1024,
         "download-buffer-size",
         R"(
           The size of Nix's internal download buffer in bytes during `curl` transfers. If data is
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
-          The default is 67108864 (64 MiB).
+          The default is 1048576 (1 MiB).
         )"};
 };
 
@@ -87,11 +87,11 @@ extern const unsigned int RETRY_TIME_MS_DEFAULT;
  * HTTP methods supported by FileTransfer.
  */
 enum struct HttpMethod {
-    GET,
-    PUT,
-    HEAD,
-    POST,
-    DELETE,
+    Get,
+    Put,
+    Head,
+    Post,
+    Delete,
 };
 
 /**
@@ -105,16 +105,31 @@ struct UsernameAuth
     std::optional<std::string> password;
 };
 
+enum class PauseTransfer : bool {
+    No = false,
+    Yes = true,
+};
+
 struct FileTransferRequest
 {
     VerbatimURL uri;
     Headers headers;
     std::string expectedETag;
-    HttpMethod method = HttpMethod::GET;
+    HttpMethod method = HttpMethod::Get;
     size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
+
+    /**
+     * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsCert;
+
+    /**
+     * Optional path to the client private key in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsKey;
 
     struct UploadData
     {
@@ -136,7 +151,14 @@ struct FileTransferRequest
 
     std::optional<UploadData> data;
     std::string mimeType;
-    std::function<void(std::string_view data)> dataCallback;
+
+    /**
+     * Callbacked invoked with a chunk of received data.
+     * Can pause the transfer by returning PauseTransfer::Yes. No data must be consumed
+     * if transfer is paused.
+     */
+    std::function<PauseTransfer(std::string_view data)> dataCallback;
+
     /**
      * Optional username and password for HTTP basic authentication.
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
@@ -157,22 +179,36 @@ struct FileTransferRequest
     }
 
     /**
-     * Returns the verb root for logging purposes.
-     * The returned string is intended to be concatenated with "ing" to form the gerund,
-     * e.g., "download" + "ing" -> "downloading", "upload" + "ing" -> "uploading".
+     * Returns the method description for logging purposes.
      */
-    std::string verb() const
+    std::string verb(bool continuous = false) const
     {
         switch (method) {
-        case HttpMethod::HEAD:
-        case HttpMethod::GET:
+        case HttpMethod::Head:
+        case HttpMethod::Get:
+            return continuous ? "downloading" : "download";
+        case HttpMethod::Put:
+        case HttpMethod::Post:
+            assert(data);
+            return continuous ? "uploading" : "upload";
+        case HttpMethod::Delete:
+            return continuous ? "deleting" : "delete";
+        }
+        unreachable();
+    }
+
+    std::string noun() const
+    {
+        switch (method) {
+        case HttpMethod::Head:
+        case HttpMethod::Get:
             return "download";
-        case HttpMethod::PUT:
-        case HttpMethod::POST:
+        case HttpMethod::Put:
+        case HttpMethod::Post:
             assert(data);
             return "upload";
-        case HttpMethod::DELETE:
-            return "delet";
+        case HttpMethod::Delete:
+            return "deletion";
         }
         unreachable();
     }
@@ -226,6 +262,25 @@ class Store;
 
 struct FileTransfer
 {
+protected:
+    class Item
+    {};
+
+public:
+    /**
+     * An opaque handle to the file transfer. Can be used to reference an in-flight transfer operations.
+     */
+    struct ItemHandle
+    {
+        std::reference_wrapper<Item> item;
+        friend struct FileTransfer;
+
+        ItemHandle(Item & item)
+            : item(item)
+        {
+        }
+    };
+
     virtual ~FileTransfer() {}
 
     /**
@@ -233,7 +288,13 @@ struct FileTransfer
      * the download. The future may throw a FileTransferError
      * exception.
      */
-    virtual void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+    virtual ItemHandle
+    enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+
+    /**
+     * Unpause a transfer that has been previously paused by a dataCallback.
+     */
+    virtual void unpauseTransfer(ItemHandle handle) = 0;
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 

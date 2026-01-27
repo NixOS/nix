@@ -30,7 +30,11 @@ enum class SymlinkResolution {
     Full,
 };
 
-MakeError(FileNotFound, Error);
+MakeError(SourceAccessorError, Error);
+MakeError(FileNotFound, SourceAccessorError);
+MakeError(NotASymlink, SourceAccessorError);
+MakeError(NotADirectory, SourceAccessorError);
+MakeError(NotARegularFile, SourceAccessorError);
 
 /**
  * A read-only filesystem abstraction. This is used by the Nix
@@ -58,7 +62,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * targets of symlinks should only occasionally be done, and only
      * with care.
      */
-    virtual std::string readFile(const CanonPath & path);
+    std::string readFile(const CanonPath & path);
 
     /**
      * Write the contents of a file as a sink. `sizeCallback` must be
@@ -222,6 +226,24 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
+struct SymlinkNotAllowed : public Error
+{
+    CanonPath path;
+
+    SymlinkNotAllowed(CanonPath path)
+        : Error("relative path '%s' points to a symlink, which is not allowed", path.rel())
+        , path(std::move(path))
+    {
+    }
+
+    template<typename... Args>
+    SymlinkNotAllowed(CanonPath path, const std::string & fs, Args &&... args)
+        : Error(fs, std::forward<Args>(args)...)
+        , path(std::move(path))
+    {
+    }
+};
+
 /**
  * Return an accessor for the root filesystem.
  */
@@ -233,7 +255,7 @@ ref<SourceAccessor> getFSSourceAccessor();
  * elements, and that absolute symlinks are resolved relative to
  * `root`.
  */
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root);
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

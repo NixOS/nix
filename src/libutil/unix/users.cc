@@ -18,7 +18,7 @@ std::string getUserName()
     return name;
 }
 
-Path getHomeOf(uid_t userId)
+std::filesystem::path getHomeOf(uid_t userId)
 {
     std::vector<char> buf(16384);
     struct passwd pwbuf;
@@ -28,25 +28,23 @@ Path getHomeOf(uid_t userId)
     return pw->pw_dir;
 }
 
-Path getHome()
+std::filesystem::path getHome()
 {
-    static Path homeDir = []() {
+    static std::filesystem::path homeDir = []() {
         std::optional<std::string> unownedUserHomeDir = {};
         auto homeDir = getEnv("HOME");
         if (homeDir) {
             // Only use $HOME if doesn't exist or is owned by the current user.
-            struct stat st;
-            int result = stat(homeDir->c_str(), &st);
-            if (result != 0) {
-                if (errno != ENOENT) {
-                    warn(
-                        "couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file",
-                        *homeDir,
-                        errno);
-                    homeDir.reset();
-                }
-            } else if (st.st_uid != geteuid()) {
-                unownedUserHomeDir.swap(homeDir);
+            try {
+                auto st = maybeStat(homeDir->c_str());
+                if (st && st->st_uid != geteuid())
+                    unownedUserHomeDir.swap(homeDir);
+            } catch (SysError & e) {
+                warn(
+                    "couldn't stat $HOME ('%s') for reason other than not existing, falling back to the one defined in the 'passwd' file: %s",
+                    *homeDir,
+                    e.what());
+                homeDir.reset();
             }
         }
         if (!homeDir) {

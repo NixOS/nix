@@ -17,11 +17,6 @@ static inline bool getInterrupted()
     return false;
 }
 
-inline void setInterruptThrown()
-{
-    /* Do nothing for now */
-}
-
 static inline bool isInterrupted()
 {
     /* Do nothing for now */

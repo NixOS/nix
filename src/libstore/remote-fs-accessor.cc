@@ -1,52 +1,13 @@
-#include <nlohmann/json.hpp>
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/store/nar-accessor.hh"
-
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, const Path & cacheDir)
+RemoteFSAccessor::RemoteFSAccessor(
+    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir)
     : store(store)
+    , narCache(cacheDir)
     , requireValidPath(requireValidPath)
-    , cacheDir(cacheDir)
 {
-    if (cacheDir != "")
-        createDirs(cacheDir);
-}
-
-Path RemoteFSAccessor::makeCacheFile(std::string_view hashPart, const std::string & ext)
-{
-    assert(cacheDir != "");
-    return fmt("%s/%s.%s", cacheDir, hashPart, ext);
-}
-
-ref<SourceAccessor> RemoteFSAccessor::addToCache(std::string_view hashPart, std::string && nar)
-{
-    if (cacheDir != "") {
-        try {
-            /* FIXME: do this asynchronously. */
-            writeFile(makeCacheFile(hashPart, "nar"), nar);
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-    }
-
-    auto narAccessor = makeNarAccessor(std::move(nar));
-    nars.emplace(hashPart, narAccessor);
-
-    if (cacheDir != "") {
-        try {
-            nlohmann::json j = listNar(narAccessor, CanonPath::root, true);
-            writeFile(makeCacheFile(hashPart, "ls"), j.dump());
-        } catch (...) {
-            ignoreExceptionExceptInterrupt();
-        }
-    }
-
-    return narAccessor;
 }
 
 std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPath & path)
@@ -59,37 +20,18 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
 
 std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath & storePath)
 {
-    auto i = nars.find(std::string(storePath.hashPart()));
-    if (i != nars.end())
-        return i->second;
+    // Check if we already have the NAR hash for this store path
+    if (auto * narHash = get(narHashes, storePath.hashPart()))
+        return narCache.getOrInsert(*narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 
-    std::string listing;
-    Path cacheFile;
+    // Query the path info to get the NAR hash
+    auto info = store->queryPathInfo(storePath);
 
-    if (cacheDir != "" && nix::pathExists(cacheFile = makeCacheFile(storePath.hashPart(), "nar"))) {
+    // Cache the mapping from store path to NAR hash
+    narHashes.emplace(storePath.hashPart(), info->narHash);
 
-        try {
-            listing = nix::readFile(makeCacheFile(storePath.hashPart(), "ls"));
-            auto listingJson = nlohmann::json::parse(listing);
-            auto narAccessor = makeLazyNarAccessor(listingJson, seekableGetNarBytes(cacheFile));
-
-            nars.emplace(storePath.hashPart(), narAccessor);
-            return narAccessor;
-
-        } catch (SystemError &) {
-        }
-
-        try {
-            auto narAccessor = makeNarAccessor(nix::readFile(cacheFile));
-            nars.emplace(storePath.hashPart(), narAccessor);
-            return narAccessor;
-        } catch (SystemError &) {
-        }
-    }
-
-    StringSink sink;
-    store->narFromPath(storePath, sink);
-    return addToCache(storePath.hashPart(), std::move(sink.s));
+    // Get or create the NAR accessor
+    return narCache.getOrInsert(info->narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 }
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
@@ -104,10 +46,10 @@ SourceAccessor::DirEntries RemoteFSAccessor::readDirectory(const CanonPath & pat
     return res.first->readDirectory(res.second);
 }
 
-std::string RemoteFSAccessor::readFile(const CanonPath & path)
+void RemoteFSAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
 {
     auto res = fetch(path);
-    return res.first->readFile(res.second);
+    res.first->readFile(res.second, sink, sizeCallback);
 }
 
 std::string RemoteFSAccessor::readLink(const CanonPath & path)

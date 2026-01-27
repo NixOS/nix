@@ -108,7 +108,7 @@ struct PrimOp
     /**
      * Optional free-form documentation about the primop.
      */
-    const char * doc = nullptr;
+    std::optional<std::string> doc;
 
     /**
      * Add a trace item, while calling the `<name>` builtin.
@@ -335,6 +335,7 @@ public:
     EvalMemory & operator=(const EvalMemory &) = delete;
     EvalMemory & operator=(EvalMemory &&) = delete;
 
+    inline void * allocBytes(size_t n);
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
@@ -348,7 +349,7 @@ public:
     ListBuilder buildList(size_t size)
     {
         stats.nrListElems += size;
-        return ListBuilder(size);
+        return ListBuilder(*this, size);
     }
 
     const Statistics & getStats() const &
@@ -1000,6 +1001,12 @@ public:
      */
     [[nodiscard]] StringMap
     realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
+
+    /**
+     * Coerce `v` to a path and realise it, i.e. build anything in the value's string context using `realiseContext()`.
+     */
+    SourcePath realisePath(
+        const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full);
 
     /**
      * Realise the given string with context, and return the string with outputs instead of downstream output

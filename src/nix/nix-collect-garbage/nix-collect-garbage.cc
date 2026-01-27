@@ -101,7 +101,7 @@ static int main_nix_collect_garbage(int argc, char ** argv)
             std::set<std::filesystem::path> dirsToClean = {
                 profilesDir(),
                 std::filesystem::path{settings.nixStateDir} / "profiles",
-                std::filesystem::path{getDefaultProfile()}.parent_path(),
+                getDefaultProfile().parent_path(),
             };
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);

@@ -17,8 +17,8 @@
 
 - `nix-shell` shebang lines now support single-quoted arguments.
 
-- `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/development/experimental-features.md#xp-fetch-tree).
-  This allows stabilising it independently of the rest of what is encompassed by [`flakes`](@docroot@/development/experimental-features.md#xp-fetch-tree).
+- `builtins.fetchTree` is now its own experimental feature, [`fetch-tree`](@docroot@/development/experimental-features.md#xp-feature-fetch-tree).
+  This allows stabilising it independently of the rest of what is encompassed by [`flakes`](@docroot@/development/experimental-features.md#xp-feature-flakes).
 
 - The interface for creating and updating lock files has been overhauled:
 
@@ -45,7 +45,7 @@
     ```json5
     [
       {
-        "path": "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15",
+        "path": "/nix/store/fvqsvk65d38p8qqir371ii0hyqxvjcw6-bash-5.2-p15",
         "valid": true,
         // ...
       },
@@ -60,7 +60,7 @@
 
     ```json5
     {
-      "/nix/store/8fv91097mbh5049i9rglc73dx6kjg3qk-bash-5.2-p15": {
+      "/nix/store/fvqsvk65d38p8qqir371ii0hyqxvjcw6-bash-5.2-p15": {
         // ...
       },
       "/nix/store/wffw7l0alvs3iw94cbgi1gmmbmw99sqb-home-manager-path": null,

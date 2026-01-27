@@ -9,7 +9,7 @@ struct SourcePath;
 /**
  * A source accessor that uses the Unix filesystem.
  */
-struct PosixSourceAccessor : virtual SourceAccessor
+class PosixSourceAccessor : virtual public SourceAccessor
 {
     /**
      * Optional root path to prefix all operations into the native file
@@ -18,8 +18,12 @@ struct PosixSourceAccessor : virtual SourceAccessor
      */
     const std::filesystem::path root;
 
+    const bool trackLastModified = false;
+
+public:
+
     PosixSourceAccessor();
-    PosixSourceAccessor(std::filesystem::path && root);
+    PosixSourceAccessor(std::filesystem::path && root, bool trackLastModified = false);
 
     /**
      * The most recent mtime seen by lstat(). This is a hack to
@@ -28,6 +32,8 @@ struct PosixSourceAccessor : virtual SourceAccessor
     time_t mtime = 0;
 
     void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
+
+    using SourceAccessor::readFile;
 
     bool pathExists(const CanonPath & path) override;
 
@@ -42,6 +48,9 @@ struct PosixSourceAccessor : virtual SourceAccessor
     /**
      * Create a `PosixSourceAccessor` and `SourcePath` corresponding to
      * some native path.
+     *
+     * @param Whether the accessor should return a non-null getLastModified.
+     * When true the accessor must be used only by a single thread.
      *
      * The `PosixSourceAccessor` is rooted as far up the tree as
      * possible, (e.g. on Windows it could scoped to a drive like
@@ -64,7 +73,12 @@ struct PosixSourceAccessor : virtual SourceAccessor
      * and
      * [`std::filesystem::path::relative_path`](https://en.cppreference.com/w/cpp/filesystem/path/relative_path).
      */
-    static SourcePath createAtRoot(const std::filesystem::path & path);
+    static SourcePath createAtRoot(const std::filesystem::path & path, bool trackLastModified = false);
+
+    std::optional<std::time_t> getLastModified() override
+    {
+        return trackLastModified ? std::optional{mtime} : std::nullopt;
+    }
 
 private:
 
@@ -73,7 +87,7 @@ private:
      */
     void assertNoSymlinks(CanonPath path);
 
-    std::optional<struct stat> cachedLstat(const CanonPath & path);
+    std::optional<PosixStat> cachedLstat(const CanonPath & path);
 
     std::filesystem::path makeAbsPath(const CanonPath & path);
 };

@@ -33,6 +33,9 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
+gmock = dependency('gmock')
+deps_private += gmock
+
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
@@ -56,6 +59,7 @@ sources = files(
   'config.cc',
   'executable-path.cc',
   'file-content-address.cc',
+  'file-descriptor.cc',
   'file-system.cc',
   'git.cc',
   'hash.cc',
@@ -63,21 +67,29 @@ sources = files(
   'json-utils.cc',
   'logging.cc',
   'lru-cache.cc',
+  'memory-source-accessor.cc',
   'monitorfdhup.cc',
+  'nar-listing.cc',
   'nix_api_util.cc',
   'nix_api_util_internal.cc',
   'pool.cc',
   'position.cc',
   'processes.cc',
   'sort.cc',
+  'source-accessor.cc',
   'spawn.cc',
   'strings.cc',
   'suggestions.cc',
   'terminal.cc',
+  'topo-sort.cc',
   'url.cc',
   'util.cc',
   'xml-writer.cc',
 )
+
+if host_machine.system() != 'windows'
+  subdir('unix')
+endif
 
 include_dirs = [ include_directories('.') ]
 

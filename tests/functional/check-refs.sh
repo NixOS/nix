@@ -64,5 +64,13 @@ fi
 if isDaemonNewer "2.28pre20241225"; then
     # test12 should fail (syntactically invalid).
     expectStderr 1 nix-build -vvv -o "$RESULT" check-refs.nix -A test12 >"$TEST_ROOT/test12.stderr"
-    grepQuiet -F "output check for 'lib' contains an illegal reference specifier 'dev', expected store path or output name (one of [lib, out])" < "$TEST_ROOT/test12.stderr"
+    if isDaemonNewer "2.33pre20251110"; then
+        grepQuiet -F \
+            "output check for 'lib' contains output name 'dev', but this is not a valid output of this derivation. (Valid outputs are [lib, out].)" \
+            < "$TEST_ROOT/test12.stderr"
+    else
+        grepQuiet -F \
+            "output check for 'lib' contains an illegal reference specifier 'dev', expected store path or output name (one of [lib, out])" \
+            < "$TEST_ROOT/test12.stderr"
+    fi
 fi

@@ -54,21 +54,13 @@ struct UnkeyedRealisation
 {
     StorePath outPath;
 
-    StringSet signatures;
-
-    /**
-     * The realisations that are required for the current one to be valid.
-     *
-     * When importing this realisation, the store will first check that all its
-     * dependencies exist, and map to the correct output path
-     */
-    std::map<DrvOutput, StorePath> dependentRealisations;
+    std::set<Signature> signatures;
 
     std::string fingerprint(const DrvOutput & key) const;
 
     void sign(const DrvOutput & key, const Signer &);
 
-    bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const Signature & sig) const;
 
     size_t checkSignatures(const DrvOutput & key, const PublicKeys & publicKeys) const;
 
@@ -86,10 +78,6 @@ struct Realisation : UnkeyedRealisation
     DrvOutput id;
 
     bool isCompatibleWith(const UnkeyedRealisation & other) const;
-
-    static std::set<Realisation> closure(Store &, const std::set<Realisation> &);
-
-    static void closure(Store &, const std::set<Realisation> &, std::set<Realisation> & res);
 
     bool operator==(const Realisation &) const = default;
     auto operator<=>(const Realisation &) const = default;
@@ -154,10 +142,6 @@ struct RealisedPath
      */
     const StorePath & path() const &;
 
-    void closure(Store & store, Set & ret) const;
-    static void closure(Store & store, const Set & startPaths, Set & ret);
-    Set closure(Store & store) const;
-
     bool operator==(const RealisedPath &) const = default;
     auto operator<=>(const RealisedPath &) const = default;
 };
@@ -182,5 +166,6 @@ public:
 
 } // namespace nix
 
+JSON_IMPL(nix::DrvOutput)
 JSON_IMPL(nix::UnkeyedRealisation)
 JSON_IMPL(nix::Realisation)

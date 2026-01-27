@@ -30,8 +30,6 @@
 #include <thread>
 #include <regex>
 
-using namespace std::string_literals;
-
 namespace nix {
 
 const unsigned int RETRY_TIME_MS_DEFAULT = 250;
@@ -41,25 +39,45 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
+namespace {
+
+using curlSList = std::unique_ptr<::curl_slist, decltype([](::curl_slist * list) { ::curl_slist_free_all(list); })>;
+using curlMulti = std::unique_ptr<::CURLM, decltype([](::CURLM * multi) { ::curl_multi_cleanup(multi); })>;
+
+struct curlMultiError : Error
+{
+    ::CURLMcode code;
+
+    curlMultiError(::CURLMcode code)
+        : Error{"unexpected curl multi error: %s", ::curl_multi_strerror(code)}
+    {
+        assert(code != CURLM_OK);
+    }
+};
+
+} // namespace
+
 struct curlFileTransfer : public FileTransfer
 {
-    CURLM * curlm = 0;
+    curlMulti curlm;
 
     std::random_device rd;
     std::mt19937 mt19937;
 
-    struct TransferItem : public std::enable_shared_from_this<TransferItem>
+    struct TransferItem : public std::enable_shared_from_this<TransferItem>, public FileTransfer::Item
     {
         curlFileTransfer & fileTransfer;
         FileTransferRequest request;
         FileTransferResult result;
-        Activity act;
+        std::unique_ptr<Activity> _act;
         bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         // buffer to accompany the `req` above
         char errbuf[CURL_ERROR_SIZE];
-        bool active = false; // whether the handle has been added to the multi object
+        bool active = false;   // whether the handle has been added to the multi object
+        bool paused = false;   // whether the request has been paused previously
+        bool enqueued = false; // whether the request has been added the incoming queue
         std::string statusMsg;
 
         unsigned int attempt = 0;
@@ -68,7 +86,7 @@ struct curlFileTransfer : public FileTransfer
            has been reached. */
         std::chrono::steady_clock::time_point embargo;
 
-        struct curl_slist * requestHeaders = 0;
+        curlSList requestHeaders;
 
         std::string encoding;
 
@@ -91,18 +109,21 @@ struct curlFileTransfer : public FileTransfer
             return httpStatus;
         }
 
+        void appendHeaders(const std::string & header)
+        {
+            curlSList tmpSList = curlSList(::curl_slist_append(requestHeaders.get(), requireCString(header)));
+            if (!tmpSList)
+                throw std::bad_alloc();
+            requestHeaders.release();
+            requestHeaders = std::move(tmpSList);
+        }
+
         TransferItem(
             curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
-            , act(*logger,
-                  lvlTalkative,
-                  actFileTransfer,
-                  fmt("%sing '%s'", request.verb(), request.uri),
-                  {request.uri.to_string()},
-                  request.parentAct)
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
                 if (errorSink) {
@@ -116,7 +137,13 @@ struct curlFileTransfer : public FileTransfer
                        successful response. */
                     if (successfulStatuses.count(httpStatus)) {
                         writtenToSink += data.size();
-                        this->request.dataCallback(data);
+                        PauseTransfer needsPause = this->request.dataCallback(data);
+                        if (needsPause == PauseTransfer::Yes) {
+                            /* Smuggle the boolean flag into writeCallback. Note that
+                               the finalSink might get called multiple times if there's
+                               decompression going on. */
+                            paused = true;
+                        }
                     }
                 } else
                     this->result.data.append(data);
@@ -124,13 +151,21 @@ struct curlFileTransfer : public FileTransfer
         {
             result.urls.push_back(request.uri.to_string());
 
-            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
+            /* Don't set Accept-Encoding for S3 requests that use AWS SigV4 signing.
+               curl's SigV4 implementation signs all headers including Accept-Encoding,
+               but some S3-compatible services (like GCS) modify this header in transit,
+               causing signature verification to fail.
+               See https://github.com/NixOS/nix/issues/15019 */
+#if NIX_WITH_AWS_AUTH
+            if (!request.awsSigV4Provider)
+#endif
+                appendHeaders("Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
-                requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
+                appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
-                requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
+                appendHeaders("Content-Type: " + request.mimeType);
             for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+                appendHeaders(fmt("%s: %s", it->first, it->second));
             }
         }
 
@@ -138,28 +173,35 @@ struct curlFileTransfer : public FileTransfer
         {
             if (req) {
                 if (active)
-                    curl_multi_remove_handle(fileTransfer.curlm, req);
+                    curl_multi_remove_handle(fileTransfer.curlm.get(), req);
                 curl_easy_cleanup(req);
             }
-            if (requestHeaders)
-                curl_slist_free_all(requestHeaders);
             try {
-                if (!done)
-                    fail(FileTransferError(Interrupted, {}, "download of '%s' was interrupted", request.uri));
+                if (!done && enqueued)
+                    fail(FileTransferError(
+                        Interrupted, {}, "%s of '%s' was interrupted", Uncolored(request.noun()), request.uri));
             } catch (...) {
                 ignoreExceptionInDestructor();
             }
         }
 
-        void failEx(std::exception_ptr ex)
+        void failEx(std::exception_ptr ex) noexcept
         {
             assert(!done);
             done = true;
+            try {
+                std::rethrow_exception(ex);
+            } catch (nix::Error & e) {
+                /* Add more context to the error message. */
+                e.addTrace({}, "during %s of '%s'", Uncolored(request.noun()), request.uri.to_string());
+            } catch (...) {
+                /* Can't add more context to the error. */
+            }
             callback.rethrow(ex);
         }
 
         template<class T>
-        void fail(T && e)
+        void fail(T && e) noexcept
         {
             failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
@@ -168,32 +210,38 @@ struct curlFileTransfer : public FileTransfer
         std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
-        std::exception_ptr writeException;
+        std::exception_ptr callbackException;
 
-        size_t writeCallback(void * contents, size_t size, size_t nmemb)
-        {
-            try {
-                size_t realSize = size * nmemb;
-                result.bodySize += realSize;
+        size_t writeCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
+            size_t realSize = size * nmemb;
+            result.bodySize += realSize;
 
-                if (!decompressionSink) {
-                    decompressionSink = makeDecompressionSink(encoding, finalSink);
-                    if (!successfulStatuses.count(getHTTPStatus())) {
-                        // In this case we want to construct a TeeSink, to keep
-                        // the response around (which we figure won't be big
-                        // like an actual download should be) to improve error
-                        // messages.
-                        errorSink = StringSink{};
-                    }
+            if (!decompressionSink) {
+                decompressionSink = makeDecompressionSink(encoding, finalSink);
+                if (!successfulStatuses.count(getHTTPStatus())) {
+                    // In this case we want to construct a TeeSink, to keep
+                    // the response around (which we figure won't be big
+                    // like an actual download should be) to improve error
+                    // messages.
+                    errorSink = StringSink{};
                 }
-
-                (*decompressionSink)({(char *) contents, realSize});
-
-                return realSize;
-            } catch (...) {
-                writeException = std::current_exception();
-                return 0;
             }
+
+            (*decompressionSink)({(char *) contents, realSize});
+            if (paused) {
+                /* The callback has signaled that the transfer needs to be
+                   paused. Already consumed data won't be returned twice unlike
+                   when returning CURL_WRITEFUNC_PAUSE.
+                   https://curl-library.cool.haxx.narkive.com/larE1cRA/curl-easy-pause-documentation-question
+                   */
+                curl_easy_pause(req, CURLPAUSE_RECV);
+            }
+
+            return realSize;
+        } catch (...) {
+            callbackException = std::current_exception();
+            return 0;
         }
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -209,8 +257,8 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
-        size_t headerCallback(void * contents, size_t size, size_t nmemb)
-        {
+        size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
+        try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
@@ -263,6 +311,15 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
             return realSize;
+        } catch (...) {
+#if LIBCURL_VERSION_NUM >= 0x075700
+            /* https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html:
+               You can also abort the transfer by returning CURL_WRITEFUNC_ERROR. */
+            callbackException = std::current_exception();
+            return CURL_WRITEFUNC_ERROR;
+#else
+            return realSize;
+#endif
         }
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -270,14 +327,37 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
         }
 
-        int progressCallback(curl_off_t dltotal, curl_off_t dlnow)
+        /**
+         * Lazily start an `Activity`. We don't do this in the `TransferItem` constructor to avoid showing downloads
+         * that are only enqueued but not actually started.
+         */
+        Activity & act()
         {
-            try {
-                act.progress(dlnow, dltotal);
-            } catch (nix::Interrupted &) {
-                assert(getInterrupted());
+            if (!_act) {
+                _act = std::make_unique<Activity>(
+                    *logger,
+                    lvlTalkative,
+                    actFileTransfer,
+                    fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
+                    Logger::Fields{request.uri.to_string()},
+                    request.parentAct);
+                // Reset the start time to when we actually started the download.
+                startTime = std::chrono::steady_clock::now();
             }
+            return *_act;
+        }
+
+        int progressCallback(curl_off_t dltotal, curl_off_t dlnow) noexcept
+        try {
+            act().progress(dlnow, dltotal);
             return getInterrupted();
+        } catch (nix::Interrupted &) {
+            assert(getInterrupted());
+            return 1;
+        } catch (...) {
+            /* Something unexpected has happened like logger throwing an exception. */
+            callbackException = std::current_exception();
+            return 1;
         }
 
         static int progressCallbackWrapper(
@@ -288,10 +368,13 @@ struct curlFileTransfer : public FileTransfer
             return item.progressCallback(isUpload ? ultotal : dltotal, isUpload ? ulnow : dlnow);
         }
 
-        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr)
-        {
+        static int debugCallback(CURL * handle, curl_infotype type, char * data, size_t size, void * userptr) noexcept
+        try {
             if (type == CURLINFO_TEXT)
                 vomit("curl: %s", chomp(std::string(data, size)));
+            return 0;
+        } catch (...) {
+            /* Swallow the exception. Nothing left to do. */
             return 0;
         }
 
@@ -302,6 +385,7 @@ struct curlFileTransfer : public FileTransfer
         } catch (EndOfFile &) {
             return 0;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_READFUNC_ABORT;
         }
 
@@ -310,7 +394,7 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
 
-#if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
+#if !defined(_WIN32)
         static int cloexec_callback(void *, curl_socket_t curlfd, curlsocktype purpose)
         {
             unix::closeOnExec(curlfd);
@@ -333,12 +417,31 @@ struct curlFileTransfer : public FileTransfer
             }
             return CURL_SEEKFUNC_OK;
         } catch (...) {
+            callbackException = std::current_exception();
             return CURL_SEEKFUNC_FAIL;
         }
 
         static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
             return ((TransferItem *) clientp)->seekCallback(offset, origin);
+        }
+
+        static int resolverCallbackWrapper(void *, void *, void * clientp) noexcept
+        try {
+            // Create the `Activity` associated with this download.
+            ((TransferItem *) clientp)->act();
+            return 0;
+        } catch (...) {
+            return 1;
+        }
+
+        void unpause()
+        {
+            /* Unpausing an already unpaused transfer is a no-op. */
+            if (paused) {
+                curl_easy_pause(req, CURLPAUSE_CONT);
+                paused = false;
+            }
         }
 
         void init()
@@ -363,15 +466,11 @@ struct curlFileTransfer : public FileTransfer
                 ("curl/" LIBCURL_VERSION " Nix/" + nixVersion
                  + (fileTransferSettings.userAgentSuffix != "" ? " " + fileTransferSettings.userAgentSuffix.get() : ""))
                     .c_str());
-#if LIBCURL_VERSION_NUM >= 0x072b00
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
-#endif
-#if LIBCURL_VERSION_NUM >= 0x072f00
             if (fileTransferSettings.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             else
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-#endif
             curl_easy_setopt(req, CURLOPT_WRITEFUNCTION, TransferItem::writeCallbackWrapper);
             curl_easy_setopt(req, CURLOPT_WRITEDATA, this);
             curl_easy_setopt(req, CURLOPT_HEADERFUNCTION, TransferItem::headerCallbackWrapper);
@@ -381,22 +480,27 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_XFERINFODATA, this);
             curl_easy_setopt(req, CURLOPT_NOPROGRESS, 0);
 
-            curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders);
+            curl_easy_setopt(req, CURLOPT_HTTPHEADER, requestHeaders.get());
 
             if (settings.downloadSpeed.get() > 0)
                 curl_easy_setopt(req, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t) (settings.downloadSpeed.get() * 1024));
 
-            if (request.method == HttpMethod::HEAD)
+            if (request.method == HttpMethod::Head)
                 curl_easy_setopt(req, CURLOPT_NOBODY, 1);
 
-            if (request.method == HttpMethod::DELETE)
+            if (request.method == HttpMethod::Delete)
                 curl_easy_setopt(req, CURLOPT_CUSTOMREQUEST, "DELETE");
 
             if (request.data) {
-                if (request.method == HttpMethod::POST) {
+                // Restart the source to ensure it's at the beginning.
+                // This is necessary for retries, where the source was
+                // already consumed by a previous attempt.
+                request.data->source->restart();
+
+                if (request.method == HttpMethod::Post) {
                     curl_easy_setopt(req, CURLOPT_POST, 1L);
                     curl_easy_setopt(req, CURLOPT_POSTFIELDSIZE_LARGE, (curl_off_t) request.data->sizeHint);
-                } else if (request.method == HttpMethod::PUT) {
+                } else if (request.method == HttpMethod::Put) {
                     curl_easy_setopt(req, CURLOPT_UPLOAD, 1L);
                     curl_easy_setopt(req, CURLOPT_INFILESIZE_LARGE, (curl_off_t) request.data->sizeHint);
                 } else {
@@ -411,10 +515,9 @@ struct curlFileTransfer : public FileTransfer
             if (settings.caFile != "")
                 curl_easy_setopt(req, CURLOPT_CAINFO, settings.caFile.get().c_str());
 
-#if !defined(_WIN32) && LIBCURL_VERSION_NUM >= 0x071000
+#if !defined(_WIN32)
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
 #endif
-
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransferSettings.connectTimeout.get());
 
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
@@ -427,6 +530,21 @@ struct curlFileTransfer : public FileTransfer
 
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);
+
+            /* Note that the underlying strings get copied by libcurl, so the path -> string conversion is ok:
+               > The application does not have to keep the string around after setting this option.
+               https://curl.se/libcurl/c/CURLOPT_SSLKEY.html
+               https://curl.se/libcurl/c/CURLOPT_SSLCERT.html */
+
+            if (request.tlsCert) {
+                curl_easy_setopt(req, CURLOPT_SSLCERTTYPE, "PEM");
+                curl_easy_setopt(req, CURLOPT_SSLCERT, request.tlsCert->string().c_str());
+            }
+
+            if (request.tlsKey) {
+                curl_easy_setopt(req, CURLOPT_SSLKEYTYPE, "PEM");
+                curl_easy_setopt(req, CURLOPT_SSLKEY, request.tlsKey->string().c_str());
+            }
 
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
@@ -449,6 +567,11 @@ struct curlFileTransfer : public FileTransfer
             }
 #endif
 
+            // This seems to be the earliest libcurl callback that signals that the download is happening, so we can
+            // call act().
+            curl_easy_setopt(req, CURLOPT_RESOLVER_START_FUNCTION, resolverCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_RESOLVER_START_DATA, this);
+
             result.data.clear();
             result.bodySize = 0;
         }
@@ -463,7 +586,7 @@ struct curlFileTransfer : public FileTransfer
 
             debug(
                 "finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
-                request.verb(),
+                request.noun(),
                 request.uri,
                 code,
                 httpStatus,
@@ -476,7 +599,7 @@ struct curlFileTransfer : public FileTransfer
                 try {
                     decompressionSink->finish();
                 } catch (...) {
-                    writeException = std::current_exception();
+                    callbackException = std::current_exception();
                 }
             }
 
@@ -485,8 +608,8 @@ struct curlFileTransfer : public FileTransfer
                 httpStatus = 304;
             }
 
-            if (writeException)
-                failEx(writeException);
+            if (callbackException)
+                failEx(callbackException);
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
                 result.cached = httpStatus == 304;
@@ -497,7 +620,7 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 304 && result.etag == "")
                     result.etag = request.expectedETag;
 
-                act.progress(result.bodySize, result.bodySize);
+                act().progress(result.bodySize, result.bodySize);
                 done = true;
                 callback(std::move(result));
             }
@@ -563,7 +686,7 @@ struct curlFileTransfer : public FileTransfer
                                                                                        Interrupted,
                                                                                        std::move(response),
                                                                                        "%s of '%s' was interrupted",
-                                                                                       request.verb(),
+                                                                                       request.noun(),
                                                                                        request.uri)
                            : httpStatus != 0
                                ? FileTransferError(
@@ -601,7 +724,7 @@ struct curlFileTransfer : public FileTransfer
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     try {
-                        fileTransfer.enqueueItem(shared_from_this());
+                        fileTransfer.enqueueItem(ref{shared_from_this()});
                     } catch (const nix::Error & e) {
                         // If enqueue fails (e.g., during shutdown), fail the transfer properly
                         // instead of letting the exception propagate, which would leave done=false
@@ -618,24 +741,24 @@ struct curlFileTransfer : public FileTransfer
     {
         struct EmbargoComparator
         {
-            bool operator()(const std::shared_ptr<TransferItem> & i1, const std::shared_ptr<TransferItem> & i2)
+            bool operator()(const ref<TransferItem> & i1, const ref<TransferItem> & i2)
             {
                 return i1->embargo > i2->embargo;
             }
         };
 
-        std::
-            priority_queue<std::shared_ptr<TransferItem>, std::vector<std::shared_ptr<TransferItem>>, EmbargoComparator>
-                incoming;
+        std::priority_queue<ref<TransferItem>, std::vector<ref<TransferItem>>, EmbargoComparator> incoming;
+        std::vector<ref<TransferItem>> unpause;
     private:
         bool quitting = false;
     public:
         void quit()
         {
             quitting = true;
-            /* We wil not be processing any more incoming requests */
+            /* We will not be processing any more incoming requests */
             while (!incoming.empty())
                 incoming.pop();
+            unpause.clear();
         }
 
         bool isQuitting()
@@ -646,14 +769,9 @@ struct curlFileTransfer : public FileTransfer
 
     Sync<State> state_;
 
-#ifndef _WIN32 // TODO need graceful async exit support on Windows?
-    /* We can't use a std::condition_variable to wake up the curl
-       thread, because it only monitors file descriptors. So use a
-       pipe instead. */
-    Pipe wakeupPipe;
-#endif
-
     std::thread workerThread;
+
+    const size_t maxQueueSize = fileTransferSettings.httpConnections.get() * 5;
 
     curlFileTransfer()
         : mt19937(rd())
@@ -661,43 +779,35 @@ struct curlFileTransfer : public FileTransfer
         static std::once_flag globalInit;
         std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
 
-        curlm = curl_multi_init();
+        curlm = curlMulti(curl_multi_init());
 
-#if LIBCURL_VERSION_NUM >= 0x072b00 // Multiplex requires >= 7.43.0
-        curl_multi_setopt(curlm, CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
-#endif
-#if LIBCURL_VERSION_NUM >= 0x071e00 // Max connections requires >= 7.30.0
-        curl_multi_setopt(curlm, CURLMOPT_MAX_TOTAL_CONNECTIONS, fileTransferSettings.httpConnections.get());
-#endif
-
-#ifndef _WIN32 // TODO need graceful async exit support on Windows?
-        wakeupPipe.create();
-        fcntl(wakeupPipe.readSide.get(), F_SETFL, O_NONBLOCK);
-#endif
+        curl_multi_setopt(curlm.get(), CURLMOPT_PIPELINING, CURLPIPE_MULTIPLEX);
+        curl_multi_setopt(curlm.get(), CURLMOPT_MAX_TOTAL_CONNECTIONS, fileTransferSettings.httpConnections.get());
 
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
 
     ~curlFileTransfer()
     {
-        stopWorkerThread();
-
+        try {
+            stopWorkerThread();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
         workerThread.join();
-
-        if (curlm)
-            curl_multi_cleanup(curlm);
     }
 
     void stopWorkerThread()
     {
         /* Signal the worker thread to exit. */
-        {
-            auto state(state_.lock());
-            state->quit();
-        }
-#ifndef _WIN32 // TODO need graceful async exit support on Windows?
-        writeFull(wakeupPipe.writeSide.get(), " ", false);
-#endif
+        state_.lock()->quit();
+        wakeupMulti();
+    }
+
+    void wakeupMulti()
+    {
+        if (auto ec = ::curl_multi_wakeup(curlm.get()))
+            throw curlMultiError(ec);
     }
 
     void workerThreadMain()
@@ -727,32 +837,25 @@ struct curlFileTransfer : public FileTransfer
 
             /* Let curl do its thing. */
             int running;
-            CURLMcode mc = curl_multi_perform(curlm, &running);
+            CURLMcode mc = curl_multi_perform(curlm.get(), &running);
             if (mc != CURLM_OK)
                 throw nix::Error("unexpected error from curl_multi_perform(): %s", curl_multi_strerror(mc));
 
             /* Set the promises of any finished requests. */
             CURLMsg * msg;
             int left;
-            while ((msg = curl_multi_info_read(curlm, &left))) {
+            while ((msg = curl_multi_info_read(curlm.get(), &left))) {
                 if (msg->msg == CURLMSG_DONE) {
                     auto i = items.find(msg->easy_handle);
                     assert(i != items.end());
                     i->second->finish(msg->data.result);
-                    curl_multi_remove_handle(curlm, i->second->req);
+                    curl_multi_remove_handle(curlm.get(), i->second->req);
                     i->second->active = false;
                     items.erase(i);
                 }
             }
 
             /* Wait for activity, including wakeup events. */
-            int numfds = 0;
-            struct curl_waitfd extraFDs[1];
-#ifndef _WIN32 // TODO need graceful async exit support on Windows?
-            extraFDs[0].fd = wakeupPipe.readSide.get();
-            extraFDs[0].events = CURL_WAIT_POLLIN;
-            extraFDs[0].revents = 0;
-#endif
             long maxSleepTimeMs = items.empty() ? 10000 : 100;
             auto sleepTimeMs = nextWakeup != std::chrono::steady_clock::time_point()
                                    ? std::max(
@@ -761,22 +864,13 @@ struct curlFileTransfer : public FileTransfer
                                              nextWakeup - std::chrono::steady_clock::now())
                                              .count())
                                    : maxSleepTimeMs;
-            vomit("download thread waiting for %d ms", sleepTimeMs);
-            mc = curl_multi_wait(curlm, extraFDs, 1, sleepTimeMs, &numfds);
+
+            int numfds = 0;
+            mc = curl_multi_poll(curlm.get(), nullptr, 0, sleepTimeMs, &numfds);
             if (mc != CURLM_OK)
-                throw nix::Error("unexpected error from curl_multi_wait(): %s", curl_multi_strerror(mc));
+                throw curlMultiError(mc);
 
             nextWakeup = std::chrono::steady_clock::time_point();
-
-            /* Add new curl requests from the incoming requests queue,
-               except for requests that are embargoed (waiting for a
-               retry timeout to expire). */
-            if (extraFDs[0].revents & CURL_WAIT_POLLIN) {
-                char buf[1024];
-                auto res = read(extraFDs[0].fd, buf, sizeof(buf));
-                if (res == -1 && errno != EINTR)
-                    throw SysError("reading curl wakeup socket");
-            }
 
             std::vector<std::shared_ptr<TransferItem>> incoming;
             auto now = std::chrono::steady_clock::now();
@@ -784,6 +878,13 @@ struct curlFileTransfer : public FileTransfer
             {
                 auto state(state_.lock());
                 while (!state->incoming.empty()) {
+                    /* Limit the number of active curl handles, since curl doesn't scale well. */
+                    if (items.size() + incoming.size() >= maxQueueSize) {
+                        auto t = now + std::chrono::milliseconds(100);
+                        if (nextWakeup == std::chrono::steady_clock::time_point() || t < nextWakeup)
+                            nextWakeup = t;
+                        break;
+                    }
                     auto item = state->incoming.top();
                     if (item->embargo <= now) {
                         incoming.push_back(item);
@@ -798,12 +899,23 @@ struct curlFileTransfer : public FileTransfer
             }
 
             for (auto & item : incoming) {
-                debug("starting %s of %s", item->request.verb(), item->request.uri);
+                debug("starting %s of %s", item->request.noun(), item->request.uri);
                 item->init();
-                curl_multi_add_handle(curlm, item->req);
+                curl_multi_add_handle(curlm.get(), item->req);
                 item->active = true;
                 items[item->req] = item;
             }
+
+            /* NOTE: Unpausing may invoke callbacks to flush all buffers. */
+            auto unpause = [&]() {
+                auto state(state_.lock());
+                auto res = state->unpause;
+                state->unpause.clear();
+                return res;
+            }();
+
+            for (auto & item : unpause)
+                item->unpause();
         }
 
         debug("download thread shutting down");
@@ -828,7 +940,7 @@ struct curlFileTransfer : public FileTransfer
         }
     }
 
-    void enqueueItem(std::shared_ptr<TransferItem> item)
+    ItemHandle enqueueItem(ref<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
             && item->request.uri.scheme() != "s3")
@@ -839,23 +951,35 @@ struct curlFileTransfer : public FileTransfer
             if (state->isQuitting())
                 throw nix::Error("cannot enqueue download request because the download thread is shutting down");
             state->incoming.push(item);
+            item->enqueued = true; /* Now any exceptions should be reported via the callback. */
         }
-#ifndef _WIN32 // TODO need graceful async exit support on Windows?
-        writeFull(wakeupPipe.writeSide.get(), " ");
-#endif
+
+        wakeupMulti();
+        return ItemHandle(static_cast<Item &>(*item));
     }
 
-    void enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
+    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
-            enqueueItem(std::make_shared<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-            return;
+            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
         }
 
-        enqueueItem(std::make_shared<TransferItem>(*this, request, std::move(callback)));
+        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+    }
+
+    void unpauseTransfer(ref<TransferItem> item)
+    {
+        auto state(state_.lock());
+        state->unpause.push_back(std::move(item));
+        wakeupMulti();
+    }
+
+    void unpauseTransfer(ItemHandle handle) override
+    {
+        unpauseTransfer(ref{static_cast<TransferItem &>(handle.item.get()).shared_from_this()});
     }
 };
 
@@ -952,6 +1076,7 @@ void FileTransfer::download(
     struct State
     {
         bool quit = false;
+        bool paused = false;
         std::exception_ptr exc;
         std::string data;
         std::condition_variable avail, request;
@@ -967,31 +1092,38 @@ void FileTransfer::download(
         state->request.notify_one();
     });
 
-    request.dataCallback = [_state](std::string_view data) {
+    request.dataCallback = [_state, uri = request.uri.to_string()](std::string_view data) -> PauseTransfer {
         auto state(_state->lock());
 
         if (state->quit)
-            return;
-
-        /* If the buffer is full, then go to sleep until the calling
-           thread wakes us up (i.e. when it has removed data from the
-           buffer). We don't wait forever to prevent stalling the
-           download thread. (Hopefully sleeping will throttle the
-           sender.) */
-        if (state->data.size() > fileTransferSettings.downloadBufferSize) {
-            debug("download buffer is full; going to sleep");
-            static bool haveWarned = false;
-            warnOnce(haveWarned, "download buffer is full; consider increasing the 'download-buffer-size' setting");
-            state.wait_for(state->request, std::chrono::seconds(10));
-        }
+            return PauseTransfer::No;
 
         /* Append data to the buffer and wake up the calling
            thread. */
         state->data.append(data);
         state->avail.notify_one();
+
+        if (state->data.size() <= fileTransferSettings.downloadBufferSize)
+            return PauseTransfer::No;
+
+        /* dataCallback gets called multiple times by an intermediate sink. Only
+           issue the debug message the first time around. */
+        if (!state->paused)
+            debug(
+                "pausing transfer for '%s': download buffer is full (%d > %d)",
+                uri,
+                state->data.size(),
+                fileTransferSettings.downloadBufferSize);
+
+        state->paused = true;
+
+        /* Technically the buffer might become larger than
+           downloadBufferSize, but with sinks there's no way to avoid
+           consuming data. */
+        return PauseTransfer::Yes;
     };
 
-    enqueueFileTransfer(
+    auto handle = enqueueFileTransfer(
         request, {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
@@ -1024,6 +1156,10 @@ void FileTransfer::download(
                     return;
                 }
 
+                if (state->paused) {
+                    unpauseTransfer(handle);
+                    state->paused = false;
+                }
                 state.wait(state->avail);
 
                 if (state->data.empty())

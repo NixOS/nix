@@ -9,6 +9,7 @@
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/remote-store.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
@@ -338,17 +339,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::HasSubstitutes: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        StorePathSet paths; // FIXME
-        paths.insert(path);
-        auto res = store->querySubstitutablePaths(paths);
-        logger->stopWork();
-        conn.to << (res.count(path) != 0);
-        break;
-    }
-
     case WorkerProto::Op::QuerySubstitutablePaths: {
         auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         logger->startWork();
@@ -358,26 +348,13 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryPathHash: {
-        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        logger->startWork();
-        auto hash = store->queryPathInfo(path)->narHash;
-        logger->stopWork();
-        conn.to << hash.to_string(HashFormat::Base16, false);
-        break;
-    }
-
-    case WorkerProto::Op::QueryReferences:
     case WorkerProto::Op::QueryReferrers:
     case WorkerProto::Op::QueryValidDerivers:
     case WorkerProto::Op::QueryDerivationOutputs: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         StorePathSet paths;
-        if (op == WorkerProto::Op::QueryReferences)
-            for (auto & i : store->queryPathInfo(path)->references)
-                paths.insert(i);
-        else if (op == WorkerProto::Op::QueryReferrers)
+        if (op == WorkerProto::Op::QueryReferrers)
             store->queryReferrers(path, paths);
         else if (op == WorkerProto::Op::QueryValidDerivers)
             paths = store->queryValidDerivers(path);
@@ -743,7 +720,7 @@ static void performOp(
 
     case WorkerProto::Op::CollectGarbage: {
         GCOptions options;
-        options.action = (GCOptions::GCAction) readInt(conn.from);
+        options.action = WorkerProto::Serialise<GCOptions::GCAction>::read(*store, rconn);
         options.pathsToDelete = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         conn.from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
@@ -884,7 +861,7 @@ static void performOp(
 
     case WorkerProto::Op::AddSignatures: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        StringSet sigs = readStrings<StringSet>(conn.from);
+        auto sigs = WorkerProto::Serialise<std::set<Signature>>::read(*store, rconn);
         logger->startWork();
         store->addSignatures(path, sigs);
         logger->stopWork();
@@ -896,7 +873,7 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
         logger->stopWork();
-        dumpPath(store->toRealPath(path), conn.to);
+        store->narFromPath(path, conn.to);
         break;
     }
 
@@ -905,11 +882,11 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(*store, rconn);
         auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
-        ValidPathInfo info{path, narHash};
+        ValidPathInfo info{path, {*store, narHash}};
         info.deriver = std::move(deriver);
         info.references = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
         conn.from >> info.registrationTime >> info.narSize >> info.ultimate;
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(*store, rconn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
         conn.from >> repair >> dontCheckSigs;
         if (!trusted && dontCheckSigs)
@@ -964,7 +941,7 @@ static void performOp(
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
-            auto outputId = DrvOutput::parse(readString(conn.from));
+            auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
             auto outputPath = StorePath(readString(conn.from));
             store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
         } else {
@@ -977,7 +954,7 @@ static void performOp(
 
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
-        auto outputId = DrvOutput::parse(readString(conn.from));
+        auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
         if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
@@ -1011,10 +988,6 @@ static void performOp(
         break;
     }
 
-    case WorkerProto::Op::QueryFailedPaths:
-    case WorkerProto::Op::ClearFailedPaths:
-        throw Error("Removed operation %1%", op);
-
     default:
         throw Error("invalid operation %1%", op);
     }
@@ -1025,6 +998,17 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
+    ReceiveInterrupts receiveInterrupts;
+
+    /* When interrupted (e.g., SSH client disconnects), shutdown any downstream
+       store connections to break circular waits. This fixes deadlocks where the
+       daemon is waiting for a response from a downstream store while the downstream
+       is waiting for more data from this daemon. */
+    auto shutdownStoreOnInterrupt = createInterruptCallback([&store]() {
+        if (auto remoteStore = dynamic_cast<RemoteStore *>(&*store)) {
+            remoteStore->shutdownConnections();
+        }
+    });
 #endif
 
     /* Exchange the greeting. */

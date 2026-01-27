@@ -162,8 +162,11 @@ nix_err nix_flake_lock_flags_add_input_override(
 {
     nix_clear_err(context);
     try {
-        auto path = nix::flake::parseInputAttrPath(inputPath);
-        flags->lockFlags->inputOverrides.emplace(path, *flakeRef->flakeRef);
+        auto path = nix::flake::NonEmptyInputAttrPath::parse(inputPath);
+        if (!path)
+            throw nix::UsageError(
+                "input override path cannot be zero-length; it would refer to the flake itself, not an input");
+        flags->lockFlags->inputOverrides.emplace(std::move(*path), *flakeRef->flakeRef);
         if (flags->lockFlags->writeLockFile) {
             return nix_flake_lock_flags_set_mode_virtual(context, flags);
         }
@@ -200,7 +203,7 @@ nix_value * nix_locked_flake_get_output_attrs(
     nix_clear_err(context);
     try {
         auto v = nix_alloc_value(context, evalState);
-        nix::flake::callFlake(evalState->state, *lockedFlake->lockedFlake, v->value);
+        nix::flake::callFlake(evalState->state, *lockedFlake->lockedFlake, *v->value);
         return v;
     }
     NIXC_CATCH_ERRS_NULL

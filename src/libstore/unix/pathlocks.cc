@@ -1,4 +1,5 @@
 #include "nix/store/pathlocks.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/util.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/signals.hh"
@@ -13,18 +14,18 @@
 
 namespace nix {
 
-AutoCloseFD openLockFile(const Path & path, bool create)
+AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 {
     AutoCloseFD fd;
 
     fd = open(path.c_str(), O_CLOEXEC | O_RDWR | (create ? O_CREAT : 0), 0600);
     if (!fd && (create || errno != ENOENT))
-        throw SysError("opening lock file '%1%'", path);
+        throw SysError("opening lock file %1%", PathFmt(path));
 
     return fd;
 }
 
-void deleteLockFile(const Path & path, Descriptor desc)
+void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 {
     /* Get rid of the lock file.  Have to be careful not to introduce
        races.  Write a (meaningless) token to the file to indicate to
@@ -69,7 +70,7 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     return true;
 }
 
-bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bool wait)
+bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait)
 {
     assert(fds.empty());
 
@@ -81,9 +82,9 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
        preventing deadlocks. */
     for (auto & path : paths) {
         checkInterrupt();
-        Path lockPath = path + ".lock";
+        std::filesystem::path lockPath = path + ".lock";
 
-        debug("locking path '%1%'", path);
+        debug("locking path %1%", PathFmt(path));
 
         AutoCloseFD fd;
 
@@ -106,19 +107,19 @@ bool PathLocks::lockPaths(const PathSet & paths, const std::string & waitMsg, bo
                 }
             }
 
-            debug("lock acquired on '%1%'", lockPath);
+            debug("lock acquired on %1%", PathFmt(lockPath));
 
             /* Check that the lock file hasn't become stale (i.e.,
                hasn't been unlinked). */
-            struct stat st;
+            PosixStat st;
             if (fstat(fd.get(), &st) == -1)
-                throw SysError("statting lock file '%1%'", lockPath);
+                throw SysError("statting lock file %1%", PathFmt(lockPath));
             if (st.st_size != 0)
                 /* This lock file has been unlinked, so we're holding
                    a lock on a deleted file.  This means that other
                    processes may create and acquire a lock on
                    `lockPath', and proceed.  So we must retry. */
-                debug("open lock file '%1%' has become stale", lockPath);
+                debug("open lock file %1% has become stale", PathFmt(lockPath));
             else
                 break;
         }
@@ -137,9 +138,9 @@ void PathLocks::unlock()
             deleteLockFile(i.second, i.first);
 
         if (close(i.first) == -1)
-            printError("error (ignored): cannot close lock file on '%1%'", i.second);
+            printError("error (ignored): cannot close lock file on %1%", PathFmt(i.second));
 
-        debug("lock released on '%1%'", i.second);
+        debug("lock released on %1%", PathFmt(i.second));
     }
 
     fds.clear();

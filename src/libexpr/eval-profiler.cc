@@ -139,7 +139,7 @@ public:
         , profileFd([&]() {
             AutoCloseFD fd = toDescriptor(open(profileFile.string().c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0660));
             if (!fd)
-                throw SysError("opening file %s", profileFile);
+                throw SysError("opening file %s", PathFmt(profileFile));
             return fd;
         }())
         , posCache(state)

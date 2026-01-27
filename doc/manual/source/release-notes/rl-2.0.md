@@ -66,7 +66,7 @@ This release has the following new features:
 
             nix copy --to ssh://machine nixpkgs.hello
 
-            nix copy --to ssh://machine /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
+            nix copy --to ssh://machine /nix/store/qbhyj3blxpw2i6pb7c6grc9185nbnpvy-hello-2.10
 
             nix copy --to ssh://machine '(with import <nixpkgs> {}; hello)'
 
@@ -187,7 +187,7 @@ This release has the following new features:
         former is primarily useful in conjunction with remote stores,
         e.g.
 
-            nix ls-store --store https://cache.nixos.org/ -lR /nix/store/0i2jd68mp5g6h2sa5k9c85rb80sn8hi9-hello-2.10
+            nix ls-store --store https://cache.nixos.org/ -lR /nix/store/qbhyj3blxpw2i6pb7c6grc9185nbnpvy-hello-2.10
 
         lists the contents of path in a binary cache.
 
@@ -358,7 +358,7 @@ This release has the following new features:
     they are needed for evaluation.
 
   - You can now use `channel:` as a short-hand for
-    <https://nixos.org/channels//nixexprs.tar.xz>. For example,
+    <https://nixos.org/channels//nixexprs.tar.xz> [now <https://channels.nixos.org//nixexprs.tar.xz>]. For example,
     `nix-build channel:nixos-15.09 -A hello` will build the GNU Hello
     package from the `nixos-15.09` channel. In the future, this may
     use Git to fetch updates more efficiently.

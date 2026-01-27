@@ -171,7 +171,7 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
     for (auto & attrPath : attrPaths) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attr = root->findAlongAttrPath(parseAttrPath(state, attrPath));
+        auto attr = root->findAlongAttrPath(AttrPath::parse(state, attrPath));
         if (attr) {
             res.push_back(ref(*attr));
         } else {

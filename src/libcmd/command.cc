@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/cmd/command.hh"
+#include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
@@ -13,6 +14,18 @@
 #include "nix/util/environment-variables.hh"
 
 namespace nix {
+
+RegisterCommand::Commands & RegisterCommand::commands()
+{
+    static RegisterCommand::Commands commands;
+    return commands;
+}
+
+RegisterLegacyCommand::Commands & RegisterLegacyCommand::commands()
+{
+    static RegisterLegacyCommand::Commands commands;
+    return commands;
+}
 
 nix::Commands RegisterCommand::getCommandsFor(const std::vector<std::string> & prefix)
 {
@@ -284,8 +297,10 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile();
+    profile = getDefaultProfile().string();
 }
+
+static constexpr auto environmentVariablesCategory = "Options that change environment variables";
 
 MixEnvironment::MixEnvironment()
     : ignoreEnvironment(false)
@@ -378,7 +393,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                     auto symlink = outLink;
                     if (i)
                         symlink += fmt("-%d", i);
-                    store.addPermRoot(bo.path, absPath(symlink.string()));
+                    store.addPermRoot(bo.path, absPath(symlink).string());
                 },
                 [&](const BuiltPath::Built & bfd) {
                     for (auto & output : bfd.outputs) {
@@ -387,7 +402,7 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                             symlink += fmt("-%d", i);
                         if (output.first != "out")
                             symlink += fmt("-%s", output.first);
-                        store.addPermRoot(output.second, absPath(symlink.string()));
+                        store.addPermRoot(output.second, absPath(symlink).string());
                     }
                 },
             },

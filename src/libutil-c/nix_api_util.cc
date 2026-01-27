@@ -13,7 +13,11 @@ extern "C" {
 
 nix_c_context * nix_c_context_create()
 {
-    return new nix_c_context();
+    try {
+        return new nix_c_context();
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 void nix_c_context_free(nix_c_context * context)
@@ -36,7 +40,7 @@ nix_err nix_context_error(nix_c_context * context)
         const char * demangled = abi::__cxa_demangle(typeid(e).name(), 0, 0, &status);
         if (demangled) {
             context->name = demangled;
-            // todo: free(demangled);
+            free((void *) demangled);
         } else {
             context->name = typeid(e).name();
         }
@@ -153,9 +157,9 @@ nix_err nix_err_code(const nix_c_context * read_context)
 }
 
 // internal
-nix_err call_nix_get_string_callback(const std::string str, nix_get_string_callback callback, void * user_data)
+nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_callback callback, void * user_data)
 {
-    callback(str.c_str(), str.size(), user_data);
+    callback(str.data(), str.size(), user_data);
     return NIX_OK;
 }
 

@@ -3,6 +3,7 @@
 
 #include <map>
 #include <span>
+#include <memory>
 #include <vector>
 #include <memory_resource>
 #include <algorithm>
@@ -11,6 +12,7 @@
 #include "nix/expr/value.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/static-string-data.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/expr/counter.hh"
 #include "nix/util/pos-table.hh"
@@ -85,18 +87,11 @@ struct AttrName
 
 static_assert(std::is_trivially_copy_constructible_v<AttrName>);
 
-typedef std::vector<AttrName> AttrPath;
+typedef std::vector<AttrName> AttrSelectionPath;
 
-std::string showAttrPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
+std::string showAttrSelectionPath(const SymbolTable & symbols, std::span<const AttrName> attrPath);
 
 using UpdateQueue = SmallTemporaryValueVector<conservativeStackReservation>;
-
-class Exprs
-{
-    std::pmr::monotonic_buffer_resource buffer;
-public:
-    std::pmr::polymorphic_allocator<char> alloc{&buffer};
-};
 
 /* Abstract syntax of Nix expressions. */
 
@@ -193,22 +188,18 @@ struct ExprString : Expr
      * This is only for strings already allocated in our polymorphic allocator,
      * or that live at least that long (e.g. c++ string literals)
      */
-    ExprString(const char * s)
+    ExprString(const StringData & s)
     {
         v.mkStringNoCopy(s);
     };
 
     ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
     {
-        auto len = sv.length();
-        if (len == 0) {
-            v.mkStringNoCopy("");
+        if (sv.size() == 0) {
+            v.mkStringNoCopy(""_sds);
             return;
         }
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkStringNoCopy(s);
+        v.mkStringNoCopy(StringData::make(*alloc.resource(), sv));
     };
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -223,11 +214,7 @@ struct ExprPath : Expr
     ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
         : accessor(accessor)
     {
-        auto len = sv.length();
-        char * s = alloc.allocate(len + 1);
-        sv.copy(s, len);
-        s[len] = '\0';
-        v.mkPath(&*accessor, s);
+        v.mkPath(&*accessor, StringData::make(*alloc.resource(), sv));
     }
 
     Value * maybeThunk(EvalState & state, Env & env) override;
@@ -352,7 +339,7 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::vector<AttrName> attrPath)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::span<AttrName> attrPath)
         : e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
@@ -408,9 +395,13 @@ struct ExprAttrs : Expr
         }
     };
 
-    typedef std::map<Symbol, AttrDef> AttrDefs;
-    AttrDefs attrs;
-    std::unique_ptr<std::vector<Expr *>> inheritFromExprs;
+    typedef std::pmr::map<Symbol, AttrDef> AttrDefs;
+    /**
+     * attrs will never be null. we use std::optional so that we can call emplace() to re-initialize the value with a
+     * new pmr::map using a different allocator (move assignment will copy into the old allocator)
+     */
+    std::optional<AttrDefs> attrs;
+    std::unique_ptr<std::pmr::vector<Expr *>> inheritFromExprs;
 
     struct DynamicAttrDef
     {
@@ -422,13 +413,20 @@ struct ExprAttrs : Expr
             , pos(pos) {};
     };
 
-    typedef std::vector<DynamicAttrDef> DynamicAttrDefs;
-    DynamicAttrDefs dynamicAttrs;
+    typedef std::pmr::vector<DynamicAttrDef> DynamicAttrDefs;
+    /**
+     * dynamicAttrs will never be null. See comment on AttrDefs above.
+     */
+    std::optional<DynamicAttrDefs> dynamicAttrs;
     ExprAttrs(const PosIdx & pos)
         : recursive(false)
-        , pos(pos) {};
+        , pos(pos)
+        , attrs(AttrDefs{})
+        , dynamicAttrs(DynamicAttrDefs{}) {};
     ExprAttrs()
-        : recursive(false) {};
+        : recursive(false)
+        , attrs(AttrDefs{})
+        , dynamicAttrs(DynamicAttrDefs{}) {};
 
     PosIdx getPos() const override
     {
@@ -440,13 +438,14 @@ struct ExprAttrs : Expr
     std::shared_ptr<const StaticEnv> bindInheritSources(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
     Env * buildInheritFromEnv(EvalState & state, Env & up);
     void showBindings(const SymbolTable & symbols, std::ostream & str) const;
+    void moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc);
 };
 
 struct ExprList : Expr
 {
     std::span<Expr *> elems;
 
-    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::vector<Expr *> exprs)
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::span<Expr *> exprs)
         : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
     {
         std::ranges::copy(exprs, elems.begin());
@@ -575,7 +574,7 @@ public:
         const PosTable & positions,
         std::pmr::polymorphic_allocator<char> & alloc,
         PosIdx pos,
-        FormalsBuilder formals,
+        const FormalsBuilder & formals,
         Expr * body)
         : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 
@@ -594,11 +593,14 @@ public:
 struct ExprCall : Expr
 {
     Expr * fun;
-    std::vector<Expr *> args;
+    /**
+     * args will never be null. See comment on ExprAttrs::AttrDefs below.
+     */
+    std::optional<std::pmr::vector<Expr *>> args;
     PosIdx pos;
     std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args)
+    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
         : fun(fun)
         , args(args)
         , pos(pos)
@@ -606,7 +608,7 @@ struct ExprCall : Expr
     {
     }
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         : fun(fun)
         , args(args)
         , pos(pos)
@@ -621,6 +623,7 @@ struct ExprCall : Expr
 
     virtual void resetCursedOr() override;
     virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
+    void moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc);
     COMMON_METHODS
 };
 
@@ -637,8 +640,8 @@ struct ExprLet : Expr
 struct ExprWith : Expr
 {
     PosIdx pos;
+    uint32_t prevWith;
     Expr *attrs, *body;
-    size_t prevWith;
     ExprWith * parentWith;
     ExprWith(const PosIdx & pos, Expr * attrs, Expr * body)
         : pos(pos)
@@ -760,11 +763,31 @@ struct ExprConcatStrings : Expr
 {
     PosIdx pos;
     bool forceString;
-    std::vector<std::pair<PosIdx, Expr *>> es;
-    ExprConcatStrings(const PosIdx & pos, bool forceString, std::vector<std::pair<PosIdx, Expr *>> && es)
+    std::span<std::pair<PosIdx, Expr *>> es;
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::span<std::pair<PosIdx, Expr *>> es)
         : pos(pos)
         , forceString(forceString)
-        , es(std::move(es)) {};
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
+
+    ExprConcatStrings(
+        std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
+        : pos(pos)
+        , forceString(forceString)
+        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+    {
+        std::ranges::copy(es, this->es.begin());
+    };
 
     PosIdx getPos() const override
     {
@@ -801,6 +824,61 @@ struct ExprBlackHole : Expr
 };
 
 extern ExprBlackHole eBlackHole;
+
+class Exprs
+{
+    std::pmr::monotonic_buffer_resource buffer;
+public:
+    std::pmr::polymorphic_allocator<char> alloc{&buffer};
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(auto &&... args)
+    {
+        return alloc.new_object<C>(std::forward<decltype(args)>(args)...);
+    }
+
+    // we define some calls to add explicitly so that the argument can be passed in as initializer lists
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return alloc.new_object<C>(pos, fun, std::move(args));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        requires(std::same_as<C, ExprCall>)
+    {
+        return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::span<std::pair<PosIdx, Expr *>> es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+
+    template<class C>
+    [[gnu::always_inline]]
+    C *
+    add(std::pmr::polymorphic_allocator<char> & alloc,
+        const PosIdx & pos,
+        bool forceString,
+        std::initializer_list<std::pair<PosIdx, Expr *>> es)
+        requires(std::same_as<C, ExprConcatStrings>)
+    {
+        return alloc.new_object<C>(alloc, pos, forceString, es);
+    }
+};
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at

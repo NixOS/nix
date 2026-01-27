@@ -95,7 +95,9 @@ struct CmdConfigCheck : StoreCommand
                 dirs.insert(std::filesystem::canonical(candidate).parent_path());
         }
 
-        if (dirs.size() != 1) {
+        if (dirs.empty()) {
+            return checkFail("No nix-env found in PATH.");
+        } else if (dirs.size() > 1) {
             std::ostringstream ss;
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)

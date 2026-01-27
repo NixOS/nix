@@ -40,7 +40,7 @@ in
       for fs in ("ext4", "btrfs", "xfs"):
         machine.succeed("mkfs.{} {} /dev/vdb".format(fs, "-F" if fs == "ext4" else "-f"))
         machine.succeed("mkdir -p /mnt")
-        machine.succeed("mount /dev/vdb /mnt")
+        machine.succeed("mount -t {} /dev/vdb /mnt".format(fs))
         machine.succeed("sync")
         machine.succeed("nix copy --offline ${pkg1} --to /mnt")
         machine.crash()
@@ -48,7 +48,7 @@ in
         machine.start()
         machine.wait_for_unit("multi-user.target")
         machine.succeed("mkdir -p /mnt")
-        machine.succeed("mount /dev/vdb /mnt")
+        machine.succeed("mount -t {} /dev/vdb /mnt".format(fs))
         machine.succeed("nix path-info --offline --store /mnt ${pkg1}")
         machine.succeed("nix store verify --all --store /mnt --no-trust")
 

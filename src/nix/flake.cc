@@ -90,9 +90,12 @@ public:
             .optional = true,
             .handler = {[&](std::vector<std::string> inputsToUpdate) {
                 for (const auto & inputToUpdate : inputsToUpdate) {
-                    InputAttrPath inputAttrPath;
+                    std::optional<NonEmptyInputAttrPath> inputAttrPath;
                     try {
-                        inputAttrPath = flake::parseInputAttrPath(inputToUpdate);
+                        inputAttrPath = flake::NonEmptyInputAttrPath::parse(inputToUpdate);
+                        if (!inputAttrPath)
+                            throw UsageError(
+                                "input path to be updated cannot be zero-length; it would refer to the flake itself, not an input");
                     } catch (Error & e) {
                         warn(
                             "Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.",
@@ -100,11 +103,11 @@ public:
                             inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(inputAttrPath))
+                    if (lockFlags.inputUpdates.contains(*inputAttrPath))
                         warn(
                             "Input '%s' was specified multiple times. You may have done this by accident.",
-                            printInputAttrPath(inputAttrPath));
-                    lockFlags.inputUpdates.insert(inputAttrPath);
+                            printInputAttrPath(*inputAttrPath));
+                    lockFlags.inputUpdates.insert(*inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
@@ -240,12 +243,12 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["lastModified"] = *lastModified;
             j["path"] = storePath;
             j["locks"] = lockedFlake.lockFile.toJSON().first;
-            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
+            if (auto fingerprint = lockedFlake.getFingerprint(*store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
             printJSON(j);
         } else {
             logger->cout(ANSI_BOLD "Resolved URL:" ANSI_NORMAL "  %s", flake.resolvedRef.to_string());
-            if (flake.lockedRef.input.isLocked())
+            if (flake.lockedRef.input.isLocked(fetchSettings))
                 logger->cout(ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s", flake.lockedRef.to_string());
             if (flake.description)
                 logger->cout(ANSI_BOLD "Description:" ANSI_NORMAL "   %s", *flake.description);
@@ -260,7 +263,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(
                     ANSI_BOLD "Last modified:" ANSI_NORMAL " %s",
                     std::put_time(std::localtime(&*lastModified), "%F %T"));
-            if (auto fingerprint = lockedFlake.getFingerprint(store, fetchSettings))
+            if (auto fingerprint = lockedFlake.getFingerprint(*store, fetchSettings))
                 logger->cout(
                     ANSI_BOLD "Fingerprint:" ANSI_NORMAL "   %s", fingerprint->to_string(HashFormat::Base16, false));
 
@@ -362,7 +365,7 @@ struct CmdFlakeCheck : FlakeCommand
                 throw;
             } catch (Error & e) {
                 if (settings.keepGoing) {
-                    ignoreExceptionExceptInterrupt();
+                    logError(e.info());
                     hasErrors = true;
                 } else
                     throw;
@@ -418,7 +421,7 @@ struct CmdFlakeCheck : FlakeCommand
             return std::nullopt;
         };
 
-        std::vector<DerivedPath> drvPaths;
+        std::map<DerivedPath, std::vector<AttrPath>> attrPathsByDrv;
 
         auto checkApp = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
             try {
@@ -616,7 +619,10 @@ struct CmdFlakeCheck : FlakeCommand
                                             .drvPath = makeConstantStorePathRef(*drvPath),
                                             .outputs = OutputsSpec::All{},
                                         };
-                                        drvPaths.push_back(std::move(path));
+
+                                        // Build and store the attribute path for error reporting
+                                        AttrPath attrPath{state->symbols.create(name), attr.name, attr2.name};
+                                        attrPathsByDrv[path].push_back(std::move(attrPath));
                                     }
                                 }
                             }
@@ -780,7 +786,9 @@ struct CmdFlakeCheck : FlakeCommand
             });
         }
 
-        if (build && !drvPaths.empty()) {
+        if (build && !attrPathsByDrv.empty()) {
+            auto keys = std::views::keys(attrPathsByDrv);
+            std::vector<DerivedPath> drvPaths(keys.begin(), keys.end());
             // TODO: This filtering of substitutable paths is a temporary workaround until
             // https://github.com/NixOS/nix/issues/5025 (union stores) is implemented.
             //
@@ -793,8 +801,6 @@ struct CmdFlakeCheck : FlakeCommand
             // via substitution, as `nix flake check` only needs to verify buildability,
             // not actually produce the outputs.
             auto missing = store->queryMissing(drvPaths);
-            // Only occurs if `drvPaths` contains a `DerivedPath::Opaque`, which should never happen
-            assert(missing.unknown.empty());
 
             std::vector<DerivedPath> toBuild;
             for (auto & path : missing.willBuild) {
@@ -806,10 +812,32 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            store->buildPaths(toBuild);
+            auto results = store->buildPathsWithResults(toBuild);
+
+            // Report build failures with attribute paths
+            for (auto & result : results) {
+                if (auto * failure = result.tryGetFailure()) {
+                    auto it = attrPathsByDrv.find(result.path);
+                    if (it != attrPathsByDrv.end() && !it->second.empty()) {
+                        for (auto & attrPath : it->second) {
+                            reportError(Error(
+                                "failed to build attribute '%s', build of '%s' failed: %s",
+                                attrPath.to_string(*state),
+                                result.path.to_string(*store),
+                                failure->errorMsg));
+                        }
+                    } else {
+                        // Derivation has no attribute path (e.g., a build dependency)
+                        reportError(
+                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->errorMsg));
+                    }
+                }
+            }
         }
         if (hasErrors)
             throw Error("some errors were encountered during the evaluation");
+
+        logger->log(lvlInfo, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
 
         if (!omittedSystems.empty()) {
             // TODO: empty system is not visible; render all as nix strings?
@@ -927,7 +955,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
                         from2,
                         st.typeString());
                 changedFiles.push_back(to2);
-                notice("wrote: %s", to2);
+                notice("wrote: %s", PathFmt(to2));
             }
         }(templateDir, flakeDir);
 
@@ -990,7 +1018,7 @@ struct CmdFlakeNew : CmdFlakeInitCommon
 
 struct CmdFlakeClone : FlakeCommand
 {
-    Path destDir;
+    std::filesystem::path destDir;
 
     std::string description() override
     {
@@ -1020,7 +1048,7 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(store).input.clone(destDir);
+        getFlakeRef().resolve(fetchSettings, *store).input.clone(fetchSettings, *store, destDir);
     }
 };
 
@@ -1071,7 +1099,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
                     std::optional<StorePath> storePath;
                     if (!(*inputNode)->lockedRef.input.isRelative()) {
                         storePath = dryRun ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                                           : (*inputNode)->lockedRef.input.fetchToStore(store).first;
+                                           : (*inputNode)->lockedRef.input.fetchToStore(fetchSettings, *store).first;
                         sources.insert(*storePath);
                     }
                     if (json) {
@@ -1143,7 +1171,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto flake = make_ref<LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
 
-        std::function<bool(eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const Symbol & attr)>
+        std::function<bool(eval_cache::AttrCursor & visitor, const AttrPath & attrPath, const Symbol & attr)>
             hasContent;
 
         // For frameworks it's important that structures are as lazy as possible
@@ -1152,11 +1180,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         // to emit more attributes than strictly (sic) necessary.
         // However, these attributes with empty values are not useful to the user
         // so we omit them.
-        hasContent =
-            [&](eval_cache::AttrCursor & visitor, const std::vector<Symbol> & attrPath, const Symbol & attr) -> bool {
+        hasContent = [&](eval_cache::AttrCursor & visitor, const AttrPath & attrPath, const Symbol & attr) -> bool {
             auto attrPath2(attrPath);
             attrPath2.push_back(attr);
-            auto attrPathS = state->symbols.resolve(attrPath2);
+            auto attrPathS = attrPath2.resolve(*state);
             const auto & attrName = state->symbols[attr];
 
             auto visitor2 = visitor.getAttr(attrName);
@@ -1196,20 +1223,20 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
         std::function<nlohmann::json(
             eval_cache::AttrCursor & visitor,
-            const std::vector<Symbol> & attrPath,
+            const AttrPath & attrPath,
             const std::string & headerPrefix,
             const std::string & nextPrefix)>
             visit;
 
         visit = [&](eval_cache::AttrCursor & visitor,
-                    const std::vector<Symbol> & attrPath,
+                    const AttrPath & attrPath,
                     const std::string & headerPrefix,
                     const std::string & nextPrefix) -> nlohmann::json {
             auto j = nlohmann::json::object();
 
-            auto attrPathS = state->symbols.resolve(attrPath);
+            auto attrPathS = attrPath.resolve(*state);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", concatStringsSep(".", attrPathS)));
+            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPath.to_string(*state)));
 
             try {
                 auto recurse = [&]() {
@@ -1288,15 +1315,16 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)",
                                     headerPrefix));
                         else {
-                            logger->warn(
-                                fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", attrPath.to_string(*state)));
                         }
                     } else {
                         try {
                             if (visitor.isDerivation())
                                 showDerivation();
-                            else
-                                throw Error("expected a derivation");
+                            else {
+                                auto name = visitor.getAttrPathStr(state->s.name);
+                                logger->warn(fmt("%s is not a derivation", name));
+                            }
                         } catch (IFDError & e) {
                             if (!json) {
                                 logger->cout(
@@ -1304,8 +1332,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                         headerPrefix));
                             } else {
                                 logger->warn(
-                                    fmt("%s omitted due to use of import from derivation",
-                                        concatStringsSep(".", attrPathS)));
+                                    fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                             }
                         }
                     }
@@ -1323,8 +1350,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL,
                                     headerPrefix));
                         } else {
-                            logger->warn(fmt(
-                                "%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                            logger->warn(
+                                fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                         }
                     }
                 }
@@ -1337,7 +1364,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             logger->cout(fmt(
                                 "%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--legacy' to show)", headerPrefix));
                         else {
-                            logger->warn(fmt("%s omitted (use '--legacy' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--legacy' to show)", attrPath.to_string(*state)));
                         }
                     } else if (!showAllSystems && std::string(attrPathS[1]) != localSystem) {
                         if (!json)
@@ -1345,8 +1372,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                 fmt("%s " ANSI_WARNING "omitted" ANSI_NORMAL " (use '--all-systems' to show)",
                                     headerPrefix));
                         else {
-                            logger->warn(
-                                fmt("%s omitted (use '--all-systems' to show)", concatStringsSep(".", attrPathS)));
+                            logger->warn(fmt("%s omitted (use '--all-systems' to show)", attrPath.to_string(*state)));
                         }
                     } else {
                         try {
@@ -1362,8 +1388,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                         headerPrefix));
                             } else {
                                 logger->warn(
-                                    fmt("%s omitted due to use of import from derivation",
-                                        concatStringsSep(".", attrPathS)));
+                                    fmt("%s omitted due to use of import from derivation", attrPath.to_string(*state)));
                             }
                         }
                     }
@@ -1467,8 +1492,8 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     void run(ref<Store> store) override
     {
         auto originalRef = getFlakeRef();
-        auto resolvedRef = originalRef.resolve(store);
-        auto [accessor, lockedRef] = resolvedRef.lazyFetch(store);
+        auto resolvedRef = originalRef.resolve(fetchSettings, *store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(getEvalState()->fetchSettings, *store);
         auto storePath =
             fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;

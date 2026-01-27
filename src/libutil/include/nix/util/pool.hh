@@ -211,6 +211,12 @@ public:
                 left.push_back(p);
         std::swap(state_->idle, left);
     }
+
+    std::vector<ref<R>> clear()
+    {
+        auto state_(state.lock());
+        return std::exchange(state_->idle, {});
+    }
 };
 
 } // namespace nix

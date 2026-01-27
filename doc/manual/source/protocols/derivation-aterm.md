@@ -1,6 +1,8 @@
 # Derivation "ATerm" file format
 
-For historical reasons, [store derivations][store derivation] are stored on-disk in [ATerm](https://homepages.cwi.nl/~daybuild/daily-books/technology/aterm-guide/aterm-guide.html) format.
+For historical reasons, [store derivations][store derivation] are stored on-disk in "Annotated Term" (ATerm) format
+([guide](https://homepages.cwi.nl/~daybuild/daily-books/technology/aterm-guide/aterm-guide.html),
+[paper](https://doi.org/10.1002/(SICI)1097-024X(200003)30:3%3C259::AID-SPE298%3E3.0.CO;2-Y)).
 
 ## The ATerm format used
 

@@ -1,11 +1,14 @@
 #include <fstream>
 
+#include <nlohmann/json.hpp>
+
 #include "nix_api_util.h"
 #include "nix_api_store.h"
 
 #include "nix/store/tests/nix_api_store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/tests/string_callback.hh"
+#include "nix/util/tests/test-data.hh"
 #include "nix/util/url.hh"
 
 #include "store-tests-config.hh"
@@ -92,6 +95,70 @@ TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
     nix_store_path_free(path);
 }
 
+// Verify it's 20 bytes
+static_assert(sizeof(nix_store_path_hash_part::bytes) == 20);
+static_assert(sizeof(nix_store_path_hash_part::bytes) == sizeof(nix_store_path_hash_part));
+
+TEST_F(nix_api_store_test, nix_store_path_hash)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    ASSERT_NE(path, nullptr);
+
+    nix_store_path_hash_part hash;
+    auto ret = nix_store_path_hash(ctx, path, &hash);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // The hash should be non-zero
+    bool allZero = true;
+    for (size_t i = 0; i < sizeof(hash.bytes); i++) {
+        if (hash.bytes[i] != 0) {
+            allZero = false;
+            break;
+        }
+    }
+    ASSERT_FALSE(allZero);
+
+    nix_store_path_free(path);
+}
+
+TEST_F(nix_api_store_test, nix_store_create_from_parts_roundtrip)
+{
+    // Parse a path
+    StorePath * original = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    EXPECT_NE(original, nullptr);
+
+    // Get its hash
+    nix_store_path_hash_part hash;
+    auto ret = nix_store_path_hash(ctx, original, &hash);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // Get its name
+    std::string name;
+    nix_store_path_name(original, OBSERVE_STRING(name));
+
+    // Reconstruct from parts
+    StorePath * reconstructed = nix_store_create_from_parts(ctx, &hash, name.c_str(), name.size());
+    assert_ctx_ok();
+    ASSERT_NE(reconstructed, nullptr);
+
+    // Should be equal
+    EXPECT_EQ(original->path, reconstructed->path);
+
+    nix_store_path_free(original);
+    nix_store_path_free(reconstructed);
+}
+
+TEST_F(nix_api_store_test, nix_store_create_from_parts_invalid_name)
+{
+    nix_store_path_hash_part hash = {};
+    // Invalid name with spaces
+    StorePath * path = nix_store_create_from_parts(ctx, &hash, "invalid name", 12);
+    ASSERT_EQ(path, nullptr);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR);
+}
+
 TEST_F(nix_api_store_test, get_version)
 {
     std::string str;
@@ -146,9 +213,9 @@ TEST_F(nix_api_store_test, nix_store_real_path)
 TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 {
     auto tmp = nix::createTempDir();
-    std::string storeRoot = tmp + "/store";
-    std::string stateDir = tmp + "/state";
-    std::string logDir = tmp + "/log";
+    auto storeRoot = (tmp / "store").string();
+    auto stateDir = (tmp / "state").string();
+    auto logDir = (tmp / "log").string();
     const char * rootkv[] = {"root", storeRoot.c_str()};
     const char * statekv[] = {"state", stateDir.c_str()};
     const char * logkv[] = {"log", logDir.c_str()};
@@ -184,7 +251,8 @@ TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 
 TEST_F(nix_api_util_context, nix_store_real_path_binary_cache)
 {
-    Store * store = nix_store_open(ctx, nix::fmt("file://%s/binary-cache", nix::createTempDir()).c_str(), nullptr);
+    Store * store =
+        nix_store_open(ctx, nix::fmt("file://%s/binary-cache", nix::createTempDir().string()).c_str(), nullptr);
     assert_ctx_ok();
     ASSERT_NE(store, nullptr);
 
@@ -235,7 +303,7 @@ public:
 
         store = open_local_store();
 
-        std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+        std::filesystem::path unitTestData = nix::getUnitTestData();
         std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
         std::stringstream buffer;
         buffer << t.rdbuf();
@@ -290,7 +358,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
 
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
@@ -337,7 +405,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -382,7 +450,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -427,7 +495,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 
     auto * store = open_local_store();
 
-    std::filesystem::path unitTestData{getenv("_NIX_TEST_UNIT_DATA")};
+    std::filesystem::path unitTestData = nix::getUnitTestData();
     std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
     std::stringstream buffer;
     buffer << t.rdbuf();
@@ -636,7 +704,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     auto outj_ph = nix::hashPlaceholder("outj");
 
     std::string drvJson = R"({
-        "version": 3,
+        "version": 4,
         "name": "multi-output-test",
         "system": ")" + nix::settings.thisSystem.get()
                           + R"(",
@@ -668,8 +736,10 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
             "outa": ")" + outa_ph
                           + R"("
         },
-        "inputDrvs": {},
-        "inputSrcs": [],
+        "inputs": {
+          "drvs": {},
+          "srcs": []
+        },
         "outputs": {
             "outd": { "hashAlgo": "sha256", "method": "nar" },
             "outf": { "hashAlgo": "sha256", "method": "nar" },
@@ -791,6 +861,99 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_get_fs_closure_error_propagati
     // Should have aborted with error
     ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
     ASSERT_EQ(call_count, 1); // Should have been called exactly once, then aborted
+}
+
+/**
+ * @brief Helper function to load JSON from a test data file
+ *
+ * @param filename Relative path from _NIX_TEST_UNIT_DATA
+ * @return JSON string contents of the file
+ */
+static std::string load_json_from_test_data(const char * filename)
+{
+    std::filesystem::path unitTestData = nix::getUnitTestData();
+    std::ifstream t{unitTestData / filename};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+    return buffer.str();
+}
+
+TEST_F(nix_api_store_test, nix_derivation_to_json_roundtrip)
+{
+    // Load JSON from test data
+    auto originalJson = load_json_from_test_data("derivation/invariants/filled-in-deferred-empty-env-var-pre.json");
+
+    // Parse to derivation
+    auto * drv = nix_derivation_from_json(ctx, store, originalJson.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    // Convert back to JSON
+    std::string convertedJson;
+    auto ret = nix_derivation_to_json(ctx, drv, OBSERVE_STRING(convertedJson));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_FALSE(convertedJson.empty());
+
+    // Parse both JSON strings to compare (ignoring whitespace differences)
+    auto originalParsed = nlohmann::json::parse(originalJson);
+    auto convertedParsed = nlohmann::json::parse(convertedJson);
+
+    // Remove parts that will be different due to filling-in.
+    originalParsed.at("outputs").erase("out");
+    originalParsed.at("env").erase("out");
+    convertedParsed.at("outputs").erase("out");
+    convertedParsed.at("env").erase("out");
+
+    // They should be equivalent
+    ASSERT_EQ(originalParsed, convertedParsed);
+
+    nix_derivation_free(drv);
+}
+
+TEST_F(nix_api_store_test, nix_derivation_store_round_trip)
+{
+    // Load a derivation from JSON
+    auto json = load_json_from_test_data("derivation/invariants/filled-in-deferred-empty-env-var-pre.json");
+    auto * drv = nix_derivation_from_json(ctx, store, json.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    // Add to store
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drvPath, nullptr);
+
+    // Retrieve from store
+    auto * drv2 = nix_store_drv_from_store_path(ctx, store, drvPath);
+    assert_ctx_ok();
+    ASSERT_NE(drv2, nullptr);
+
+    // The round trip should make the same derivation
+    ASSERT_EQ(drv->drv, drv2->drv);
+
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_derivation_free(drv2);
+}
+
+TEST_F(nix_api_store_test, nix_derivation_clone)
+{
+    // Load a derivation from JSON
+    auto json = load_json_from_test_data("derivation/invariants/filled-in-deferred-empty-env-var-pre.json");
+    auto * drv = nix_derivation_from_json(ctx, store, json.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    // Clone the derivation
+    auto * drv2 = nix_derivation_clone(drv);
+    ASSERT_NE(drv2, nullptr);
+
+    // The clone should be equal
+    ASSERT_EQ(drv->drv, drv2->drv);
+
+    nix_derivation_free(drv);
+    nix_derivation_free(drv2);
 }
 
 } // namespace nixC

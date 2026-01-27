@@ -5,6 +5,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/os-string.hh"
+#include "nix/util/json-non-null.hh"
 
 namespace nix {
 
@@ -52,5 +53,9 @@ struct PathViewNG : OsStringView
 std::optional<std::filesystem::path> maybePath(PathView path);
 
 std::filesystem::path pathNG(PathView path);
+
+template<>
+struct json_avoids_null<std::filesystem::path> : std::true_type
+{};
 
 } // namespace nix

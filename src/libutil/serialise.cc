@@ -1,6 +1,8 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/socket.hh"
 #include "nix/util/util.hh"
 
 #include <cstring>
@@ -11,8 +13,6 @@
 
 #ifdef _WIN32
 #  include <fileapi.h>
-#  include <winsock2.h>
-#  include "nix/util/windows-error.hh"
 #else
 #  include <poll.h>
 #endif
@@ -124,7 +124,7 @@ void Source::skip(size_t len)
 size_t BufferedSource::read(char * data, size_t len)
 {
     if (!buffer)
-        buffer = decltype(buffer)(new char[bufSize]);
+        buffer = std::make_unique_for_overwrite<char[]>(bufSize);
 
     if (!bufPosIn)
         bufPosIn = readUnbuffered(buffer.get(), bufSize);
@@ -136,6 +136,51 @@ size_t BufferedSource::read(char * data, size_t len)
     if (bufPosIn == bufPosOut)
         bufPosIn = bufPosOut = 0;
     return n;
+}
+
+std::string BufferedSource::readLine(bool eofOk)
+{
+    if (!buffer)
+        buffer = std::make_unique_for_overwrite<char[]>(bufSize);
+
+    std::string line;
+    while (true) {
+        if (bufPosOut < bufPosIn) {
+            auto * start = buffer.get() + bufPosOut;
+            auto * end = buffer.get() + bufPosIn;
+            if (auto * newline = static_cast<char *>(memchr(start, '\n', end - start))) {
+                line.append(start, newline - start);
+                bufPosOut = (newline - buffer.get()) + 1;
+                if (bufPosOut == bufPosIn)
+                    bufPosOut = bufPosIn = 0;
+                return line;
+            }
+
+            line.append(start, end - start);
+            bufPosOut = bufPosIn = 0;
+        }
+
+        auto handleEof = [&]() -> std::string {
+            bufPosOut = bufPosIn = 0;
+            if (eofOk)
+                return line;
+            throw EndOfFile("unexpected EOF reading a line");
+        };
+
+        size_t n = 0;
+        try {
+            n = readUnbuffered(buffer.get(), bufSize);
+        } catch (EndOfFile & e) {
+            return handleEof();
+        }
+
+        if (n == 0) {
+            return handleEof();
+        }
+
+        bufPosIn = n;
+        bufPosOut = 0;
+    }
 }
 
 bool BufferedSource::hasData()
@@ -162,11 +207,11 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
         _good = false;
         throw SysError("reading from file");
     }
+#endif
     if (n == 0) {
         _good = false;
         throw EndOfFile(std::string(*endOfFileError));
     }
-#endif
     read += n;
     return n;
 }
@@ -184,21 +229,31 @@ bool FdSource::hasData()
     while (true) {
         fd_set fds;
         FD_ZERO(&fds);
-        int fd_ = fromDescriptorReadOnly(fd);
-        FD_SET(fd_, &fds);
+        Socket sock = toSocket(fd);
+        FD_SET(sock, &fds);
 
         struct timeval timeout;
         timeout.tv_sec = 0;
         timeout.tv_usec = 0;
 
-        auto n = select(fd_ + 1, &fds, nullptr, nullptr, &timeout);
+        auto n = select(sock + 1, &fds, nullptr, nullptr, &timeout);
         if (n < 0) {
             if (errno == EINTR)
                 continue;
             throw SysError("polling file descriptor");
         }
-        return FD_ISSET(fd, &fds);
+        return FD_ISSET(sock, &fds);
     }
+}
+
+void FdSource::restart()
+{
+    if (!isSeekable)
+        throw Error("can't seek to the start of a file");
+    buffer.reset();
+    read = bufPosIn = bufPosOut = 0;
+    if (lseek(fd, 0, SEEK_SET) == -1)
+        throw SysError("seeking to the start of a file");
 }
 
 void FdSource::skip(size_t len)
@@ -253,7 +308,7 @@ void StringSource::skip(size_t len)
     pos += len;
 }
 
-CompressedSource::CompressedSource(RestartableSource & source, const std::string & compressionMethod)
+CompressedSource::CompressedSource(RestartableSource & source, CompressionAlgo compressionMethod)
     : compressedData([&]() {
         StringSink sink;
         auto compressionSink = makeCompressionSink(compressionMethod, sink);
@@ -357,7 +412,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
             }
 
             if (cur.empty()) {
-                if (hasCoro) {
+                if (hasCoro && *coro) {
                     (*coro)();
                 }
                 if (*coro) {
@@ -371,6 +426,16 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
 
             size_t n = cur.copy(data, len);
             cur.remove_prefix(n);
+
+            /* This is necessary to ensure that the coroutine gets resumed
+               after the consumer has finished reading the Source. Otherwise the
+               coroutine is always abandoned (i.e. it is always destroyed when
+               suspended). */
+            if (cur.empty() && coro && *coro) {
+                (*coro)();
+                if (*coro)
+                    cur = coro->get();
+            }
 
             return n;
         }
@@ -525,43 +590,6 @@ size_t ChainSource::read(char * data, size_t len)
             return this->read(data, len);
         }
     }
-}
-
-std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory)
-{
-    struct RestartableSourceImpl : RestartableSource
-    {
-        RestartableSourceImpl(decltype(factory) factory_)
-            : factory_(std::move(factory_))
-            , impl(this->factory_())
-        {
-        }
-
-        decltype(factory) factory_;
-        std::unique_ptr<Source> impl = factory_();
-
-        size_t read(char * data, size_t len) override
-        {
-            return impl->read(data, len);
-        }
-
-        bool good() override
-        {
-            return impl->good();
-        }
-
-        void skip(size_t len) override
-        {
-            return impl->skip(len);
-        }
-
-        void restart() override
-        {
-            impl = factory_();
-        }
-    };
-
-    return std::make_unique<RestartableSourceImpl>(std::move(factory));
 }
 
 } // namespace nix

@@ -1,9 +1,26 @@
+{ nixComponents, ... }:
 {
   name = "fetchers-substitute";
 
   nodes.substituter =
     { pkgs, ... }:
     {
+      # nix-serve is broken while cross-compiling in nixpkgs 25.11. It's been
+      # fixed since, but while we're pinning 25.11 we use this workaround.
+      nixpkgs.overlays = [
+        (final: prev: {
+          nix-serve =
+            final.lib.warnIf (final.lib.versions.majorMinor final.lib.version != "25.11")
+              "remove the hack in fetchers-substitute.nix when updating nixpkgs from 25.11"
+              (
+                prev.nix-serve.override {
+                  nix = prev.nix // {
+                    libs.nix-perl-bindings = nixComponents.nix-perl-bindings;
+                  };
+                }
+              );
+        })
+      ];
       virtualisation.writableStore = true;
 
       nix.settings.extra-experimental-features = [
@@ -47,6 +64,7 @@
     { nodes }: # python
     ''
       import json
+      import os
 
       start_all()
 
@@ -117,10 +135,10 @@
       tarball_store_path = json.loads(tarball_store_path_json)
 
       # Get the NAR hash of the unpacked tarball in SRI format
-      path_info_json = substituter.succeed(f"nix path-info --json {tarball_store_path}").strip()
-      path_info_dict = json.loads(path_info_json)
-      # nix path-info returns a dict with store paths as keys
-      tarball_hash_sri = path_info_dict[tarball_store_path]["narHash"]
+      path_info_json = substituter.succeed(f"nix path-info --json-format 2 --json {tarball_store_path}").strip()
+      path_info_dict = json.loads(path_info_json)["info"]
+      # narHash is already in SRI format
+      tarball_hash_sri = path_info_dict[os.path.basename(tarball_store_path)]["narHash"]
       print(f"Tarball NAR hash (SRI): {tarball_hash_sri}")
 
       # Also get the old format hash for fetchTarball (which uses sha256 parameter)

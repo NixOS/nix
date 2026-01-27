@@ -1,7 +1,9 @@
 #include "nix/util/serialise.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/gc-store.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/archive.hh"
@@ -45,6 +47,46 @@ void WorkerProto::Serialise<BuildMode>::write(
     default:
         assert(false);
     };
+}
+
+GCAction WorkerProto::Serialise<GCAction>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto temp = readNum<unsigned>(conn.from);
+    using enum GCAction;
+    switch (temp) {
+    case 0:
+        return gcReturnLive;
+    case 1:
+        return gcReturnDead;
+    case 2:
+        return gcDeleteDead;
+    case 3:
+        return gcDeleteSpecific;
+    default:
+        throw Error("Invalid GC action");
+    }
+}
+
+void WorkerProto::Serialise<GCAction>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const GCAction & action)
+{
+    using enum GCAction;
+    switch (action) {
+    case gcReturnLive:
+        conn.to << unsigned{0};
+        break;
+    case gcReturnDead:
+        conn.to << unsigned{1};
+        break;
+    case gcDeleteDead:
+        conn.to << unsigned{2};
+        break;
+    case gcDeleteSpecific:
+        conn.to << unsigned{3};
+        break;
+    default:
+        assert(false);
+    }
 }
 
 std::optional<TrustedFlag>
@@ -168,7 +210,7 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
     BuildResult::Success success;
     BuildResult::Failure failure;
 
-    auto rawStatus = readInt(conn.from);
+    auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, {conn.from});
     conn.from >> failure.errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
@@ -184,13 +226,18 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
             success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
 
-    if (BuildResult::Success::statusIs(rawStatus)) {
-        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
-        res.inner = std::move(success);
-    } else {
-        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
-        res.inner = std::move(failure);
-    }
+    res.inner = std::visit(
+        overloaded{
+            [&](BuildResult::Success::Status s) -> decltype(res.inner) {
+                success.status = s;
+                return std::move(success);
+            },
+            [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
+                failure.status = s;
+                return std::move(failure);
+            },
+        },
+        status);
 
     return res;
 }
@@ -222,11 +269,11 @@ void WorkerProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                conn.to << failure.status;
+                WorkerProto::write(store, {conn.to}, BuildResultStatus{failure.status});
                 common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                conn.to << success.status;
+                WorkerProto::write(store, {conn.to}, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },
@@ -253,13 +300,13 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
 {
     auto deriver = WorkerProto::Serialise<std::optional<StorePath>>::read(store, conn);
     auto narHash = Hash::parseAny(readString(conn.from), HashAlgorithm::SHA256);
-    UnkeyedValidPathInfo info(narHash);
+    UnkeyedValidPathInfo info(store, narHash);
     info.deriver = std::move(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
         conn.from >> info.ultimate;
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
     return info;
@@ -273,7 +320,9 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     WorkerProto::write(store, conn, pathInfo.references);
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
     if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
-        conn.to << pathInfo.ultimate << pathInfo.sigs << renderContentAddress(pathInfo.ca);
+        conn.to << pathInfo.ultimate;
+        WorkerProto::write(store, conn, pathInfo.sigs);
+        conn.to << renderContentAddress(pathInfo.ca);
     }
 }
 

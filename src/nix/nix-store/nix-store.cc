@@ -15,6 +15,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
+#include "nix/util/strings.hh"
 
 #include "man-pages.hh"
 
@@ -503,7 +504,8 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 args.insert(p);
 
         StorePathSet referrers;
-        store->computeFSClosure(args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
+        auto & gcSettings = settings.getGCSettings();
+        store->computeFSClosure(args, referrers, true, gcSettings.keepOutputs, gcSettings.keepDerivations);
 
         auto & gcStore = require<GcStore>(*store);
         Roots roots = gcStore.findRoots(false);
@@ -534,17 +536,9 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     for (auto & i : drv.env)
         logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
 
-    /* Also output the arguments.  This doesn't preserve whitespace in
-       arguments. */
-    cout << "export _args; _args='";
-    bool first = true;
-    for (auto & i : drv.args) {
-        if (!first)
-            cout << ' ';
-        first = false;
-        cout << escapeShellArgAlways(i);
-    }
-    cout << "'\n";
+    /* Also output the arguments. */
+    std::string argsStr = concatStringsSep(" ", drv.args);
+    cout << "export _args; _args=" << escapeShellArgAlways(argsStr) << "\n";
 }
 
 static void opReadLog(Strings opFlags, Strings opArgs)
@@ -909,7 +903,7 @@ static void opServe(Strings opFlags, Strings opArgs)
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
         verbosity = lvlError;
-        settings.keepLog = false;
+        settings.getLogFileSettings().keepLog = false;
         settings.useSubstitutes = false;
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
@@ -1057,13 +1051,16 @@ static void opServe(Strings opFlags, Strings opArgs)
             auto deriver = readString(in);
             ValidPathInfo info{
                 store->parseStorePath(path),
-                Hash::parseAny(readString(in), HashAlgorithm::SHA256),
+                {
+                    *store,
+                    Hash::parseAny(readString(in), HashAlgorithm::SHA256),
+                },
             };
             if (deriver != "")
                 info.deriver = store->parseStorePath(deriver);
             info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
             in >> info.registrationTime >> info.narSize >> info.ultimate;
-            info.sigs = readStrings<StringSet>(in);
+            info.sigs = ServeProto::Serialise<std::set<Signature>>::read(*store, rconn);
             info.ca = ContentAddress::parseOpt(readString(in));
 
             if (info.narSize == 0)

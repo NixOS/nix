@@ -62,9 +62,147 @@ const uint32_t maxIdsPerBuild =
 #endif
     ;
 
-class Settings : public Config
+struct GCSettings : public virtual Config
 {
+    Setting<off_t> reservedSize{
+        this,
+        8 * 1024 * 1024,
+        "gc-reserved-space",
+        "Amount of reserved disk space for the garbage collector.",
+    };
 
+    Setting<bool> keepOutputs{
+        this,
+        false,
+        "keep-outputs",
+        R"(
+          If `true`, the garbage collector keeps the outputs of
+          non-garbage derivations. If `false` (default), outputs are
+          deleted unless they are GC roots themselves (or reachable from other
+          roots).
+
+          In general, outputs must be registered as roots separately. However,
+          even if the output of a derivation is registered as a root, the
+          collector still deletes store paths that are used only at build
+          time (e.g., the C compiler, or source tarballs downloaded from the
+          network). To prevent it from doing so, set this option to `true`.
+        )",
+        {"gc-keep-outputs"},
+    };
+
+    Setting<bool> keepDerivations{
+        this,
+        true,
+        "keep-derivations",
+        R"(
+          If `true` (default), the garbage collector keeps the derivations
+          from which non-garbage store paths were built. If `false`, they are
+          deleted unless explicitly registered as a root (or reachable from
+          other roots).
+
+          Keeping derivation around is useful for querying and traceability
+          (e.g., it allows you to ask with what dependencies or options a
+          store path was built), so by default this option is on. Turn it off
+          to save a bit of disk space (or a lot if `keep-outputs` is also
+          turned on).
+        )",
+        {"gc-keep-derivations"},
+    };
+
+    Setting<uint64_t> minFree{
+        this,
+        0,
+        "min-free",
+        R"(
+          When free disk space in `/nix/store` drops below `min-free` during a
+          build, Nix performs a garbage-collection until `max-free` bytes are
+          available or there is no more garbage. A value of `0` (the default)
+          disables this feature.
+        )",
+    };
+
+    // n.b. this is deliberately int64 max rather than uint64 max because
+    // this goes through the Nix language JSON parser and thus needs to be
+    // representable in Nix language integers.
+    Setting<uint64_t> maxFree{
+        this,
+        std::numeric_limits<int64_t>::max(),
+        "max-free",
+        R"(
+          When a garbage collection is triggered by the `min-free` option, it
+          stops as soon as `max-free` bytes are available. The default is
+          infinity (i.e. delete all garbage).
+        )",
+    };
+
+    Setting<uint64_t> minFreeCheckInterval{
+        this,
+        5,
+        "min-free-check-interval",
+        "Number of seconds between checking free disk space.",
+    };
+};
+
+struct LogFileSettings : public virtual Config
+{
+    /**
+     * The directory where we log various operations.
+     */
+    const Path nixLogDir;
+
+protected:
+    LogFileSettings();
+
+public:
+    Setting<bool> keepLog{
+        this,
+        true,
+        "keep-build-log",
+        R"(
+          If set to `true` (the default), Nix writes the build log of a
+          derivation (i.e. the standard output and error of its builder) to
+          the directory `/nix/var/log/nix/drvs`. The build log can be
+          retrieved using the command `nix-store -l path`.
+        )",
+        {"build-keep-log"}};
+
+    Setting<bool> compressLog{
+        this,
+        true,
+        "compress-build-log",
+        R"(
+          If set to `true` (the default), build logs written to
+          `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
+          Otherwise, they are not compressed.
+        )",
+        {"build-compress-log"}};
+};
+
+struct AutoAllocateUidSettings : public virtual Config
+{
+    Setting<uint32_t> startId{
+        this,
+#ifdef __linux__
+        0x34000000,
+#else
+        56930,
+#endif
+        "start-id",
+        "The first UID and GID to use for dynamic ID allocation."};
+
+    Setting<uint32_t> uidCount{
+        this,
+#ifdef __linux__
+        maxIdsPerBuild * 128,
+#else
+        128,
+#endif
+        "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+};
+
+class Settings : public virtual Config, private AutoAllocateUidSettings, private GCSettings, private LogFileSettings
+{
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -77,21 +215,47 @@ public:
 
     Settings();
 
-    static unsigned int getDefaultCores();
+    /**
+     * Get the GC settings.
+     */
+    GCSettings & getGCSettings()
+    {
+        return *this;
+    }
 
-    Path nixPrefix;
+    const GCSettings & getGCSettings() const
+    {
+        return *this;
+    }
+
+    /**
+     * Get the log file settings.
+     */
+    LogFileSettings & getLogFileSettings()
+    {
+        return *this;
+    }
+
+    const LogFileSettings & getLogFileSettings() const
+    {
+        return *this;
+    }
+
+    /**
+     * Get AutoAllocateUidSettings if auto-allocate-uids is enabled.
+     * @return Pointer to settings if enabled, nullptr otherwise.
+     */
+    const AutoAllocateUidSettings * getAutoAllocateUidSettings() const
+    {
+        return autoAllocateUids ? this : nullptr;
+    }
+
+    static unsigned int getDefaultCores();
 
     /**
      * The directory where we store sources and derived files.
      */
     Path nixStore;
-
-    Path nixDataDir; /* !!! fix */
-
-    /**
-     * The directory where we log various operations.
-     */
-    Path nixLogDir;
 
     /**
      * The directory where state is stored.
@@ -101,7 +265,7 @@ public:
     /**
      * The directory where system configuration files are stored.
      */
-    Path nixConfDir;
+    std::filesystem::path nixConfDir;
 
     /**
      * A list of user configuration files to load.
@@ -189,7 +353,7 @@ public:
         0,
         "cores",
         R"(
-          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/language/derivations.md#builder-execution) of a derivation.
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/store/building.md#builder-execution) of a derivation.
           The `builder` executable can use this variable to control its own maximum amount of parallelism.
 
           <!--
@@ -292,7 +456,7 @@ public:
 
     Setting<std::string> builders{
         this,
-        "@" + nixConfDir + "/machines",
+        "@" + nixConfDir.string() + "/machines",
         "builders",
         R"(
           A semicolon- or newline-separated list of build machines.
@@ -431,9 +595,6 @@ public:
           This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
         )"};
 
-    Setting<off_t> reservedSize{
-        this, 8 * 1024 * 1024, "gc-reserved-space", "Amount of reserved disk space for the garbage collector."};
-
     Setting<bool> fsyncMetadata{
         this,
         true,
@@ -528,26 +689,6 @@ public:
         true,
         Xp::AutoAllocateUids};
 
-    Setting<uint32_t> startId{
-        this,
-#ifdef __linux__
-        0x34000000,
-#else
-        56930,
-#endif
-        "start-id",
-        "The first UID and GID to use for dynamic ID allocation."};
-
-    Setting<uint32_t> uidCount{
-        this,
-#ifdef __linux__
-        maxIdsPerBuild * 128,
-#else
-        128,
-#endif
-        "id-count",
-        "The number of UIDs/GIDs to use for dynamic ID allocation."};
-
 #ifdef __linux__
     Setting<bool> useCgroups{
         this,
@@ -569,29 +710,6 @@ public:
         "Whether to impersonate a Linux 2.6 machine on newer kernels.",
         {"build-impersonate-linux-26"}};
 
-    Setting<bool> keepLog{
-        this,
-        true,
-        "keep-build-log",
-        R"(
-          If set to `true` (the default), Nix writes the build log of a
-          derivation (i.e. the standard output and error of its builder) to
-          the directory `/nix/var/log/nix/drvs`. The build log can be
-          retrieved using the command `nix-store -l path`.
-        )",
-        {"build-keep-log"}};
-
-    Setting<bool> compressLog{
-        this,
-        true,
-        "compress-build-log",
-        R"(
-          If set to `true` (the default), build logs written to
-          `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
-          Otherwise, they are not compressed.
-        )",
-        {"build-compress-log"}};
-
     Setting<unsigned long> maxLogSize{
         this,
         0,
@@ -604,42 +722,6 @@ public:
         {"build-max-log-size"}};
 
     Setting<unsigned int> pollInterval{this, 5, "build-poll-interval", "How often (in seconds) to poll for locks."};
-
-    Setting<bool> gcKeepOutputs{
-        this,
-        false,
-        "keep-outputs",
-        R"(
-          If `true`, the garbage collector keeps the outputs of
-          non-garbage derivations. If `false` (default), outputs are
-          deleted unless they are GC roots themselves (or reachable from other
-          roots).
-
-          In general, outputs must be registered as roots separately. However,
-          even if the output of a derivation is registered as a root, the
-          collector still deletes store paths that are used only at build
-          time (e.g., the C compiler, or source tarballs downloaded from the
-          network). To prevent it from doing so, set this option to `true`.
-        )",
-        {"gc-keep-outputs"}};
-
-    Setting<bool> gcKeepDerivations{
-        this,
-        true,
-        "keep-derivations",
-        R"(
-          If `true` (default), the garbage collector keeps the derivations
-          from which non-garbage store paths were built. If `false`, they are
-          deleted unless explicitly registered as a root (or reachable from
-          other roots).
-
-          Keeping derivation around is useful for querying and traceability
-          (e.g., it allows you to ask with what dependencies or options a
-          store path was built), so by default this option is on. Turn it off
-          to save a bit of disk space (or a lot if `keep-outputs` is also
-          turned on).
-        )",
-        {"gc-keep-derivations"}};
 
     Setting<bool> autoOptimiseStore{
         this,
@@ -794,6 +876,8 @@ public:
         "build-dir",
         R"(
             Override the `build-dir` store setting for all stores that have this setting.
+
+            See also the per-store [`build-dir`](@docroot@/store/types/local-store.md#store-local-store-build-dir) setting.
         )"};
 
     Setting<PathSet> allowedImpureHostPrefixes{
@@ -821,6 +905,8 @@ public:
           `nix.conf` configuration file, and cannot be passed at the command
           line.
         )"};
+
+private:
 
     OptionalPathSetting diffHook{
         this,
@@ -853,6 +939,16 @@ public:
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.
         )"};
+
+public:
+
+    const Path * getDiffHook() const
+    {
+        if (!runDiffHook.get()) {
+            return nullptr;
+        }
+        return get(diffHook.get());
+    }
 
     Setting<Strings> trustedPublicKeys{
         this,
@@ -1123,11 +1219,11 @@ public:
               character.
 
               Example:
-              `/nix/store/zf5lbh336mnzf1nlswdn11g4n2m8zh3g-bash-4.4-p23-dev
-              /nix/store/rjxwxwv1fpn9wa2x5ssk5phzwlcv4mna-bash-4.4-p23-doc
-              /nix/store/6bqvbzjkcp9695dq0dpl5y43nvy37pq1-bash-4.4-p23-info
-              /nix/store/r7fng3kk3vlpdlh2idnrbn37vh4imlj2-bash-4.4-p23-man
-              /nix/store/xfghy8ixrhz3kyy6p724iv3cxji088dx-bash-4.4-p23`.
+              `/nix/store/l88brggg9hpy96ijds34dlq4n8fan63g-bash-4.4-p23-dev
+              /nix/store/vch71bhyi5akr5zs40k8h2wqxx69j80l-bash-4.4-p23-doc
+              /nix/store/c5cxjywi66iwn9dcx5yvwjkvl559ay6p-bash-4.4-p23-info
+              /nix/store/scz72lskj03ihkcn42ias5mlp4i4gr1k-bash-4.4-p23-man
+              /nix/store/a724znygmd1cac856j3gfsyvih3lw07j-bash-4.4-p23`.
         )"};
 
     Setting<unsigned int> downloadSpeed{
@@ -1141,7 +1237,7 @@ public:
 
     Setting<std::string> netrcFile{
         this,
-        fmt("%s/%s", nixConfDir, "netrc"),
+        (nixConfDir / "netrc").string(),
         "netrc-file",
         R"(
           If set to an absolute path to a `netrc` file, Nix uses the HTTP
@@ -1253,32 +1349,6 @@ public:
           `http://tarballs.nixos.org/sha256/2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae`
           first. If it is not available there, it tries the original URI.
         )"};
-
-    Setting<uint64_t> minFree{
-        this,
-        0,
-        "min-free",
-        R"(
-          When free disk space in `/nix/store` drops below `min-free` during a
-          build, Nix performs a garbage-collection until `max-free` bytes are
-          available or there is no more garbage. A value of `0` (the default)
-          disables this feature.
-        )"};
-
-    Setting<uint64_t> maxFree{// n.b. this is deliberately int64 max rather than uint64 max because
-                              // this goes through the Nix language JSON parser and thus needs to be
-                              // representable in Nix language integers.
-                              this,
-                              std::numeric_limits<int64_t>::max(),
-                              "max-free",
-                              R"(
-          When a garbage collection is triggered by the `min-free` option, it
-          stops as soon as `max-free` bytes are available. The default is
-          infinity (i.e. delete all garbage).
-        )"};
-
-    Setting<uint64_t> minFreeCheckInterval{
-        this, 5, "min-free-check-interval", "Number of seconds between checking free disk space."};
 
     Setting<size_t> narBufferSize{
         this, 32 * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};

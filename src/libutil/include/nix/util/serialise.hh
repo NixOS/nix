@@ -4,6 +4,7 @@
 #include <memory>
 #include <type_traits>
 
+#include "nix/util/compression-algo.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
@@ -105,7 +106,7 @@ struct Source
  * A buffered abstract source. Warning: a BufferedSource should not be
  * used from multiple threads concurrently.
  */
-struct BufferedSource : Source
+struct BufferedSource : virtual Source
 {
     size_t bufSize, bufPosIn, bufPosOut;
     std::unique_ptr<char[]> buffer;
@@ -120,6 +121,8 @@ struct BufferedSource : Source
 
     size_t read(char * data, size_t len) override;
 
+    std::string readLine(bool eofOk = false);
+
     /**
      * Return true if the buffer is not empty.
      */
@@ -130,6 +133,14 @@ protected:
      * Underlying read call, to be overridden.
      */
     virtual size_t readUnbuffered(char * data, size_t len) = 0;
+};
+
+/**
+ * Source type that can be restarted.
+ */
+struct RestartableSource : virtual Source
+{
+    virtual void restart() = 0;
 };
 
 /**
@@ -151,6 +162,8 @@ struct FdSink : BufferedSink
     }
 
     FdSink(FdSink &&) = default;
+    FdSink(const FdSink &) = delete;
+    FdSink & operator=(const FdSink &) = delete;
 
     FdSink & operator=(FdSink && s)
     {
@@ -174,7 +187,7 @@ private:
 /**
  * A source that reads data from a file descriptor.
  */
-struct FdSource : BufferedSource
+struct FdSource : BufferedSource, RestartableSource
 {
     Descriptor fd;
     size_t read = 0;
@@ -192,10 +205,13 @@ struct FdSource : BufferedSource
     }
 
     FdSource(FdSource &&) = default;
-
     FdSource & operator=(FdSource && s) = default;
+    FdSource(const FdSource &) = delete;
+    FdSource & operator=(const FdSource & s) = delete;
+    ~FdSource() = default;
 
     bool good() override;
+    void restart() override;
 
     /**
      * Return true if the buffer is not empty after a non-blocking
@@ -228,14 +244,6 @@ struct StringSink : Sink
     StringSink(std::string && s)
         : s(std::move(s)) {};
     void operator()(std::string_view data) override;
-};
-
-/**
- * Source type that can be restarted.
- */
-struct RestartableSource : Source
-{
-    virtual void restart() = 0;
 };
 
 /**
@@ -283,7 +291,7 @@ struct CompressedSource : RestartableSource
 {
 private:
     std::string compressedData;
-    std::string compressionMethod;
+    CompressionAlgo compressionMethod;
     StringSource stringSource;
 
 public:
@@ -291,9 +299,9 @@ public:
      * Compress a RestartableSource using the specified compression method.
      *
      * @param source The source data to compress
-     * @param compressionMethod The compression method to use (e.g., "xz", "br")
+     * @param compressionMethod The compression method to use
      */
-    CompressedSource(RestartableSource & source, const std::string & compressionMethod);
+    CompressedSource(RestartableSource & source, CompressionAlgo compressionMethod);
 
     size_t read(char * data, size_t len) override
     {
@@ -309,21 +317,7 @@ public:
     {
         return compressedData.size();
     }
-
-    std::string_view getCompressionMethod() const
-    {
-        return compressionMethod;
-    }
 };
-
-/**
- * Create a restartable Source from a factory function.
- *
- * @param factory Factory function that returns a fresh instance of the Source. Gets
- * called for each source restart.
- * @pre factory must return an equivalent source for each invocation.
- */
-std::unique_ptr<RestartableSource> restartableSourceFromFactory(std::function<std::unique_ptr<Source>()> factory);
 
 /**
  * A sink that writes all incoming data to two other sinks.
@@ -447,18 +441,32 @@ struct LengthSource : Source
  */
 struct LambdaSink : Sink
 {
-    typedef std::function<void(std::string_view data)> lambda_t;
+    typedef std::function<void(std::string_view data)> data_t;
+    typedef std::function<void()> cleanup_t;
 
-    lambda_t lambda;
+    data_t dataFun;
+    cleanup_t cleanupFun;
 
-    LambdaSink(const lambda_t & lambda)
-        : lambda(lambda)
+    LambdaSink(
+        const data_t & dataFun, const cleanup_t & cleanupFun = []() {})
+        : dataFun(dataFun)
+        , cleanupFun(cleanupFun)
     {
+    }
+
+    LambdaSink(LambdaSink &&) = delete;
+    LambdaSink(const LambdaSink &) = delete;
+    LambdaSink & operator=(LambdaSink &&) = delete;
+    LambdaSink & operator=(const LambdaSink &) = delete;
+
+    ~LambdaSink()
+    {
+        cleanupFun();
     }
 
     void operator()(std::string_view data) override
     {
-        lambda(data);
+        dataFun(data);
     }
 };
 
@@ -627,6 +635,11 @@ struct FramedSource : Source
     {
     }
 
+    FramedSource(FramedSource &&) = delete;
+    FramedSource(const FramedSource &) = delete;
+    FramedSource & operator=(FramedSource &&) = delete;
+    FramedSource & operator=(const FramedSource &) = delete;
+
     ~FramedSource()
     {
         try {
@@ -683,6 +696,11 @@ struct FramedSink : nix::BufferedSink
         , checkError(checkError)
     {
     }
+
+    FramedSink(FramedSink &&) = delete;
+    FramedSink(const FramedSink &) = delete;
+    FramedSink & operator=(FramedSink &&) = delete;
+    FramedSink & operator=(const FramedSink &) = delete;
 
     ~FramedSink()
     {

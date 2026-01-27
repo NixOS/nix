@@ -36,7 +36,7 @@ public:
     /**
      * Enqueue a function to be executed by the thread pool.
      */
-    void enqueue(const work_t & t);
+    void enqueue(work_t t);
 
     /**
      * Execute work items until the queue is empty.
@@ -51,6 +51,12 @@ public:
      * otherwise ignored.
      */
     void process();
+
+    /**
+     * Shut down all worker threads and wait until they've exited.
+     * Active work items are finished, but any pending work items are discarded.
+     */
+    void shutdown();
 
 private:
 
@@ -72,8 +78,6 @@ private:
     std::condition_variable work;
 
     void doWork(bool mainThread);
-
-    void shutdown();
 };
 
 /**

@@ -121,38 +121,34 @@ static void update(const StringSet & channelNames)
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
             // definition from a consistent location if the redirect changes mid-download.
-            auto result = fetchers::downloadFile(store, fetchSettings, url, std::string(baseNameOf(url)));
-            auto filename = store->toRealPath(result.storePath);
+            auto result = fetchers::downloadFile(*store, fetchSettings, url, std::string(baseNameOf(url)));
             url = result.effectiveUrl;
 
             bool unpacked = false;
-            if (std::regex_search(filename, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
+            if (std::regex_search(std::string{result.storePath.to_string()}, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
                 runProgram(
                     getNixBin("nix-build").string(),
                     false,
                     {"--no-out-link",
                      "--expr",
                      "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
-                         + "\"; src = builtins.storePath \"" + filename + "\"; }"});
+                         + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"});
                 unpacked = true;
             }
 
             if (!unpacked) {
                 // Download the channel tarball.
                 try {
-                    filename = store->toRealPath(
-                        fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz")
-                            .storePath);
+                    result = fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz");
                 } catch (FileTransferError & e) {
-                    filename = store->toRealPath(
-                        fetchers::downloadFile(store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2")
-                            .storePath);
+                    result =
+                        fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2");
                 }
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression
             exprs.push_back(
                 "f: f { name = \"" + cname + "\"; channelName = \"" + name + "\"; src = builtins.storePath \""
-                + filename + "\"; " + extraAttrs + " }");
+                + store->printStorePath(result.storePath) + "\"; " + extraAttrs + " }");
         }
     }
 
@@ -167,7 +163,7 @@ static void update(const StringSet & channelNames)
     runProgram(getNixBin("nix-env").string(), false, envArgs);
 
     // Make the channels appear in nix-env.
-    struct stat st;
+    PosixStat st;
     if (lstat(nixDefExpr.c_str(), &st) == 0) {
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
