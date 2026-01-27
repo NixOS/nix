@@ -7,4 +7,5 @@ sed -i "$testcaseBasename.err" \
   -e 's/filesystem error: in read_symlink:/filesystem error: read_symlink:/' \
   -e 's/Invalid argument/not a symlink/' \
   -e 's/Not a symbolic link/not a symlink/' \
+  -e 's/\["\([^"]*\)"\]/[\1]/' \
   ;
