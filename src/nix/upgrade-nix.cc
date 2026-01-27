@@ -9,9 +9,32 @@
 #include "nix/store/names.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
 #include "self-exe.hh"
 
 using namespace nix;
+
+/**
+ * Settings related to upgrading Nix itself.
+ */
+struct UpgradeSettings : Config
+{
+    /**
+     * The URL of the file that contains the store paths of the latest Nix release.
+     */
+    Setting<std::string> storePathUrl{
+        this,
+        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix",
+        "upgrade-nix-store-path-url",
+        R"(
+          Used by `nix upgrade-nix`, the URL of the file that contains the
+          store paths of the latest Nix release.
+        )"};
+};
+
+UpgradeSettings upgradeSettings;
+
+static GlobalConfig::Register rSettings(&upgradeSettings);
 
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {
@@ -31,7 +54,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
             .longName = "nix-store-paths-url",
             .description = "The URL of the file that contains the store paths of the latest Nix release.",
             .labels = {"url"},
-            .handler = {&(std::string &) settings.upgradeNixStorePathUrl},
+            .handler = {&(std::string &) upgradeSettings.storePathUrl},
         });
     }
 
@@ -156,7 +179,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
         Activity act(*logger, lvlInfo, actUnknown, "querying latest Nix version");
 
         // FIXME: use nixos.org?
-        auto req = FileTransferRequest(parseURL(settings.upgradeNixStorePathUrl.get()));
+        auto req = FileTransferRequest(parseURL(upgradeSettings.storePathUrl.get()));
         auto res = getFileTransfer()->download(req);
 
         auto state = std::make_unique<EvalState>(LookupPath{}, store, fetchSettings, evalSettings);
