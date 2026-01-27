@@ -3,7 +3,7 @@
 %define api.namespace { ::nix::parser }
 %define api.parser.class { BisonParser }
 %locations
-%define parse.error verbose
+%define parse.error detailed
 %defines
 /* %no-lines */
 %parse-param { void * scanner }
@@ -140,18 +140,41 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %type <Expr *> path_start
 %type <ToBeStringyExpr> string_parts string_attr
 %type <StringToken> attr
-%token <StringToken> ID
-%token <StringToken> STR IND_STR
-%token <NixInt> INT_LIT
-%token <NixFloat> FLOAT_LIT
-%token <StringToken> PATH HPATH SPATH PATH_END
-%token <StringToken> URI
-%token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
-%token PIPE_FROM PIPE_INTO /* <| and |> */
-%token DOLLAR_CURLY /* == ${ */
-%token IND_STRING_OPEN IND_STRING_CLOSE
-%token ELLIPSIS
-
+%token <StringToken> ID "identifier"
+%token <StringToken> STR "string"
+%token <StringToken> IND_STR "indented string"
+%token <NixInt> INT_LIT "integer"
+%token <NixFloat> FLOAT_LIT "floating-point literal"
+%token <StringToken> PATH "path"
+%token <StringToken> HPATH "'~/…' path"
+%token <StringToken> SPATH "'<…>' path"
+%token <StringToken> PATH_END "end of path"
+%token <StringToken> URI "URI"
+%token IF "'if'"
+%token THEN "'then'"
+%token ELSE "'else'"
+%token ASSERT "'assert'"
+%token WITH "'with'"
+%token LET "'let'"
+%token IN_KW "'in'"
+%token REC "'rec'"
+%token INHERIT "'inherit'"
+%token EQ "'=='"
+%token NEQ "'!='"
+%token LEQ "'<='"
+%token GEQ "'>='"
+%token UPDATE "'//'"
+%token CONCAT "'++'"
+%token AND "'&&'"
+%token OR "'||'"
+%token IMPL "'->'"
+%token OR_KW "'or'"
+%token PIPE_FROM "'<|'"
+%token PIPE_INTO "'|>'"
+%token DOLLAR_CURLY "'${'"
+%token IND_STRING_OPEN "start of an indented string"
+%token IND_STRING_CLOSE "end of an indented string"
+%token ELLIPSIS "'...'"
 
 %right IMPL
 %left OR
