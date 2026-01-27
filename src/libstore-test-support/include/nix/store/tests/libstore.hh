@@ -7,6 +7,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/tests/test-main.hh"
 
 namespace nix {
 
@@ -18,14 +19,16 @@ public:
         initLibStore(false);
     }
 
+    Settings settings = getTestSettings();
+
 protected:
-    LibStoreTest(ref<Store> store)
-        : store(std::move(store))
+    LibStoreTest(auto && makeStore)
+        : store(makeStore(settings))
     {
     }
 
     LibStoreTest()
-        : LibStoreTest(openStore("dummy://"))
+        : LibStoreTest([](auto & settings) { return openStore(settings, "dummy://"); })
     {
     }
 

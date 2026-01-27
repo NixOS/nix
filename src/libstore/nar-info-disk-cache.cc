@@ -62,6 +62,8 @@ class NarInfoDiskCacheImpl : public NarInfoDiskCache
 {
 public:
 
+    const Settings & settings;
+
     /* How often to purge expired entries from the cache. */
     const int purgeInterval = 24 * 3600;
 
@@ -86,7 +88,8 @@ public:
 
     Sync<State> _state;
 
-    NarInfoDiskCacheImpl(Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
+    NarInfoDiskCacheImpl(const Settings & settings, Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
+        : settings(settings)
     {
         auto state(_state.lock());
 
@@ -372,15 +375,15 @@ public:
     }
 };
 
-ref<NarInfoDiskCache> getNarInfoDiskCache()
+ref<NarInfoDiskCache> getNarInfoDiskCache(const Settings & settings)
 {
-    static ref<NarInfoDiskCache> cache = make_ref<NarInfoDiskCacheImpl>();
+    static ref<NarInfoDiskCache> cache = make_ref<NarInfoDiskCacheImpl>(settings);
     return cache;
 }
 
-ref<NarInfoDiskCache> getTestNarInfoDiskCache(Path dbPath)
+ref<NarInfoDiskCache> getTestNarInfoDiskCache(const Settings & settings, Path dbPath)
 {
-    return make_ref<NarInfoDiskCacheImpl>(dbPath);
+    return make_ref<NarInfoDiskCacheImpl>(settings, dbPath);
 }
 
 } // namespace nix

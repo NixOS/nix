@@ -116,6 +116,8 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
+    auto & settings = config.settings;
+
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.keepGoing << settings.tryFallback
             << verbosity << settings.maxBuildJobs << settings.maxSilentTime << true
             << (settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type

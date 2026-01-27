@@ -1,4 +1,5 @@
 #include "nix/store/tests/https-store.hh"
+#include "nix/store/tests/test-main.hh"
 
 #include <thread>
 
@@ -35,9 +36,9 @@ void HttpsBinaryCacheStoreTest::SetUp()
     cacheDir = tmpDir / "cache";
     delTmpDir = std::make_unique<AutoDelete>(tmpDir);
 
-    localCacheStore =
-        make_ref<LocalBinaryCacheStoreConfig>("file", cacheDir.string(), LocalBinaryCacheStoreConfig::Params{})
-            ->openStore();
+    localCacheStore = make_ref<LocalBinaryCacheStoreConfig>(
+                          settings, "file", cacheDir.string(), LocalBinaryCacheStoreConfig::Params{})
+                          ->openStore();
 
     caCert = tmpDir / "ca.crt";
     caKey = tmpDir / "ca.key";
@@ -80,13 +81,13 @@ void HttpsBinaryCacheStoreTest::SetUp()
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     /* FIXME: Don't use global settings. Tests are not run concurrently, so this is fine for now. */
-    oldCaCert = settings.caFile;
-    settings.caFile = caCert.string();
+    oldCaCert = fileTransferSettings.caFile;
+    fileTransferSettings.caFile = caCert.string();
 }
 
 void HttpsBinaryCacheStoreTest::TearDown()
 {
-    settings.caFile = oldCaCert;
+    fileTransferSettings.caFile = oldCaCert;
     serverPid.kill();
     delTmpDir.reset();
 }
@@ -117,7 +118,8 @@ std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
 
 ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig(BinaryCacheStoreConfig::Params params)
 {
-    auto res = make_ref<TestHttpBinaryCacheStoreConfig>("https", fmt("localhost:%d", port), std::move(params));
+    auto res =
+        make_ref<TestHttpBinaryCacheStoreConfig>(settings, "https", fmt("localhost:%d", port), std::move(params));
     res->pathInfoCacheSize = 0; /* We don't want any caching in tests. */
     return res;
 }

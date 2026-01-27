@@ -271,7 +271,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
         if (!state.store->isStorePath(name))
             state.error<EvalError>("context key '%s' is not a store path", name).atPos(i.pos).debugThrow();
         auto namePath = state.store->parseStorePath(name);
-        if (!settings.readOnlyMode)
+        if (!state.settings.settings.readOnlyMode)
             state.store->ensurePath(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
 

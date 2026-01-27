@@ -251,7 +251,7 @@ static ref<Store> openUncachedStore()
     Store::Config::Params params; // FIXME: get params from somewhere
     // Disable caching since the client already does that.
     params["path-info-cache-size"] = "0";
-    return openStore(settings.storeUri, params);
+    return openStore(settings, settings.storeUri, params);
 }
 
 /**
@@ -317,7 +317,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 
     //  Otherwise, create and bind to a Unix domain socket.
     else {
-        createDirs(dirOf(settings.nixDaemonSocketFile));
+        createDirs(settings.nixDaemonSocketFile.parent_path());
         fdSocket = createUnixDomainSocket(settings.nixDaemonSocketFile, 0666);
     }
 

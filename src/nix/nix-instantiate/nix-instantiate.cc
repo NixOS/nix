@@ -166,8 +166,8 @@ static int main_nix_instantiate(int argc, char ** argv)
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
-        auto store = openStore();
-        auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
+        auto store = openStore(settings);
+        auto evalStore = myArgs.evalStoreUrl ? openStore(settings, *myArgs.evalStoreUrl) : store;
 
         auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
         state->repair = myArgs.repair;

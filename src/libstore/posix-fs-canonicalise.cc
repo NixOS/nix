@@ -42,6 +42,7 @@ void canonicaliseTimestampAndPermissions(const Path & path)
 }
 
 static void canonicalisePathMetaData_(
+    const Settings & settings,
     const Path & path,
 #ifndef _WIN32
     std::optional<std::pair<uid_t, uid_t>> uidRange,
@@ -132,6 +133,7 @@ static void canonicalisePathMetaData_(
         for (auto & i : DirectoryIterator{path}) {
             checkInterrupt();
             canonicalisePathMetaData_(
+                settings,
                 i.path().string(),
 #ifndef _WIN32
                 uidRange,
@@ -142,6 +144,7 @@ static void canonicalisePathMetaData_(
 }
 
 void canonicalisePathMetaData(
+    const Settings & settings,
     const Path & path,
 #ifndef _WIN32
     std::optional<std::pair<uid_t, uid_t>> uidRange,
@@ -149,6 +152,7 @@ void canonicalisePathMetaData(
     InodesSeen & inodesSeen)
 {
     canonicalisePathMetaData_(
+        settings,
         path,
 #ifndef _WIN32
         uidRange,
@@ -168,6 +172,7 @@ void canonicalisePathMetaData(
 }
 
 void canonicalisePathMetaData(
+    const Settings & settings,
     const Path & path
 #ifndef _WIN32
     ,
@@ -177,6 +182,7 @@ void canonicalisePathMetaData(
 {
     InodesSeen inodesSeen;
     canonicalisePathMetaData_(
+        settings,
         path,
 #ifndef _WIN32
         uidRange,

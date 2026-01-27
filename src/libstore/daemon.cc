@@ -230,7 +230,7 @@ struct ClientSettings
     bool useSubstitutes;
     StringMap overrides;
 
-    void apply(TrustedFlag trusted)
+    void apply(Settings & settings, TrustedFlag trusted)
     {
         settings.keepFailed = keepFailed;
         settings.keepGoing = keepGoing;
@@ -771,7 +771,7 @@ static void performOp(
         // FIXME: use some setting in recursive mode. Will need to use
         // non-global variables.
         if (!recursive)
-            clientSettings.apply(trusted);
+            clientSettings.apply(store->config.settings, trusted);
 
         logger->stopWork();
         break;

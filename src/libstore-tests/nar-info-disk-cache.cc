@@ -1,10 +1,12 @@
-#include "nix/store/nar-info-disk-cache.hh"
-
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 #include "nix/store/globals.hh"
 #include "nix/store/sqlite.hh"
 #include <sqlite3.h>
+
+#include "nix/store/globals.hh"
+#include "nix/store/sqlite.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 
 namespace nix {
 
@@ -24,8 +26,10 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     SQLite db;
     SQLiteStmt getIds;
 
+    Settings settings;
+
     {
-        auto cache = getTestNarInfoDiskCache(dbPath.string());
+        auto cache = getTestNarInfoDiskCache(settings, dbPath.string());
 
         // Set up "background noise" and check that different caches receive different ids
         {
@@ -74,7 +78,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     {
         // We can't clear the in-memory cache, so we use a new cache object. This is
         // more realistic anyway.
-        auto cache2 = getTestNarInfoDiskCache(dbPath.string());
+        auto cache2 = getTestNarInfoDiskCache(settings, dbPath.string());
 
         {
             auto r = cache2->upToDateCacheExists("http://foo");

@@ -43,7 +43,8 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , LocalFSStore{*config}
     , LocalStore{static_cast<ref<const LocalStore::Config>>(config)}
     , config{config}
-    , lowerStore(openStore(percentDecode(config->lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(
+          openStore(config->settings, percentDecode(config->lowerStoreUri.get())).dynamic_pointer_cast<LocalFSStore>())
 {
     if (config->checkMount.get()) {
         std::smatch match;

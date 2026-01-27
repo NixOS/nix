@@ -1,38 +1,44 @@
 #include <gtest/gtest.h>
 #include <regex>
 
+#include "nix/store/globals.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/tests/https-store.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/store/tests/test-main.hh"
 
 namespace nix {
 
 TEST(HttpBinaryCacheStore, constructConfig)
 {
-    HttpBinaryCacheStoreConfig config{"http", "foo.bar.baz", {}};
+    auto settings = getTestSettings();
+    HttpBinaryCacheStoreConfig config{settings, "http", "foo.bar.baz", {}};
 
     EXPECT_EQ(config.cacheUri.to_string(), "http://foo.bar.baz");
 }
 
 TEST(HttpBinaryCacheStore, constructConfigNoTrailingSlash)
 {
-    HttpBinaryCacheStoreConfig config{"https", "foo.bar.baz/a/b/", {}};
+    auto settings = getTestSettings();
+    HttpBinaryCacheStoreConfig config{settings, "https", "foo.bar.baz/a/b/", {}};
 
     EXPECT_EQ(config.cacheUri.to_string(), "https://foo.bar.baz/a/b");
 }
 
 TEST(HttpBinaryCacheStore, constructConfigWithParams)
 {
+    auto settings = getTestSettings();
     StoreConfig::Params params{{"compression", "xz"}};
-    HttpBinaryCacheStoreConfig config{"https", "foo.bar.baz/a/b/", params};
+    HttpBinaryCacheStoreConfig config{settings, "https", "foo.bar.baz/a/b/", params};
     EXPECT_EQ(config.cacheUri.to_string(), "https://foo.bar.baz/a/b");
     EXPECT_EQ(config.getReference().params, params);
 }
 
 TEST(HttpBinaryCacheStore, constructConfigWithParamsAndUrlWithParams)
 {
+    auto settings = getTestSettings();
     StoreConfig::Params params{{"compression", "xz"}};
-    HttpBinaryCacheStoreConfig config{"https", "foo.bar.baz/a/b?some-param=some-value", params};
+    HttpBinaryCacheStoreConfig config{settings, "https", "foo.bar.baz/a/b?some-param=some-value", params};
     EXPECT_EQ(config.cacheUri.to_string(), "https://foo.bar.baz/a/b?some-param=some-value");
     EXPECT_EQ(config.getReference().params, params);
 }
@@ -89,6 +95,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWrongClientCert)
     openssl({"req", "-new", "-x509", "-days", "1", "-key", wrongKey.string(), "-out", wrongCert.string(), "-subj", "/CN=WrongClient"});
     // clang-format on
 
+    auto settings = getTestSettings();
     auto config = makeConfig({
         {"tls-certificate"s, wrongCert.string()},
         {"tls-private-key"s, wrongKey.string()},
@@ -109,6 +116,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
             writeFile(entry.path(), content);
         }
 
+    auto settings = getTestSettings();
     auto config = makeConfig({
         {"tls-certificate"s, clientCert.string()},
         {"tls-private-key"s, clientKey.string()},

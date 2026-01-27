@@ -96,7 +96,7 @@ void execProgramInStore(
 
 #ifdef __linux__
     if (system)
-        linux::setPersonality(*system);
+        linux::setPersonality(store->config.settings, *system);
 #endif
 
     if (useLookupPath == UseLookupPath::Use) {
@@ -251,7 +251,7 @@ void chrootHelper(int argc, char ** argv)
 
 #  ifdef __linux__
     if (system != "")
-        linux::setPersonality(system);
+        linux::setPersonality(settings, system);
 #  endif
 
     execvp(cmd.c_str(), stringsToCharPtrs(args).data());

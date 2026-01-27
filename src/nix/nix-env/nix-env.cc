@@ -1376,14 +1376,14 @@ static int main_nix_env(int argc, char ** argv)
         globals.instSource.type = srcUnknown;
         globals.instSource.systemFilter = "*";
 
-        std::filesystem::path nixExprPath = getNixDefExpr();
+        std::filesystem::path nixExprPath = getNixDefExpr(settings);
 
         if (!pathExists(nixExprPath)) {
             try {
                 createDirs(nixExprPath);
-                replaceSymlink(defaultChannelsDir(), nixExprPath / "channels");
+                replaceSymlink(defaultChannelsDir(settings), nixExprPath / "channels");
                 if (!isRootUser())
-                    replaceSymlink(rootChannelsDir(), nixExprPath / "channels_root");
+                    replaceSymlink(rootChannelsDir(settings), nixExprPath / "channels_root");
             } catch (std::filesystem::filesystem_error &) {
             } catch (Error &) {
             }
@@ -1474,7 +1474,7 @@ static int main_nix_env(int argc, char ** argv)
         if (!op)
             throw UsageError("no operation specified");
 
-        auto store = openStore();
+        auto store = openStore(settings);
 
         globals.state =
             std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
@@ -1490,7 +1490,7 @@ static int main_nix_env(int argc, char ** argv)
             globals.profile = getEnv("NIX_PROFILE").value_or("");
 
         if (globals.profile == "")
-            globals.profile = getDefaultProfile().string();
+            globals.profile = getDefaultProfile(settings).string();
 
         op(globals, std::move(opFlags), std::move(opArgs));
 

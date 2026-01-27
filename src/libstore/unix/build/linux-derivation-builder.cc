@@ -1,6 +1,7 @@
 #ifdef __linux__
 
 #  include "nix/store/personality.hh"
+#  include "nix/store/filetransfer.hh"
 #  include "nix/util/cgroup.hh"
 #  include "nix/util/linux-namespaces.hh"
 #  include "nix/util/logging.hh"
@@ -24,7 +25,7 @@
 
 namespace nix {
 
-static void setupSeccomp()
+static void setupSeccomp(const Settings & settings)
 {
     if (!settings.filterSyscalls)
         return;
@@ -161,9 +162,9 @@ struct LinuxDerivationBuilder : virtual DerivationBuilderImpl
 
     void enterChroot() override
     {
-        setupSeccomp();
+        setupSeccomp(store.config->settings);
 
-        linux::setPersonality(drv.platform);
+        linux::setPersonality(store.config->settings, drv.platform);
     }
 };
 
@@ -215,12 +216,13 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(settings.buildUsersGroup, drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(
+            store.config->settings, settings.buildUsersGroup, drvOptions.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void prepareUser() override
     {
-        if ((buildUser && buildUser->getUIDCount() != 1) || settings.useCgroups) {
+        if ((buildUser && buildUser->getUIDCount() != 1) || store.config->settings.useCgroups) {
             experimentalFeatureSettings.require(Xp::Cgroups);
 
             /* If we're running from the daemon, then this will return the
@@ -556,11 +558,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (pathExists(path))
                     ss.push_back(path);
 
-            if (settings.caFile != "") {
-                std::filesystem::path caFile = settings.caFile.get();
-                if (pathExists(caFile))
+            if (auto & caFile = fileTransferSettings.caFile.get()) {
+                if (pathExists(*caFile))
                     pathsInChroot.try_emplace(
-                        "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile.native(), true), true);
+                        "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile->native(), true), true);
             }
         }
 

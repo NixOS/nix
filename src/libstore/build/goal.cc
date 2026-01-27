@@ -228,7 +228,7 @@ Goal::Done Goal::amDone(ExitCode result, std::optional<Error> ex)
 
             if (goal->waitees.empty()) {
                 worker.wakeUp(goal);
-            } else if (result == ecFailed && !settings.keepGoing) {
+            } else if (result == ecFailed && !worker.store.config.settings.keepGoing) {
                 /* If we failed and keepGoing is not set, we remove all
                    remaining waitees. */
                 for (auto & g : goal->waitees) {

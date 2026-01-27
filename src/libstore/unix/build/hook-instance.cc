@@ -8,14 +8,14 @@
 
 namespace nix {
 
-HookInstance::HookInstance()
+HookInstance::HookInstance(const Strings & buildHookArgs_)
 {
-    debug("starting build hook '%s'", concatStringsSep(" ", settings.buildHook.get()));
+    debug("starting build hook '%s'", concatStringsSep(" ", buildHookArgs_));
 
-    auto buildHookArgs = settings.buildHook.get();
-
-    if (buildHookArgs.empty())
+    if (buildHookArgs_.empty())
         throw Error("'build-hook' setting is empty");
+
+    auto buildHookArgs = buildHookArgs_;
 
     std::filesystem::path buildHook = buildHookArgs.front();
     buildHookArgs.pop_front();

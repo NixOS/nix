@@ -9,6 +9,8 @@
 
 namespace nix {
 
+class Settings;
+
 typedef std::pair<dev_t, ino_t> Inode;
 typedef std::set<Inode> InodesSeen;
 
@@ -30,6 +32,7 @@ typedef std::set<Inode> InodesSeen;
  * [uidRange->first, uidRange->second].
  */
 void canonicalisePathMetaData(
+    const Settings & settings,
     const Path & path,
 #ifndef _WIN32
     std::optional<std::pair<uid_t, uid_t>> uidRange,
@@ -37,6 +40,7 @@ void canonicalisePathMetaData(
     InodesSeen & inodesSeen);
 
 void canonicalisePathMetaData(
+    const Settings & settings,
     const Path & path
 #ifndef _WIN32
     ,

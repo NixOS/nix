@@ -10,12 +10,15 @@
 
 namespace nix {
 
+class Settings;
+
 struct BuiltinBuilderContext
 {
     const BasicDerivation & drv;
     std::map<std::string, Path> outputs;
     std::string netrcData;
     std::string caFileData;
+    Strings hashedMirrors;
     Path tmpDirInSandbox;
 
 #if NIX_WITH_AWS_AUTH

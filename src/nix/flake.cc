@@ -1125,7 +1125,7 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
         }
 
         if (!dryRun && !dstUri.empty()) {
-            ref<Store> dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+            ref<Store> dstStore = dstUri.empty() ? openStore(settings) : openStore(settings, dstUri);
 
             copyPaths(*store, *dstStore, sources, NoRepair, checkSigs, substitute);
         }

@@ -49,8 +49,8 @@ static int main_nix_copy_closure(int argc, char ** argv)
             throw UsageError("no host name specified");
 
         auto remoteUri = "ssh://" + sshHost + (gzip ? "?compress=true" : "");
-        auto to = toMode ? openStore(remoteUri) : openStore();
-        auto from = toMode ? openStore() : openStore(remoteUri);
+        auto to = toMode ? openStore(settings, remoteUri) : openStore(settings);
+        auto from = toMode ? openStore(settings) : openStore(settings, remoteUri);
 
         RealisedPath::Set storePaths2;
         for (auto & path : storePaths)

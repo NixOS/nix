@@ -21,14 +21,14 @@ protected:
     ref<DummyStore> substituter;
 
     WorkerSubstitutionTest()
-        : LibStoreTest([] {
-            auto config = make_ref<DummyStoreConfig>(DummyStoreConfig::Params{});
+        : LibStoreTest([](auto & settings) {
+            auto config = make_ref<DummyStoreConfig>(settings, DummyStoreConfig::Params{});
             config->readOnly = false;
             return config->openDummyStore();
-        }())
+        })
         , dummyStore(store.dynamic_pointer_cast<DummyStore>())
-        , substituter([] {
-            auto config = make_ref<DummyStoreConfig>(DummyStoreConfig::Params{});
+        , substituter([this] {
+            auto config = make_ref<DummyStoreConfig>(settings, DummyStoreConfig::Params{});
             config->readOnly = false;
             config->isTrusted = true;
             return config->openDummyStore();
@@ -67,10 +67,10 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
         HashAlgorithm::SHA256);
 
     // Snapshot the substituter (has one store object)
-    checkpointJson("single/substituter", substituter);
+    checkpointJson("single/substituter", substituter, settings);
 
     // Snapshot the destination store before (should be empty)
-    checkpointJson("../dummy-store/empty", dummyStore);
+    checkpointJson("../dummy-store/empty", dummyStore, settings);
 
     // The path should not exist in the destination store yet
     ASSERT_FALSE(dummyStore->isValidPath(pathInSubstituter));
@@ -92,7 +92,7 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     worker.run(goals);
 
     // Snapshot the destination store after (should match the substituter)
-    checkpointJson("single/substituter", dummyStore);
+    checkpointJson("single/substituter", dummyStore, settings);
 
     // The path should now exist in the destination store
     ASSERT_TRUE(dummyStore->isValidPath(pathInSubstituter));
@@ -138,10 +138,10 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
         StorePathSet{dependencyPath});
 
     // Snapshot the substituter (has two store objects)
-    checkpointJson("with-dep/substituter", substituter);
+    checkpointJson("with-dep/substituter", substituter, settings);
 
     // Snapshot the destination store before (should be empty)
-    checkpointJson("../dummy-store/empty", dummyStore);
+    checkpointJson("../dummy-store/empty", dummyStore, settings);
 
     // Neither path should exist in the destination store yet
     ASSERT_FALSE(dummyStore->isValidPath(dependencyPath));
@@ -164,7 +164,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
     worker.run(goals);
 
     // Snapshot the destination store after (should match the substituter)
-    checkpointJson("with-dep/substituter", dummyStore);
+    checkpointJson("with-dep/substituter", dummyStore, settings);
 
     // Both paths should now exist in the destination store
     ASSERT_TRUE(dummyStore->isValidPath(dependencyPath));
@@ -196,7 +196,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     auto drvPath = writeDerivation(*dummyStore, drv);
 
     // Snapshot the destination store before
-    checkpointJson("ca-drv/store-before", dummyStore);
+    checkpointJson("ca-drv/store-before", dummyStore, settings);
 
     // Compute the hash modulo of the derivation
     // For CA floating derivations, the kind is Deferred since outputs aren't known until build
@@ -233,7 +233,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
         });
 
     // Snapshot the substituter
-    checkpointJson("ca-drv/substituter", substituter);
+    checkpointJson("ca-drv/substituter", substituter, settings);
 
     // The realisation should not exist in the destination store yet
     DrvOutput drvOutput{drvHash, "out"};
@@ -256,7 +256,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     worker.run(goals);
 
     // Snapshot the destination store after
-    checkpointJson("ca-drv/store-after", dummyStore);
+    checkpointJson("ca-drv/store-after", dummyStore, settings);
 
     // The output path should now exist in the destination store
     ASSERT_TRUE(dummyStore->isValidPath(outputPath));
@@ -351,7 +351,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     auto rootDrvPath = writeDerivation(*dummyStore, rootDrv);
 
     // Snapshot the destination store before
-    checkpointJson("issue-11928/store-before", dummyStore);
+    checkpointJson("issue-11928/store-before", dummyStore, settings);
 
     // Compute the hash modulo for the root derivation
     auto rootHashModulo = hashDerivationModulo(*dummyStore, rootDrv, true);
@@ -395,7 +395,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Snapshot the substituter
     // Note: it has realisations for both drvs, but only the root's output store object
-    checkpointJson("issue-11928/substituter", substituter);
+    checkpointJson("issue-11928/substituter", substituter, settings);
 
     // The realisations should not exist in the destination store yet
     ASSERT_FALSE(dummyStore->queryRealisation(depDrvOutput));
@@ -418,7 +418,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     worker.run(goals);
 
     // Snapshot the destination store after
-    checkpointJson("issue-11928/store-after", dummyStore);
+    checkpointJson("issue-11928/store-after", dummyStore, settings);
 
     // The root output path should now exist in the destination store
     ASSERT_TRUE(dummyStore->isValidPath(rootOutputPath));

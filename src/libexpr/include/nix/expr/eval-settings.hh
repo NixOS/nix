@@ -9,9 +9,15 @@ namespace nix {
 
 class EvalState;
 struct PrimOp;
+class Settings;
 
 struct EvalSettings : Config
 {
+    /**
+     * Reference to the "parent" store-layer settings.
+     */
+    nix::Settings & settings;
+
     /**
      * Function used to interpret look path entries of a given scheme.
      *
@@ -38,11 +44,9 @@ struct EvalSettings : Config
      */
     using LookupPathHooks = std::map<std::string, std::function<LookupPathHook>>;
 
-    EvalSettings(bool & readOnlyMode, LookupPathHooks lookupPathHooks = {});
+    EvalSettings(nix::Settings & settings, LookupPathHooks lookupPathHooks = {});
 
-    bool & readOnlyMode;
-
-    static Strings getDefaultNixPath();
+    static Strings getDefaultNixPath(nix::Settings & settings);
 
     static bool isPseudoUrl(std::string_view s);
 
@@ -366,6 +370,6 @@ struct EvalSettings : Config
 /**
  * Conventionally part of the default nix path in impure mode.
  */
-std::filesystem::path getNixDefExpr();
+std::filesystem::path getNixDefExpr(const Settings & settings);
 
 } // namespace nix

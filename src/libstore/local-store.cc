@@ -61,9 +61,10 @@
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+LocalStoreConfig::LocalStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+    : StoreConfig(settings, params)
+    , LocalFSStoreConfig(settings, authority, params)
 {
 }
 
@@ -74,11 +75,11 @@ std::string LocalStoreConfig::doc()
         ;
 }
 
-Path LocalBuildStoreConfig::getBuildDir() const
+std::filesystem::path LocalBuildStoreConfig::getBuildDir() const
 {
     return settings.buildDir.get().has_value() ? *settings.buildDir.get()
            : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+                                               : std::filesystem::path{stateDir.get()} / "builds";
 }
 
 ref<Store> LocalStore::Config::openStore() const
@@ -140,7 +141,7 @@ LocalStore::LocalStore(ref<const Config> config)
     createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = config->stateDir + "/gcroots";
-    const auto & gcSettings = settings.getGCSettings();
+    const auto & gcSettings = config->settings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
         replaceSymlink(profilesDir, gcRootsDir + "/profiles");
@@ -159,13 +160,14 @@ LocalStore::LocalStore(ref<const Config> config)
 #ifndef _WIN32
     /* Optionally, create directories and set permissions for a
        multi-user install. */
-    if (isRootUser() && settings.buildUsersGroup != "") {
+    if (isRootUser() && config->settings.buildUsersGroup != "") {
         mode_t perm = 01775;
 
-        struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
+        struct group * gr = getgrnam(config->settings.buildUsersGroup.get().c_str());
         if (!gr)
             printError(
-                "warning: the group '%1%' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+                "warning: the group '%1%' specified in 'build-users-group' does not exist",
+                config->settings.buildUsersGroup);
         else if (!config->readOnly) {
             auto st = stat(config->realStoreDir.get());
 
@@ -179,7 +181,7 @@ LocalStore::LocalStore(ref<const Config> config)
 #endif
 
     /* Ensure that the store and its parents are not symlinks. */
-    if (!settings.allowSymlinkedStore) {
+    if (!config->settings.allowSymlinkedStore) {
         std::filesystem::path path = config->realStoreDir.get();
         std::filesystem::path root = path.root_path();
         while (path != root) {
@@ -501,7 +503,8 @@ void LocalStore::openDB(State & state, bool create)
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                     : create         ? SQLiteOpenMode::Normal
                                      : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
+    state.db =
+        SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = config->settings.useSQLiteWAL});
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -520,12 +523,12 @@ void LocalStore::openDB(State & state, bool create)
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
        crashes. */
-    std::string syncMode = settings.fsyncMetadata ? "normal" : "off";
+    std::string syncMode = config->settings.fsyncMetadata ? "normal" : "off";
     db.exec("pragma synchronous = " + syncMode);
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
        default. */
-    std::string mode = settings.useSQLiteWAL ? "wal" : "truncate";
+    std::string mode = config->settings.useSQLiteWAL ? "wal" : "truncate";
     std::string prevMode;
     {
         SQLiteStmt stmt;
@@ -902,7 +905,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
-    if (settings.syncBeforeRegistering)
+    if (config->settings.syncBeforeRegistering)
         sync();
 #endif
 
@@ -970,7 +973,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 {
     auto state(_state->lock());
     if (!state->publicKeys)
-        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
+        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys(config->settings));
     return *state->publicKeys;
 }
 
@@ -1027,7 +1030,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 TeeSource wrapperSource{source, hashSink};
 
                 narRead = true;
-                restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
+                restorePath(realPath, wrapperSource, config->settings.fsyncStorePaths);
 
                 auto hashResult = hashSink.finish();
 
@@ -1083,11 +1086,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                canonicalisePathMetaData(realPath);
+                canonicalisePathMetaData(config->settings, realPath);
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
-                if (settings.fsyncStorePaths) {
+                if (config->settings.fsyncStorePaths) {
                     recursiveSync(realPath);
                     syncParent(realPath);
                 }
@@ -1138,10 +1141,10 @@ StorePath LocalStore::addToStoreFromDump(
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
        or the original source is empty */
-    while (dump.size() < settings.narBufferSize) {
+    while (dump.size() < config->settings.narBufferSize) {
         auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
-        auto want = std::min(chunkSize, settings.narBufferSize - oldSize);
+        auto want = std::min(chunkSize, config->settings.narBufferSize - oldSize);
         if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
             dumpBuffer.release();
             dumpBuffer.reset((char *) tmp);
@@ -1178,7 +1181,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath.string(), bothSource, dumpMethod, settings.fsyncStorePaths);
+        restorePath(tempPath.string(), bothSource, dumpMethod, config->settings.fsyncStorePaths);
 
         dumpBuffer.reset();
         dump = {};
@@ -1222,7 +1225,7 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, settings.fsyncStorePaths);
+                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, config->settings.fsyncStorePaths);
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1243,11 +1246,11 @@ StorePath LocalStore::addToStoreFromDump(
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath); // FIXME: merge into restorePath
+            canonicalisePathMetaData(config->settings, realPath); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
-            if (settings.fsyncStorePaths) {
+            if (config->settings.fsyncStorePaths) {
                 recursiveSync(realPath);
                 syncParent(realPath);
             }

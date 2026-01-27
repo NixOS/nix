@@ -58,7 +58,7 @@ struct HookInstance
      */
     std::function<void()> onKillChild;
 
-    HookInstance();
+    HookInstance(const Strings & buildHookArgs);
 
     ~HookInstance();
 };

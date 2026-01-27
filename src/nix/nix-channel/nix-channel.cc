@@ -82,7 +82,7 @@ static void update(const StringSet & channelNames)
 {
     readChannels();
 
-    auto store = openStore();
+    auto store = openStore(settings);
 
     auto [fd, unpackChannelPath] = createTempFile();
     writeFull(
@@ -183,10 +183,10 @@ static int main_nix_channel(int argc, char ** argv)
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
         channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
-        nixDefExpr = getNixDefExpr();
+        nixDefExpr = getNixDefExpr(settings);
 
         // Figure out the name of the channels profile.
-        profile = profilesDir() + "/channels";
+        profile = profilesDir(settings) + "/channels";
         createDirs(dirOf(profile));
 
         enum { cNone, cAdd, cRemove, cList, cUpdate, cListGenerations, cRollback } cmd = cNone;

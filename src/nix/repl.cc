@@ -2,6 +2,7 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/globals.hh"
+#include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-value.hh"
@@ -99,7 +100,7 @@ struct CmdRepl : RawInstallablesCommand
             }
             return values;
         };
-        auto repl = AbstractNixRepl::create(lookupPath, openStore(), state, getValues, runNix);
+        auto repl = AbstractNixRepl::create(lookupPath, openStore(settings), state, getValues, runNix);
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->initEnv();
         repl->mainLoop();

@@ -15,6 +15,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/expr/function-trace.hh"
 #include "nix/store/profiles.hh"
+#include "nix/store/globals.hh"
 #include "nix/expr/print.hh"
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
@@ -331,7 +332,7 @@ EvalState::EvalState(
             lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
         }
         if (!settings.restrictEval) {
-            for (auto & i : EvalSettings::getDefaultNixPath()) {
+            for (auto & i : EvalSettings::getDefaultNixPath(store->config.settings)) {
                 lookupPath.elements.emplace_back(LookupPath::Elem::parse(i));
             }
         }
@@ -2509,7 +2510,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             fetchSettings,
             *store,
             path.resolveSymlinks(SymlinkResolution::Ancestors),
-            settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+            settings.settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
             path.baseName(),
             ContentAddressMethod::Raw::NixArchive,
             nullptr,

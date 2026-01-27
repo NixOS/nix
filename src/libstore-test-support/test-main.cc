@@ -7,14 +7,11 @@
 
 namespace nix {
 
-int testMainForBuidingPre(int argc, char ** argv)
+Settings getTestSettings()
 {
-    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
-        printError("test-build-remote: not supported in libexpr unit tests");
-        return EXIT_FAILURE;
-    }
+    Settings settings;
 
-    // Disable build hook. We won't be testing remote builds in these unit tests. If we do, fix the above build hook.
+    // Disable build hook. We won't be testing remote builds in these unit tests.
     settings.buildHook = {};
 
     // No substituters, unless a test specifically requests.
@@ -40,6 +37,16 @@ int testMainForBuidingPre(int argc, char ** argv)
     settings.sandboxMode = smDisabled;
     setEnv("_NIX_TEST_NO_SANDBOX", "1");
 #endif
+
+    return settings;
+}
+
+int testMainForBuidingPre(int argc, char ** argv)
+{
+    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
+        printError("test-build-remote: not supported in libexpr unit tests");
+        return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }

@@ -593,7 +593,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 #ifdef _WIN32 // TODO implement on Windows
                 throw UnimplementedError("file attribute canonicalisation Is not implemented on Windows");
 #else
-                canonicalisePathMetaData(store->printStorePath(info->path), {});
+                canonicalisePathMetaData(settings, store->printStorePath(info->path), {});
 #endif
             if (!hashGiven) {
                 HashResult hash = hashPath(
@@ -1231,7 +1231,7 @@ static int main_nix_store(int argc, char ** argv)
             throw UsageError("no operation specified");
 
         if (op != opDump && op != opRestore) /* !!! hack */
-            store = openStore();
+            store = openStore(settings);
 
         op(std::move(opFlags), std::move(opArgs));
 

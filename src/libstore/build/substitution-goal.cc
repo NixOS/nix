@@ -56,6 +56,8 @@ Goal::Co PathSubstitutionGoal::init()
         co_return doneSuccess(BuildResult::Success::AlreadyValid);
     }
 
+    auto & settings = worker.store.config.settings;
+
     if (settings.readOnlyMode)
         throw Error(
             "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
@@ -210,7 +212,8 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     /* Make sure that we are allowed to start a substitution.  Note that even
        if maxSubstitutionJobs == 0, we still allow a substituter to run. This
        prevents infinite waiting. */
-    while (worker.getNrSubstitutions() >= std::max(1U, (unsigned int) settings.maxSubstitutionJobs)) {
+    while (worker.getNrSubstitutions()
+           >= std::max(1U, (unsigned int) worker.store.config.settings.maxSubstitutionJobs)) {
         co_await waitForBuildSlot();
     }
 

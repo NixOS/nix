@@ -3,6 +3,7 @@
 #include <string>
 #include <utility>
 
+#include "nix/store/globals.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix/fetchers/attrs.hh"
@@ -19,7 +20,8 @@ TEST(parseFlakeRef, path)
 {
     experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
 
-    fetchers::Settings fetchSettings;
+    Settings settings;
+    fetchers::Settings fetchSettings{settings};
 
     {
         auto s = "/foo/bar";
@@ -69,7 +71,8 @@ TEST(parseFlakeRef, GitArchiveInput)
 {
     experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
 
-    fetchers::Settings fetchSettings;
+    Settings settings;
+    fetchers::Settings fetchSettings{settings};
 
     {
         auto s = "github:foo/bar/branch%23"; // branch name with `#`
@@ -112,7 +115,8 @@ class InputFromURLTest : public ::testing::WithParamInterface<InputFromURLTestCa
 TEST_P(InputFromURLTest, attrsAreCorrectAndRoundTrips)
 {
     experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
-    fetchers::Settings fetchSettings;
+    Settings settings;
+    fetchers::Settings fetchSettings{settings};
 
     const auto & testCase = GetParam();
 
@@ -274,7 +278,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST(to_string, doesntReencodeUrl)
 {
-    fetchers::Settings fetchSettings;
+    Settings settings;
+    fetchers::Settings fetchSettings{settings};
     auto s = "http://localhost:8181/test/+3d.tar.gz";
     auto flakeref = parseFlakeRef(fetchSettings, s);
     auto unparsed = flakeref.to_string();

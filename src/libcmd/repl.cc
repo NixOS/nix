@@ -566,7 +566,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else if (command == ":log") {
             settings.readOnlyMode = true;
             Finally roModeReset([&]() { settings.readOnlyMode = false; });
-            auto subs = getDefaultSubstituters();
+            auto subs = getDefaultSubstituters(settings);
 
             subs.push_front(state->store);
 
@@ -919,7 +919,7 @@ ReplExitStatus AbstractNixRepl::runSimple(ref<EvalState> evalState, const ValMap
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
     auto repl = std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
+        openStore(settings),
         evalState,
         getValues,
         /*runNix=*/nullptr);

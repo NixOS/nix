@@ -236,7 +236,8 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         throw;
                     }
 
-                    if (!knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+                    if (!knownOutputPaths && config.settings.useSubstitutes
+                        && drvOptions.substitutesAllowed(config.settings)) {
                         experimentalFeatureSettings.require(Xp::CaDerivations);
 
                         // If there are unknown output paths, attempt to find if the
@@ -249,7 +250,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                                 continue;
 
                             bool found = false;
-                            for (auto & sub : getDefaultSubstituters()) {
+                            for (auto & sub : getDefaultSubstituters(config.settings)) {
                                 auto realisation = sub->queryRealisation({hash, outputName});
                                 if (!realisation)
                                     continue;
@@ -266,7 +267,8 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         }
                     }
 
-                    if (knownOutputPaths && settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+                    if (knownOutputPaths && config.settings.useSubstitutes
+                        && drvOptions.substitutesAllowed(config.settings)) {
                         auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
                         for (auto & output : invalid)
                             pool.enqueue(std::bind(checkOutput, drvPath, drv, output, drvState));
