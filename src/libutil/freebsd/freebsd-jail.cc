@@ -11,39 +11,35 @@
 
 namespace nix {
 
-AutoRemoveJail::AutoRemoveJail()
-    : del{false}
-{
-}
+AutoRemoveJail::AutoRemoveJail() = default;
 
 AutoRemoveJail::AutoRemoveJail(int jid)
     : jid(jid)
-    , del(true)
 {
+}
+
+void AutoRemoveJail::remove()
+{
+    if (jid != INVALID_JAIL) {
+        if (jail_remove(jid) < 0) {
+            throw SysError("Failed to remove jail %1%", jid);
+        }
+    }
+    cancel();
 }
 
 AutoRemoveJail::~AutoRemoveJail()
 {
     try {
-        if (del) {
-            if (jail_remove(jid) < 0) {
-                throw SysError("Failed to remove jail %1%", jid);
-            }
-        }
+        remove();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoRemoveJail::cancel()
+void AutoRemoveJail::cancel() noexcept
 {
-    del = false;
-}
-
-void AutoRemoveJail::reset(int j)
-{
-    del = true;
-    jid = j;
+    jid = INVALID_JAIL;
 }
 
 //////////////////////////////////////////////////////////////////////

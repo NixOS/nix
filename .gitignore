@@ -1,5 +1,7 @@
 # Default meson build dir
 /build
+# Meson creates this file too
+src/.wraplock
 
 # /tests/functional/
 /tests/functional/common/subst-vars.sh

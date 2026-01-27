@@ -332,15 +332,37 @@ public:
         x.del = false;
     }
 
+    AutoDelete & operator=(AutoDelete && x) noexcept
+    {
+        swap(*this, x);
+        return *this;
+    }
+
+    friend void swap(AutoDelete & lhs, AutoDelete & rhs) noexcept
+    {
+        using std::swap;
+        swap(lhs._path, rhs._path);
+        swap(lhs.del, rhs.del);
+        swap(lhs.recursive, rhs.recursive);
+    }
+
     AutoDelete(const std::filesystem::path & p, bool recursive = true);
     AutoDelete(const AutoDelete &) = delete;
-    AutoDelete & operator=(AutoDelete &&) = delete;
     AutoDelete & operator=(const AutoDelete &) = delete;
     ~AutoDelete();
 
-    void cancel();
+    /**
+     * Delete the file the path points to, and cancel this `AutoDelete`,
+     * so deletion is not attempted a second time by the destructor.
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void deletePath();
 
-    void reset(const std::filesystem::path & p, bool recursive = true);
+    /**
+     * Cancel the pending deletion
+     */
+    void cancel() noexcept;
 
     const std::filesystem::path & path() const
     {
@@ -520,11 +542,11 @@ private:
 #ifdef __FreeBSD__
 class AutoUnmount
 {
-    Path path;
+    std::filesystem::path path;
     bool del;
 public:
     AutoUnmount();
-    AutoUnmount(Path &);
+    AutoUnmount(const std::filesystem::path &);
     AutoUnmount(const AutoUnmount &) = delete;
 
     AutoUnmount(AutoUnmount && other) noexcept
@@ -535,13 +557,31 @@ public:
 
     AutoUnmount & operator=(AutoUnmount && other) noexcept
     {
-        path = std::move(other.path);
-        del = std::exchange(other.del, false);
+        swap(*this, other);
         return *this;
     }
 
+    friend void swap(AutoUnmount & lhs, AutoUnmount & rhs) noexcept
+    {
+        using std::swap;
+        swap(lhs.path, rhs.path);
+        swap(lhs.del, rhs.del);
+    }
+
     ~AutoUnmount();
-    void cancel();
+
+    /**
+     * Cancel the unmounting
+     */
+    void cancel() noexcept;
+
+    /**
+     * Unmount the mountpoint right away (if it exists), resetting the
+     * `AutoUnmount`
+     *
+     * The destructor calls this, but ignoring any exception.
+     */
+    void unmount();
 };
 #endif
 

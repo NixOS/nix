@@ -1,0 +1,5 @@
+error: syntax error, unexpected '=='
+       at «stdin»:1:1:
+            1| == 1
+             | ^
+            2|

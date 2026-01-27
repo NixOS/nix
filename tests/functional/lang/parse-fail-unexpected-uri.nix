@@ -1,0 +1,1 @@
+{ inherit http://x; }
