@@ -368,4 +368,9 @@ struct EvalSettings : Config
  */
 std::filesystem::path getNixDefExpr();
 
+/**
+ * EvalSettings instance from libexpr.
+ */
+extern EvalSettings evalSettings;
+
 } // namespace nix
