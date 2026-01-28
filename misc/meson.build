@@ -4,6 +4,7 @@ subdir('zsh')
 
 if host_machine.system() == 'linux'
   subdir('systemd')
+  subdir('openrc')
 endif
 
 if host_machine.system() == 'darwin'
