@@ -103,7 +103,6 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 
         if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
             throw Error("'%s' does not depend on '%s'", package->what(), dependency->what());
-            return; // should not be accessed
         }
 
         auto dependencyPath = *optDependencyPath;
