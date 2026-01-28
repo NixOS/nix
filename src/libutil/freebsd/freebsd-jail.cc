@@ -11,8 +11,6 @@
 
 namespace nix {
 
-AutoRemoveJail::AutoRemoveJail() = default;
-
 AutoRemoveJail::AutoRemoveJail(int jid)
     : jid(jid)
 {
