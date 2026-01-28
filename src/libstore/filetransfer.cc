@@ -9,6 +9,8 @@
 
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
+#include "nix/store/gcs-url.hh"
+#include "nix/store/gcs-creds.hh"
 #include <optional>
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -144,6 +146,12 @@ struct curlFileTransfer : public FileTransfer
                 requestHeaders = curl_slist_append(requestHeaders, ("Content-Type: " + request.mimeType).c_str());
             for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
                 requestHeaders = curl_slist_append(requestHeaders, fmt("%s: %s", it->first, it->second).c_str());
+            }
+
+            // Set up bearer token authentication if provided (for OAuth2, e.g., GCS)
+            if (request.bearerToken) {
+                requestHeaders =
+                    curl_slist_append(requestHeaders, fmt("Authorization: Bearer %s", *request.bearerToken).c_str());
             }
         }
 
@@ -921,6 +929,13 @@ struct curlFileTransfer : public FileTransfer
             return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
         }
 
+        /* Handle gs:// URIs by converting to HTTPS and adding OAuth2 bearer token */
+        if (request.uri.scheme() == "gs") {
+            auto modifiedRequest = request;
+            modifiedRequest.setupForGcs();
+            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+        }
+
         return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
     }
 
@@ -992,6 +1007,23 @@ void FileTransferRequest::setupForS3()
     // When built without AWS support, just try as public bucket
     debug("S3 request without authentication (built without AWS support)");
 #endif
+}
+
+void FileTransferRequest::setupForGcs()
+{
+    auto parsedGcs = ParsedGcsURL::parse(uri.parsed());
+    // Update the request URI to use HTTPS
+    uri = parsedGcs.toHttpsUrl();
+
+    // Get OAuth2 bearer token from Application Default Credentials
+    // Use read-only scope by default, read-write if ?write=true is specified
+    if (auto token = getGcsCredentialsProvider()->maybeGetAccessToken(parsedGcs.writable)) {
+        bearerToken = std::move(*token);
+        debug("Using GCS OAuth2 bearer token for request (writable=%s)", parsedGcs.writable ? "true" : "false");
+    } else {
+        // No credentials - try as public bucket
+        debug("GCS request without authentication (no credentials found)");
+    }
 }
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)

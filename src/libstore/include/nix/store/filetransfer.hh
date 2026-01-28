@@ -154,6 +154,12 @@ struct FileTransferRequest
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
      */
     std::optional<UsernameAuth> usernameAuth;
+
+    /**
+     * Optional bearer token for OAuth2 authentication (e.g., Google Cloud Storage).
+     * When provided, adds "Authorization: Bearer <token>" header to requests.
+     */
+    std::optional<std::string> bearerToken;
 #if NIX_WITH_AWS_AUTH
     /**
      * Pre-resolved AWS session token for S3 requests.
@@ -204,6 +210,7 @@ struct FileTransferRequest
     }
 
     void setupForS3();
+    void setupForGcs();
 
 private:
     friend struct curlFileTransfer;

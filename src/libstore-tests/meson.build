@@ -63,6 +63,7 @@ sources = files(
   'derived-path.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',
+  'gcs-url.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
   'local-binary-cache-store.cc',

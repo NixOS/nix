@@ -160,6 +160,14 @@ deps_public += nlohmann_json
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
+# OpenSSL for GCS service account JWT signing
+openssl = dependency(
+  'libcrypto',
+  'openssl',
+  version : '>= 1.1.1',
+)
+deps_private += openssl
+
 s3_aws_auth = get_option('s3-aws-auth')
 aws_crt_cpp = cxx.find_library('aws-crt-cpp', required : s3_aws_auth)
 
@@ -356,6 +364,12 @@ sources = files(
 if s3_aws_auth.enabled()
   sources += files('aws-creds.cc')
 endif
+
+# GCS (Google Cloud Storage) support
+sources += files(
+  'gcs-creds.cc',
+  'gcs-url.cc',
+)
 
 subdir('include/nix/store')
 

@@ -43,6 +43,8 @@ headers = [ config_pub_h ] + files(
   'export-import.hh',
   'filetransfer.hh',
   'gc-store.hh',
+  'gcs-creds.hh',
+  'gcs-url.hh',
   'globals.hh',
   'http-binary-cache-store.hh',
   'indirect-root-store.hh',
