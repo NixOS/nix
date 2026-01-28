@@ -87,9 +87,37 @@ private:
     size_type numAttrsInChain = 0;
 
     /**
-     * Length of the layers list.
+     * Packed field containing:
+     * - Bits 0-30: Length of the layers list (max 8, but we have room)
+     * - Bit 31: Whether any tombstones exist in the layer chain
      */
-    uint32_t numLayers = 1;
+    uint32_t numLayersAndTombstoneFlag = 1;
+
+    static constexpr uint32_t tombstoneFlagBit = 1u << 31;
+    static constexpr uint32_t numLayersMask = ~tombstoneFlagBit;
+
+    uint32_t numLayers() const noexcept
+    {
+        return numLayersAndTombstoneFlag & numLayersMask;
+    }
+
+    bool hasTombstonesInChain() const noexcept
+    {
+        return numLayersAndTombstoneFlag & tombstoneFlagBit;
+    }
+
+    void setNumLayers(uint32_t n) noexcept
+    {
+        numLayersAndTombstoneFlag = (numLayersAndTombstoneFlag & tombstoneFlagBit) | n;
+    }
+
+    void setHasTombstonesInChain(bool v) noexcept
+    {
+        if (v)
+            numLayersAndTombstoneFlag |= tombstoneFlagBit;
+        else
+            numLayersAndTombstoneFlag &= numLayersMask;
+    }
 
     /**
      * Bindings that this attrset is "layered" on top of.
@@ -209,6 +237,11 @@ public:
          */
         bool doMerge = true;
 
+        /**
+         * Whether tombstones exist in the chain (enables slow path).
+         */
+        bool hasTombstones = false;
+
         void push(BindingsCursor cursor) noexcept
         {
             cursorHeap.push_back(cursor);
@@ -229,7 +262,22 @@ public:
             return *this;
         }
 
-        void next(BindingsCursor cursor) noexcept
+        /**
+         * Fast path for next() when no tombstones exist.
+         */
+        void nextFast(BindingsCursor cursor) noexcept
+        {
+            current = &cursor.get();
+            cursor.increment();
+
+            if (!cursor.empty())
+                push(cursor);
+        }
+
+        /**
+         * Slow path for next() that handles tombstones.
+         */
+        void nextWithTombstones(BindingsCursor cursor) noexcept
         {
             while (true) {
                 current = &cursor.get();
@@ -256,6 +304,14 @@ public:
             }
         }
 
+        void next(BindingsCursor cursor) noexcept
+        {
+            if (hasTombstones) [[unlikely]]
+                nextWithTombstones(cursor);
+            else
+                nextFast(cursor);
+        }
+
         std::optional<BindingsCursor> consumeAllUntilCurrentName() noexcept
         {
             auto cursor = pop();
@@ -277,6 +333,7 @@ public:
 
         explicit iterator(const Bindings & attrs) noexcept
             : doMerge(attrs.baseLayer)
+            , hasTombstones(attrs.hasTombstonesInChain())
         {
             auto pushBindings = [this, priority = unsigned{0}](const Bindings & layer) mutable {
                 auto first = layer.attrs;
@@ -385,7 +442,8 @@ public:
             const Attr * maybeAttr = getInChunk(*currentChunk);
             if (maybeAttr) {
                 // Tombstone (nullptr value) means the attribute is deleted
-                if (maybeAttr->value == nullptr)
+                // Only check when tombstones exist in the chain (rare)
+                if (hasTombstonesInChain() && maybeAttr->value == nullptr) [[unlikely]]
                     return nullptr;
                 return maybeAttr;
             }
@@ -400,7 +458,7 @@ public:
      */
     bool isLayerListFull() const noexcept
     {
-        return numLayers == Bindings::maxLayers;
+        return numLayers() == Bindings::maxLayers;
     }
 
     /**
@@ -408,7 +466,7 @@ public:
      */
     bool isLayered() const noexcept
     {
-        return numLayers > 1;
+        return numLayers() > 1;
     }
 
     const_iterator begin() const
@@ -474,6 +532,12 @@ private:
     Bindings * bindings;
     Bindings::size_type capacity_;
 
+    /**
+     * Whether any tombstones have been added to this layer.
+     * Only set by insertTombstone(), not by regular push_back().
+     */
+    bool hasTombstonesInLayer = false;
+
     friend class EvalMemory;
 
     BindingsBuilder(EvalMemory & mem, SymbolTable & symbols, Bindings * bindings, size_type capacity)
@@ -506,13 +570,39 @@ private:
         auto & base = *bindings->baseLayer;
         auto attrs = std::span(bindings->attrs, bindings->numAttrs);
 
-        // Count tombstones and track how many delete base attrs
-        Bindings::size_type tombstones = 0;
+        // Propagate tombstone flag from base, and set if this layer has tombstones
+        bindings->setHasTombstonesInChain(base.hasTombstonesInChain() || hasTombstonesInLayer);
+
+        // Fast path: no tombstones anywhere in the chain
+        if (!bindings->hasTombstonesInChain()) {
+            // Count attrs that shadow base attrs
+            Bindings::size_type duplicates = 0;
+
+            if (attrs.size() > base.size()) {
+                std::set_intersection(
+                    base.begin(),
+                    base.end(),
+                    attrs.begin(),
+                    attrs.end(),
+                    boost::make_function_output_iterator([&]([[maybe_unused]] auto && _) { ++duplicates; }));
+            } else {
+                for (const auto & attr : attrs) {
+                    if (base.get(attr.name))
+                        ++duplicates;
+                }
+            }
+
+            bindings->numAttrsInChain = base.numAttrsInChain + attrs.size() - duplicates;
+            return;
+        }
+
+        // Slow path: tombstones exist, need to count them and which ones delete base attrs
+        Bindings::size_type tombstoneCount = 0;
         Bindings::size_type tombstonesDeletingBase = 0;
 
         for (const auto & attr : attrs) {
             if (attr.value == nullptr) {
-                ++tombstones;
+                ++tombstoneCount;
                 if (base.get(attr.name))
                     ++tombstonesDeletingBase;
             }
@@ -542,7 +632,7 @@ private:
 
         // Final size = base size + new non-tombstone attrs - deletions from base
         bindings->numAttrsInChain =
-            base.numAttrsInChain + (attrs.size() - tombstones - duplicates) - tombstonesDeletingBase;
+            base.numAttrsInChain + (attrs.size() - tombstoneCount - duplicates) - tombstonesDeletingBase;
     }
 
 public:
@@ -557,6 +647,17 @@ public:
     void insert(const Attr & attr)
     {
         push_back(attr);
+    }
+
+    /**
+     * Insert a tombstone (deletion marker) for the given attribute name.
+     * This marks the attribute as deleted in layered bindings.
+     * Only use this for implementing filterAttrs-like operations.
+     */
+    void insertTombstone(Symbol name)
+    {
+        hasTombstonesInLayer = true;
+        push_back(Attr(name, nullptr));
     }
 
     void push_back(const Attr & attr)
@@ -578,7 +679,7 @@ public:
     void layerOnTopOf(const Bindings & base) noexcept
     {
         bindings->baseLayer = &base;
-        bindings->numLayers = base.numLayers + 1;
+        bindings->setNumLayers(base.numLayers() + 1);
     }
 
     Value & alloc(Symbol name, PosIdx pos = noPos);
