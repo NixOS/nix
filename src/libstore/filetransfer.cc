@@ -131,7 +131,13 @@ struct curlFileTransfer : public FileTransfer
         {
             result.urls.push_back(request.uri.to_string());
 
-            requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
+            // Don't set Accept-Encoding for AWS-signed requests. Services like GCS
+            // modify this header (adding "gzip(gfe)"), which breaks SigV4 signature
+            // validation since the header value no longer matches what was signed.
+#if NIX_WITH_AWS_AUTH
+            if (!request.awsSigV4Provider)
+#endif
+                requestHeaders = curl_slist_append(requestHeaders, "Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 requestHeaders = curl_slist_append(requestHeaders, ("If-None-Match: " + request.expectedETag).c_str());
             if (!request.mimeType.empty())
