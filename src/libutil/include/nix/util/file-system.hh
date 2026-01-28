@@ -131,6 +131,10 @@ PosixStat lstat(const std::filesystem::path & path);
  */
 PosixStat stat(const std::filesystem::path & path);
 /**
+ * Get status of an open file descriptor.
+ */
+PosixStat fstat(int fd);
+/**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
  */

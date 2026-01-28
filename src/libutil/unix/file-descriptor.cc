@@ -51,10 +51,7 @@ void pollFD(int fd, int events)
 
 std::string readFile(int fd)
 {
-    PosixStat st;
-    if (fstat(fd, &st) == -1)
-        throw SysError("statting file");
-
+    auto st = nix::fstat(fd);
     return drainFD(fd, true, st.st_size);
 }
 

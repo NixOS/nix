@@ -7,6 +7,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 
 #include "store-config-private.hh"
@@ -68,9 +69,7 @@ void LocalStore::createTempRootsFile()
 
         /* Check whether the garbage collector didn't get in our
            way. */
-        PosixStat st;
-        if (fstat(fromDescriptorReadOnly(fdTempRoots->get()), &st) == -1)
-            throw SysError("statting '%1%'", fnTempRoots);
+        auto st = nix::fstat(fromDescriptorReadOnly(fdTempRoots->get()));
         if (st.st_size == 0)
             break;
 

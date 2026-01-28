@@ -55,9 +55,7 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::fun
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
 
-    PosixStat st;
-    if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
-        throw SysError("statting file");
+    auto st = nix::fstat(fromDescriptorReadOnly(fd.get()));
 
     sizeCallback(st.st_size);
 
