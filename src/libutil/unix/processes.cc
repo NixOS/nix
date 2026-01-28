@@ -12,7 +12,7 @@
 #include <future>
 #include <iostream>
 #include <sstream>
-#include <thread>
+#include <atomic>
 
 #include <grp.h>
 #include <sys/types.h>
@@ -67,6 +67,20 @@ int Pid::kill(bool allowInterrupts)
 
     debug("killing process %1%", pid);
 
+    std::atomic<bool> killed = false;
+
+    if (killTimeout > 0ms && killSignal != SIGKILL)
+        killThread = std::thread([&]() {
+            auto elapsed = 0ms;
+            while (elapsed < killTimeout) {
+                std::this_thread::sleep_for(25ms);
+                elapsed += 25ms;
+                if (killed)
+                    return;
+            }
+            ::kill(separatePG ? -pid : pid, SIGKILL);
+        });
+
     /* Send the requested signal to the child.  If it has its own
        process group, send the signal to every process in the child
        process group (which hopefully includes *all* its children). */
@@ -80,7 +94,12 @@ int Pid::kill(bool allowInterrupts)
             logError(SysError("killing process %d", pid).info());
     }
 
-    return wait(allowInterrupts);
+    int ret = wait(allowInterrupts);
+    if (killThread.joinable()) {
+        killed = true;
+        killThread.join();
+    }
+    return ret;
 }
 
 int Pid::wait(bool allowInterrupts)
@@ -108,6 +127,11 @@ void Pid::setSeparatePG(bool separatePG)
 void Pid::setKillSignal(int signal)
 {
     this->killSignal = signal;
+}
+
+void Pid::setKillTimeout(std::chrono::milliseconds duration)
+{
+    this->killTimeout = duration;
 }
 
 pid_t Pid::release()
