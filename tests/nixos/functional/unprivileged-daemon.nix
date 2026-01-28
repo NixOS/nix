@@ -5,8 +5,38 @@
   imports = [ ./common.nix ];
 
   nodes.machine =
-    { config, pkgs, ... }:
     {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    let
+      inherit (config.boot.kernelPackages) kernel;
+      # Here until https://github.com/NixOS/nixpkgs/pull/484057 is merged
+      btf = pkgs.stdenv.mkDerivation {
+        pname = "btf";
+        inherit (kernel) version;
+        nativeBuildInputs = [ pkgs.bpftools ];
+        dontUnpack = true;
+        buildPhase = ''
+          mkdir -p $out/include
+          bpftool btf dump file ${lib.getDev kernel}/vmlinux format c > $out/include/vmlinux.h
+        '';
+      };
+      systemd = pkgs.systemd.overrideAttrs (prev: {
+        mesonFlags = prev.mesonFlags ++ [
+          (lib.mesonOption "vmlinux-h-path" "${btf}/include/vmlinux.h")
+        ];
+      });
+    in
+    {
+      systemd.package = systemd;
+      systemd.additionalUpstreamSystemUnits = [
+        "systemd-nsresourced.service"
+        "systemd-nsresourced.socket"
+      ];
+
       users.groups.nix-daemon = { };
       users.users.nix-daemon = {
         isSystemUser = true;
@@ -34,6 +64,7 @@
       systemd.packages = [ config.nix.package ];
 
       systemd.services.nix-daemon = {
+        requires = [ "systemd-nsresourced.socket" ];
         path = [
           config.nix.package
           config.programs.ssh.package
@@ -41,7 +72,13 @@
         environment = {
           CURL_CA_BUNDLE = config.security.pki.caBundle;
           NIX_REMOTE = "local?ignore-gc-delete-failure=true";
-          NIX_CONFIG = "extra-experimental-features = local-overlay-store";
+          NIX_CONFIG = ''
+            extra-experimental-features = local-overlay-store auto-allocate-uids
+            auto-allocate-uids = true
+            use-systemd-nsresourced = true
+            sandbox = true
+            sandbox-fallback = false
+          '';
         };
         serviceConfig = {
           User = "nix-daemon";
