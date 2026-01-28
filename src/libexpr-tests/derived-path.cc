@@ -43,7 +43,7 @@ RC_GTEST_FIXTURE_PROP(
 
     auto * v = state.allocValue();
     state.mkOutputString(*v, b, std::nullopt, mockXpSettings);
-    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "", mockXpSettings);
+    auto d = state.coerceToSingleDerivedPath(noPos, *v, "", mockXpSettings, true);
     RC_ASSERT(SingleDerivedPath{b} == d);
 }
 
@@ -57,7 +57,7 @@ RC_GTEST_FIXTURE_PROP(
 
     auto * v = state.allocValue();
     state.mkOutputString(*v, b, outPath, mockXpSettings);
-    auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "", mockXpSettings);
+    auto d = state.coerceToSingleDerivedPath(noPos, *v, "", mockXpSettings, true);
     RC_ASSERT(SingleDerivedPath{b} == d);
 }
 

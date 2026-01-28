@@ -1,0 +1,4 @@
+warning:
+         … while evaluating the first argument passed to builtins.toPath
+
+         warning: in a future version of Nix this will be an error: cannot coerce a set that is not a package to a single derived path: { outPath = «thunk»; }
