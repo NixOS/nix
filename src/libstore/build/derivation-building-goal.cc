@@ -931,7 +931,7 @@ static void runPostBuildHook(
     LogSink sink(act);
 
     runProgram2({
-        .program = settings.postBuildHook,
+        .program = settings.postBuildHook.get(),
         .environment = hookEnvironment,
         .standardOut = &sink,
         .mergeStderrToStdout = true,
@@ -1047,15 +1047,15 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
 
     auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
 
-    Path logDir;
+    std::filesystem::path logDir;
     if (auto localStore = dynamic_cast<LocalStore *>(&store))
-        logDir = localStore->config->logDir;
+        logDir = localStore->config->logDir.get();
     else
         logDir = logSettings.nixLogDir;
-    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
+    auto dir = logDir / LocalFSStore::drvsLogDir / baseName.substr(0, 2);
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
+    auto logFileName = dir / (baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
 
     fd = toDescriptor(open(
         logFileName.c_str(),
@@ -1066,7 +1066,7 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
         ,
         0666));
     if (!fd)
-        throw SysError("creating log file '%1%'", logFileName);
+        throw SysError("creating log file %1%", PathFmt(logFileName));
 
     fileSink = std::make_shared<FdSink>(fd.get());
 

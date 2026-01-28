@@ -74,7 +74,7 @@ struct InstallSourceInfo
 {
     InstallSourceType type;
     std::shared_ptr<SourcePath> nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
-    Path profile;                            /* for srcProfile */
+    std::filesystem::path profile;           /* for srcProfile */
     std::string systemFilter;                /* for srcNixExprDrvs */
     Bindings * autoArgs;
 };
@@ -82,7 +82,7 @@ struct InstallSourceInfo
 struct Globals
 {
     InstallSourceInfo instSource;
-    Path profile;
+    std::filesystem::path profile;
     std::shared_ptr<EvalState> state;
     bool dryRun;
     bool preserveInstalled;
@@ -522,8 +522,8 @@ static void setMetaFlag(EvalState & state, PackageInfo & drv, const std::string 
     drv.setMeta(name, v);
 }
 
-static void
-installDerivations(Globals & globals, const Strings & args, const Path & profile, std::optional<int> priority)
+static void installDerivations(
+    Globals & globals, const Strings & args, const std::filesystem::path & profile, std::optional<int> priority)
 {
     debug("installing derivations");
 
@@ -800,7 +800,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     switchLink(globals.profile, generation);
 }
 
-static void uninstallDerivations(Globals & globals, Strings & selectors, Path & profile)
+static void uninstallDerivations(Globals & globals, Strings & selectors, const std::filesystem::path & profile)
 {
     while (true) {
         auto lockToken = optimisticLockProfile(profile);
@@ -1294,7 +1294,7 @@ static void opSwitchProfile(Globals & globals, Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1)
         throw UsageError("exactly one argument expected");
 
-    Path profile = absPath(opArgs.front());
+    auto profile = absPath(std::filesystem::path{opArgs.front()});
     auto profileLink = settings.useXDGBaseDirectories ? createNixStateDir() / "profile" : getHome() / ".nix-profile";
 
     switchLink(profileLink, profile);

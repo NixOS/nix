@@ -14,7 +14,7 @@ void checkOutputs(
     const decltype(DerivationOptions<StorePath>::outputChecks) & outputChecks,
     const std::map<std::string, ValidPathInfo> & outputs)
 {
-    std::map<Path, const ValidPathInfo &> outputsByPath;
+    std::map<std::filesystem::path, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
         outputsByPath.emplace(store.printStorePath(output.second.path), output.second);
 

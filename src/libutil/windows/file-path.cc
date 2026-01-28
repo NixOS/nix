@@ -9,7 +9,7 @@
 
 namespace nix {
 
-std::optional<std::filesystem::path> maybePath(PathView path)
+static std::optional<std::filesystem::path> maybePath(PathView path)
 {
     if (path.length() >= 3 && (('A' <= path[0] && path[0] <= 'Z') || ('a' <= path[0] && path[0] <= 'z'))
         && path[1] == ':' && WindowsPathTrait<char>::isPathSep(path[2])) {

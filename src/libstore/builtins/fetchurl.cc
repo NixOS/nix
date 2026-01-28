@@ -15,11 +15,11 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        pass a pointer to the data. */
     if (ctx.netrcData != "") {
         settings.netrcFile = "netrc";
-        writeFile(settings.netrcFile, ctx.netrcData, 0600);
+        writeFile(settings.netrcFile.get(), ctx.netrcData, 0600);
     }
 
     settings.caFile = "ca-certificates.crt";
-    writeFile(settings.caFile, ctx.caFileData, 0600);
+    writeFile(*settings.caFile.get(), ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
     if (!out)

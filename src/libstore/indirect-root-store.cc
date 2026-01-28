@@ -5,11 +5,11 @@ namespace nix {
 void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
 {
     /* Create directories up to `gcRoot'. */
-    createDirs(dirOf(link));
+    createDirs(std::filesystem::path(link).parent_path());
 
     /* Create the new symlink. */
-    Path tempLink = fmt("%1%.tmp-%2%-%3%", link, getpid(), rand());
-    createSymlink(target, tempLink);
+    auto tempLink = std::filesystem::path(link).concat(fmt(".tmp-%1%-%2%", getpid(), rand()));
+    createSymlink(target, tempLink.string());
 
     /* Atomically replace the old one. */
     std::filesystem::rename(tempLink, link);
@@ -17,13 +17,13 @@ void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
 
 Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
-    Path gcRoot(canonPath(_gcRoot));
+    auto gcRoot = canonPath(_gcRoot);
 
-    if (isInStore(gcRoot))
+    if (isInStore(gcRoot.string()))
         throw Error(
             "creating a garbage collector root (%1%) in the Nix store is forbidden "
             "(are you running nix-build inside the store?)",
-            gcRoot);
+            PathFmt(gcRoot));
 
     /* Register this root with the garbage collector, if it's
        running. This should be superfluous since the caller should
@@ -33,13 +33,13 @@ Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _g
 
     /* Don't clobber the link if it already exists and doesn't
        point to the Nix store. */
-    if (pathExists(gcRoot) && (!std::filesystem::is_symlink(gcRoot) || !isInStore(readLink(gcRoot))))
-        throw Error("cannot create symlink '%1%'; already exists", gcRoot);
+    if (pathExists(gcRoot.string()) && (!std::filesystem::is_symlink(gcRoot) || !isInStore(readLink(gcRoot).string())))
+        throw Error("cannot create symlink %1%; already exists", PathFmt(gcRoot));
 
-    makeSymlink(gcRoot, printStorePath(storePath));
-    addIndirectRoot(gcRoot);
+    makeSymlink(gcRoot.string(), printStorePath(storePath));
+    addIndirectRoot(gcRoot.string());
 
-    return gcRoot;
+    return gcRoot.string();
 }
 
 } // namespace nix

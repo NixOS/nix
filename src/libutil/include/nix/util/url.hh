@@ -265,7 +265,7 @@ std::string percentEncode(std::string_view s, std::string_view keep = "");
  * paths have no escape sequences --- file names cannot contain a
  * `/`.
  */
-Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath);
+std::string renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath);
 
 /**
  * Percent encode path. `%2F` for "interior slashes" is the most

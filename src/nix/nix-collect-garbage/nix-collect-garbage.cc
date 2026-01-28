@@ -12,10 +12,6 @@
 #include <iostream>
 #include <cerrno>
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 std::string deleteOlderThan;

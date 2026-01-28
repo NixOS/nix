@@ -32,7 +32,7 @@ AutoCloseFD createUnixDomainSocket()
     return fdSocket;
 }
 
-AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
+AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mode)
 {
     auto fdSocket = nix::createUnixDomainSocket();
 
@@ -41,11 +41,14 @@ AutoCloseFD createUnixDomainSocket(const Path & path, mode_t mode)
     chmod(path, mode);
 
     if (listen(toSocket(fdSocket.get()), 100) == -1)
-        throw SysError("cannot listen on socket '%1%'", path);
+        throw SysError("cannot listen on socket %s", PathFmt(path));
 
     return fdSocket;
 }
 
+/**
+ * Use string for path, because no `struct sockaddr_un` variant supports native wide character paths.
+ */
 static void
 bindConnectProcHelper(std::string_view operationName, auto && operation, Socket fd, const std::string & path)
 {
@@ -68,9 +71,9 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
         Pid pid = startProcess([&] {
             try {
                 pipe.readSide.close();
-                Path dir = dirOf(path);
+                auto dir = std::filesystem::path(path).parent_path();
                 if (chdir(dir.c_str()) == -1)
-                    throw SysError("chdir to '%s' failed", dir);
+                    throw SysError("chdir to %s failed", PathFmt(dir));
                 std::string base(baseNameOf(path));
                 if (base.size() + 1 >= sizeof(addr.sun_path))
                     throw Error("socket path '%s' is too long", base);
@@ -100,11 +103,11 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
     }
 }
 
-void bind(Socket fd, const std::string & path)
+void bind(Socket fd, const std::filesystem::path & path)
 {
     unlink(path.c_str());
 
-    bindConnectProcHelper("bind", ::bind, fd, path);
+    bindConnectProcHelper("bind", ::bind, fd, path.string());
 }
 
 void connect(Socket fd, const std::filesystem::path & path)

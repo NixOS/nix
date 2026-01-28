@@ -440,7 +440,7 @@ private:
 };
 
 static void handleDiffHook(
-    const Path & diffHook,
+    const std::filesystem::path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,
@@ -458,7 +458,8 @@ static void handleDiffHook(
                 .gid = gid,
                 .chdir = "/"});
         if (!statusOk(diffRes.first))
-            throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
+            throw ExecError(
+                diffRes.first, "diff-hook program %s %2%", PathFmt(diffHook), statusToString(diffRes.first));
 
         if (diffRes.second != "")
             printError(chomp(diffRes.second));
@@ -889,7 +890,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
         auto state = stBegin;
-        auto lines = runProgram(settings.preBuildHook, false, getPreBuildHookArgs());
+        auto lines = runProgram(settings.preBuildHook.get(), false, getPreBuildHookArgs());
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
             auto line = lines.substr(lastPos, nlPos - lastPos);
@@ -1259,14 +1260,15 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
             try {
-                ctx.netrcData = readFile(settings.netrcFile);
+                ctx.netrcData = readFile(settings.netrcFile.get());
             } catch (SystemError &) {
             }
 
-            try {
-                ctx.caFileData = readFile(settings.caFile);
-            } catch (SystemError &) {
-            }
+            if (auto & caFile = settings.caFile.get())
+                try {
+                    ctx.caFileData = readFile(*caFile);
+                } catch (SystemError &) {
+                }
         }
 
         enterChroot();

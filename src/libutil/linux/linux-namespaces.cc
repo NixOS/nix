@@ -22,13 +22,13 @@ bool userNamespacesSupported()
             return false;
         }
 
-        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
+        std::filesystem::path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
         if (!pathExists(maxUserNamespaces) || trim(readFile(maxUserNamespaces)) == "0") {
             debug("user namespaces appear to be disabled; check '/proc/sys/user/max_user_namespaces'");
             return false;
         }
 
-        Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
+        std::filesystem::path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
         if (pathExists(procSysKernelUnprivilegedUsernsClone)
             && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
             debug("user namespaces appear to be disabled; check '/proc/sys/kernel/unprivileged_userns_clone'");

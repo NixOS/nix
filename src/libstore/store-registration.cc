@@ -30,7 +30,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     auto storeConfig = std::visit(
         overloaded{
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
-                auto stateDir = getOr(params, "state", settings.nixStateDir);
+                auto stateDir = getOr(params, "state", settings.nixStateDir.string());
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
                 else if (pathExists(settings.nixDaemonSocketFile))
@@ -42,17 +42,18 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     /* If /nix doesn't exist, there is no daemon socket, and
                        we're not root, then automatically set up a chroot
                        store in ~/.local/share/nix/root. */
-                    auto chrootStore = getDataDir() + "/root";
+                    auto chrootStore = getDataDir() / "root";
                     if (!pathExists(chrootStore)) {
                         try {
                             createDirs(chrootStore);
                         } catch (SystemError & e) {
                             return make_ref<LocalStore::Config>(params);
                         }
-                        warn("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
+                        warn("%s does not exist, so Nix will use %s as a chroot store", stateDir, PathFmt(chrootStore));
                     } else
-                        debug("'%s' does not exist, so Nix will use '%s' as a chroot store", stateDir, chrootStore);
-                    return make_ref<LocalStore::Config>("local", chrootStore, params);
+                        debug(
+                            "%s does not exist, so Nix will use %s as a chroot store", stateDir, PathFmt(chrootStore));
+                    return make_ref<LocalStore::Config>("local", chrootStore.string(), params);
                 }
 #endif
                 else

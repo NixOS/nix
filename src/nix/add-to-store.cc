@@ -10,7 +10,7 @@ using namespace nix;
 
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
-    Path path;
+    std::filesystem::path path;
     std::optional<std::string> namePart;
     ContentAddressMethod caMethod = ContentAddressMethod::Raw::NixArchive;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
@@ -36,7 +36,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     void run(ref<Store> store) override
     {
         if (!namePart)
-            namePart = baseNameOf(path);
+            namePart = path.filename().filename().string();
 
         auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
 

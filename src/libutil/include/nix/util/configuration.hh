@@ -2,6 +2,7 @@
 ///@file
 
 #include <cassert>
+#include <filesystem>
 #include <map>
 #include <set>
 

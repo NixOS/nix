@@ -28,7 +28,7 @@ BinaryCacheStore::BinaryCacheStore(Config & config)
     : config{config}
 {
     if (config.secretKeyFile != "")
-        signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile)}));
+        signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile.get())}));
 
     if (config.secretKeyFiles != "") {
         std::stringstream ss(config.secretKeyFiles);

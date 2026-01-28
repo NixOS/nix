@@ -39,7 +39,7 @@ static auto rDumpPath = registerCommand2<CmdDumpPath>({"store", "dump-path"});
 
 struct CmdDumpPath2 : Command
 {
-    Path path;
+    std::filesystem::path path;
 
     CmdDumpPath2()
     {
@@ -61,7 +61,7 @@ struct CmdDumpPath2 : Command
     void run() override
     {
         auto sink = getNarSink();
-        dumpPath(path, sink);
+        dumpPath(path.string(), sink);
         sink.flush();
     }
 };

@@ -117,7 +117,7 @@ struct PathInputScheme : InputScheme
     std::optional<std::string> isRelative(const Input & input) const override
     {
         auto path = getStrAttr(input.attrs, "path");
-        if (isAbsolute(path))
+        if (std::filesystem::path(path).is_absolute())
             return std::nullopt;
         else
             return path;
@@ -132,7 +132,7 @@ struct PathInputScheme : InputScheme
     {
         auto path = getStrAttr(input.attrs, "path");
 
-        if (isAbsolute(path))
+        if (std::filesystem::path(path).is_absolute())
             return canonPath(path);
 
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());

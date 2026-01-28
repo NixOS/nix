@@ -90,7 +90,7 @@ public:
     {
         auto state(_state.lock());
 
-        createDirs(dirOf(dbPath));
+        createDirs(std::filesystem::path(dbPath).parent_path());
 
         state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
 
