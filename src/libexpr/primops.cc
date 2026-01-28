@@ -3212,25 +3212,62 @@ static void prim_removeAttrs(EvalState & state, const PosIdx pos, Value ** args,
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.removeAttrs");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.removeAttrs");
 
-    /* Get the attribute names to be removed.
-       We keep them as Attrs instead of Symbols so std::set_difference
-       can be used to remove them from attrs[0]. */
+    auto * source = args[0]->attrs();
+    auto listSize = args[1]->listSize();
+
+    // Fast path: empty removal list returns the original attrset
+    if (listSize == 0) {
+        v = *args[0];
+        return;
+    }
+
+    // Fast path: empty source attrset
+    if (source->empty()) {
+        v.mkAttrs(&Bindings::emptyBindings);
+        return;
+    }
+
+    /* Get the attribute names to be removed. */
     // 64: large enough to fit the attributes of a derivation
-    boost::container::small_vector<Attr, 64> names;
-    names.reserve(args[1]->listSize());
+    boost::container::small_vector<Symbol, 64> namesToRemove;
     for (auto elem : args[1]->listView()) {
         state.forceStringNoCtx(
             *elem, pos, "while evaluating the values of the second argument passed to builtins.removeAttrs");
-        names.emplace_back(state.symbols.create(elem->string_view()), nullptr);
+        auto sym = state.symbols.create(elem->string_view());
+        // Only add if the attribute actually exists in source
+        if (source->get(sym))
+            namesToRemove.push_back(sym);
     }
-    std::sort(names.begin(), names.end());
 
-    /* Copy all attributes not in that set.  Note that we don't need
-       to sort v.attrs because it's a subset of an already sorted
-       vector. */
-    auto attrs = state.buildBindings(args[0]->attrs()->size());
-    std::set_difference(
-        args[0]->attrs()->begin(), args[0]->attrs()->end(), names.begin(), names.end(), std::back_inserter(attrs));
+    // Fast path: none of the names to remove exist in source
+    if (namesToRemove.empty()) {
+        v = *args[0];
+        return;
+    }
+
+    // Tombstone path: for large attrsets, layer tombstones on top
+    // instead of copying all remaining attributes
+    constexpr size_t tombstoneThreshold = 8;
+    if (source->size() >= tombstoneThreshold && !source->isLayerListFull()) {
+        auto attrs = state.buildBindings(namesToRemove.size());
+        for (auto sym : namesToRemove)
+            attrs.insertTombstone(sym);
+        attrs.layerOnTopOf(*source);
+        v.mkAttrs(attrs.finish());
+        return;
+    }
+
+    /* Copy all attributes not in the removal set.  Note that we don't need
+       to sort v.attrs because it's a subset of an already sorted vector. */
+    std::sort(namesToRemove.begin(), namesToRemove.end());
+    // Convert to Attr for set_difference
+    boost::container::small_vector<Attr, 64> names;
+    names.reserve(namesToRemove.size());
+    for (auto sym : namesToRemove)
+        names.emplace_back(sym, nullptr);
+
+    auto attrs = state.buildBindings(source->size());
+    std::set_difference(source->begin(), source->end(), names.begin(), names.end(), std::back_inserter(attrs));
     v.mkAttrs(attrs.alreadySorted());
 }
 
