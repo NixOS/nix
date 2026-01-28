@@ -19,6 +19,8 @@
   gid ? 0,
   uname ? "root",
   gname ? "root",
+  extraFakeRootCommands ? "",
+  extraExtraCommands ? "",
   Labels ? {
     "org.opencontainers.image.title" = "Nix";
     "org.opencontainers.image.source" = "https://github.com/NixOS/nix";
@@ -359,13 +361,13 @@ dockerTools.buildLayeredImageWithNixDb {
   extraCommands = ''
     rm -rf nix-support
     ln -s /nix/var/nix/profiles nix/var/nix/gcroots/profiles
-  '';
+  '' + extraExtraCommands;
   fakeRootCommands = ''
     chmod 1777 tmp
     chmod 1777 var/tmp
     chown -R ${toString uid}:${toString gid} .${userHome}
     chown -R ${toString uid}:${toString gid} nix
-  '';
+  '' + extraFakeRootCommands;
 
   config = {
     inherit Cmd Labels;
