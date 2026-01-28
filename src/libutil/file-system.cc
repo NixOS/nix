@@ -217,6 +217,20 @@ PosixStat lstat(const std::filesystem::path & path)
     return st;
 }
 
+PosixStat fstat(int fd)
+{
+    PosixStat st;
+    if (
+#ifdef _WIN32
+        _fstat64
+#else
+        ::fstat
+#endif
+        (fd, &st))
+        throw SysError("getting status of fd %d", fd);
+    return st;
+}
+
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
     std::optional<PosixStat> st{std::in_place};
