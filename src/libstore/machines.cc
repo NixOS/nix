@@ -1,4 +1,5 @@
 #include "nix/util/base-n.hh"
+#include "nix/util/url.hh"
 #include "nix/store/machines.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
@@ -31,7 +32,9 @@ Machine::Machine(
     , maxJobs(maxJobs)
     , speedFactor(speedFactor == 0.0f ? 1.0f : speedFactor)
     , supportedFeatures(supportedFeatures)
+    , supportedFeaturesCount(countFeatures(supportedFeatures))
     , mandatoryFeatures(mandatoryFeatures)
+    , mandatoryFeaturesCount(countFeatures(mandatoryFeatures))
     , sshPublicHostKey(sshPublicHostKey)
 {
     if (speedFactor < 0.0)
@@ -45,16 +48,40 @@ bool Machine::systemSupported(const std::string & system) const
 
 bool Machine::allSupported(const StringSet & features) const
 {
-    return std::all_of(features.begin(), features.end(), [&](const std::string & feature) {
-        return supportedFeatures.count(feature) || mandatoryFeatures.count(feature);
-    });
+    if (experimentalFeatureSettings.isEnabled(Xp::ResourceManagement)) {
+        auto featuresCount = countFeatures(features);
+        return std::all_of(featuresCount.begin(), featuresCount.end(), [&](const auto & f) {
+            return (
+                supportedFeaturesCount.count(f.first) > 0 && (         // feature is supported, and
+                    supportedFeaturesCount.at(f.first) >= f.second ||  // we have the quantity of it needed or
+                    supportedFeaturesCount.at(f.first) == 0            // we have a limitless supply of it
+                )
+            ) || (
+                mandatoryFeaturesCount.count(f.first) > 0 && (
+                    mandatoryFeaturesCount.at(f.first) >= f.second ||
+                    mandatoryFeaturesCount.at(f.first) == 0
+                )
+            );
+        });
+    } else {
+        return std::all_of(features.begin(), features.end(), [&](const std::string & feature) {
+            return supportedFeatures.count(feature) || mandatoryFeatures.count(feature);
+        });
+    }
 }
 
 bool Machine::mandatoryMet(const StringSet & features) const
 {
-    return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(), [&](const std::string & feature) {
-        return features.count(feature);
-    });
+    if (experimentalFeatureSettings.isEnabled(Xp::ResourceManagement)) {
+        auto featureCount = countFeatures(features);
+        return std::all_of(mandatoryFeaturesCount.begin(), mandatoryFeaturesCount.end(), [&](const auto & feature) {
+            return featureCount.count(feature.first);
+        });
+    } else {
+        return std::all_of(mandatoryFeatures.begin(), mandatoryFeatures.end(), [&](const std::string & feature) {
+            return features.count(feature);
+        });
+    }
 }
 
 StoreReference Machine::completeStoreReference() const
@@ -81,7 +108,7 @@ StoreReference Machine::completeStoreReference() const
             for (auto & f : feats) {
                 if (fs.size() > 0)
                     fs += ' ';
-                fs += f;
+                fs += percentEncode(f);
             }
         };
         append(supportedFeatures);
@@ -205,6 +232,26 @@ Machines Machine::parseConfig(const StringSet & defaultSystems, const std::strin
 {
     const auto builderLines = expandBuilderLines(s);
     return parseBuilderLines(defaultSystems, builderLines);
+}
+
+FeatureCount Machine::countFeatures(const StringSet & features)
+{
+    FeatureCount fc;
+    for (auto & f : features) {
+        std::istringstream fss(f);
+        std::string name;
+        std::string quantity;
+        unsigned long ulquantity = 0;
+        std::getline(fss, name, ':');
+        if (std::getline(fss, quantity)) {
+            ulquantity = std::stoul(quantity);
+            if (ulquantity == 0) {
+                throw UsageError("quantity for feature %s must be > 0", name);
+            }
+        }
+        fc.emplace(name, ulquantity);
+    };
+    return fc;
 }
 
 Machines getMachines()
