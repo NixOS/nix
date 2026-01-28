@@ -35,6 +35,10 @@ class Pid
 #endif
 public:
     Pid();
+    Pid(const Pid &) = delete;
+    Pid(Pid && other) noexcept;
+    Pid & operator=(const Pid &) = delete;
+    Pid & operator=(Pid && other) noexcept;
 #ifndef _WIN32
     Pid(pid_t pid);
     void operator=(pid_t pid);
@@ -53,6 +57,18 @@ public:
     void setKillSignal(int signal);
     pid_t release();
 #endif
+
+    friend void swap(Pid & lhs, Pid & rhs) noexcept
+    {
+        using std::swap;
+#ifndef _WIN32
+        swap(lhs.pid, rhs.pid);
+        swap(lhs.separatePG, rhs.separatePG);
+        swap(lhs.killSignal, rhs.killSignal);
+#else
+        swap(lhs.pid, rhs.pid);
+#endif
+    }
 };
 
 #ifndef _WIN32

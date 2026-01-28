@@ -8,6 +8,7 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
@@ -217,6 +218,10 @@ struct AutoUserLock : UserLock
 std::unique_ptr<UserLock> acquireUserLock(const std::string & userGroup, uid_t nrIds, bool useUserNamespace)
 {
     if (auto * uidSettings = settings.getAutoAllocateUidSettings()) {
+#ifdef __linux__
+        if (uidSettings->useSystemdNsresourced)
+            return linux::acquireSystemdUserLock(nrIds);
+#endif
         auto userPoolDir = std::filesystem::path{settings.nixStateDir} / "userpool2";
         createDirs(userPoolDir);
         return AutoUserLock::acquire(userPoolDir, userGroup, nrIds, useUserNamespace, *uidSettings);

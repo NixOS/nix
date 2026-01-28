@@ -40,4 +40,10 @@ std::unique_ptr<UserLock> acquireUserLock(const std::string & userGroup, uid_t n
 
 bool useBuildUsers();
 
+#ifdef __linux__
+namespace linux {
+std::unique_ptr<UserLock> acquireSystemdUserLock(uid_t nrIds);
+}
+#endif
+
 } // namespace nix
