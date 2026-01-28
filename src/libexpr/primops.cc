@@ -3565,6 +3565,93 @@ static RegisterPrimOp primop_mapAttrs({
     .fun = prim_mapAttrs,
 });
 
+static void prim_filterAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.filterAttrs");
+
+    auto * source = args[1]->attrs();
+
+    // Fast path: empty attrset
+    if (source->empty()) {
+        v = *args[1];
+        return;
+    }
+
+    state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.filterAttrs");
+
+    // For large attrsets with available layer capacity, use tombstones.
+    // This is beneficial when most attrs pass the filter (common case).
+    constexpr size_t tombstoneThreshold = 8;
+    if (source->size() >= tombstoneThreshold && !source->isLayerListFull()) {
+        // Collect attrs that DON'T pass the filter (will become tombstones)
+        boost::container::small_vector<Symbol, 64> toRemove;
+
+        for (auto & attr : *source) {
+            Value * vName = Value::toPtr(state.symbols[attr.name]);
+            Value * callArgs[] = {vName, attr.value};
+            Value res;
+            state.callFunction(*args[0], callArgs, res, noPos);
+            if (!state.forceBool(
+                    res,
+                    pos,
+                    "while evaluating the return value of the filtering function passed to builtins.filterAttrs"))
+                toRemove.push_back(attr.name);
+        }
+
+        // If nothing to remove, return original
+        if (toRemove.empty()) {
+            v = *args[1];
+            return;
+        }
+
+        // If everything filtered out, return empty
+        if (toRemove.size() == source->size()) {
+            v.mkAttrs(&Bindings::emptyBindings);
+            return;
+        }
+
+        // Layer tombstones on top
+        auto attrs = state.buildBindings(toRemove.size());
+        for (auto sym : toRemove)
+            attrs.insertTombstone(sym);
+        attrs.layerOnTopOf(*source);
+        v.mkAttrs(attrs.finish());
+        return;
+    }
+
+    // Copy approach for small attrsets or when layer list is full
+    auto attrs = state.buildBindings(source->size());
+
+    for (auto & attr : *source) {
+        Value * vName = Value::toPtr(state.symbols[attr.name]);
+        Value * callArgs[] = {vName, attr.value};
+        Value res;
+        state.callFunction(*args[0], callArgs, res, noPos);
+        if (state.forceBool(
+                res, pos, "while evaluating the return value of the filtering function passed to builtins.filterAttrs"))
+            attrs.insert(attr.name, attr.value);
+    }
+
+    v.mkAttrs(attrs.alreadySorted());
+}
+
+static RegisterPrimOp primop_filterAttrs({
+    .name = "__filterAttrs",
+    .args = {"f", "attrset"},
+    .doc = R"(
+      Return an attribute set consisting of the attributes in *attrset* for which
+      the function *f* returns `true`. The function *f* is called with two arguments:
+      the name of the attribute and the value of the attribute. For example,
+
+      ```nix
+      builtins.filterAttrs (name: value: name == "foo") { foo = 1; bar = 2; }
+      ```
+
+      evaluates to `{ foo = 1; }`.
+    )",
+    .fun = prim_filterAttrs,
+});
+
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     // we will first count how many values are present for each given key.
