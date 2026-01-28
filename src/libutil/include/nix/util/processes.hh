@@ -18,6 +18,7 @@
 #include <map>
 #include <sstream>
 #include <optional>
+#include <thread>
 
 namespace nix {
 
@@ -30,6 +31,8 @@ class Pid
     pid_t pid = -1;
     bool separatePG = false;
     int killSignal = SIGKILL;
+    unsigned killTimeout = 0;
+    std::jthread killThread;
 #else
     AutoCloseFD pid = INVALID_DESCRIPTOR;
 #endif
@@ -51,6 +54,7 @@ public:
 #ifndef _WIN32
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
+    void setKillTimeout(unsigned duration);
     pid_t release();
 #endif
 };
