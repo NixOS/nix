@@ -51,6 +51,7 @@ headers = [ config_pub_h ] + files(
   'local-binary-cache-store.hh',
   'local-fs-store.hh',
   'local-overlay-store.hh',
+  'local-settings.hh',
   'local-store.hh',
   'log-store.hh',
   'machines.hh',

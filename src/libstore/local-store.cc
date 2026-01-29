@@ -6,7 +6,6 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/realisation.hh"
-#include "nix/store/nar-info.hh"
 #include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
@@ -16,12 +15,9 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
-#include "nix/util/url.hh"
 #include "nix/util/users.hh"
-#include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 
-#include <iostream>
 #include <algorithm>
 #include <cstring>
 
@@ -33,7 +29,6 @@
 #include <unistd.h>
 #include <utime.h>
 #include <fcntl.h>
-#include <errno.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -76,9 +71,14 @@ std::string LocalStoreConfig::doc()
 
 Path LocalBuildStoreConfig::getBuildDir() const
 {
-    return settings.buildDir.get().has_value() ? *settings.buildDir.get()
-           : buildDir.get().has_value()        ? *buildDir.get()
-                                               : stateDir.get() + "/builds";
+    return settings.getLocalSettings().buildDir.get().has_value() ? *getLocalSettings().buildDir.get()
+           : buildDir.get().has_value()                           ? *buildDir.get()
+                                                                  : stateDir.get() + "/builds";
+}
+
+const LocalSettings & LocalBuildStoreConfig::getLocalSettings() const
+{
+    return settings.getLocalSettings();
 }
 
 ref<Store> LocalStore::Config::openStore() const
@@ -140,6 +140,7 @@ LocalStore::LocalStore(ref<const Config> config)
     createDirs(tempRootsDir);
     createDirs(dbDir);
     Path gcRootsDir = config->stateDir + "/gcroots";
+    const auto & settings = config->getLocalSettings();
     const auto & gcSettings = settings.getGCSettings();
     if (!pathExists(gcRootsDir)) {
         createDirs(gcRootsDir);
@@ -453,11 +454,6 @@ LocalStore::~LocalStore()
     }
 }
 
-const GCSettings & LocalStoreConfig::getGCSettings() const
-{
-    return settings.getGCSettings();
-}
-
 StoreReference LocalStoreConfig::getReference() const
 {
     auto params = getQueryParams();
@@ -520,7 +516,7 @@ void LocalStore::openDB(State & state, bool create)
        should be safe enough.  If the user asks for it, don't sync at
        all.  This can cause database corruption if the system
        crashes. */
-    std::string syncMode = settings.fsyncMetadata ? "normal" : "off";
+    std::string syncMode = config->getLocalSettings().fsyncMetadata ? "normal" : "off";
     db.exec("pragma synchronous = " + syncMode);
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
@@ -902,7 +898,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
        be fsync-ed.  So some may want to fsync them before registering
        the validity, at the expense of some speed of the path
        registering operation. */
-    if (settings.syncBeforeRegistering)
+    if (config->getLocalSettings().syncBeforeRegistering)
         sync();
 #endif
 
@@ -1027,7 +1023,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 TeeSource wrapperSource{source, hashSink};
 
                 narRead = true;
-                restorePath(realPath, wrapperSource, settings.fsyncStorePaths);
+                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
 
                 auto hashResult = hashSink.finish();
 
@@ -1087,7 +1083,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
-                if (settings.fsyncStorePaths) {
+                if (config->getLocalSettings().fsyncStorePaths) {
                     recursiveSync(realPath);
                     syncParent(realPath);
                 }
@@ -1115,6 +1111,7 @@ StorePath LocalStore::addToStoreFromDump(
     /* For computing the store path. */
     auto hashSink = std::make_unique<HashSink>(hashAlgo);
     TeeSource source{source0, *hashSink};
+    const LocalSettings & settings = config->getLocalSettings();
 
     /* Read the source path into memory, but only if it's up to
        narBufferSize bytes. If it's larger, write it to a temporary
