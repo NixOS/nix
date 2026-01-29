@@ -588,7 +588,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
-                canonicalisePathMetaData(store->printStorePath(info->path));
+                canonicalisePathMetaData(
+                    store->printStorePath(info->path), {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},

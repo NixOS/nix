@@ -1083,7 +1083,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                canonicalisePathMetaData(realPath);
+                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1243,7 +1243,8 @@ StorePath LocalStore::addToStoreFromDump(
                 narHash = narSink.finish();
             }
 
-            canonicalisePathMetaData(realPath); // FIXME: merge into restorePath
+            canonicalisePathMetaData(
+                realPath, {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
