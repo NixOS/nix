@@ -69,6 +69,8 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
            to avoid reporting spurious failures with empty messages. */
         if (goalPtr->exitCode == Goal::ecBusy)
             continue;
+        if (auto * failure = goalPtr->buildResult.tryGetFailure())
+            failure->withExitStatus(failure->exitStatus());
         results.emplace_back(
             KeyedBuildResult{
                 goalPtr->buildResult,

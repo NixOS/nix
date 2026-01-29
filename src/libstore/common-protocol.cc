@@ -115,8 +115,6 @@ void CommonProto::Serialise<Signature>::write(
  * Mapping from protocol wire values to BuildResultStatus.
  *
  * The array index is the wire value.
- * Note: HashMismatch is not in the protocol; it gets converted
- * to OutputRejected before serialization.
  */
 constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultSuccessStatus::Built,                  // 0
@@ -134,12 +132,14 @@ constexpr static BuildResultStatus buildResultStatusTable[] = {
     BuildResultFailureStatus::NotDeterministic,       // 12
     BuildResultSuccessStatus::ResolvesToAlreadyValid, // 13
     BuildResultFailureStatus::NoSubstituters,         // 14
+    BuildResultFailureStatus::HashMismatch,           // 15 (requires hash-mismatch-status feature)
 };
 
 BuildResultStatus
 CommonProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    auto rawStatus = readNum<uint8_t>(conn.from);
+    // Read as uint64_t for backwards compatibility with older daemons
+    auto rawStatus = readNum<uint64_t>(conn.from);
 
     if (rawStatus >= std::size(buildResultStatusTable))
         throw Error("Invalid BuildResult status %d from remote", rawStatus);
@@ -152,7 +152,8 @@ void CommonProto::Serialise<BuildResultStatus>::write(
 {
     for (auto && [wire, val] : enumerate(buildResultStatusTable))
         if (val == status) {
-            conn.to << uint8_t(wire);
+            // Write as uint64_t for backwards compatibility with older clients
+            conn.to << uint64_t(wire);
             return;
         }
     unreachable();
