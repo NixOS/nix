@@ -1,11 +1,12 @@
 #include "nix/store/remote-fs-accessor.hh"
+#include "nix/store/local-nar-cache.hh"
 
 namespace nix {
 
 RemoteFSAccessor::RemoteFSAccessor(
     ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir)
     : store(store)
-    , narCache(cacheDir)
+    , narCache(cacheDir ? makeLocalNarCache(*cacheDir) : makeMemoryNarCache())
     , requireValidPath(requireValidPath)
 {
 }
@@ -18,11 +19,11 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
     return {ref{accessObject(storePath)}, CanonPath{restPath}};
 }
 
-std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath & storePath)
+ref<NarAccessor> RemoteFSAccessor::accessObject(const StorePath & storePath)
 {
     // Check if we already have the NAR hash for this store path
     if (auto * narHash = get(narHashes, storePath.hashPart()))
-        return narCache.getOrInsert(*narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
+        return narCache->getOrInsert(*narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 
     // Query the path info to get the NAR hash
     auto info = store->queryPathInfo(storePath);
@@ -31,7 +32,7 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
     narHashes.emplace(storePath.hashPart(), info->narHash);
 
     // Get or create the NAR accessor
-    return narCache.getOrInsert(info->narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
+    return narCache->getOrInsert(info->narHash, [&](Sink & sink) { store->narFromPath(storePath, sink); });
 }
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)

@@ -841,7 +841,7 @@ ref<SourceAccessor> RemoteStore::getFSAccessor(bool requireValidPath)
 
 std::shared_ptr<SourceAccessor> RemoteStore::getFSAccessor(const StorePath & path, bool requireValidPath)
 {
-    return getRemoteFSAccessor(requireValidPath)->accessObject(path);
+    return static_cast<ref<SourceAccessor>>(getRemoteFSAccessor(requireValidPath)->accessObject(path));
 }
 
 void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
