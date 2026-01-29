@@ -8,50 +8,33 @@ export NIX_FIRST_BUILD_UID="${NIX_FIRST_BUILD_UID:-30001}"
 export NIX_BUILD_GROUP_ID="${NIX_BUILD_GROUP_ID:-30000}"
 export NIX_BUILD_USER_NAME_TEMPLATE="nixbld%d"
 
-readonly SERVICE_SRC=/lib/systemd/system/nix-daemon.service
-readonly SERVICE_DEST=/etc/systemd/system/nix-daemon.service
+readonly SERVICE_SRC=/lib/openrc/nix-daemon
+readonly SERVICE_DEST=/etc/init.d/nix-daemon
+# Path for the override variables file to contain the proxy settings
+readonly SERVICE_OVERRIDE=/etc/conf.d/nix-daemon
 
-readonly SOCKET_SRC=/lib/systemd/system/nix-daemon.socket
-readonly SOCKET_DEST=/etc/systemd/system/nix-daemon.socket
-
-readonly TMPFILES_SRC=/lib/tmpfiles.d/nix-daemon.conf
-readonly TMPFILES_DEST=/etc/tmpfiles.d/nix-daemon.conf
-
-# Path for the systemd override unit file to contain the proxy settings
-readonly SERVICE_OVERRIDE=${SERVICE_DEST}.d/override.conf
-
-create_systemd_override() {
-     header "Configuring proxy for the nix-daemon service"
-    _sudo "create directory for systemd unit override" mkdir -p "$(dirname "$SERVICE_OVERRIDE")"
-    cat <<EOF | _sudo "create systemd unit override" tee "$SERVICE_OVERRIDE"
-[Service]
-$1
-EOF
-}
-
-escape_systemd_env() {
-    temp_var="${1//\'/\\\'}"
-    echo "${temp_var//\%/%%}"
-}
-
-# Gather all non-empty proxy environment variables into a string
-create_systemd_proxy_env() {
-    vars="http_proxy https_proxy ftp_proxy all_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY NO_PROXY"
-    for v in $vars; do
-        # shellcheck disable=SC2268
-        if [ "x${!v:-}" != "x" ]; then
-            echo "Environment=${v}=$(escape_systemd_env "${!v}")"
+create_openrc_override() {
+    # clear the file if it already exists
+    : > $SERVICE_OVERRIDE
+    for v in $1; do
+        if [ -n "${!v:-}" ]; then
+            echo "$v=${!v}" >> $SERVICE_OVERRIDE
         fi
     done
 }
 
 handle_network_proxy() {
-    # Create a systemd unit override with proxy environment variables
+    header "Configuring proxy for the nix-daemon service"
+    # Create an openrc override with proxy environment variables
     # if any proxy environment variables are not empty.
-    PROXY_ENV_STRING=$(create_systemd_proxy_env)
-    if [ -n "${PROXY_ENV_STRING}" ]; then
-        create_systemd_override "${PROXY_ENV_STRING}"
-    fi
+    vars="http_proxy https_proxy ftp_proxy all_proxy no_proxy HTTP_PROXY HTTPS_PROXY FTP_PROXY ALL_PROXY NO_PROXY"
+    for v in $vars; do
+        if [ -n "${!v:-}" ]; then
+            _sudo "create openrc env overide file" \
+                create_openrc_override "$vars"
+            break
+        fi
+    done
 }
 
 poly_cure_artifacts() {
@@ -59,32 +42,30 @@ poly_cure_artifacts() {
 }
 
 poly_service_installed_check() {
-    [ "$(systemctl is-enabled nix-daemon.service)" = "linked" ] \
-        || [ "$(systemctl is-enabled nix-daemon.socket)" = "enabled" ]
+    rc-service nix-daemon status | grep -q 'status: started'
 }
 
 poly_service_uninstall_directions() {
         cat <<EOF
-$1. Delete the systemd service and socket units
+$1. Remove and delete the openrc service
 
-  sudo systemctl stop nix-daemon.socket
-  sudo systemctl stop nix-daemon.service
-  sudo systemctl disable nix-daemon.socket
-  sudo systemctl disable nix-daemon.service
-  sudo systemctl daemon-reload
+  sudo rc-service nix-daemon stop
+  sudo rc-service del nix-daemon
+  sudo rm -f $SERVICE_DEST
+  sudo rm -f $SERVICE_OVERRIDE
 EOF
 }
 
 poly_service_setup_note() {
     cat <<EOF
  - load and start a service (at $SERVICE_DEST
-   and $SOCKET_DEST) for nix-daemon
+   ) for nix-daemon
 
 EOF
 }
 
 poly_extra_try_me_commands() {
-    if [ -e /run/systemd/system ]; then
+    if command -v rc-status > /dev/null; then
         :
     else
         cat <<EOF
@@ -94,33 +75,21 @@ EOF
 }
 
 poly_configure_nix_daemon_service() {
-    task "Setting up the nix-daemon systemd service"
+    task "Setting up the nix-daemon openrc service"
 
-    _sudo "to create parent of the nix-daemon tmpfiles config" \
-          mkdir -p "$(dirname "$TMPFILES_DEST")"
+    _sudo "to create the nix-daemon service script" \
+        ln -sfn "/nix/var/nix/profiles/default$SERVICE_SRC" "$SERVICE_DEST"
 
-    _sudo "to create the nix-daemon tmpfiles config" \
-          ln -sfn "/nix/var/nix/profiles/default$TMPFILES_SRC" "$TMPFILES_DEST"
-
-    _sudo "to run systemd-tmpfiles once to pick that path up" \
-         systemd-tmpfiles --create --prefix=/nix/var/nix
+    _sudo "to set permissions on the nix-daemon service" \
+        chmod a+rx $SERVICE_DEST
 
     _sudo "to set up the nix-daemon service" \
-          systemctl link "/nix/var/nix/profiles/default$SERVICE_SRC"
-
-    _sudo "to set up the nix-daemon socket service" \
-          systemctl enable "/nix/var/nix/profiles/default$SOCKET_SRC"
+        rc-update add nix-daemon
 
     handle_network_proxy
 
-    _sudo "to load the systemd unit for nix-daemon" \
-          systemctl daemon-reload
-
-    _sudo "to start the nix-daemon.socket" \
-          systemctl start nix-daemon.socket
-
     _sudo "to start the nix-daemon.service" \
-          systemctl restart nix-daemon.service
+        rc-service nix-daemon start
 }
 
 poly_group_exists() {
@@ -221,3 +190,4 @@ poly_create_build_user() {
 poly_prepare_to_install() {
     :
 }
+
