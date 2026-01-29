@@ -96,7 +96,10 @@ void execProgramInStore(
 
 #ifdef __linux__
     if (system)
-        linux::setPersonality(*system);
+        linux::setPersonality({
+            .system = *system,
+            .impersonateLinux26 = settings.impersonateLinux26,
+        });
 #endif
 
     if (useLookupPath == UseLookupPath::Use) {
@@ -251,7 +254,10 @@ void chrootHelper(int argc, char ** argv)
 
 #  ifdef __linux__
     if (system != "")
-        linux::setPersonality(system);
+        linux::setPersonality({
+            .system = system,
+            .impersonateLinux26 = settings.impersonateLinux26,
+        });
 #  endif
 
     execvp(cmd.c_str(), stringsToCharPtrs(args).data());
