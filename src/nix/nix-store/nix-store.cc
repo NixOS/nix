@@ -6,6 +6,7 @@
 #include "nix/store/store-cast.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/local-store.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-connection.hh"
 #include "nix/main/shared.hh"
@@ -16,13 +17,12 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
 #include "nix/util/strings.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
 
 #include "man-pages.hh"
 
 #ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
-#  include "nix/store/local-store.hh"
 #  include "nix/util/monitor-fd.hh"
-#  include "nix/store/posix-fs-canonicalise.hh"
 #endif
 
 #include <iostream>
@@ -49,7 +49,6 @@ static int rootNr = 0;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
-#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
 ref<LocalStore> ensureLocalStore()
 {
     auto store2 = std::dynamic_pointer_cast<LocalStore>(store);
@@ -57,7 +56,6 @@ ref<LocalStore> ensureLocalStore()
         throw Error("you don't have sufficient rights to use this command");
     return ref<LocalStore>(store2);
 }
-#endif
 
 static StorePath useDeriver(const StorePath & path)
 {
@@ -590,11 +588,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
-#ifdef _WIN32 // TODO implement on Windows
-                throw UnimplementedError("file attribute canonicalisation Is not implemented on Windows");
-#else
-                canonicalisePathMetaData(store->printStorePath(info->path), {});
-#endif
+                canonicalisePathMetaData(store->printStorePath(info->path));
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},
@@ -607,9 +601,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
     ensureLocalStore()->registerValidPaths(infos);
-#endif
 }
 
 static void opLoadDB(Strings opFlags, Strings opArgs)
