@@ -6,6 +6,7 @@
   unixtools,
   darwin,
 
+  nix-roots,
   nix-util,
   boost,
   curl,
@@ -70,6 +71,7 @@ mkMesonLibrary (finalAttrs: {
   ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
+    nix-roots
     nix-util
     nlohmann_json
   ];
