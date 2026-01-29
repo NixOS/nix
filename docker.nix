@@ -29,6 +29,7 @@
     "org.opencontainers.image.description" = "Nix container image";
   },
   Cmd ? [ (lib.getExe bashInteractive) ],
+  Entrypoint ? null,
   # Default Packages
   nix ? pkgs.nix,
   bashInteractive ? pkgs.bashInteractive,
@@ -370,7 +371,7 @@ dockerTools.buildLayeredImageWithNixDb {
   '' + extraFakeRootCommands;
 
   config = {
-    inherit Cmd Labels;
+    inherit Cmd Labels Entrypoint;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"
