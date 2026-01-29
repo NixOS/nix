@@ -15,8 +15,10 @@ PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
         return PathInfoJsonFormat::V1;
     case 2:
         return PathInfoJsonFormat::V2;
+    case 3:
+        return PathInfoJsonFormat::V3;
     default:
-        throw Error("unsupported path info JSON format version %d; supported versions are 1 and 2", version);
+        throw Error("unsupported path info JSON format version %d; supported versions are 1, 2 and 3", version);
     }
 }
 
@@ -211,7 +213,13 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
 
         jsonObject["ultimate"] = ultimate;
 
-        jsonObject["signatures"] = sigs;
+        if (format == PathInfoJsonFormat::V3) {
+            jsonObject["signatures"] = sigs;
+        } else {
+            auto & sigsObj = jsonObject["signatures"] = json::array();
+            for (auto & sig : sigs)
+                sigsObj.push_back(sig.to_string());
+        }
     }
 
     return jsonObject;
@@ -313,7 +321,7 @@ UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json 
 
 void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
 {
-    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V2);
+    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V3);
 }
 
 ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)
