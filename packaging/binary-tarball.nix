@@ -4,6 +4,7 @@
   buildPackages,
   cacert,
   nix,
+  nixComponents2,
 }:
 
 let
@@ -11,6 +12,7 @@ let
   installerClosureInfo = buildPackages.closureInfo {
     rootPaths = [
       nix
+      nixComponents2.nix-manual.man
       cacert
     ];
   };
@@ -42,6 +44,7 @@ runCommand "nix-binary-tarball-${version}" env ''
     --subst-var-by cacert ${cacert}
   substitute ${../scripts/install-multi-user.sh} $TMPDIR/install-multi-user \
     --subst-var-by nix ${nix} \
+    --subst-var-by nix-manual ${nixComponents2.nix-manual.man} \
     --subst-var-by cacert ${cacert}
 
   if type -p shellcheck; then
