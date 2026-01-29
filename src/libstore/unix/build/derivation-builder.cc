@@ -19,6 +19,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <queue>
 
@@ -459,7 +460,8 @@ static void handleDiffHook(
                 .gid = gid,
                 .chdir = "/"});
         if (!statusOk(diffRes.first))
-            throw ExecError(diffRes.first, "diff-hook program '%1%' %2%", diffHook, statusToString(diffRes.first));
+            throw ExecError(
+                diffRes.first, "diff-hook program %s %2%", PathFmt(diffHook), statusToString(diffRes.first));
 
         if (diffRes.second != "")
             printError(chomp(diffRes.second));
@@ -1252,6 +1254,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
+            .hashedMirrors = settings.hashedMirrors,
             .tmpDirInSandbox = tmpDirInSandbox(),
 #if NIX_WITH_AWS_AUTH
             .awsCredentials = args.awsCredentials,
@@ -1260,14 +1263,15 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
             try {
-                ctx.netrcData = readFile(settings.netrcFile);
+                ctx.netrcData = readFile(fileTransferSettings.netrcFile);
             } catch (SystemError &) {
             }
 
-            try {
-                ctx.caFileData = readFile(settings.caFile);
-            } catch (SystemError &) {
-            }
+            if (auto & caFile = fileTransferSettings.caFile.get())
+                try {
+                    ctx.caFileData = readFile(*caFile);
+                } catch (SystemError &) {
+                }
         }
 
         enterChroot();
