@@ -90,7 +90,12 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 nrFailed,
                 nrFailed == 1 ? "dependency" : "dependencies");
         msg += showKnownOutputs(worker.store, *drv);
-        co_return amDone(ecFailed, {BuildError(BuildResult::Failure::DependencyFailed, msg)});
+        co_return doneFailure(
+            ecFailed,
+            BuildResult::Failure{{
+                .status = BuildResult::Failure::DependencyFailed,
+                .msg = HintFmt(msg),
+            }});
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -185,7 +190,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
         }
     }
 
-    co_return amDone(ecSuccess, std::nullopt);
+    co_return amDone(ecSuccess);
 }
 
 } // namespace nix

@@ -824,12 +824,12 @@ struct CmdFlakeCheck : FlakeCommand
                                 "failed to build attribute '%s', build of '%s' failed: %s",
                                 attrPath.to_string(*state),
                                 result.path.to_string(*store),
-                                failure->errorMsg));
+                                failure->message()));
                         }
                     } else {
                         // Derivation has no attribute path (e.g., a build dependency)
                         reportError(
-                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->errorMsg));
+                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->message()));
                     }
                 }
             }

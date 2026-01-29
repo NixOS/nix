@@ -26,25 +26,6 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
     cleanup();
 }
 
-Goal::Done PathSubstitutionGoal::doneSuccess(BuildResult::Success::Status status)
-{
-    return Goal::doneSuccess(
-        BuildResult::Success{
-            .status = status,
-        });
-}
-
-Goal::Done PathSubstitutionGoal::doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg)
-{
-    debug(errorMsg);
-    return Goal::doneFailure(
-        result,
-        BuildResult::Failure{
-            .status = status,
-            .errorMsg = std::move(errorMsg),
-        });
-}
-
 Goal::Co PathSubstitutionGoal::init()
 {
     trace("init");
@@ -53,7 +34,7 @@ Goal::Co PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        co_return doneSuccess(BuildResult::Success::AlreadyValid);
+        co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::AlreadyValid});
     }
 
     if (settings.readOnlyMode)
@@ -175,9 +156,12 @@ Goal::Co PathSubstitutionGoal::init()
        build. */
     co_return doneFailure(
         substituterFailed ? ecFailed : ecNoSubstituters,
-        BuildResult::Failure::NoSubstituters,
-        fmt("path '%s' is required, but there is no substituter that can build it",
-            worker.store.printStorePath(storePath)));
+        BuildResult::Failure{{
+            .status = BuildResult::Failure::NoSubstituters,
+            .msg = HintFmt(
+                "path '%s' is required, but there is no substituter that can build it",
+                worker.store.printStorePath(storePath)),
+        }});
 }
 
 Goal::Co PathSubstitutionGoal::tryToRun(
@@ -188,8 +172,11 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     if (nrFailed > 0) {
         co_return doneFailure(
             nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
-            BuildResult::Failure::DependencyFailed,
-            fmt("some references of path '%s' could not be realised", worker.store.printStorePath(storePath)));
+            BuildResult::Failure{{
+                .status = BuildResult::Failure::DependencyFailed,
+                .msg = HintFmt(
+                    "some references of path '%s' could not be realised", worker.store.printStorePath(storePath)),
+            }});
     }
 
     for (auto & i : info->references)
@@ -316,7 +303,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
     worker.updateProgress();
 
-    co_return doneSuccess(BuildResult::Success::Substituted);
+    co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::Substituted});
 }
 
 void PathSubstitutionGoal::cleanup()

@@ -59,6 +59,7 @@ struct NotDeterministic : BuildError
     NotDeterministic(auto &&... args)
         : BuildError(BuildResult::Failure::NotDeterministic, args...)
     {
+        isNonDeterministic = true;
     }
 };
 
