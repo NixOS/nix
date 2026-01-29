@@ -163,7 +163,10 @@ struct LinuxDerivationBuilder : virtual DerivationBuilderImpl
     {
         setupSeccomp();
 
-        linux::setPersonality(drv.platform);
+        linux::setPersonality({
+            .system = drv.platform,
+            .impersonateLinux26 = settings.impersonateLinux26,
+        });
     }
 };
 
