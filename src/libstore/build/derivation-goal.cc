@@ -492,10 +492,7 @@ Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
     mcExpectedBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
