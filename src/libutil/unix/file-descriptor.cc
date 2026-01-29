@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <poll.h>
+#include <sys/socket.h>
 #include <span>
 
 #if defined(__linux__)
@@ -434,6 +435,51 @@ std::string unix::readLinkAt(Descriptor dirFd, const CanonPath & path)
         else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
     }
+}
+
+void unix::sendMessageWithFds(Descriptor sockfd, std::string_view data, std::span<const int> fds)
+{
+    struct iovec iov{
+        .iov_base = const_cast<char *>(data.data()),
+        .iov_len = data.size(),
+    };
+
+    struct msghdr msg{
+        .msg_iov = &iov,
+        .msg_iovlen = 1,
+        .msg_control = nullptr,
+        .msg_controllen = 0,
+    };
+
+    // Allocate control message buffer with proper alignment for struct cmsghdr
+    std::unique_ptr<void, decltype(&::free)> controlData(nullptr, ::free);
+
+    if (!fds.empty()) {
+        size_t controlSize = CMSG_SPACE(sizeof(int) * fds.size());
+        controlData.reset(::operator new(controlSize, std::align_val_t{alignof(struct cmsghdr)}));
+
+        if (!controlData)
+            throw SysError("allocating control message buffer");
+
+        msg.msg_control = controlData.get();
+        msg.msg_controllen = controlSize;
+
+        auto * cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_len = CMSG_LEN(sizeof(int) * fds.size());
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+
+        // Copy file descriptors (duplicating them to avoid ownership issues)
+        auto * fdPtr = reinterpret_cast<int *>(CMSG_DATA(cmsg));
+        for (size_t i = 0; i < fds.size(); ++i) {
+            fdPtr[i] = dup(fds[i]);
+            if (fdPtr[i] < 0)
+                throw SysError("duplicating file descriptor for sendmsg");
+        }
+    }
+
+    if (sendmsg(sockfd, &msg, 0) < 0)
+        throw SysError("sendmsg");
 }
 
 } // namespace nix
