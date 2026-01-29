@@ -19,7 +19,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     }
 
     settings.caFile = "ca-certificates.crt";
-    writeFile(settings.caFile, ctx.caFileData, 0600);
+    writeFile(*settings.caFile.get(), ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
     if (!out)

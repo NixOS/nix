@@ -71,7 +71,7 @@ protected:
     std::filesystem::path tmpDir, cacheDir;
     std::filesystem::path caCert, caKey, serverCert, serverKey;
     std::filesystem::path clientCert, clientKey;
-    std::string oldCaCert;
+    std::optional<std::filesystem::path> oldCaCert;
     Pid serverPid;
     uint16_t port = 8443;
     std::shared_ptr<Store> localCacheStore;
