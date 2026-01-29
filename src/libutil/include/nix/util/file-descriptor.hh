@@ -356,6 +356,17 @@ namespace unix {
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
 
+/**
+ * Send a message with file descriptors over a Unix domain socket using sendmsg with SCM_RIGHTS.
+ *
+ * @param sockfd The socket file descriptor to send the message on
+ * @param data The data to send
+ * @param fds A span of file descriptors to pass via SCM_RIGHTS
+ *
+ * @throws SysError on failure
+ */
+void sendMessageWithFds(Descriptor sockfd, std::string_view data, std::span<const int> fds);
+
 } // namespace unix
 #endif
 
