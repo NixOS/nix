@@ -1,0 +1,10 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-attrset.nix:1:1:
+            1| builtins.derivationOf { foo = "bar"; }
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.derivationOf
+
+       error: cannot coerce a set to a string: { foo = "bar"; }
