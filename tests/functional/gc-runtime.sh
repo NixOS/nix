@@ -11,26 +11,16 @@ esac
 
 set -m # enable job control, needed for kill
 
-TODO_NixOS
-
-profiles="$NIX_STATE_DIR"/profiles
-rm -rf "$profiles"
-
-nix-env -p "$profiles/test" -f ./gc-runtime.nix -i gc-runtime-{program,environ,open}
-
-programPath=$(nix-env -p "$profiles/test" -q --no-name --out-path gc-runtime-program)
-environPath=$(nix-env -p "$profiles/test" -q --no-name --out-path gc-runtime-environ)
-openPath=$(nix-env -p "$profiles/test" -q --no-name --out-path gc-runtime-open)
+programPath=$(nix-build --no-link ./gc-runtime.nix -A program)
+environPath=$(nix-build --no-link ./gc-runtime.nix -A environ)
+openPath=$(nix-build --no-link ./gc-runtime.nix -A open)
 
 echo "backgrounding program..."
 export environPath
-"$profiles"/test/program "$openPath"/open &
+"$programPath"/program "$openPath"/open &
 sleep 2 # hack - wait for the program to get started
 child=$!
 echo PID=$child
-
-nix-env -p "$profiles/test" -e gc-runtime-{program,environ,open}
-nix-env -p "$profiles/test" --delete-generations old
 
 nix-store --gc
 
