@@ -336,6 +336,12 @@ struct BuildingStore : StoreDirConfig
 
     virtual std::filesystem::path getRealStoreDir() const = 0;
 
+    /**
+     * A handle to `getRealStoreDir()`, for `*At` operations on store
+     * objects.
+     */
+    virtual Descriptor getRealStoreDirFd() const = 0;
+
     virtual std::filesystem::path getBuildDir() const = 0;
 
     virtual const LocalSettings & getLocalSettings() const = 0;
