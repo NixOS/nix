@@ -45,6 +45,9 @@ struct WorkerProto
      */
     enum struct Op : uint64_t;
 
+    using Feature = std::string;
+    using FeatureSet = std::set<Feature, std::less<>>;
+
     /**
      * Version type for the protocol.
      *
@@ -52,30 +55,35 @@ struct WorkerProto
      */
     struct Version
     {
-        unsigned int major;
-        uint8_t minor;
-
-        constexpr auto operator<=>(const Version &) const = default;
-
-        /**
-         * Convert to wire format for protocol compatibility.
-         * Format: (major << 8) | minor
-         */
-        constexpr unsigned int toWire() const
+        struct Number
         {
-            return (major << 8) | minor;
-        }
+            unsigned int major;
+            uint8_t minor;
 
-        /**
-         * Convert from wire format.
-         */
-        static constexpr Version fromWire(unsigned int wire)
-        {
-            return {
-                .major = (wire & 0xff00) >> 8,
-                .minor = static_cast<uint8_t>(wire & 0x00ff),
+            constexpr auto operator<=>(const Version &) const = default;
+
+            /**
+             * Convert to wire format for protocol compatibility.
+             * Format: (major << 8) | minor
+             */
+            constexpr unsigned int toWire() const
+            {
+                return (major << 8) | minor;
+            }
+
+            /**
+             * Convert from wire format.
+             */
+            static constexpr Version fromWire(unsigned int wire)
+            {
+                return {
+                    .major = (wire & 0xff00) >> 8,
+                    .minor = static_cast<uint8_t>(wire & 0x00ff),
+                };
             };
-        }
+        } number;
+
+        const FeatureSet & features;
     };
 
     /**
@@ -107,7 +115,6 @@ struct WorkerProto
     {
         Source & from;
         Version version;
-        FeatureSet features = {};
     };
 
     /**
@@ -118,7 +125,6 @@ struct WorkerProto
     {
         Sink & to;
         Version version;
-        FeatureSet features = {};
     };
 
     /**

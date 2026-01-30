@@ -479,7 +479,11 @@ void RemoteStore::addMultipleToStore(
                 *this,
                 WorkerProto::WriteConn{
                     .to = sink,
-                    .version = 16,
+                    .version =
+                        {
+                            .number = 16,
+                            .features = {},
+                        },
                 },
                 pathInfo);
             pathSource->drainInto(sink);

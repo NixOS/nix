@@ -60,7 +60,11 @@ public:
                     this->store,
                     typename Proto::ReadConn{
                         .from = from,
-                        .version = version,
+                        .version =
+                            {
+                                .number = version,
+                                .features = {},
+                            },
                     });
             });
 
@@ -80,7 +84,11 @@ public:
                 this->store,
                 typename Proto::WriteConn{
                     .to = to,
-                    .version = version,
+                    .version =
+                        {
+                            .number = version,
+                            .features = {},
+                        },
                 },
                 decoded);
             return std::move(to.s);

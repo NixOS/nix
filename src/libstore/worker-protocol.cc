@@ -213,7 +213,7 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
     std::string errorMsg;
     bool isNonDeterministic = false;
 
-    auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, {conn.from});
+    auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, conn);
     conn.from >> errorMsg;
 
     if (conn.version >= WorkerProto::Version{1, 29}) {
@@ -279,13 +279,13 @@ void WorkerProto::Serialise<BuildResult>::write(
                 /* If the remote doesn't support the hash-mismatch-status feature,
                    convert HashMismatch to OutputRejected for backwards compatibility. */
                 if (status == BuildResult::Failure::HashMismatch
-                    && !conn.features.contains(WorkerProto::featureHashMismatchStatus))
+                    && !conn.version.features.contains(WorkerProto::featureHashMismatchStatus))
                     status = BuildResult::Failure::OutputRejected;
-                WorkerProto::write(store, {conn.to}, BuildResultStatus{status});
+                WorkerProto::write(store, conn, BuildResultStatus{status});
                 common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                WorkerProto::write(store, {conn.to}, BuildResultStatus{success.status});
+                WorkerProto::write(store, conn, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },
