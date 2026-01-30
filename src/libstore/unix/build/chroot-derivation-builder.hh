@@ -28,6 +28,11 @@ public:
      */
     std::optional<AutoDelete> autoDelChroot;
 
+    /**
+     * A handle to the store directory inside the chroot.
+     */
+    AutoCloseFD chrootStoreDirFd;
+
     PathsInChroot pathsInChroot;
 
     inline bool needsHashRewrite() override
@@ -46,6 +51,8 @@ public:
     Strings getPreBuildHookArgs() override;
 
     std::filesystem::path realPathInHost(const StorePath & p) override;
+
+    Descriptor realStoreDirFdInHost() override;
 
     void cleanupBuild(bool force) override;
 

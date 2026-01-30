@@ -590,7 +590,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(
-                    localStore->toRealPath(info->path),
+                    localStore->getRealStoreDirFd(),
+                    OsFilename{info->path.filename()},
                     {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
