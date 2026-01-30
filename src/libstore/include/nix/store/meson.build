@@ -50,6 +50,7 @@ headers = [ config_pub_h ] + files(
   'length-prefixed-protocol-helper.hh',
   'local-binary-cache-store.hh',
   'local-fs-store.hh',
+  'local-gc.hh',
   'local-overlay-store.hh',
   'local-store.hh',
   'log-store.hh',

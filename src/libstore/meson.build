@@ -315,6 +315,7 @@ sources = files(
   'legacy-ssh-store.cc',
   'local-binary-cache-store.cc',
   'local-fs-store.cc',
+  'local-gc.cc',
   'local-overlay-store.cc',
   'local-store.cc',
   'log-store.cc',
