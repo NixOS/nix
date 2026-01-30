@@ -19,7 +19,7 @@ class RemoteFSAccessor : public SourceAccessor
      */
     std::map<std::string, Hash, std::less<>> narHashes;
 
-    NarCache narCache;
+    std::unique_ptr<NarCache> narCache;
 
     bool requireValidPath;
 
@@ -32,7 +32,7 @@ public:
     /**
      * @return nullptr if the store does not contain any object at that path.
      */
-    std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
+    ref<NarAccessor> accessObject(const StorePath & path);
 
     RemoteFSAccessor(
         ref<Store> store, bool requireValidPath = true, std::optional<std::filesystem::path> cacheDir = {});
