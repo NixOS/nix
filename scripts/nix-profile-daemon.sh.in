@@ -1,8 +1,5 @@
-# Only execute this file once per shell.
+# This script is idempotent and can be executed more than once per shell.
 # This file is tested by tests/installer/default.nix.
-if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
-export __ETC_PROFILE_NIX_SOURCED=1
-
 NIX_LINK=$HOME/.nix-profile
 if [ -n "${XDG_STATE_HOME-}" ]; then
     NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
@@ -32,11 +29,17 @@ export NIX_PROFILES="@localstatedir@/nix/profiles/default $NIX_LINK"
 
 # Populate bash completions, .desktop files, etc
 if [ -z "${XDG_DATA_DIRS-}" ]; then
-    # According to XDG spec the default is /usr/local/share:/usr/share, don't set something that prevents that default
-    export XDG_DATA_DIRS="/usr/local/share:/usr/share:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
-else
-    export XDG_DATA_DIRS="$XDG_DATA_DIRS:$NIX_LINK/share:/nix/var/nix/profiles/default/share"
+    # This is the default according to the XDG spec
+    XDG_DATA_DIRS="/usr/local/share:/usr/share"
 fi
+# Append Nix share dirs to XDG_DATA_DIRS, after removing any duplicates
+USER_NIX_SHARE="$NIX_LINK/share"
+SYS_NIX_SHARE="@localstatedir@/nix/profiles/default/share"
+XDG_DATA_DIRS=":$XDG_DATA_DIRS:" # wrap in ':'s for ease of processing
+XDG_DATA_DIRS=$(printf '%s' "$XDG_DATA_DIRS" | sed "s|:$USER_NIX_SHARE:|:|g; s|:$SYS_NIX_SHARE:|:|g")
+XDG_DATA_DIRS=$(printf '%s' "$XDG_DATA_DIRS" | sed "s|^:||; s|:$||") # unwrap ':'s
+export XDG_DATA_DIRS="${XDG_DATA_DIRS:+"$XDG_DATA_DIRS:"}$USER_NIX_SHARE:$SYS_NIX_SHARE"
+unset USER_NIX_SHARE SYS_NIX_SHARE
 
 # Set $NIX_SSL_CERT_FILE so that Nixpkgs applications like curl work.
 if [ -n "${NIX_SSL_CERT_FILE:-}" ]; then
@@ -68,5 +71,12 @@ else
   unset -f check_nix_profiles
 fi
 
-export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
+# Prepend Nix bin dirs to PATH, after removing any duplicates
+USER_NIX_BIN="$NIX_LINK/bin"
+SYS_NIX_BIN="@localstatedir@/nix/profiles/default/bin"
+PATH=":$PATH:" # wrap in ':'s for ease of processing
+PATH=$(printf '%s' "$PATH" | sed "s|:$USER_NIX_BIN:|:|g; s|:$SYS_NIX_BIN:|:|g")
+PATH=$(printf '%s' "$PATH" | sed "s|^:||; s|:$||") # unwrap ':'s
+export PATH="$USER_NIX_BIN:$SYS_NIX_BIN${PATH:+":$PATH"}"
+unset USER_NIX_BIN SYS_NIX_BIN
 unset NIX_LINK NIX_LINK_NEW
