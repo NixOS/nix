@@ -16,6 +16,7 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
