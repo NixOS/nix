@@ -186,6 +186,22 @@ Path readLink(const Path & path);
  */
 std::filesystem::path readLink(const std::filesystem::path & path);
 
+#ifdef _WIN32
+namespace windows {
+
+/**
+ * Get the path associated with a file handle.
+ *
+ * @note One MUST only use this for error handling, because it creates
+ * TOCTOU issues. We don't mind if error messages point to out of date
+ * paths (that is a rather trivial TOCTOU --- the error message is best
+ * effort) but for anything else we do.
+ */
+std::filesystem::path handleToPath(Descriptor handle);
+
+} // namespace windows
+#endif
+
 /**
  * Open a `Descriptor` with read-only access to the given directory.
  */

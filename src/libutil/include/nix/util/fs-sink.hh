@@ -99,7 +99,6 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 struct RestoreSink : FileSystemObjectSink
 {
     std::filesystem::path dstPath;
-#ifndef _WIN32
     /**
      * File descriptor for the directory located at dstPath. Used for *at
      * operations relative to this file descriptor. This sink must *never*
@@ -110,7 +109,6 @@ struct RestoreSink : FileSystemObjectSink
      * is not susceptible to symlink replacement.
      */
     AutoCloseFD dirFd;
-#endif
     bool startFsync = false;
 
     explicit RestoreSink(bool startFsync)
@@ -120,9 +118,7 @@ struct RestoreSink : FileSystemObjectSink
 
     void createDirectory(const CanonPath & path) override;
 
-#ifndef _WIN32
     void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
-#endif
 
     void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
 
