@@ -239,6 +239,12 @@ public:
     const std::filesystem::path tempRootsDir;
     const std::filesystem::path fnTempRoots;
 
+    /**
+     * An open file descriptor to the real store directory, for use
+     * with `*at` system calls.
+     */
+    AutoCloseFD realStoreDirFd;
+
 private:
 
     const PublicKeys & getPublicKeys();
