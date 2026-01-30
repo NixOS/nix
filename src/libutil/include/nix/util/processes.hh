@@ -19,7 +19,6 @@
 #include <sstream>
 #include <optional>
 #include <thread>
-using namespace std::chrono_literals;
 
 namespace nix {
 
@@ -32,7 +31,7 @@ class Pid
     pid_t pid = -1;
     bool separatePG = false;
     int killSignal = SIGKILL;
-    std::chrono::milliseconds killTimeout = 0ms;
+    std::chrono::milliseconds killTimeout;
     std::thread killThread;
 #else
     AutoCloseFD pid = INVALID_DESCRIPTOR;
