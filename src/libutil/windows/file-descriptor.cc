@@ -3,6 +3,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/canon-path.hh"
 
 #include <span>
 
@@ -193,5 +194,67 @@ off_t lseek(HANDLE h, off_t offset, int whence)
 
     return newPos.QuadPart;
 }
+
+namespace windows {
+
+/**
+ * Convert Unix time_t to Windows FILETIME
+ */
+static FILETIME timeToFileTime(time_t t)
+{
+    // Windows FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC)
+    // Unix time_t is seconds since January 1, 1970 (UTC)
+    // Difference between 1601 and 1970 in 100-nanosecond intervals
+    const uint64_t EPOCH_DIFFERENCE = 116444736000000000ULL;
+
+    uint64_t intervals = (static_cast<uint64_t>(t) * 10000000ULL) + EPOCH_DIFFERENCE;
+
+    FILETIME ft;
+    ft.dwLowDateTime = static_cast<DWORD>(intervals);
+    ft.dwHighDateTime = static_cast<DWORD>(intervals >> 32);
+    return ft;
+}
+
+void setWriteTime(Descriptor dirHandle, const CanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    assert(!path.isRoot());
+
+    // Get the directory path from the handle
+#if _WIN32_WINNT >= 0x0600
+    std::filesystem::path dirPath = handleToPath(dirHandle);
+#else
+    throw Error("setWriteTime: getting directory path not supported on Windows versions < Vista");
+#endif
+
+    // Construct the full path
+    std::filesystem::path fullPath = dirPath / path.rel();
+
+    // Open the file without following symlinks (reparse points)
+    // Use FILE_FLAG_BACKUP_SEMANTICS to allow opening directories
+    // Use FILE_FLAG_OPEN_REPARSE_POINT to not follow symlinks
+    AutoCloseFD fileHandle = CreateFileW(
+        fullPath.c_str(),
+        FILE_WRITE_ATTRIBUTES,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+        NULL
+    );
+
+    if (!fileHandle)
+        throw WinError("opening '%s' to set file times", fullPath.string());
+
+    // Convert times to FILETIME
+    FILETIME accessTime = timeToFileTime(accessedTime);
+    FILETIME modifyTime = timeToFileTime(modificationTime);
+
+    // Set the file times
+    // Note: We pass NULL for creation time to leave it unchanged
+    if (!SetFileTime(fileHandle.get(), NULL, &accessTime, &modifyTime))
+        throw WinError("setting file times for '%s'", fullPath.string());
+}
+
+} // namespace windows
 
 } // namespace nix
