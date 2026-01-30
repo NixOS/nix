@@ -6,11 +6,43 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
+#include "nix/store/config.hh"
 
 namespace nix {
 
 typedef std::pair<dev_t, ino_t> Inode;
 typedef std::set<Inode> InodesSeen;
+
+struct CanonicalizePathMetadataOptions
+{
+#ifndef _WIN32
+    /**
+     * If uidRange is not empty, this function will throw an error if it
+     * encounters files owned by a user outside of the closed interval
+     * [uidRange->first, uidRange->second].
+     */
+    std::optional<std::pair<uid_t, uid_t>> uidRange;
+#endif
+
+#if NIX_SUPPORT_ACL
+    /**
+     * A list of ACLs that should be ignored when canonicalising.
+     * Normally Nix attempts to remove all ACLs from files and directories
+     * in the Nix store, but some ACLs like `security.selinux` or
+     * `system.nfs4_acl` can't be removed even by root.
+     */
+    const StringSet & ignoredAcls;
+#endif
+};
+
+/**
+ * Makes it easier to cope with conditionally-available fields.
+ */
+#if NIX_SUPPORT_ACL
+#  define NIX_IGNORE_ACLS_SETTING .ignoredAcls = settings.ignoredAcls,
+#else
+#  define NIX_IGNORE_ACLS_SETTING
+#endif
 
 /**
  * "Fix", or canonicalise, the meta-data of the files in a store path
@@ -24,25 +56,10 @@ typedef std::set<Inode> InodesSeen;
  *
  * - the owner and group are set to the Nix user and group, if we're
  *   running as root. (Unix only.)
- *
- * If uidRange is not empty, this function will throw an error if it
- * encounters files owned by a user outside of the closed interval
- * [uidRange->first, uidRange->second].
  */
-void canonicalisePathMetaData(
-    const Path & path,
-#ifndef _WIN32
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-#endif
-    InodesSeen & inodesSeen);
+void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
 
-void canonicalisePathMetaData(
-    const Path & path
-#ifndef _WIN32
-    ,
-    std::optional<std::pair<uid_t, uid_t>> uidRange = std::nullopt
-#endif
-);
+void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options);
 
 void canonicaliseTimestampAndPermissions(const Path & path);
 

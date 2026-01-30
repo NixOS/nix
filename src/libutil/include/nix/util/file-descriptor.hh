@@ -291,6 +291,14 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
 
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const CanonPath & path, time_t accessedTime, time_t modificationTime);
+
 /*
  * Read a symlink relative to a directory file descriptor.
  *
@@ -299,12 +307,32 @@ void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
  */
 std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
 
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const CanonPath & path, time_t accessedTime, time_t modificationTime);
+
 } // namespace unix
 #endif
 
 MakeError(EndOfFile, Error);
 
 #ifdef _WIN32
+
+namespace windows {
+
+/**
+ * Set the access and modification time of a file relative to a directory handle.
+ *
+ * @pre path.isRoot() is false
+ * @throws WinError if any operation fails
+ */
+void setWriteTime(Descriptor dirHandle, const CanonPath & path, time_t accessedTime, time_t modificationTime);
+
+} // namespace windows
 
 /**
  * Windows specific replacement for POSIX `lseek` that operates on a `HANDLE` and not
