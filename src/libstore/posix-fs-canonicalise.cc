@@ -107,19 +107,9 @@ canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions opt
     canonicaliseTimestampAndPermissions(path, st);
 
 #ifndef _WIN32
-    /* Change ownership to the current uid.  If it's a symlink, use
-       lchown if available, otherwise don't bother.  Wrong ownership
-       of a symlink doesn't matter, since the owning user can't change
-       the symlink and can't delete it because the directory is not
-       writable.  The only exception is top-level paths in the Nix
-       store (since that directory is group-writable for the Nix build
-       users group); we check for this case below. */
+    /* Change ownership to the current uid. */
     if (st.st_uid != geteuid()) {
-#  if HAVE_LCHOWN
         if (lchown(path.c_str(), geteuid(), getegid()) == -1)
-#  else
-        if (!S_ISLNK(st.st_mode) && chown(path.c_str(), geteuid(), getegid()) == -1)
-#  endif
             throw SysError("changing owner of '%1%' to %2%", path, geteuid());
     }
 #endif
@@ -135,17 +125,6 @@ canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions opt
 void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
     canonicalisePathMetaData_(path, options, inodesSeen);
-
-#ifndef _WIN32
-    /* On platforms that don't have lchown(), the top-level path can't
-       be a symlink, since we can't change its ownership. */
-    auto st = lstat(path);
-
-    if (st.st_uid != geteuid()) {
-        assert(S_ISLNK(st.st_mode));
-        throw Error("wrong ownership of top-level store path '%1%'", path);
-    }
-#endif
 }
 
 void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options)
