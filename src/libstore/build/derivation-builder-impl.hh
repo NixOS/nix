@@ -95,6 +95,14 @@ protected:
         return store->toRealPath(p);
     }
 
+    /**
+     * A handle to the directory `realPathInHost()` puts output paths in.
+     */
+    virtual Descriptor realStoreDirFdInHost()
+    {
+        return store->getRealStoreDirFd();
+    }
+
 
 public:
 
