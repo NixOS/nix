@@ -10,12 +10,12 @@ namespace nix {
 
 Path LocalFSStoreConfig::getDefaultStateDir()
 {
-    return settings.nixStateDir;
+    return settings.nixStateDir.string();
 }
 
 Path LocalFSStoreConfig::getDefaultLogDir()
 {
-    return settings.getLogFileSettings().nixLogDir;
+    return settings.getLogFileSettings().nixLogDir.string();
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
