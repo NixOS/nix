@@ -4,6 +4,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/canon-path.hh"
 
 #include <span>
 
@@ -442,6 +443,61 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
 {
     AutoCloseFD linkHandle(windows::openSymlinkAt(dirFd, path));
     return windows::readSymlinkTarget(linkHandle.get());
+}
+
+namespace windows {
+
+namespace {
+
+/**
+ * Convert Unix time_t to Windows FILETIME
+ */
+FILETIME timeToFileTime(time_t t)
+{
+    // Windows FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC)
+    // Unix time_t is seconds since January 1, 1970 (UTC)
+    // Difference between 1601 and 1970 in 100-nanosecond intervals
+    const uint64_t EPOCH_DIFFERENCE = 116444736000000000ULL;
+
+    uint64_t intervals = (static_cast<uint64_t>(t) * 10000000ULL) + EPOCH_DIFFERENCE;
+
+    FILETIME ft;
+    ft.dwLowDateTime = static_cast<DWORD>(intervals);
+    ft.dwHighDateTime = static_cast<DWORD>(intervals >> 32);
+    return ft;
+}
+
+void setWriteTime(Descriptor fileHandle, time_t accessedTime, time_t modificationTime)
+{
+    // Convert times to FILETIME
+    FILETIME accessTime = timeToFileTime(accessedTime);
+    FILETIME modifyTime = timeToFileTime(modificationTime);
+
+    // Set the file times
+    // Note: We pass NULL for creation time to leave it unchanged
+    if (!SetFileTime(fileHandle, NULL, &accessTime, &modifyTime))
+        throw WinError("setting file times for '%s'", path.rel());
+}
+
+} // anonymous namespace
+
+} // namespace windows
+
+void setWriteTime(Descriptor dirHandle, const CanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    assert(!path.isRoot());
+
+    // Open the file relative to the directory handle using ntOpenAt
+    // This avoids TOCTOU issues by not converting handle to path and back
+    std::wstring wpath = string_to_os_string(path.rel());
+    AutoCloseFD fileHandle = ntOpenAt(
+        dirHandle,
+        wpath,
+        FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
+        FILE_OPEN_REPARSE_POINT // Don't follow symlinks
+    );
+
+    setWriteTime(fileHandle.get(), accessedTime, modificationTime);
 }
 
 } // namespace nix
