@@ -6,6 +6,8 @@
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
 
+using namespace std::chrono_literals;
+
 namespace nix {
 
 HookInstance::HookInstance()
