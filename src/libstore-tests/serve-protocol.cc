@@ -25,7 +25,10 @@ struct ServeProtoTest : VersionedProtoTest<ServeProto, serveProtoDir>
      * For serializers that don't care about the minimum version, we
      * used the oldest one: 2.5.
      */
-    ServeProto::Version defaultVersion = 2 << 8 | 5;
+    ServeProto::Version defaultVersion = {
+        .major = 2,
+        .minor = 5,
+    };
 };
 
 VERSIONED_CHARACTERIZATION_TEST(
@@ -144,54 +147,77 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2.2", 2 << 8 | 2, ({
-                                    using namespace std::literals::chrono_literals;
-                                    std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{{
-                                            .status = BuildResult::Failure::OutputRejected,
-                                            .msg = HintFmt("no idea why"),
-                                        }}}},
-                                        BuildResult{.inner{BuildResult::Failure{{
-                                            .status = BuildResult::Failure::NotDeterministic,
-                                            .msg = HintFmt("no idea why"),
-                                        }}}},
-                                        BuildResult{.inner{BuildResult::Success{
-                                            .status = BuildResult::Success::Built,
-                                        }}},
-                                    };
-                                    t;
-                                }))
-
-VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_3, "build-result-2.3", 2 << 8 | 3, ({
-                                    using namespace std::literals::chrono_literals;
-                                    std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{{
-                                            .status = BuildResult::Failure::OutputRejected,
-                                            .msg = HintFmt("no idea why"),
-                                        }}}},
-                                        BuildResult{
-                                            .inner{BuildResult::Failure{{
-                                                .status = BuildResult::Failure::NotDeterministic,
-                                                .msg = HintFmt("no idea why"),
-                                                .isNonDeterministic = true,
-                                            }}},
-                                            .timesBuilt = 3,
-                                            .startTime = 30,
-                                            .stopTime = 50,
-                                        },
-                                        BuildResult{
-                                            .inner{BuildResult::Success{
-                                                .status = BuildResult::Success::Built,
-                                            }},
-                                            .startTime = 30,
-                                            .stopTime = 50,
-                                        },
-                                    };
-                                    t;
-                                }))
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    buildResult_2_2,
+    "build-result-2.2",
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 2,
+    }),
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t{
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::OutputRejected,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::NotDeterministic,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{.inner{BuildResult::Success{
+                .status = BuildResult::Success::Built,
+            }}},
+        };
+        t;
+    }))
 
 VERSIONED_CHARACTERIZATION_TEST(
-    ServeProtoTest, buildResult_2_6, "build-result-2.6", 2 << 8 | 6, ({
+    ServeProtoTest,
+    buildResult_2_3,
+    "build-result-2.3",
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 3,
+    }),
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t{
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::OutputRejected,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{
+                .inner{BuildResult::Failure{{
+                    .status = BuildResult::Failure::NotDeterministic,
+                    .msg = HintFmt("no idea why"),
+                    .isNonDeterministic = true,
+                }}},
+                .timesBuilt = 3,
+                .startTime = 30,
+                .stopTime = 50,
+            },
+            BuildResult{
+                .inner{BuildResult::Success{
+                    .status = BuildResult::Success::Built,
+                }},
+                .startTime = 30,
+                .stopTime = 50,
+            },
+        };
+        t;
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST(
+    ServeProtoTest,
+    buildResult_2_6,
+    "build-result-2.6",
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 6,
+    }),
+    ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
             BuildResult{.inner{BuildResult::Failure{{
@@ -260,7 +286,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     unkeyedValidPathInfo_2_3,
     "unkeyed-valid-path-info-2.3",
-    2 << 8 | 3,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 3,
+    }),
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{std::string{defaultStoreDir}, Hash::dummy};
@@ -286,7 +315,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest,
     unkeyedValidPathInfo_2_4,
     "unkeyed-valid-path-info-2.4",
-    2 << 8 | 4,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 4,
+    }),
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
@@ -340,7 +372,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_1,
     "build-options-2.1",
-    2 << 8 | 1,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 1,
+    }),
     (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
@@ -350,7 +385,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_2,
     "build-options-2.2",
-    2 << 8 | 2,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 2,
+    }),
     (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
@@ -361,7 +399,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_3,
     "build-options-2.3",
-    2 << 8 | 3,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 3,
+    }),
     (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,
@@ -374,7 +415,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     ServeProtoTest,
     build_options_2_7,
     "build-options-2.7",
-    2 << 8 | 7,
+    (ServeProto::Version{
+        .major = 2,
+        .minor = 7,
+    }),
     (ServeProto::BuildOptions{
         .maxSilentTime = 5,
         .buildTimeout = 6,

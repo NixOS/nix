@@ -83,9 +83,9 @@ void RemoteStore::initConnection(Connection & conn)
         StringSink saved;
         TeeSource tee(conn.from, saved);
         try {
-            auto [protoVersion, features] =
-                WorkerProto::BasicClientConnection::handshake(conn.to, tee, PROTOCOL_VERSION, WorkerProto::allFeatures);
-            if (protoVersion < MINIMUM_PROTOCOL_VERSION)
+            auto [protoVersion, features] = WorkerProto::BasicClientConnection::handshake(
+                conn.to, tee, WorkerProto::latest, WorkerProto::allFeatures);
+            if (protoVersion < WorkerProto::minimum)
                 throw Error("the Nix daemon version is too old");
             conn.protoVersion = protoVersion;
             conn.features = features;
@@ -208,7 +208,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
     auto conn(getConnection());
 
     conn->to << WorkerProto::Op::QuerySubstitutablePathInfos;
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 22) {
+    if (conn->protoVersion < WorkerProto::Version{1, 22}) {
         StorePathSet paths;
         for (auto & path : pathsMap)
             paths.insert(path.first);
@@ -264,7 +264,7 @@ StorePathSet RemoteStore::queryValidDerivers(const StorePath & path)
 
 StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 {
-    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+    if (WorkerProto::Version::fromWire(getProtocol()) >= WorkerProto::Version{1, 22}) {
         return Store::queryDerivationOutputs(path);
     }
     auto conn(getConnection());
@@ -277,7 +277,7 @@ StorePathSet RemoteStore::queryDerivationOutputs(const StorePath & path)
 std::map<std::string, std::optional<StorePath>>
 RemoteStore::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore_)
 {
-    if (GET_PROTOCOL_MINOR(getProtocol()) >= 0x16) {
+    if (WorkerProto::Version::fromWire(getProtocol()) >= WorkerProto::Version{1, 22}) {
         if (!evalStore_) {
             auto conn(getConnection());
             conn->to << WorkerProto::Op::QueryDerivationOutputMap;
@@ -328,7 +328,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 25) {
+    if (conn->protoVersion >= WorkerProto::Version{1, 25}) {
 
         conn->to << WorkerProto::Op::AddToStore << name << caMethod.renderWithAlgo(hashAlgo);
         WorkerProto::write(*this, *conn, references);
@@ -447,9 +447,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
     WorkerProto::write(*this, *conn, info.sigs);
     conn->to << renderContentAddress(info.ca) << repair << !checkSigs;
 
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 23) {
+    if (conn->protoVersion >= WorkerProto::Version{1, 23}) {
         conn.withFramedSink([&](Sink & sink) { copyNAR(source, sink); });
-    } else if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 21) {
+    } else if (conn->protoVersion >= WorkerProto::Version{1, 21}) {
         conn.processStderr(0, &source);
     } else {
         copyNAR(source, conn->to);
@@ -493,7 +493,7 @@ void RemoteStore::addMultipleToStore(
 
 void RemoteStore::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (GET_PROTOCOL_MINOR(getConnection()->protoVersion) >= 32) {
+    if (getConnection()->protoVersion >= WorkerProto::Version{1, 32}) {
         auto conn(getConnection());
         conn->to << WorkerProto::Op::AddMultipleToStore << repair << !checkSigs;
         conn.withFramedSink([&](Sink & sink) { source.drainInto(sink); });
@@ -505,7 +505,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
+    if (conn->protoVersion < WorkerProto::Version{1, 31}) {
         WorkerProto::write(*this, *conn, info.id);
         conn->to << std::string(info.outPath.to_string());
     } else {
@@ -520,7 +520,7 @@ void RemoteStore::queryRealisationUncached(
     try {
         auto conn(getConnection());
 
-        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 27) {
+        if (conn->protoVersion < WorkerProto::Version{1, 27}) {
             warn("the daemon is too old to support content-addressing derivations, please upgrade it to 2.4");
             return callback(nullptr);
         }
@@ -530,7 +530,7 @@ void RemoteStore::queryRealisationUncached(
         conn.processStderr();
 
         auto real = [&]() -> std::shared_ptr<const UnkeyedRealisation> {
-            if (GET_PROTOCOL_MINOR(conn->protoVersion) < 31) {
+            if (conn->protoVersion < WorkerProto::Version{1, 31}) {
                 auto outPaths = WorkerProto::Serialise<std::set<StorePath>>::read(*this, *conn);
                 if (outPaths.empty())
                     return nullptr;
@@ -590,7 +590,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
     std::optional<ConnectionHandle> conn_(getConnection());
     auto & conn = *conn_;
 
-    if (GET_PROTOCOL_MINOR(conn->protoVersion) >= 34) {
+    if (conn->protoVersion >= WorkerProto::Version{1, 34}) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
         WorkerProto::write(*this, *conn, paths);
         conn->to << buildMode;
@@ -754,7 +754,7 @@ MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
 {
     {
         auto conn(getConnection());
-        if (GET_PROTOCOL_MINOR(conn->protoVersion) < 19)
+        if (conn->protoVersion < WorkerProto::Version{1, 19})
             // Don't hold the connection handle in the fallback case
             // to prevent a deadlock.
             goto fallback;
@@ -796,7 +796,7 @@ void RemoteStore::connect()
 unsigned int RemoteStore::getProtocol()
 {
     auto conn(connections->get());
-    return conn->protoVersion;
+    return conn->protoVersion.toWire();
 }
 
 std::optional<TrustedFlag> RemoteStore::isTrustedClient()

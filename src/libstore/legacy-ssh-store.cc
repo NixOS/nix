@@ -73,7 +73,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
     TeeSource tee(conn->from, saved);
     try {
         conn->remoteVersion =
-            ServeProto::BasicClientConnection::handshake(conn->to, tee, SERVE_PROTOCOL_VERSION, config->authority.host);
+            ServeProto::BasicClientConnection::handshake(conn->to, tee, ServeProto::latest, config->authority.host);
     } catch (SerialisationError & e) {
         // in.close(): Don't let the remote block on us not writing.
         conn->sshConn->in.close();
@@ -290,7 +290,7 @@ void LegacySSHStore::connect()
 unsigned int LegacySSHStore::getProtocol()
 {
     auto conn(connections->get());
-    return conn->remoteVersion;
+    return conn->remoteVersion.toWire();
 }
 
 pid_t LegacySSHStore::getConnectionPid()
