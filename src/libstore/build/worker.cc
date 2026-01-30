@@ -27,10 +27,6 @@ Worker::Worker(Store & store, Store & evalStore)
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
-    permanentFailure = false;
-    timedOut = false;
-    hashMismatch = false;
-    checkMismatch = false;
 }
 
 Worker::~Worker()
@@ -511,26 +507,6 @@ void Worker::waitForInput()
         }
         waitingForAWhile.clear();
     }
-}
-
-unsigned int Worker::failingExitStatus()
-{
-    // See API docs in header for explanation
-    unsigned int mask = 0;
-    bool buildFailure = permanentFailure || timedOut || hashMismatch;
-    if (buildFailure)
-        mask |= 0x04; // 100
-    if (timedOut)
-        mask |= 0x01; // 101
-    if (hashMismatch)
-        mask |= 0x02; // 102
-    if (checkMismatch) {
-        mask |= 0x08; // 104
-    }
-
-    if (mask)
-        mask |= 0x60;
-    return mask ? mask : 1;
 }
 
 bool Worker::pathContentsGood(const StorePath & path)

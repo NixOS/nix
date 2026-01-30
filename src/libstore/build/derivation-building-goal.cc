@@ -381,7 +381,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                                 "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
                     outputLocks.unlock();
-                    worker.permanentFailure = true;
                     co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
                 }
                 useHook = false;
@@ -732,7 +731,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
-                worker.permanentFailure = true;
                 co_return doneFailure(std::move(e));
             }
 
@@ -821,26 +819,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     } catch (BuildError & e) {
         builder.reset();
         outputLocks.unlock();
-// Allow selecting a subset of enum values
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (e.status) {
-        case BuildResult::Failure::HashMismatch:
-            worker.hashMismatch = true;
-            /* See header, the protocols don't know about `HashMismatch`
-               yet, so change it to `OutputRejected`, which they expect
-               for this case (hash mismatch is a type of output
-               rejection). */
-            e.status = BuildResult::Failure::OutputRejected;
-            break;
-        case BuildResult::Failure::NotDeterministic:
-            worker.checkMismatch = true;
-            break;
-        default:
-            /* Other statuses need no adjusting */
-            break;
-        }
-#  pragma GCC diagnostic pop
         co_return doneFailure(std::move(e));
     }
     {
@@ -1201,10 +1179,7 @@ Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
     mcRunningBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 

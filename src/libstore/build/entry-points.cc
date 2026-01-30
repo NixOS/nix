@@ -35,12 +35,13 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     }
 
     if (failed.size() == 1 && failure) {
-        failure->withExitStatus(worker.failingExitStatus());
+        failure->withExitStatus(worker.exitStatusFlags.failingExitStatus());
         throw *failure;
     } else if (!failed.empty()) {
+        auto exitStatus = worker.exitStatusFlags.failingExitStatus();
         if (failure)
             logError(failure->info());
-        throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
+        throw Error(exitStatus, "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
 
@@ -109,8 +110,9 @@ void Store::ensurePath(const StorePath & path)
     worker.run(goals);
 
     if (goal->exitCode != Goal::ecSuccess) {
-        goal->buildResult.tryThrowBuildError(worker.failingExitStatus());
-        throw Error(worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+        auto exitStatus = worker.exitStatusFlags.failingExitStatus();
+        goal->buildResult.tryThrowBuildError(exitStatus);
+        throw Error(exitStatus, "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
 
@@ -137,7 +139,7 @@ void Store::repairPath(const StorePath & path)
                 bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
+            throw Error(worker.exitStatusFlags.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
     }
 }
 

@@ -4,6 +4,59 @@
 
 namespace nix {
 
+void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
+{
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (status) {
+    case BuildResult::Failure::TimedOut:
+        timedOut = true;
+        break;
+    case BuildResult::Failure::HashMismatch:
+        hashMismatch = true;
+        break;
+    case BuildResult::Failure::NotDeterministic:
+        checkMismatch = true;
+        break;
+    case BuildResult::Failure::PermanentFailure:
+    // Also considered a permenant failure, it seems
+    case BuildResult::Failure::InputRejected:
+        permanentFailure = true;
+        break;
+    default:
+        break;
+    }
+#pragma GCC diagnostic pop
+}
+
+unsigned int ExitStatusFlags::failingExitStatus() const
+{
+    bool buildFailure = permanentFailure || timedOut || hashMismatch;
+
+    /* Any of the 4 booleans we track */
+    bool problemWithSpecialExitCode = checkMismatch || buildFailure;
+
+    unsigned int mask = 0;
+    if (problemWithSpecialExitCode) {
+        mask |= 0b1100000;
+        if (buildFailure) {
+            mask |= 0b0100; // 100
+            if (timedOut)
+                mask |= 0b0001; // 101
+            if (hashMismatch)
+                mask |= 0b0010; // 102
+        }
+        if (checkMismatch)
+            mask |= 0b1000; // 104
+    }
+
+    /* We still (per the function docs) only call this function in the
+       failure case, so the default should not be 0, but 1, indicating
+       "some other kind of error. */
+    return mask ? mask : 1;
+}
+
 bool BuildResult::operator==(const BuildResult &) const noexcept = default;
 std::strong_ordering BuildResult::operator<=>(const BuildResult &) const noexcept = default;
 
