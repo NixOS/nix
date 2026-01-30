@@ -4,6 +4,13 @@
 
 namespace nix {
 
+unsigned int BuildError::exitCodeFromStatus(Status status)
+{
+    ExitStatusFlags flags{};
+    flags.updateFromStatus(status);
+    return flags.failingExitStatus();
+}
+
 void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
 {
 // Allow selecting a subset of enum values
