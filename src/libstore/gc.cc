@@ -339,7 +339,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 static std::string quoteRegexChars(const std::string & raw)
 {
     static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
-    return boost::regex_replace(raw, specialRegex, R"(\$&)");
+    return boost::regex_replace(raw, specialRegex, R"(\\$&)");
 }
 
 #ifdef __linux__
