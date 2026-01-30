@@ -1495,7 +1495,7 @@ void LocalStore::verifyPath(
 
 unsigned int LocalStore::getProtocol()
 {
-    return PROTOCOL_VERSION;
+    return WorkerProto::latest.toWire();
 }
 
 std::optional<TrustedFlag> LocalStore::isTrustedClient()

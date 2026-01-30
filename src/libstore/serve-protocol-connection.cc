@@ -8,14 +8,14 @@ namespace nix {
 ServeProto::Version ServeProto::BasicClientConnection::handshake(
     BufferedSink & to, Source & from, ServeProto::Version localVersion, std::string_view host)
 {
-    to << SERVE_MAGIC_1 << localVersion;
+    to << SERVE_MAGIC_1 << localVersion.toWire();
     to.flush();
 
     unsigned int magic = readInt(from);
     if (magic != SERVE_MAGIC_2)
         throw Error("'nix-store --serve' protocol mismatch from '%s'", host);
-    auto remoteVersion = readInt(from);
-    if (GET_PROTOCOL_MAJOR(remoteVersion) != 0x200 || GET_PROTOCOL_MINOR(remoteVersion) < 5)
+    auto remoteVersion = ServeProto::Version::fromWire(readInt(from));
+    if (remoteVersion.major != 2 || remoteVersion < ServeProto::Version{2, 5})
         throw Error("unsupported 'nix-store --serve' protocol version on '%s'", host);
     return std::min(remoteVersion, localVersion);
 }
@@ -26,9 +26,9 @@ ServeProto::BasicServerConnection::handshake(BufferedSink & to, Source & from, S
     unsigned int magic = readInt(from);
     if (magic != SERVE_MAGIC_1)
         throw Error("protocol mismatch");
-    to << SERVE_MAGIC_2 << localVersion;
+    to << SERVE_MAGIC_2 << localVersion.toWire();
     to.flush();
-    auto remoteVersion = readInt(from);
+    auto remoteVersion = ServeProto::Version::fromWire(readInt(from));
     return std::min(remoteVersion, localVersion);
 }
 

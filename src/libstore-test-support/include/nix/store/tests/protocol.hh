@@ -60,7 +60,11 @@ public:
                     this->store,
                     typename Proto::ReadConn{
                         .from = from,
-                        .version = version,
+                        .version =
+                            {
+                                .number = version,
+                                .features = {},
+                            },
                     });
             });
 
@@ -80,7 +84,11 @@ public:
                 this->store,
                 typename Proto::WriteConn{
                     .to = to,
-                    .version = version,
+                    .version =
+                        {
+                            .number = version,
+                            .features = {},
+                        },
                 },
                 decoded);
             return std::move(to.s);
@@ -100,26 +108,26 @@ public:
         writeProtoTest(STEM, VERSION, VALUE);                                              \
     }
 
-#define VERSIONED_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE)  \
-    VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE)
+#define VERSIONED_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE)    \
+    VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, (VERSION), VALUE) \
+    VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, (VERSION), VALUE)
 
-#define VERSIONED_READ_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)     \
-    VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    TEST_F(FIXTURE, NAME##_json_read)                                                 \
-    {                                                                                 \
-        readJsonTest(STEM, VALUE);                                                    \
+#define VERSIONED_READ_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)       \
+    VERSIONED_READ_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, (VERSION), VALUE) \
+    TEST_F(FIXTURE, NAME##_json_read)                                                   \
+    {                                                                                   \
+        readJsonTest(STEM, VALUE);                                                      \
     }
 
-#define VERSIONED_WRITE_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)     \
-    VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    TEST_F(FIXTURE, NAME##_json_write)                                                 \
-    {                                                                                  \
-        writeJsonTest(STEM, VALUE);                                                    \
+#define VERSIONED_WRITE_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)       \
+    VERSIONED_WRITE_CHARACTERIZATION_TEST_NO_JSON(FIXTURE, NAME, STEM, (VERSION), VALUE) \
+    TEST_F(FIXTURE, NAME##_json_write)                                                   \
+    {                                                                                    \
+        writeJsonTest(STEM, VALUE);                                                      \
     }
 
-#define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)  \
-    VERSIONED_READ_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE) \
-    VERSIONED_WRITE_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)
+#define VERSIONED_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, VERSION, VALUE)    \
+    VERSIONED_READ_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, (VERSION), VALUE) \
+    VERSIONED_WRITE_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, (VERSION), VALUE)
 
 } // namespace nix

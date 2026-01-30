@@ -26,9 +26,9 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
     auto status = ServeProto::Serialise<BuildResultStatus>::read(store, {conn.from});
     conn.from >> errorMsg;
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 3)
+    if (conn.version >= ServeProto::Version{2, 3})
         conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
+    if (conn.version >= ServeProto::Version{2, 6}) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
             success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
@@ -63,9 +63,9 @@ void ServeProto::Serialise<BuildResult>::write(
        default value for the fields that don't exist in that case. */
     auto common = [&](std::string_view errorMsg, bool isNonDeterministic, const auto & builtOutputs) {
         conn.to << errorMsg;
-        if (GET_PROTOCOL_MINOR(conn.version) >= 3)
+        if (conn.version >= ServeProto::Version{2, 3})
             conn.to << res.timesBuilt << isNonDeterministic << res.startTime << res.stopTime;
-        if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
+        if (conn.version >= ServeProto::Version{2, 6}) {
             DrvOutputs builtOutputsFullKey;
             for (auto & [output, realisation] : builtOutputs)
                 builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
@@ -75,7 +75,12 @@ void ServeProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                auto status = failure.status;
+                /* ServeProto doesn't have feature negotiation, so always
+                   convert HashMismatch to OutputRejected for compatibility. */
+                if (status == BuildResult::Failure::HashMismatch)
+                    status = BuildResult::Failure::OutputRejected;
+                ServeProto::write(store, {conn.to}, BuildResultStatus{status});
                 common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
@@ -100,7 +105,7 @@ UnkeyedValidPathInfo ServeProto::Serialise<UnkeyedValidPathInfo>::read(const Sto
     readLongLong(conn.from); // download size, unused
     info.narSize = readLongLong(conn.from);
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 4) {
+    if (conn.version >= ServeProto::Version{2, 4}) {
         auto s = readString(conn.from);
         if (!s.empty())
             info.narHash = Hash::parseAnyPrefixed(s);
@@ -120,7 +125,7 @@ void ServeProto::Serialise<UnkeyedValidPathInfo>::write(
     // !!! Maybe we want compression?
     conn.to << info.narSize // downloadSize, lie a little
             << info.narSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 4) {
+    if (conn.version >= ServeProto::Version{2, 4}) {
         conn.to << info.narHash.to_string(HashFormat::Nix32, true) << renderContentAddress(info.ca);
         ServeProto::write(store, conn, info.sigs);
     }
@@ -132,13 +137,13 @@ ServeProto::Serialise<ServeProto::BuildOptions>::read(const StoreDirConfig & sto
     BuildOptions options;
     options.maxSilentTime = readInt(conn.from);
     options.buildTimeout = readInt(conn.from);
-    if (GET_PROTOCOL_MINOR(conn.version) >= 2)
+    if (conn.version >= ServeProto::Version{2, 2})
         options.maxLogSize = readNum<unsigned long>(conn.from);
-    if (GET_PROTOCOL_MINOR(conn.version) >= 3) {
+    if (conn.version >= ServeProto::Version{2, 3}) {
         options.nrRepeats = readInt(conn.from);
         options.enforceDeterminism = readInt(conn.from);
     }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 7) {
+    if (conn.version >= ServeProto::Version{2, 7}) {
         options.keepFailed = (bool) readInt(conn.from);
     }
     return options;
@@ -148,12 +153,12 @@ void ServeProto::Serialise<ServeProto::BuildOptions>::write(
     const StoreDirConfig & store, WriteConn conn, const ServeProto::BuildOptions & options)
 {
     conn.to << options.maxSilentTime << options.buildTimeout;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 2)
+    if (conn.version >= ServeProto::Version{2, 2})
         conn.to << options.maxLogSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 3)
+    if (conn.version >= ServeProto::Version{2, 3})
         conn.to << options.nrRepeats << options.enforceDeterminism;
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 7) {
+    if (conn.version >= ServeProto::Version{2, 7}) {
         conn.to << ((int) options.keepFailed);
     }
 }
