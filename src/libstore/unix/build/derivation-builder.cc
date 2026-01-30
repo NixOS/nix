@@ -1459,7 +1459,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
         canonicalisePathMetaData(
-            actualPath, buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt, inodesSeen);
+            actualPath,
+            {
+#ifndef _WIN32
+                .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
+#endif
+                NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)},
+            inodesSeen);
 
         bool discardReferences = false;
         if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
@@ -1581,7 +1587,15 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
-                canonicalisePathMetaData(actualPath, {}, inodesSeen);
+                canonicalisePathMetaData(
+                    actualPath,
+                    {
+#ifndef _WIN32
+                        // builder UIDs are already dealt with
+                        .uidRange = std::nullopt,
+#endif
+                        NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)},
+                    inodesSeen);
             }
         };
 
@@ -1738,7 +1752,15 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
-        canonicalisePathMetaData(actualPath, {}, inodesSeen);
+        canonicalisePathMetaData(
+            actualPath,
+            {
+#ifndef _WIN32
+                // builder UIDs are already dealt with
+                .uidRange = std::nullopt,
+#endif
+                NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)},
+            inodesSeen);
 
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
