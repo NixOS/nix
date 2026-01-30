@@ -68,10 +68,8 @@ endif
 summary('can hardlink to symlink', can_link_symlink, bool_yn : true)
 configdata_priv.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 
-# Check for each of these functions, and create a define like `#define HAVE_LCHOWN 1`.
+# Check for each of these functions, and create a define like `#define HAVE_POSIX_FALLOCATE 1`.
 check_funcs = [
-  # Optionally used for canonicalising files from the build
-  'lchown',
   'posix_fallocate',
   'statvfs',
 ]
