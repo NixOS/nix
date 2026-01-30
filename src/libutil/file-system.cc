@@ -650,11 +650,6 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
-{
-    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
-}
-
 void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete)
 {
     auto fromStatus = std::filesystem::symlink_status(from);
@@ -679,7 +674,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
-    setWriteTime(to, lstat(from.string().c_str()));
+    // Note: we don't preserve timestamps anymore
     if (andDelete) {
         if (!std::filesystem::is_symlink(fromStatus))
             std::filesystem::permissions(

@@ -122,6 +122,14 @@ Descriptor openFileEnsureBeneathNoSymlinks(
 #endif
 );
 
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const CanonPath & path, time_t accessedTime, time_t modificationTime);
+
 #ifdef __linux__
 namespace linux {
 

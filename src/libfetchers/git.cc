@@ -16,10 +16,14 @@
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/canon-path.hh"
 
 #include <regex>
 #include <string.h>
 #include <sys/time.h>
+#include <fcntl.h>
 
 #ifndef _WIN32
 #  include <sys/wait.h>
@@ -846,8 +850,13 @@ struct GitInputScheme : InputScheme
                 }
 
                 try {
-                    if (!input.getRev())
-                        setWriteTime(localRefFile, now, now);
+                    if (!input.getRev()) {
+                        auto parent = localRefFile.parent_path();
+                        auto name = localRefFile.filename();
+                        AutoCloseFD dirFd = openDirectory(parent);
+                        if (dirFd)
+                            setWriteTime(dirFd.get(), CanonPath(name.string()), now, now);
+                    }
                 } catch (Error & e) {
                     warn("could not update mtime for file %s: %s", PathFmt(localRefFile), e.info().msg);
                 }

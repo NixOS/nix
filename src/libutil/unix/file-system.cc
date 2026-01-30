@@ -84,53 +84,6 @@ PosixStat lstat(const std::filesystem::path & path)
     return st;
 }
 
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
-{
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
-    struct timespec times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_nsec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_nsec = 0,
-        },
-    };
-    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path));
-#else
-    struct timeval times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_usec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_usec = 0,
-        },
-    };
-#  if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", PathFmt{path});
-#  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
-
-    if (!isSymlink) {
-        if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
-    } else {
-        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
-    }
-#  endif
-#endif
-}
-
 #ifdef __FreeBSD__
 #  define MOUNTEDPATHS_PARAM , std::set<Path> & mountedPaths
 #  define MOUNTEDPATHS_ARG , mountedPaths

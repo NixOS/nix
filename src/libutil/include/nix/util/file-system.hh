@@ -339,30 +339,6 @@ void createDirs(const std::filesystem::path & path);
 void createDir(const Path & path, mode_t mode = 0755);
 
 /**
- * Set the access and modification times of the given path, not
- * following symlinks.
- *
- * @param accessedTime Specified in seconds.
- *
- * @param modificationTime Specified in seconds.
- *
- * @param isSymlink Whether the file in question is a symlink. Used for
- * fallback code where we don't have `lutimes` or similar. if
- * `std::optional` is passed, the information will be recomputed if it
- * is needed. Race conditions are possible so be careful!
- */
-void setWriteTime(
-    const std::filesystem::path & path,
-    time_t accessedTime,
-    time_t modificationTime,
-    std::optional<bool> isSymlink = std::nullopt);
-
-/**
- * Convenience wrapper that takes all arguments from the `PosixStat`.
- */
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
-
-/**
  * Create a symlink.
  *
  */

@@ -266,4 +266,31 @@ PosixStat fstatat(Descriptor dirFd, const CanonPath & path)
     return st;
 }
 
+void setWriteTime(Descriptor dirFd, const CanonPath & path, time_t accessedTime, time_t modificationTime)
+{
+    struct timespec times[2] = {
+        {
+            .tv_sec = accessedTime,
+            .tv_nsec = 0,
+        },
+        {
+            .tv_sec = modificationTime,
+            .tv_nsec = 0,
+        },
+    };
+
+#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
+    if (utimensat(dirFd, path.rel_c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("changing modification time of '%s' (using `utimensat`)", path);
+#else
+    // Fallback: open the file and use futimens
+    AutoCloseFD fd = openat(dirFd, path.rel_c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening '%s' to change modification time", path);
+
+    if (futimens(fd.get(), times) == -1)
+        throw SysError("changing modification time of '%s' (using `futimens`)", path);
+#endif
+}
+
 } // namespace nix
