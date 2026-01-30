@@ -104,10 +104,11 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
  *
  * @param fd The file descriptor to read from
  * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
+ * @param terminator The chartacter that ends the line
  *
  * @return A line of text ending in `\n`, or a string without `\n` if `eofOk` is true and EOF is reached.
  */
-std::string readLine(Descriptor fd, bool eofOk = false);
+std::string readLine(Descriptor fd, bool eofOk = false, char terminator = '\n');
 
 /**
  * Write a line to a file descriptor.
@@ -298,6 +299,17 @@ void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
  * @throws Interrupted if interrupted. SysError::errNo can never be EINTR.
  */
 std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Send a message with file descriptors over a Unix domain socket using sendmsg with SCM_RIGHTS.
+ *
+ * @param sockfd The socket file descriptor to send the message on
+ * @param data The data to send
+ * @param fds A span of file descriptors to pass via SCM_RIGHTS
+ *
+ * @throws SysError on failure
+ */
+void sendMessageWithFds(Descriptor sockfd, std::string_view data, std::span<const int> fds);
 
 } // namespace unix
 #endif

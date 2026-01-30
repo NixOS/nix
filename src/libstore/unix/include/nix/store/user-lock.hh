@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/file-descriptor.hh"
 #include <memory>
 #include <vector>
 #include <sys/types.h>
@@ -30,6 +31,27 @@ struct UserLock
     virtual gid_t getGID() = 0;
 
     virtual std::vector<gid_t> getSupplementaryGIDs() = 0;
+
+    virtual std::optional<AutoCloseFD> openUserNamespace()
+    {
+        return std::nullopt;
+    };
+
+    /**
+     * Get the UID that should be used inside a user namespace.
+     */
+    virtual uid_t getSandboxedUID()
+    {
+        return getUIDCount() == 1 ? 1000 : 0;
+    }
+
+    /**
+     * Get the GID that should be used inside a user namespace.
+     */
+    virtual gid_t getSandboxedGID()
+    {
+        return getUIDCount() == 1 ? 100 : 0;
+    }
 };
 
 /**
@@ -39,5 +61,11 @@ struct UserLock
 std::unique_ptr<UserLock> acquireUserLock(const std::string & userGroup, uid_t nrIds, bool useUserNamespace);
 
 bool useBuildUsers();
+
+#ifdef __linux__
+namespace linux {
+std::unique_ptr<UserLock> acquireSystemdUserLock(uid_t nrIds);
+}
+#endif
 
 } // namespace nix
