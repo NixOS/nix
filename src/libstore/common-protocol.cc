@@ -150,6 +150,13 @@ CommonProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, Co
 void CommonProto::Serialise<BuildResultStatus>::write(
     const StoreDirConfig & store, CommonProto::WriteConn conn, const BuildResultStatus & status)
 {
+    /* See definition, the protocols don't know about `HashMismatch`
+       yet, so change it to `OutputRejected`, which they expect
+       for this case (hash mismatch is a type of output
+       rejection). */
+    if (status == BuildResultStatus{BuildResultFailureStatus::HashMismatch}) {
+        return write(store, conn, BuildResultFailureStatus::OutputRejected);
+    }
     for (auto && [wire, val] : enumerate(buildResultStatusTable))
         if (val == status) {
             conn.to << uint8_t(wire);

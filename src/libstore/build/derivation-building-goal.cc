@@ -827,11 +827,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         switch (e.status) {
         case BuildResult::Failure::HashMismatch:
             worker.hashMismatch = true;
-            /* See header, the protocols don't know about `HashMismatch`
-               yet, so change it to `OutputRejected`, which they expect
-               for this case (hash mismatch is a type of output
-               rejection). */
-            e.status = BuildResult::Failure::OutputRejected;
             break;
         case BuildResult::Failure::NotDeterministic:
             worker.checkMismatch = true;
