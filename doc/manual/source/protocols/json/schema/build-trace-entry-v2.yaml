@@ -90,6 +90,4 @@ additionalProperties:
         description: |
           A set of cryptographic signatures attesting to the authenticity of this build trace entry.
         items:
-          type: string
-          title: Signature
-          description: A single cryptographic signature
+          "$ref": "signature-v2.yaml"
