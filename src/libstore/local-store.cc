@@ -14,6 +14,7 @@
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
@@ -130,6 +131,9 @@ LocalStore::LocalStore(ref<const Config> config)
 
     /* Create missing state directories if they don't already exist. */
     createDirs(config->realStoreDir.get());
+    realStoreDirFd = openDirectory(config->realStoreDir.get());
+    if (!realStoreDirFd)
+        throw SysError("opening store directory %s", PathFmt(config->realStoreDir.get()));
     if (config->readOnly) {
         experimentalFeatureSettings.require(Xp::ReadOnlyLocalStore);
     } else {
@@ -1111,7 +1115,10 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
+                canonicalisePathMetaData(
+                    realStoreDirFd.get(),
+                    OsFilename{realPath.filename()},
+                    {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1273,7 +1280,9 @@ StorePath LocalStore::addToStoreFromDump(
             }
 
             canonicalisePathMetaData(
-                realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
+                realStoreDirFd.get(),
+                OsFilename{realPath.filename()},
+                {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 

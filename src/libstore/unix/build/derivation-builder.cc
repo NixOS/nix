@@ -1512,7 +1512,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
         canonicalisePathMetaData(
-            actualPath,
+            store.realStoreDirFd.get(),
+            OsFilename{actualPath.filename()},
             {
 #ifndef _WIN32
                 .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
@@ -1648,7 +1649,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
                 canonicalisePathMetaData(
-                    actualPath,
+                    store.realStoreDirFd.get(),
+                    OsFilename{actualPath.filename()},
                     {
 #ifndef _WIN32
                         // builder UIDs are already dealt with
@@ -1827,7 +1829,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
         canonicalisePathMetaData(
-            actualPath,
+            store.realStoreDirFd.get(),
+            OsFilename{actualPath.filename()},
             {
 #ifndef _WIN32
                 // builder UIDs are already dealt with
