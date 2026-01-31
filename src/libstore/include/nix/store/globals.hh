@@ -62,6 +62,31 @@ const uint32_t maxIdsPerBuild =
 #endif
     ;
 
+/**
+ * Settings that are needed very early during initialization, before a
+ * main `Settings` object can be constructed.
+ *
+ * For now, unlike `Settings`, this remains a global variable. The good
+ * news is that it is immutable except for depending on env vars, so it
+ * is almost a constant.
+ */
+struct BootstrapSettings
+{
+    /**
+     * The directory where system configuration files are stored.
+     */
+    std::filesystem::path nixConfDir;
+
+    /**
+     * A list of user configuration files to load.
+     */
+    std::vector<std::filesystem::path> nixUserConfFiles;
+
+    BootstrapSettings();
+};
+
+extern const BootstrapSettings bootstrapSettings;
+
 struct GCSettings : public virtual Config
 {
     Setting<off_t> reservedSize{
@@ -148,7 +173,7 @@ struct LogFileSettings : public virtual Config
     /**
      * The directory where we log various operations.
      */
-    const Path nixLogDir;
+    std::filesystem::path nixLogDir;
 
 protected:
     LogFileSettings();
@@ -209,8 +234,6 @@ class Settings : public virtual Config, private AutoAllocateUidSettings, private
 
     bool isWSL1();
 
-    Path getDefaultSSLCertFile();
-
 public:
 
     Settings();
@@ -260,22 +283,12 @@ public:
     /**
      * The directory where state is stored.
      */
-    Path nixStateDir;
-
-    /**
-     * The directory where system configuration files are stored.
-     */
-    std::filesystem::path nixConfDir;
-
-    /**
-     * A list of user configuration files to load.
-     */
-    std::vector<Path> nixUserConfFiles;
+    std::filesystem::path nixStateDir;
 
     /**
      * File name of the socket the daemon listens to.
      */
-    Path nixDaemonSocketFile;
+    std::filesystem::path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{
         this,
@@ -456,7 +469,7 @@ public:
 
     Setting<std::string> builders{
         this,
-        "@" + nixConfDir.string() + "/machines",
+        "@" + (bootstrapSettings.nixConfDir / "machines").string(),
         "builders",
         R"(
           A semicolon- or newline-separated list of build machines.
@@ -834,7 +847,7 @@ public:
 #endif
 
 #if defined(__linux__) || defined(__FreeBSD__)
-    Setting<Path> sandboxBuildDir{
+    Setting<std::filesystem::path> sandboxBuildDir{
         this,
         "/build",
         "sandbox-build-dir",
@@ -847,7 +860,7 @@ public:
         )"};
 #endif
 
-    Setting<std::optional<Path>> buildDir{
+    Setting<std::optional<std::filesystem::path>> buildDir{
         this,
         std::nullopt,
         "build-dir",
@@ -885,7 +898,7 @@ public:
 
 private:
 
-    OptionalPathSetting diffHook{
+    Setting<std::optional<std::filesystem::path>> diffHook{
         this,
         std::nullopt,
         "diff-hook",
@@ -919,7 +932,7 @@ private:
 
 public:
 
-    const Path * getDiffHook() const
+    const std::filesystem::path * getDiffHook() const
     {
         if (!runDiffHook.get()) {
             return nullptr;
@@ -1203,64 +1216,6 @@ public:
               /nix/store/a724znygmd1cac856j3gfsyvih3lw07j-bash-4.4-p23`.
         )"};
 
-    Setting<unsigned int> downloadSpeed{
-        this,
-        0,
-        "download-speed",
-        R"(
-          Specify the maximum transfer rate in kilobytes per second you want
-          Nix to use for downloads.
-        )"};
-
-    Setting<std::string> netrcFile{
-        this,
-        (nixConfDir / "netrc").string(),
-        "netrc-file",
-        R"(
-          If set to an absolute path to a `netrc` file, Nix uses the HTTP
-          authentication credentials in this file when trying to download from
-          a remote host through HTTP or HTTPS. Defaults to
-          `$NIX_CONF_DIR/netrc`.
-
-          The `netrc` file consists of a list of accounts in the following
-          format:
-
-              machine my-machine
-              login my-username
-              password my-password
-
-          For the exact syntax, see [the `curl`
-          documentation](https://ec.haxx.se/usingcurl-netrc.html).
-
-          > **Note**
-          >
-          > This must be an absolute path, and `~` is not resolved. For
-          > example, `~/.netrc` won't resolve to your home directory's
-          > `.netrc`.
-        )"};
-
-    Setting<Path> caFile{
-        this,
-        getDefaultSSLCertFile(),
-        "ssl-cert-file",
-        R"(
-          The path of a file containing CA certificates used to
-          authenticate `https://` downloads. Nix by default uses
-          the first of the following files that exists:
-
-          1. `/etc/ssl/certs/ca-certificates.crt`
-          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
-
-          The path can be overridden by the following environment
-          variables, in order of precedence:
-
-          1. `NIX_SSL_CERT_FILE`
-          2. `SSL_CERT_FILE`
-        )",
-        {},
-        // Don't document the machine-specific default value
-        false};
-
 #ifdef __linux__
     Setting<bool> filterSyscalls{
         this,
@@ -1483,7 +1438,7 @@ public:
 };
 
 // FIXME: don't use a global variable.
-extern Settings settings;
+extern nix::Settings settings;
 
 /**
  * Load the configuration (from `nix.conf`, `NIX_CONFIG`, etc.) into the
@@ -1492,9 +1447,6 @@ extern Settings settings;
  * Usually called with `globalConfig`.
  */
 void loadConfFile(AbstractConfig & config);
-
-// Used by the Settings constructor
-std::vector<Path> getUserConfigFiles();
 
 /**
  * The version of Nix itself.
