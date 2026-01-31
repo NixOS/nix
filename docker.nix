@@ -30,6 +30,7 @@
   },
   Cmd ? [ (lib.getExe bashInteractive) ],
   Entrypoint ? null,
+  Env ? [],
   # Default Packages
   nix ? pkgs.nix,
   bashInteractive ? pkgs.bashInteractive,
@@ -392,7 +393,7 @@ dockerTools.buildLayeredImageWithNixDb {
       "GIT_SSL_CAINFO=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_PATH=/nix/var/nix/profiles/per-user/${uname}/channels:${userHome}/.nix-defexpr/channels"
-    ];
+    ] ++ Env;
   };
 
 }
