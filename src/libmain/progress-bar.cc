@@ -1,6 +1,7 @@
 #include "nix/main/progress-bar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/names.hh"
 
@@ -94,10 +95,16 @@ private:
     bool printBuildLogs = false;
     bool isTTY;
 
+    std::unique_ptr<InterruptCallback> interruptCallback;
+
 public:
 
     ProgressBar(bool isTTY)
         : isTTY(isTTY)
+        , interruptCallback(createInterruptCallback([&]() {
+            pause();
+            redraw("\rshutting down\e[K");
+        }))
     {
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
