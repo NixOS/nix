@@ -12,6 +12,7 @@
 #include "graphml.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/finally.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
@@ -899,14 +900,42 @@ static void opServe(Strings opFlags, Strings opArgs)
         .version = clientVersion,
     };
 
-    auto getBuildSettings = [&]() {
-        // FIXME: changing options here doesn't work if we're
-        // building through the daemon.
+    struct BuildSettingsSnapshot
+    {
+        Verbosity verbosity;
+        bool keepLog;
+        bool useSubstitutes;
+        time_t maxSilentTime;
+        time_t buildTimeout;
+        bool buildTimeoutOverridden;
+        unsigned long maxLogSize;
+        bool maxLogSizeOverridden;
+        bool runDiffHook;
+        bool keepFailed;
+    };
+
+    auto snapshotBuildSettings = [&]() {
+        return BuildSettingsSnapshot{
+            .verbosity = verbosity,
+            .keepLog = settings.getLogFileSettings().keepLog.get(),
+            .useSubstitutes = settings.useSubstitutes.get(),
+            .maxSilentTime = settings.maxSilentTime.get(),
+            .buildTimeout = settings.buildTimeout.get(),
+            .buildTimeoutOverridden = settings.buildTimeout.overridden,
+            .maxLogSize = settings.maxLogSize.get(),
+            .maxLogSizeOverridden = settings.maxLogSize.overridden,
+            .runDiffHook = settings.runDiffHook.get(),
+            .keepFailed = settings.keepFailed.get(),
+        };
+    };
+
+    auto applyBuildSettings = [&](const ServeProto::BuildOptions & options) {
         verbosity = lvlError;
         settings.getLogFileSettings().keepLog = false;
         settings.useSubstitutes = false;
 
-        auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
+        auto trusted = store->isTrustedClient();
+        bool allowRestricted = trusted && *trusted == Trusted;
 
         // Only certain fields get initialized based on the protocol
         // version. This is why not all the code below is unconditional.
@@ -914,13 +943,14 @@ static void opServe(Strings opFlags, Strings opArgs)
         // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
         // these conditions.
         settings.maxSilentTime = options.maxSilentTime;
-        settings.buildTimeout = options.buildTimeout;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.maxLogSize = options.maxLogSize;
+        settings.buildTimeout.override(options.buildTimeout);
+        if (GET_PROTOCOL_MINOR(clientVersion) >= 2) {
+            if (allowRestricted)
+                settings.maxLogSize.override(options.maxLogSize);
+            else
+                settings.maxLogSize = options.maxLogSize;
+        }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
-            if (options.nrRepeats != 0) {
-                throw Error("client requested repeating builds, but this is not currently implemented");
-            }
             // Ignore 'options.enforceDeterminism'.
             //
             // It used to be true by default, but also only never had
@@ -933,6 +963,19 @@ static void opServe(Strings opFlags, Strings opArgs)
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = options.keepFailed;
         }
+    };
+
+    auto restoreBuildSettings = [&](const BuildSettingsSnapshot & prev) {
+        verbosity = prev.verbosity;
+        settings.getLogFileSettings().keepLog = prev.keepLog;
+        settings.useSubstitutes = prev.useSubstitutes;
+        settings.maxSilentTime = prev.maxSilentTime;
+        settings.buildTimeout = prev.buildTimeout;
+        settings.buildTimeout.overridden = prev.buildTimeoutOverridden;
+        settings.maxLogSize = prev.maxLogSize;
+        settings.maxLogSize.overridden = prev.maxLogSizeOverridden;
+        settings.runDiffHook = prev.runDiffHook;
+        settings.keepFailed = prev.keepFailed;
     };
 
     while (true) {
@@ -999,8 +1042,6 @@ static void opServe(Strings opFlags, Strings opArgs)
             for (auto & s : readStrings<Strings>(in))
                 paths.push_back(parsePathWithOutputs(*store, s));
 
-            getBuildSettings();
-
             try {
 #ifndef _WIN32 // TODO figure out if Windows needs something similar
                 MonitorFdHup monitor(in.fd);
@@ -1023,7 +1064,24 @@ static void opServe(Strings opFlags, Strings opArgs)
             BasicDerivation drv;
             readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
 
-            getBuildSettings();
+            auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
+            if (GET_PROTOCOL_MINOR(clientVersion) >= 3 && options.nrRepeats != 0) {
+                throw Error("client requested repeating builds, but this is not currently implemented");
+            }
+
+            auto prevSettings = snapshotBuildSettings();
+            applyBuildSettings(options);
+            Finally restoreSettings([&]() {
+                try {
+                    restoreBuildSettings(prevSettings);
+                    store->setOptions();
+                } catch (...) {
+                    if (!std::uncaught_exceptions())
+                        throw;
+                }
+            });
+
+            store->setOptions();
 
 #ifndef _WIN32 // TODO figure out if Windows needs something similar
             MonitorFdHup monitor(in.fd);
