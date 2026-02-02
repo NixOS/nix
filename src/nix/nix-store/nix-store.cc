@@ -1100,9 +1100,8 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 
     auto secretKey = SecretKey::generate(keyName);
 
-    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
-    umask(0077);
-    writeFile(secretKeyFile, secretKey.to_string());
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string(), 0666, FsSync::Yes);
+    writeFile(secretKeyFile, secretKey.to_string(), 0600, FsSync::Yes);
 }
 
 static void opVersion(Strings opFlags, Strings opArgs)
