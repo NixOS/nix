@@ -26,13 +26,23 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/stat.h>
-#include <sys/select.h>
 #include <errno.h>
-#include <pwd.h>
-#include <grp.h>
 #include <fcntl.h>
+
+#ifdef _WIN32
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#  include <afunix.h>
+#  include <thread>
+#else
+#  include <sys/wait.h>
+#  include <sys/socket.h>
+#  include <sys/un.h>
+#  include <sys/select.h>
+#  include <pwd.h>
+#  include <grp.h>
+#endif
 
 #ifdef __linux__
 #  include "nix/util/cgroup.hh"
@@ -99,27 +109,30 @@ AuthorizationSettings authorizationSettings;
 
 static GlobalConfig::Register rSettings(&authorizationSettings);
 
-#ifndef __linux__
-#  define SPLICE_F_MOVE 0
-
-static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size_t len, unsigned int flags)
+/**
+ * Copy data from one file descriptor to another.
+ *
+ * @return bytes copied, 0 on EOF
+ * @throws SysError on read/write failure
+ */
+static size_t copyData(Descriptor from, Descriptor to)
 {
-    // We ignore most parameters, we just have them for conformance with the linux syscall
-    std::vector<char> buf(8192);
-    auto read_count = read(fd_in, buf.data(), buf.size());
-    if (read_count == -1)
-        return read_count;
-    auto write_count = decltype(read_count)(0);
-    while (write_count < read_count) {
-        auto res = write(fd_out, buf.data() + write_count, read_count - write_count);
-        if (res == -1)
-            return res;
-        write_count += res;
-    }
-    return read_count;
-}
+#ifdef __linux__
+    auto res = splice(from, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
+    if (res == -1)
+        throw SysError("copying data between file descriptors");
+    return res;
+#else
+    std::array<std::byte, 8192> buf;
+    auto res = nix::read(from, buf);
+    if (res == 0)
+        return 0;
+    writeFull(to, std::string_view(reinterpret_cast<char *>(buf.data()), res), false);
+    return res;
 #endif
+}
 
+#ifndef _WIN32
 static void sigChldHandler(int sigNo)
 {
     // Ensure we don't modify errno of whatever we've interrupted
@@ -193,17 +206,6 @@ matchUser(const std::optional<std::string> & user, const std::optional<std::stri
 }
 
 /**
- * Open a store without a path info cache.
- */
-static ref<Store> openUncachedStore()
-{
-    Store::Config::Params params; // FIXME: get params from somewhere
-    // Disable caching since the client already does that.
-    params["path-info-cache-size"] = "0";
-    return openStore(settings.storeUri, params);
-}
-
-/**
  * Authenticate a potential client
  *
  * @param peer Information about other end of the connection, the client which
@@ -240,6 +242,19 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::P
     return {trusted, std::move(user)};
 }
 
+#endif
+
+/**
+ * Open a store without a path info cache.
+ */
+static ref<Store> openUncachedStore()
+{
+    Store::Config::Params params; // FIXME: get params from somewhere
+    // Disable caching since the client already does that.
+    params["path-info-cache-size"] = "0";
+    return openStore(settings.storeUri, params);
+}
+
 /**
  * Run a server. The loop opens a socket and accepts new connections from that
  * socket.
@@ -253,8 +268,10 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
+#ifndef _WIN32
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
+#endif
 
 #ifdef __linux__
     if (settings.getLocalSettings().useCgroups) {
@@ -278,32 +295,41 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 #endif
 
     try {
-        unix::serveUnixSocket(
-            {
-                .socketPath = settings.nixDaemonSocketFile,
-                .socketMode = 0666,
-            },
+        serveUnixSocket(
+            {.socketPath = settings.nixDaemonSocketFile, .socketMode = 0666},
             [&](AutoCloseFD remote, std::function<void()> closeListeners) {
+
+#ifndef _WIN32
                 unix::closeOnExec(remote.get());
 
                 unix::PeerInfo peer;
+#endif
                 TrustedFlag trusted;
                 std::optional<std::string> userName;
 
                 if (forceTrustClientOpt)
                     trusted = *forceTrustClientOpt;
                 else {
+#ifndef _WIN32
                     peer = unix::getPeerInfo(remote.get());
                     auto [_trusted, _userName] = authPeer(peer);
                     trusted = _trusted;
                     userName = _userName;
+#else
+                    warn("no peer cred on windows yet, defaulting to untrusted");
+                    trusted = NotTrusted;
+#endif
                 };
 
                 printInfo(
                     (std::string) "accepted connection from pid %1%, user %2%" + (trusted ? " (trusted)" : ""),
-                    peer.pid ? std::to_string(*peer.pid) : "<unknown>",
+#ifndef _WIN32
+                    peer.pid ? std::to_string(*peer.pid) :
+#endif
+                             "<unknown>",
                     userName.value_or("<unknown>"));
 
+#ifndef _WIN32
                 // Fork a child to handle the connection.
                 ProcessOptions options;
                 options.errorPrefix = "unexpected Nix daemon error: ";
@@ -334,6 +360,20 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                         exit(0);
                     },
                     options);
+#else
+                // Spawn a thread to handle the connection.
+                std::thread([remote = std::move(remote), trusted]() {
+                    try {
+                        // Handle the connection.
+                        processConnection(
+                            openUncachedStore(), FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
+                    } catch (Error & e) {
+                        auto ei = e.info();
+                        ei.msg = HintFmt("unexpected Nix daemon error: %1%", ei.msg.str());
+                        logError(ei);
+                    }
+                }).detach();
+#endif
             });
     } catch (Interrupted & e) {
         return;
@@ -351,8 +391,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
 static void forwardStdioConnection(RemoteStore & store)
 {
     auto conn = store.openConnectionWrapper();
-    int from = conn->from.fd;
-    int to = conn->to.fd;
+    Descriptor from = conn->from.fd;
+    Descriptor to = conn->to.fd;
 
     Socket fromSock = toSocket(from), stdinSock = toSocket(getStandardInput());
     auto nfds = std::max(fromSock, stdinSock) + 1;
@@ -364,18 +404,22 @@ static void forwardStdioConnection(RemoteStore & store)
         if (select(nfds, &fds, nullptr, nullptr, nullptr) == -1)
             throw SysError("waiting for data from client or server");
         if (FD_ISSET(fromSock, &fds)) {
-            auto res = splice(from, nullptr, STDOUT_FILENO, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-            if (res == -1)
-                throw SysError("splicing data from daemon socket to stdout");
-            else if (res == 0)
-                throw EndOfFile("unexpected EOF from daemon socket");
+            try {
+                if (copyData(from, getStandardOutput()) == 0)
+                    throw EndOfFile("unexpected EOF from daemon socket");
+            } catch (SysError & e) {
+                e.addTrace({}, "splicing data from daemon socket to stdout");
+                throw;
+            }
         }
         if (FD_ISSET(stdinSock, &fds)) {
-            auto res = splice(STDIN_FILENO, nullptr, to, nullptr, SSIZE_MAX, SPLICE_F_MOVE);
-            if (res == -1)
-                throw SysError("splicing data from stdin to daemon socket");
-            else if (res == 0)
-                return;
+            try {
+                if (copyData(getStandardInput(), to) == 0)
+                    return;
+            } catch (SysError & e) {
+                e.addTrace({}, "splicing data from stdin to daemon socket");
+                throw;
+            }
         }
     }
 }
@@ -391,7 +435,7 @@ static void forwardStdioConnection(RemoteStore & store)
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    processConnection(store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, NotRecursive);
+    processConnection(store, FdSource(getStandardInput()), FdSink(getStandardOutput()), trustClient, NotRecursive);
 }
 
 /**

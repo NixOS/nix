@@ -34,6 +34,10 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
+if host_machine.system() == 'windows'
+  deps_other += cxx.find_library('ws2_32')
+endif
+
 configdata = configuration_data()
 
 # The CLI has a more detailed version string than the libraries; see `nixVersion`
@@ -68,6 +72,7 @@ nix_sources = [ config_priv_h ] + files(
   'config.cc',
   'copy.cc',
   'crash-handler.cc',
+  'daemon.cc',
   'derivation-add.cc',
   'derivation-show.cc',
   'derivation.cc',
@@ -109,12 +114,6 @@ nix_sources = [ config_priv_h ] + files(
   'verify.cc',
   'why-depends.cc',
 )
-
-if host_machine.system() != 'windows'
-  nix_sources += files(
-    'unix/daemon.cc',
-  )
-endif
 
 nix_sources += [
   gen_header.process('doc/manual/generate-manpage.nix'),
