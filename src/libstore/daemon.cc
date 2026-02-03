@@ -852,7 +852,10 @@ static void performOp(
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         std::shared_ptr<const ValidPathInfo> info;
         logger->startWork();
-        info = store->queryPathInfo(path);
+        try {
+            info = store->queryPathInfo(path);
+        } catch (InvalidPath &) {
+        }
         logger->stopWork();
         if (info) {
             conn.to << 1;
