@@ -849,7 +849,10 @@ static void performOp(
         auto path = store->parseStorePath(readString(conn.from));
         std::shared_ptr<const ValidPathInfo> info;
         logger->startWork();
-        info = store->queryPathInfo(path);
+        try {
+            info = store->queryPathInfo(path);
+        } catch (InvalidPath &) {
+        }
         logger->stopWork();
         if (info) {
             conn.to << 1;
