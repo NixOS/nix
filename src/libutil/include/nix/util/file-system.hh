@@ -198,6 +198,29 @@ Descriptor openDirectory(const std::filesystem::path & path);
  */
 Descriptor openFileReadonly(const std::filesystem::path & path);
 
+struct OpenNewFileForWriteParams
+{
+    /**
+     * Whether to truncate an existing file.
+     */
+    bool truncateExisting:1 = false;
+    /**
+     * Whether to follow symlinks if @ref truncateExisting is true.
+     */
+    bool followSymlinksOnTruncate:1 = false;
+};
+
+/**
+ * Open a `Descriptor` for write access or create it if it doesn't exist or truncate existing depending on @ref
+ * truncateExisting.
+ *
+ * @param mode POSIX permission bits. Ignored on Windows.
+ * @throws Nothing.
+ *
+ * @todo Reparse points on Windows.
+ */
+Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params);
+
 /**
  * Read the contents of a file into a string.
  */

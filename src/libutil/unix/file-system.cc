@@ -32,6 +32,19 @@ Descriptor openFileReadonly(const std::filesystem::path & path)
     return open(path.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
+Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
+{
+    auto flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+    if (params.truncateExisting) {
+        flags |= O_TRUNC;
+        if (!params.followSymlinksOnTruncate)
+            flags |= O_NOFOLLOW;
+    } else {
+        flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
+    }
+    return open(path.c_str(), flags, mode);
+}
+
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
