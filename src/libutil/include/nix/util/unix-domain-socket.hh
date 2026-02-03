@@ -5,7 +5,7 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/socket.hh"
 
-#include <unistd.h>
+#include <sys/types.h>
 
 #include <filesystem>
 

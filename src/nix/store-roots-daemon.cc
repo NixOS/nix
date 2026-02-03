@@ -40,7 +40,7 @@ struct CmdRootsDaemon : StoreConfigCommand
 
         auto gcSocketPath = localStoreConfig->getRootsSocketPath();
 
-        unix::serveUnixSocket(
+        serveUnixSocket(
             {
                 .socketPath = gcSocketPath,
                 .socketMode = 0666,

@@ -9,27 +9,37 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
 
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <poll.h>
+#include <sys/types.h>
+
+#ifdef _WIN32
+#  include <winsock2.h>
+#  include <afunix.h>
+#else
+#  include <sys/socket.h>
+#  include <sys/un.h>
+#  include <poll.h>
+#endif
 
 #if defined(__APPLE__) || defined(__FreeBSD__)
 #  include <sys/ucred.h>
 #endif
 
-namespace nix::unix {
+namespace nix {
+
+#ifndef _WIN32
+namespace unix {
 
 PeerInfo getPeerInfo(Descriptor remote)
 {
     PeerInfo peer;
 
-#if defined(SO_PEERCRED)
+#  if defined(SO_PEERCRED)
 
-#  if defined(__OpenBSD__)
+#    if defined(__OpenBSD__)
     struct sockpeercred cred;
-#  else
+#    else
     ucred cred;
-#  endif
+#    endif
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0) {
         peer.pid = cred.pid;
@@ -37,26 +47,30 @@ PeerInfo getPeerInfo(Descriptor remote)
         peer.gid = cred.gid;
     }
 
-#elif defined(LOCAL_PEERCRED)
+#  elif defined(LOCAL_PEERCRED)
 
-#  if !defined(SOL_LOCAL)
-#    define SOL_LOCAL 0
-#  endif
+#    if !defined(SOL_LOCAL)
+#      define SOL_LOCAL 0
+#    endif
 
     xucred cred;
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
         peer.uid = cred.cr_uid;
 
-#endif
+#  endif
 
     return peer;
 }
+
+} // namespace unix
+#endif
 
 [[noreturn]] void serveUnixSocket(const ServeUnixSocketOptions & options, UnixSocketHandler handler)
 {
     std::vector<AutoCloseFD> listeningSockets;
 
+#ifndef _WIN32
     static constexpr int SD_LISTEN_FDS_START = 3;
 
     //  Handle socket-based activation by systemd.
@@ -68,26 +82,32 @@ PeerInfo getPeerInfo(Descriptor remote)
         assert(count);
         for (unsigned int i = 0; i < count; ++i) {
             AutoCloseFD fdSocket(SD_LISTEN_FDS_START + i);
-            closeOnExec(fdSocket.get());
+            unix::closeOnExec(fdSocket.get());
             listeningSockets.push_back(std::move(fdSocket));
         }
     }
 
     //  Otherwise, create and bind to a Unix domain socket.
     else {
+#else
+    {
+#endif
         createDirs(options.socketPath.parent_path());
         listeningSockets.push_back(createUnixDomainSocket(options.socketPath.string(), options.socketMode));
     }
 
+#ifndef _WIN32
     std::vector<struct pollfd> fds;
     for (auto & i : listeningSockets)
         fds.push_back({.fd = i.get(), .events = POLLIN});
+#endif
 
     //  Loop accepting connections.
     while (1) {
         try {
             checkInterrupt();
 
+#ifndef _WIN32
             auto count = poll(fds.data(), fds.size(), -1);
             if (count == -1) {
                 if (errno == EINTR)
@@ -95,15 +115,26 @@ PeerInfo getPeerInfo(Descriptor remote)
                 throw SysError("polling for incoming connections");
             }
 
-            for (auto & fd : fds) {
-                if (!fd.revents)
+            for (auto & pollfd : fds) {
+                if (!pollfd.revents)
                     continue;
+                Socket fd = toSocket(pollfd.fd);
+#else
+            assert(listeningSockets.size() == 1);
+            {
+                Socket fd = toSocket(listeningSockets[0].get());
+#endif
 
                 // Accept a connection.
                 struct sockaddr_un remoteAddr;
-                socklen_t remoteAddrLen = sizeof(remoteAddr);
+#ifndef _WIN32
+                socklen_t
+#else
+                int
+#endif
+                    remoteAddrLen = sizeof(remoteAddr);
 
-                AutoCloseFD remote = accept(fd.fd, (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                AutoCloseFD remote = fromSocket(accept(fd, (struct sockaddr *) &remoteAddr, &remoteAddrLen));
                 checkInterrupt();
                 if (!remote) {
                     if (errno == EINTR)
@@ -123,4 +154,4 @@ PeerInfo getPeerInfo(Descriptor remote)
     }
 }
 
-} // namespace nix::unix
+} // namespace nix

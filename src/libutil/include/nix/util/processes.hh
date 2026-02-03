@@ -100,7 +100,7 @@ struct ProcessOptions
 };
 
 #ifndef _WIN32
-pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
+pid_t startProcess(std::move_only_function<void()> fun, const ProcessOptions & options = ProcessOptions());
 #endif
 
 /**
