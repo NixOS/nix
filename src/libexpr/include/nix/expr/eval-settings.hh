@@ -402,10 +402,10 @@ struct EvalSettings : Config
 
     Setting<std::string> tectonixGitDir{
         this,
-        "",
+        "~/world/git",
         "tectonix-git-dir",
         R"(
-          Path to the git directory for tectonix builtins (e.g., `~/world/git`).
+          Path to the git directory for tectonix builtins (default: `~/world/git`).
 
           This enables the tectonix builtins (`builtins.unsafeTectonixInternalTreeSha`, `builtins.unsafeTectonixInternalTree`,
           `builtins.unsafeTectonixInternalZoneSrc`, `builtins.unsafeTectonixInternalZone`, `builtins.unsafeTectonixInternalManifest`)

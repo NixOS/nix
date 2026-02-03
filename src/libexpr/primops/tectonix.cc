@@ -51,7 +51,8 @@ static RegisterPrimOp primop_worldManifest({
 
       Example: `builtins.unsafeTectonixInternalManifest."//areas/tools/dev"` returns `"W-123456"`.
 
-      Requires `--tectonix-git-dir` and `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
+      `--tectonix-git-sha` to be set.
     )",
     .fun = prim_worldManifest,
 });
@@ -89,7 +90,8 @@ static RegisterPrimOp primop_worldManifestInverted({
 
       Example: `builtins.unsafeTectonixInternalManifestInverted."W-123456"` returns `"//areas/tools/dev"`.
 
-      Requires `--tectonix-git-dir` and `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
+      `--tectonix-git-sha` to be set.
     )",
     .fun = prim_worldManifestInverted,
 });
@@ -116,7 +118,8 @@ static RegisterPrimOp primop_unsafeTectonixInternalTreeSha({
       Example: `builtins.unsafeTectonixInternalTreeSha "//areas/tools/tec"` returns the tree SHA
       for that zone.
 
-      Requires `--tectonix-git-dir` and `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
+      `--tectonix-git-sha` to be set.
     )",
     .fun = prim_unsafeTectonixInternalTreeSha,
 });
@@ -161,7 +164,7 @@ static RegisterPrimOp primop_unsafeTectonixInternalTree({
 
       Example: `builtins.unsafeTectonixInternalTree "abc123..."` returns `/nix/store/...-world-tree-abc123`.
 
-      Requires `--tectonix-git-dir` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`).
     )",
     .fun = prim_unsafeTectonixInternalTree,
 });
@@ -197,7 +200,8 @@ static RegisterPrimOp primop_unsafeTectonixInternalZoneSrc({
 
       Example: `builtins.unsafeTectonixInternalZoneSrc "//areas/tools/tec"`
 
-      Requires `--tectonix-git-dir` and `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
+      `--tectonix-git-sha` to be set.
     )",
     .fun = prim_unsafeTectonixInternalZoneSrc,
 });
@@ -334,7 +338,8 @@ static RegisterPrimOp primop_unsafeTectonixInternalZone({
 
           mkDerivation { src = zone.outPath; }
 
-      Requires `--tectonix-git-dir` and `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
+      `--tectonix-git-sha` to be set.
     )",
     .fun = prim_unsafeTectonixInternalZone,
 });
