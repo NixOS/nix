@@ -40,16 +40,16 @@ git -C "$rootRepo" commit -m "Add submodule"
 
 rev=$(git -C "$rootRepo" rev-parse HEAD)
 
-r1=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-r2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = false; }).outPath")
-r3=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
+r1=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; }).outPath")
+r2=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = false; }).outPath")
+r3=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = true; }).outPath")
 
 [[ $r1 == "$r2" ]]
 [[ $r2 != "$r3" ]]
 
-r4=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; }).outPath")
-r5=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = false; }).outPath")
-r6=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
+r4=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; ref = \"master\"; rev = \"$rev\"; }).outPath")
+r5=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; ref = \"master\"; rev = \"$rev\"; submodules = false; }).outPath")
+r6=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
 r7=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
 r8=$(nix eval --raw --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
 
@@ -68,10 +68,10 @@ have_submodules=$(nix eval --expr "(builtins.fetchGit { url = $rootRepo; rev = \
 have_submodules=$(nix eval --expr "(builtins.fetchGit { url = $rootRepo; rev = \"$rev\"; submodules = true; }).submodules")
 [[ $have_submodules == true ]]
 
-pathWithoutSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; }).outPath")
-pathWithSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-pathWithSubmodulesAgain=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }).outPath")
-pathWithSubmodulesAgainWithRef=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithoutSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; }).outPath")
+pathWithSubmodules=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgain=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = true; }).outPath")
+pathWithSubmodulesAgainWithRef=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; ref = \"master\"; rev = \"$rev\"; submodules = true; }).outPath")
 
 # The resulting store path cannot be the same.
 [[ $pathWithoutSubmodules != "$pathWithSubmodules" ]]
@@ -93,8 +93,8 @@ test "$(find "$pathWithSubmodules" -name .git)" = ""
 
 # Git repos without submodules can be fetched with submodules = true.
 subRev=$(git -C "$subRepo" rev-parse HEAD)
-noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; }).outPath")
-noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$subRepo; rev = \"$subRev\"; submodules = true; }).outPath")
+noSubmoduleRepoBaseline=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$subRepo\"; rev = \"$subRev\"; }).outPath")
+noSubmoduleRepo=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$subRepo\"; rev = \"$subRev\"; submodules = true; }).outPath")
 
 [[ $noSubmoduleRepoBaseline == "$noSubmoduleRepo" ]]
 
@@ -114,7 +114,7 @@ git -C "$rootRepo" commit -a -m "Add bad submodules"
 
 rev=$(git -C "$rootRepo" rev-parse HEAD)
 
-r=$(nix eval --raw --expr "builtins.fetchGit { url = file://$rootRepo; rev = \"$rev\"; submodules = true; }")
+r=$(nix eval --raw --expr "builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev\"; submodules = true; }")
 
 [[ -f $r/file ]]
 [[ ! -e $r/missing ]]
@@ -126,14 +126,14 @@ initGitRepo "$rootRepo"
 git -C "$rootRepo" submodule add ../gitSubmodulesSub sub
 git -C "$rootRepo" commit -m "Add submodule"
 rev2=$(git -C "$rootRepo" rev-parse HEAD)
-pathWithRelative=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$rootRepo; rev = \"$rev2\"; submodules = true; }).outPath")
+pathWithRelative=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; rev = \"$rev2\"; submodules = true; }).outPath")
 diff -r -x .gitmodules "$pathWithSubmodules" "$pathWithRelative"
 
 # Test clones that have an upstream with relative submodule URLs.
 rm "$TEST_HOME"/.cache/nix/fetcher-cache*
 cloneRepo=$TEST_ROOT/a/b/gitSubmodulesClone # NB /a/b to make the relative path not work relative to $cloneRepo
 git clone "$rootRepo" "$cloneRepo"
-pathIndirect=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$cloneRepo; rev = \"$rev2\"; submodules = true; }).outPath")
+pathIndirect=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$cloneRepo\"; rev = \"$rev2\"; submodules = true; }).outPath")
 [[ $pathIndirect = "$pathWithRelative" ]]
 
 # Test submodule export-ignore interaction
@@ -161,7 +161,7 @@ git -C "$rootRepo" status
 
 # # TBD: not supported yet, because semantics are undecided and current implementation leaks rules from the root to submodules
 # # exportIgnore can be used with submodules
-# pathWithExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; exportIgnore = true; }).outPath")
+# pathWithExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; submodules = true; exportIgnore = true; }).outPath")
 # # find $pathWithExportIgnore
 # # git -C $rootRepo archive --format=tar HEAD | tar -t
 # # cp -a $rootRepo /tmp/rootRepo
@@ -176,14 +176,14 @@ git -C "$rootRepo" status
 
 
 # exportIgnore can be explicitly disabled with submodules
-pathWithoutExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; exportIgnore = false; }).outPath")
+pathWithoutExportIgnore=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; submodules = true; exportIgnore = false; }).outPath")
 # find $pathWithoutExportIgnore
 
 [[ -e $pathWithoutExportIgnore/exclude-from-root ]]
 [[ -e $pathWithoutExportIgnore/sub/exclude-from-sub ]]
 
 # exportIgnore defaults to false when submodules = true
-pathWithSubmodules=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = file://$rootRepo; submodules = true; }).outPath")
+pathWithSubmodules=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$rootRepo\"; submodules = true; }).outPath")
 
 [[ -e $pathWithoutExportIgnore/exclude-from-root ]]
 [[ -e $pathWithoutExportIgnore/sub/exclude-from-sub ]]

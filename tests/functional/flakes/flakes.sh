@@ -330,7 +330,7 @@ cat > "$flake3Dir/flake.nix" <<EOF
 {
   inputs.flake2.inputs.flake1 = {
     type = "git";
-    url = file://$flake7Dir;
+    url = "file://$flake7Dir";
   };
 
   outputs = { self, flake2 }: {
@@ -344,7 +344,7 @@ nix flake lock "$flake3Dir"
 cat > "$flake3Dir/flake.nix" <<EOF
 {
   inputs.flake2.inputs.flake1.follows = "foo";
-  inputs.foo.url = git+file://$flake7Dir;
+  inputs.foo.url = "git+file://$flake7Dir";
 
   outputs = { self, flake2 }: {
   };

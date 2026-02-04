@@ -26,11 +26,11 @@ cat > "$flake3Dir/flake.nix" <<EOF
     flake1 = {};
     flake2 = {};
     nonFlake = {
-      url = git+file://$nonFlakeDir;
+      url = "git+file://$nonFlakeDir";
       flake = false;
     };
     nonFlakeFile = {
-      url = path://$nonFlakeDir/README.md;
+      url = "path://$nonFlakeDir/README.md";
       flake = false;
     };
     nonFlakeFile2 = {

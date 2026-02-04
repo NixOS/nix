@@ -34,10 +34,10 @@ git -C "$repo" add hello_world
 git -C "$repo" commit -m 'My first commit.'
 
 # We now do an eval
-nix eval --impure --raw --expr "builtins.fetchGit { url = file://$repo; }"
+nix eval --impure --raw --expr "builtins.fetchGit { url = \"file://$repo\"; }"
 
 # test that our eval even worked by checking for the presence of the file
-[[ $(nix eval --impure --raw --expr "builtins.readFile ((builtins.fetchGit { url = file://$repo; }) + \"/hello_world\")") = 'hello world' ]]
+[[ $(nix eval --impure --raw --expr "builtins.readFile ((builtins.fetchGit { url = \"file://$repo\"; }) + \"/hello_world\")") = 'hello world' ]]
 
 # Validate that refs/heads/master exists
 shopt -s nullglob
@@ -67,7 +67,7 @@ git -C "$repo" add hello_again
 git -C "$repo" commit -m 'Second commit.'
 
 # re-eval — this should return the path to the cached version
-store_path=$(nix eval --tarball-ttl 3600 --impure --raw --expr "(builtins.fetchGit { url = file://$repo; }).outPath")
+store_path=$(nix eval --tarball-ttl 3600 --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; }).outPath")
 echo "Fetched store path: $store_path"
 
 # Validate that the new file is *not* there

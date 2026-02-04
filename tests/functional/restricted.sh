@@ -26,18 +26,18 @@ nix-instantiate --restrict-eval --eval -E 'builtins.readFile ./simple.nix' -I sr
 expectStderr 1 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' | grepQuiet "forbidden in restricted mode"
 nix-instantiate --restrict-eval --eval -E 'let __nixPath = [ { prefix = "foo"; path = ./.; } ]; in builtins.readFile <foo/simple.nix>' -I src=.
 
-p=$(nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}")
+p=$(nix eval --raw --expr "builtins.fetchurl \"file://${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}")
 cmp "$p" "${_NIX_TEST_SOURCE_DIR}/restricted.sh"
 
-(! nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval)
+(! nix eval --raw --expr "builtins.fetchurl \"file://${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval)
 
-(! nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}/restricted.sh/")
+(! nix eval --raw --expr "builtins.fetchurl \"file://${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}/restricted.sh/")
 
-nix eval --raw --expr "builtins.fetchurl file://${_NIX_TEST_SOURCE_DIR}/restricted.sh" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}/restricted.sh"
+nix eval --raw --expr "builtins.fetchurl \"file://${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}/restricted.sh"
 
-(! nix eval --raw --expr "builtins.fetchurl https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval)
-(! nix eval --raw --expr "builtins.fetchTarball https://github.com/NixOS/patchelf/archive/master.tar.gz" --impure --restrict-eval)
-(! nix eval --raw --expr "fetchGit git://github.com/NixOS/patchelf.git" --impure --restrict-eval)
+(! nix eval --raw --expr "builtins.fetchurl \"https://github.com/NixOS/patchelf/archive/master.tar.gz\"" --impure --restrict-eval)
+(! nix eval --raw --expr "builtins.fetchTarball \"https://github.com/NixOS/patchelf/archive/master.tar.gz\"" --impure --restrict-eval)
+(! nix eval --raw --expr "fetchGit \"git://github.com/NixOS/patchelf.git\"" --impure --restrict-eval)
 
 ln -sfn "${_NIX_TEST_SOURCE_DIR}/restricted.nix" "$TEST_ROOT/restricted.nix"
 [[ $(nix-instantiate --eval "$TEST_ROOT"/restricted.nix) == 3 ]]
