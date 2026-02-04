@@ -3,6 +3,7 @@
 
 #include "nix/util/canon-path.hh"
 #include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -133,6 +134,14 @@ void drainFD(
 );
 
 /**
+ * Read a symlink relative to a directory file descriptor.
+ *
+ * @throws SystemError on any I/O errors.
+ * @throws Interrupted if interrupted.
+ */
+OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
+
+/**
  * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
  */
 [[gnu::always_inline]]
@@ -248,38 +257,42 @@ std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t 
 } // namespace linux
 #endif
 
-#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
-namespace windows {
-
-Path handleToPath(Descriptor handle);
-std::wstring handleToFileName(Descriptor handle);
-
-} // namespace windows
-#endif
-
-#ifndef _WIN32
-namespace unix {
-
 /**
- * Safe(r) function to open \param path file relative to \param dirFd, while
- * disallowing escaping from a directory and resolving any symlinks in the
- * process.
+ * Safe(r) function to open a file relative to dirFd, while
+ * disallowing escaping from a directory and any symlinks in the process.
  *
- * @note When not on Linux or when openat2 is not available this is implemented
- * via openat single path component traversal. Uses RESOLVE_BENEATH with openat2
- * or O_RESOLVE_BENEATH.
+ * @note On Windows, implemented via NtCreateFile single path component traversal
+ * with FILE_OPEN_REPARSE_POINT. On Unix, uses RESOLVE_BENEATH with openat2 when
+ * available, or falls back to openat single path component traversal.
  *
- * @note Since this is Unix-only path is specified as CanonPath, which models
- * Unix-style paths and ensures that there are no .. or . components.
- *
- * @param flags O_* flags
- * @param mode Mode for O_{CREAT,TMPFILE}
+ * @param dirFd Directory handle to open relative to
+ * @param path Relative path (no .. or . components)
+ * @param desiredAccess (Windows) Windows ACCESS_MASK (e.g., GENERIC_READ, FILE_WRITE_DATA)
+ * @param createOptions (Windows) Windows create options (e.g., FILE_NON_DIRECTORY_FILE)
+ * @param createDisposition (Windows) FILE_OPEN, FILE_CREATE, etc.
+ * @param flags (Unix) O_* flags
+ * @param mode (Unix) Mode for O_{CREAT,TMPFILE}
  *
  * @pre path.isRoot() is false
  *
- * @throws SymlinkNotAllowed if any path components
+ * @throws SymlinkNotAllowed if any path components are symlinks
+ * @throws SystemError on other errors
  */
-Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+Descriptor openFileEnsureBeneathNoSymlinks(
+    Descriptor dirFd,
+    const CanonPath & path,
+#ifdef _WIN32
+    ACCESS_MASK desiredAccess,
+    ULONG createOptions,
+    ULONG createDisposition = FILE_OPEN
+#else
+    int flags,
+    mode_t mode = 0
+#endif
+);
+
+#ifndef _WIN32
+namespace unix {
 
 /**
  * Try to change the mode of file named by \ref path relative to the parent directory denoted by \ref dirFd.
@@ -291,14 +304,6 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
  * @throws SysError if any operation fails
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
-
-/*
- * Read a symlink relative to a directory file descriptor.
- *
- * @throws SysError on any I/O errors.
- * @throws Interrupted if interrupted. SysError::errNo can never be EINTR.
- */
-std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
 
 } // namespace unix
 #endif
