@@ -27,7 +27,7 @@ static void validateZonePath(EvalState & state, const PosIdx pos, std::string_vi
 
 // ============================================================================
 // builtins.worldManifest
-// Returns path -> zoneId mapping from //.meta/manifest.json
+// Returns path -> zone metadata mapping from //.meta/manifest.json
 // ============================================================================
 static void prim_worldManifest(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
@@ -38,7 +38,10 @@ static void prim_worldManifest(EvalState & state, const PosIdx pos, Value ** arg
         if (!value.contains("id") || !value.at("id").is_string())
             throw Error("zone '%s' in manifest has missing or non-string 'id' field", path);
         auto idStr = value.at("id").get<std::string>();
-        attrs.alloc(state.symbols.create(path)).mkString(idStr, state.mem);
+
+        auto zoneAttrs = state.buildBindings(1);
+        zoneAttrs.alloc("id").mkString(idStr, state.mem);
+        attrs.alloc(state.symbols.create(path)).mkAttrs(zoneAttrs);
     }
     v.mkAttrs(attrs);
 }
@@ -47,9 +50,9 @@ static RegisterPrimOp primop_worldManifest({
     .name = "__unsafeTectonixInternalManifest",
     .args = {},
     .doc = R"(
-      Get the world manifest as a Nix attrset mapping zone paths to zone IDs.
+      Get the world manifest as a Nix attrset mapping zone paths to zone metadata.
 
-      Example: `builtins.unsafeTectonixInternalManifest."//areas/tools/dev"` returns `"W-123456"`.
+      Example: `builtins.unsafeTectonixInternalManifest."//areas/tools/dev".id` returns `"W-123456"`.
 
       Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
       `--tectonix-git-sha` to be set.

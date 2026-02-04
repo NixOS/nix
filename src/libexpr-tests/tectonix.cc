@@ -184,7 +184,7 @@ public:
 // Phase 4: Builtin Tests - __unsafeTectonixInternalManifest
 // ============================================================================
 
-TEST_F(TectonixTest, manifest_returns_path_to_id_mapping)
+TEST_F(TectonixTest, manifest_returns_path_to_metadata_mapping)
 {
     auto ctx = createTectonixContext();
     auto v = ctx->eval("builtins.unsafeTectonixInternalManifest");
@@ -195,17 +195,26 @@ TEST_F(TectonixTest, manifest_returns_path_to_id_mapping)
     // Check //areas/tools/dev maps to W-000001
     auto dev = v.attrs()->get(ctx->state->symbols.create("//areas/tools/dev"));
     ASSERT_NE(dev, nullptr);
-    ASSERT_THAT(*dev->value, IsStringEq("W-000001"));
+    ASSERT_THAT(*dev->value, IsAttrs());
+    auto devId = dev->value->attrs()->get(ctx->state->symbols.create("id"));
+    ASSERT_NE(devId, nullptr);
+    ASSERT_THAT(*devId->value, IsStringEq("W-000001"));
 
     // Check //areas/tools/tec maps to W-000002
     auto tec = v.attrs()->get(ctx->state->symbols.create("//areas/tools/tec"));
     ASSERT_NE(tec, nullptr);
-    ASSERT_THAT(*tec->value, IsStringEq("W-000002"));
+    ASSERT_THAT(*tec->value, IsAttrs());
+    auto tecId = tec->value->attrs()->get(ctx->state->symbols.create("id"));
+    ASSERT_NE(tecId, nullptr);
+    ASSERT_THAT(*tecId->value, IsStringEq("W-000002"));
 
     // Check //areas/platform/core maps to W-000003
     auto core = v.attrs()->get(ctx->state->symbols.create("//areas/platform/core"));
     ASSERT_NE(core, nullptr);
-    ASSERT_THAT(*core->value, IsStringEq("W-000003"));
+    ASSERT_THAT(*core->value, IsAttrs());
+    auto coreId = core->value->attrs()->get(ctx->state->symbols.create("id"));
+    ASSERT_NE(coreId, nullptr);
+    ASSERT_THAT(*coreId->value, IsStringEq("W-000003"));
 }
 
 // ============================================================================

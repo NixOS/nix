@@ -257,11 +257,11 @@ Extend the `TectonixTest` fixture to test all builtins.
 ### 4.1 `__unsafeTectonixInternalManifest`
 
 ```cpp
-TEST_F(TectonixTest, manifest_returns_path_to_id_mapping)
+TEST_F(TectonixTest, manifest_returns_path_to_metadata_mapping)
 {
     auto v = eval("builtins.__unsafeTectonixInternalManifest");
     ASSERT_THAT(v, IsAttrs());
-    // Verify known zone paths map to correct IDs
+    // Verify known zone paths map to correct IDs via .id
 }
 
 TEST_F(TectonixTest, manifest_missing_id_field)
