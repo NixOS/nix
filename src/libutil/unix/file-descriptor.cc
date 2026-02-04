@@ -49,17 +49,17 @@ void pollFD(int fd, int events)
 }
 } // namespace
 
-std::string readFile(int fd)
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     auto st = nix::fstat(fd);
-    return drainFD(fd, true, st.st_size);
+    return st.st_size;
 }
 
 void readFull(int fd, char * buf, size_t count)
 {
     while (count) {
         checkInterrupt();
-        ssize_t res = read(fd, buf, count);
+        ssize_t res = ::read(fd, buf, count);
         if (res == -1) {
             switch (errno) {
             case EINTR:
@@ -105,7 +105,7 @@ std::string readLine(int fd, bool eofOk, char terminator)
         checkInterrupt();
         char ch;
         // FIXME: inefficient
-        ssize_t rd = read(fd, &ch, 1);
+        ssize_t rd = ::read(fd, &ch, 1);
         if (rd == -1) {
             switch (errno) {
             case EINTR:
@@ -130,38 +130,12 @@ std::string readLine(int fd, bool eofOk, char terminator)
     }
 }
 
-void drainFD(int fd, Sink & sink, bool block)
+size_t read(Descriptor fd, std::span<std::byte> buffer)
 {
-    // silence GCC maybe-uninitialized warning in finally
-    int saved = 0;
-
-    if (!block) {
-        saved = fcntl(fd, F_GETFL);
-        if (fcntl(fd, F_SETFL, saved | O_NONBLOCK) == -1)
-            throw SysError("making file descriptor non-blocking");
-    }
-
-    Finally finally([&]() {
-        if (!block) {
-            if (fcntl(fd, F_SETFL, saved) == -1)
-                throw SysError("making file descriptor blocking");
-        }
-    });
-
-    std::vector<unsigned char> buf(64 * 1024);
-    while (1) {
-        checkInterrupt();
-        ssize_t rd = read(fd, buf.data(), buf.size());
-        if (rd == -1) {
-            if (!block && (errno == EAGAIN || errno == EWOULDBLOCK))
-                break;
-            if (errno != EINTR)
-                throw SysError("reading from file");
-        } else if (rd == 0)
-            break;
-        else
-            sink({reinterpret_cast<char *>(buf.data()), (size_t) rd});
-    }
+    ssize_t n = ::read(fd, buffer.data(), buffer.size());
+    if (n == -1)
+        throw SysError("read of %1% bytes", buffer.size());
+    return static_cast<size_t>(n);
 }
 
 size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)

@@ -18,6 +18,7 @@
 #include "nix/util/callback.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/socket.hh"
 
 #ifndef _WIN32
 #  include <sys/socket.h>
@@ -811,16 +812,14 @@ void RemoteStore::flushBadConnections()
 
 void RemoteStore::shutdownConnections()
 {
-#ifndef _WIN32
     auto fds = connectionFds.lock();
     for (auto fd : *fds) {
         /* Use shutdown() instead of close() to signal EOF to any blocking
            reads/writes without actually closing the FD (which would cause
            issues if the connection is still in use). This breaks circular
            waits when the client disconnects during long-running operations. */
-        ::shutdown(fromDescriptorReadOnly(fd), SHUT_RDWR);
+        ::shutdown(toSocket(fd), SHUT_RDWR);
     }
-#endif
 }
 
 void RemoteStore::narFromPath(const StorePath & path, Sink & sink)

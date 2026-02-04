@@ -69,8 +69,7 @@ void LocalStore::createTempRootsFile()
 
         /* Check whether the garbage collector didn't get in our
            way. */
-        auto st = nix::fstat(fromDescriptorReadOnly(fdTempRoots->get()));
-        if (st.st_size == 0)
+        if (getFileSize(fdTempRoots->get()) == 0)
             break;
 
         /* The garbage collector deleted this file before we could get

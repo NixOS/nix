@@ -49,24 +49,33 @@ static inline Descriptor toDescriptor(int fd)
 }
 
 /**
- * Convert a POSIX file descriptor to a native `Descriptor` in read-only
- * mode.
- *
- * This is a no-op except on Windows.
- */
-static inline int fromDescriptorReadOnly(Descriptor fd)
-{
-#ifdef _WIN32
-    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
-#else
-    return fd;
-#endif
-}
-
-/**
  * Read the contents of a resource into a string.
  */
 std::string readFile(Descriptor fd);
+
+/**
+ * Platform-specific read into a buffer.
+ *
+ * Thin wrapper around ::read (Unix) or ReadFile (Windows).
+ * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ *
+ * @param fd The file descriptor to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t read(Descriptor fd, std::span<std::byte> buffer);
+
+/**
+ * Get the size of a file.
+ *
+ * Thin wrapper around fstat (Unix) or GetFileSizeEx (Windows).
+ *
+ * @param fd The file descriptor
+ * @return The file size
+ * @throws SystemError on failure
+ */
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd);
 
 /**
  * Platform-specific positioned read into a buffer.
@@ -117,21 +126,63 @@ std::string readLine(Descriptor fd, bool eofOk = false, char terminator = '\n');
 void writeLine(Descriptor fd, std::string s);
 
 /**
- * Read a file descriptor until EOF occurs.
+ * Options for draining a file descriptor to a sink.
  */
-std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize = 0);
+struct DrainFdSinkOpts
+{
+    /**
+     * If provided, read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     */
+    std::optional<std::make_unsigned_t<off_t>> expectedSize = {};
+
+#ifndef _WIN32
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
+#endif
+};
 
 /**
- * The Windows version is always blocking.
+ * Options for draining a file descriptor to a string.
  */
-void drainFD(
-    Descriptor fd,
-    Sink & sink
+struct DrainFdOpts
+{
+    /**
+     * If expected=true: read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     * If expected=false: size hint for string allocation.
+     */
+    std::make_unsigned_t<off_t> size = 0;
+
+    /**
+     * If true, size is exact expected size. If false, size is just a reservation hint.
+     */
+    bool expected = false;
+
 #ifndef _WIN32
-    ,
-    bool block = true
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
 #endif
-);
+};
+
+/**
+ * Read a file descriptor until EOF occurs.
+ *
+ * @param fd The file descriptor to drain
+ * @param opts Options for the drain operation
+ */
+std::string drainFD(Descriptor fd, DrainFdOpts opts = {});
+
+/**
+ * Read a file descriptor until EOF occurs, writing to a sink.
+ *
+ * @param fd The file descriptor to drain
+ * @param sink The sink to write data to
+ * @param opts Options for the drain operation
+ */
+void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts = {});
 
 /**
  * Read a symlink relative to a directory file descriptor.

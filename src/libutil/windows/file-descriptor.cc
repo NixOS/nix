@@ -20,13 +20,12 @@ namespace nix {
 
 using namespace nix::windows;
 
-std::string readFile(HANDLE handle)
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     LARGE_INTEGER li;
-    if (!GetFileSizeEx(handle, &li))
-        throw WinError("%s:%d statting file", __FILE__, __LINE__);
-
-    return drainFD(handle, true, li.QuadPart);
+    if (!GetFileSizeEx(fd, &li))
+        throw WinError("GetFileSizeEx");
+    return li.QuadPart;
 }
 
 void readFull(HANDLE handle, char * buf, size_t count)
@@ -83,21 +82,12 @@ std::string readLine(HANDLE handle, bool eofOk)
     }
 }
 
-void drainFD(HANDLE handle, Sink & sink /*, bool block*/)
+size_t read(Descriptor fd, std::span<std::byte> buffer)
 {
-    std::vector<unsigned char> buf(64 * 1024);
-    while (1) {
-        checkInterrupt();
-        DWORD rd;
-        if (!ReadFile(handle, buf.data(), buf.size(), &rd, NULL)) {
-            WinError winError("%s:%d reading from handle %p", __FILE__, __LINE__, handle);
-            if (winError.lastError == ERROR_BROKEN_PIPE)
-                break;
-            throw winError;
-        } else if (rd == 0)
-            break;
-        sink({(char *) buf.data(), (size_t) rd});
-    }
+    DWORD n;
+    if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL))
+        throw WinError("ReadFile of %1% bytes", buffer.size());
+    return static_cast<size_t>(n);
 }
 
 size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
