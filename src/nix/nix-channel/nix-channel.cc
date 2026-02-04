@@ -44,7 +44,13 @@ static void readChannels()
 // Writes the list of channels.
 static void writeChannels()
 {
-    auto channelsFD = AutoCloseFD{open(channelsList.c_str(), O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC, 0644)};
+    AutoCloseFD channelsFD = openNewFileForWrite(
+        channelsList,
+        0644,
+        {
+            .truncateExisting = true,
+            .followSymlinksOnTruncate = true, /* Back-compat. */
+        });
     if (!channelsFD)
         throw SysError("opening '%1%' for writing", channelsList.string());
     for (const auto & channel : channels)

@@ -41,6 +41,19 @@ Descriptor openFileReadonly(const std::filesystem::path & path)
         /*hTemplateFile=*/nullptr);
 }
 
+Descriptor
+openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t mode, OpenNewFileForWriteParams params)
+{
+    return CreateFileW(
+        path.c_str(),
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_DELETE,
+        /*lpSecurityAttributes=*/nullptr,
+        params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */
+        FILE_ATTRIBUTE_NORMAL,
+        /*hTemplateFile=*/nullptr);
+}
+
 std::filesystem::path defaultTempDir()
 {
     wchar_t buf[MAX_PATH + 1];
