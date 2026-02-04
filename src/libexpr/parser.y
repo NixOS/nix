@@ -26,6 +26,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/users.hh"
+#include "nix/util/configuration.hh"
 
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
@@ -314,12 +315,12 @@ expr_simple
            state->exprs.add<ExprString>(state->exprs.alloc, path)});
   }
   | URI {
-      static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
-      if (noURLLiterals)
+      if (!experimentalFeatureSettings.isEnabled(DeprecatedFeature::UrlLiterals)) {
           throw ParseError({
               .msg = HintFmt("URL literals are disabled"),
               .pos = state->positions[CUR_POS]
           });
+      }
       $$ = state->exprs.add<ExprString>(state->exprs.alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
