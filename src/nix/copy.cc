@@ -63,7 +63,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, Mix
 
         copyPaths(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
 
-        updateProfile(rootPaths);
+        updateProfile(*dstStore, rootPaths);
 
         if (outLink) {
             if (auto store2 = dstStore.dynamic_pointer_cast<LocalFSStore>())

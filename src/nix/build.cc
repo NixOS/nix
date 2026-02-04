@@ -182,7 +182,7 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
         BuiltPaths buildables2;
         for (auto & b : buildables)
             buildables2.push_back(b.path);
-        updateProfile(buildables2);
+        updateProfile(*store, buildables2);
     }
 };
 
