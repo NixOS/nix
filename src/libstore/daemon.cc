@@ -134,7 +134,10 @@ struct TunnelLogger : public Logger
             to << STDERR_LAST;
         else {
             if (clientVersion >= WorkerProto::Version{.number = {1, 26}}) {
-                to << STDERR_ERROR << *ex;
+                to << STDERR_ERROR;
+                if (clientVersion.features.contains(WorkerProto::featureCancelledAndHashMismatchStatus))
+                    to << ex->info().status;
+                to << *ex;
             } else {
                 to << STDERR_ERROR << ex->what() << ex->info().status;
             }

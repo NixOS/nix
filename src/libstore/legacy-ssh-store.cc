@@ -244,7 +244,7 @@ void LegacySSHStore::buildPaths(
 
     conn->to.flush();
 
-    auto status = CommonProto::Serialise<BuildResultStatus>::read(*this, {conn->from});
+    auto status = ServeProto::Serialise<BuildResultStatus>::read(*this, *conn);
     if (auto * failure = std::get_if<BuildResultFailureStatus>(&status)) {
         std::string errorMsg;
         conn->from >> errorMsg;
