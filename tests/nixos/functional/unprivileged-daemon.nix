@@ -21,7 +21,11 @@
       nix.enable = false;
 
       # Unprivileged nix daemon cannot remount store read/write, so never make it read-only in the first place.
-      boot.readOnlyNixStore = false;
+      boot.nixStoreMountOpts = lib.mkForce [
+        "nodev"
+        "nosuid"
+        "rw"
+      ];
 
       environment.systemPackages = [ config.nix.package ];
       # nix normally defaults to local if running as root, we want root to use the daemon as well.

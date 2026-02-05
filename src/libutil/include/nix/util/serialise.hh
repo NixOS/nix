@@ -121,7 +121,7 @@ struct BufferedSource : virtual Source
 
     size_t read(char * data, size_t len) override;
 
-    std::string readLine(bool eofOk = false);
+    std::string readLine(bool eofOk = false, char terminator = '\n');
 
     /**
      * Return true if the buffer is not empty.

@@ -33,6 +33,11 @@ using namespace nix::windows;
 
 Pid::Pid() {}
 
+Pid::Pid(Pid && other) noexcept
+    : pid(std::move(other.pid))
+{
+}
+
 Pid::Pid(AutoCloseFD pid)
     : pid(std::move(pid))
 {

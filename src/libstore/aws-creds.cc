@@ -13,6 +13,11 @@
 // C library headers for SSO provider support
 #  include <aws/auth/credentials.h>
 
+// C library headers for custom logging
+#  include <aws/common/logging.h>
+
+#  include <cstdarg>
+
 #  include <boost/unordered/concurrent_flat_map.hpp>
 
 #  include <chrono>
@@ -29,6 +34,101 @@ AwsAuthError::AwsAuthError(int errorCode)
 }
 
 namespace {
+
+/**
+ * Map AWS log level to Nix verbosity.
+ * AWS levels: AWS_LL_NONE=0, AWS_LL_FATAL=1, AWS_LL_ERROR=2, AWS_LL_WARN=3,
+ *             AWS_LL_INFO=4, AWS_LL_DEBUG=5, AWS_LL_TRACE=6
+ *
+ * We map very conservatively because the AWS SDK is extremely noisy. What AWS
+ * considers "info" includes low-level details like "Initializing epoll" and
+ * "Starting event-loop thread". What it considers "errors" includes expected
+ * conditions like missing ~/.aws/config or IMDS being unavailable on non-EC2.
+ *
+ * To avoid spamming users, we only show FATAL at default verbosity. Everything
+ * else requires -vvvvv (lvlDebug) or higher to see.
+ */
+static Verbosity awsLogLevelToVerbosity(enum aws_log_level level)
+{
+    switch (level) {
+    case AWS_LL_FATAL:
+        return lvlError;
+    case AWS_LL_ERROR:
+    case AWS_LL_WARN:
+    case AWS_LL_INFO:
+        return lvlDebug;
+    case AWS_LL_DEBUG:
+    case AWS_LL_TRACE:
+        return lvlVomit;
+    // AWS_LL_NONE and AWS_LL_COUNT are enum sentinels, not real log levels
+    case AWS_LL_NONE:
+    case AWS_LL_COUNT:
+        return lvlDebug;
+    }
+    unreachable();
+}
+
+/**
+ * Custom AWS logger that routes logs through Nix's logging infrastructure.
+ *
+ * The AWS CRT C++ wrapper (ApiHandle::InitializeLogging) only supports FILE*
+ * or filename-based logging. The underlying C library supports custom loggers
+ * via aws_logger struct with a vtable containing callback functions.
+ */
+static int nixAwsLoggerLog(
+    struct aws_logger * logger, enum aws_log_level logLevel, aws_log_subject_t subject, const char * format, ...)
+{
+    Verbosity nixLevel = awsLogLevelToVerbosity(logLevel);
+    if (nixLevel > verbosity)
+        return AWS_OP_SUCCESS; /* Bail out early to avoid formatting the message unnecessarily. */
+
+    va_list args;
+    va_start(args, format);
+    std::array<char, 4096> buffer{};
+    auto res = vsnprintf(buffer.data(), buffer.size(), format, args);
+    va_end(args);
+    if (res < 0) /* Skip garbage debug messages in case the SDK is busted. */
+        return AWS_OP_SUCCESS;
+
+    const char * subjectName = aws_log_subject_name(subject);
+    printMsgUsing(nix::logger, nixLevel, "(aws:%s) %s", subjectName ? subjectName : "unknown", chomp(buffer.data()));
+    return AWS_OP_SUCCESS;
+}
+
+/**
+ * Get current log level for a subject - determines which messages will be logged.
+ * Must be consistent with awsLogLevelToVerbosity mapping.
+ */
+static aws_log_level nixAwsLoggerGetLevel(struct aws_logger * logger, aws_log_subject_t subject)
+{
+    // Map Nix verbosity back to AWS log level (inverse of awsLogLevelToVerbosity)
+    if (verbosity >= lvlVomit)
+        return AWS_LL_TRACE;
+    if (verbosity >= lvlDebug)
+        return AWS_LL_INFO; // error/warn/info are all mapped to lvlDebug
+    return AWS_LL_FATAL;
+}
+
+static void initialiseAwsLogger()
+{
+    static std::once_flag initialised; /* aws_logger_set must only be called once */
+    std::call_once(initialised, []() {
+        static aws_logger_vtable nixAwsLoggerVtable = {
+            .log = nixAwsLoggerLog,
+            .get_log_level = nixAwsLoggerGetLevel,
+            .clean_up = [](struct aws_logger *) {}, // No resources to clean up
+            .set_log_level = nullptr,
+        };
+
+        static aws_logger nixAwsLogger = {
+            .vtable = &nixAwsLoggerVtable,
+            .allocator = nullptr,
+            .p_impl = nullptr,
+        };
+
+        aws_logger_set(&nixAwsLogger);
+    });
+}
 
 /**
  * Helper function to wrap a C credentials provider in the C++ interface.
@@ -119,18 +219,9 @@ class AwsCredentialProviderImpl : public AwsCredentialProvider
 public:
     AwsCredentialProviderImpl()
     {
-        // Map Nix's verbosity to AWS CRT log level
-        Aws::Crt::LogLevel logLevel;
-        if (verbosity >= lvlVomit) {
-            logLevel = Aws::Crt::LogLevel::Trace;
-        } else if (verbosity >= lvlDebug) {
-            logLevel = Aws::Crt::LogLevel::Debug;
-        } else if (verbosity >= lvlChatty) {
-            logLevel = Aws::Crt::LogLevel::Info;
-        } else {
-            logLevel = Aws::Crt::LogLevel::Warn;
-        }
-        apiHandle.InitializeLogging(logLevel, stderr);
+        // Install custom logger that routes AWS CRT logs through Nix's logging infrastructure.
+        // This ensures AWS logs respect Nix's verbosity settings and are formatted consistently.
+        initialiseAwsLogger();
 
         // Create a shared TLS context for SSO (required for HTTPS connections)
         auto allocator = Aws::Crt::ApiAllocator();

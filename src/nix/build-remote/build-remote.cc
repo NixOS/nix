@@ -237,7 +237,7 @@ static int main_build_remote(int argc, char ** argv)
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
                 } catch (std::exception & e) {
-                    auto msg = chomp(drainFD(5, false));
+                    auto msg = chomp(drainFD(5, {.block = false}));
                     printError("cannot build on '%s': %s%s", storeUri, e.what(), msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
                     continue;
@@ -333,7 +333,7 @@ static int main_build_remote(int argc, char ** argv)
                             : "");
                 }
                 throw Error(
-                    "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, failureP->errorMsg);
+                    "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, failureP->message());
             }
         } else {
             copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);

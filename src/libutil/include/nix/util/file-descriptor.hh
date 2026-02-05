@@ -3,6 +3,7 @@
 
 #include "nix/util/canon-path.hh"
 #include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -48,24 +49,33 @@ static inline Descriptor toDescriptor(int fd)
 }
 
 /**
- * Convert a POSIX file descriptor to a native `Descriptor` in read-only
- * mode.
- *
- * This is a no-op except on Windows.
- */
-static inline int fromDescriptorReadOnly(Descriptor fd)
-{
-#ifdef _WIN32
-    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
-#else
-    return fd;
-#endif
-}
-
-/**
  * Read the contents of a resource into a string.
  */
 std::string readFile(Descriptor fd);
+
+/**
+ * Platform-specific read into a buffer.
+ *
+ * Thin wrapper around ::read (Unix) or ReadFile (Windows).
+ * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ *
+ * @param fd The file descriptor to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t read(Descriptor fd, std::span<std::byte> buffer);
+
+/**
+ * Get the size of a file.
+ *
+ * Thin wrapper around fstat (Unix) or GetFileSizeEx (Windows).
+ *
+ * @param fd The file descriptor
+ * @return The file size
+ * @throws SystemError on failure
+ */
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd);
 
 /**
  * Platform-specific positioned read into a buffer.
@@ -104,10 +114,11 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
  *
  * @param fd The file descriptor to read from
  * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
+ * @param terminator The chartacter that ends the line
  *
  * @return A line of text ending in `\n`, or a string without `\n` if `eofOk` is true and EOF is reached.
  */
-std::string readLine(Descriptor fd, bool eofOk = false);
+std::string readLine(Descriptor fd, bool eofOk = false, char terminator = '\n');
 
 /**
  * Write a line to a file descriptor.
@@ -115,21 +126,71 @@ std::string readLine(Descriptor fd, bool eofOk = false);
 void writeLine(Descriptor fd, std::string s);
 
 /**
- * Read a file descriptor until EOF occurs.
+ * Options for draining a file descriptor to a sink.
  */
-std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize = 0);
+struct DrainFdSinkOpts
+{
+    /**
+     * If provided, read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     */
+    std::optional<std::make_unsigned_t<off_t>> expectedSize = {};
+
+#ifndef _WIN32
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
+#endif
+};
 
 /**
- * The Windows version is always blocking.
+ * Options for draining a file descriptor to a string.
  */
-void drainFD(
-    Descriptor fd,
-    Sink & sink
+struct DrainFdOpts
+{
+    /**
+     * If expected=true: read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     * If expected=false: size hint for string allocation.
+     */
+    std::make_unsigned_t<off_t> size = 0;
+
+    /**
+     * If true, size is exact expected size. If false, size is just a reservation hint.
+     */
+    bool expected = false;
+
 #ifndef _WIN32
-    ,
-    bool block = true
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
 #endif
-);
+};
+
+/**
+ * Read a file descriptor until EOF occurs.
+ *
+ * @param fd The file descriptor to drain
+ * @param opts Options for the drain operation
+ */
+std::string drainFD(Descriptor fd, DrainFdOpts opts = {});
+
+/**
+ * Read a file descriptor until EOF occurs, writing to a sink.
+ *
+ * @param fd The file descriptor to drain
+ * @param sink The sink to write data to
+ * @param opts Options for the drain operation
+ */
+void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts = {});
+
+/**
+ * Read a symlink relative to a directory file descriptor.
+ *
+ * @throws SystemError on any I/O errors.
+ * @throws Interrupted if interrupted.
+ */
+OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
 
 /**
  * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
@@ -247,38 +308,42 @@ std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t 
 } // namespace linux
 #endif
 
-#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
-namespace windows {
-
-Path handleToPath(Descriptor handle);
-std::wstring handleToFileName(Descriptor handle);
-
-} // namespace windows
-#endif
-
-#ifndef _WIN32
-namespace unix {
-
 /**
- * Safe(r) function to open \param path file relative to \param dirFd, while
- * disallowing escaping from a directory and resolving any symlinks in the
- * process.
+ * Safe(r) function to open a file relative to dirFd, while
+ * disallowing escaping from a directory and any symlinks in the process.
  *
- * @note When not on Linux or when openat2 is not available this is implemented
- * via openat single path component traversal. Uses RESOLVE_BENEATH with openat2
- * or O_RESOLVE_BENEATH.
+ * @note On Windows, implemented via NtCreateFile single path component traversal
+ * with FILE_OPEN_REPARSE_POINT. On Unix, uses RESOLVE_BENEATH with openat2 when
+ * available, or falls back to openat single path component traversal.
  *
- * @note Since this is Unix-only path is specified as CanonPath, which models
- * Unix-style paths and ensures that there are no .. or . components.
- *
- * @param flags O_* flags
- * @param mode Mode for O_{CREAT,TMPFILE}
+ * @param dirFd Directory handle to open relative to
+ * @param path Relative path (no .. or . components)
+ * @param desiredAccess (Windows) Windows ACCESS_MASK (e.g., GENERIC_READ, FILE_WRITE_DATA)
+ * @param createOptions (Windows) Windows create options (e.g., FILE_NON_DIRECTORY_FILE)
+ * @param createDisposition (Windows) FILE_OPEN, FILE_CREATE, etc.
+ * @param flags (Unix) O_* flags
+ * @param mode (Unix) Mode for O_{CREAT,TMPFILE}
  *
  * @pre path.isRoot() is false
  *
- * @throws SymlinkNotAllowed if any path components
+ * @throws SymlinkNotAllowed if any path components are symlinks
+ * @throws SystemError on other errors
  */
-Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+Descriptor openFileEnsureBeneathNoSymlinks(
+    Descriptor dirFd,
+    const CanonPath & path,
+#ifdef _WIN32
+    ACCESS_MASK desiredAccess,
+    ULONG createOptions,
+    ULONG createDisposition = FILE_OPEN
+#else
+    int flags,
+    mode_t mode = 0
+#endif
+);
+
+#ifndef _WIN32
+namespace unix {
 
 /**
  * Try to change the mode of file named by \ref path relative to the parent directory denoted by \ref dirFd.
@@ -290,14 +355,6 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
  * @throws SysError if any operation fails
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
-
-/*
- * Read a symlink relative to a directory file descriptor.
- *
- * @throws SysError on any I/O errors.
- * @throws Interrupted if interrupted. SysError::errNo can never be EINTR.
- */
-std::string readLinkAt(Descriptor dirFd, const CanonPath & path);
 
 } // namespace unix
 #endif

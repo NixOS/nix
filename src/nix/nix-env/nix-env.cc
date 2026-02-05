@@ -5,6 +5,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/config-global.hh"
 #include "nix/store/names.hh"
 #include "nix/store/profiles.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -33,6 +34,39 @@
 
 using namespace nix;
 using std::cout;
+
+/**
+ * Settings related to Nix user environments.
+ */
+struct EnvSettings : Config
+{
+    Setting<bool> keepDerivations{
+        this,
+        false,
+        "keep-env-derivations",
+        R"(
+          If `false` (default), derivations are not stored in Nix user
+          environments. That is, the derivations of any build-time-only
+          dependencies may be garbage-collected.
+
+          If `true`, when you add a Nix derivation to a user environment, the
+          path of the derivation is stored in the user environment. Thus, the
+          derivation isn't garbage-collected until the user environment
+          generation is deleted (`nix-env --delete-generations`). To prevent
+          build-time-only dependencies from being collected, you should also
+          turn on `keep-outputs`.
+
+          The difference between this option and `keep-derivations` is that
+          this one is "sticky": it applies to any user environment created
+          while this option was enabled, while `keep-derivations` only applies
+          at the moment the garbage collector is run.
+        )",
+        {"env-keep-derivations"}};
+};
+
+EnvSettings envSettings;
+
+static GlobalConfig::Register rSettings(&envSettings);
 
 typedef enum { srcNixExprDrvs, srcNixExprs, srcStorePaths, srcProfile, srcAttrPath, srcUnknown } InstallSourceType;
 
@@ -546,7 +580,7 @@ installDerivations(Globals & globals, const Strings & args, const Path & profile
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, allElems, profile, settings.envKeepDerivations, lockToken))
+        if (createUserEnv(*globals.state, allElems, profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }
@@ -657,7 +691,7 @@ static void upgradeDerivations(Globals & globals, const Strings & args, UpgradeT
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, newElems, globals.profile, settings.envKeepDerivations, lockToken))
+        if (createUserEnv(*globals.state, newElems, globals.profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }
@@ -716,7 +750,7 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
         checkSelectorUse(selectors);
 
         /* Write the new user environment. */
-        if (createUserEnv(*globals.state, installedElems, globals.profile, settings.envKeepDerivations, lockToken))
+        if (createUserEnv(*globals.state, installedElems, globals.profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }
@@ -799,7 +833,7 @@ static void uninstallDerivations(Globals & globals, Strings & selectors, Path & 
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, workingElems, profile, settings.envKeepDerivations, lockToken))
+        if (createUserEnv(*globals.state, workingElems, profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }

@@ -4,14 +4,64 @@
 
 namespace nix {
 
+void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
+{
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+    switch (status) {
+    case BuildResult::Failure::TimedOut:
+        timedOut = true;
+        break;
+    case BuildResult::Failure::HashMismatch:
+        hashMismatch = true;
+        break;
+    case BuildResult::Failure::NotDeterministic:
+        checkMismatch = true;
+        break;
+    case BuildResult::Failure::PermanentFailure:
+    // Also considered a permenant failure, it seems
+    case BuildResult::Failure::InputRejected:
+        permanentFailure = true;
+        break;
+    default:
+        break;
+    }
+#pragma GCC diagnostic pop
+}
+
+unsigned int ExitStatusFlags::failingExitStatus() const
+{
+    bool buildFailure = permanentFailure || timedOut || hashMismatch;
+
+    /* Any of the 4 booleans we track */
+    bool problemWithSpecialExitCode = checkMismatch || buildFailure;
+
+    unsigned int mask = 0;
+    if (problemWithSpecialExitCode) {
+        mask |= 0b1100000;
+        if (buildFailure) {
+            mask |= 0b0100; // 100
+            if (timedOut)
+                mask |= 0b0001; // 101
+            if (hashMismatch)
+                mask |= 0b0010; // 102
+        }
+        if (checkMismatch)
+            mask |= 0b1000; // 104
+    }
+
+    /* We still (per the function docs) only call this function in the
+       failure case, so the default should not be 0, but 1, indicating
+       "some other kind of error. */
+    return mask ? mask : 1;
+}
+
 bool BuildResult::operator==(const BuildResult &) const noexcept = default;
 std::strong_ordering BuildResult::operator<=>(const BuildResult &) const noexcept = default;
 
 bool BuildResult::Success::operator==(const BuildResult::Success &) const noexcept = default;
 std::strong_ordering BuildResult::Success::operator<=>(const BuildResult::Success &) const noexcept = default;
-
-bool BuildResult::Failure::operator==(const BuildResult::Failure &) const noexcept = default;
-std::strong_ordering BuildResult::Failure::operator<=>(const BuildResult::Failure &) const noexcept = default;
 
 static constexpr std::array<std::pair<BuildResult::Success::Status, std::string_view>, 4> successStatusStrings{{
 #define ENUM_ENTRY(e) {BuildResult::Success::e, #e}
@@ -75,9 +125,18 @@ static BuildResult::Failure::Status failureStatusFromString(std::string_view str
     throw Error("unknown built result failure status '%s'", str);
 }
 
-[[noreturn]] void BuildResult::Failure::rethrow() const
+bool BuildError::operator==(const BuildError & other) const noexcept
 {
-    throw BuildError(status, "%s", errorMsg);
+    return status == other.status && isNonDeterministic == other.isNonDeterministic && message() == other.message();
+}
+
+std::strong_ordering BuildError::operator<=>(const BuildError & other) const noexcept
+{
+    if (auto cmp = status <=> other.status; cmp != 0)
+        return cmp;
+    if (auto cmp = isNonDeterministic <=> other.isNonDeterministic; cmp != 0)
+        return cmp;
+    return message() <=> other.message();
 }
 
 } // namespace nix
@@ -113,7 +172,7 @@ void adl_serializer<BuildResult>::to_json(json & res, const BuildResult & br)
             [&](const BuildResult::Failure & failure) {
                 res["success"] = false;
                 res["status"] = failureStatusToString(failure.status);
-                res["errorMsg"] = failure.errorMsg;
+                res["errorMsg"] = failure.message();
                 res["isNonDeterministic"] = failure.isNonDeterministic;
             },
         },
@@ -148,11 +207,11 @@ BuildResult adl_serializer<BuildResult>::from_json(const json & _json)
         s.builtOutputs = valueAt(json, "builtOutputs");
         br.inner = std::move(s);
     } else {
-        BuildResult::Failure f;
-        f.status = failureStatusFromString(statusStr);
-        f.errorMsg = getString(valueAt(json, "errorMsg"));
-        f.isNonDeterministic = getBoolean(valueAt(json, "isNonDeterministic"));
-        br.inner = std::move(f);
+        br.inner = BuildResult::Failure{{
+            .status = failureStatusFromString(statusStr),
+            .msg = HintFmt(getString(valueAt(json, "errorMsg"))),
+            .isNonDeterministic = getBoolean(valueAt(json, "isNonDeterministic")),
+        }};
     }
 
     return br;

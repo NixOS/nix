@@ -381,7 +381,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                                 "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
 
                     outputLocks.unlock();
-                    worker.permanentFailure = true;
                     co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
                 }
                 useHook = false;
@@ -396,13 +395,22 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     if (useHook) {
         co_return buildWithHook(
             std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
-    } else {
+    } else if (auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store)) {
         co_return buildLocally(
+            *localStoreP,
             std::move(inputPaths),
             std::move(initialOutputs),
             std::move(drvOptions),
             std::move(outputLocks),
             externalBuilder);
+    } else {
+        throw Error(
+            R"(
+            Unable to build with a primary store that isn't a local store;
+            either pass a different '--store' or enable remote builds.
+
+            For more information check 'man nix.conf' and search for '/machines'.
+            )");
     }
 }
 
@@ -611,6 +619,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 }
 
 Goal::Co DerivationBuildingGoal::buildLocally(
+    LocalStore & localStore,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -618,16 +627,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     const ExternalBuilder * externalBuilder)
 {
     co_await yield();
-
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
-        throw Error(
-            R"(
-            Unable to build with a primary store that isn't a local store;
-            either pass a different '--store' or enable remote builds.
-
-            For more information check 'man nix.conf' and search for '/machines'.
-            )");
-    }
 
 #ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
     throw UnimplementedError("building derivations is not yet implemented on Windows");
@@ -656,7 +655,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     };
 
     std::unique_ptr<Activity> actLock;
-    std::unique_ptr<DerivationBuilder> builder;
+    DerivationBuilderUnique builder;
     Descriptor builderOut;
 
     // Will continue here while waiting for a build user below
@@ -708,9 +707,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 }
             };
 
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
-
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
@@ -735,7 +731,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
-                worker.permanentFailure = true;
                 co_return doneFailure(std::move(e));
             }
 
@@ -756,12 +751,12 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                already be created, so we don't need to create it again. */
             builder = externalBuilder
                           ? makeExternalDerivationBuilder(
-                                *localStoreP,
+                                localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params),
                                 *externalBuilder)
                           : makeDerivationBuilder(
-                                *localStoreP,
+                                localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params));
         }
@@ -824,26 +819,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     } catch (BuildError & e) {
         builder.reset();
         outputLocks.unlock();
-// Allow selecting a subset of enum values
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (e.status) {
-        case BuildResult::Failure::HashMismatch:
-            worker.hashMismatch = true;
-            /* See header, the protocols don't know about `HashMismatch`
-               yet, so change it to `OutputRejected`, which they expect
-               for this case (hash mismatch is a type of output
-               rejection). */
-            e.status = BuildResult::Failure::OutputRejected;
-            break;
-        case BuildResult::Failure::NotDeterministic:
-            worker.checkMismatch = true;
-            break;
-        default:
-            /* Other statuses need no adjusting */
-            break;
-        }
-#  pragma GCC diagnostic pop
         co_return doneFailure(std::move(e));
     }
     {
@@ -1060,14 +1035,13 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
 
     Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
 
-    fd = toDescriptor(open(
-        logFileName.c_str(),
-        O_CREAT | O_WRONLY | O_TRUNC
-#ifndef _WIN32
-            | O_CLOEXEC
-#endif
-        ,
-        0666));
+    fd = openNewFileForWrite(
+        logFileName,
+        0666,
+        {
+            .truncateExisting = true,
+            .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
+        });
     if (!fd)
         throw SysError("creating log file '%1%'", logFileName);
 
@@ -1204,22 +1178,13 @@ Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
     mcRunningBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();
 
-    return Goal::doneFailure(
-        ecFailed,
-        BuildResult::Failure{
-            .status = ex.status,
-            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-        },
-        std::move(ex));
+    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix

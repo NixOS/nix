@@ -193,39 +193,70 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
     return path == dir || isInDir(path, dir);
 }
 
-struct stat stat(const Path & path)
-{
-    struct stat st;
-    if (stat(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
-    return st;
-}
-
 #ifdef _WIN32
-#  define STAT stat
+#  define STAT _wstat64
+#  define LSTAT _wstat64
 #else
-#  define STAT lstat
+#  define STAT stat
+#  define LSTAT lstat
 #endif
 
-struct stat lstat(const Path & path)
+PosixStat stat(const std::filesystem::path & path)
 {
-    struct stat st;
+    PosixStat st;
     if (STAT(path.c_str(), &st))
-        throw SysError("getting status of '%1%'", path);
+        throw SysError("getting status of %s", PathFmt(path));
     return st;
 }
 
-std::optional<struct stat> maybeLstat(const Path & path)
+PosixStat lstat(const std::filesystem::path & path)
 {
-    std::optional<struct stat> st{std::in_place};
+    PosixStat st;
+    if (LSTAT(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
+}
+
+PosixStat fstat(int fd)
+{
+    PosixStat st;
+    if (
+#ifdef _WIN32
+        _fstat64
+#else
+        ::fstat
+#endif
+        (fd, &st))
+        throw SysError("getting status of fd %d", fd);
+    return st;
+}
+
+std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
     if (STAT(path.c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
         else
-            throw SysError("getting status of '%s'", path);
+            throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
 }
+
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
+    if (LSTAT(path.c_str(), &*st)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            st.reset();
+        else
+            throw SysError("getting status of %s", PathFmt(path));
+    }
+    return st;
+}
+
+#undef STAT
+#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -448,31 +479,29 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
     this->recursive = recursive;
 }
 
+void AutoDelete::deletePath()
+{
+    if (del) {
+        if (recursive)
+            nix::deletePath(_path);
+        else
+            std::filesystem::remove(_path);
+        cancel();
+    }
+}
+
 AutoDelete::~AutoDelete()
 {
     try {
-        if (del) {
-            if (recursive)
-                deletePath(_path);
-            else {
-                std::filesystem::remove(_path);
-            }
-        }
+        deletePath();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoDelete::cancel()
+void AutoDelete::cancel() noexcept
 {
     del = false;
-}
-
-void AutoDelete::reset(const std::filesystem::path & p, bool recursive)
-{
-    _path = p;
-    this->recursive = recursive;
-    del = true;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -483,7 +512,7 @@ AutoUnmount::AutoUnmount()
 {
 }
 
-AutoUnmount::AutoUnmount(Path & p)
+AutoUnmount::AutoUnmount(const std::filesystem::path & p)
     : path(p)
     , del(true)
 {
@@ -492,19 +521,25 @@ AutoUnmount::AutoUnmount(Path & p)
 AutoUnmount::~AutoUnmount()
 {
     try {
-        if (del) {
-            if (unmount(path.c_str(), 0) < 0) {
-                throw SysError("Failed to unmount path %1%", path);
-            }
-        }
+        unmount();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoUnmount::cancel()
+void AutoUnmount::cancel() noexcept
 {
     del = false;
+}
+
+void AutoUnmount::unmount()
+{
+    if (del) {
+        if (::unmount(path.c_str(), 0) < 0) {
+            throw SysError("Failed to unmount path %1%", PathFmt(path));
+        }
+    }
+    cancel();
 }
 #endif
 
@@ -641,7 +676,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void setWriteTime(const std::filesystem::path & path, const struct stat & st)
+void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
 {
     setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }
@@ -739,6 +774,19 @@ std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
     }
 }
 
+void chmod(const std::filesystem::path & path, mode_t mode)
+{
+    if (
+#ifdef _WIN32
+        ::_wchmod
+#else
+        ::chmod
+#endif
+        (path.c_str(), mode)
+        == -1)
+        throw SysError("setting permissions on %s", PathFmt(path));
+}
+
 bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
 {
     auto pathString = path.string();
@@ -747,9 +795,7 @@ bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
     if (((prevMode ^ mode) & mask) == 0)
         return false;
 
-    if (chmod(pathString.c_str(), mode) != 0)
-        throw SysError("could not set permissions on '%s' to %o", pathString, mode);
-
+    chmod(path, mode);
     return true;
 }
 

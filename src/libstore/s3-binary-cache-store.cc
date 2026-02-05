@@ -138,6 +138,20 @@ void S3BinaryCacheStore::upsertFile(
         if (auto storageClass = s3Config->storageClass.get()) {
             uploadHeaders.emplace_back("x-amz-storage-class", *storageClass);
         }
+
+        {
+            HashSink hashSink(HashAlgorithm::MD5);
+            src.drainInto(hashSink);
+            auto [hash, gotLength] = hashSink.finish();
+            /* Use this opportunity to check that the upload size matches what we expect. */
+            if (gotLength != size)
+                throw Error("unexpected size for upload '%s', expected %d, got: %d", path, size, gotLength);
+            /* The Base64 encoded 128-bit MD5 digest of the message (without the headers) according to RFC 1864:
+               https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html */
+            uploadHeaders.push_back({"Content-MD5", hash.to_string(HashFormat::Base64, /*includeAlgo=*/false)});
+            src.restart(); /* Seek to the beginning. */
+        }
+
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
             uploadMultipart(path, src, size, mimeType, std::move(uploadHeaders));
         } else {

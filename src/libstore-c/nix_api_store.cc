@@ -182,10 +182,8 @@ nix_err nix_store_realise(
         assert(results.size() == 1);
 
         // Check if any builds failed
-        for (auto & result : results) {
-            if (auto * failureP = result.tryGetFailure())
-                failureP->rethrow();
-        }
+        for (auto & result : results)
+            result.tryThrowBuildError();
 
         if (callback) {
             for (const auto & result : results) {

@@ -1,5 +1,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/signals.hh"
+
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+
+#include <boost/format.hpp>
 
 namespace nix {
 
@@ -41,6 +47,19 @@ Descriptor openFileReadonly(const std::filesystem::path & path)
         /*hTemplateFile=*/nullptr);
 }
 
+Descriptor
+openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t mode, OpenNewFileForWriteParams params)
+{
+    return CreateFileW(
+        path.c_str(),
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_DELETE,
+        /*lpSecurityAttributes=*/nullptr,
+        params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */
+        FILE_ATTRIBUTE_NORMAL,
+        /*hTemplateFile=*/nullptr);
+}
+
 std::filesystem::path defaultTempDir()
 {
     wchar_t buf[MAX_PATH + 1];
@@ -62,6 +81,28 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     bytesFreed = 0;
     deletePath(path);
+}
+
+std::filesystem::path windows::handleToPath(HANDLE handle)
+{
+    std::vector<wchar_t> buf(0x100);
+    DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
+    if (dw == 0) {
+        if (handle == GetStdHandle(STD_INPUT_HANDLE))
+            return L"<stdin>";
+        if (handle == GetStdHandle(STD_OUTPUT_HANDLE))
+            return L"<stdout>";
+        if (handle == GetStdHandle(STD_ERROR_HANDLE))
+            return L"<stderr>";
+        return (boost::wformat(L"<unnnamed handle %X>") % handle).str();
+    }
+    if (dw > buf.size()) {
+        buf.resize(dw);
+        if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw - 1)
+            throw WinError("GetFinalPathNameByHandleW");
+        dw -= 1;
+    }
+    return std::filesystem::path{std::wstring{buf.data(), dw}};
 }
 
 } // namespace nix

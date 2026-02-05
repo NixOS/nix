@@ -37,6 +37,12 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
           (e.g. `brotli`).
         )"};
 
+    const Setting<std::optional<std::filesystem::path>> tlsCert{
+        this, std::nullopt, "tls-certificate", "Path to an optional TLS client certificate in PEM format."};
+
+    const Setting<std::optional<std::filesystem::path>> tlsKey{
+        this, std::nullopt, "tls-private-key", "Path to an optional TLS client certificate private key in PEM format."};
+
     static const std::string name()
     {
         return "HTTP Binary Cache Store";

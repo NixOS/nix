@@ -2,6 +2,7 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/util/archive.hh"
@@ -15,30 +16,41 @@ namespace nix {
 
 BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
 {
-    BuildResult status;
+    BuildResult res;
     BuildResult::Success success;
-    BuildResult::Failure failure;
 
-    auto rawStatus = readInt(conn.from);
-    conn.from >> failure.errorMsg;
+    // Temp variables for failure fields since BuildError uses methods
+    std::string errorMsg;
+    bool isNonDeterministic = false;
+
+    auto status = ServeProto::Serialise<BuildResultStatus>::read(store, {conn.from});
+    conn.from >> errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 3)
-        conn.from >> status.timesBuilt >> failure.isNonDeterministic >> status.startTime >> status.stopTime;
+        conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
     if (GET_PROTOCOL_MINOR(conn.version) >= 6) {
         auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
         for (auto && [output, realisation] : builtOutputs)
             success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
 
-    if (BuildResult::Success::statusIs(rawStatus)) {
-        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
-        status.inner = std::move(success);
-    } else {
-        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
-        status.inner = std::move(failure);
-    }
+    res.inner = std::visit(
+        overloaded{
+            [&](BuildResult::Success::Status s) -> decltype(res.inner) {
+                success.status = s;
+                return std::move(success);
+            },
+            [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
+                return BuildResult::Failure{{
+                    .status = s,
+                    .msg = HintFmt(std::move(errorMsg)),
+                    .isNonDeterministic = isNonDeterministic,
+                }};
+            },
+        },
+        status);
 
-    return status;
+    return res;
 }
 
 void ServeProto::Serialise<BuildResult>::write(
@@ -63,11 +75,11 @@ void ServeProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                conn.to << failure.status;
-                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+                ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                conn.to << success.status;
+                ServeProto::write(store, {conn.to}, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },

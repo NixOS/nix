@@ -1,10 +1,10 @@
 #include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/store/build-result.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
-
+#include "nix/store/globals.hh"
 #include "store-config-private.hh"
 
 #if NIX_SUPPORT_ACL
@@ -15,7 +15,7 @@ namespace nix {
 
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
-static void canonicaliseTimestampAndPermissions(const Path & path, const struct stat & st)
+static void canonicaliseTimestampAndPermissions(const Path & path, const PosixStat & st)
 {
     if (!S_ISLNK(st.st_mode)) {
 
@@ -24,14 +24,13 @@ static void canonicaliseTimestampAndPermissions(const Path & path, const struct 
         bool isDir = S_ISDIR(st.st_mode);
         if ((mode != 0444 || isDir) && mode != 0555) {
             mode = (st.st_mode & S_IFMT) | 0444 | (st.st_mode & S_IXUSR || isDir ? 0111 : 0);
-            if (chmod(path.c_str(), mode) == -1)
-                throw SysError("changing mode of '%1%' to %2$o", path, mode);
+            chmod(path, mode);
         }
     }
 
 #ifndef _WIN32 // TODO implement
     if (st.st_mtime != mtimeStore) {
-        struct stat st2 = st;
+        PosixStat st2 = st;
         st2.st_mtime = mtimeStore, setWriteTime(path, st2);
     }
 #endif
@@ -42,12 +41,8 @@ void canonicaliseTimestampAndPermissions(const Path & path)
     canonicaliseTimestampAndPermissions(path, lstat(path));
 }
 
-static void canonicalisePathMetaData_(
-    const Path & path,
-#ifndef _WIN32
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-#endif
-    InodesSeen & inodesSeen)
+static void
+canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -81,7 +76,7 @@ static void canonicalisePathMetaData_(
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (settings.ignoredAcls.get().count(eaName))
+            if (options.ignoredAcls.count(eaName))
                 continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
@@ -96,7 +91,7 @@ static void canonicalisePathMetaData_(
        However, ignore files that we chown'ed ourselves previously to
        ensure that we don't fail on hard links within the same build
        (i.e. "touch $out/foo; ln $out/foo $out/bar"). */
-    if (uidRange && (st.st_uid < uidRange->first || st.st_uid > uidRange->second)) {
+    if (options.uidRange && (st.st_uid < options.uidRange->first || st.st_uid > options.uidRange->second)) {
         if (S_ISDIR(st.st_mode) || !inodesSeen.count(Inode(st.st_dev, st.st_ino)))
             throw BuildError(BuildResult::Failure::OutputRejected, "invalid ownership on file '%1%'", path);
         mode_t mode = st.st_mode & ~S_IFMT;
@@ -132,29 +127,14 @@ static void canonicalisePathMetaData_(
     if (S_ISDIR(st.st_mode)) {
         for (auto & i : DirectoryIterator{path}) {
             checkInterrupt();
-            canonicalisePathMetaData_(
-                i.path().string(),
-#ifndef _WIN32
-                uidRange,
-#endif
-                inodesSeen);
+            canonicalisePathMetaData_(i.path().string(), options, inodesSeen);
         }
     }
 }
 
-void canonicalisePathMetaData(
-    const Path & path,
-#ifndef _WIN32
-    std::optional<std::pair<uid_t, uid_t>> uidRange,
-#endif
-    InodesSeen & inodesSeen)
+void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(
-        path,
-#ifndef _WIN32
-        uidRange,
-#endif
-        inodesSeen);
+    canonicalisePathMetaData_(path, options, inodesSeen);
 
 #ifndef _WIN32
     /* On platforms that don't have lchown(), the top-level path can't
@@ -168,21 +148,10 @@ void canonicalisePathMetaData(
 #endif
 }
 
-void canonicalisePathMetaData(
-    const Path & path
-#ifndef _WIN32
-    ,
-    std::optional<std::pair<uid_t, uid_t>> uidRange
-#endif
-)
+void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData_(
-        path,
-#ifndef _WIN32
-        uidRange,
-#endif
-        inodesSeen);
+    canonicalisePathMetaData_(path, options, inodesSeen);
 }
 
 } // namespace nix

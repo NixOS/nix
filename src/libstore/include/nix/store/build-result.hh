@@ -7,28 +7,122 @@
 
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/util/error.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/json-impls.hh"
 
 namespace nix {
+
+/**
+ * Names must be disjoint with `BuildResultFailureStatus`.
+ *
+ * @note Prefer using `BuildResult::Success::Status`, this name is just
+ * for sake of forward declarations.
+ */
+enum struct BuildResultSuccessStatus : uint8_t {
+    Built,
+    Substituted,
+    AlreadyValid,
+    ResolvesToAlreadyValid,
+};
+
+/**
+ * Names must be disjoint with `BuildResultSuccessStatus`.
+ *
+ * @note Prefer using `BuildResult::Failure::Status`, this name is just
+ * for sake of forward declarations.
+ */
+enum struct BuildResultFailureStatus : uint8_t {
+    PermanentFailure,
+    InputRejected,
+    OutputRejected,
+    /// possibly transient
+    TransientFailure,
+    /// no longer used
+    CachedFailure,
+    TimedOut,
+    MiscFailure,
+    DependencyFailed,
+    LogLimitExceeded,
+    NotDeterministic,
+    NoSubstituters,
+    /// A certain type of `OutputRejected`. The protocols do not yet
+    /// know about this one, so change it back to `OutputRejected`
+    /// before serialization.
+    HashMismatch,
+};
+
+/**
+ * Denotes a permanent build failure.
+ *
+ * This is both an exception type (inherits from Error) and serves as
+ * the failure variant in BuildResult::inner.
+ */
+struct BuildError : public Error
+{
+    using Status = BuildResultFailureStatus;
+    using enum Status;
+
+    Status status = MiscFailure;
+
+    /**
+     * If timesBuilt > 1, whether some builds did not produce the same
+     * result. (Note that 'isNonDeterministic = false' does not mean
+     * the build is deterministic, just that we don't have evidence of
+     * non-determinism.)
+     */
+    bool isNonDeterministic = false;
+
+public:
+    /**
+     * Variadic constructor for throwing with format strings.
+     * Delegates to the string constructor after formatting.
+     */
+    template<typename... Args>
+    BuildError(Status status, const Args &... args)
+        : Error(args...)
+        , status{status}
+    {
+    }
+
+    struct Args
+    {
+        Status status;
+        HintFmt msg;
+        bool isNonDeterministic = false;
+    };
+
+    /**
+     * Constructor taking a pre-formatted error message.
+     * Also used for deserialization.
+     */
+    BuildError(Args args)
+        : Error(std::move(args.msg))
+        , status{args.status}
+        , isNonDeterministic{args.isNonDeterministic}
+
+    {
+    }
+
+    /**
+     * Default constructor for deserialization.
+     */
+    BuildError()
+        : Error("")
+    {
+    }
+
+    bool operator==(const BuildError &) const noexcept;
+    std::strong_ordering operator<=>(const BuildError &) const noexcept;
+};
 
 struct BuildResult
 {
     struct Success
     {
-        /**
-         * @note This is directly used in the nix-store --serve protocol.
-         * That means we need to worry about compatibility across versions.
-         * Therefore, don't remove status codes, and only add new status
-         * codes at the end of the list.
-         *
-         * Must be disjoint with `Failure::Status`.
-         */
-        enum Status : uint8_t {
-            Built = 0,
-            Substituted = 1,
-            AlreadyValid = 2,
-            ResolvesToAlreadyValid = 13,
-        } status;
+        using Status = enum BuildResultSuccessStatus;
+        using enum Status;
+        Status status;
 
         /**
          * For derivations, a mapping from the names of the wanted outputs
@@ -38,65 +132,12 @@ struct BuildResult
 
         bool operator==(const BuildResult::Success &) const noexcept;
         std::strong_ordering operator<=>(const BuildResult::Success &) const noexcept;
-
-        static bool statusIs(uint8_t status)
-        {
-            return status == Built || status == Substituted || status == AlreadyValid
-                   || status == ResolvesToAlreadyValid;
-        }
     };
 
-    struct Failure
-    {
-        /**
-         * @note This is directly used in the nix-store --serve protocol.
-         * That means we need to worry about compatibility across versions.
-         * Therefore, don't remove status codes, and only add new status
-         * codes at the end of the list.
-         *
-         * Must be disjoint with `Success::Status`.
-         */
-        enum Status : uint8_t {
-            PermanentFailure = 3,
-            InputRejected = 4,
-            OutputRejected = 5,
-            /// possibly transient
-            TransientFailure = 6,
-            /// no longer used
-            CachedFailure = 7,
-            TimedOut = 8,
-            MiscFailure = 9,
-            DependencyFailed = 10,
-            LogLimitExceeded = 11,
-            NotDeterministic = 12,
-            NoSubstituters = 14,
-            /// A certain type of `OutputRejected`. The protocols do not yet
-            /// know about this one, so change it back to `OutputRejected`
-            /// before serialization.
-            HashMismatch = 15,
-        } status = MiscFailure;
-
-        /**
-         * Information about the error if the build failed.
-         *
-         * @todo This should be an entire ErrorInfo object, not just a
-         * string, for richer information.
-         */
-        std::string errorMsg;
-
-        /**
-         * If timesBuilt > 1, whether some builds did not produce the same
-         * result. (Note that 'isNonDeterministic = false' does not mean
-         * the build is deterministic, just that we don't have evidence of
-         * non-determinism.)
-         */
-        bool isNonDeterministic = false;
-
-        bool operator==(const BuildResult::Failure &) const noexcept;
-        std::strong_ordering operator<=>(const BuildResult::Failure &) const noexcept;
-
-        [[noreturn]] void rethrow() const;
-    };
+    /**
+     * Failure is now an alias for BuildError.
+     */
+    using Failure = BuildError;
 
     std::variant<Success, Failure> inner = Failure{};
 
@@ -121,6 +162,19 @@ struct BuildResult
     }
 
     /**
+     * Throw the build error if this result represents a failure.
+     * Optionally set the exit status on the error before throwing.
+     */
+    void tryThrowBuildError(std::optional<unsigned int> exitStatus = std::nullopt)
+    {
+        if (auto * failure = tryGetFailure()) {
+            if (exitStatus)
+                failure->withExitStatus(*exitStatus);
+            throw *failure;
+        }
+    }
+
+    /**
      * How many times this build was performed.
      */
     unsigned int timesBuilt = 0;
@@ -141,20 +195,6 @@ struct BuildResult
 };
 
 /**
- * denotes a permanent build failure
- */
-struct BuildError : public Error
-{
-    BuildResult::Failure::Status status;
-
-    BuildError(BuildResult::Failure::Status status, auto &&... args)
-        : Error{args...}
-        , status{status}
-    {
-    }
-};
-
-/**
  * A `BuildResult` together with its "primary key".
  */
 struct KeyedBuildResult : BuildResult
@@ -170,6 +210,61 @@ struct KeyedBuildResult : BuildResult
         , path(std::move(path))
     {
     }
+};
+
+/**
+ * Flags tracking different types of build failures for exit status computation.
+ */
+struct ExitStatusFlags
+{
+    /**
+     * Set if at least one derivation had a BuildError (i.e. permanent
+     * failure).
+     */
+    bool permanentFailure = false;
+
+    /**
+     * Set if at least one derivation had a timeout.
+     */
+    bool timedOut = false;
+
+    /**
+     * Set if at least one derivation fails with a hash mismatch.
+     */
+    bool hashMismatch = false;
+
+    /**
+     * Set if at least one derivation is not deterministic in check mode.
+     */
+    bool checkMismatch = false;
+
+    /**
+     * Update flags based on a build failure status.
+     */
+    void updateFromStatus(BuildResult::Failure::Status status);
+
+    /**
+     * The exit status in case of failure.
+     *
+     * In the case of a build failure, returned value follows this
+     * bitmask:
+     *
+     * ```
+     * 0b1100100
+     *      ^^^^
+     *      |||`- timeout
+     *      ||`-- output hash mismatch
+     *      |`--- build failure
+     *      `---- not deterministic
+     * ```
+     *
+     * In other words, the failure code is at least 100 (0b1100100), but
+     * might also be greater.
+     *
+     * Otherwise (no build failure, but some other sort of failure by
+     * assumption), this returned value is 1.
+     */
+    unsigned int failingExitStatus() const;
 };
 
 } // namespace nix

@@ -3,6 +3,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/archive.hh"
@@ -207,13 +208,16 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
 {
     BuildResult res;
     BuildResult::Success success;
-    BuildResult::Failure failure;
 
-    auto rawStatus = readInt(conn.from);
-    conn.from >> failure.errorMsg;
+    // Temp variables for failure fields since BuildError uses methods
+    std::string errorMsg;
+    bool isNonDeterministic = false;
+
+    auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, {conn.from});
+    conn.from >> errorMsg;
 
     if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
-        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
+        conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
     }
     if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
@@ -225,13 +229,21 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
             success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
     }
 
-    if (BuildResult::Success::statusIs(rawStatus)) {
-        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
-        res.inner = std::move(success);
-    } else {
-        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
-        res.inner = std::move(failure);
-    }
+    res.inner = std::visit(
+        overloaded{
+            [&](BuildResult::Success::Status s) -> decltype(res.inner) {
+                success.status = s;
+                return std::move(success);
+            },
+            [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
+                return BuildResult::Failure{{
+                    .status = s,
+                    .msg = HintFmt(std::move(errorMsg)),
+                    .isNonDeterministic = isNonDeterministic,
+                }};
+            },
+        },
+        status);
 
     return res;
 }
@@ -263,11 +275,11 @@ void WorkerProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                conn.to << failure.status;
-                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+                WorkerProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                conn.to << success.status;
+                WorkerProto::write(store, {conn.to}, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },

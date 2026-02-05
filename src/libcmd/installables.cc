@@ -583,16 +583,12 @@ static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const
     auto failedResult = failed.begin();
     if (failedResult != failed.end()) {
         if (failed.size() == 1) {
-            failedResult->second->rethrow();
+            throw *failedResult->second;
         } else {
             StringSet failedPaths;
             for (; failedResult != failed.end(); failedResult++) {
-                if (!failedResult->second->errorMsg.empty()) {
-                    logError(
-                        ErrorInfo{
-                            .level = lvlError,
-                            .msg = failedResult->second->errorMsg,
-                        });
+                if (!failedResult->second->message().empty()) {
+                    logError(failedResult->second->info());
                 }
                 failedPaths.insert(failedResult->first->path.to_string(store));
             }

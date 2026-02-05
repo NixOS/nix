@@ -121,6 +121,16 @@ struct FileTransferRequest
     ActivityId parentAct;
     bool decompress = true;
 
+    /**
+     * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsCert;
+
+    /**
+     * Optional path to the client private key in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsKey;
+
     struct UploadData
     {
         UploadData(StringSource & s)

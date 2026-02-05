@@ -27,7 +27,12 @@ struct NarAccessor : SourceAccessor
  */
 ref<NarAccessor> makeNarAccessor(std::string && nar);
 
-ref<NarAccessor> makeNarAccessor(Source & source);
+/**
+ * This NAR accessor doesn't actually access a NAR, and thus cannot read
+ * the contents of files. It just conveys the information which is
+ * gotten from `listing`.
+ */
+ref<NarAccessor> makeNarAccessor(NarListing listing);
 
 /**
  * Create a NAR accessor from a NAR listing (in the format produced by
@@ -44,12 +49,9 @@ GetNarBytes seekableGetNarBytes(const std::filesystem::path & path);
 
 GetNarBytes seekableGetNarBytes(Descriptor fd);
 
-ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes);
-
 /**
- * Creates a NAR accessor from a given stream and a GetNarBytes getter.
- * @param source Consumed eagerly. References to it are not persisted in the resulting SourceAccessor.
+ * Creates a NAR accessor from a given listing and a `GetNarBytes` getter.
  */
-ref<NarAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes);
+ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes);
 
 } // namespace nix

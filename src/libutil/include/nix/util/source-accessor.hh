@@ -213,6 +213,11 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     {
         return std::nullopt;
     }
+
+    /**
+     * Invalidate any cached value the accessor may have for the specified path.
+     */
+    virtual void invalidateCache(const CanonPath & path) {}
 };
 
 /**

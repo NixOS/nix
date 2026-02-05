@@ -501,7 +501,7 @@ struct Common : InstallableCommand, MixProfile
     {
         auto shellOutPath = getShellOutPath(store, installable);
 
-        updateProfile(shellOutPath);
+        updateProfile(*store, shellOutPath);
 
         debug("reading environment file '%s'", store->printStorePath(shellOutPath));
 

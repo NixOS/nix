@@ -200,14 +200,14 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
 VERSIONED_CHARACTERIZATION_TEST(WorkerProtoTest, buildResult_1_27, "build-result-1.27", 1 << 8 | 27, ({
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{
+                                        BuildResult{.inner{BuildResult::Failure{{
                                             .status = BuildResult::Failure::OutputRejected,
-                                            .errorMsg = "no idea why",
-                                        }}},
-                                        BuildResult{.inner{BuildResult::Failure{
+                                            .msg = HintFmt("no idea why"),
+                                        }}}},
+                                        BuildResult{.inner{BuildResult::Failure{{
                                             .status = BuildResult::Failure::NotDeterministic,
-                                            .errorMsg = "no idea why",
-                                        }}},
+                                            .msg = HintFmt("no idea why"),
+                                        }}}},
                                         BuildResult{.inner{BuildResult::Success{
                                             .status = BuildResult::Success::Built,
                                         }}},
@@ -219,14 +219,14 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest, buildResult_1_28, "build-result-1.28", 1 << 8 | 28, ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
-            BuildResult{.inner{BuildResult::Failure{
+            BuildResult{.inner{BuildResult::Failure{{
                 .status = BuildResult::Failure::OutputRejected,
-                .errorMsg = "no idea why",
-            }}},
-            BuildResult{.inner{BuildResult::Failure{
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{.inner{BuildResult::Failure{{
                 .status = BuildResult::Failure::NotDeterministic,
-                .errorMsg = "no idea why",
-            }}},
+                .msg = HintFmt("no idea why"),
+            }}}},
             BuildResult{.inner{BuildResult::Success{
                 .status = BuildResult::Success::Built,
                 .builtOutputs =
@@ -265,16 +265,16 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest, buildResult_1_29, "build-result-1.29", 1 << 8 | 29, ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
-            BuildResult{.inner{BuildResult::Failure{
+            BuildResult{.inner{BuildResult::Failure{{
                 .status = BuildResult::Failure::OutputRejected,
-                .errorMsg = "no idea why",
-            }}},
+                .msg = HintFmt("no idea why"),
+            }}}},
             BuildResult{
-                .inner{BuildResult::Failure{
+                .inner{BuildResult::Failure{{
                     .status = BuildResult::Failure::NotDeterministic,
-                    .errorMsg = "no idea why",
+                    .msg = HintFmt("no idea why"),
                     .isNonDeterministic = true,
-                }},
+                }}},
                 .timesBuilt = 3,
                 .startTime = 30,
                 .stopTime = 50,
@@ -324,16 +324,16 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest, buildResult_1_37, "build-result-1.37", 1 << 8 | 37, ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
-            BuildResult{.inner{BuildResult::Failure{
+            BuildResult{.inner{BuildResult::Failure{{
                 .status = BuildResult::Failure::OutputRejected,
-                .errorMsg = "no idea why",
-            }}},
+                .msg = HintFmt("no idea why"),
+            }}}},
             BuildResult{
-                .inner{BuildResult::Failure{
+                .inner{BuildResult::Failure{{
                     .status = BuildResult::Failure::NotDeterministic,
-                    .errorMsg = "no idea why",
+                    .msg = HintFmt("no idea why"),
                     .isNonDeterministic = true,
-                }},
+                }}},
                 .timesBuilt = 3,
                 .startTime = 30,
                 .stopTime = 50,
@@ -385,22 +385,22 @@ VERSIONED_CHARACTERIZATION_TEST(WorkerProtoTest, keyedBuildResult_1_29, "keyed-b
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<KeyedBuildResult, KeyedBuildResult /*, KeyedBuildResult*/> t{
                                         KeyedBuildResult{
-                                            {.inner{BuildResult::Failure{
+                                            BuildResult{.inner{KeyedBuildResult::Failure{{
                                                 .status = KeyedBuildResult::Failure::OutputRejected,
-                                                .errorMsg = "no idea why",
-                                            }}},
+                                                .msg = HintFmt("no idea why"),
+                                            }}}},
                                             /* .path = */
                                             DerivedPath::Opaque{
                                                 StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-xxx"},
                                             },
                                         },
                                         KeyedBuildResult{
-                                            {
-                                                .inner{BuildResult::Failure{
+                                            BuildResult{
+                                                .inner{KeyedBuildResult::Failure{{
                                                     .status = KeyedBuildResult::Failure::NotDeterministic,
-                                                    .errorMsg = "no idea why",
+                                                    .msg = HintFmt("no idea why"),
                                                     .isNonDeterministic = true,
-                                                }},
+                                                }}},
                                                 .timesBuilt = 3,
                                                 .startTime = 30,
                                                 .stopTime = 50,

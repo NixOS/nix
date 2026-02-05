@@ -131,7 +131,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
     ignoreCrossFile = flags: builtins.filter (flag: !(lib.strings.hasInfix "cross-file" flag)) flags;
 
     availableComponents = lib.filterAttrs (
-      k: v: lib.meta.availableOn pkgs.hostPlatform v
+      k: v: lib.meta.availableOn pkgs.stdenv.hostPlatform v
     ) allComponents;
 
     activeComponents = buildInputsClosureCond isInternal (
@@ -323,7 +323,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             pkgs.buildPackages.shellcheck
             pkgs.buildPackages.include-what-you-use
           ]
-          ++ lib.optional pkgs.hostPlatform.isUnix pkgs.buildPackages.gdb
+          ++ lib.optional stdenv.hostPlatform.isUnix pkgs.buildPackages.gdb
           ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
             lib.hiPrio pkgs.buildPackages.clang-tools
           )
@@ -341,7 +341,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
 
     buildInputs =
       # TODO change Nixpkgs to mark gbenchmark as building on Windows
-      lib.optional pkgs.hostPlatform.isUnix pkgs.gbenchmark
+      lib.optional stdenv.hostPlatform.isUnix pkgs.gbenchmark
       ++ dedupByString (v: "${v}") (
         lib.filter (x: !isInternal x) (lib.lists.concatMap (c: c.buildInputs) activeComponents)
       )

@@ -147,14 +147,14 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
 VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2.2", 2 << 8 | 2, ({
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{
+                                        BuildResult{.inner{BuildResult::Failure{{
                                             .status = BuildResult::Failure::OutputRejected,
-                                            .errorMsg = "no idea why",
-                                        }}},
-                                        BuildResult{.inner{BuildResult::Failure{
+                                            .msg = HintFmt("no idea why"),
+                                        }}}},
+                                        BuildResult{.inner{BuildResult::Failure{{
                                             .status = BuildResult::Failure::NotDeterministic,
-                                            .errorMsg = "no idea why",
-                                        }}},
+                                            .msg = HintFmt("no idea why"),
+                                        }}}},
                                         BuildResult{.inner{BuildResult::Success{
                                             .status = BuildResult::Success::Built,
                                         }}},
@@ -165,16 +165,16 @@ VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_2, "build-result-2
 VERSIONED_CHARACTERIZATION_TEST(ServeProtoTest, buildResult_2_3, "build-result-2.3", 2 << 8 | 3, ({
                                     using namespace std::literals::chrono_literals;
                                     std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{
+                                        BuildResult{.inner{BuildResult::Failure{{
                                             .status = BuildResult::Failure::OutputRejected,
-                                            .errorMsg = "no idea why",
-                                        }}},
+                                            .msg = HintFmt("no idea why"),
+                                        }}}},
                                         BuildResult{
-                                            .inner{BuildResult::Failure{
+                                            .inner{BuildResult::Failure{{
                                                 .status = BuildResult::Failure::NotDeterministic,
-                                                .errorMsg = "no idea why",
+                                                .msg = HintFmt("no idea why"),
                                                 .isNonDeterministic = true,
-                                            }},
+                                            }}},
                                             .timesBuilt = 3,
                                             .startTime = 30,
                                             .stopTime = 50,
@@ -194,16 +194,16 @@ VERSIONED_CHARACTERIZATION_TEST(
     ServeProtoTest, buildResult_2_6, "build-result-2.6", 2 << 8 | 6, ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
-            BuildResult{.inner{BuildResult::Failure{
+            BuildResult{.inner{BuildResult::Failure{{
                 .status = BuildResult::Failure::OutputRejected,
-                .errorMsg = "no idea why",
-            }}},
+                .msg = HintFmt("no idea why"),
+            }}}},
             BuildResult{
-                .inner{BuildResult::Failure{
+                .inner{BuildResult::Failure{{
                     .status = BuildResult::Failure::NotDeterministic,
-                    .errorMsg = "no idea why",
+                    .msg = HintFmt("no idea why"),
                     .isNonDeterministic = true,
-                }},
+                }}},
                 .timesBuilt = 3,
                 .startTime = 30,
                 .stopTime = 50,

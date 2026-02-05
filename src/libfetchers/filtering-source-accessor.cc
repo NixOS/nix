@@ -61,6 +61,11 @@ std::pair<CanonPath, std::optional<std::string>> FilteringSourceAccessor::getFin
     return next->getFingerprint(prefix / path);
 }
 
+void FilteringSourceAccessor::invalidateCache(const CanonPath & path)
+{
+    next->invalidateCache(prefix / path);
+}
+
 void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 {
     if (!isAllowed(path))

@@ -34,14 +34,8 @@ struct NarAccessorImpl : NarAccessor
     {
     }
 
-    NarAccessorImpl(Source & source)
-        : root{parseNarListing(source)}
-    {
-    }
-
-    NarAccessorImpl(Source & source, GetNarBytes getNarBytes)
-        : root{parseNarListing(source)}
-        , getNarBytes{std::move(getNarBytes)}
+    NarAccessorImpl(NarListing && listing)
+        : root{std::move(listing)}
     {
     }
 
@@ -147,19 +141,14 @@ ref<NarAccessor> makeNarAccessor(std::string && nar)
     return make_ref<NarAccessorImpl>(std::move(nar));
 }
 
-ref<NarAccessor> makeNarAccessor(Source & source)
+ref<NarAccessor> makeNarAccessor(NarListing listing)
 {
-    return make_ref<NarAccessorImpl>(source);
+    return make_ref<NarAccessorImpl>(std::move(listing));
 }
 
 ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes)
 {
     return make_ref<NarAccessorImpl>(std::move(listing), getNarBytes);
-}
-
-ref<NarAccessor> makeLazyNarAccessor(Source & source, GetNarBytes getNarBytes)
-{
-    return make_ref<NarAccessorImpl>(source, getNarBytes);
 }
 
 GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)

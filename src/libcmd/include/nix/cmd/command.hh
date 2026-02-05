@@ -41,27 +41,42 @@ struct NixMultiCommand : MultiCommand, virtual Command
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 
 /**
+ * A command that requires a \ref StoreConfig store configuration.
+ */
+struct StoreConfigCommand : virtual Command
+{
+    StoreConfigCommand();
+    void run() override;
+
+    /**
+     * Return the default Nix store configuration.
+     */
+    ref<StoreConfig> getStoreConfig();
+
+    virtual ref<StoreConfig> createStoreConfig();
+    /**
+     * Main entry point, with a `StoreConfig` provided
+     */
+    virtual void run(ref<StoreConfig>) = 0;
+
+private:
+    std::shared_ptr<StoreConfig> _storeConfig;
+};
+
+/**
  * A command that requires a \ref Store "Nix store".
  */
-struct StoreCommand : virtual Command
+struct StoreCommand : virtual StoreConfigCommand
 {
     StoreCommand();
-    void run() override;
+    void run(ref<StoreConfig>) override;
 
     /**
      * Return the default Nix store.
      */
     ref<Store> getStore();
 
-    /**
-     * Return the destination Nix store.
-     */
-    virtual ref<Store> getDstStore()
-    {
-        return getStore();
-    }
-
-    virtual ref<Store> createStore();
+    ref<Store> createStore();
     /**
      * Main entry point, with a `Store` provided
      */
@@ -81,9 +96,9 @@ struct CopyCommand : virtual StoreCommand
 
     CopyCommand();
 
-    ref<Store> createStore() override;
+    ref<StoreConfig> createStoreConfig() override;
 
-    ref<Store> getDstStore() override;
+    ref<Store> getDstStore();
 };
 
 /**
@@ -315,11 +330,11 @@ struct MixProfile : virtual StoreCommand
     MixProfile();
 
     /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(const StorePath & storePath);
+    void updateProfile(Store & store, const StorePath & storePath);
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const BuiltPaths & buildables);
+    void updateProfile(Store & store, const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile

@@ -21,8 +21,9 @@ clearStore
 
 # Submodules can't be fetched locally by default.
 # See fetchGitSubmodules.sh
-export XDG_CONFIG_HOME=$TEST_HOME/.config
-git config --global protocol.file.allow always
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=protocol.file.allow
+export GIT_CONFIG_VALUE_0=always
 
 
 rootRepo=$TEST_ROOT/rootRepo

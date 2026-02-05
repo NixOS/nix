@@ -178,9 +178,31 @@ public:
         {"build-compress-log"}};
 };
 
-class Settings : public virtual Config, private GCSettings, private LogFileSettings
+struct AutoAllocateUidSettings : public virtual Config
 {
+    Setting<uint32_t> startId{
+        this,
+#ifdef __linux__
+        0x34000000,
+#else
+        56930,
+#endif
+        "start-id",
+        "The first UID and GID to use for dynamic ID allocation."};
 
+    Setting<uint32_t> uidCount{
+        this,
+#ifdef __linux__
+        maxIdsPerBuild * 128,
+#else
+        128,
+#endif
+        "id-count",
+        "The number of UIDs/GIDs to use for dynamic ID allocation."};
+};
+
+class Settings : public virtual Config, private AutoAllocateUidSettings, private GCSettings, private LogFileSettings
+{
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();
@@ -217,6 +239,15 @@ public:
     const LogFileSettings & getLogFileSettings() const
     {
         return *this;
+    }
+
+    /**
+     * Get AutoAllocateUidSettings if auto-allocate-uids is enabled.
+     * @return Pointer to settings if enabled, nullptr otherwise.
+     */
+    const AutoAllocateUidSettings * getAutoAllocateUidSettings() const
+    {
+        return autoAllocateUids ? this : nullptr;
     }
 
     static unsigned int getDefaultCores();
@@ -658,26 +689,6 @@ public:
         true,
         Xp::AutoAllocateUids};
 
-    Setting<uint32_t> startId{
-        this,
-#ifdef __linux__
-        0x34000000,
-#else
-        56930,
-#endif
-        "start-id",
-        "The first UID and GID to use for dynamic ID allocation."};
-
-    Setting<uint32_t> uidCount{
-        this,
-#ifdef __linux__
-        maxIdsPerBuild * 128,
-#else
-        128,
-#endif
-        "id-count",
-        "The number of UIDs/GIDs to use for dynamic ID allocation."};
-
 #ifdef __linux__
     Setting<bool> useCgroups{
         this,
@@ -723,29 +734,6 @@ public:
           default), you can still run `nix-store --optimise` to get rid of
           duplicate files.
         )"};
-
-    Setting<bool> envKeepDerivations{
-        this,
-        false,
-        "keep-env-derivations",
-        R"(
-          If `false` (default), derivations are not stored in Nix user
-          environments. That is, the derivations of any build-time-only
-          dependencies may be garbage-collected.
-
-          If `true`, when you add a Nix derivation to a user environment, the
-          path of the derivation is stored in the user environment. Thus, the
-          derivation isn't garbage-collected until the user environment
-          generation is deleted (`nix-env --delete-generations`). To prevent
-          build-time-only dependencies from being collected, you should also
-          turn on `keep-outputs`.
-
-          The difference between this option and `keep-derivations` is that
-          this one is “sticky”: it applies to any user environment created
-          while this option was enabled, while `keep-derivations` only applies
-          at the moment the garbage collector is run.
-        )",
-        {"env-keep-derivations"}};
 
     Setting<SandboxMode> sandboxMode{
         this,
@@ -895,6 +883,8 @@ public:
           line.
         )"};
 
+private:
+
     OptionalPathSetting diffHook{
         this,
         std::nullopt,
@@ -926,6 +916,16 @@ public:
           When using the Nix daemon, `diff-hook` must be set in the `nix.conf`
           configuration file, and cannot be passed at the command line.
         )"};
+
+public:
+
+    const Path * getDiffHook() const
+    {
+        if (!runDiffHook.get()) {
+            return nullptr;
+        }
+        return get(diffHook.get());
+    }
 
     Setting<Strings> trustedPublicKeys{
         this,
@@ -1399,15 +1399,6 @@ public:
         {},   // aliases
         true, // document default
         Xp::ConfigurableImpureEnv};
-
-    Setting<std::string> upgradeNixStorePathUrl{
-        this,
-        "https://github.com/NixOS/nixpkgs/raw/master/nixos/modules/installer/tools/nix-fallback-paths.nix",
-        "upgrade-nix-store-path-url",
-        R"(
-          Used by `nix upgrade-nix`, the URL of the file that contains the
-          store paths of the latest Nix release.
-        )"};
 
     Setting<uint64_t> warnLargePathThreshold{
         this,

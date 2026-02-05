@@ -7,6 +7,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 
 #include "store-config-private.hh"
@@ -68,10 +69,7 @@ void LocalStore::createTempRootsFile()
 
         /* Check whether the garbage collector didn't get in our
            way. */
-        struct stat st;
-        if (fstat(fromDescriptorReadOnly(fdTempRoots->get()), &st) == -1)
-            throw SysError("statting '%1%'", fnTempRoots);
-        if (st.st_size == 0)
+        if (getFileSize(fdTempRoots->get()) == 0)
             break;
 
         /* The garbage collector deleted this file before we could get
@@ -340,7 +338,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
 static std::string quoteRegexChars(const std::string & raw)
 {
     static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
-    return boost::regex_replace(raw, specialRegex, R"(\$&)");
+    return boost::regex_replace(raw, specialRegex, R"(\\$&)");
 }
 
 #ifdef __linux__
@@ -901,9 +899,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                accounting.  */
         }
 
-        struct stat st;
-        if (stat(linksDir.c_str(), &st) == -1)
-            throw SysError("statting '%1%'", linksDir);
+        auto st = stat(linksDir);
         int64_t overhead =
 #ifdef _WIN32
             0

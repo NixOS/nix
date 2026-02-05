@@ -374,10 +374,6 @@ void mainWrapped(int argc, char ** argv)
     }
 #endif
 
-    initNix();
-    initGC();
-    flakeSettings.configureEvalSettings(evalSettings);
-
     /* Set the build hook location
 
        For builds we perform a self-invocation, so Nix has to be
@@ -389,6 +385,10 @@ void mainWrapped(int argc, char ** argv)
             getNixBin({}).string(),
             "__build-remote",
         });
+
+    initNix();
+    initGC();
+    flakeSettings.configureEvalSettings(evalSettings);
 
 #ifdef __linux__
     if (isRootUser()) {

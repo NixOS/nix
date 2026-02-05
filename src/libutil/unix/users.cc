@@ -35,18 +35,16 @@ std::filesystem::path getHome()
         auto homeDir = getEnv("HOME");
         if (homeDir) {
             // Only use $HOME if doesn't exist or is owned by the current user.
-            struct stat st;
-            int result = stat(homeDir->c_str(), &st);
-            if (result != 0) {
-                if (errno != ENOENT) {
-                    warn(
-                        "couldn't stat $HOME ('%s') for reason other than not existing ('%d'), falling back to the one defined in the 'passwd' file",
-                        *homeDir,
-                        errno);
-                    homeDir.reset();
-                }
-            } else if (st.st_uid != geteuid()) {
-                unownedUserHomeDir.swap(homeDir);
+            try {
+                auto st = maybeStat(homeDir->c_str());
+                if (st && st->st_uid != geteuid())
+                    unownedUserHomeDir.swap(homeDir);
+            } catch (SysError & e) {
+                warn(
+                    "couldn't stat $HOME ('%s') for reason other than not existing, falling back to the one defined in the 'passwd' file: %s",
+                    *homeDir,
+                    e.what());
+                homeDir.reset();
             }
         }
         if (!homeDir) {

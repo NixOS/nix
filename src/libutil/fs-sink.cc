@@ -69,7 +69,6 @@ static std::filesystem::path append(const std::filesystem::path & src, const Can
     return dst;
 }
 
-#ifndef _WIN32
 void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
 {
     if (path.isRoot()) {
@@ -83,15 +82,23 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
 
     RestoreSink dirSink{startFsync};
     dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd =
-        unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    dirSink.dirFd = openFileEnsureBeneathNoSymlinks(
+        dirFd.get(),
+        path,
+#ifdef _WIN32
+        FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_DIRECTORY_FILE
+#else
+        O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC,
+        0
+#endif
+    );
 
     if (!dirSink.dirFd)
         throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
 
     callback(dirSink, CanonPath::root);
 }
-#endif
 
 void RestoreSink::createDirectory(const CanonPath & path)
 {
@@ -174,7 +181,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
             constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
             if (!dirFd)
                 return ::open(p.c_str(), flags, 0666);
-            return unix::openFileEnsureBeneathNoSymlinks(dirFd.get(), path, flags, 0666);
+            return openFileEnsureBeneathNoSymlinks(dirFd.get(), path, flags, 0666);
         }()
 #endif
     );
@@ -189,9 +196,7 @@ void RestoreRegularFile::isExecutable()
     // Windows doesn't have a notion of executable file permissions we
     // care about here, right?
 #ifndef _WIN32
-    struct stat st;
-    if (fstat(fd.get(), &st) == -1)
-        throw SysError("fstat");
+    auto st = nix::fstat(fd.get());
     if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
         throw SysError("fchmod");
 #endif

@@ -32,6 +32,19 @@ Descriptor openFileReadonly(const std::filesystem::path & path)
     return open(path.c_str(), O_RDONLY | O_CLOEXEC);
 }
 
+Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
+{
+    auto flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+    if (params.truncateExisting) {
+        flags |= O_TRUNC;
+        if (!params.followSymlinksOnTruncate)
+            flags |= O_NOFOLLOW;
+    } else {
+        flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
+    }
+    return open(path.c_str(), flags, mode);
+}
+
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
@@ -70,15 +83,15 @@ void setWriteTime(
     };
 #  if HAVE_LUTIMES
     if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", path);
+        throw SysError("changing modification time of %s", PathFmt{path});
 #  else
     bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
 
     if (!isSymlink) {
         if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", path);
+            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
     } else {
-        throw Error("Cannot change modification time of symlink %s", path);
+        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
     }
 #  endif
 #endif
@@ -110,7 +123,7 @@ static void _deletePath(
     std::string name(path.filename());
     assert(name != "." && name != ".." && !name.empty());
 
-    struct stat st;
+    PosixStat st;
     if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT)
             return;

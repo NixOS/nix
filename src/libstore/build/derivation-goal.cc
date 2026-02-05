@@ -252,7 +252,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode, storeDerivation);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
-    g->preserveException = true;
+    g->preserveFailure = true;
 
     {
         Goals waitees;
@@ -312,7 +312,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
     }
 
-    co_return amDone(g->exitCode, g->ex);
+    co_return amDone(g->exitCode);
 }
 
 Goal::Co DerivationGoal::repairClosure()
@@ -492,22 +492,13 @@ Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
     mcExpectedBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();
 
-    return Goal::doneFailure(
-        ecFailed,
-        BuildResult::Failure{
-            .status = ex.status,
-            .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-        },
-        std::move(ex));
+    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix
