@@ -23,13 +23,12 @@ SourcePath EvalState::storePath(const StorePath & path)
 StorePath
 EvalState::mountInput(fetchers::Input & input, const fetchers::Input & originalInput, ref<SourceAccessor> accessor)
 {
-    auto storePath = fetchToStore(fetchSettings, *store, accessor, FetchMode::Copy, input.getName());
+    auto [storePath, narHash] = fetchToStore2(fetchSettings, *store, accessor, FetchMode::Copy, input.getName());
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
     storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
 
-    auto narHash = store->queryPathInfo(storePath)->narHash;
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
     if (originalInput.getNarHash() && narHash != *originalInput.getNarHash())
