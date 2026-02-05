@@ -25,6 +25,13 @@ expect_failure nix eval --json \
     --option tectonix-git-sha "0000000000000000000000000000000000000000" \
     --expr 'builtins.unsafeTectonixInternalManifest'
 
+# Test: Missing git-sha
+echo "Testing missing git-sha..."
+expect_failure nix eval --json \
+    --extra-experimental-features 'nix-command' \
+    --option tectonix-git-dir "$TEST_WORLD/.git" \
+    --expr 'builtins.unsafeTectonixInternalManifest'
+
 # Test: Non-zone path (parent of zone)
 echo "Testing non-zone path (parent)..."
 expect_failure tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
@@ -44,6 +51,15 @@ expect_failure tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
 echo "Testing invalid tree SHA..."
 expect_failure tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
     'builtins.unsafeTectonixInternalTree "0000000000000000000000000000000000000000"'
+
+# Test: Tree access works without git SHA
+
+echo "Testing tree access without git SHA..."
+TREE_SHA=$(git -C "$TEST_WORLD" rev-parse HEAD^{tree})
+nix eval --raw \
+    --extra-experimental-features 'nix-command' \
+    --option tectonix-git-dir "$TEST_WORLD/.git" \
+    --expr "builtins.unsafeTectonixInternalTree \"$TREE_SHA\"" > /dev/null
 
 # Test: Non-existent git directory
 echo "Testing non-existent git directory..."

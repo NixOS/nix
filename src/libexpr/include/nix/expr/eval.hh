@@ -573,6 +573,11 @@ private:
      */
     StorePath getZoneFromCheckout(std::string_view zonePath);
 
+    /**
+     * Return the configured tectonix git SHA, or throw if unset.
+     */
+    const std::string & requireTectonixGitSha() const;
+
 public:
 
     /**

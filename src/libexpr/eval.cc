@@ -443,12 +443,18 @@ ref<GitRepo> EvalState::getWorldRepo() const
     return *worldRepo;
 }
 
+const std::string & EvalState::requireTectonixGitSha() const
+{
+    auto & sha = settings.tectonixGitSha.get();
+    if (sha.empty())
+        throw Error("--tectonix-git-sha must be specified to use tectonix builtins");
+    return sha;
+}
+
 ref<SourceAccessor> EvalState::getWorldGitAccessor() const
 {
     std::call_once(worldGitAccessorFlag, [this]() {
-        auto sha = settings.tectonixGitSha.get();
-        if (sha.empty())
-            throw Error("--tectonix-git-sha must be specified to use tectonix builtins");
+        auto & sha = requireTectonixGitSha();
 
         auto repo = getWorldRepo();
         auto hash = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
@@ -536,7 +542,7 @@ Hash EvalState::getWorldTreeSha(std::string_view worldPath) const
 
     // Compute by walking from root
     auto repo = getWorldRepo();
-    auto sha = settings.tectonixGitSha.get();
+    auto & sha = requireTectonixGitSha();
     auto commitSha = Hash::parseNonSRIUnprefixed(sha, HashAlgorithm::SHA1);
 
     // Get the root tree SHA from the commit

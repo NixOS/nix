@@ -592,6 +592,26 @@ TEST_F(TectonixTest, missing_git_sha_throws)
     ASSERT_THROW(evalState.getWorldGitAccessor(), Error);
 }
 
+TEST_F(TectonixTest, missing_git_sha_tree_sha_throws)
+{
+    bool readOnly = true;
+    fetchers::Settings fetchSettings{};
+    EvalSettings evalSettings{readOnly};
+    evalSettings.nixPath = {};
+    evalSettings.tectonixGitDir = (repoPath / ".git").string();
+    evalSettings.tectonixGitSha = ""; // empty
+
+    EvalState evalState(
+        LookupPath{},
+        openStore("dummy://"),
+        fetchSettings,
+        evalSettings,
+        nullptr
+    );
+
+    ASSERT_THROW(evalState.getWorldTreeSha("//areas/tools/dev"), Error);
+}
+
 TEST_F(TectonixTest, invalid_sha_throws)
 {
     bool readOnly = true;

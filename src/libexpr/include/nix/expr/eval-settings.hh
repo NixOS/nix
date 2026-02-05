@@ -417,10 +417,12 @@ struct EvalSettings : Config
         "",
         "tectonix-git-sha",
         R"(
-          Git commit SHA to use for tectonix builtins.
+          Git commit SHA to use for git-backed tectonix builtins.
 
-          This specifies the commit to read from when using tectonix builtins.
-          Typically set to HEAD of the repository.
+          This specifies the commit to read from when using tectonix builtins that
+          access the world repository by commit (manifest, tree SHA, zone access).
+          It is optional unless those builtins are invoked. Typically set to HEAD
+          of the repository.
         )"};
 
     Setting<std::string> tectonixCheckoutPath{
