@@ -214,26 +214,26 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(const std::string & userGroup, uid_t nrIds, bool useUserNamespace)
+std::unique_ptr<UserLock> acquireUserLock(const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)
 {
-    if (auto * uidSettings = settings.getAutoAllocateUidSettings()) {
+    if (auto * uidSettings = localSettings.getAutoAllocateUidSettings()) {
         auto userPoolDir = std::filesystem::path{settings.nixStateDir} / "userpool2";
         createDirs(userPoolDir);
-        return AutoUserLock::acquire(userPoolDir, userGroup, nrIds, useUserNamespace, *uidSettings);
+        return AutoUserLock::acquire(userPoolDir, localSettings.buildUsersGroup, nrIds, useUserNamespace, *uidSettings);
     } else {
         auto userPoolDir = std::filesystem::path{settings.nixStateDir} / "userpool";
         createDirs(userPoolDir);
-        return SimpleUserLock::acquire(userPoolDir, userGroup);
+        return SimpleUserLock::acquire(userPoolDir, localSettings.buildUsersGroup);
     }
 }
 
-bool useBuildUsers()
+bool useBuildUsers(const LocalSettings & localSettings)
 {
 #ifdef __linux__
-    static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
+    static bool b = (localSettings.buildUsersGroup != "" || localSettings.autoAllocateUids) && isRootUser();
     return b;
 #elif defined(__APPLE__) || defined(__FreeBSD__)
-    static bool b = settings.buildUsersGroup != "" && isRootUser();
+    static bool b = localSettings.buildUsersGroup != "" && isRootUser();
     return b;
 #else
     return false;

@@ -96,7 +96,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
 
             /* Violations will go to the syslog if you set this. Unfortunately the destination does not appear to be
              * configurable */
-            if (settings.darwinLogSandboxViolations) {
+            if (store.config->getLocalSettings().darwinLogSandboxViolations) {
                 sandboxProfile += "(deny default)\n";
             } else {
                 sandboxProfile += "(deny default (with no-log))\n";

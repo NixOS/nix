@@ -463,7 +463,7 @@ struct GCLimitReached
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
-    const auto & gcSettings = config->getGCSettings();
+    const auto & gcSettings = config->getLocalSettings().getGCSettings();
 
     bool shouldDelete = options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific;
     bool keepOutputs = gcSettings.keepOutputs;
@@ -918,7 +918,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 void LocalStore::autoGC(bool sync)
 {
 #if HAVE_STATVFS
-    const auto & gcSettings = config->getGCSettings();
+    const auto & gcSettings = config->getLocalSettings().getGCSettings();
 
     static auto fakeFreeSpaceFile = getEnv("_NIX_TEST_FREE_SPACE_FILE");
 

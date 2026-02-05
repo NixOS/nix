@@ -287,7 +287,7 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const PeerInf
     if (matchUser(user, group, trustedUsers))
         trusted = Trusted;
 
-    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.buildUsersGroup)
+    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.getLocalSettings().buildUsersGroup)
         throw Error("user '%1%' is not allowed to connect to the Nix daemon", user.value_or("<unknown>"));
 
     return {trusted, std::move(user)};
@@ -336,7 +336,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     setSigChldAction(true);
 
 #ifdef __linux__
-    if (settings.useCgroups) {
+    if (settings.getLocalSettings().useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         //  This also sets the root cgroup to the current one.

@@ -98,7 +98,7 @@ void execProgramInStore(
     if (system)
         linux::setPersonality({
             .system = *system,
-            .impersonateLinux26 = settings.impersonateLinux26,
+            .impersonateLinux26 = settings.getLocalSettings().impersonateLinux26,
         });
 #endif
 
@@ -256,7 +256,7 @@ void chrootHelper(int argc, char ** argv)
     if (system != "")
         linux::setPersonality({
             .system = system,
-            .impersonateLinux26 = settings.impersonateLinux26,
+            .impersonateLinux26 = settings.getLocalSettings().impersonateLinux26,
         });
 #  endif
 

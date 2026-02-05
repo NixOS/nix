@@ -502,7 +502,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 args.insert(p);
 
         StorePathSet referrers;
-        auto & gcSettings = settings.getGCSettings();
+        auto & gcSettings = settings.getLocalSettings().getGCSettings();
         store->computeFSClosure(args, referrers, true, gcSettings.keepOutputs, gcSettings.keepDerivations);
 
         auto & gcStore = require<GcStore>(*store);
@@ -589,7 +589,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(
-                    store->printStorePath(info->path), {NIX_WHEN_SUPPORT_ACLS(settings.ignoredAcls)});
+                    store->printStorePath(info->path),
+                    {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},
@@ -921,7 +922,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             // checked that `nrRepeats` in fact is 0, so we can safely
             // ignore this without doing something other than what the
             // client asked for.
-            settings.runDiffHook = true;
+            settings.getLocalSettings().runDiffHook = true;
         }
         if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
             settings.keepFailed = options.keepFailed;
