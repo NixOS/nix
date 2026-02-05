@@ -882,7 +882,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSink out(getStandardOutput());
 
     /* Exchange the greeting. */
-    ServeProto::Version clientVersion = ServeProto::BasicServerConnection::handshake(out, in, SERVE_PROTOCOL_VERSION);
+    ServeProto::Version clientVersion = ServeProto::BasicServerConnection::handshake(out, in, ServeProto::latest);
 
     ServeProto::ReadConn rconn{
         .from = in,
@@ -909,9 +909,9 @@ static void opServe(Strings opFlags, Strings opArgs)
         // these conditions.
         settings.maxSilentTime = options.maxSilentTime;
         settings.buildTimeout = options.buildTimeout;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
+        if (clientVersion >= ServeProto::Version{2, 2})
             settings.maxLogSize = options.maxLogSize;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
+        if (clientVersion >= ServeProto::Version{2, 3}) {
             if (options.nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
@@ -924,7 +924,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             // client asked for.
             settings.getLocalSettings().runDiffHook = true;
         }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
+        if (clientVersion >= ServeProto::Version{2, 7}) {
             settings.keepFailed = options.keepFailed;
         }
     };

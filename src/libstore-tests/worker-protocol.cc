@@ -25,7 +25,10 @@ struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
      * For serializers that don't care about the minimum version, we
      * used the oldest one: 1.10.
      */
-    WorkerProto::Version defaultVersion = 1 << 8 | 10;
+    WorkerProto::Version defaultVersion = {
+        .major = 1,
+        .minor = 10,
+    };
 };
 
 VERSIONED_CHARACTERIZATION_TEST(
@@ -79,7 +82,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     derivedPath_1_29,
     "derived-path-1.29",
-    1 << 8 | 29,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 29,
+    }),
     (std::tuple<DerivedPath, DerivedPath, DerivedPath>{
         DerivedPath::Opaque{
             .path = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
@@ -104,7 +110,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     derivedPath_1_30,
     "derived-path-1.30",
-    1 << 8 | 30,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 30,
+    }),
     (std::tuple<DerivedPath, DerivedPath, DerivedPath, DerivedPath>{
         DerivedPath::Opaque{
             .path = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
@@ -197,26 +206,41 @@ VERSIONED_READ_CHARACTERIZATION_TEST(
         },
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(WorkerProtoTest, buildResult_1_27, "build-result-1.27", 1 << 8 | 27, ({
-                                    using namespace std::literals::chrono_literals;
-                                    std::tuple<BuildResult, BuildResult, BuildResult> t{
-                                        BuildResult{.inner{BuildResult::Failure{{
-                                            .status = BuildResult::Failure::OutputRejected,
-                                            .msg = HintFmt("no idea why"),
-                                        }}}},
-                                        BuildResult{.inner{BuildResult::Failure{{
-                                            .status = BuildResult::Failure::NotDeterministic,
-                                            .msg = HintFmt("no idea why"),
-                                        }}}},
-                                        BuildResult{.inner{BuildResult::Success{
-                                            .status = BuildResult::Success::Built,
-                                        }}},
-                                    };
-                                    t;
-                                }))
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_27,
+    "build-result-1.27",
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 27,
+    }),
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t{
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::OutputRejected,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::NotDeterministic,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{.inner{BuildResult::Success{
+                .status = BuildResult::Success::Built,
+            }}},
+        };
+        t;
+    }))
 
 VERSIONED_CHARACTERIZATION_TEST(
-    WorkerProtoTest, buildResult_1_28, "build-result-1.28", 1 << 8 | 28, ({
+    WorkerProtoTest,
+    buildResult_1_28,
+    "build-result-1.28",
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 28,
+    }),
+    ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
             BuildResult{.inner{BuildResult::Failure{{
@@ -262,7 +286,14 @@ VERSIONED_CHARACTERIZATION_TEST(
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
-    WorkerProtoTest, buildResult_1_29, "build-result-1.29", 1 << 8 | 29, ({
+    WorkerProtoTest,
+    buildResult_1_29,
+    "build-result-1.29",
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 29,
+    }),
+    ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
             BuildResult{.inner{BuildResult::Failure{{
@@ -321,7 +352,14 @@ VERSIONED_CHARACTERIZATION_TEST(
     }))
 
 VERSIONED_CHARACTERIZATION_TEST(
-    WorkerProtoTest, buildResult_1_37, "build-result-1.37", 1 << 8 | 37, ({
+    WorkerProtoTest,
+    buildResult_1_37,
+    "build-result-1.37",
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 37,
+    }),
+    ({
         using namespace std::literals::chrono_literals;
         std::tuple<BuildResult, BuildResult, BuildResult> t{
             BuildResult{.inner{BuildResult::Failure{{
@@ -381,48 +419,59 @@ VERSIONED_CHARACTERIZATION_TEST(
         t;
     }))
 
-VERSIONED_CHARACTERIZATION_TEST(WorkerProtoTest, keyedBuildResult_1_29, "keyed-build-result-1.29", 1 << 8 | 29, ({
-                                    using namespace std::literals::chrono_literals;
-                                    std::tuple<KeyedBuildResult, KeyedBuildResult /*, KeyedBuildResult*/> t{
-                                        KeyedBuildResult{
-                                            BuildResult{.inner{KeyedBuildResult::Failure{{
-                                                .status = KeyedBuildResult::Failure::OutputRejected,
-                                                .msg = HintFmt("no idea why"),
-                                            }}}},
-                                            /* .path = */
-                                            DerivedPath::Opaque{
-                                                StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-xxx"},
-                                            },
-                                        },
-                                        KeyedBuildResult{
-                                            BuildResult{
-                                                .inner{KeyedBuildResult::Failure{{
-                                                    .status = KeyedBuildResult::Failure::NotDeterministic,
-                                                    .msg = HintFmt("no idea why"),
-                                                    .isNonDeterministic = true,
-                                                }}},
-                                                .timesBuilt = 3,
-                                                .startTime = 30,
-                                                .stopTime = 50,
-                                            },
-                                            /* .path = */
-                                            DerivedPath::Built{
-                                                .drvPath = makeConstantStorePathRef(
-                                                    StorePath{
-                                                        "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
-                                                    }),
-                                                .outputs = OutputsSpec::Names{"out"},
-                                            },
-                                        },
-                                    };
-                                    t;
-                                }))
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    keyedBuildResult_1_29,
+    "keyed-build-result-1.29",
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 29,
+    }),
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<KeyedBuildResult, KeyedBuildResult /*, KeyedBuildResult*/> t{
+            KeyedBuildResult{
+                BuildResult{.inner{KeyedBuildResult::Failure{{
+                    .status = KeyedBuildResult::Failure::OutputRejected,
+                    .msg = HintFmt("no idea why"),
+                }}}},
+                /* .path = */
+                DerivedPath::Opaque{
+                    StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-xxx"},
+                },
+            },
+            KeyedBuildResult{
+                BuildResult{
+                    .inner{KeyedBuildResult::Failure{{
+                        .status = KeyedBuildResult::Failure::NotDeterministic,
+                        .msg = HintFmt("no idea why"),
+                        .isNonDeterministic = true,
+                    }}},
+                    .timesBuilt = 3,
+                    .startTime = 30,
+                    .stopTime = 50,
+                },
+                /* .path = */
+                DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(
+                        StorePath{
+                            "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
+                        }),
+                    .outputs = OutputsSpec::Names{"out"},
+                },
+            },
+        };
+        t;
+    }))
 
 VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     unkeyedValidPathInfo_1_15,
     "unkeyed-valid-path-info-1.15",
-    1 << 8 | 15,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 15,
+    }),
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
@@ -456,7 +505,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     validPathInfo_1_15,
     "valid-path-info-1.15",
-    1 << 8 | 15,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 15,
+    }),
     (std::tuple<ValidPathInfo, ValidPathInfo>{
         ({
             ValidPathInfo info{
@@ -505,7 +557,10 @@ VERSIONED_CHARACTERIZATION_TEST(
     WorkerProtoTest,
     validPathInfo_1_16,
     "valid-path-info-1.16",
-    1 << 8 | 16,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 16,
+    }),
     (std::tuple<ValidPathInfo, ValidPathInfo, ValidPathInfo>{
         ({
             ValidPathInfo info{
@@ -660,7 +715,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_30,
     "client-handshake-info_1_30",
-    1 << 8 | 30,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 30,
+    }),
     (std::tuple<WorkerProto::ClientHandshakeInfo>{
         {},
     }))
@@ -669,7 +727,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_33,
     "client-handshake-info_1_33",
-    1 << 8 | 33,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 33,
+    }),
     (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo>{
         {
             .daemonNixVersion = std::optional{"foo"},
@@ -683,7 +744,10 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     WorkerProtoTest,
     clientHandshakeInfo_1_35,
     "client-handshake-info_1_35",
-    1 << 8 | 35,
+    (WorkerProto::Version{
+        .major = 1,
+        .minor = 35,
+    }),
     (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo>{
         {
             .daemonNixVersion = std::optional{"foo"},
@@ -736,17 +800,36 @@ TEST_F(WorkerProtoTest, handshake_features)
     auto clientThread = std::thread([&]() {
         FdSink out{toServer.writeSide.get()};
         FdSource in{toClient.readSide.get()};
-        clientResult = WorkerProto::BasicClientConnection::handshake(out, in, 123, {"bar", "aap", "mies", "xyzzy"});
+        clientResult = WorkerProto::BasicClientConnection::handshake(
+            out,
+            in,
+            WorkerProto::Version{
+                .major = 1,
+                .minor = 123,
+            },
+            {"bar", "aap", "mies", "xyzzy"});
     });
 
     FdSink out{toClient.writeSide.get()};
     FdSource in{toServer.readSide.get()};
-    auto daemonResult = WorkerProto::BasicServerConnection::handshake(out, in, 456, {"foo", "bar", "xyzzy"});
+    auto daemonResult = WorkerProto::BasicServerConnection::handshake(
+        out,
+        in,
+        WorkerProto::Version{
+            .major = 1,
+            .minor = 200,
+        },
+        {"foo", "bar", "xyzzy"});
 
     clientThread.join();
 
     EXPECT_EQ(clientResult, daemonResult);
-    EXPECT_EQ(std::get<0>(clientResult), 123u);
+    EXPECT_EQ(
+        std::get<0>(clientResult),
+        (WorkerProto::Version{
+            .major = 1,
+            .minor = 123,
+        }));
     EXPECT_EQ(std::get<1>(clientResult), WorkerProto::FeatureSet({"bar", "xyzzy"}));
 }
 

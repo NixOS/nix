@@ -133,7 +133,7 @@ struct TunnelLogger : public Logger
         if (!ex)
             to << STDERR_LAST;
         else {
-            if (GET_PROTOCOL_MINOR(clientVersion) >= 26) {
+            if (clientVersion >= WorkerProto::Version{1, 26}) {
                 to << STDERR_ERROR << *ex;
             } else {
                 to << STDERR_ERROR << ex->what() << ex->info().status;
@@ -149,7 +149,7 @@ struct TunnelLogger : public Logger
         const Fields & fields,
         ActivityId parent) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20) {
+        if (clientVersion < WorkerProto::Version{1, 20}) {
             if (!s.empty())
                 log(lvl, s + "...");
             return;
@@ -162,7 +162,7 @@ struct TunnelLogger : public Logger
 
     void stopActivity(ActivityId act) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20)
+        if (clientVersion < WorkerProto::Version{1, 20})
             return;
         StringSink buf;
         buf << STDERR_STOP_ACTIVITY << act;
@@ -171,7 +171,7 @@ struct TunnelLogger : public Logger
 
     void result(ActivityId act, ResultType type, const Fields & fields) override
     {
-        if (GET_PROTOCOL_MINOR(clientVersion) < 20)
+        if (clientVersion < WorkerProto::Version{1, 20})
             return;
         StringSink buf;
         buf << STDERR_RESULT << act << type << fields;
@@ -325,7 +325,7 @@ static void performOp(
         auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
 
         SubstituteFlag substitute = NoSubstitute;
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 27) {
+        if (conn.protoVersion >= WorkerProto::Version{1, 27}) {
             substitute = readInt(conn.from) ? Substitute : NoSubstitute;
         }
 
@@ -402,7 +402,7 @@ static void performOp(
     }
 
     case WorkerProto::Op::AddToStore: {
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 25) {
+        if (conn.protoVersion >= WorkerProto::Version{1, 25}) {
             auto name = readString(conn.from);
             auto camStr = readString(conn.from);
             auto refs = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
@@ -798,7 +798,7 @@ static void performOp(
     case WorkerProto::Op::QuerySubstitutablePathInfos: {
         SubstitutablePathInfos infos;
         StorePathCAMap pathsMap = {};
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 22) {
+        if (conn.protoVersion < WorkerProto::Version{1, 22}) {
             auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
             for (auto & path : paths)
                 pathsMap.emplace(path, std::nullopt);
@@ -897,7 +897,7 @@ static void performOp(
         if (!trusted)
             info.ultimate = false;
 
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 23) {
+        if (conn.protoVersion >= WorkerProto::Version{1, 23}) {
             logger->startWork();
             {
                 FramedSource source(conn.from);
@@ -909,7 +909,7 @@ static void performOp(
         else {
             std::unique_ptr<Source> source;
             StringSink saved;
-            if (GET_PROTOCOL_MINOR(conn.protoVersion) >= 21)
+            if (conn.protoVersion >= WorkerProto::Version{1, 21})
                 source = std::make_unique<TunnelSource>(conn.from, conn.to);
             else {
                 TeeSource tee{conn.from, saved};
@@ -943,7 +943,7 @@ static void performOp(
 
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
+        if (conn.protoVersion < WorkerProto::Version{1, 31}) {
             auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
             auto outputPath = StorePath(readString(conn.from));
             store->registerDrvOutput(Realisation{{.outPath = outputPath}, outputId});
@@ -960,7 +960,7 @@ static void performOp(
         auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
         auto info = store->queryRealisation(outputId);
         logger->stopWork();
-        if (GET_PROTOCOL_MINOR(conn.protoVersion) < 31) {
+        if (conn.protoVersion < WorkerProto::Version{1, 31}) {
             std::set<StorePath> outPaths;
             if (info)
                 outPaths.insert(info->outPath);
@@ -1016,9 +1016,9 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 
     /* Exchange the greeting. */
     auto [protoVersion, features] =
-        WorkerProto::BasicServerConnection::handshake(to, from, PROTOCOL_VERSION, WorkerProto::allFeatures);
+        WorkerProto::BasicServerConnection::handshake(to, from, WorkerProto::latest, WorkerProto::allFeatures);
 
-    if (protoVersion < MINIMUM_PROTOCOL_VERSION)
+    if (protoVersion < WorkerProto::minimum)
         throw Error("the Nix client version is too old");
 
     WorkerProto::BasicServerConnection conn;
