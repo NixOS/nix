@@ -199,7 +199,7 @@ void Store::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag
             *this,
             WorkerProto::ReadConn{
                 .from = source,
-                .version = 16,
+                .version = {.number = {.major = 1, .minor = 16}},
             });
         info.ultimate = false;
         addToStore(info, source, repair, checkSigs);

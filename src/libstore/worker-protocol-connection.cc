@@ -5,8 +5,6 @@
 
 namespace nix {
 
-const WorkerProto::FeatureSet WorkerProto::allFeatures{};
-
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {
     try {
@@ -64,7 +62,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
         }
 
         else if (msg == STDERR_ERROR) {
-            if (protoVersion >= WorkerProto::Version{1, 26}) {
+            if (protoVersion >= WorkerProto::Version{.number = {1, 26}}) {
                 ex = std::make_exception_ptr(readError(from));
             } else {
                 auto error = readString(from);
@@ -122,7 +120,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             // explain to users what's going on when their daemon is
             // older than #4628 (2023).
             if (experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations)
-                && protoVersion <= WorkerProto::Version{1, 35}) {
+                && protoVersion.number < WorkerProto::Version::Number{1, 36}) {
                 auto m = e.msg();
                 if (m.find("parsing derivation") != std::string::npos && m.find("expected string") != std::string::npos
                     && m.find("Derive([") != std::string::npos)
@@ -146,86 +144,87 @@ void WorkerProto::BasicClientConnection::processStderr(
     }
 }
 
-static WorkerProto::FeatureSet intersectFeatures(const WorkerProto::FeatureSet & a, const WorkerProto::FeatureSet & b)
+static WorkerProto::Version::FeatureSet
+intersectFeatures(const WorkerProto::Version::FeatureSet & a, const WorkerProto::Version::FeatureSet & b)
 {
-    WorkerProto::FeatureSet res;
+    WorkerProto::Version::FeatureSet res;
     for (auto & x : a)
         if (b.contains(x))
             res.insert(x);
     return res;
 }
 
-std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> WorkerProto::BasicClientConnection::handshake(
-    BufferedSink & to,
-    Source & from,
-    WorkerProto::Version localVersion,
-    const WorkerProto::FeatureSet & supportedFeatures)
+WorkerProto::Version WorkerProto::BasicClientConnection::handshake(
+    BufferedSink & to, Source & from, const WorkerProto::Version & localVersion)
 {
-    to << WORKER_MAGIC_1 << localVersion.toWire();
+    to << WORKER_MAGIC_1 << localVersion.number.toWire();
     to.flush();
 
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_2)
         throw Error("nix-daemon protocol mismatch from");
-    auto daemonVersion = WorkerProto::Version::fromWire(readInt(from));
+    auto daemonVersion = WorkerProto::Version::Number::fromWire(readInt(from));
 
-    if (daemonVersion.major != WorkerProto::latest.major)
+    if (daemonVersion.major != WorkerProto::latest.number.major)
         throw Error("Nix daemon protocol version not supported");
-    if (daemonVersion < WorkerProto::Version{1, 10})
+    if (daemonVersion < WorkerProto::Version::Number{1, 10})
         throw Error("the Nix daemon version is too old");
 
-    auto protoVersion = std::min(daemonVersion, localVersion);
+    auto protoVersionNumber = std::min(daemonVersion, localVersion.number);
 
     /* Exchange features. */
-    WorkerProto::FeatureSet daemonFeatures;
-    if (protoVersion >= WorkerProto::Version{1, 38}) {
-        to << supportedFeatures;
+    WorkerProto::Version::FeatureSet daemonFeatures;
+    if (protoVersionNumber >= WorkerProto::Version::Number{1, 38}) {
+        to << localVersion.features;
         to.flush();
-        daemonFeatures = readStrings<WorkerProto::FeatureSet>(from);
+        daemonFeatures = readStrings<WorkerProto::Version::FeatureSet>(from);
     }
 
-    return {protoVersion, intersectFeatures(daemonFeatures, supportedFeatures)};
+    return {
+        .number = protoVersionNumber,
+        .features = intersectFeatures(daemonFeatures, localVersion.features),
+    };
 }
 
-std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> WorkerProto::BasicServerConnection::handshake(
-    BufferedSink & to,
-    Source & from,
-    WorkerProto::Version localVersion,
-    const WorkerProto::FeatureSet & supportedFeatures)
+WorkerProto::Version WorkerProto::BasicServerConnection::handshake(
+    BufferedSink & to, Source & from, const WorkerProto::Version & localVersion)
 {
     unsigned int magic = readInt(from);
     if (magic != WORKER_MAGIC_1)
         throw Error("protocol mismatch");
-    to << WORKER_MAGIC_2 << localVersion.toWire();
+    to << WORKER_MAGIC_2 << localVersion.number.toWire();
     to.flush();
-    auto clientVersion = WorkerProto::Version::fromWire(readInt(from));
+    auto clientVersion = WorkerProto::Version::Number::fromWire(readInt(from));
 
-    auto protoVersion = std::min(clientVersion, localVersion);
+    auto protoVersionNumber = std::min(clientVersion, localVersion.number);
 
     /* Exchange features. */
-    WorkerProto::FeatureSet clientFeatures;
-    if (protoVersion >= WorkerProto::Version{1, 38}) {
-        clientFeatures = readStrings<WorkerProto::FeatureSet>(from);
-        to << supportedFeatures;
+    WorkerProto::Version::FeatureSet clientFeatures;
+    if (protoVersionNumber >= WorkerProto::Version::Number{1, 38}) {
+        clientFeatures = readStrings<WorkerProto::Version::FeatureSet>(from);
+        to << localVersion.features;
         to.flush();
     }
 
-    return {protoVersion, intersectFeatures(clientFeatures, supportedFeatures)};
+    return {
+        .number = protoVersionNumber,
+        .features = intersectFeatures(clientFeatures, localVersion.features),
+    };
 }
 
 WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandshake(const StoreDirConfig & store)
 {
     WorkerProto::ClientHandshakeInfo res;
 
-    if (protoVersion >= WorkerProto::Version{1, 14}) {
+    if (protoVersion >= WorkerProto::Version{.number = {1, 14}}) {
         // Obsolete CPU affinity.
         to << 0;
     }
 
-    if (protoVersion >= WorkerProto::Version{1, 11})
+    if (protoVersion >= WorkerProto::Version{.number = {1, 11}})
         to << false; // obsolete reserveSpace
 
-    if (protoVersion >= WorkerProto::Version{1, 33})
+    if (protoVersion >= WorkerProto::Version{.number = {1, 33}})
         to.flush();
 
     return WorkerProto::Serialise<ClientHandshakeInfo>::read(store, *this);
@@ -233,12 +232,12 @@ WorkerProto::ClientHandshakeInfo WorkerProto::BasicClientConnection::postHandsha
 
 void WorkerProto::BasicServerConnection::postHandshake(const StoreDirConfig & store, const ClientHandshakeInfo & info)
 {
-    if (protoVersion >= WorkerProto::Version{1, 14} && readInt(from)) {
+    if (protoVersion >= WorkerProto::Version{.number = {1, 14}} && readInt(from)) {
         // Obsolete CPU affinity.
         readInt(from);
     }
 
-    if (protoVersion >= WorkerProto::Version{1, 11})
+    if (protoVersion >= WorkerProto::Version{.number = {1, 11}})
         readInt(from); // obsolete reserveSpace
 
     WorkerProto::write(store, *this, info);
@@ -256,7 +255,7 @@ std::optional<UnkeyedValidPathInfo> WorkerProto::BasicClientConnection::queryPat
             return std::nullopt;
         throw;
     }
-    if (protoVersion >= WorkerProto::Version{1, 17}) {
+    if (protoVersion >= WorkerProto::Version{.number = {1, 17}}) {
         bool valid;
         from >> valid;
         if (!valid)
@@ -268,10 +267,10 @@ std::optional<UnkeyedValidPathInfo> WorkerProto::BasicClientConnection::queryPat
 StorePathSet WorkerProto::BasicClientConnection::queryValidPaths(
     const StoreDirConfig & store, bool * daemonException, const StorePathSet & paths, SubstituteFlag maybeSubstitute)
 {
-    assert((protoVersion >= WorkerProto::Version{1, 12}));
+    assert((protoVersion >= WorkerProto::Version{.number = {1, 12}}));
     to << WorkerProto::Op::QueryValidPaths;
     WorkerProto::write(store, *this, paths);
-    if (protoVersion >= WorkerProto::Version{1, 27}) {
+    if (protoVersion >= WorkerProto::Version{.number = {1, 27}}) {
         to << maybeSubstitute;
     }
     processStderr(daemonException);

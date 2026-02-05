@@ -15,6 +15,80 @@
 
 namespace nix {
 
+TEST(WorkerProtoVersionNumber, ordering)
+{
+    using Number = WorkerProto::Version::Number;
+    EXPECT_LT((Number{1, 10}), (Number{1, 20}));
+    EXPECT_GT((Number{1, 30}), (Number{1, 20}));
+    EXPECT_EQ((Number{1, 10}), (Number{1, 10}));
+    EXPECT_LT((Number{0, 255}), (Number{1, 0}));
+}
+
+TEST(WorkerProtoVersion, partialOrderingSameFeatures)
+{
+    using V = WorkerProto::Version;
+    V v1{.number = {1, 20}, .features = {"a", "b"}};
+    V v2{.number = {1, 30}, .features = {"a", "b"}};
+
+    EXPECT_TRUE(v1 < v2);
+    EXPECT_TRUE(v2 > v1);
+    EXPECT_TRUE(v1 <= v2);
+    EXPECT_TRUE(v2 >= v1);
+    EXPECT_FALSE(v1 == v2);
+}
+
+TEST(WorkerProtoVersion, partialOrderingSubsetFeatures)
+{
+    using V = WorkerProto::Version;
+    V fewer{.number = {1, 30}, .features = {"a"}};
+    V more{.number = {1, 30}, .features = {"a", "b"}};
+
+    // fewer <= more: JUST the features are a subset
+    EXPECT_TRUE(fewer < more);
+    EXPECT_TRUE(fewer <= more);
+    EXPECT_FALSE(fewer > more);
+    EXPECT_TRUE(fewer != more);
+}
+
+TEST(WorkerProtoVersion, partialOrderingUnordered)
+{
+    using V = WorkerProto::Version;
+    // Same number but incomparable features
+    V v1{.number = {1, 20}, .features = {"a", "c"}};
+    V v2{.number = {1, 20}, .features = {"a", "b"}};
+
+    EXPECT_FALSE(v1 < v2);
+    EXPECT_FALSE(v1 > v2);
+    EXPECT_FALSE(v1 <= v2);
+    EXPECT_FALSE(v1 >= v2);
+    EXPECT_FALSE(v1 == v2);
+    EXPECT_TRUE(v1 != v2);
+}
+
+TEST(WorkerProtoVersion, partialOrderingHigherNumberFewerFeatures)
+{
+    using V = WorkerProto::Version;
+    // Higher number but fewer features — unordered
+    V v1{.number = {1, 30}, .features = {"a"}};
+    V v2{.number = {1, 20}, .features = {"a", "b"}};
+
+    EXPECT_FALSE(v1 < v2);
+    EXPECT_FALSE(v1 > v2);
+    EXPECT_FALSE(v1 == v2);
+}
+
+TEST(WorkerProtoVersion, partialOrderingEmptyFeatures)
+{
+    using V = WorkerProto::Version;
+    V empty{.number = {1, 20}, .features = {}};
+    V some{.number = {1, 30}, .features = {"a"}};
+
+    // empty features is a subset of everything
+    EXPECT_TRUE(empty < some);
+    EXPECT_TRUE(empty <= some);
+    EXPECT_TRUE(empty != some);
+}
+
 const char workerProtoDir[] = "worker-protocol";
 
 static constexpr std::string_view defaultStoreDir = "/nix/store";
@@ -26,8 +100,11 @@ struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
      * used the oldest one: 1.10.
      */
     WorkerProto::Version defaultVersion = {
-        .major = 1,
-        .minor = 10,
+        .number =
+            {
+                .major = 1,
+                .minor = 10,
+            },
     };
 };
 
@@ -83,8 +160,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     derivedPath_1_29,
     "derived-path-1.29",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 29,
+        .number =
+            {
+                .major = 1,
+                .minor = 29,
+            },
     }),
     (std::tuple<DerivedPath, DerivedPath, DerivedPath>{
         DerivedPath::Opaque{
@@ -111,8 +191,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     derivedPath_1_30,
     "derived-path-1.30",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 30,
+        .number =
+            {
+                .major = 1,
+                .minor = 30,
+            },
     }),
     (std::tuple<DerivedPath, DerivedPath, DerivedPath, DerivedPath>{
         DerivedPath::Opaque{
@@ -211,8 +294,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     buildResult_1_27,
     "build-result-1.27",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 27,
+        .number =
+            {
+                .major = 1,
+                .minor = 27,
+            },
     }),
     ({
         using namespace std::literals::chrono_literals;
@@ -237,8 +323,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     buildResult_1_28,
     "build-result-1.28",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 28,
+        .number =
+            {
+                .major = 1,
+                .minor = 28,
+            },
     }),
     ({
         using namespace std::literals::chrono_literals;
@@ -290,8 +379,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     buildResult_1_29,
     "build-result-1.29",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 29,
+        .number =
+            {
+                .major = 1,
+                .minor = 29,
+            },
     }),
     ({
         using namespace std::literals::chrono_literals;
@@ -356,8 +448,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     buildResult_1_37,
     "build-result-1.37",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 37,
+        .number =
+            {
+                .major = 1,
+                .minor = 37,
+            },
     }),
     ({
         using namespace std::literals::chrono_literals;
@@ -424,8 +519,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     keyedBuildResult_1_29,
     "keyed-build-result-1.29",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 29,
+        .number =
+            {
+                .major = 1,
+                .minor = 29,
+            },
     }),
     ({
         using namespace std::literals::chrono_literals;
@@ -469,8 +567,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     unkeyedValidPathInfo_1_15,
     "unkeyed-valid-path-info-1.15",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 15,
+        .number =
+            {
+                .major = 1,
+                .minor = 15,
+            },
     }),
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
@@ -506,8 +607,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     validPathInfo_1_15,
     "valid-path-info-1.15",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 15,
+        .number =
+            {
+                .major = 1,
+                .minor = 15,
+            },
     }),
     (std::tuple<ValidPathInfo, ValidPathInfo>{
         ({
@@ -558,8 +662,11 @@ VERSIONED_CHARACTERIZATION_TEST(
     validPathInfo_1_16,
     "valid-path-info-1.16",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 16,
+        .number =
+            {
+                .major = 1,
+                .minor = 16,
+            },
     }),
     (std::tuple<ValidPathInfo, ValidPathInfo, ValidPathInfo>{
         ({
@@ -716,8 +823,11 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     clientHandshakeInfo_1_30,
     "client-handshake-info_1_30",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 30,
+        .number =
+            {
+                .major = 1,
+                .minor = 30,
+            },
     }),
     (std::tuple<WorkerProto::ClientHandshakeInfo>{
         {},
@@ -728,8 +838,11 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     clientHandshakeInfo_1_33,
     "client-handshake-info_1_33",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 33,
+        .number =
+            {
+                .major = 1,
+                .minor = 33,
+            },
     }),
     (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo>{
         {
@@ -745,8 +858,11 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
     clientHandshakeInfo_1_35,
     "client-handshake-info_1_35",
     (WorkerProto::Version{
-        .major = 1,
-        .minor = 35,
+        .number =
+            {
+                .major = 1,
+                .minor = 35,
+            },
     }),
     (std::tuple<WorkerProto::ClientHandshakeInfo, WorkerProto::ClientHandshakeInfo>{
         {
@@ -774,13 +890,13 @@ TEST_F(WorkerProtoTest, handshake_log)
             FdSink out{toServer.writeSide.get()};
             FdSource in0{toClient.readSide.get()};
             TeeSource in{in0, toClientLog};
-            clientResult = std::get<0>(WorkerProto::BasicClientConnection::handshake(out, in, defaultVersion, {}));
+            clientResult = WorkerProto::BasicClientConnection::handshake(out, in, defaultVersion);
         });
 
         {
             FdSink out{toClient.writeSide.get()};
             FdSource in{toServer.readSide.get()};
-            WorkerProto::BasicServerConnection::handshake(out, in, defaultVersion, {});
+            WorkerProto::BasicServerConnection::handshake(out, in, defaultVersion);
         };
 
         thread.join();
@@ -795,7 +911,7 @@ TEST_F(WorkerProtoTest, handshake_features)
     toClient.create();
     toServer.create();
 
-    std::tuple<WorkerProto::Version, WorkerProto::FeatureSet> clientResult;
+    WorkerProto::Version clientResult;
 
     auto clientThread = std::thread([&]() {
         FdSink out{toServer.writeSide.get()};
@@ -804,10 +920,9 @@ TEST_F(WorkerProtoTest, handshake_features)
             out,
             in,
             WorkerProto::Version{
-                .major = 1,
-                .minor = 123,
-            },
-            {"bar", "aap", "mies", "xyzzy"});
+                .number = {.major = 1, .minor = 123},
+                .features = {"bar", "aap", "mies", "xyzzy"},
+            });
     });
 
     FdSink out{toClient.writeSide.get()};
@@ -816,21 +931,23 @@ TEST_F(WorkerProtoTest, handshake_features)
         out,
         in,
         WorkerProto::Version{
-            .major = 1,
-            .minor = 200,
-        },
-        {"foo", "bar", "xyzzy"});
+            .number = {.major = 1, .minor = 200},
+            .features = {"foo", "bar", "xyzzy"},
+        });
 
     clientThread.join();
 
     EXPECT_EQ(clientResult, daemonResult);
     EXPECT_EQ(
-        std::get<0>(clientResult),
+        clientResult,
         (WorkerProto::Version{
-            .major = 1,
-            .minor = 123,
+            .number =
+                {
+                    .major = 1,
+                    .minor = 123,
+                },
+            .features = {"bar", "xyzzy"},
         }));
-    EXPECT_EQ(std::get<1>(clientResult), WorkerProto::FeatureSet({"bar", "xyzzy"}));
 }
 
 /// Has to be a `BufferedSink` for handshake.
@@ -845,8 +962,7 @@ TEST_F(WorkerProtoTest, handshake_client_replay)
         NullBufferedSink nullSink;
 
         StringSource in{toClientLog};
-        auto clientResult =
-            std::get<0>(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}));
+        auto clientResult = WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion);
 
         EXPECT_EQ(clientResult, defaultVersion);
     });
@@ -860,11 +976,10 @@ TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
             auto substring = toClientLog.substr(0, len);
             StringSource in{substring};
             if (len < 8) {
-                EXPECT_THROW(
-                    WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}), EndOfFile);
+                EXPECT_THROW(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion), EndOfFile);
             } else {
                 // Not sure why cannot keep on checking for `EndOfFile`.
-                EXPECT_THROW(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}), Error);
+                EXPECT_THROW(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion), Error);
             }
         }
     });
@@ -884,14 +999,13 @@ TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
 
             if (idx < 4 || idx == 9) {
                 // magic bytes don't match
-                EXPECT_THROW(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}), Error);
+                EXPECT_THROW(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion), Error);
             } else if (idx < 8 || idx >= 12) {
                 // Number out of bounds
                 EXPECT_THROW(
-                    WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}),
-                    SerialisationError);
+                    WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion), SerialisationError);
             } else {
-                auto ver = std::get<0>(WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion, {}));
+                auto ver = WorkerProto::BasicClientConnection::handshake(nullSink, in, defaultVersion);
                 // `std::min` of this and the other version saves us
                 EXPECT_EQ(ver, defaultVersion);
             }
