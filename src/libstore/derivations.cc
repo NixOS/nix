@@ -139,6 +139,17 @@ StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
+    /* Protect the derivation and its references from GC. Without this,
+       a path written by a previous process (whose daemon worker has
+       since exited, taking its temp roots with it) could be collected
+       by auto-GC before we get a chance to register a new path that
+       references it. The early return below is especially important:
+       without addTempRoot the current daemon worker would never hold
+       a temp root for an already-valid path. */
+    addTempRoot(path);
+    for (auto & ref : references)
+        addTempRoot(ref);
+
     if (isValidPath(path) && !repair)
         return path;
 
