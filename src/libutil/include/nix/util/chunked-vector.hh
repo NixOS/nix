@@ -40,6 +40,10 @@ private:
     }
 
 public:
+    ChunkedVector() {
+        addChunk();
+    };
+
     ChunkedVector(uint32_t reserve)
     {
         chunks.reserve(reserve);
