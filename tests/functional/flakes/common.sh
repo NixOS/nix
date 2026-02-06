@@ -32,6 +32,8 @@ writeSimpleFlake() {
     baseName = builtins.baseNameOf ./.;
 
     root = ./.;
+
+    number = 123;
   };
 }
 EOF
