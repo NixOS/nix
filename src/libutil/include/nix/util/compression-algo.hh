@@ -37,6 +37,12 @@ CompressionAlgo parseCompressionAlgo(std::string_view method, bool suggestions =
 
 std::string showCompressionAlgo(CompressionAlgo method);
 
+/**
+ * Returns the file extension (including the dot) for the given
+ * compression algorithm. Returns empty string for `none`.
+ */
+std::string_view compressionAlgoExtension(CompressionAlgo method);
+
 MakeError(UnknownCompressionMethod, Error);
 
 } // namespace nix

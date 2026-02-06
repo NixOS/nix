@@ -43,4 +43,37 @@ std::string showCompressionAlgo(CompressionAlgo method)
     unreachable();
 }
 
+std::string_view compressionAlgoExtension(CompressionAlgo method)
+{
+    switch (method) {
+    case CompressionAlgo::none:
+        return "";
+    case CompressionAlgo::brotli:
+        return ".br";
+    case CompressionAlgo::bzip2:
+        return ".bz2";
+    case CompressionAlgo::compress:
+        return ".Z";
+    case CompressionAlgo::grzip:
+        return ".grz";
+    case CompressionAlgo::gzip:
+        return ".gz";
+    case CompressionAlgo::lrzip:
+        return ".lrz";
+    case CompressionAlgo::lz4:
+        return ".lz4";
+    case CompressionAlgo::lzip:
+        return ".lzip";
+    case CompressionAlgo::lzma:
+        return ".lzma";
+    case CompressionAlgo::lzop:
+        return ".lzo";
+    case CompressionAlgo::xz:
+        return ".xz";
+    case CompressionAlgo::zstd:
+        return ".zst";
+    }
+    unreachable();
+}
+
 } // namespace nix
