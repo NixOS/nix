@@ -112,6 +112,12 @@ NarListing parseNarListing(Source & source)
             pos += n;
             return n;
         }
+
+        void skip(size_t len) override
+        {
+            source.skip(len);
+            pos += len;
+        }
     };
 
     NarIndexer indexer(source);
