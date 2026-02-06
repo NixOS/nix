@@ -135,7 +135,12 @@ isDaemonNewer () {
   [[ -n "${NIX_DAEMON_PACKAGE:-}" ]] || return 0
   local requiredVersion="$1"
   local daemonVersion
-  daemonVersion=$("$NIX_DAEMON_PACKAGE/bin/nix" daemon --version | cut -d' ' -f3)
+  # Nix 2.4+ has unified 'nix' command; older versions only have nix-store etc.
+  if [[ -x "$NIX_DAEMON_PACKAGE/bin/nix" ]]; then
+    daemonVersion=$("$NIX_DAEMON_PACKAGE/bin/nix" daemon --version | cut -d' ' -f3)
+  else
+    daemonVersion=$("$NIX_DAEMON_PACKAGE/bin/nix-store" --version | cut -d' ' -f3)
+  fi
   [[ $(nix eval --expr "builtins.compareVersions ''$daemonVersion'' ''$requiredVersion''") -ge 0 ]]
 }
 
