@@ -1034,7 +1034,8 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
     Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
+    auto compression = logSettings.compressLog.get();
+    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), compressionAlgoExtension(compression));
 
     fd = openNewFileForWrite(
         logFileName,
@@ -1048,8 +1049,8 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
 
     fileSink = std::make_shared<FdSink>(fd.get());
 
-    if (logSettings.compressLog)
-        sink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *fileSink));
+    if (logSettings.compressLog.enabled())
+        sink = std::shared_ptr<CompressionSink>(makeCompressionSink(compression, *fileSink));
     else
         sink = fileSink;
 }
