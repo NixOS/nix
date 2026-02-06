@@ -108,6 +108,8 @@ in
 
   remoteBuildsSshNg = runNixOSTest ./remote-builds-ssh-ng.nix;
 
+  remoteBuildsPlainDaemon = runNixOSTest ./remote-builds-plain-daemon.nix;
+
 }
 // lib.concatMapAttrs (
   nixVersion:
