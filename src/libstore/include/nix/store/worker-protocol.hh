@@ -1,7 +1,9 @@
 #pragma once
 ///@file
 
+#include <algorithm>
 #include <chrono>
+#include <compare>
 
 #include "nix/store/common-protocol.hh"
 
@@ -48,48 +50,64 @@ struct WorkerProto
     /**
      * Version type for the protocol.
      *
-     * @todo Convert to struct with separate major vs minor fields.
+     * This bundles the protocol version number with the negotiated
+     * feature set. The version number has a total ordering, but the
+     * full `Version` (number + features) only has a partial ordering,
+     * so there is no `operator<=>` on `Version` itself --- callers
+     * must compare `.number` explicitly.
      */
     struct Version
     {
-        unsigned int major;
-        uint8_t minor;
-
-        constexpr auto operator<=>(const Version &) const = default;
-
-        /**
-         * Convert to wire format for protocol compatibility.
-         * Format: (major << 8) | minor
-         */
-        constexpr unsigned int toWire() const
+        struct Number
         {
-            return (major << 8) | minor;
-        }
+            unsigned int major;
+            uint8_t minor;
 
-        /**
-         * Convert from wire format.
-         */
-        static constexpr Version fromWire(unsigned int wire)
-        {
-            return {
-                .major = (wire & 0xff00) >> 8,
-                .minor = static_cast<uint8_t>(wire & 0x00ff),
+            constexpr auto operator<=>(const Number &) const = default;
+
+            /**
+             * Convert to wire format for protocol compatibility.
+             * Format: (major << 8) | minor
+             */
+            constexpr unsigned int toWire() const
+            {
+                return (major << 8) | minor;
+            }
+
+            /**
+             * Convert from wire format.
+             */
+            static constexpr Number fromWire(unsigned int wire)
+            {
+                return {
+                    .major = (wire & 0xff00) >> 8,
+                    .minor = static_cast<uint8_t>(wire & 0x00ff),
+                };
             };
-        }
+        } number;
+
+        using Feature = std::string;
+        using FeatureSet = std::set<Feature, std::less<>>;
+
+        FeatureSet features = {};
+
+        bool operator==(const Version &) const = default;
+
+        /**
+         * Partial ordering: v1 <= v2 iff v1.number <= v2.number AND
+         * v1.features is a subset of v2.features. Two versions with
+         * incomparable feature sets are unordered.
+         */
+        std::partial_ordering operator<=>(const Version & other) const;
     };
 
     /**
-     * @note you generally shouldn't change the protocol version. Define a new
-     * `WorkerProto::Feature` instead.
+     * @note you generally shouldn't change the protocol version number. Define a new
+     * `WorkerProto::Version::Feature` instead.
      */
-    static constexpr Version latest = {
-        .major = 1,
-        .minor = 38,
-    };
-    static constexpr Version minimum = {
-        .major = 1,
-        .minor = 18,
-    };
+    static const Version latest;
+
+    static const Version minimum;
 
     /**
      * A unidirectional read connection, to be used by the read half of the
@@ -98,7 +116,7 @@ struct WorkerProto
     struct ReadConn
     {
         Source & from;
-        Version version;
+        const Version & version;
     };
 
     /**
@@ -108,7 +126,7 @@ struct WorkerProto
     struct WriteConn
     {
         Sink & to;
-        Version version;
+        const Version & version;
     };
 
     /**
@@ -165,11 +183,6 @@ struct WorkerProto
     {
         WorkerProto::Serialise<T>::write(store, conn, t);
     }
-
-    using Feature = std::string;
-    using FeatureSet = std::set<Feature, std::less<>>;
-
-    static const FeatureSet allFeatures;
 };
 
 enum struct WorkerProto::Op : uint64_t {

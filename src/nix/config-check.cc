@@ -22,7 +22,7 @@ namespace {
 std::string formatProtocol(unsigned int proto)
 {
     if (proto) {
-        auto version = WorkerProto::Version::fromWire(proto);
+        auto version = WorkerProto::Version::Number::fromWire(proto);
         return fmt("%1%.%2%", version.major, version.minor);
     }
     return "unknown";
@@ -152,9 +152,10 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkStoreProtocol(unsigned int storeProto)
     {
-        auto storeVersion = WorkerProto::Version::fromWire(storeProto);
-        unsigned int clientProto = (storeVersion.major == ServeProto::latest.major) ? ServeProto::latest.toWire()
-                                                                                    : WorkerProto::latest.toWire();
+        auto storeVersion = WorkerProto::Version::Number::fromWire(storeProto);
+        unsigned int clientProto = (storeVersion.major == ServeProto::latest.major)
+                                       ? ServeProto::latest.toWire()
+                                       : WorkerProto::latest.number.toWire();
 
         if (clientProto != storeProto) {
             std::ostringstream ss;
