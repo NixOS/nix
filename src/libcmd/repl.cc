@@ -65,7 +65,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
-    Value lastLoaded;
+    std::optional<Value> lastLoaded;
     Env * env;
     int displ;
     StringSet varNames;
@@ -78,7 +78,6 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     NixRepl(
         const LookupPath & lookupPath,
-        nix::ref<Store> store,
         ref<EvalState> state,
         std::function<AnnotatedValues()> getValues,
         RunNix * runNix);
@@ -133,7 +132,6 @@ std::string removeWhitespace(std::string s)
 
 NixRepl::NixRepl(
     const LookupPath & lookupPath,
-    nix::ref<Store> store,
     ref<EvalState> state,
     std::function<NixRepl::AnnotatedValues()> getValues,
     RunNix * runNix)
@@ -773,11 +771,19 @@ void NixRepl::initEnv()
 
 void NixRepl::showLastLoaded()
 {
-    RunPager pager;
+    if (!lastLoaded)
+        throw Error("nothing has been loaded yet");
 
-    for (auto & i : *lastLoaded.attrs()) {
-        std::string_view name = state->symbols[i.name];
-        logger->cout(name);
+    RunPager pager;
+    try {
+        for (auto & i : *lastLoaded->attrs()) {
+            std::string_view name = state->symbols[i.name];
+            logger->cout(name);
+        }
+    } catch (SystemError & e) {
+        /* Ignore broken pipes when the pager gets interrupted. */
+        if (!e.is(std::errc::broken_pipe))
+            throw;
     }
 }
 
@@ -900,13 +906,9 @@ void NixRepl::runNix(const std::string & program, const Strings & args, const st
 }
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-    const LookupPath & lookupPath,
-    nix::ref<Store> store,
-    ref<EvalState> state,
-    std::function<AnnotatedValues()> getValues,
-    RunNix * runNix)
+    const LookupPath & lookupPath, ref<EvalState> state, std::function<AnnotatedValues()> getValues, RunNix * runNix)
 {
-    return std::make_unique<NixRepl>(lookupPath, std::move(store), state, getValues, runNix);
+    return std::make_unique<NixRepl>(lookupPath, state, getValues, runNix);
 }
 
 ReplExitStatus AbstractNixRepl::runSimple(ref<EvalState> evalState, const ValMap & extraEnv)
@@ -919,7 +921,6 @@ ReplExitStatus AbstractNixRepl::runSimple(ref<EvalState> evalState, const ValMap
     // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDelete)
     auto repl = std::make_unique<NixRepl>(
         lookupPath,
-        openStore(),
         evalState,
         getValues,
         /*runNix=*/nullptr);

@@ -311,6 +311,12 @@ testReplResponseNoRegex '
 }
 '
 
+testReplResponseNoRegex '
+:ll
+' \
+'error: nothing has been loaded yet
+'
+
 # Don't prompt for more input when getting unexpected EOF in imported files.
 testReplResponse "
 import $testDir/lang/parse-fail-eof-pos.nix
