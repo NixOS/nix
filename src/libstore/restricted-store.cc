@@ -73,6 +73,8 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
         throw Error("queryPathFromHashPart");
     }
 
+    void bumpLastUsageTime(const StorePath & path) override;
+
     StorePath addToStore(
         std::string_view name,
         const SourcePath & srcPath,
@@ -181,6 +183,7 @@ void RestrictedStore::queryPathInfoUncached(
             auto info = std::make_shared<ValidPathInfo>(*next->queryPathInfo(path));
             info->deriver.reset();
             info->registrationTime = 0;
+            info->lastUsageTime = 0;
             info->ultimate = false;
             info->sigs.clear();
             callback(info);
@@ -199,6 +202,11 @@ RestrictedStore::queryPartialDerivationOutputMap(const StorePath & path, Store *
     if (!goal.isAllowed(path))
         throw InvalidPath("cannot query output map for unknown path '%s' in recursive Nix", printStorePath(path));
     return next->queryPartialDerivationOutputMap(path, evalStore);
+}
+
+void RestrictedStore::bumpLastUsageTime(const StorePath & path)
+{
+    next->bumpLastUsageTime(path);
 }
 
 void RestrictedStore::addToStore(
@@ -234,6 +242,7 @@ void RestrictedStore::ensurePath(const StorePath & path)
     if (!goal.isAllowed(path))
         throw InvalidPath("cannot substitute unknown path '%s' in recursive Nix", printStorePath(path));
     /* Nothing to be done; 'path' must already be valid. */
+    bumpLastUsageTime(path);
 }
 
 void RestrictedStore::registerDrvOutput(const Realisation & info)

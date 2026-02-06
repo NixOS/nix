@@ -608,6 +608,13 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (options.action == GCOptions::gcDeleteSpecific && !options.pathsToDelete.count(*path))
                 return;
 
+            /* If this path is too young, bail out */
+            if (options.olderThan.has_value() && isValidPath(*path)
+                && options.olderThan.value() < queryPathInfo(*path)->lastUsageTime) {
+                debug("not deleting '%s' because it's too young", printStorePath(*path));
+                return markAlive();
+            }
+
             {
                 auto hashPart = path->hashPart();
                 auto shared(_shared.lock());

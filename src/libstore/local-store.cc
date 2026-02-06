@@ -100,6 +100,7 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryPathInfo;
     SQLiteStmt QueryReferences;
     SQLiteStmt QueryReferrers;
+    SQLiteStmt BumpPathUsageTime;
     SQLiteStmt InvalidatePath;
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
@@ -116,7 +117,7 @@ LocalStore::LocalStore(ref<const Config> config)
     : Store{*config}
     , LocalFSStore{*config}
     , config{config}
-    , _state(make_ref<Sync<State>>())
+    , _state(make_ref<SyncRec<State>>())
     , dbDir(config->stateDir + "/db")
     , linksDir(config->realStoreDir + "/.links")
     , reservedPath(dbDir + "/reserved")
@@ -334,16 +335,18 @@ LocalStore::LocalStore(ref<const Config> config)
         state->db,
         "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
     state->stmts->UpdatePathInfo.create(
-        state->db, "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
+        state->db,
+        "update ValidPaths set narSize = ?, hash = ?, lastUsageTime = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
     state->stmts->AddReference.create(state->db, "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmts->QueryPathInfo.create(
         state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, lastUsageTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
     state->stmts->QueryReferences.create(
         state->db, "select path from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmts->QueryReferrers.create(
         state->db,
         "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
+    state->stmts->BumpPathUsageTime.create(state->db, "update ValidPaths set lastUsageTime = ? where path = ?;");
     state->stmts->InvalidatePath.create(state->db, "delete from ValidPaths where path = ?;");
     state->stmts->AddDerivationOutput.create(
         state->db, "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
@@ -595,6 +598,8 @@ void LocalStore::upgradeDBSchema(State & state)
             "20220326-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
+
+    doUpgrade("20251205-last-usage-time", "alter table ValidPaths add column lastUsageTime integer default 0 not null");
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
@@ -743,22 +748,23 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     info->id = id;
 
-    info->registrationTime = useQueryPathInfo.getInt(2);
+    info->registrationTime = (time_t) useQueryPathInfo.getInt(2);
+    info->lastUsageTime = std::max((time_t) useQueryPathInfo.getInt(3), info->registrationTime);
 
-    auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
+    auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 4);
     if (s)
         info->deriver = parseStorePath(s);
 
     /* Note that narSize = NULL yields 0. */
-    info->narSize = useQueryPathInfo.getInt(4);
+    info->narSize = useQueryPathInfo.getInt(5);
 
-    info->ultimate = useQueryPathInfo.getInt(5) == 1;
+    info->ultimate = useQueryPathInfo.getInt(6) == 1;
 
-    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 6);
+    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
     if (s)
         info->sigs = Signature::parseMany(tokenizeString<StringSet>(s, " "));
 
-    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
+    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 8);
     if (s)
         info->ca = ContentAddress::parseOpt(s);
 
@@ -775,7 +781,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
     state.stmts->UpdatePathInfo
-        .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(
+        .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(time(0))(
             info.ultimate ? 1 : 0,
             info.ultimate)(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())(
             renderContentAddress(info.ca), (bool) info.ca)(printStorePath(info.path))
@@ -885,6 +891,13 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
             return parseStorePath(s);
         return {};
     });
+}
+
+void LocalStore::bumpLastUsageTime(const StorePath & path)
+{
+    if (config->readOnly)
+        return;
+    retrySQLite<void>([&]() { _state->lock()->stmts->BumpPathUsageTime.use()(time(0))(printStorePath(path)).exec(); });
 }
 
 void LocalStore::registerValidPath(const ValidPathInfo & info)
@@ -1090,9 +1103,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 }
 
                 registerValidPath(info);
+            } else {
+                bumpLastUsageTime(info.path);
             }
 
             outputLock.setDeletion(true);
+        } else {
+            bumpLastUsageTime(info.path);
         }
     }
 
@@ -1254,9 +1271,13 @@ StorePath LocalStore::addToStoreFromDump(
             auto info = ValidPathInfo::makeFromCA(*this, name, std::move(desc), narHash.hash);
             info.narSize = narHash.numBytesDigested;
             registerValidPath(info);
+        } else {
+            bumpLastUsageTime(dstPath);
         }
 
         outputLock.setDeletion(true);
+    } else {
+        bumpLastUsageTime(dstPath);
     }
 
     return dstPath;

@@ -68,6 +68,8 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
     queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr) override;
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
+    void bumpLastUsageTime(const StorePath & path) override;
+
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override;
 
     void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos) override;

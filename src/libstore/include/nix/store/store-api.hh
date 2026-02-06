@@ -495,6 +495,11 @@ public:
     virtual std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) = 0;
 
     /**
+     * Bumps the last usage time of the given store path to the current time.
+     */
+    virtual void bumpLastUsageTime(const StorePath & path) {}
+
+    /**
      * Query which of the given paths have substitutes.
      */
     virtual StorePathSet querySubstitutablePaths(const StorePathSet & paths);

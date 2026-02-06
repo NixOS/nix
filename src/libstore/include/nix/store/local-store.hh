@@ -198,10 +198,12 @@ private:
     };
 
     /**
-     * Mutable state. It's behind a `ref` to reduce false sharing
-     * between immutable and mutable fields.
+     * Mutable state. It's behind a `ref` to reduce false sharing between
+     * immutable and mutable fields. Additionally, it uses a recursive mutex
+     * since operations like e.g. `bumpLastUsageTime` can be invoked from within
+     * other DB-modifying operations.
      */
-    ref<Sync<State>> _state;
+    ref<SyncRec<State>> _state;
 
 public:
 
@@ -252,6 +254,8 @@ public:
     queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
+
+    void bumpLastUsageTime(const StorePath & path) override;
 
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
     bool realisationIsUntrusted(const Realisation &) override;

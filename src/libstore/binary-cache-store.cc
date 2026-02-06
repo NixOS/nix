@@ -295,6 +295,7 @@ void BinaryCacheStore::addToStore(
 {
     if (!repair && isValidPath(info.path)) {
         // FIXME: copyNAR -> null sink
+        bumpLastUsageTime(info.path);
         narSource.drain();
         return;
     }

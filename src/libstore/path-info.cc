@@ -34,6 +34,7 @@ GENERATE_CMP_EXT(
     me->narHash,
     me->references,
     me->registrationTime,
+    // me->lastUsageTime,
     me->narSize,
     // me->id,
     me->ultimate,
@@ -208,6 +209,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
             jsonObject["deriver"] = deriver;
         }
         jsonObject["registrationTime"] = registrationTime ? std::optional{registrationTime} : std::nullopt;
+        jsonObject["lastUsageTime"] = lastUsageTime ? std::optional{lastUsageTime} : std::nullopt;
 
         jsonObject["ultimate"] = ultimate;
 
@@ -280,6 +282,10 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
     if (auto * rawRegistrationTime0 = optionalValueAt(json, "registrationTime"))
         if (auto * rawRegistrationTime = getNullable(*rawRegistrationTime0))
             res.registrationTime = getInteger<time_t>(*rawRegistrationTime);
+
+    if (auto * rawLastUsageTime0 = optionalValueAt(json, "lastUsageTime"))
+        if (auto * rawLastUsageTime = getNullable(*rawLastUsageTime0))
+            res.lastUsageTime = getInteger<time_t>(*rawLastUsageTime);
 
     if (auto * rawUltimate = optionalValueAt(json, "ultimate"))
         res.ultimate = getBoolean(*rawUltimate);

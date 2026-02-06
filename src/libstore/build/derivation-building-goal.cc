@@ -85,8 +85,10 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     }
 
     for (auto & i : drv->inputSrcs) {
-        if (worker.store.isValidPath(i))
+        if (worker.store.isValidPath(i)) {
+            worker.store.bumpLastUsageTime(i);
             continue;
+        }
         if (!settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",

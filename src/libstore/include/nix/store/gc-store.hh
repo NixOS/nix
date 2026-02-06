@@ -58,6 +58,11 @@ struct GCOptions
      * Stop after at least `maxFreed` bytes have been freed.
      */
     uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
+
+    /**
+     * Only delete paths older than a certain point in time.
+     */
+    std::optional<time_t> olderThan;
 };
 
 struct GCResults

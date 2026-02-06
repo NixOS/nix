@@ -1932,6 +1932,8 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     auto path2 = state.store->toStorePath(path.abs()).first;
     if (!settings.readOnlyMode)
         state.store->ensurePath(path2);
+    else
+        state.store->bumpLastUsageTime(path2);
     context.insert(NixStringContextElem::Opaque{.path = path2});
     v.mkString(path.abs(), context, state.mem);
 }

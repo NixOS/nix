@@ -65,6 +65,7 @@ static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
             "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
         };
         info.registrationTime = 23423;
+        info.lastUsageTime = 34534;
         info.ultimate = true;
         info.sigs = {
             Signature{.keyName = "asdf", .sig = std::string(64, '\0')},

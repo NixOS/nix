@@ -100,8 +100,10 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
 void Store::ensurePath(const StorePath & path)
 {
     /* If the path is already valid, we're done. */
-    if (isValidPath(path))
+    if (isValidPath(path)) {
+        bumpLastUsageTime(path);
         return;
+    }
 
     Worker worker(*this, *this);
     GoalPtr goal = worker.makePathSubstitutionGoal(path);
