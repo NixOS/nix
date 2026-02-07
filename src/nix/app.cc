@@ -110,6 +110,11 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
         auto aMeta = cursor->maybeGetAttr(state.s.meta);
         auto aMainProgram = aMeta ? aMeta->maybeGetAttr("mainProgram") : nullptr;
         auto mainProgram = aMainProgram ? aMainProgram->getString() : aPname ? aPname->getString() : DrvName(name).name;
+
+        auto provenance = aMainProgram ? MainProgramNameProvenance::MetaMainProgram
+            : aPname ? MainProgramNameProvenance::Pname
+            : MainProgramNameProvenance::Name;
+
         auto program = outPath + "/bin/" + mainProgram;
         return UnresolvedApp{App{
             .context = {DerivedPath::Built{
@@ -117,6 +122,8 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                 .outputs = OutputsSpec::Names{outputName},
             }},
             .program = program,
+            .mainProgramNameProvenance = provenance,
+            .derivationName = name,
         }};
     }
 
