@@ -1317,6 +1317,9 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
         auto info = msg.info();
         info.level = lvlWarn;
         info.isFromExpr = true;
+        // Do not indent relative to the "evaluation warning: " prefix if the message starts with a newline.
+        info.noIndent = msgStr.starts_with("\n");
+
         logWarning(info);
     }
 
