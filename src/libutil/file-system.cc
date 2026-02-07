@@ -469,14 +469,15 @@ void createDirs(const std::filesystem::path & path)
 
 AutoDelete::AutoDelete()
     : del{false}
+    , recursive(false)
 {
 }
 
 AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
     : _path(p)
+    , del(true)
+    , recursive(recursive)
 {
-    del = true;
-    this->recursive = recursive;
 }
 
 void AutoDelete::deletePath()
