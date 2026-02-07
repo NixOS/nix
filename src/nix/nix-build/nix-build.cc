@@ -531,7 +531,7 @@ static void main_nix_build(int argc, char ** argv)
             shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
         }
 
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        if (drv.shouldResolve()) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;
