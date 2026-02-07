@@ -404,7 +404,7 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
         buf.resize(bufSize);
         ssize_t rlSize = ::readlinkat(dirFd, path.rel_c_str(), buf.data(), bufSize);
         if (rlSize == -1)
-            throw SysError("reading symbolic link '%1%'", path);
+            throw SysError("reading symbolic link '%1%' relative to parent directory", path.rel());
         else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
     }
