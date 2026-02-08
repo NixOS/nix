@@ -403,6 +403,8 @@ void MixEnvironment::setEnviron()
     for (const auto & [name, value] : setVars)
         env[name] = value;
 
+    env["IN_NIX_SHELL"] = ignoreEnvironment ? "pure" : "impure";
+
     if (!unsetVars.empty())
         std::erase_if(env, [&](const auto & var) { return unsetVars.contains(var.first); });
 
