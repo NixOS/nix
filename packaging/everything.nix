@@ -31,6 +31,8 @@
 
   nix-cmd,
 
+  nix-nswrapper,
+
   nix-cli,
 
   nix-functional-tests,
@@ -171,6 +173,9 @@ stdenv.mkDerivation (finalAttrs: {
       # Forwarded outputs
       ln -sT ${nix-manual} $doc
       ln -sT ${nix-manual.man} $man
+    ''
+    + lib.optionalString stdenv.isLinux ''
+      lndir ${nix-nswrapper} $out
     '';
 
   passthru = {

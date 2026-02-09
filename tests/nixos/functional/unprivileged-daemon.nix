@@ -1,4 +1,10 @@
-{ lib, ... }:
+{ lib, nixComponents, ... }:
+
+let
+  startUid = 65536 * 1024;
+  numExtraUids = 65536 * 1024;
+in
+
 {
   name = "functional-tests-on-nixos_unprivileged-daemon";
 
@@ -11,6 +17,18 @@
       users.users.nix-daemon = {
         isSystemUser = true;
         group = "nix-daemon";
+        subUidRanges = [
+          {
+            startUid = startUid;
+            count = numExtraUids;
+          }
+        ];
+        subGidRanges = [
+          {
+            startGid = startUid;
+            count = numExtraUids;
+          }
+        ];
       };
       users.users.alice = {
         isNormalUser = true;
@@ -37,11 +55,25 @@
         path = [
           config.nix.package
           config.programs.ssh.package
+          "/run/wrappers"
         ];
+        serviceConfig.ExecStart = [
+          ""
+          "${nixComponents.nix-nswrapper}/libexec/nix-nswrapper ${toString startUid} ${toString numExtraUids} ${config.nix.package}/bin/nix-daemon --daemon"
+        ];
+
         environment = {
           CURL_CA_BUNDLE = config.security.pki.caBundle;
           NIX_REMOTE = "local?ignore-gc-delete-failure=true";
-          NIX_CONFIG = "extra-experimental-features = local-overlay-store";
+          NIX_CONFIG = ''
+            experimental-features = local-overlay-store auto-allocate-uids
+            build-users-group =
+            auto-allocate-uids = true
+            start-id = ${toString startUid}
+            id-count = ${toString numExtraUids}
+            sandbox = true
+            sandbox-fallback = false
+          '';
         };
         serviceConfig = {
           User = "nix-daemon";

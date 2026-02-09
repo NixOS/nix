@@ -57,6 +57,7 @@ let
         "nix-flake"
         "nix-flake-c"
         "nix-flake-tests"
+        "nix-nswrapper"
         "nix-main"
         "nix-main-c"
         "nix-cmd"
