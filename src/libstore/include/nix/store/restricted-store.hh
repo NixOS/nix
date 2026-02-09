@@ -59,6 +59,8 @@ struct RestrictionContext
         addDependencyImpl(path);
     }
 
+    virtual ~RestrictionContext() = default;
+
 protected:
 
     /**
