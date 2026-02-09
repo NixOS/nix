@@ -61,6 +61,8 @@ public:
      */
     virtual std::filesystem::path getCommandBaseDir() const;
 
+    virtual ~Args() = default;
+
 protected:
 
     /**
@@ -481,6 +483,8 @@ public:
      * Add a single completion to the collection
      */
     virtual void add(std::string completion, std::string description = "") = 0;
+
+    virtual ~AddCompletions() = default;
 };
 
 Strings parseShebangContent(std::string_view s);

@@ -14,6 +14,7 @@ namespace detail {
 struct ReplCompleterMixin
 {
     virtual StringSet completePrefix(const std::string & prefix) = 0;
+    virtual ~ReplCompleterMixin() = default;
 };
 }; // namespace detail
 

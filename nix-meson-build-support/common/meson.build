@@ -22,6 +22,8 @@ add_project_arguments(
   '-Werror=undef',
   '-Werror=unused-result',
   '-Werror=sign-compare',
+  '-Werror=return-type',
+  '-Werror=non-virtual-dtor',
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
