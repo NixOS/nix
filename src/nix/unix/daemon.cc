@@ -193,17 +193,6 @@ matchUser(const std::optional<std::string> & user, const std::optional<std::stri
 }
 
 /**
- * Open a store without a path info cache.
- */
-static ref<Store> openUncachedStore()
-{
-    Store::Config::Params params; // FIXME: get params from somewhere
-    // Disable caching since the client already does that.
-    params["path-info-cache-size"] = "0";
-    return openStore(settings.storeUri, params);
-}
-
-/**
  * Authenticate a potential client
  *
  * @param peer Information about other end of the connection, the client which
@@ -244,11 +233,12 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::P
  * Run a server. The loop opens a socket and accepts new connections from that
  * socket.
  *
+ * @param storeConfig The store configuration to use for opening stores.
  * @param forceTrustClientOpt If present, force trusting or not trusted
  * the client. Otherwise, decide based on the authentication settings
  * and user credentials (from the unix domain socket).
  */
-static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
+static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<TrustedFlag> forceTrustClientOpt)
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -311,7 +301,7 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 options.runExitHandlers = true;
                 options.allowVfork = false;
                 startProcess(
-                    [&, closeListeners = std::move(closeListeners)]() {
+                    [&, storeConfig, closeListeners = std::move(closeListeners)]() {
                         closeListeners();
 
                         // Background the daemon.
@@ -328,8 +318,9 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                         }
 
                         // Handle the connection.
-                        processConnection(
-                            openUncachedStore(), FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
+                        auto store = storeConfig->openStore();
+                        store->init();
+                        processConnection(store, FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
 
                         exit(0);
                     },
@@ -398,16 +389,22 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
  * Entry point shared between the new CLI `nix daemon` and old CLI
  * `nix-daemon`.
  *
+ * @param storeConfig The store configuration to use for opening stores.
  * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
  * the same name over there for details.
  *
  * @param processOps Whether to force processing ops even if the next
  * store also is a remote store and could process it directly.
  */
-static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
+static void
+runDaemon(ref<StoreConfig> storeConfig, bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
 {
+    // Disable caching since the client already does that.
+    storeConfig->pathInfoCacheSize = 0;
+
     if (stdio) {
-        auto store = openUncachedStore();
+        auto store = storeConfig->openStore();
+        store->init();
 
         std::shared_ptr<RemoteStore> remoteStore;
 
@@ -424,7 +421,7 @@ static void runDaemon(bool stdio, std::optional<TrustedFlag> forceTrustClientOpt
             // access to those is explicitly not `nix-daemon`'s responsibility.
             processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
     } else
-        daemonLoop(forceTrustClientOpt);
+        daemonLoop(storeConfig, forceTrustClientOpt);
 }
 
 static int main_nix_daemon(int argc, char ** argv)
@@ -460,7 +457,7 @@ static int main_nix_daemon(int argc, char ** argv)
             return true;
         });
 
-        runDaemon(stdio, isTrustedOpt, processOps);
+        runDaemon(resolveStoreConfig(StoreReference::parse(settings.storeUri.get())), stdio, isTrustedOpt, processOps);
 
         return 0;
     }
@@ -468,7 +465,7 @@ static int main_nix_daemon(int argc, char ** argv)
 
 static RegisterLegacyCommand r_nix_daemon("nix-daemon", main_nix_daemon);
 
-struct CmdDaemon : Command
+struct CmdDaemon : StoreConfigCommand
 {
     bool stdio = false;
     std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
@@ -533,9 +530,9 @@ struct CmdDaemon : Command
             ;
     }
 
-    void run() override
+    void run(ref<StoreConfig> storeConfig) override
     {
-        runDaemon(stdio, isTrustedOpt, processOps);
+        runDaemon(std::move(storeConfig), stdio, isTrustedOpt, processOps);
     }
 };
 
