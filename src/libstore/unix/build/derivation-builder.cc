@@ -26,6 +26,9 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
+#ifdef __linux__
+#  include <sys/prctl.h>
+#endif
 
 #include "store-config-private.hh"
 
@@ -59,6 +62,37 @@ struct NotDeterministic : BuildError
         isNonDeterministic = true;
     }
 };
+
+void preserveDeathSignal(std::function<void()> fn)
+{
+#ifdef __linux__
+    /* Record the old parent pid. This is to avoid a race in case the parent
+       gets killed after setuid, but before we restored the death signal. It is
+       zero if the parent isn't visible inside the PID namespace.
+       See: https://stackoverflow.com/questions/284325/how-to-make-child-process-die-after-parent-exits */
+    auto parentPid = getppid();
+
+    int oldDeathSignal;
+    if (prctl(PR_GET_PDEATHSIG, &oldDeathSignal) == -1)
+        throw SysError("getting death signal");
+
+    fn(); /* Invoke the callback that does setuid etc. */
+
+    /* Set the old death signal. SIGKILL is set by default in startProcess,
+       but it gets cleared after setuid. Without this we end up with runaway
+       build processes if we get killed. */
+    if (prctl(PR_SET_PDEATHSIG, oldDeathSignal) == -1)
+        throw SysError("setting death signal");
+
+    /* The parent got killed and we got reparented. Commit seppuku. This check
+       doesn't help much with PID namespaces, but it's still useful without
+       sandboxing. */
+    if (oldDeathSignal && getppid() != parentPid)
+        raise(oldDeathSignal);
+#else
+    fn(); /* Just call the function on non-Linux. */
+#endif
+}
 
 /**
  * This class represents the state for building locally.
@@ -403,8 +437,8 @@ protected:
     /**
      * Delete the temporary directory, if we have one.
      *
-     * @param force We know the build suceeded, so don't attempt to
-     * preseve anything for debugging.
+     * @param force We know the build succeeded, so don't attempt to
+     * preserve anything for debugging.
      */
     virtual void cleanupBuild(bool force);
 
@@ -1344,17 +1378,21 @@ void DerivationBuilderImpl::setUser()
        setuid() when run as root sets the real, effective and
        saved UIDs. */
     if (buildUser) {
-        /* Preserve supplementary groups of the build user, to allow
-           admins to specify groups such as "kvm".  */
-        auto gids = buildUser->getSupplementaryGIDs();
-        if (setgroups(gids.size(), gids.data()) == -1)
-            throw SysError("cannot set supplementary groups of build user");
+        preserveDeathSignal([this]() {
+            /* Preserve supplementary groups of the build user, to allow
+               admins to specify groups such as "kvm".  */
+            auto gids = buildUser->getSupplementaryGIDs();
+            if (setgroups(gids.size(), gids.data()) == -1)
+                throw SysError("cannot set supplementary groups of build user");
 
-        if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID() || getegid() != buildUser->getGID())
-            throw SysError("setgid failed");
+            if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
+                || getegid() != buildUser->getGID())
+                throw SysError("setgid failed");
 
-        if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID() || geteuid() != buildUser->getUID())
-            throw SysError("setuid failed");
+            if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
+                || geteuid() != buildUser->getUID())
+                throw SysError("setuid failed");
+        });
     }
 }
 

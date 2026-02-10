@@ -183,6 +183,19 @@ struct DerivationBuilder : RestrictionContext
     virtual bool killChild() = 0;
 };
 
+/**
+ * Run a callback that may change process credentials (setuid, setgid, etc.)
+ * while preserving the parent-death signal.
+ *
+ * The parent-death signal setting is cleared by the Linux kernel upon changes
+ * to EUID, EGID.
+ *
+ * @note Does nothing on non-Linux systems.
+ * @see man PR_SET_PDEATHSIG
+ * @see https://github.com/golang/go/issues/9686
+ */
+void preserveDeathSignal(std::function<void()> fn);
+
 struct ExternalBuilder
 {
     StringSet systems;
