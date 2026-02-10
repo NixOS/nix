@@ -270,6 +270,19 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
  */
 StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash);
 
+/**
+ * @brief Copy a path from one store to another.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] srcStore nix source store reference
+ * @param[in] dstStore nix destination store reference
+ * @param[in] path The path to copy
+ * @param[in] repair Whether to repair the path
+ * @param[in] checkSigs Whether to check path signatures are trusted before copying
+ */
+nix_err nix_store_copy_path(
+    nix_c_context * context, Store * srcStore, Store * dstStore, const StorePath * path, bool repair, bool checkSigs);
+
 // cffi end
 #ifdef __cplusplus
 }
