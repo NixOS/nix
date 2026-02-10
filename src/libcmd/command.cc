@@ -75,7 +75,7 @@ ref<StoreConfig> StoreConfigCommand::getStoreConfig()
 
 ref<StoreConfig> StoreConfigCommand::createStoreConfig()
 {
-    return resolveStoreConfig(StoreReference::parse(settings.storeUri.get()));
+    return resolveStoreConfig(settings.getStoreReference());
 }
 
 void StoreConfigCommand::run()

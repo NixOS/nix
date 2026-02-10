@@ -530,4 +530,25 @@ void initLibStore(bool loadConfig)
     initLibStoreDone = true;
 }
 
+StoreReference Settings::getStoreReference() const
+{
+    return StoreReference::parse(storeUri.get());
+}
+
+std::vector<StoreReference> Settings::getSubstituters() const
+{
+    std::vector<StoreReference> res;
+    for (const auto & s : substituters.get())
+        res.push_back(StoreReference::parse(s));
+    return res;
+}
+
+std::set<StoreReference> Settings::getTrustedSubstituters() const
+{
+    std::set<StoreReference> res;
+    for (const auto & s : trustedSubstituters.get())
+        res.insert(StoreReference::parse(s));
+    return res;
+}
+
 } // namespace nix

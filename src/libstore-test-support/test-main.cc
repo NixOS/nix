@@ -18,7 +18,7 @@ int testMainForBuidingPre(int argc, char ** argv)
     settings.buildHook = {};
 
     // No substituters, unless a test specifically requests.
-    settings.substituters = {};
+    settings.set("substituters", "");
 
 #ifdef __linux__ // should match the conditional around sandboxBuildDir declaration.
 

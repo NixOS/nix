@@ -8,6 +8,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-settings.hh"
+#include "nix/store/store-reference.hh"
 
 #include "nix/store/config.hh"
 
@@ -616,6 +617,8 @@ public:
         // Don't document the machine-specific default value
         false};
 
+private:
+
     Setting<Strings> substituters{
         this,
         Strings{"https://cache.nixos.org/"},
@@ -648,6 +651,8 @@ public:
           Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.
         )",
         {"trusted-binary-caches"}};
+
+public:
 
     Setting<unsigned int> ttlNegativeNarInfoCache{
         this,
@@ -864,6 +869,15 @@ public:
      * derivation, or else returns a null pointer.
      */
     const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
+
+    /** Gets the store URI setting. */
+    StoreReference getStoreReference() const;
+
+    /** Gets the substituters setting. */
+    std::vector<StoreReference> getSubstituters() const;
+
+    /** Gets the trusted-substituters setting. */
+    std::set<StoreReference> getTrustedSubstituters() const;
 };
 
 // FIXME: don't use a global variable.

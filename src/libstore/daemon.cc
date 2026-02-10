@@ -246,25 +246,25 @@ struct ClientSettings
             auto & name(i.first);
             auto & value(i.second);
 
-            auto setSubstituters = [&](Setting<Strings> & res) {
-                if (name != res.name && res.aliases.count(name) == 0)
+            auto setSubstituters = [&]() {
+                if (name != "substituters" && name != "binary-caches")
                     return false;
-                StringSet trusted = settings.trustedSubstituters;
-                for (auto & s : settings.substituters.get())
-                    trusted.insert(s);
+                std::set<StoreReference> trusted = settings.getTrustedSubstituters();
+                for (auto & ref : settings.getSubstituters())
+                    trusted.insert(ref);
                 Strings subs;
                 auto ss = tokenizeString<Strings>(value);
-                for (auto & s : ss)
-                    if (trusted.count(s))
+                for (auto & s : ss) {
+                    auto ref = StoreReference::parse(s);
+                    if (trusted.count(ref))
                         subs.push_back(s);
-                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
-                        subs.push_back(s + "/");
                     else
                         warn(
                             "ignoring untrusted substituter '%s', you are not a trusted user.\n"
                             "Run `man nix.conf` for more information on the `substituters` configuration option.",
                             s);
-                res = subs;
+                }
+                settings.set("substituters", concatStringsSep(" ", subs));
                 return true;
             };
 
@@ -286,7 +286,7 @@ struct ClientSettings
                     || name == settings.pollInterval.name || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
-                else if (setSubstituters(settings.substituters))
+                else if (setSubstituters())
                     ;
                 else
                     warn(
