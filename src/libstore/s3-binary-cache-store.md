@@ -84,6 +84,27 @@ Your account will need an IAM policy to support uploading to the bucket:
 }
 ```
 
+### S3 Transfer Acceleration
+
+For faster uploads and downloads when accessing S3 buckets from geographically distant locations, you can enable AWS S3 Transfer Acceleration. This routes transfers through CloudFront edge locations for improved performance.
+
+To enable transfer acceleration, add the `use-transfer-acceleration=true` parameter to your S3 URL:
+
+```console
+$ nix copy nixpkgs.hello \
+  --to 's3://example-nix-cache?use-transfer-acceleration=true&region=ap-northeast-1'
+```
+
+#### Requirements for Transfer Acceleration
+
+- Bucket names cannot contain dots (`.`) - e.g., `my.bucket.name` will not work
+- Transfer Acceleration must be enabled on your S3 bucket (see [AWS documentation](https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html))
+- Additional charges apply for Transfer Acceleration (see AWS pricing)
+
+> **Note**
+>
+> Transfer Acceleration only works with AWS S3 buckets. It has no effect when using custom endpoints for S3-compatible services like MinIO.
+
 ### Examples
 
 With bucket policies and authentication set up as described above, uploading works via [`nix copy`](@docroot@/command-ref/new-cli/nix3-copy.md) (experimental).
@@ -100,6 +121,13 @@ With bucket policies and authentication set up as described above, uploading wor
   ```console
   $ nix copy nixpkgs.hello --to \
     's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
+  ```
+
+- To use S3 Transfer Acceleration for faster transfers from distant locations:
+
+  ```console
+  $ nix copy nixpkgs.hello \
+    --to 's3://my-cache?profile=cache-upload&region=ap-northeast-1&use-transfer-acceleration=true'
   ```
 
 )"

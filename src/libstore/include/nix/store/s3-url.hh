@@ -27,6 +27,9 @@ struct ParsedS3URL
     std::optional<std::string> region;
     std::optional<std::string> scheme;
     std::optional<std::string> versionId;
+#if NIX_WITH_AWS_AUTH
+    bool use_transfer_acceleration;
+#endif
     /**
      * The endpoint can be either missing, be an absolute URI (with a scheme like `http:`)
      * or an authority (so an IP address or a registered name).
