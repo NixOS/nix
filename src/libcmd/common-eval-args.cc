@@ -148,7 +148,7 @@ MixEvalArgs::MixEvalArgs()
           )",
         .category = category,
         .labels = {"store-url"},
-        .handler = {&evalStoreUrl},
+        .handler = {[this](std::string s) { evalStoreUrl = StoreReference::parse(s); }},
     });
 }
 

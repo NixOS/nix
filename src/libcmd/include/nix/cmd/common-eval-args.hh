@@ -6,6 +6,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/expr/search-path.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/store/store-reference.hh"
 
 #include <filesystem>
 
@@ -55,7 +56,7 @@ struct MixEvalArgs : virtual Args, virtual MixRepair
 
     LookupPath lookupPath;
 
-    std::optional<std::string> evalStoreUrl;
+    std::optional<StoreReference> evalStoreUrl;
 
 private:
     struct AutoArgExpr
