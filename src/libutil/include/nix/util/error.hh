@@ -334,6 +334,16 @@ void throwExceptionSelfCheck();
 void panic(std::string_view msg);
 
 /**
+ * Run a function, printing an error and returning on exception.
+ * Useful for wrapping a `main` function that may throw
+ *
+ * @param programName Name of program, usually argv[0]
+ * @param fun Function to run inside the try block
+ * @return exit code: 0 if success, 1 if exception does not specify.
+ */
+int handleExceptions(const std::string & programName, std::function<void()> fun);
+
+/**
  * Print a basic error message with source position and std::terminate().
  *
  * @note: This assumes that the logger is operational

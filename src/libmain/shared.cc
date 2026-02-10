@@ -312,35 +312,6 @@ void printVersion(const std::string & programName)
     throw Exit();
 }
 
-int handleExceptions(const std::string & programName, std::function<void()> fun)
-{
-    ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
-
-    ErrorInfo::programName = baseNameOf(programName);
-
-    std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
-    try {
-        fun();
-    } catch (Exit & e) {
-        return e.status;
-    } catch (UsageError & e) {
-        logError(e.info());
-        printError("Try '%1% --help' for more information.", programName);
-        return 1;
-    } catch (BaseError & e) {
-        logError(e.info());
-        return e.info().status;
-    } catch (std::bad_alloc & e) {
-        printError(error + "out of memory");
-        return 1;
-    } catch (std::exception & e) {
-        printError(error + e.what());
-        return 1;
-    }
-
-    return 0;
-}
-
 RunPager::RunPager()
 {
     if (!isatty(STDOUT_FILENO))
