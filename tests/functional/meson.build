@@ -70,6 +70,7 @@ suites = [
       'gc-concurrent.sh',
       'repair.sh',
       'fixed.sh',
+      'meta.sh',
       'export-graph.sh',
       'timeout.sh',
       'fetchGitRefs.sh',
