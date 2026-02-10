@@ -86,6 +86,12 @@ sources = files(
   'repl.cc',
 )
 
+if host_machine.system() != 'windows'
+  sources += files(
+    'unix/unix-socket-server.cc',
+  )
+endif
+
 subdir('include/nix/cmd')
 
 subdir('nix-meson-build-support/export-all-symbols')

@@ -15,6 +15,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/legacy.hh"
+#include "nix/cmd/unix-socket-server.hh"
 #include "nix/store/daemon.hh"
 #include "man-pages.hh"
 
@@ -27,22 +28,14 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <sys/select.h>
 #include <errno.h>
 #include <pwd.h>
 #include <grp.h>
 #include <fcntl.h>
-#include <netdb.h>
-#include <poll.h>
 
 #ifdef __linux__
 #  include "nix/util/cgroup.hh"
-#endif
-
-#if defined(__APPLE__) || defined(__FreeBSD__)
-#  include <sys/ucred.h>
 #endif
 
 using namespace nix;
@@ -199,52 +192,6 @@ matchUser(const std::optional<std::string> & user, const std::optional<std::stri
     return false;
 }
 
-struct PeerInfo
-{
-    std::optional<pid_t> pid;
-    std::optional<uid_t> uid;
-    std::optional<gid_t> gid;
-};
-
-/**
- * Get the identity of the caller, if possible.
- */
-static PeerInfo getPeerInfo(Descriptor remote)
-{
-    PeerInfo peer;
-
-#if defined(SO_PEERCRED)
-
-#  if defined(__OpenBSD__)
-    struct sockpeercred cred;
-#  else
-    ucred cred;
-#  endif
-    socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_SOCKET, SO_PEERCRED, &cred, &credLen) == 0) {
-        peer.pid = cred.pid;
-        peer.uid = cred.uid;
-        peer.gid = cred.gid;
-    }
-
-#elif defined(LOCAL_PEERCRED)
-
-#  if !defined(SOL_LOCAL)
-#    define SOL_LOCAL 0
-#  endif
-
-    xucred cred;
-    socklen_t credLen = sizeof(cred);
-    if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == 0)
-        peer.uid = cred.cr_uid;
-
-#endif
-
-    return peer;
-}
-
-#define SD_LISTEN_FDS_START 3
-
 /**
  * Open a store without a path info cache.
  */
@@ -267,7 +214,7 @@ static ref<Store> openUncachedStore()
  *
  * If the potential client is not allowed to talk to us, we throw an `Error`.
  */
-static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const PeerInfo & peer)
+static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::PeerInfo & peer)
 {
     TrustedFlag trusted = NotTrusted;
 
@@ -306,32 +253,6 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    std::vector<AutoCloseFD> listeningSockets;
-
-    //  Handle socket-based activation by systemd.
-    auto listenFds = getEnv("LISTEN_FDS");
-    if (listenFds) {
-        if (getEnv("LISTEN_PID") != std::to_string(getpid()))
-            throw Error("unexpected systemd environment variables");
-        auto count = string2Int<unsigned int>(*listenFds);
-        assert(count);
-        for (auto i = 0; i < count; ++i) {
-            AutoCloseFD fdSocket(SD_LISTEN_FDS_START + i);
-            unix::closeOnExec(fdSocket.get());
-            listeningSockets.push_back(std::move(fdSocket));
-        }
-    }
-
-    //  Otherwise, create and bind to a Unix domain socket.
-    else {
-        createDirs(dirOf(settings.nixDaemonSocketFile));
-        listeningSockets.push_back(createUnixDomainSocket(settings.nixDaemonSocketFile, 0666));
-    }
-
-    std::vector<struct pollfd> fds;
-    for (auto & i : listeningSockets)
-        fds.push_back({.fd = i.get(), .events = POLLIN});
-
     //  Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
@@ -356,45 +277,23 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
     }
 #endif
 
-    //  Loop accepting connections.
-    while (1) {
-
-        try {
-            checkInterrupt();
-
-            auto count = poll(fds.data(), fds.size(), -1);
-            if (count == -1) {
-                if (errno == EINTR)
-                    continue;
-                throw SysError("polling for incomming connections");
-            }
-
-            for (auto & fd : fds) {
-                if (!fd.revents)
-                    continue;
-
-                // Accept a connection.
-                struct sockaddr_un remoteAddr;
-                socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-                AutoCloseFD remote = accept(fd.fd, (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-                checkInterrupt();
-                if (!remote) {
-                    if (errno == EINTR)
-                        continue;
-                    throw SysError("accepting connection");
-                }
-
+    try {
+        unix::serveUnixSocket(
+            {
+                .socketPath = settings.nixDaemonSocketFile,
+                .socketMode = 0666,
+            },
+            [&](AutoCloseFD remote, std::function<void()> closeListeners) {
                 unix::closeOnExec(remote.get());
 
-                PeerInfo peer;
+                unix::PeerInfo peer;
                 TrustedFlag trusted;
                 std::optional<std::string> userName;
 
                 if (forceTrustClientOpt)
                     trusted = *forceTrustClientOpt;
                 else {
-                    peer = getPeerInfo(remote.get());
+                    peer = unix::getPeerInfo(remote.get());
                     auto [_trusted, _userName] = authPeer(peer);
                     trusted = _trusted;
                     userName = _userName;
@@ -412,8 +311,8 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                 options.runExitHandlers = true;
                 options.allowVfork = false;
                 startProcess(
-                    [&]() {
-                        listeningSockets.clear();
+                    [&, closeListeners = std::move(closeListeners)]() {
+                        closeListeners();
 
                         // Background the daemon.
                         if (setsid() == -1)
@@ -435,16 +334,9 @@ static void daemonLoop(std::optional<TrustedFlag> forceTrustClientOpt)
                         exit(0);
                     },
                     options);
-            }
-
-        } catch (Interrupted & e) {
-            return;
-        } catch (Error & error) {
-            auto ei = error.info();
-            // FIXME: add to trace?
-            ei.msg = HintFmt("while processing connection: %1%", ei.msg.str());
-            logError(ei);
-        }
+            });
+    } catch (Interrupted & e) {
+        return;
     }
 }
 
