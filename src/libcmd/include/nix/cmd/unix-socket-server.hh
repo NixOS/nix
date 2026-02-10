@@ -6,9 +6,15 @@
 #include <filesystem>
 #include <functional>
 #include <optional>
-#include <sys/types.h>
 
-namespace nix::unix {
+#ifndef _WIN32
+#  include <sys/types.h>
+#endif
+
+namespace nix {
+
+#ifndef _WIN32
+namespace unix {
 
 /**
  * Information about the identity of the peer on a Unix domain socket connection.
@@ -24,6 +30,9 @@ struct PeerInfo
  * Get the identity of the caller, if possible.
  */
 PeerInfo getPeerInfo(Descriptor remote);
+
+} // namespace unix
+#endif
 
 /**
  * Callback type for handling new connections.
@@ -76,4 +85,4 @@ struct ServeUnixSocketOptions
  */
 [[noreturn]] void serveUnixSocket(const ServeUnixSocketOptions & options, UnixSocketHandler handler);
 
-} // namespace nix::unix
+} // namespace nix
