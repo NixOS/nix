@@ -562,11 +562,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 if (pathExists(path))
                     ss.push_back(path);
 
-            if (settings.caFile != "") {
-                std::filesystem::path caFile = settings.caFile.get();
-                if (pathExists(caFile))
+            if (auto & caFile = settings.caFile.get()) {
+                if (pathExists(*caFile))
                     pathsInChroot.try_emplace(
-                        "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile.native(), true), true);
+                        "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile->native(), true), true);
             }
         }
 

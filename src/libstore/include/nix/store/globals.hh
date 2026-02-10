@@ -34,7 +34,7 @@ struct LogFileSettings : public virtual Config
     /**
      * The directory where we log various operations.
      */
-    const Path nixLogDir;
+    std::filesystem::path nixLogDir;
 
 protected:
     LogFileSettings();
@@ -72,7 +72,7 @@ class Settings : public virtual Config, private LocalSettings, private LogFileSe
 
     bool isWSL1();
 
-    Path getDefaultSSLCertFile();
+    std::filesystem::path getDefaultSSLCertFile();
 
 public:
 
@@ -116,7 +116,7 @@ public:
     /**
      * The directory where state is stored.
      */
-    Path nixStateDir;
+    std::filesystem::path nixStateDir;
 
     /**
      * The directory where system configuration files are stored.
@@ -126,12 +126,12 @@ public:
     /**
      * A list of user configuration files to load.
      */
-    std::vector<Path> nixUserConfFiles;
+    std::vector<std::filesystem::path> nixUserConfFiles;
 
     /**
      * File name of the socket the daemon listens to.
      */
-    Path nixDaemonSocketFile;
+    std::filesystem::path nixDaemonSocketFile;
 
     Setting<std::string> storeUri{
         this,
@@ -768,7 +768,7 @@ public:
           > `.netrc`.
         )"};
 
-    Setting<Path> caFile{
+    Setting<std::optional<std::filesystem::path>> caFile{
         this,
         getDefaultSSLCertFile(),
         "ssl-cert-file",
@@ -876,9 +876,6 @@ extern Settings settings;
  * Usually called with `globalConfig`.
  */
 void loadConfFile(AbstractConfig & config);
-
-// Used by the Settings constructor
-std::vector<Path> getUserConfigFiles();
 
 /**
  * The version of Nix itself.

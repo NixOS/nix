@@ -416,7 +416,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
 #endif
 
 #if defined(__linux__) || defined(__FreeBSD__)
-    Setting<Path> sandboxBuildDir{
+    Setting<std::filesystem::path> sandboxBuildDir{
         this,
         "/build",
         "sandbox-build-dir",
@@ -429,7 +429,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
         )"};
 #endif
 
-    Setting<std::optional<Path>> buildDir{
+    Setting<std::optional<std::filesystem::path>> buildDir{
         this,
         std::nullopt,
         "build-dir",
@@ -467,7 +467,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
 
 private:
 
-    OptionalPathSetting diffHook{
+    Setting<std::optional<std::filesystem::path>> diffHook{
         this,
         std::nullopt,
         "diff-hook",
@@ -505,7 +505,7 @@ public:
      * Get the diff hook path if run-diff-hook is enabled.
      * @return Pointer to path if enabled, nullptr otherwise.
      */
-    const Path * getDiffHook() const
+    const std::filesystem::path * getDiffHook() const
     {
         if (!runDiffHook.get()) {
             return nullptr;

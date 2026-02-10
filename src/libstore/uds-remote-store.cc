@@ -24,7 +24,7 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     : Store::Config{params}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params}
-    , path{authority.empty() ? settings.nixDaemonSocketFile : authority}
+    , path{authority.empty() ? settings.nixDaemonSocketFile.string() : authority}
 {
     if (uriSchemes().count(scheme) == 0) {
         throw UsageError("Scheme must be 'unix'");
