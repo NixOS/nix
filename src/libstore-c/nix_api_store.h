@@ -270,6 +270,24 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
  */
 StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash);
 
+/**
+ * @brief Queries for the nix store path info as JSON.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] store_path A store path
+ * @param[in] format The JSON format version to use
+ * @param[in] userdata The data to pass to the callback
+ * @param[in] callback Called for when the path info is resolved
+ */
+nix_err nix_store_query_path_info_json(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * store_path,
+    unsigned int format,
+    nix_get_string_callback callback,
+    void * userdata);
+
 // cffi end
 #ifdef __cplusplus
 }
