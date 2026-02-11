@@ -1,4 +1,5 @@
 #include "nix/util/archive.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
@@ -16,6 +17,12 @@ Path LocalFSStoreConfig::getDefaultStateDir()
 Path LocalFSStoreConfig::getDefaultLogDir()
 {
     return settings.getLogFileSettings().nixLogDir.string();
+}
+
+std::filesystem::path LocalFSStoreConfig::getDefaultDaemonSocketPath() const
+{
+    return getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH")
+        .value_or(std::filesystem::path{stateDir.get()} / "daemon-socket" / "socket");
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)

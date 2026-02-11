@@ -24,7 +24,9 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(
     : Store::Config{params}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params}
-    , path{authority.empty() ? settings.nixDaemonSocketFile.string() : authority}
+    , path{
+          !authority.empty() ? std::string{authority} : getDefaultDaemonSocketPath().string(),
+      }
 {
     if (uriSchemes().count(scheme) == 0) {
         throw UsageError("Scheme must be 'unix'");
@@ -38,10 +40,8 @@ std::string UDSRemoteStoreConfig::doc()
         ;
 }
 
-// A bit gross that we now pass empty string but this is knowing that
-// empty string will later default to the same nixDaemonSocketFile. Why
-// don't we just wire it all through? I believe there are cases where it
-// will live reload so we want to continue to account for that.
+// Empty authority will default to the per-store socket path based on
+// stateDir.
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
     : UDSRemoteStoreConfig(*uriSchemes().begin(), "", params)
 {
@@ -60,7 +60,7 @@ StoreReference UDSRemoteStoreConfig::getReference() const
     /* We specifically return "daemon" here instead of "unix://" or "unix://${path}"
      * to be more compatible with older versions of nix. Some tooling out there
      * tries hard to parse store references and it might not be able to handle "unix://". */
-    if (path == settings.nixDaemonSocketFile)
+    if (path == getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(getDefaultDaemonSocketPath().string()))
         return {
             .variant = StoreReference::Daemon{},
             .params = getQueryParams(),
