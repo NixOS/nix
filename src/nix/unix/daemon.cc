@@ -4,6 +4,7 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
+#include "nix/store/local-fs-store.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
@@ -267,10 +268,16 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
     }
 #endif
 
+    auto socketPath = [&]() -> std::filesystem::path {
+        if (auto * localFSConfig = dynamic_cast<const LocalFSStoreConfig *>(&*storeConfig))
+            return localFSConfig->getDefaultDaemonSocketPath();
+        throw Error("cannot run daemon for non-local-filesystem store");
+    }();
+
     try {
         unix::serveUnixSocket(
             {
-                .socketPath = settings.nixDaemonSocketFile,
+                .socketPath = socketPath,
                 .socketMode = 0666,
             },
             [&](AutoCloseFD remote, std::function<void()> closeListeners) {
