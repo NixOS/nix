@@ -9,11 +9,12 @@ void TestHttpBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-ref<TestHttpBinaryCacheStore> TestHttpBinaryCacheStoreConfig::openTestStore() const
+ref<TestHttpBinaryCacheStore> TestHttpBinaryCacheStoreConfig::openTestStore(ref<FileTransfer> fileTransfer) const
 {
     auto store = make_ref<TestHttpBinaryCacheStore>(
         ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
+            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
+        fileTransfer);
     store->init();
     return store;
 }
@@ -79,16 +80,18 @@ void HttpsBinaryCacheStoreTest::SetUp()
        for the port explicitly - this is enough. */
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    /* FIXME: Don't use global settings. Tests are not run concurrently, so this is fine for now. */
-    oldCaCert = fileTransferSettings.caFile;
-    fileTransferSettings.caFile = caCert.string();
+    /* Create custom FileTransferSettings with our test CA certificate.
+       This avoids mutating global settings. */
+    testFileTransferSettings = std::make_unique<FileTransferSettings>();
+    testFileTransferSettings->caFile = caCert;
+    testFileTransfer = makeFileTransfer(*testFileTransferSettings);
 }
 
 void HttpsBinaryCacheStoreTest::TearDown()
 {
-    fileTransferSettings.caFile = oldCaCert;
     serverPid.kill();
     delTmpDir.reset();
+    testFileTransferSettings.reset();
 }
 
 std::vector<std::string> HttpsBinaryCacheStoreTest::serverArgs()
@@ -115,11 +118,17 @@ std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
     return args;
 }
 
-ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig(BinaryCacheStoreConfig::Params params)
+ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
 {
-    auto res = make_ref<TestHttpBinaryCacheStoreConfig>("https", fmt("localhost:%d", port), std::move(params));
+    auto res = make_ref<TestHttpBinaryCacheStoreConfig>(
+        "https", fmt("localhost:%d", port), TestHttpBinaryCacheStoreConfig::Params{});
     res->pathInfoCacheSize = 0; /* We don't want any caching in tests. */
     return res;
+}
+
+ref<TestHttpBinaryCacheStore> HttpsBinaryCacheStoreTest::openStore(ref<TestHttpBinaryCacheStoreConfig> config)
+{
+    return config->openTestStore(ref<FileTransfer>{testFileTransfer});
 }
 
 } // namespace nix::testing

@@ -52,6 +52,8 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     static std::string doc();
 
+    ref<Store> openStore(ref<FileTransfer> fileTransfer) const;
+
     ref<Store> openStore() const override;
 
     StoreReference getReference() const override;
@@ -67,13 +69,17 @@ class HttpBinaryCacheStore : public virtual BinaryCacheStore
 
     Sync<State> _state;
 
+protected:
+
+    ref<FileTransfer> fileTransfer;
+
 public:
 
     using Config = HttpBinaryCacheStoreConfig;
 
     ref<Config> config;
 
-    HttpBinaryCacheStore(ref<Config> config);
+    HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer> fileTransfer = getFileTransfer());
 
     void init() override;
 

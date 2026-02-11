@@ -50,9 +50,10 @@ std::string HttpBinaryCacheStoreConfig::doc()
         ;
 }
 
-HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config)
+HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer> fileTransfer)
     : Store{*config} // TODO it will actually mutate the configuration
     , BinaryCacheStore{*config}
+    , fileTransfer{fileTransfer}
     , config{config}
 {
     diskCache = getNarInfoDiskCache();
@@ -121,7 +122,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
     try {
         FileTransferRequest request(makeRequest(path));
         request.method = HttpMethod::Head;
-        getFileTransfer()->download(request);
+        fileTransfer->download(request);
         return true;
     } catch (FileTransferError & e) {
         /* S3 buckets return 403 if a file doesn't exist and the
@@ -151,7 +152,7 @@ void HttpBinaryCacheStore::upload(
     req.data = {sizeHint, source};
     req.mimeType = mimeType;
 
-    getFileTransfer()->upload(req);
+    fileTransfer->upload(req);
 }
 
 void HttpBinaryCacheStore::upsertFile(
@@ -219,7 +220,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
     checkEnabled();
     auto request(makeRequest(path));
     try {
-        getFileTransfer()->download(std::move(request), sink);
+        fileTransfer->download(std::move(request), sink);
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             throw NoSuchBinaryCacheFile(
@@ -238,19 +239,19 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
 
         auto request(makeRequest(path));
 
-        getFileTransfer()->enqueueFileTransfer(request, {[callbackPtr, this](std::future<FileTransferResult> result) {
-                                                   try {
-                                                       (*callbackPtr)(std::move(result.get().data));
-                                                   } catch (FileTransferError & e) {
-                                                       if (e.error == FileTransfer::NotFound
-                                                           || e.error == FileTransfer::Forbidden)
-                                                           return (*callbackPtr)({});
-                                                       maybeDisable();
-                                                       callbackPtr->rethrow();
-                                                   } catch (...) {
-                                                       callbackPtr->rethrow();
-                                                   }
-                                               }});
+        fileTransfer->enqueueFileTransfer(request, {[callbackPtr, this](std::future<FileTransferResult> result) {
+                                              try {
+                                                  (*callbackPtr)(std::move(result.get().data));
+                                              } catch (FileTransferError & e) {
+                                                  if (e.error == FileTransfer::NotFound
+                                                      || e.error == FileTransfer::Forbidden)
+                                                      return (*callbackPtr)({});
+                                                  maybeDisable();
+                                                  callbackPtr->rethrow();
+                                              } catch (...) {
+                                                  callbackPtr->rethrow();
+                                              }
+                                          }});
 
     } catch (...) {
         callbackPtr->rethrow();
@@ -261,7 +262,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
 std::optional<std::string> HttpBinaryCacheStore::getNixCacheInfo()
 {
     try {
-        auto result = getFileTransfer()->download(makeRequest(cacheInfoFile));
+        auto result = fileTransfer->download(makeRequest(cacheInfoFile));
         return result.data;
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound)
@@ -284,11 +285,17 @@ std::optional<TrustedFlag> HttpBinaryCacheStore::isTrustedClient()
     return std::nullopt;
 }
 
-ref<Store> HttpBinaryCacheStore::Config::openStore() const
+ref<Store> HttpBinaryCacheStore::Config::openStore(ref<FileTransfer> fileTransfer) const
 {
     return make_ref<HttpBinaryCacheStore>(
         ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
+            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
+        fileTransfer);
+}
+
+ref<Store> HttpBinaryCacheStoreConfig::openStore() const
+{
+    return openStore(getFileTransfer());
 }
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;

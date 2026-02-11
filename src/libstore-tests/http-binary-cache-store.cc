@@ -45,28 +45,18 @@ using namespace std::string_literals;
 
 TEST_F(HttpsBinaryCacheStoreTest, queryPathInfo)
 {
-    auto config = makeConfig({});
-    auto store = config->openStore();
+    auto store = openStore(makeConfig());
     StringSource dump{"test"sv};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
     EXPECT_NO_THROW(store->queryPathInfo(path));
 }
 
-auto withNoRetries()
-{
-    auto oldTries = fileTransferSettings.tries.get();
-    Finally restoreTries = [=]() { fileTransferSettings.tries = oldTries; };
-    fileTransferSettings.tries = 1; /* FIXME: Don't use global settings. */
-    return restoreTries;
-}
-
 TEST_F(HttpsBinaryCacheStoreMtlsTest, queryPathInfo)
 {
-    auto config = makeConfig({
-        {"tls-certificate"s, clientCert.string()},
-        {"tls-private-key"s, clientKey.string()},
-    });
-    auto store = config->openStore();
+    auto config = makeConfig();
+    config->tlsCert = clientCert;
+    config->tlsKey = clientKey;
+    auto store = openStore(config);
     StringSource dump{"test"sv};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
     EXPECT_NO_THROW(store->queryPathInfo(path));
@@ -74,9 +64,8 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, queryPathInfo)
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWithoutClientCert)
 {
-    auto restoreTries = withNoRetries();
-    auto config = makeConfig({});
-    EXPECT_THROW(config->openStore(), Error);
+    testFileTransferSettings->tries = 1;
+    EXPECT_THROW(openStore(makeConfig()), Error);
 }
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWrongClientCert)
@@ -89,12 +78,11 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWrongClientCert)
     openssl({"req", "-new", "-x509", "-days", "1", "-key", wrongKey.string(), "-out", wrongCert.string(), "-subj", "/CN=WrongClient"});
     // clang-format on
 
-    auto config = makeConfig({
-        {"tls-certificate"s, wrongCert.string()},
-        {"tls-private-key"s, wrongKey.string()},
-    });
-    auto restoreTries = withNoRetries();
-    EXPECT_THROW(config->openStore(), Error);
+    auto config = makeConfig();
+    config->tlsCert = wrongCert;
+    config->tlsKey = wrongKey;
+    testFileTransferSettings->tries = 1;
+    EXPECT_THROW(openStore(config), Error);
 }
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthority)
@@ -109,13 +97,11 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
             writeFile(entry.path(), content);
         }
 
-    auto config = makeConfig({
-        {"tls-certificate"s, clientCert.string()},
-        {"tls-private-key"s, clientKey.string()},
-    });
-    auto store = config->openStore();
-
-    auto restoreTries = withNoRetries();
+    auto config = makeConfig();
+    config->tlsCert = clientCert;
+    config->tlsKey = clientKey;
+    testFileTransferSettings->tries = 1;
+    auto store = openStore(config);
     auto info = store->queryPathInfo(path);
     NullSink null;
     EXPECT_THROW(store->narFromPath(path, null), Error);
