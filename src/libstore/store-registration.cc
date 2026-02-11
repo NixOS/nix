@@ -58,7 +58,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                 } localFSStoreConfig{params};
                 if (access(localFSStoreConfig.stateDir.get().c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
-                else if (pathExists(getDaemonSocketPath()))
+                else if (pathExists(getDaemonSocketPath(localFSStoreConfig)))
                     return make_ref<UDSRemoteStore::Config>(params);
 #ifdef __linux__
                 else if (

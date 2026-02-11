@@ -8,12 +8,20 @@
 namespace nix {
 
 /**
- * Get the daemon socket path.
+ * Get the daemon socket path for the given store configuration.
  *
  * Returns `NIX_DAEMON_SOCKET_PATH` if set, otherwise
- * `settings.nixStateDir / "daemon-socket" / "socket"`.
+ * `stateDir / "daemon-socket" / "socket"` where `stateDir` is from
+ * the config (for LocalFSStore) or global settings.
+ *
+ * @note This function accepts any `Store::Config`, not just
+ * `UDSRemoteStoreConfig`, because the daemon uses it to determine where
+ * to listen for connections (configuring the daemon) and where to
+ * connect to (configuring the client). The daemon may be serving any
+ * type of store --- `UDSRemoteStoreConfig` is for *client* stores, not
+ * for the server store.
  */
-std::filesystem::path getDaemonSocketPath();
+std::filesystem::path getDaemonSocketPath(const Store::Config & config);
 
 struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>,
                               virtual LocalFSStoreConfig,
