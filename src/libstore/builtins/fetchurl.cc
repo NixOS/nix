@@ -73,7 +73,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     /* Try the hashed mirrors first. */
     auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
-        for (auto hashedMirror : settings.hashedMirrors.get())
+        for (auto hashedMirror : ctx.hashedMirrors)
             try {
                 if (!hasSuffix(hashedMirror, "/"))
                     hashedMirror += '/';

@@ -1252,6 +1252,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
+            .hashedMirrors = settings.getLocalSettings().hashedMirrors,
             .tmpDirInSandbox = tmpDirInSandbox(),
 #if NIX_WITH_AWS_AUTH
             .awsCredentials = args.awsCredentials,
