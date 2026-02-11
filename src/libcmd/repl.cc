@@ -12,9 +12,8 @@
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/util/signals.hh"
-#include "nix/store/store-open.hh"
-#include "nix/store/log-store.hh"
 #include "nix/cmd/common-eval-args.hh"
+#include "nix/cmd/get-build-log.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
@@ -564,31 +563,9 @@ ProcessLineResult NixRepl::processLine(std::string line)
         } else if (command == ":log") {
             settings.readOnlyMode = true;
             Finally roModeReset([&]() { settings.readOnlyMode = false; });
-            auto subs = getDefaultSubstituters();
-
-            subs.push_front(state->store);
-
-            bool foundLog = false;
             RunPager pager;
-            for (auto & sub : subs) {
-                auto * logSubP = dynamic_cast<LogStore *>(&*sub);
-                if (!logSubP) {
-                    printInfo(
-                        "Skipped '%s' which does not support retrieving build logs", sub->config.getHumanReadableURI());
-                    continue;
-                }
-                auto & logSub = *logSubP;
-
-                auto log = logSub.getBuildLog(drvPath);
-                if (log) {
-                    printInfo("got build log for '%s' from '%s'", drvPathRaw, logSub.config.getHumanReadableURI());
-                    logger->writeToStdout(*log);
-                    foundLog = true;
-                    break;
-                }
-            }
-            if (!foundLog)
-                throw Error("build log of '%s' is not available", drvPathRaw);
+            auto log = fetchBuildLog(state->store, drvPath, drvPathRaw);
+            logger->writeToStdout(log);
         } else {
             runNix("nix-shell", {drvPathRaw});
         }
