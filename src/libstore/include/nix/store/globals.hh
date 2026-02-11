@@ -129,11 +129,6 @@ public:
      */
     std::vector<std::filesystem::path> nixUserConfFiles;
 
-    /**
-     * File name of the socket the daemon listens to.
-     */
-    std::filesystem::path nixDaemonSocketFile;
-
     Setting<StoreReference> storeUri{
         this,
         StoreReference::parse(getEnv("NIX_REMOTE").value_or("auto")),
