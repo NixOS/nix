@@ -1,4 +1,5 @@
 #include "nix/store/globals.hh"
+#include "nix/util/config-impl.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/archive.hh"
@@ -448,6 +449,88 @@ void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append
         value.clear();
     value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
+
+template<>
+struct BaseSetting<std::vector<StoreReference>>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+struct BaseSetting<std::set<StoreReference>>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+StoreReference BaseSetting<StoreReference>::parse(const std::string & str) const
+{
+    return StoreReference::parse(str);
+}
+
+template<>
+std::string BaseSetting<StoreReference>::to_string() const
+{
+    return value.render();
+}
+
+template<>
+std::vector<StoreReference> BaseSetting<std::vector<StoreReference>>::parse(const std::string & str) const
+{
+    std::vector<StoreReference> res;
+    for (const auto & s : tokenizeString<Strings>(str))
+        res.push_back(StoreReference::parse(s));
+    return res;
+}
+
+template<>
+std::string BaseSetting<std::vector<StoreReference>>::to_string() const
+{
+    Strings ss;
+    for (const auto & ref : value)
+        ss.push_back(ref.render());
+    return concatStringsSep(" ", ss);
+}
+
+template<>
+void BaseSetting<std::vector<StoreReference>>::appendOrSet(std::vector<StoreReference> newValue, bool append)
+{
+    if (append)
+        value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+    else
+        value = std::move(newValue);
+}
+
+template<>
+std::set<StoreReference> BaseSetting<std::set<StoreReference>>::parse(const std::string & str) const
+{
+    std::set<StoreReference> res;
+    for (const auto & s : tokenizeString<Strings>(str))
+        res.insert(StoreReference::parse(s));
+    return res;
+}
+
+template<>
+std::string BaseSetting<std::set<StoreReference>>::to_string() const
+{
+    Strings ss;
+    for (const auto & ref : value)
+        ss.push_back(ref.render());
+    return concatStringsSep(" ", ss);
+}
+
+template<>
+void BaseSetting<std::set<StoreReference>>::appendOrSet(std::set<StoreReference> newValue, bool append)
+{
+    if (append)
+        value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+    else
+        value = std::move(newValue);
+}
+
+template class BaseSetting<StoreReference>;
+template class BaseSetting<std::vector<StoreReference>>;
+template class BaseSetting<std::set<StoreReference>>;
 
 static void preloadNSS()
 {

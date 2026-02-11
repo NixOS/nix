@@ -246,25 +246,36 @@ struct ClientSettings
             auto & name(i.first);
             auto & value(i.second);
 
-            auto setSubstituters = [&](Setting<Strings> & res) {
+            auto setSubstituters = [&](Setting<std::vector<StoreReference>> & res) {
                 if (name != res.name && res.aliases.count(name) == 0)
                     return false;
-                StringSet trusted = settings.trustedSubstituters;
-                for (auto & s : settings.substituters.get())
-                    trusted.insert(s);
-                Strings subs;
+                std::set<StoreReference> trusted = settings.trustedSubstituters;
+                for (auto & ref : settings.substituters.get())
+                    trusted.insert(ref);
+                std::vector<StoreReference> subs;
                 auto ss = tokenizeString<Strings>(value);
-                for (auto & s : ss)
-                    if (trusted.count(s))
-                        subs.push_back(s);
-                    else if (!hasSuffix(s, "/") && trusted.count(s + "/"))
-                        subs.push_back(s + "/");
+                for (auto & s : ss) {
+                    auto ref = StoreReference::parse(s);
+                    auto tryTrust = [&] {
+                        if (trusted.count(ref))
+                            return true;
+                        if (auto * specified = std::get_if<StoreReference::Specified>(&ref.variant);
+                            specified && !hasSuffix(specified->authority, "/")) {
+                            specified->authority += "/";
+                            if (trusted.count(ref))
+                                return true;
+                        }
+                        return false;
+                    };
+                    if (tryTrust())
+                        subs.push_back(std::move(ref));
                     else
                         warn(
                             "ignoring untrusted substituter '%s', you are not a trusted user.\n"
                             "Run `man nix.conf` for more information on the `substituters` configuration option.",
                             s);
-                res = subs;
+                }
+                res = std::move(subs);
                 return true;
             };
 

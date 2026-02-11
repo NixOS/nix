@@ -457,7 +457,7 @@ static int main_nix_daemon(int argc, char ** argv)
             return true;
         });
 
-        runDaemon(resolveStoreConfig(StoreReference::parse(settings.storeUri.get())), stdio, isTrustedOpt, processOps);
+        runDaemon(resolveStoreConfig(StoreReference{settings.storeUri.get()}), stdio, isTrustedOpt, processOps);
 
         return 0;
     }

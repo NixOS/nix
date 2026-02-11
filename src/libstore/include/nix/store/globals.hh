@@ -8,6 +8,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-settings.hh"
+#include "nix/store/store-reference.hh"
 
 #include "nix/store/config.hh"
 
@@ -133,9 +134,9 @@ public:
      */
     std::filesystem::path nixDaemonSocketFile;
 
-    Setting<std::string> storeUri{
+    Setting<StoreReference> storeUri{
         this,
-        getEnv("NIX_REMOTE").value_or("auto"),
+        StoreReference::parse(getEnv("NIX_REMOTE").value_or("auto")),
         "store",
         R"(
           The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
@@ -616,9 +617,9 @@ public:
         // Don't document the machine-specific default value
         false};
 
-    Setting<Strings> substituters{
+    Setting<std::vector<StoreReference>> substituters{
         this,
-        Strings{"https://cache.nixos.org/"},
+        std::vector<StoreReference>{StoreReference::parse("https://cache.nixos.org/")},
         "substituters",
         R"(
           A list of [URLs of Nix stores](@docroot@/store/types/index.md#store-url-format) to be used as substituters, separated by whitespace.
@@ -637,7 +638,7 @@ public:
         )",
         {"binary-caches"}};
 
-    Setting<StringSet> trustedSubstituters{
+    Setting<std::set<StoreReference>> trustedSubstituters{
         this,
         {},
         "trusted-substituters",
