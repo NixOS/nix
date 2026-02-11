@@ -303,6 +303,7 @@ sources = files(
   'derivations.cc',
   'derived-path-map.cc',
   'derived-path.cc',
+  'disk-cached-binary-cache-store.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',
   'export-import.cc',

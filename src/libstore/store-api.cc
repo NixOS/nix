@@ -7,8 +7,8 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/nar-info.hh"
 #include "nix/util/util.hh"
-#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
@@ -513,27 +513,7 @@ bool Store::isValidPath(const StorePath & storePath)
         return res->didExist();
     }
 
-    if (diskCache) {
-        auto res = diskCache->lookupNarInfo(
-            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()));
-        if (res.first != NarInfoDiskCache::oUnknown) {
-            stats.narInfoReadAverted++;
-            pathInfoCache->lock()->upsert(
-                storePath,
-                res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
-                                                        : PathInfoCacheValue{.value = res.second});
-            return res.first == NarInfoDiskCache::oValid;
-        }
-    }
-
-    bool valid = isValidPathUncached(storePath);
-
-    if (diskCache && !valid)
-        // FIXME: handle valid = true case.
-        diskCache->upsertNarInfo(
-            config.getReference().render(/*FIXME withParams=*/false), std::string(storePath.hashPart()), 0);
-
-    return valid;
+    return isValidPathUncached(storePath);
 }
 
 /* Default implementation for stores that only implement
@@ -571,8 +551,6 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
 
 std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
 {
-    auto hashPart = std::string(storePath.hashPart());
-
     auto res = pathInfoCache->lock()->get(storePath);
     if (res && res->isKnownNow()) {
         stats.narInfoReadAverted++;
@@ -582,28 +560,11 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
             return std::make_optional(nullptr);
     }
 
-    if (diskCache) {
-        auto res = diskCache->lookupNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart);
-        if (res.first != NarInfoDiskCache::oUnknown) {
-            stats.narInfoReadAverted++;
-            pathInfoCache->lock()->upsert(
-                storePath,
-                res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
-                                                        : PathInfoCacheValue{.value = res.second});
-            if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
-                return std::make_optional(nullptr);
-            assert(res.second);
-            return std::make_optional(res.second);
-        }
-    }
-
     return std::nullopt;
 }
 
 void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidPathInfo>> callback) noexcept
 {
-    auto hashPart = std::string(storePath.hashPart());
-
     try {
         auto r = queryPathInfoFromClientCache(storePath);
         if (r.has_value()) {
@@ -620,12 +581,9 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     queryPathInfoUncached(
-        storePath, {[this, storePath, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+        storePath, {[this, storePath, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
             try {
                 auto info = fut.get();
-
-                if (diskCache)
-                    diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
                 pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
 
@@ -644,45 +602,12 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
 void Store::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
-
-    try {
-        if (diskCache) {
-            auto [cacheOutcome, maybeCachedRealisation] =
-                diskCache->lookupRealisation(config.getReference().render(/*FIXME: withParams=*/false), id);
-            switch (cacheOutcome) {
-            case NarInfoDiskCache::oValid:
-                debug("Returning a cached realisation for %s", id.to_string());
-                callback(maybeCachedRealisation);
-                return;
-            case NarInfoDiskCache::oInvalid:
-                debug("Returning a cached missing realisation for %s", id.to_string());
-                callback(nullptr);
-                return;
-            case NarInfoDiskCache::oUnknown:
-                break;
-            }
-        }
-    } catch (...) {
-        return callback.rethrow();
-    }
-
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    queryRealisationUncached(id, {[this, id, callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
+    queryRealisationUncached(id, {[callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
                                  try {
                                      auto info = fut.get();
-
-                                     if (diskCache) {
-                                         if (info)
-                                             diskCache->upsertRealisation(
-                                                 config.getReference().render(/*FIXME withParams=*/false), {*info, id});
-                                         else
-                                             diskCache->upsertAbsentRealisation(
-                                                 config.getReference().render(/*FIXME withParams=*/false), id);
-                                     }
-
                                      (*callbackPtr)(std::shared_ptr<const UnkeyedRealisation>(info));
-
                                  } catch (...) {
                                      callbackPtr->rethrow();
                                  }

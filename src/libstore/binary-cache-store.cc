@@ -7,7 +7,6 @@
 #include "nix/store/nar-info.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
@@ -128,12 +127,6 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
     pathInfoCache->lock()->upsert(narInfo->path, PathInfoCacheValue{.value = std::shared_ptr<NarInfo>(narInfo)});
-
-    if (diskCache)
-        diskCache->upsertNarInfo(
-            config.getReference().render(/*FIXME withParams=*/false),
-            std::string(narInfo->path.hashPart()),
-            std::shared_ptr<NarInfo>(narInfo));
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
@@ -549,8 +542,6 @@ void BinaryCacheStore::queryRealisationUncached(
 
 void BinaryCacheStore::registerDrvOutput(const Realisation & info)
 {
-    if (diskCache)
-        diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);
     upsertFile(makeRealisationPath(info.id), static_cast<nlohmann::json>(info).dump(), "application/json");
 }
 

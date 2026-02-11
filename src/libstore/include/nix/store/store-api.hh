@@ -40,7 +40,6 @@ struct BasicDerivation;
 struct Derivation;
 
 struct SourceAccessor;
-class NarInfoDiskCache;
 class Store;
 
 typedef std::map<std::string, StorePath> OutputPathMap;
@@ -311,8 +310,6 @@ protected:
     // Note: this is a `ref` to avoid false sharing with immutable
     // bits of `Store`.
     ref<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
-
-    std::shared_ptr<NarInfoDiskCache> diskCache;
 
     Store(const Store::Config & config);
 

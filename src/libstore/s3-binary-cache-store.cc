@@ -1,5 +1,7 @@
 #include "nix/store/s3-binary-cache-store.hh"
+#include "nix/store/disk-cached-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
@@ -477,9 +479,12 @@ std::string S3BinaryCacheStoreConfig::doc()
 
 ref<Store> S3BinaryCacheStoreConfig::openStore() const
 {
-    auto sharedThis = std::const_pointer_cast<S3BinaryCacheStoreConfig>(
+    auto self = std::const_pointer_cast<S3BinaryCacheStoreConfig>(
         std::static_pointer_cast<const S3BinaryCacheStoreConfig>(shared_from_this()));
-    return make_ref<S3BinaryCacheStore>(ref{sharedThis});
+    auto s3Store = make_ref<S3BinaryCacheStore>(ref{self});
+    auto store = make_ref<DiskCachedBinaryCacheStore>(s3Store, getNarInfoDiskCache());
+    store->init();
+    return store;
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;
