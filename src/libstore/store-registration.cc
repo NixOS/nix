@@ -8,7 +8,7 @@ namespace nix {
 
 ref<Store> openStore()
 {
-    return openStore(settings.storeUri.get());
+    return openStore(StoreReference{settings.storeUri.get()});
 }
 
 ref<Store> openStore(const std::string & uri, const Store::Config::Params & extraParams)
@@ -79,20 +79,20 @@ std::list<ref<Store>> getDefaultSubstituters()
     static auto stores([]() {
         std::list<ref<Store>> stores;
 
-        StringSet done;
+        std::set<StoreReference> done;
 
-        auto addStore = [&](const std::string & uri) {
-            if (!done.insert(uri).second)
+        auto addStore = [&](const StoreReference & ref) {
+            if (!done.insert(ref).second)
                 return;
             try {
-                stores.push_back(openStore(uri));
+                stores.push_back(openStore(StoreReference{ref}));
             } catch (Error & e) {
                 logWarning(e.info());
             }
         };
 
-        for (const auto & uri : settings.substituters.get())
-            addStore(uri);
+        for (const auto & ref : settings.substituters.get())
+            addStore(ref);
 
         stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
 

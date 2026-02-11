@@ -6,6 +6,7 @@
 #include "nix/util/util.hh"
 
 #include <boost/url/ipv6_address.hpp>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -184,3 +185,19 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+StoreReference adl_serializer<StoreReference>::from_json(const json & json)
+{
+    return StoreReference::parse(json.get<std::string>());
+}
+
+void adl_serializer<StoreReference>::to_json(json & json, const StoreReference & ref)
+{
+    json = ref.render();
+}
+
+} // namespace nlohmann

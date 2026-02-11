@@ -253,7 +253,7 @@ LegacyArgs::LegacyArgs(
         .longName = "store",
         .description = "The URL of the Nix store to use.",
         .labels = {"store-uri"},
-        .handler = {&(std::string &) settings.storeUri},
+        .handler = {[](std::string s) { settings.storeUri = StoreReference::parse(s); }},
     });
 }
 
