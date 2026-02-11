@@ -24,6 +24,10 @@ subproject('libcmd')
 # Executables
 subproject('nix')
 
+if host_machine.system() == 'linux'
+  subproject('nswrapper')
+endif
+
 # Docs
 if get_option('doc-gen')
   subproject('internal-api-docs')

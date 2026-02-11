@@ -418,6 +418,8 @@ in
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
 
+  nix-nswrapper = callPackage ../src/nswrapper/package.nix { };
+
   /**
     The Nix command line interface. Note that this does not include its tests, whereas `nix-everything` does.
   */
