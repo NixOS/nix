@@ -1,9 +1,8 @@
 #include "nix/cmd/command.hh"
+#include "nix/cmd/get-build-log.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-open.hh"
-#include "nix/store/log-store.hh"
 
 using namespace nix;
 
@@ -30,10 +29,6 @@ struct CmdLog : InstallableCommand
     {
         settings.readOnlyMode = true;
 
-        auto subs = getDefaultSubstituters();
-
-        subs.push_front(store);
-
         auto b = installable->toDerivedPath();
 
         // For compat with CLI today, TODO revisit
@@ -46,25 +41,9 @@ struct CmdLog : InstallableCommand
         auto path = resolveDerivedPath(*store, *oneUp);
 
         RunPager pager;
-        for (auto & sub : subs) {
-            auto * logSubP = dynamic_cast<LogStore *>(&*sub);
-            if (!logSubP) {
-                printInfo(
-                    "Skipped '%s' which does not support retrieving build logs", sub->config.getHumanReadableURI());
-                continue;
-            }
-            auto & logSub = *logSubP;
-
-            auto log = logSub.getBuildLog(path);
-            if (!log)
-                continue;
-            logger->stop();
-            printInfo("got build log for '%s' from '%s'", installable->what(), logSub.config.getHumanReadableURI());
-            writeFull(getStandardOutput(), *log);
-            return;
-        }
-
-        throw Error("build log of '%s' is not available", installable->what());
+        auto log = fetchBuildLog(store, path, installable->what());
+        logger->stop();
+        writeFull(getStandardOutput(), log);
     }
 };
 

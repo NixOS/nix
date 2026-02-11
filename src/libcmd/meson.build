@@ -74,6 +74,7 @@ sources = files(
   'command.cc',
   'common-eval-args.cc',
   'editor-for.cc',
+  'get-build-log.cc',
   'installable-attr-path.cc',
   'installable-derived-path.cc',
   'installable-flake.cc',
