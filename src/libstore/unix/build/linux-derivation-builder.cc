@@ -691,13 +691,15 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void setUser() override
     {
-        /* Switch to the sandbox uid/gid in the user namespace,
-           which corresponds to the build user or calling user in
-           the parent namespace. */
-        if (setgid(sandboxGid()) == -1)
-            throw SysError("setgid failed");
-        if (setuid(sandboxUid()) == -1)
-            throw SysError("setuid failed");
+        preserveDeathSignal([this]() {
+            /* Switch to the sandbox uid/gid in the user namespace,
+               which corresponds to the build user or calling user in
+               the parent namespace. */
+            if (setgid(sandboxGid()) == -1)
+                throw SysError("setgid failed");
+            if (setuid(sandboxUid()) == -1)
+                throw SysError("setuid failed");
+        });
     }
 
     SingleDrvOutputs unprepareBuild() override
