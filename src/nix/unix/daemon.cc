@@ -4,6 +4,7 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
+#include "nix/store/local-fs-store.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/remote-store.hh"
@@ -23,6 +24,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstring>
+#include <variant>
 
 #include <unistd.h>
 #include <signal.h>
@@ -246,7 +248,10 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::P
  * the client. Otherwise, decide based on the authentication settings
  * and user credentials (from the unix domain socket).
  */
-static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<TrustedFlag> forceTrustClientOpt)
+static void daemonLoop(
+    ref<const StoreConfig> storeConfig,
+    std::optional<TrustedFlag> forceTrustClientOpt,
+    std::filesystem::path socketPath)
 {
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
@@ -284,7 +289,7 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
     try {
         unix::serveUnixSocket(
             {
-                .socketPath = getDaemonSocketPath(),
+                .socketPath = std::move(socketPath),
                 .socketMode = 0666,
                 .auxiliaryFd = sigChldPipe.readSide.get(),
                 .onAuxiliaryFdPollin =
@@ -421,42 +426,81 @@ static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 }
 
 /**
+ * Tag indicating the daemon should communicate via standard I/O.
+ */
+struct StdIO
+{};
+
+/**
+ * Tag indicating the daemon should listen on a UNIX socket.
+ *
+ * Use the the given path if defined, or at the default path for the given
+ * store (configuration) if `std::nullopt`.
+ */
+using UnixSocket = std::optional<std::filesystem::path>;
+
+/**
+ * How the daemon should accept connections. See the underlying types for
+ * details on each choice.
+ */
+using DaemonMode = std::variant<StdIO, UnixSocket>;
+
+/**
  * Entry point shared between the new CLI `nix daemon` and old CLI
  * `nix-daemon`.
  *
  * @param storeConfig The store configuration to use for opening stores.
+ * @param mode How the daemon accepts connections; stdio or UNIX socket.
  * @param forceTrustClientOpt See `daemonLoop()` and the parameter with
  * the same name over there for details.
  *
  * @param processOps Whether to force processing ops even if the next
  * store also is a remote store and could process it directly.
  */
-static void
-runDaemon(ref<StoreConfig> storeConfig, bool stdio, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
+static void runDaemon(
+    ref<StoreConfig> storeConfig, DaemonMode mode, std::optional<TrustedFlag> forceTrustClientOpt, bool processOps)
 {
     // Disable caching since the client already does that.
     storeConfig->pathInfoCacheSize = 0;
 
-    if (stdio) {
-        auto store = storeConfig->openStore();
-        store->init();
+    std::visit(
+        overloaded{
+            [&](StdIO) {
+                auto store = storeConfig->openStore();
+                store->init();
 
-        std::shared_ptr<RemoteStore> remoteStore;
+                std::shared_ptr<RemoteStore> remoteStore;
 
-        // If --force-untrusted is passed, we cannot forward the connection and
-        // must process it ourselves (before delegating to the next store) to
-        // force untrusting the client.
-        processOps |= !forceTrustClientOpt || *forceTrustClientOpt != NotTrusted;
+                // If --force-untrusted is passed, we cannot forward the connection and
+                // must process it ourselves (before delegating to the next store) to
+                // force untrusting the client.
+                processOps |= !forceTrustClientOpt || *forceTrustClientOpt != NotTrusted;
 
-        if (!processOps && (remoteStore = store.dynamic_pointer_cast<RemoteStore>()))
-            forwardStdioConnection(*remoteStore);
-        else
-            // `Trusted` is passed in the auto (no override case) because we
-            // cannot see who is on the other side of a plain pipe. Limiting
-            // access to those is explicitly not `nix-daemon`'s responsibility.
-            processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
-    } else
-        daemonLoop(storeConfig, forceTrustClientOpt);
+                if (!processOps && (remoteStore = store.dynamic_pointer_cast<RemoteStore>()))
+                    forwardStdioConnection(*remoteStore);
+                else
+                    // `Trusted` is passed in the auto (no override case) because we
+                    // cannot see who is on the other side of a plain pipe. Limiting
+                    // access to those is explicitly not `nix-daemon`'s responsibility.
+                    processStdioConnection(store, forceTrustClientOpt.value_or(Trusted));
+            },
+            [&](UnixSocket socketPathOverride) {
+                auto socketPath = std::move(socketPathOverride)
+                                      .or_else([&]() -> std::optional<std::filesystem::path> {
+                                          return getDaemonSocketPath(*storeConfig);
+                                      })
+                                      .value();
+
+                if (auto * udsConfig = dynamic_cast<const UDSRemoteStoreConfig *>(storeConfig.get());
+                    udsConfig && udsConfig->path == socketPath)
+                    warn(
+                        "daemon socket path %s is the same as the store's socket path; this will fail",
+                        PathFmt(socketPath));
+
+                daemonLoop(storeConfig, forceTrustClientOpt, std::move(socketPath));
+            },
+        },
+        mode);
 }
 
 static int main_nix_daemon(int argc, char ** argv)
@@ -492,7 +536,11 @@ static int main_nix_daemon(int argc, char ** argv)
             return true;
         });
 
-        runDaemon(resolveStoreConfig(StoreReference{settings.storeUri.get()}), stdio, isTrustedOpt, processOps);
+        runDaemon(
+            resolveStoreConfig(StoreReference{settings.storeUri.get()}),
+            stdio ? DaemonMode{StdIO{}} : DaemonMode{UnixSocket{}},
+            isTrustedOpt,
+            processOps);
 
         return 0;
     }
@@ -505,6 +553,7 @@ struct CmdDaemon : StoreConfigCommand
     bool stdio = false;
     std::optional<TrustedFlag> isTrustedOpt = std::nullopt;
     bool processOps = false;
+    std::optional<std::filesystem::path> socketPath;
 
     CmdDaemon()
     {
@@ -539,6 +588,17 @@ struct CmdDaemon : StoreConfigCommand
         });
 
         addFlag({
+            .longName = "socket-path",
+            .description = R"(
+              Path to the daemon's UNIX socket.
+              Overrides `NIX_DAEMON_SOCKET_PATH` and the default.
+              Incompatible with `--stdio`.
+            )",
+            .labels = {"path"},
+            .handler = {[&](std::filesystem::path s) { socketPath = std::move(s); }},
+        });
+
+        addFlag({
             .longName = "process-ops",
             .description = R"(
               Forces the daemon to process received commands itself rather than forwarding the commands straight to the remote store.
@@ -569,7 +629,13 @@ struct CmdDaemon : StoreConfigCommand
 
     void run(ref<StoreConfig> storeConfig) override
     {
-        runDaemon(std::move(storeConfig), stdio, isTrustedOpt, processOps);
+        if (stdio && socketPath)
+            throw UsageError("'--stdio' and '--socket-path' are incompatible");
+        runDaemon(
+            std::move(storeConfig),
+            stdio ? DaemonMode{StdIO{}} : DaemonMode{std::move(socketPath)},
+            isTrustedOpt,
+            processOps);
     }
 };
 

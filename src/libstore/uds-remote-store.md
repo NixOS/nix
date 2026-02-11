@@ -10,10 +10,8 @@ the socket path is determined as follows:
 
 1. The [`NIX_DAEMON_SOCKET_PATH`] environment variable, if set.
 
-2. Otherwise, `$NIX_STATE_DIR/daemon-socket/socket`.
-   See [`NIX_STATE_DIR`] for details about the defaults when that variable is not defined.
+2. Otherwise, `daemon-socket/socket` within the [`state`](#store-setting-state) directory.
 
 [`NIX_DAEMON_SOCKET_PATH`]: @docroot@/command-ref/env-common.md#env-NIX_DAEMON_SOCKET_PATH
-[`NIX_STATE_DIR`]: @docroot@/command-ref/env-common.md#env-NIX_STATE_DIR
 
 )"
