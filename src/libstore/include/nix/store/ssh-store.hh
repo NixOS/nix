@@ -17,7 +17,7 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
 
     SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
 
-    const Setting<Strings> remoteProgram{
+    Setting<Strings> remoteProgram{
         this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
 
     static const std::string name()

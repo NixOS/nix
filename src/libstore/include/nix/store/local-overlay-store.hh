@@ -19,7 +19,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
     {
     }
 
-    const Setting<std::string> lowerStoreUri{
+    Setting<std::string> lowerStoreUri{
         (StoreConfig *) this,
         "",
         "lower-store",
@@ -31,7 +31,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const PathSetting upperLayer{
+    PathSetting upperLayer{
         (StoreConfig *) this,
         "",
         "upper-layer",
@@ -53,7 +53,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const PathSetting remountHook{
+    PathSetting remountHook{
         (StoreConfig *) this,
         "",
         "remount-hook",
