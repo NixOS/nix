@@ -50,18 +50,26 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir(opendir(linksDir.c_str()));
-    if (!dir)
-        throw SysError("opening directory '%1%'", linksDir);
+    auto scanDir = [&](const Path & dir) {
+        AutoCloseDir d(opendir(dir.c_str()));
+        if (!d) {
+            if (errno == ENOENT)
+                return;
+            throw SysError("opening directory '%1%'", dir);
+        }
 
-    struct dirent * dirent;
-    while (errno = 0, dirent = readdir(dir.get())) { /* sic */
-        checkInterrupt();
-        // We don't care if we hit non-hash files, anything goes
-        inodeHash.insert(dirent->d_ino);
-    }
-    if (errno)
-        throw SysError("reading directory '%1%'", linksDir);
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(d.get())) { /* sic */
+            checkInterrupt();
+            // We don't care if we hit non-hash files, anything goes
+            inodeHash.insert(dirent->d_ino);
+        }
+        if (errno)
+            throw SysError("reading directory '%1%'", dir);
+    };
+
+    scanDir(linksDir);
+    scanDir(linksDirB3);
 
     printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
@@ -154,29 +162,50 @@ void LocalStore::optimisePath_(
 
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
-       the contents of the target (which may not even exist). */
-    Hash hash = ({
-        hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path)},
-            FileSerialisationMethod::NixArchive,
-            HashAlgorithm::SHA256)
-            .hash;
-    });
+       the contents of the target (which may not even exist).
+
+       For BLAKE3 links, we hash the flat content instead and encode
+       the file type as a suffix (r/x/s) in the link name. */
+    auto useB3 = experimentalFeatureSettings.isEnabled(Xp::BLAKE3Links);
+    auto hashAlgo = useB3 ? HashAlgorithm::BLAKE3 : HashAlgorithm::SHA256;
+    Hash hash = [&] {
+        if (useB3) {
+            if ((st.st_mode & S_IFMT) == S_IFLNK)
+                return hashString(hashAlgo, readLink(path));
+            else
+                return hashFile(hashAlgo, path);
+        } else {
+            return hashPath(
+                       {make_ref<PosixSourceAccessor>(), CanonPath(path)},
+                       FileSerialisationMethod::NixArchive,
+                       hashAlgo)
+                .hash;
+        }
+    }();
     debug("'%1%' has hash '%2%'", path, hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
-    std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
+    std::string linkName = hash.to_string(HashFormat::Nix32, false);
+    if (useB3) {
+        linkName += '-';
+        linkName += linkModeSuffix(st.st_mode);
+    }
+    std::filesystem::path linkPath = std::filesystem::path{useB3 ? linksDirB3 : linksDir} / linkName;
 
     /* Maybe delete the link, if it has been corrupted. */
     if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
         auto stLink = lstat(linkPath);
-        if (st.st_size != stLink.st_size || (repair && hash != ({
-                                                           hashPath(
-                                                               makeFSSourceAccessor(linkPath),
-                                                               FileSerialisationMethod::NixArchive,
-                                                               HashAlgorithm::SHA256)
-                                                               .hash;
-                                                       }))) {
+        auto linkHash = [&] {
+            if (useB3) {
+                if ((stLink.st_mode & S_IFMT) == S_IFLNK)
+                    return hashString(hashAlgo, readLink(linkPath).string());
+                else
+                    return hashFile(hashAlgo, linkPath);
+            } else {
+                return hashPath(makeFSSourceAccessor(linkPath), FileSerialisationMethod::NixArchive, hashAlgo).hash;
+            }
+        };
+        if (st.st_size != stLink.st_size || (repair && hash != linkHash())) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", PathFmt(linkPath));
             warn(
