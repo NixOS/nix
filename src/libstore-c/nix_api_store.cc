@@ -9,6 +9,7 @@
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/store-reference.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/base-nix-32.hh"
@@ -47,14 +48,14 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         if (uri_str.empty())
             return new Store{nix::openStore()};
 
-        if (!params)
-            return new Store{nix::openStore(uri_str)};
+        auto storeRef = nix::StoreReference::parse(uri_str);
 
-        nix::Store::Config::Params params_map;
-        for (size_t i = 0; params[i] != nullptr; i++) {
-            params_map[params[i][0]] = params[i][1];
+        if (params) {
+            for (size_t i = 0; params[i] != nullptr; i++) {
+                storeRef.params[params[i][0]] = params[i][1];
+            }
         }
-        return new Store{nix::openStore(uri_str, params_map)};
+        return new Store{nix::openStore(std::move(storeRef))};
     }
     NIXC_CATCH_ERRS_NULL
 }

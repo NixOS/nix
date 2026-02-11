@@ -191,19 +191,25 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
             {.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
              .pos = state.positions[pos]});
 
-    auto parsedURL = parseURL(*fromStoreUrl, /*lenient=*/true);
+    auto storeRef = StoreReference::parse(*fromStoreUrl);
 
-    if (parsedURL.scheme != "http" && parsedURL.scheme != "https"
-        && !(getEnv("_NIX_IN_TEST").has_value() && parsedURL.scheme == "file"))
-        throw Error(
-            {.msg = HintFmt("'fetchClosure' only supports http:// and https:// stores"), .pos = state.positions[pos]});
+    if ([&] {
+            auto * specified = std::get_if<StoreReference::Specified>(&storeRef.variant);
+            return !specified
+                   || (specified->scheme != "http" && specified->scheme != "https"
+                       && !(getEnv("_NIX_IN_TEST").has_value() && specified->scheme == "file"));
+        }())
+        throw Error({
+            .msg = HintFmt("'fetchClosure' only supports http:// and https:// stores"),
+            .pos = state.positions[pos],
+        });
 
-    if (!parsedURL.query.empty())
+    if (!storeRef.params.empty())
         throw Error(
             {.msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
              .pos = state.positions[pos]});
 
-    auto fromStore = openStore(parsedURL.to_string());
+    auto fromStore = openStore(std::move(storeRef));
 
     if (toPath)
         runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, *toPath, v);
