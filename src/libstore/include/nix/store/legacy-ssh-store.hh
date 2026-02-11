@@ -20,15 +20,15 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
     // Hack for getting remote build log output.
     // Intentionally not in `LegacySSHStoreConfig` so that it doesn't appear in
     // the documentation
-    const Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
+    Setting<int> logFD{this, INVALID_DESCRIPTOR, "log-fd", "file descriptor to which SSH's stderr is connected"};
 #else
     Descriptor logFD = INVALID_DESCRIPTOR;
 #endif
 
-    const Setting<Strings> remoteProgram{
+    Setting<Strings> remoteProgram{
         this, {"nix-store"}, "remote-program", "Path to the `nix-store` executable on the remote machine."};
 
-    const Setting<int> maxConnections{this, 1, "max-connections", "Maximum number of concurrent SSH connections."};
+    Setting<int> maxConnections{this, 1, "max-connections", "Maximum number of concurrent SSH connections."};
 
     /**
      * Hack for hydra

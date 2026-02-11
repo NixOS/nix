@@ -21,13 +21,13 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     ParsedURL cacheUri;
 
-    const Setting<std::optional<CompressionAlgo>> narinfoCompression{
+    Setting<std::optional<CompressionAlgo>> narinfoCompression{
         this, std::nullopt, "narinfo-compression", "Compression method for `.narinfo` files."};
 
-    const Setting<std::optional<CompressionAlgo>> lsCompression{
+    Setting<std::optional<CompressionAlgo>> lsCompression{
         this, std::nullopt, "ls-compression", "Compression method for `.ls` files."};
 
-    const Setting<std::optional<CompressionAlgo>> logCompression{
+    Setting<std::optional<CompressionAlgo>> logCompression{
         this,
         std::nullopt,
         "log-compression",
@@ -37,10 +37,10 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
           (e.g. `brotli`).
         )"};
 
-    const Setting<std::optional<std::filesystem::path>> tlsCert{
+    Setting<std::optional<std::filesystem::path>> tlsCert{
         this, std::nullopt, "tls-certificate", "Path to an optional TLS client certificate in PEM format."};
 
-    const Setting<std::optional<std::filesystem::path>> tlsKey{
+    Setting<std::optional<std::filesystem::path>> tlsKey{
         this, std::nullopt, "tls-private-key", "Path to an optional TLS client certificate private key in PEM format."};
 
     static const std::string name()
