@@ -479,6 +479,10 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransferSettings.connectTimeout.get());
 
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPALIVE, 1L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPIDLE, 60L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPINTVL, 60L);
+
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransferSettings.stalledDownloadTimeout.get());
 
