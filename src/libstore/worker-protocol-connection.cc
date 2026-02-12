@@ -82,11 +82,19 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
+            // Namespace remote activity IDs to prevent collisions with
+            // local IDs by setting the high bit. Local IDs use
+            // PID << 32 | counter, where PIDs fit in 31 bits, so bit 63
+            // is always clear for local activities.
+            act |= (1ULL << 63);
+            if (parent != 0)
+                parent |= (1ULL << 63);
             logger->startActivity(act, lvl, type, s, fields, parent, /* forwarded = */ true);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
+            act |= (1ULL << 63);
             logger->stopActivity(act);
         }
 
@@ -94,6 +102,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto act = readNum<ActivityId>(from);
             auto type = (ResultType) readInt(from);
             auto fields = readFields(from);
+            act |= (1ULL << 63);
             logger->result(act, type, fields);
         }
 
