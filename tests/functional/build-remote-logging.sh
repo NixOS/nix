@@ -2,9 +2,10 @@
 
 # Test that structured log events are properly forwarded from remote builds.
 # Specifically tests:
-# - resSetPhase (type 104) forwarding
-# - actBuild (type 105) start/stop events
-# - resBuildLogLine (type 101) forwarding
+# - resSetPhase (result type 104) forwarding
+# - actBuild (activity type 105) start events
+# - resBuildLogLine (result type 101) forwarding
+# - forwarded field on remote activities
 
 source common.sh
 
@@ -49,29 +50,31 @@ nix build -L -v --log-format internal-json \
 outPath=$(readlink -f "$TEST_ROOT/result-hook")
 grepQuiet 'done' "$TEST_ROOT/machine0/$outPath"
 
-echo "--- JSON output (build hook path) ---"
+echo "--- Checking JSON output (build hook path) ---"
 
-# resBuildLogLine (101) should always be forwarded
+# resBuildLogLine (result type 101) should be forwarded.
+# Use action-qualified pattern to avoid matching actFileTransfer (activity type 101).
 echo "Checking resBuildLogLine (101)..."
-grepQuiet '"type":101' "$json_output"
+grepQuiet '"action":"result".*"type":101' "$json_output"
 
-# actBuild start (105) should appear
+# actBuild (activity type 105) start events should appear.
+# Use action-qualified pattern to avoid matching resProgress (result type 105).
 echo "Checking actBuild start (105)..."
-grepQuiet '"type":105' "$json_output"
+grepQuiet '"action":"start".*"type":105' "$json_output"
 
-# resSetPhase (104) — this is the key test.
-# The builder emits @nix {"action":"setPhase",...} messages.
-# These should be forwarded as resSetPhase (type 104) results.
+# resSetPhase (result type 104) — the key test.
+# The builder emits @nix {"action":"setPhase",...} messages which should
+# be forwarded as resSetPhase (type 104) result events.
+# Use action-qualified pattern to avoid matching actBuilds (activity type 104).
 echo "Checking resSetPhase (104)..."
-grepQuiet '"type":104' "$json_output"
+grepQuiet '"action":"result".*"type":104' "$json_output"
 
-# Check for specific phase names in the output
-command grep '"buildPhase"' "$json_output" > /dev/null
+# Check for specific phase names in SetPhase results
+command grep '"action":"result"' "$json_output" | grepQuiet '"buildPhase"'
 
-# Forwarded activities from the remote daemon should have "forwarded":true.
-# The remote Build activity is forwarded through the build hook, so at least
-# one start event should carry the forwarded flag.
-echo "Checking forwarded field on remote activities..."
-grepQuiet '"forwarded":true' "$json_output"
+# Forwarded activities from the remote daemon should carry a "machine"
+# field identifying the remote store (not present on local activities).
+echo "Checking machine field on remote start events..."
+command grep '"action":"start"' "$json_output" | grepQuiet '"machine":"ssh-ng://'
 
 echo "=== Test 1 PASSED ==="

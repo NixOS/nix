@@ -76,6 +76,10 @@ ref<RemoteStore::Connection> RemoteStore::openConnectionWrapper()
 
 void RemoteStore::initConnection(Connection & conn)
 {
+    /* Set the remote description so that build activities forwarded from
+       the remote daemon have the correct machine name. */
+    conn.remoteDescription = config.getHumanReadableURI();
+
     /* Send the magic greeting, check for the reply. */
     try {
         conn.from.endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";

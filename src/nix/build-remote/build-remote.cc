@@ -287,12 +287,7 @@ static int main_build_remote(int argc, char ** argv)
         auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
-            Activity act(
-                *logger,
-                lvlTalkative,
-                actBuildWaiting,
-                fmt("copying dependencies to '%s'", storeUri),
-                Logger::Fields{store->printStorePath(*drvPath), storeUri});
+            Activity act(*logger, lvlTalkative, actBuildWaiting, fmt("copying dependencies to '%s'", storeUri));
             copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
         }
 
