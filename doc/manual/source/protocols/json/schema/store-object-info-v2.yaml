@@ -107,7 +107,7 @@ $defs:
         type: string
         title: Store Directory
         description: |
-          The [store directory](@docroot@/store/store-path.md#store-directory) this store object belongs to (e.g. `/nix/store`).
+          The [path to the store directory](@docroot@/store/store-path.md#store-directory-path) this store object belongs within (e.g. `/nix/store`).
     additionalProperties: false
 
   impure:
