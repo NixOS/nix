@@ -31,6 +31,7 @@ public:
     virtual Guard init(detail::ReplCompleterMixin * repl) = 0;
     /** Returns a boolean of whether the interacter got EOF */
     virtual bool getLine(std::string & input, ReplPromptType promptType) = 0;
+    virtual void addHistory(std::string & input) = 0;
     virtual ~ReplInteracter() {};
 };
 
@@ -45,6 +46,7 @@ public:
 
     virtual Guard init(detail::ReplCompleterMixin * repl) override;
     virtual bool getLine(std::string & input, ReplPromptType promptType) override;
+    virtual void addHistory(std::string & input) override;
     virtual ~ReadlineLikeInteracter() override;
 };
 
