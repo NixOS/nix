@@ -19,6 +19,8 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
     HttpBinaryCacheStoreConfig(
         std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params);
 
+    HttpBinaryCacheStoreConfig(ParsedURL cacheUri, const Store::Config::Params & params);
+
     ParsedURL cacheUri;
 
     Setting<std::optional<CompressionAlgo>> narinfoCompression{

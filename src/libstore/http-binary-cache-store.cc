@@ -20,12 +20,20 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
     std::string_view scheme, std::string_view _cacheUri, const Params & params)
+    : HttpBinaryCacheStoreConfig(
+          parseURL(
+              std::string{scheme} + "://"
+              + (!_cacheUri.empty()
+                     ? _cacheUri
+                     : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme))),
+          params)
+{
+}
+
+HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, const Params & params)
     : StoreConfig(params)
     , BinaryCacheStoreConfig(params)
-    , cacheUri(parseURL(
-          std::string{scheme} + "://"
-          + (!_cacheUri.empty() ? _cacheUri
-                                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme))))
+    , cacheUri(std::move(_cacheUri))
 {
     while (!cacheUri.path.empty() && cacheUri.path.back() == "")
         cacheUri.path.pop_back();
