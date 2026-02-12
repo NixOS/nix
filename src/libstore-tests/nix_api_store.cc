@@ -299,7 +299,7 @@ public:
         nix_api_store_test_base::SetUp();
 
         nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-        nix::settings.substituters = {};
+        nix::settings.getWorkerSettings().substituters = {};
 
         store = open_local_store();
 
@@ -354,7 +354,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
 {
     // FIXME get rid of these
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
 
@@ -401,7 +401,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 {
     // Test that nix_store_realise properly reports errors when the system is invalid
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
 
@@ -446,7 +446,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 {
     // Test that nix_store_realise properly reports errors when the builder fails
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
 
@@ -491,7 +491,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 {
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
 
@@ -687,7 +687,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     // This test uses a CA derivation with 10 outputs in randomized input order
     // to verify that the callback order is deterministic and alphabetical.
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
-    nix::settings.substituters = {};
+    nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
 

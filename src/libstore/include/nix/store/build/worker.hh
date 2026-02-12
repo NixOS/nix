@@ -16,6 +16,7 @@
 namespace nix {
 
 /* Forward definition. */
+struct WorkerSettings;
 struct DerivationTrampolineGoal;
 struct DerivationGoal;
 struct DerivationResolutionGoal;
@@ -156,6 +157,7 @@ public:
 
     Store & store;
     Store & evalStore;
+    const WorkerSettings & settings;
 
     /**
      * Function to get the substituters to use for path substitution.

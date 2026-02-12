@@ -91,7 +91,7 @@ std::list<ref<Store>> getDefaultSubstituters()
             }
         };
 
-        for (const auto & ref : settings.substituters.get())
+        for (const auto & ref : settings.getWorkerSettings().substituters.get())
             addStore(ref);
 
         stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });

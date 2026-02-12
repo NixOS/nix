@@ -233,13 +233,13 @@ LegacyArgs::LegacyArgs(
         .longName = "keep-going",
         .shortName = 'k',
         .description = "Keep going after a build fails.",
-        .handler = {&(bool &) settings.keepGoing, true},
+        .handler = {&(bool &) settings.getWorkerSettings().keepGoing, true},
     });
 
     addFlag({
         .longName = "fallback",
         .description = "Build from source if substitution fails.",
-        .handler = {&(bool &) settings.tryFallback, true},
+        .handler = {&(bool &) settings.getWorkerSettings().tryFallback, true},
     });
 
     auto intSettingAlias =

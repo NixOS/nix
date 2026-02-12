@@ -37,7 +37,7 @@ namespace {
 // old version of git, which will ignore unrecognized `-c` options.
 const std::string gitInitialBranch = "__nix_dummy_branch";
 
-bool isCacheFileWithinTtl(time_t now, const PosixStat & st)
+static bool isCacheFileWithinTtl(const Settings & settings, time_t now, const PosixStat & st)
 {
     return st.st_mtime + static_cast<time_t>(settings.tarballTtl) > now;
 }
@@ -105,7 +105,7 @@ bool storeCachedHead(const std::string & actualUrl, bool shallow, const std::str
     return true;
 }
 
-std::optional<std::string> readHeadCached(const std::string & actualUrl, bool shallow)
+static std::optional<std::string> readHeadCached(const Settings & settings, const std::string & actualUrl, bool shallow)
 {
     // Create a cache path to store the branch of the HEAD ref. Append something
     // in front of the URL to prevent collision with the repository itself.
@@ -117,7 +117,7 @@ std::optional<std::string> readHeadCached(const std::string & actualUrl, bool sh
     std::optional<std::string> cachedRef;
     if (st) {
         cachedRef = readHead(cacheDir);
-        if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(now, *st)) {
+        if (cachedRef != std::nullopt && *cachedRef != gitInitialBranch && isCacheFileWithinTtl(settings, now, *st)) {
             debug("using cached HEAD ref '%s' for repo '%s'", *cachedRef, actualUrl);
             return cachedRef;
         }
@@ -728,12 +728,12 @@ struct GitInputScheme : InputScheme
         return revCount;
     }
 
-    std::string getDefaultRef(const RepoInfo & repoInfo, bool shallow) const
+    std::string getDefaultRef(const Settings & settings, const RepoInfo & repoInfo, bool shallow) const
     {
         auto head = std::visit(
             overloaded{
                 [&](const std::filesystem::path & path) { return GitRepo::openRepo(path, {})->getWorkdirRef(); },
-                [&](const ParsedURL & url) { return readHeadCached(url.to_string(), shallow); }},
+                [&](const ParsedURL & url) { return readHeadCached(settings, url.to_string(), shallow); }},
             repoInfo.location);
         if (!head) {
             warn("could not read HEAD ref from repo at '%s', using 'master'", repoInfo.locationToArg());
@@ -783,7 +783,7 @@ struct GitInputScheme : InputScheme
 
         auto originalRef = input.getRef();
         bool shallow = getShallowAttr(input);
-        auto ref = originalRef ? *originalRef : getDefaultRef(repoInfo, shallow);
+        auto ref = originalRef ? *originalRef : getDefaultRef(settings, repoInfo, shallow);
         input.attrs.insert_or_assign("ref", ref);
 
         std::filesystem::path repoDir;
@@ -822,7 +822,7 @@ struct GitInputScheme : InputScheme
                     /* If the local ref is older than 'tarball-ttl' seconds, do a
                        git fetch to update the local ref to the remote ref. */
                     auto st = maybeStat(localRefFile);
-                    doFetch = !st || !isCacheFileWithinTtl(now, *st);
+                    doFetch = !st || !isCacheFileWithinTtl(settings, now, *st);
                 }
             }
 

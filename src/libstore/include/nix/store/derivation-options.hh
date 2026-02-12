@@ -10,6 +10,7 @@
 #include "nix/util/json-impls.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/downstream-placeholder.hh"
+#include "nix/store/worker-settings.hh"
 
 namespace nix {
 
@@ -193,7 +194,7 @@ struct DerivationOptions
      */
     bool willBuildLocally(Store & localStore, const BasicDerivation & drv) const;
 
-    bool substitutesAllowed() const;
+    bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`

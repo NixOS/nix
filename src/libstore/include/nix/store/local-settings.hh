@@ -185,6 +185,29 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
         return autoAllocateUids ? this : nullptr;
     }
 
+    Setting<unsigned int> buildCores{
+        this,
+        0,
+        "cores",
+        R"(
+          Sets the value of the `NIX_BUILD_CORES` environment variable in the [invocation of the `builder` executable](@docroot@/store/building.md#builder-execution) of a derivation.
+          The `builder` executable can use this variable to control its own maximum amount of parallelism.
+
+          <!--
+          FIXME(@fricklerhandwerk): I don't think this should even be mentioned here.
+          A very generic example using `derivation` and `xargs` may be more appropriate to explain the mechanism.
+          Using `mkDerivation` as an example requires being aware of that there are multiple independent layers that are completely opaque here.
+          -->
+          For instance, in Nixpkgs, if the attribute `enableParallelBuilding` for the `mkDerivation` build helper is set to `true`, it passes the `-j${NIX_BUILD_CORES}` flag to GNU Make.
+
+          If set to `0`, nix will detect the number of CPU cores and pass this number via `NIX_BUILD_CORES`.
+
+          > **Note**
+          >
+          > The number of parallel local Nix build jobs is independently controlled with the [`max-jobs`](#conf-max-jobs) setting.
+        )",
+        {"build-cores"}};
+
     Setting<bool> fsyncMetadata{
         this,
         true,

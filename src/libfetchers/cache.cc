@@ -34,14 +34,20 @@ struct CacheImpl : Cache
 
     Sync<State> _state;
 
-    CacheImpl()
+    /**
+     * This is a back-reference to the `Settings` that owns us.
+     */
+    const Settings & settings;
+
+    CacheImpl(const Settings & _settings)
+        : settings(_settings)
     {
         auto state(_state.lock());
 
         auto dbPath = (getCacheDir() / "fetcher-cache-v4.sqlite").string();
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
+        state->db = SQLite(dbPath, {.useWAL = nix::settings.useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 
@@ -154,7 +160,7 @@ ref<Cache> Settings::getCache() const
 {
     auto cache(_cache.lock());
     if (!*cache)
-        *cache = std::make_shared<CacheImpl>();
+        *cache = std::make_shared<CacheImpl>(*this);
     return ref<Cache>(*cache);
 }
 

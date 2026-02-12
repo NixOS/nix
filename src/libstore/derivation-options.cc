@@ -366,7 +366,7 @@ bool DerivationOptions<Input>::canBuildLocally(Store & localStore, const BasicDe
         && !drv.isBuiltin())
         return false;
 
-    if (settings.maxBuildJobs.get() == 0 && !drv.isBuiltin())
+    if (settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
         return false;
 
     for (auto & feature : getRequiredSystemFeatures(drv))
@@ -383,9 +383,9 @@ bool DerivationOptions<Input>::willBuildLocally(Store & localStore, const BasicD
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::substitutesAllowed() const
+bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
-    return settings.alwaysAllowSubstitutes ? true : allowSubstitutes;
+    return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;
 }
 
 template<typename Input>

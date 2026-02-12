@@ -114,22 +114,23 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
-    conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.keepGoing << settings.tryFallback
-            << verbosity << settings.maxBuildJobs << settings.maxSilentTime << true
-            << (settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
-            << 0                                                  /* obsolete print build trace */
-            << settings.buildCores << settings.useSubstitutes;
+    conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
+            << settings.getWorkerSettings().tryFallback << verbosity << settings.getWorkerSettings().maxBuildJobs
+            << settings.getWorkerSettings().maxSilentTime << true << (settings.verboseBuild ? lvlError : lvlVomit)
+            << 0 // obsolete log type
+            << 0 /* obsolete print build trace */
+            << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;
     settings.getSettings(overrides, true); // libstore settings
     fileTransferSettings.getSettings(overrides, true);
     overrides.erase(settings.keepFailed.name);
-    overrides.erase(settings.keepGoing.name);
-    overrides.erase(settings.tryFallback.name);
-    overrides.erase(settings.maxBuildJobs.name);
-    overrides.erase(settings.maxSilentTime.name);
-    overrides.erase(settings.buildCores.name);
-    overrides.erase(settings.useSubstitutes.name);
+    overrides.erase(settings.getWorkerSettings().keepGoing.name);
+    overrides.erase(settings.getWorkerSettings().tryFallback.name);
+    overrides.erase(settings.getWorkerSettings().maxBuildJobs.name);
+    overrides.erase(settings.getWorkerSettings().maxSilentTime.name);
+    overrides.erase(settings.getLocalSettings().buildCores.name);
+    overrides.erase(settings.getWorkerSettings().useSubstitutes.name);
     overrides.erase(loggerSettings.showTrace.name);
     overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
     overrides.erase("plugin-files");

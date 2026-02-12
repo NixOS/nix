@@ -76,8 +76,8 @@ static int main_build_remote(int argc, char ** argv)
             settings.set(name, value);
         }
 
-        auto maxBuildJobs = settings.maxBuildJobs;
-        settings.maxBuildJobs.set("1"); // hack to make tests with local?root= work
+        auto maxBuildJobs = settings.getWorkerSettings().maxBuildJobs;
+        settings.getWorkerSettings().maxBuildJobs.set("1"); // hack to make tests with local?root= work
 
         initPlugins();
 
@@ -284,7 +284,7 @@ static int main_build_remote(int argc, char ** argv)
             signal(SIGALRM, old);
         }
 
-        auto substitute = settings.buildersUseSubstitutes ? Substitute : NoSubstitute;
+        auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
