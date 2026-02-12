@@ -121,7 +121,15 @@ std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
 ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
 {
     auto res = make_ref<TestHttpBinaryCacheStoreConfig>(
-        "https", fmt("localhost:%d", port), TestHttpBinaryCacheStoreConfig::Params{});
+        ParsedURL{
+            .scheme = "https",
+            .authority =
+                ParsedURL::Authority{
+                    .host = "localhost",
+                    .port = port,
+                },
+        },
+        TestHttpBinaryCacheStoreConfig::Params{});
     res->pathInfoCacheSize = 0; /* We don't want any caching in tests. */
     return res;
 }

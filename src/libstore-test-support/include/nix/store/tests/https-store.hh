@@ -42,10 +42,9 @@ public:
 class TestHttpBinaryCacheStoreConfig : public HttpBinaryCacheStoreConfig
 {
 public:
-    TestHttpBinaryCacheStoreConfig(
-        std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params)
+    TestHttpBinaryCacheStoreConfig(ParsedURL url, const Store::Config::Params & params)
         : StoreConfig(params)
-        , HttpBinaryCacheStoreConfig(scheme, cacheUri, params)
+        , HttpBinaryCacheStoreConfig(url, params)
     {
     }
 
