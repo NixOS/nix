@@ -202,7 +202,8 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        bool forwarded) override
     {
         auto state(state_.lock());
 

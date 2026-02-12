@@ -82,7 +82,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
-            logger->startActivity(act, lvl, type, s, fields, parent);
+            logger->startActivity(act, lvl, type, s, fields, parent, /* forwarded = */ true);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {

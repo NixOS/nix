@@ -47,10 +47,11 @@ struct TeeLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        bool forwarded) override
     {
         for (auto & logger : loggers)
-            logger->startActivity(act, lvl, type, s, fields, parent);
+            logger->startActivity(act, lvl, type, s, fields, parent, forwarded);
     }
 
     void stopActivity(ActivityId act) override

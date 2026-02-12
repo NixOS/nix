@@ -152,7 +152,8 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) {};
+        ActivityId parent,
+        bool forwarded = false) {};
 
     virtual void stopActivity(ActivityId act) {};
 
@@ -202,7 +203,8 @@ struct Activity
         ActivityType type,
         const std::string & s = "",
         const Logger::Fields & fields = {},
-        ActivityId parent = getCurActivity());
+        ActivityId parent = getCurActivity(),
+        bool forwarded = false);
 
     Activity(
         Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())

@@ -130,7 +130,8 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        bool forwarded) override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
@@ -184,11 +185,12 @@ Activity::Activity(
     ActivityType type,
     const std::string & s,
     const Logger::Fields & fields,
-    ActivityId parent)
+    ActivityId parent,
+    bool forwarded)
     : logger(logger)
     , id(nextId++ + (((uint64_t) getPid()) << 32))
 {
-    logger.startActivity(id, lvl, type, s, fields, parent);
+    logger.startActivity(id, lvl, type, s, fields, parent, forwarded);
 }
 
 void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
@@ -306,7 +308,8 @@ struct JSONLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        bool forwarded) override
     {
         nlohmann::json json;
         json["action"] = "start";
@@ -315,6 +318,8 @@ struct JSONLogger : Logger
         json["type"] = type;
         json["text"] = s;
         json["parent"] = parent;
+        if (forwarded)
+            json["forwarded"] = true;
         addFields(json, fields);
         write(json);
     }
@@ -426,7 +431,13 @@ bool handleJSONLogMessage(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(
-                        *logger, (Verbosity) json["level"], type, json["text"], getFields(json["fields"]), act.id));
+                        *logger,
+                        (Verbosity) json["level"],
+                        type,
+                        json["text"],
+                        getFields(json["fields"]),
+                        act.id,
+                        /* forwarded = */ true));
         }
 
         else if (action == "stop")

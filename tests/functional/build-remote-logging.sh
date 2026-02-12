@@ -68,4 +68,10 @@ grepQuiet '"type":104' "$json_output"
 # Check for specific phase names in the output
 command grep '"buildPhase"' "$json_output" > /dev/null
 
+# Forwarded activities from the remote daemon should have "forwarded":true.
+# The remote Build activity is forwarded through the build hook, so at least
+# one start event should carry the forwarded flag.
+echo "Checking forwarded field on remote activities..."
+grepQuiet '"forwarded":true' "$json_output"
+
 echo "=== Test 1 PASSED ==="
