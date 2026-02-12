@@ -49,7 +49,11 @@ N getIntArg(const std::string & opt, Strings::iterator & i, const Strings::itera
     ++i;
     if (i == end)
         throw UsageError("'%1%' requires an argument", opt);
-    return string2IntWithUnitPrefix<N>(*i);
+    if (allowUnit)
+        return string2IntWithUnitPrefix<N>(*i);
+    else if (auto n = string2Int<N>(*i))
+        return *n;
+    throw UsageError("'%s' is not an integer", *i);
 }
 
 struct LegacyArgs : public MixCommonArgs, public RootArgs
