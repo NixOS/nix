@@ -42,6 +42,7 @@ headers = [ config_pub_h ] + files(
   'export-import.hh',
   'filetransfer.hh',
   'gc-store.hh',
+  'global-paths.hh',
   'globals.hh',
   'http-binary-cache-store.hh',
   'indirect-root-store.hh',
@@ -94,4 +95,5 @@ headers = [ config_pub_h ] + files(
   'worker-protocol-connection.hh',
   'worker-protocol-impl.hh',
   'worker-protocol.hh',
+  'worker-settings.hh',
 )

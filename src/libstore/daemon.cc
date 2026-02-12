@@ -233,14 +233,14 @@ struct ClientSettings
     void apply(TrustedFlag trusted)
     {
         settings.keepFailed = keepFailed;
-        settings.keepGoing = keepGoing;
-        settings.tryFallback = tryFallback;
+        settings.getWorkerSettings().keepGoing = keepGoing;
+        settings.getWorkerSettings().tryFallback = tryFallback;
         nix::verbosity = verbosity;
-        settings.maxBuildJobs.assign(maxBuildJobs);
-        settings.maxSilentTime = maxSilentTime;
+        settings.getWorkerSettings().maxBuildJobs.assign(maxBuildJobs);
+        settings.getWorkerSettings().maxSilentTime = maxSilentTime;
         settings.verboseBuild = verboseBuild;
-        settings.buildCores = buildCores;
-        settings.useSubstitutes = useSubstitutes;
+        settings.getLocalSettings().buildCores = buildCores;
+        settings.getWorkerSettings().useSubstitutes = useSubstitutes;
 
         for (auto & i : overrides) {
             auto & name(i.first);
@@ -250,7 +250,7 @@ struct ClientSettings
                 if (name != res.name && res.aliases.count(name) == 0)
                     return false;
                 std::set<StoreReference> trusted = settings.trustedSubstituters;
-                for (auto & ref : settings.substituters.get())
+                for (auto & ref : settings.getWorkerSettings().substituters.get())
                     trusted.insert(ref);
                 std::vector<StoreReference> subs;
                 auto ss = tokenizeString<Strings>(value);
@@ -293,11 +293,12 @@ struct ClientSettings
                         "Ignoring the client-specified plugin-files.\n"
                         "The client specifying plugins to the daemon never made sense, and was removed in Nix >=2.14.");
                 } else if (
-                    trusted || name == settings.buildTimeout.name || name == settings.maxSilentTime.name
-                    || name == settings.pollInterval.name || name == "connect-timeout"
+                    trusted || name == settings.getWorkerSettings().buildTimeout.name
+                    || name == settings.getWorkerSettings().maxSilentTime.name
+                    || name == settings.getWorkerSettings().pollInterval.name || name == "connect-timeout"
                     || (name == "builders" && value == ""))
                     settings.set(name, value);
-                else if (setSubstituters(settings.substituters))
+                else if (setSubstituters(settings.getWorkerSettings().substituters))
                     ;
                 else
                     warn(

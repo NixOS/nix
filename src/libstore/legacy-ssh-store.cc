@@ -183,9 +183,9 @@ void LegacySSHStore::narFromPath(const StorePath & path, std::function<void(Sour
 static ServeProto::BuildOptions buildSettings()
 {
     return {
-        .maxSilentTime = settings.maxSilentTime,
-        .buildTimeout = settings.buildTimeout,
-        .maxLogSize = settings.maxLogSize,
+        .maxSilentTime = settings.getWorkerSettings().maxSilentTime,
+        .buildTimeout = settings.getWorkerSettings().buildTimeout,
+        .maxLogSize = settings.getWorkerSettings().maxLogSize,
         .nrRepeats = 0, // buildRepeat hasn't worked for ages anyway
         .enforceDeterminism = 0,
         .keepFailed = settings.keepFailed,

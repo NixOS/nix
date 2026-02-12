@@ -209,7 +209,7 @@ Machines Machine::parseConfig(const StringSet & defaultSystems, const std::strin
 
 Machines getMachines()
 {
-    return Machine::parseConfig({settings.thisSystem}, settings.builders);
+    return Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
 }
 
 } // namespace nix

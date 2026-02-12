@@ -94,7 +94,7 @@ std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const 
 void HttpBinaryCacheStore::maybeDisable()
 {
     auto state(_state.lock());
-    if (state->enabled && settings.tryFallback) {
+    if (state->enabled && settings.getWorkerSettings().tryFallback) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
         state->enabled = false;

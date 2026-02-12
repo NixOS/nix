@@ -15,10 +15,10 @@ int testMainForBuidingPre(int argc, char ** argv)
     }
 
     // Disable build hook. We won't be testing remote builds in these unit tests. If we do, fix the above build hook.
-    settings.buildHook = {};
+    settings.getWorkerSettings().buildHook = {};
 
     // No substituters, unless a test specifically requests.
-    settings.substituters = {};
+    settings.getWorkerSettings().substituters = {};
 
 #ifdef __linux__ // should match the conditional around sandboxBuildDir declaration.
 

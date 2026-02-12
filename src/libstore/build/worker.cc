@@ -22,7 +22,10 @@ Worker::Worker(Store & store, Store & evalStore)
     , actSubstitutions(*logger, actCopyPaths)
     , store(store)
     , evalStore(evalStore)
-    , getSubstituters{[] { return settings.useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{}; }}
+    , settings(nix::settings.getWorkerSettings())
+    , getSubstituters{[] {
+        return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
+    }}
 {
     nrLocalBuilds = 0;
     nrSubstitutions = 0;

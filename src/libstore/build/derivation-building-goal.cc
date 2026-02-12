@@ -63,7 +63,11 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
 }
 
 static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
@@ -87,7 +91,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i))
             continue;
-        if (!settings.useSubstitutes)
+        if (!worker.settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i),
@@ -325,7 +329,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
            `preferLocalBuild' set.  Also, check and repair modes are only
            supported for local builds. */
         bool buildLocally = (buildMode != bmNormal || drvOptions.willBuildLocally(worker.store, *drv))
-                            && settings.maxBuildJobs.get() != 0;
+                            && worker.settings.maxBuildJobs.get() != 0;
 
         if (buildLocally) {
             useHook = false;
@@ -476,7 +480,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     msg += fmt(" on '%s'", hook->machineName);
 
     std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
-        settings.logLines,
+        worker.settings.logLines,
         std::make_unique<Activity>(
             *logger,
             lvlInfo,
@@ -496,7 +500,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
             auto & data = output->data;
             if (fd == hook->builderOut.readSide.get()) {
                 logSize += data.size();
-                if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     hook.reset();
                     co_return doneFailureLogTooLong(*buildLog);
                 }
@@ -605,7 +609,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     StorePathSet outputPaths;
     for (auto & [_, output] : builtOutputs)
         outputPaths.insert(output.outPath);
-    runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+    runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will
@@ -647,7 +651,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                                        : "building '%s'",
                 worker.store.printStorePath(drvPath));
         buildLog = std::make_unique<BuildLog>(
-            settings.logLines,
+            worker.settings.logLines,
             std::make_unique<Activity>(
                 *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
@@ -662,7 +666,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     while (true) {
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= settings.maxBuildJobs) {
+        if (curBuilds >= worker.settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
             co_return tryToBuild(std::move(inputPaths));
@@ -791,7 +795,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         if (auto * output = std::get_if<ChildOutput>(&event)) {
             if (output->fd == builder->builderOut.get()) {
                 logSize += output->data.size();
-                if (settings.maxLogSize && logSize > settings.maxLogSize) {
+                if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     builder->killChild();
                     co_return doneFailureLogTooLong(*buildLog);
                 }
@@ -838,7 +842,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
-        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+        runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -852,9 +856,13 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 }
 
 static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths)
 {
-    auto hook = settings.postBuildHook;
+    auto hook = workerSettings.postBuildHook;
     if (hook == "")
         return;
 
@@ -862,7 +870,7 @@ static void runPostBuildHook(
         logger,
         lvlTalkative,
         actPostBuildHook,
-        fmt("running post-build-hook '%s'", settings.postBuildHook),
+        fmt("running post-build-hook '%s'", workerSettings.postBuildHook),
         Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
     StringMap hookEnvironment = getEnv();
@@ -910,7 +918,7 @@ static void runPostBuildHook(
     LogSink sink(act);
 
     runProgram2({
-        .program = settings.postBuildHook,
+        .program = workerSettings.postBuildHook,
         .environment = hookEnvironment,
         .standardOut = &sink,
         .mergeStderrToStdout = true,
@@ -957,17 +965,18 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 #else
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
-    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
+    if (worker.settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
         return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>();
+        worker.hook = std::make_unique<HookInstance>(worker.settings.buildHook);
 
     try {
 
         /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0) << drv->platform
-                          << worker.store.printStorePath(drvPath) << drvOptions.getRequiredSystemFeatures(*drv);
+        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
+                          << drv->platform << worker.store.printStorePath(drvPath)
+                          << drvOptions.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1073,7 +1082,7 @@ Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
         BuildResult::Failure::LogLimitExceeded,
         "%s killed after writing more than %d bytes of log output",
         getName(),
-        settings.maxLogSize));
+        worker.settings.maxLogSize));
 }
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()

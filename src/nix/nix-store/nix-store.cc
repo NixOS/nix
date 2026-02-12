@@ -898,7 +898,7 @@ static void opServe(Strings opFlags, Strings opArgs)
         // building through the daemon.
         verbosity = lvlError;
         settings.getLogFileSettings().keepLog = false;
-        settings.useSubstitutes = false;
+        settings.getWorkerSettings().useSubstitutes = false;
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
 
@@ -907,10 +907,10 @@ static void opServe(Strings opFlags, Strings opArgs)
         // See how the serialization logic in
         // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
         // these conditions.
-        settings.maxSilentTime = options.maxSilentTime;
-        settings.buildTimeout = options.buildTimeout;
+        settings.getWorkerSettings().maxSilentTime = options.maxSilentTime;
+        settings.getWorkerSettings().buildTimeout = options.buildTimeout;
         if (clientVersion >= ServeProto::Version{2, 2})
-            settings.maxLogSize = options.maxLogSize;
+            settings.getWorkerSettings().maxLogSize = options.maxLogSize;
         if (clientVersion >= ServeProto::Version{2, 3}) {
             if (options.nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
