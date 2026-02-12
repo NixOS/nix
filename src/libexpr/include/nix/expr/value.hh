@@ -134,7 +134,7 @@ public:
     virtual bool operator==(const ExternalValueBase & b) const noexcept;
 
     /**
-     * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
+     * Print the value as JSON. Defaults to unconvertible, i.e. throws an error
      */
     virtual nlohmann::json
     printValueAsJSON(EvalState & state, bool strict, NixStringContext & context, bool copyToStore = true) const;
@@ -587,7 +587,7 @@ class alignas(16)
     enum PrimaryDiscriminator : int {
         pdUninitialized = 0,
         pdSingleDWord, //< layout: Single/zero field payload
-        /* The order of these enumations must be the same as in InternalType. */
+        /* The order of these enumerations must be the same as in InternalType. */
         pdListN, //< layout: Single untaggable field.
         pdString,
         pdPath,
