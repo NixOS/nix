@@ -510,6 +510,14 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
                         if (json) {
                             auto s = handleJSONLogMessage(
                                 *json, worker.act, hook->activities, "the derivation builder", true);
+
+                            // Update the expected build count when the remote daemon
+                            // starts building sub-dependencies we didn't know about.
+                            if ((*json)["action"] == "start" && (ActivityType) (int) (*json)["type"] == actBuild) {
+                                worker.expectedBuilds++;
+                                worker.updateProgress();
+                            }
+
                             // ensure that logs from a builder using `ssh-ng://` as protocol
                             // are also available to `nix log`.
                             if (s && logFile->sink) {
