@@ -12,13 +12,14 @@
 #include "nix/util/url.hh"
 
 #include "nix/store/config.hh"
-#include "nix/store/globals.hh"
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
 #include "nix/store/s3-url.hh"
 
 namespace nix {
+
+const std::filesystem::path & nixConfDir();
 
 struct FileTransferSettings : Config
 {
@@ -401,7 +402,7 @@ ref<FileTransfer> getFileTransfer();
  *
  * Prefer getFileTransfer() to this; see its docs for why.
  */
-ref<FileTransfer> makeFileTransfer();
+ref<FileTransfer> makeFileTransfer(const FileTransferSettings & settings = fileTransferSettings);
 
 class FileTransferError : public Error
 {

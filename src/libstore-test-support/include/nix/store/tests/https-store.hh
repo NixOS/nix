@@ -28,10 +28,10 @@ public:
     TestHttpBinaryCacheStore & operator=(const TestHttpBinaryCacheStore &) = delete;
     TestHttpBinaryCacheStore & operator=(TestHttpBinaryCacheStore &&) = delete;
 
-    TestHttpBinaryCacheStore(ref<HttpBinaryCacheStoreConfig> config)
+    TestHttpBinaryCacheStore(ref<HttpBinaryCacheStoreConfig> config, ref<FileTransfer> fileTransfer)
         : Store{*config}
         , BinaryCacheStore{*config}
-        , HttpBinaryCacheStore(config)
+        , HttpBinaryCacheStore(config, fileTransfer)
     {
         diskCache = nullptr; /* Disable caching, we'll be creating a new binary cache for each test. */
     }
@@ -49,12 +49,7 @@ public:
     {
     }
 
-    ref<TestHttpBinaryCacheStore> openTestStore() const;
-
-    ref<Store> openStore() const override
-    {
-        return openTestStore();
-    }
+    ref<TestHttpBinaryCacheStore> openTestStore(ref<FileTransfer> fileTransfer) const;
 };
 
 class HttpsBinaryCacheStoreTest : public virtual LibStoreNetworkTest
@@ -71,17 +66,29 @@ protected:
     std::filesystem::path tmpDir, cacheDir;
     std::filesystem::path caCert, caKey, serverCert, serverKey;
     std::filesystem::path clientCert, clientKey;
-    std::optional<std::filesystem::path> oldCaCert;
     Pid serverPid;
     uint16_t port = 8443;
     std::shared_ptr<Store> localCacheStore;
+
+    /**
+     * Custom FileTransferSettings with the test CA certificate.
+     * This is used instead of modifying global settings.
+     */
+    std::unique_ptr<FileTransferSettings> testFileTransferSettings;
+
+    /**
+     * FileTransfer instance using our test settings.
+     * Initialized in SetUp().
+     */
+    std::shared_ptr<FileTransfer> testFileTransfer;
 
     static void openssl(Strings args);
     void SetUp() override;
     void TearDown() override;
 
     virtual std::vector<std::string> serverArgs();
-    ref<TestHttpBinaryCacheStoreConfig> makeConfig(BinaryCacheStoreConfig::Params params);
+    ref<TestHttpBinaryCacheStoreConfig> makeConfig();
+    ref<TestHttpBinaryCacheStore> openStore(ref<TestHttpBinaryCacheStoreConfig> config);
 };
 
 class HttpsBinaryCacheStoreMtlsTest : public HttpsBinaryCacheStoreTest
