@@ -540,6 +540,8 @@ struct curlFileTransfer : public FileTransfer
 #endif
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransfer.settings.connectTimeout.get());
 
+            // Enable TCP keep-alive so that idle connections in curl's reuse pool
+            // are not silently dropped by NATs, firewalls, or load balancers.
             curl_easy_setopt(req, CURLOPT_TCP_KEEPALIVE, 1L);
             curl_easy_setopt(req, CURLOPT_TCP_KEEPIDLE, 60L);
             curl_easy_setopt(req, CURLOPT_TCP_KEEPINTVL, 60L);
