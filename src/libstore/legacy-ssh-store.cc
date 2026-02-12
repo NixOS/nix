@@ -1,5 +1,6 @@
 #include "nix/store/legacy-ssh-store.hh"
 #include "nix/store/common-ssh-store-config.hh"
+#include "nix/store/path-info-cache-store.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/remote-store.hh"
@@ -102,7 +103,7 @@ StoreReference LegacySSHStoreConfig::getReference() const
     };
 }
 
-std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached(const StorePathSet & paths)
+std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfos(const StorePathSet & paths)
 {
     auto conn(connections->get());
 
@@ -121,11 +122,11 @@ std::map<StorePath, UnkeyedValidPathInfo> LegacySSHStore::queryPathInfosUncached
     return infos;
 }
 
-void LegacySSHStore::queryPathInfoUncached(
+void LegacySSHStore::queryPathInfo(
     const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
-        auto infos = queryPathInfosUncached({path});
+        auto infos = queryPathInfos({path});
 
         switch (infos.size()) {
         case 0:
@@ -324,7 +325,10 @@ std::optional<TrustedFlag> LegacySSHStore::isTrustedClient()
 
 ref<Store> LegacySSHStore::Config::openStore() const
 {
-    return make_ref<LegacySSHStore>(ref{shared_from_this()});
+    return PathInfoCachedStore::make(pathInfoCacheSize.get(), [&](auto * cache) {
+        (void) cache; // LegacySSHStore doesn't need cache injection
+        return make_ref<LegacySSHStore>(ref{shared_from_this()});
+    });
 }
 
 static RegisterStoreImplementation<LegacySSHStore::Config> regLegacySSHStore;

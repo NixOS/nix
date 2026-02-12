@@ -48,7 +48,7 @@ TEST_F(HttpsBinaryCacheStoreTest, queryPathInfo)
     auto store = openStore(makeConfig());
     StringSource dump{"test"sv};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
-    EXPECT_NO_THROW(store->queryPathInfo(path));
+    EXPECT_NO_THROW(store->Store::queryPathInfo(path));
 }
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, queryPathInfo)
@@ -59,7 +59,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, queryPathInfo)
     auto store = openStore(config);
     StringSource dump{"test"sv};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
-    EXPECT_NO_THROW(store->queryPathInfo(path));
+    EXPECT_NO_THROW(store->Store::queryPathInfo(path));
 }
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWithoutClientCert)
@@ -102,7 +102,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
     config->tlsKey = clientKey;
     testFileTransferSettings->tries = 1;
     auto store = openStore(config);
-    auto info = store->queryPathInfo(path);
+    auto info = store->Store::queryPathInfo(path);
     NullSink null;
     EXPECT_THROW(store->narFromPath(path, null), Error);
 }

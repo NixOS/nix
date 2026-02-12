@@ -47,10 +47,10 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
 {
 }
 
-UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
+UDSRemoteStore::UDSRemoteStore(ref<const Config> config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache)
     : Store{*config}
     , LocalFSStore{*config}
-    , RemoteStore{*config}
+    , RemoteStore{*config, pathInfoCache}
     , config{config}
 {
 }
@@ -105,7 +105,9 @@ void UDSRemoteStore::addIndirectRoot(const Path & path)
 
 ref<Store> UDSRemoteStore::Config::openStore() const
 {
-    return make_ref<UDSRemoteStore>(ref{shared_from_this()});
+    return PathInfoCachedStore::make(pathInfoCacheSize.get(), [&](auto * cache) {
+        return make_ref<UDSRemoteStore>(ref{shared_from_this()}, cache);
+    });
 }
 
 static RegisterStoreImplementation<UDSRemoteStore::Config> regUDSRemoteStore;

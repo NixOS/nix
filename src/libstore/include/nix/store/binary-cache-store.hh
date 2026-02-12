@@ -3,6 +3,7 @@
 
 #include "nix/util/compression-settings.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/path-info-cache-store.hh"
 #include "nix/store/log-store.hh"
 
 #include "nix/util/pool.hh"
@@ -87,6 +88,12 @@ private:
     std::vector<std::unique_ptr<Signer>> signers;
 
 protected:
+    /**
+     * Optional pointer to the in-memory path info cache.
+     * Passed by `PathInfoCachedStore` wrapper to allow `writeNarInfo`
+     * to update the cache after writing a narinfo file.
+     */
+    SharedSync<PathInfoCachedStore::Cache> * pathInfoCache;
 
     /**
      * The prefix under which realisation infos will be stored
@@ -95,7 +102,7 @@ protected:
 
     constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
-    BinaryCacheStore(Config &);
+    BinaryCacheStore(Config &, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr);
 
     /**
      * Compute the path to the given realisation
@@ -174,10 +181,10 @@ private:
 
 public:
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPath(const StorePath & path) override;
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
@@ -204,8 +211,8 @@ public:
 
     void registerDrvOutput(const Realisation & info) override;
 
-    void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+    void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void narFromPath(const StorePath & path, Sink & sink) override;
 

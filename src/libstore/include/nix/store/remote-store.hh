@@ -6,6 +6,7 @@
 #include <string>
 
 #include "nix/store/store-api.hh"
+#include "nix/store/path-info-cache-store.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
@@ -45,18 +46,24 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     const Config & config;
 
-    RemoteStore(const Config & config);
+    /**
+     * Pointer to the wrapper's path info cache, for invalidation.
+     * Passed by `PathInfoCachedStore` wrapper.
+     */
+    SharedSync<PathInfoCachedStore::Cache> * pathInfoCache;
+
+    RemoteStore(const Config & config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr);
 
     /* Implementations of abstract store API methods. */
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPath(const StorePath & path) override;
 
     StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -104,8 +111,8 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void registerDrvOutput(const Realisation & info) override;
 
-    void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+    void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void
     buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;

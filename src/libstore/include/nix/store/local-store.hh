@@ -6,6 +6,7 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/path-info-cache-store.hh"
 #include "nix/util/sync.hh"
 
 #include <chrono>
@@ -216,6 +217,12 @@ private:
 
     const PublicKeys & getPublicKeys();
 
+    /**
+     * Pointer to the wrapper's path info cache, for invalidation.
+     * Passed by `PathInfoCachedStore` wrapper.
+     */
+    SharedSync<PathInfoCachedStore::Cache> * pathInfoCache;
+
 public:
 
     /**
@@ -227,7 +234,7 @@ public:
      * Initialise the local store, upgrading the schema if
      * necessary.
      */
-    LocalStore(ref<const Config> params);
+    LocalStore(ref<const Config> params, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr);
 
     ~LocalStore();
 
@@ -235,14 +242,14 @@ public:
      * Implementations of abstract store API methods.
      */
 
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPath(const StorePath & path) override;
 
     StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -411,8 +418,8 @@ public:
 
     std::optional<const UnkeyedRealisation> queryRealisation_(State & state, const DrvOutput & id);
     std::optional<std::pair<int64_t, UnkeyedRealisation>> queryRealisationCore_(State & state, const DrvOutput & id);
-    void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+    void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     std::optional<std::string> getVersion() override;
 

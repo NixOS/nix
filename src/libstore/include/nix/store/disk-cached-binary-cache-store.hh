@@ -11,8 +11,8 @@ namespace nix {
  * of `NarInfo` and realisation lookups.
  *
  * This uses the decorator pattern - it wraps another store and intercepts
- * the `*Uncached` methods to check/update the disk cache before delegating
- * to the wrapped store.
+ * `isValidPath`, `queryPathInfo`, and `queryRealisation` to check/update the
+ * disk cache before delegating to the wrapped store.
  *
  * Methods like `narFromPath`, `addSignatures`, `getFSAccessor` are NOT overridden
  * because they internally call `queryPathInfo`, which should go through this
@@ -35,13 +35,13 @@ public:
     void init() override;
 
 protected:
-    // Cache-aware overrides of the `*Uncached` methods
-    bool isValidPathUncached(const StorePath & path) override;
+    // Cache-aware overrides
+    bool isValidPath(const StorePath & path) override;
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    void queryRealisationUncached(
+    void queryRealisation(
         const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void writeNarInfo(ref<NarInfo> narInfo) override;

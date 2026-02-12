@@ -54,7 +54,7 @@ struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
 
     ref<const Config> config;
 
-    UDSRemoteStore(ref<const Config>);
+    UDSRemoteStore(ref<const Config>, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr);
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     {

@@ -44,9 +44,9 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
 
     ref<const Config> config;
 
-    SSHStore(ref<const Config> config)
+    SSHStore(ref<const Config> config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr)
         : Store{*config}
-        , RemoteStore{*config}
+        , RemoteStore{*config, pathInfoCache}
         , config{config}
         , master(config->createSSHMaster(
               // Use SSH master only if using more than 1 connection.
@@ -131,10 +131,10 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 {
     using Config = MountedSSHStoreConfig;
 
-    MountedSSHStore(ref<const Config> config)
+    MountedSSHStore(ref<const Config> config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr)
         : Store{*config}
-        , RemoteStore{*config}
-        , SSHStore{config}
+        , RemoteStore{*config, pathInfoCache}
+        , SSHStore{config, pathInfoCache}
         , LocalFSStore{*config}
     {
         extraRemoteProgramArgs = {
@@ -190,12 +190,16 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 
 ref<Store> SSHStore::Config::openStore() const
 {
-    return make_ref<SSHStore>(ref{shared_from_this()});
+    return PathInfoCachedStore::make(
+        pathInfoCacheSize.get(), [&](auto * cache) { return make_ref<SSHStore>(ref{shared_from_this()}, cache); });
 }
 
 ref<Store> MountedSSHStore::Config::openStore() const
 {
-    return make_ref<MountedSSHStore>(ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())});
+    return PathInfoCachedStore::make(pathInfoCacheSize.get(), [&](auto * cache) {
+        return make_ref<MountedSSHStore>(
+            ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())}, cache);
+    });
 }
 
 ref<RemoteStore::Connection> SSHStore::openConnection()

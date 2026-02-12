@@ -1844,7 +1844,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* Check against already registered outputs */
 
             if (store.isValidPath(newInfo.path)) {
-                ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
+                ValidPathInfo oldInfo(*store.Store::queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
                     if (diffHook || settings.keepFailed) {

@@ -330,6 +330,7 @@ sources = files(
   'outputs-spec.cc',
   'parsed-derivations.cc',
   'path-info.cc',
+  'path-info-cache-store.cc',
   'path-references.cc',
   'path-with-outputs.cc',
   'path.cc',

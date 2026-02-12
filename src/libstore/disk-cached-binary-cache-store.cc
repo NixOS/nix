@@ -32,7 +32,7 @@ void DiskCachedBinaryCacheStore::init()
     }
 }
 
-bool DiskCachedBinaryCacheStore::isValidPathUncached(const StorePath & storePath)
+bool DiskCachedBinaryCacheStore::isValidPath(const StorePath & storePath)
 {
     auto res = diskCache->lookupNarInfo(cacheUri(), std::string(storePath.hashPart()));
     if (res.first != NarInfoDiskCache::oUnknown) {
@@ -49,7 +49,7 @@ bool DiskCachedBinaryCacheStore::isValidPathUncached(const StorePath & storePath
     return valid;
 }
 
-void DiskCachedBinaryCacheStore::queryPathInfoUncached(
+void DiskCachedBinaryCacheStore::queryPathInfo(
     const StorePath & storePath, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto hashPart = std::string(storePath.hashPart());
@@ -71,21 +71,22 @@ void DiskCachedBinaryCacheStore::queryPathInfoUncached(
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
     // Call the full queryPathInfo on inner
-    inner->queryPathInfo(storePath, {[this, hashPart, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
-                             try {
-                                 auto info = fut.get();
-                                 diskCache->upsertNarInfo(cacheUri(), hashPart, info.get_ptr());
-                                 (*callbackPtr)(info.get_ptr());
-                             } catch (InvalidPath &) {
-                                 diskCache->upsertNarInfo(cacheUri(), hashPart, 0);
-                                 (*callbackPtr)(nullptr);
-                             } catch (...) {
-                                 callbackPtr->rethrow();
-                             }
-                         }});
+    inner->queryPathInfo(
+        storePath, {[this, hashPart, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+            try {
+                auto info = fut.get();
+                diskCache->upsertNarInfo(cacheUri(), hashPart, info);
+                (*callbackPtr)(std::move(info));
+            } catch (InvalidPath &) {
+                diskCache->upsertNarInfo(cacheUri(), hashPart, nullptr);
+                (*callbackPtr)(nullptr);
+            } catch (...) {
+                callbackPtr->rethrow();
+            }
+        }});
 }
 
-void DiskCachedBinaryCacheStore::queryRealisationUncached(
+void DiskCachedBinaryCacheStore::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {

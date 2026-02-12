@@ -23,8 +23,9 @@
 
 namespace nix {
 
-BinaryCacheStore::BinaryCacheStore(Config & config)
+BinaryCacheStore::BinaryCacheStore(Config & config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache)
     : config{config}
+    , pathInfoCache{pathInfoCache}
 {
     if (config.secretKeyFile != "")
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile)}));
@@ -126,7 +127,9 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 
     upsertFile(narInfoFile, narInfo->to_string(*this), "text/x-nix-narinfo");
 
-    pathInfoCache->lock()->upsert(narInfo->path, PathInfoCacheValue{.value = std::shared_ptr<NarInfo>(narInfo)});
+    if (pathInfoCache)
+        pathInfoCache->lock()->upsert(
+            narInfo->path, PathInfoCachedStore::CacheValue{.value = std::shared_ptr<NarInfo>(narInfo)});
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
@@ -185,7 +188,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     for (auto & ref : info.references)
         try {
             if (ref != info.path)
-                queryPathInfo(ref);
+                Store::queryPathInfo(ref);
         } catch (InvalidPath &) {
             throw Error(
                 "cannot add '%s' to the binary cache because the reference '%s' is not valid",
@@ -376,7 +379,7 @@ StorePath BinaryCacheStore::addToStoreFromDump(
         ->path;
 }
 
-bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
+bool BinaryCacheStore::isValidPath(const StorePath & storePath)
 {
     // FIXME: this only checks whether a .narinfo with a matching hash
     // part exists. So ‘f4kb...-foo’ matches ‘f4kb...-bar’, even
@@ -388,7 +391,7 @@ std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::stri
 {
     auto pseudoPath = StorePath(hashPart + "-" + MissingName);
     try {
-        auto info = queryPathInfo(pseudoPath);
+        auto info = Store::queryPathInfo(pseudoPath);
         return info->path;
     } catch (InvalidPath &) {
         return std::nullopt;
@@ -397,7 +400,7 @@ std::optional<StorePath> BinaryCacheStore::queryPathFromHashPart(const std::stri
 
 void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
 {
-    auto info = queryPathInfo(storePath).cast<const NarInfo>();
+    auto info = Store::queryPathInfo(storePath).cast<const NarInfo>();
 
     uint64_t narSize = 0;
 
@@ -425,7 +428,7 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
     // Note: don't do anything here because it's never reached if we're called as a coroutine.
 }
 
-void BinaryCacheStore::queryPathInfoUncached(
+void BinaryCacheStore::queryPathInfo(
     const StorePath & storePath, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
@@ -510,7 +513,7 @@ std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
     return realisationsPrefix + "/" + id.to_string() + ".doi";
 }
 
-void BinaryCacheStore::queryRealisationUncached(
+void BinaryCacheStore::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     auto outputInfoFilePath = makeRealisationPath(id);
@@ -567,7 +570,7 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set
        when addSignatures() is called sequentially on a path, because
        S3 might return an outdated cached version. */
 
-    auto narInfo = make_ref<NarInfo>((NarInfo &) *queryPathInfo(storePath));
+    auto narInfo = make_ref<NarInfo>((NarInfo &) *Store::queryPathInfo(storePath));
 
     narInfo->sigs.insert(sigs.begin(), sigs.end());
 

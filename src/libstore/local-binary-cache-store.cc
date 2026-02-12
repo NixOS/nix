@@ -40,9 +40,9 @@ struct LocalBinaryCacheStore : virtual BinaryCacheStore
 
     ref<Config> config;
 
-    LocalBinaryCacheStore(ref<Config> config)
+    LocalBinaryCacheStore(ref<Config> config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr)
         : Store{*config}
-        , BinaryCacheStore{*config}
+        , BinaryCacheStore{*config, pathInfoCache}
         , config{config}
     {
     }
@@ -124,11 +124,14 @@ StringSet LocalBinaryCacheStoreConfig::uriSchemes()
 
 ref<Store> LocalBinaryCacheStoreConfig::openStore() const
 {
-    auto store = make_ref<LocalBinaryCacheStore>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())});
-    store->init();
-    return store;
+    return PathInfoCachedStore::make(pathInfoCacheSize.get(), [&](auto * cache) {
+        auto inner = make_ref<LocalBinaryCacheStore>(
+            ref{// FIXME we shouldn't actually need a mutable config
+                std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())},
+            cache);
+        inner->init();
+        return inner;
+    });
 }
 
 static RegisterStoreImplementation<LocalBinaryCacheStore::Config> regLocalBinaryCacheStore;

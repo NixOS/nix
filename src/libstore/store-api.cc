@@ -323,7 +323,6 @@ StringSet Store::Config::getDefaultSystemFeatures()
 Store::Store(const Store::Config & config)
     : StoreDirConfig{config}
     , config{config}
-    , pathInfoCache(make_ref<decltype(pathInfoCache)::element_type>((size_t) config.pathInfoCacheSize))
 {
     assertLibStoreInitialized();
 }
@@ -331,19 +330,6 @@ Store::Store(const Store::Config & config)
 StoreReference StoreConfig::getReference() const
 {
     return {.variant = StoreReference::Auto{}};
-}
-
-bool Store::PathInfoCacheValue::isKnownNow()
-{
-    std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
-                                           : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
-
-    return std::chrono::steady_clock::now() < time_point + ttl;
-}
-
-void Store::invalidatePathInfoCacheFor(const StorePath & path)
-{
-    pathInfoCache->lock()->erase(path);
 }
 
 std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
@@ -505,20 +491,8 @@ StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
     return res;
 }
 
-bool Store::isValidPath(const StorePath & storePath)
-{
-    auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
-        stats.narInfoReadAverted++;
-        return res->didExist();
-    }
-
-    return isValidPathUncached(storePath);
-}
-
-/* Default implementation for stores that only implement
-   queryPathInfoUncached(). */
-bool Store::isValidPathUncached(const StorePath & path)
+/* Default implementation for stores that only implement queryPathInfo(). */
+bool Store::isValidPath(const StorePath & path)
 {
     try {
         queryPathInfo(path);
@@ -549,69 +523,24 @@ static bool goodStorePath(const StorePath & expected, const StorePath & actual)
            && (expected.name() == Store::MissingName || expected.name() == actual.name());
 }
 
-std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClientCache(const StorePath & storePath)
-{
-    auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
-        stats.narInfoReadAverted++;
-        if (res->didExist())
-            return std::make_optional(res->value);
-        else
-            return std::make_optional(nullptr);
-    }
-
-    return std::nullopt;
-}
-
 void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidPathInfo>> callback) noexcept
 {
-    try {
-        auto r = queryPathInfoFromClientCache(storePath);
-        if (r.has_value()) {
-            std::shared_ptr<const ValidPathInfo> & info = *r;
-            if (info)
-                return callback(ref(info));
-            else
-                throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-        }
-    } catch (...) {
-        return callback.rethrow();
-    }
-
     auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
 
-    queryPathInfoUncached(
-        storePath, {[this, storePath, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
-            try {
-                auto info = fut.get();
+    queryPathInfo(storePath, {[this, storePath, callbackPtr](std::future<std::shared_ptr<const ValidPathInfo>> fut) {
+                      try {
+                          auto info = fut.get();
 
-                pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
+                          if (!info || !goodStorePath(storePath, info->path)) {
+                              stats.narInfoMissing++;
+                              throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
+                          }
 
-                if (!info || !goodStorePath(storePath, info->path)) {
-                    stats.narInfoMissing++;
-                    throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
-                }
-
-                (*callbackPtr)(ref<const ValidPathInfo>(info));
-            } catch (...) {
-                callbackPtr->rethrow();
-            }
-        }});
-}
-
-void Store::queryRealisation(
-    const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
-{
-    auto callbackPtr = std::make_shared<decltype(callback)>(std::move(callback));
-
-    queryRealisationUncached(id, {[callbackPtr](std::future<std::shared_ptr<const UnkeyedRealisation>> fut) {
-                                 try {
-                                     auto info = fut.get();
-                                     (*callbackPtr)(std::shared_ptr<const UnkeyedRealisation>(info));
-                                 } catch (...) {
-                                     callbackPtr->rethrow();
-                                 }
-                             }});
+                          (*callbackPtr)(ref<const ValidPathInfo>(info));
+                      } catch (...) {
+                          callbackPtr->rethrow();
+                      }
+                  }});
 }
 
 std::shared_ptr<const UnkeyedRealisation> Store::queryRealisation(const DrvOutput & id)
@@ -776,7 +705,6 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
 
 const Store::Stats & Store::getStats()
 {
-    stats.pathInfoCacheSize = pathInfoCache->readLock()->size();
     return stats;
 }
 
