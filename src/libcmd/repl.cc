@@ -120,15 +120,6 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     }
 };
 
-std::string removeWhitespace(std::string s)
-{
-    s = chomp(s);
-    size_t n = s.find_first_not_of(" \n\r\t");
-    if (n != std::string::npos)
-        s = std::string(s, n);
-    return s;
-}
-
 NixRepl::NixRepl(
     const LookupPath & lookupPath,
     ref<EvalState> state,
@@ -362,7 +353,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         size_t p = line.find_first_of(" \n\r\t");
         command = line.substr(0, p);
         if (p != std::string::npos)
-            arg = removeWhitespace(line.substr(p));
+            arg = trim(line.substr(p));
     } else {
         arg = line;
     }
@@ -671,7 +662,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         size_t p = line.find('=');
         std::string name;
         if (p != std::string::npos && p < line.size() && line[p + 1] != '='
-            && isVarName(name = removeWhitespace(line.substr(0, p)))) {
+            && isVarName(name = trim(line.substr(0, p)))) {
             Expr * e = parseString(line.substr(p + 1));
             Value & v(*state->allocValue());
             v.mkThunk(env, e);

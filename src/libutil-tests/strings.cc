@@ -8,6 +8,83 @@
 namespace nix {
 
 /* ----------------------------------------------------------------------------
+ * concatStringsTo
+ * --------------------------------------------------------------------------*/
+
+TEST(concatStringsTo, preservesEmbeddedNulInStdString)
+{
+    // Arrange
+    std::string part{"a\0b", 3};
+    std::string s;
+
+    // Act
+    concatStringsTo(s, part);
+
+    // Assert - appends embedded NUL bytes
+    ASSERT_EQ(s.size(), 3u);
+    EXPECT_EQ(s[0], 'a');
+    EXPECT_EQ(s[1], '\0');
+    EXPECT_EQ(s[2], 'b');
+}
+
+TEST(concatStringsTo, appendsMultiplePartsToExistingString)
+{
+    // Arrange
+    std::string s = "pre";
+    std::string tail = "post";
+    std::string_view mid = "mid";
+
+    // Act
+    concatStringsTo(s, "-", mid, "-", tail);
+
+    // Assert
+    ASSERT_EQ(s, "pre-mid-post");
+}
+
+TEST(concatStringsTo, acceptsSubstringStringView)
+{
+    // Arrange
+    std::string base = "hello world";
+    std::string_view view = std::string_view(base).substr(6);
+    std::string s;
+
+    // Act
+    concatStringsTo(s, view);
+
+    // Assert
+    ASSERT_EQ(s, "world");
+}
+
+TEST(concatStringsTo, cStringPointerUsesCStringLength)
+{
+    // Arrange
+    const char * p = "a\0b";
+    std::string s;
+
+    // Act
+    concatStringsTo(s, p);
+
+    // Assert - C string length stops at NUL
+    ASSERT_EQ(s, "a");
+}
+
+TEST(concatStringsTo, stringViewWithExplicitLengthPreservesNul)
+{
+    // Arrange
+    std::string s;
+    std::string_view v{"a\0b", 3};
+
+    // Act
+    concatStringsTo(s, v);
+
+    // Assert
+    ASSERT_EQ(s.size(), 3u);
+    EXPECT_EQ(s[0], 'a');
+    EXPECT_EQ(s[1], '\0');
+    EXPECT_EQ(s[2], 'b');
+}
+
+/* ----------------------------------------------------------------------------
  * concatStringsSep
  * --------------------------------------------------------------------------*/
 
