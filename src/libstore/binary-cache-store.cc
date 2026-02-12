@@ -170,13 +170,7 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
     narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
-                   + (config.compression == CompressionAlgo::xz       ? ".xz"
-                      : config.compression == CompressionAlgo::bzip2  ? ".bz2"
-                      : config.compression == CompressionAlgo::zstd   ? ".zst"
-                      : config.compression == CompressionAlgo::lzip   ? ".lzip"
-                      : config.compression == CompressionAlgo::lz4    ? ".lz4"
-                      : config.compression == CompressionAlgo::brotli ? ".br"
-                                                                      : "");
+                   + std::string(compressionAlgoExtension(config.compression));
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(

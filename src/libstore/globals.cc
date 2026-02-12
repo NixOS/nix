@@ -78,6 +78,37 @@ LogFileSettings::LogFileSettings()
 {
 }
 
+CompressionAlgo BuildLogCompressionSetting::parse(const std::string & str) const
+{
+    if (str == "true")
+        return CompressionAlgo::bzip2;
+    if (str == "false")
+        return CompressionAlgo::none;
+    try {
+        return parseCompressionAlgo(str, /*suggestions=*/true);
+    } catch (UnknownCompressionMethod & e) {
+        throw UsageError(e.info().suggestions, "option '%s' has invalid value '%s'", name, str);
+    }
+}
+
+void BuildLogCompressionSetting::convertToArg(Args & args, const std::string & category)
+{
+    args.addFlag({
+        .longName = name,
+        .aliases = aliases,
+        .description = fmt("Compression method for build logs."),
+        .category = category,
+        .labels = {"method"},
+        .handler = {[this](std::string s) { override(parse(s)); }},
+    });
+    args.addFlag({
+        .longName = "no-" + name,
+        .description = fmt("Disable build log compression."),
+        .category = category,
+        .handler = {[this]() { override(CompressionAlgo::none); }},
+    });
+}
+
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);

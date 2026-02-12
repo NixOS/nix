@@ -11,11 +11,25 @@ path=$(nix-build dependencies.nix --no-out-link)
 # Test nix-store -l.
 [ "$(nix-store -l "$path")" = FOO ]
 
-# Test compressed logs.
+# Test compressed logs (bzip2).
 clearStore
 rm -rf "$NIX_LOG_DIR"
 (! nix-store -l "$path")
-nix-build dependencies.nix --no-out-link --compress-build-log
+nix-build dependencies.nix --no-out-link --compress-build-log bzip2
+[ "$(nix-store -l "$path")" = FOO ]
+
+# Test compressed logs (zstd).
+clearStore
+rm -rf "$NIX_LOG_DIR"
+(! nix-store -l "$path")
+nix-build dependencies.nix --no-out-link --compress-build-log zstd
+[ "$(nix-store -l "$path")" = FOO ]
+
+# Test no compression.
+clearStore
+rm -rf "$NIX_LOG_DIR"
+(! nix-store -l "$path")
+nix-build dependencies.nix --no-out-link --no-compress-build-log
 [ "$(nix-store -l "$path")" = FOO ]
 
 # test whether empty logs work fine with `nix log`.

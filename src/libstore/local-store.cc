@@ -1580,7 +1580,16 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto baseName = drvPath.to_string();
 
-    auto logPath = fmt("%s/%s/%s/%s.bz2", config->logDir, drvsLogDir, baseName.substr(0, 2), baseName.substr(2));
+    auto & logSettings = settings.getLogFileSettings();
+    auto compression = logSettings.compressLog.get();
+
+    auto logPath =
+        fmt("%s/%s/%s/%s%s",
+            config->logDir,
+            drvsLogDir,
+            baseName.substr(0, 2),
+            baseName.substr(2),
+            compressionAlgoExtension(compression));
 
     if (pathExists(logPath))
         return;
@@ -1589,7 +1598,10 @@ void LocalStore::addBuildLog(const StorePath & drvPath, std::string_view log)
 
     auto tmpFile = fmt("%s.tmp.%d", logPath, getpid());
 
-    writeFile(tmpFile, compress(CompressionAlgo::bzip2, log));
+    if (logSettings.compressLog.enabled())
+        writeFile(tmpFile, compress(compression, log));
+    else
+        writeFile(tmpFile, log);
 
     std::filesystem::rename(tmpFile, logPath);
 }

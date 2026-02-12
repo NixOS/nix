@@ -10,9 +10,40 @@
 #include "nix/store/local-settings.hh"
 #include "nix/store/store-reference.hh"
 
+#include "nix/util/compression-settings.hh"
 #include "nix/store/config.hh"
 
 namespace nix {
+
+/**
+ * Custom setting subclass for build log compression that handles
+ * backward compatibility with the old boolean values.
+ *
+ * Accepts `true` (mapped to `bzip2`), `false` (mapped to `none`),
+ * or any compression algorithm name.
+ */
+struct BuildLogCompressionSetting : public BaseSetting<CompressionAlgo>
+{
+    BuildLogCompressionSetting(
+        Config * options,
+        CompressionAlgo def,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {})
+        : BaseSetting<CompressionAlgo>(def, true, name, description, aliases)
+    {
+        options->addSetting(this);
+    }
+
+    CompressionAlgo parse(const std::string & str) const override;
+
+    void convertToArg(Args & args, const std::string & category) override;
+
+    bool enabled() const
+    {
+        return value != CompressionAlgo::none;
+    }
+};
 
 struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 {
@@ -77,14 +108,16 @@ public:
         )",
         {"build-keep-log"}};
 
-    Setting<bool> compressLog{
+    BuildLogCompressionSetting compressLog{
         this,
-        true,
+        CompressionAlgo::bzip2,
         "compress-build-log",
         R"(
-          If set to `true` (the default), build logs written to
-          `/nix/var/log/nix/drvs` are compressed on the fly using bzip2.
-          Otherwise, they are not compressed.
+          Compression method for build logs written to `/nix/var/log/nix/drvs`.
+          Valid values are `none` (no compression), `bzip2` (the default),
+          `zstd`, `xz`, `gzip`, `lz4`, or `br`.
+          For backward compatibility, `true` is equivalent to `bzip2`
+          and `false` is equivalent to `none`.
         )",
         {"build-compress-log"}};
 };

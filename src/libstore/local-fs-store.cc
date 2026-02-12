@@ -118,20 +118,31 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 {
     auto baseName = path.to_string();
 
+    static const std::vector<std::pair<std::string, CompressionAlgo>> compressedExtensions = {
+        {".bz2", CompressionAlgo::bzip2},
+        {".zst", CompressionAlgo::zstd},
+        {".xz", CompressionAlgo::xz},
+        {".gz", CompressionAlgo::gzip},
+        {".lz4", CompressionAlgo::lz4},
+        {".br", CompressionAlgo::brotli},
+    };
+
     for (int j = 0; j < 2; j++) {
 
         Path logPath =
             j == 0 ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
                    : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
-        Path logBz2Path = logPath + ".bz2";
 
         if (pathExists(logPath))
             return readFile(logPath);
 
-        else if (pathExists(logBz2Path)) {
-            try {
-                return decompress("bzip2", readFile(logBz2Path));
-            } catch (Error &) {
+        for (auto & [ext, algo] : compressedExtensions) {
+            Path compressedPath = logPath + ext;
+            if (pathExists(compressedPath)) {
+                try {
+                    return decompress(showCompressionAlgo(algo), readFile(compressedPath));
+                } catch (Error &) {
+                }
             }
         }
     }
