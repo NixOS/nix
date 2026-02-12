@@ -27,6 +27,7 @@ add_project_arguments(
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
+  '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
   language : 'cpp',
 )
 
