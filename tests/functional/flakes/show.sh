@@ -138,8 +138,13 @@ cat >flake.nix <<EOF
 {
   description = "System folding test";
   outputs = inputs: {
+    packages.\${system}.p1 = import ./simple.nix;
     packages.x86_64-linux.p1 = import ./simple.nix;
     packages.aarch64-linux.p1 = import ./simple.nix;
+    apps.\${system}.a1 = {
+      type = "app";
+      program = "\${./simple.nix}";
+    };
     apps.x86_64-linux.a1 = {
       type = "app";
       program = "\${./simple.nix}";
@@ -148,8 +153,10 @@ cat >flake.nix <<EOF
       type = "app";
       program = "\${./simple.nix}";
     };
+    checks.\${system}.c1 = import ./simple.nix;
     checks.x86_64-linux.c1 = import ./simple.nix;
     checks.aarch64-linux.c1 = import ./simple.nix;
+    devShells.\${system}.default = import ./shell.nix;
     devShells.x86_64-linux.default = import ./shell.nix;
     devShells.aarch64-linux.default = import ./shell.nix;
   };
@@ -157,7 +164,10 @@ cat >flake.nix <<EOF
 EOF
 
 nix flake show > show-output.txt
-grep -q "\[x86_64-linux\]" show-output.txt
+# The current system should be highlighted in brackets
+grep -q "\[\${system}\]" show-output.txt
+# Other systems should be present
+grep -q "x86_64-linux" show-output.txt
 grep -q "aarch64-linux" show-output.txt
 
 # Test 2: --no-system-folding shows all systems separately
