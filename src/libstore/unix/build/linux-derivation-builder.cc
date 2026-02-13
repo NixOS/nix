@@ -222,7 +222,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     std::unique_ptr<UserLock> getBuildUser() override
     {
-        return acquireUserLock(store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        return acquireUserLock(
+            settings.nixStateDir, store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
     }
 
     void prepareUser() override

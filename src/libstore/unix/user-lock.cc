@@ -214,14 +214,15 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)
+std::unique_ptr<UserLock> acquireUserLock(
+    const std::filesystem::path & stateDir, const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)
 {
     if (auto * uidSettings = localSettings.getAutoAllocateUidSettings()) {
-        auto userPoolDir = settings.nixStateDir / "userpool2";
+        auto userPoolDir = stateDir / "userpool2";
         createDirs(userPoolDir);
         return AutoUserLock::acquire(userPoolDir, localSettings.buildUsersGroup, nrIds, useUserNamespace, *uidSettings);
     } else {
-        auto userPoolDir = settings.nixStateDir / "userpool";
+        auto userPoolDir = stateDir / "userpool";
         createDirs(userPoolDir);
         return SimpleUserLock::acquire(userPoolDir, localSettings.buildUsersGroup);
     }
