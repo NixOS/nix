@@ -57,29 +57,30 @@ void Pid::operator=(AutoCloseFD pid)
     this->pid = std::move(pid);
 }
 
-// TODO: Implement (not needed for process spawning yet)
 int Pid::kill(bool allowInterrupts)
 {
     assert(pid.get() != INVALID_DESCRIPTOR);
 
     debug("killing process %1%", pid.get());
 
-    throw UnimplementedError("Pid::kill unimplemented");
+    if (!TerminateProcess(pid.get(), 1))
+        logError(WinError("terminating process %1%", pid.get()).info());
+
+    return wait(allowInterrupts);
 }
 
+// Note that `allowInterrupts` is ignored for now, but there to match
+// Unix.
 int Pid::wait(bool allowInterrupts)
 {
-    // https://github.com/nix-windows/nix/blob/windows-meson/src/libutil/util.cc#L1938
     assert(pid.get() != INVALID_DESCRIPTOR);
     DWORD status = WaitForSingleObject(pid.get(), INFINITE);
-    if (status != WAIT_OBJECT_0) {
-        debug("WaitForSingleObject returned %1%", status);
-    }
+    if (status != WAIT_OBJECT_0)
+        throw WinError("waiting for process %1%", pid.get());
 
     DWORD exitCode = 0;
-    if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE) {
-        debug("GetExitCodeProcess failed on pid %1%", pid.get());
-    }
+    if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE)
+        throw WinError("getting exit code of process %1%", pid.get());
 
     pid.close();
     return exitCode;
