@@ -270,7 +270,7 @@ protected:
      */
     virtual std::unique_ptr<UserLock> getBuildUser()
     {
-        return acquireUserLock(localSettings, 1, false);
+        return acquireUserLock(settings.nixStateDir, localSettings, 1, false);
     }
 
     /**
