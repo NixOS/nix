@@ -40,7 +40,7 @@ struct CmdStoreDelete : StorePathsCommand
             options.pathsToDelete.insert(path);
 
         GCResults results;
-        PrintFreed freed(true, results);
+        Finally printer([&] { printFreed(false, results); });
         gcStore.collectGarbage(options, results);
     }
 };

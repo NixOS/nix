@@ -69,8 +69,7 @@ struct GCResults
     PathSet paths;
 
     /**
-     * For `gcReturnDead`, `gcDeleteDead` and `gcDeleteSpecific`, the
-     * number of bytes that would be or was freed.
+     * For `gcDeleteDead` and `gcDeleteSpecific`, the number of bytes that were freed.
      */
     uint64_t bytesFreed = 0;
 };
