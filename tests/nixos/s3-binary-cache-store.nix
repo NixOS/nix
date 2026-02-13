@@ -48,9 +48,14 @@ in
           rootCredentialsFile = pkgs.writeText "minio-credentials-full" ''
             MINIO_ROOT_USER=${accessKey}
             MINIO_ROOT_PASSWORD=${secretKey}
+            MINIO_DOMAIN=minio.local
           '';
         };
         networking.firewall.allowedTCPPorts = [ 9000 ];
+        # Static hosts for virtual-hosted-style S3 tests.
+        # MinIO with MINIO_DOMAIN=minio.local accepts virtual-hosted requests
+        # where the bucket name is a hostname prefix.
+        networking.extraHosts = "127.0.0.1 vhost-test.minio.local minio.local";
       };
 
     client =
@@ -62,6 +67,7 @@ in
           experimental-features = nix-command
           substituters =
         '';
+        networking.extraHosts = "192.168.1.2 vhost-test.minio.local minio.local";
       };
   };
 
@@ -82,6 +88,10 @@ in
       SECRET_KEY = '${secretKey}'
       ENDPOINT = 'http://server:9000'
       REGION = 'eu-west-1'
+
+      # Virtual-hosted-style configuration (requires MINIO_DOMAIN and static host entries)
+      VHOST_DOMAIN = 'minio.local'
+      VHOST_ENDPOINT = f'http://{VHOST_DOMAIN}:9000'
 
       PKGS = {
           'A': '${pkgA}',
@@ -859,6 +869,92 @@ in
               print(output)
               raise Exception("Expected SSO provider to be skipped")
 
+      def test_virtual_hosted_copy():
+          """Test nix copy with virtual-hosted-style addressing on custom endpoint"""
+          print("\n=== Testing Virtual-Hosted-Style Addressing ===")
+
+          # Use a fixed bucket name matching the static /etc/hosts entries
+          bucket = 'vhost-test'
+          server.succeed(f"mc mb minio/{bucket}")
+          try:
+              store_url = make_s3_url(
+                  bucket,
+                  endpoint=VHOST_ENDPOINT,
+                  **{'addressing-style': 'virtual'}
+              )
+
+              # Upload with virtual-hosted-style, capture debug output
+              output = server.succeed(
+                  f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' {PKGS['A']} 2>&1"
+              )
+
+              # Verify virtual-hosted-style URL was used (bucket in hostname)
+              vhost_url_prefix = f"http://{bucket}.{VHOST_DOMAIN}:9000/"
+              if vhost_url_prefix not in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception(
+                      f"Expected virtual-hosted-style URL containing '{vhost_url_prefix}'"
+                  )
+
+              # Verify path-style URL was NOT used (bucket should not be in the path)
+              path_style_pattern = f"{VHOST_ENDPOINT}/{bucket}/"
+              if path_style_pattern in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception("Found path-style URL when virtual-hosted-style was expected")
+
+              # Download with virtual-hosted-style
+              verify_packages_in_store(client, PKGS['A'], should_exist=False)
+              output = client.succeed(
+                  f"{ENV_WITH_CREDS} nix copy --debug --no-check-sigs "
+                  f"--from '{store_url}' {PKGS['A']} 2>&1"
+              )
+
+              if vhost_url_prefix not in output:
+                  print("Debug output:")
+                  print(output)
+                  raise Exception(
+                      f"Expected virtual-hosted-style URL in download containing '{vhost_url_prefix}'"
+                  )
+
+              verify_packages_in_store(client, PKGS['A'])
+          finally:
+              server.succeed(f"mc rb --force minio/{bucket}")
+              for pkg in PKGS.values():
+                  client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
+
+      @setup_s3()
+      def test_explicit_path_style(bucket):
+          """Test that addressing-style=path works as backwards-compatible fallback"""
+          print("\n=== Testing Explicit Path-Style Addressing ===")
+
+          store_url = make_s3_url(
+              bucket,
+              **{'addressing-style': 'path'}
+          )
+
+          # Upload with explicit path-style
+          output = server.succeed(
+              f"{ENV_WITH_CREDS} nix copy --debug --to '{store_url}' {PKGS['A']} 2>&1"
+          )
+
+          # Verify path-style URL was used (bucket in path, not hostname)
+          path_style_pattern = f"{ENDPOINT}/{bucket}/"
+          if path_style_pattern not in output:
+              print("Debug output:")
+              print(output)
+              raise Exception(
+                  f"Expected path-style URL containing '{path_style_pattern}'"
+              )
+
+          # Download
+          verify_packages_in_store(client, PKGS['A'], should_exist=False)
+          client.succeed(
+              f"{ENV_WITH_CREDS} nix copy --no-check-sigs --from '{store_url}' {PKGS['A']}"
+          )
+          verify_packages_in_store(client, PKGS['A'])
+
       # ============================================================================
       # Main Test Execution
       # ============================================================================
@@ -896,5 +992,7 @@ in
       test_profile_credentials()
       test_env_vars_precedence()
       test_credential_provider_chain()
+      test_virtual_hosted_copy()
+      test_explicit_path_style()
     '';
 }
