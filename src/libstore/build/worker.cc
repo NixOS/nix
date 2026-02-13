@@ -367,7 +367,9 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty())
             waitForInput();
         else if (awake.empty() && 0U == settings.maxBuildJobs) {
-            if (getMachines(store.config.settings).empty())
+            if (Machine::parseConfig(
+                    {store.config.settings.thisSystem}, store.config.settings.getWorkerSettings().builders)
+                    .empty())
                 throw Error(
                     "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
                     "\n"

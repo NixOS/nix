@@ -93,7 +93,7 @@ static int main_build_remote(int argc, char ** argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
-        auto machines = getMachines(settings);
+        auto machines = Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
         debug("got %d remote builders", machines.size());
 
         if (machines.empty()) {

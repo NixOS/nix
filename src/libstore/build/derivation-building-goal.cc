@@ -328,7 +328,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         /* Don't do a remote build if the derivation has the attribute
            `preferLocalBuild' set.  Also, check and repair modes are only
            supported for local builds. */
-        bool buildLocally = (buildMode != bmNormal || drvOptions.willBuildLocally(worker.store.config, *drv))
+        bool buildLocally = (buildMode != bmNormal
+                             || (drvOptions.preferLocalBuild && drvOptions.canBuildLocally(worker.store.config, *drv)))
                             && worker.settings.maxBuildJobs.get() != 0;
 
         if (buildLocally) {

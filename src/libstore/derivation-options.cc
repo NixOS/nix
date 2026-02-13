@@ -377,12 +377,6 @@ bool DerivationOptions<Input>::canBuildLocally(const StoreConfig & localStoreCon
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::willBuildLocally(const StoreConfig & localStoreConfig, const BasicDerivation & drv) const
-{
-    return preferLocalBuild && canBuildLocally(localStoreConfig, drv);
-}
-
-template<typename Input>
 bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
     return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;
