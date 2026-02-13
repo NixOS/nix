@@ -198,6 +198,11 @@ elif isDaemonNewer "2.29pre"; then
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 1 dependency failed."
     <<<"$out" grepQuiet -E "Build failed due to failed dependency"
+elif ! isDaemonNewer "2.0"; then
+    # Observed with Nix 1.11.16: new client with very old daemon still produces new-style messages.
+    # TODO: if the `else` branch (2.0 to 2.29pre) also produces new-style messages, merge these branches.
+    <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
+    <<<"$out" grepQuiet -E "Reason: 1 dependency failed."
 else
     <<<"$out" grepQuiet -E "error: 1 dependencies of derivation '.*-x4\\.drv' failed to build"
 fi
@@ -209,6 +214,11 @@ test "$status" = 1
 # Precise number of errors depends on daemon version / goal refactorings
 (( "$(<<<"$out" grep -cE '^error:')" >= 3 ))
 if isDaemonNewer "2.29pre"; then
+    <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
+    <<<"$out" grepQuiet -E "Reason: 2 dependencies failed."
+elif ! isDaemonNewer "2.0"; then
+    # Observed with Nix 1.11.16: new client with very old daemon still produces new-style messages.
+    # TODO: if the `else` branch (2.0 to 2.29pre) also produces new-style messages, merge these branches.
     <<<"$out" grepQuiet -E "error: Cannot build '.*-x4\\.drv'"
     <<<"$out" grepQuiet -E "Reason: 2 dependencies failed."
 else
