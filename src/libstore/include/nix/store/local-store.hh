@@ -117,6 +117,8 @@ public:
           > While the filesystem the database resides on might appear to be read-only, consider whether another user or system might have write access to it.
         )"};
 
+    bool getReadOnly() const override;
+
     Setting<bool> ignoreGcDeleteFailure{
         this,
         false,

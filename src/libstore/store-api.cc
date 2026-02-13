@@ -333,6 +333,11 @@ StoreReference StoreConfig::getReference() const
     return {.variant = StoreReference::Auto{}};
 }
 
+bool StoreConfig::getReadOnly() const
+{
+    return settings.readOnlyMode;
+}
+
 bool Store::PathInfoCacheValue::isKnownNow()
 {
     std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
