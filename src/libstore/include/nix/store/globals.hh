@@ -15,6 +15,8 @@
 
 namespace nix {
 
+struct ProfileDirsOptions;
+
 struct LogFileSettings : public virtual Config
 {
     /**
@@ -398,6 +400,11 @@ public:
      * derivation, or else returns a null pointer.
      */
     const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
+
+    /**
+     * Get the options needed for profile directory functions.
+     */
+    ProfileDirsOptions getProfileDirsOptions() const;
 };
 
 // FIXME: don't use a global variable.
