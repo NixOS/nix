@@ -360,23 +360,6 @@ StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivat
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::canBuildLocally(const StoreConfig & localStoreConfig, const BasicDerivation & drv) const
-{
-    if (drv.platform != localStoreConfig.settings.thisSystem.get()
-        && !localStoreConfig.settings.extraPlatforms.get().count(drv.platform) && !drv.isBuiltin())
-        return false;
-
-    if (localStoreConfig.settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
-        return false;
-
-    for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStoreConfig.systemFeatures.get().count(feature))
-            return false;
-
-    return true;
-}
-
-template<typename Input>
 bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
     return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;

@@ -186,11 +186,6 @@ struct DerivationOptions
      */
     StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
 
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    bool canBuildLocally(const StoreConfig & localStoreConfig, const BasicDerivation & drv) const;
-
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
     /**
