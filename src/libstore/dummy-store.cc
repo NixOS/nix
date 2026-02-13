@@ -119,6 +119,11 @@ ref<Store> DummyStoreConfig::openStore() const
     return openDummyStore();
 }
 
+bool DummyStoreConfig::getReadOnly() const
+{
+    return readOnly.get() || StoreConfig::getReadOnly();
+}
+
 struct DummyStoreImpl : DummyStore
 {
     using Config = DummyStoreConfig;
