@@ -18,6 +18,8 @@
 #include "nix/store/export-import.hh"
 #include "nix/util/strings.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/error.hh"
+#include "nix/store/gc-store.hh"
 
 #include "man-pages.hh"
 
@@ -679,6 +681,10 @@ static void opGC(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
 
+    if (options.maxFreed != std::numeric_limits<uint64_t>::max()
+        && (options.action == GCOptions::gcReturnDead || options.action == GCOptions::gcReturnLive || printRoots))
+        throw UsageError("option --max-freed cannot be combined with --print-live, --print-dead, or --print-roots");
+
     auto & gcStore = require<GcStore>(*store);
 
     if (printRoots) {
@@ -693,12 +699,14 @@ static void opGC(Strings opFlags, Strings opArgs)
     }
 
     else {
-        PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
+        Finally printer([&] {
+            if (options.action != GCOptions::gcDeleteDead)
+                for (auto & i : results.paths)
+                    cout << i << std::endl;
+            else
+                printFreed(false, results);
+        });
         gcStore.collectGarbage(options, results);
-
-        if (options.action != GCOptions::gcDeleteDead)
-            for (auto & i : results.paths)
-                cout << i << std::endl;
     }
 }
 
@@ -722,7 +730,7 @@ static void opDelete(Strings opFlags, Strings opArgs)
     auto & gcStore = require<GcStore>(*store);
 
     GCResults results;
-    PrintFreed freed(true, results);
+    Finally printer([&] { printFreed(false, results); });
     gcStore.collectGarbage(options, results);
 }
 

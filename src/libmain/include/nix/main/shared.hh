@@ -89,19 +89,7 @@ extern volatile ::sig_atomic_t blockInt;
 
 struct GCResults;
 
-struct PrintFreed
-{
-    bool show;
-    const GCResults & results;
-
-    PrintFreed(bool show, const GCResults & results)
-        : show(show)
-        , results(results)
-    {
-    }
-
-    ~PrintFreed();
-};
+void printFreed(bool dryRun, const GCResults & results);
 
 #ifndef _WIN32
 /**
