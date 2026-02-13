@@ -79,11 +79,4 @@ struct Machine
     static Machines parseConfig(const StringSet & defaultSystems, const std::string & config);
 };
 
-/**
- * Parse machines from the global config
- *
- * @todo Remove, globals are bad.
- */
-Machines getMachines();
-
 } // namespace nix
