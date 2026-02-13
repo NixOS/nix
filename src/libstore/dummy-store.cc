@@ -139,8 +139,8 @@ struct DummyStoreImpl : DummyStore
         wholeStoreView->setPathDisplay(config->storeDir);
     }
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
     {
         if (path.isDerivation()) {
             if (auto accessor_ = getMemoryFSAccessor(path)) {
@@ -170,12 +170,12 @@ struct DummyStoreImpl : DummyStore
     }
 
     /**
-     * Do this to avoid `queryPathInfoUncached` computing `PathInfo`
+     * Do this to avoid `queryPathInfo` computing `PathInfo`
      * that we don't need just to return a `bool`.
      */
-    bool isValidPathUncached(const StorePath & path) override
+    bool isValidPath(const StorePath & path) override
     {
-        return path.isDerivation() ? derivations.contains(path) : Store::isValidPathUncached(path);
+        return path.isDerivation() ? derivations.contains(path) : Store::isValidPath(path);
     }
 
     /**
@@ -330,7 +330,7 @@ struct DummyStoreImpl : DummyStore
         });
     }
 
-    void queryRealisationUncached(
+    void queryRealisation(
         const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     {
         bool visited = false;

@@ -40,7 +40,6 @@ struct BasicDerivation;
 struct Derivation;
 
 struct SourceAccessor;
-class NarInfoDiskCache;
 class Store;
 
 typedef std::map<std::string, StorePath> OutputPathMap;
@@ -277,43 +276,6 @@ public:
 
 protected:
 
-    struct PathInfoCacheValue
-    {
-
-        /**
-         * Time of cache entry creation or update
-         */
-        std::chrono::time_point<std::chrono::steady_clock> time_point = std::chrono::steady_clock::now();
-
-        /**
-         * Null if missing
-         */
-        std::shared_ptr<const ValidPathInfo> value;
-
-        /**
-         * Whether the value is valid as a cache entry. The path may not
-         * exist.
-         */
-        bool isKnownNow();
-
-        /**
-         * Past tense, because a path can only be assumed to exists when
-         * isKnownNow() && didExist()
-         */
-        inline bool didExist()
-        {
-            return value != nullptr;
-        }
-    };
-
-    void invalidatePathInfoCacheFor(const StorePath & path);
-
-    // Note: this is a `ref` to avoid false sharing with immutable
-    // bits of `Store`.
-    ref<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
-
-    std::shared_ptr<NarInfoDiskCache> diskCache;
-
     Store(const Store::Config & config);
 
 public:
@@ -338,12 +300,11 @@ public:
 
     /**
      * Check whether a path is valid.
+     *
+     * Default implementation calls `queryPathInfo()` and returns true if it
+     * doesn't throw `InvalidPath`. Subclasses may override for efficiency.
      */
-    bool isValidPath(const StorePath & path);
-
-protected:
-
-    virtual bool isValidPathUncached(const StorePath & path);
+    virtual bool isValidPath(const StorePath & path);
 
 public:
 
@@ -378,33 +339,39 @@ public:
     /**
      * Query information about a valid path. It is permitted to omit
      * the name part of the store path.
+     *
+     * Synchronous convenience wrapper around the async version.
+     * Throws `InvalidPath` if the path is not valid.
      */
     ref<const ValidPathInfo> queryPathInfo(const StorePath & path);
 
     /**
-     * Asynchronous version of queryPathInfo().
+     * Asynchronous version of queryPathInfo() that throws on invalid paths.
+     * Non-virtual wrapper around the `shared_ptr` version.
      */
     void queryPathInfo(const StorePath & path, Callback<ref<const ValidPathInfo>> callback) noexcept;
 
     /**
-     * Version of queryPathInfo() that only queries the local narinfo cache and not
-     * the actual store.
+     * Query information about a valid path. It is permitted to omit
+     * the name part of the store path.
      *
-     * @return `std::nullopt` if nothing is known about the path in the local narinfo cache.
-     * @return `std::make_optional(nullptr)` if the path is known to not exist.
-     * @return `std::make_optional(validPathInfo)` if the path is known to exist.
+     * @return `nullptr` if the path is not valid, otherwise the path info.
      */
-    std::optional<std::shared_ptr<const ValidPathInfo>> queryPathInfoFromClientCache(const StorePath & path);
+    virtual void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
 
     /**
      * Query the information about a realisation.
+     *
+     * Synchronous convenience wrapper around the async version.
      */
     std::shared_ptr<const UnkeyedRealisation> queryRealisation(const DrvOutput &);
 
     /**
-     * Asynchronous version of queryRealisation().
+     * Query the information about a realisation.
      */
-    void queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept;
+    virtual void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept = 0;
 
     /**
      * Check whether the given valid path info is sufficiently attested, by
@@ -426,13 +393,6 @@ public:
     {
         return true;
     }
-
-protected:
-
-    virtual void
-    queryPathInfoUncached(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept = 0;
-    virtual void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept = 0;
 
 public:
 
@@ -858,15 +818,6 @@ public:
      * - Otherwise, find one of its derivers
      */
     std::optional<StorePath> getBuildDerivationPath(const StorePath &);
-
-    /**
-     * Hack to allow long-running processes like hydra-queue-runner to
-     * occasionally flush their path info cache.
-     */
-    void clearPathInfoCache()
-    {
-        pathInfoCache->lock()->clear();
-    }
 
     /**
      * Establish a connection to the store, for store types that have

@@ -73,10 +73,10 @@ struct LegacySSHStore : public virtual Store
 
     ref<Connection> openConnection();
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
-    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfosUncached(const StorePathSet & paths);
+    std::map<StorePath, UnkeyedValidPathInfo> queryPathInfos(const StorePathSet & paths);
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
@@ -208,8 +208,8 @@ public:
      */
     std::optional<TrustedFlag> isTrustedClient() override;
 
-    void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
+    void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     // TODO: Implement
     {
         unsupported("queryRealisation");

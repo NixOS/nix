@@ -60,8 +60,8 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     StorePathSet queryAllValidPaths() override;
 
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;
 
@@ -106,7 +106,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     void registerDrvOutput(const Realisation & info) override;
 
-    void queryRealisationUncached(
+    void queryRealisation(
         const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     void
@@ -172,13 +172,13 @@ StorePathSet RestrictedStore::queryAllValidPaths()
     return paths;
 }
 
-void RestrictedStore::queryPathInfoUncached(
+void RestrictedStore::queryPathInfo(
     const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     if (goal.isAllowed(path)) {
         try {
             /* Censor impure information. */
-            auto info = std::make_shared<ValidPathInfo>(*next->queryPathInfo(path));
+            auto info = std::make_shared<ValidPathInfo>(*next->Store::queryPathInfo(path));
             info->deriver.reset();
             info->registrationTime = 0;
             info->ultimate = false;
@@ -243,7 +243,7 @@ void RestrictedStore::registerDrvOutput(const Realisation & info)
     throw Error("registerDrvOutput");
 }
 
-void RestrictedStore::queryRealisationUncached(
+void RestrictedStore::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 // XXX: This should probably be allowed if the realisation corresponds to
 // an allowed derivation

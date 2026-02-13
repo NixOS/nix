@@ -636,7 +636,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 if (keepDerivations && path->isDerivation()) {
                     for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(*path))
                         if (maybeOutPath && isValidPath(*maybeOutPath)
-                            && queryPathInfo(*maybeOutPath)->deriver == *path)
+                            && Store::queryPathInfo(*maybeOutPath)->deriver == *path)
                             enqueue(*maybeOutPath);
                 }
 

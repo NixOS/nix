@@ -116,7 +116,7 @@ struct LocalOverlayStore : virtual LocalStore
 
     ref<const Config> config;
 
-    LocalOverlayStore(ref<const Config>);
+    LocalOverlayStore(ref<const Config>, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache = nullptr);
 
 private:
     /**
@@ -137,8 +137,8 @@ private:
     /**
      * Check lower store if upper DB does not have.
      */
-    void queryPathInfoUncached(
-        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
+    void
+    queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
 
     /**
      * Check lower store if upper DB does not have.
@@ -146,7 +146,7 @@ private:
      * In addition, copy up metadata for lower store objects (and their
      * closure). (I.e. Optimistically cache in the upper DB.)
      */
-    bool isValidPathUncached(const StorePath & path) override;
+    bool isValidPath(const StorePath & path) override;
 
     /**
      * Check the lower store and upper DB.
@@ -172,8 +172,8 @@ private:
     /**
      * Check lower store if upper DB does not have.
      */
-    void queryRealisationUncached(
-        const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
+    void
+    queryRealisation(const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
     /**
      * Call `remountIfNecessary` after collecting garbage normally.

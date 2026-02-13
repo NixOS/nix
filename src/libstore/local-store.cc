@@ -85,7 +85,8 @@ std::filesystem::path LocalBuildStoreConfig::getBuildDir() const
 
 ref<Store> LocalStore::Config::openStore() const
 {
-    return make_ref<LocalStore>(ref{shared_from_this()});
+    return PathInfoCachedStore::make(
+        pathInfoCacheSize.get(), [&](auto * cache) { return make_ref<LocalStore>(ref{shared_from_this()}, cache); });
 }
 
 bool LocalStoreConfig::getDefaultRequireSigs()
@@ -114,10 +115,11 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryValidPaths;
 };
 
-LocalStore::LocalStore(ref<const Config> config)
+LocalStore::LocalStore(ref<const Config> config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache)
     : Store{*config}
     , LocalFSStore{*config}
     , config{config}
+    , pathInfoCache{pathInfoCache}
     , _state(make_ref<Sync<State>>())
     , dbDir(config->stateDir + "/db")
     , linksDir(config->realStoreDir + "/.links")
@@ -706,13 +708,10 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
         }
     }
 
-    pathInfoCache->lock()->upsert(info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
-
     return id;
 }
 
-void LocalStore::queryPathInfoUncached(
-    const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
+void LocalStore::queryPathInfo(const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
         callback(retrySQLite<std::shared_ptr<const ValidPathInfo>>([&]() {
@@ -797,7 +796,7 @@ bool LocalStore::isValidPath_(State & state, const StorePath & path)
     return state.stmts->QueryPathInfo.use()(printStorePath(path)).next();
 }
 
-bool LocalStore::isValidPathUncached(const StorePath & path)
+bool LocalStore::isValidPath(const StorePath & path)
 {
     return retrySQLite<bool>([&]() { return isValidPath_(*_state->lock(), path); });
 }
@@ -962,7 +961,8 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
 
-    pathInfoCache->lock()->erase(path);
+    if (pathInfoCache)
+        pathInfoCache->lock()->erase(path);
 }
 
 const PublicKeys & LocalStore::getPublicKeys()
@@ -1347,8 +1347,8 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
         for (auto & i : validPaths) {
             try {
-                auto info =
-                    std::const_pointer_cast<ValidPathInfo>(std::shared_ptr<const ValidPathInfo>(queryPathInfo(i)));
+                auto info = std::const_pointer_cast<ValidPathInfo>(
+                    std::shared_ptr<const ValidPathInfo>(Store::queryPathInfo(i)));
 
                 /* Check the content hash (optionally - slow). */
                 printMsg(lvlTalkative, "checking contents of '%s'", printStorePath(i));
@@ -1554,7 +1554,7 @@ std::optional<const UnkeyedRealisation> LocalStore::queryRealisation_(LocalStore
     return {res};
 }
 
-void LocalStore::queryRealisationUncached(
+void LocalStore::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {

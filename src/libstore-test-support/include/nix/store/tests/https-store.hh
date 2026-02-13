@@ -14,43 +14,6 @@
 
 namespace nix::testing {
 
-class TestHttpBinaryCacheStoreConfig;
-
-/**
- * Test shim for testing. We don't want to use the on-disk narinfo cache in unit
- * tests.
- */
-class TestHttpBinaryCacheStore : public HttpBinaryCacheStore
-{
-public:
-    TestHttpBinaryCacheStore(const TestHttpBinaryCacheStore &) = delete;
-    TestHttpBinaryCacheStore(TestHttpBinaryCacheStore &&) = delete;
-    TestHttpBinaryCacheStore & operator=(const TestHttpBinaryCacheStore &) = delete;
-    TestHttpBinaryCacheStore & operator=(TestHttpBinaryCacheStore &&) = delete;
-
-    TestHttpBinaryCacheStore(ref<HttpBinaryCacheStoreConfig> config, ref<FileTransfer> fileTransfer)
-        : Store{*config}
-        , BinaryCacheStore{*config}
-        , HttpBinaryCacheStore(config, fileTransfer)
-    {
-        diskCache = nullptr; /* Disable caching, we'll be creating a new binary cache for each test. */
-    }
-
-    void init() override;
-};
-
-class TestHttpBinaryCacheStoreConfig : public HttpBinaryCacheStoreConfig
-{
-public:
-    TestHttpBinaryCacheStoreConfig(ParsedURL url, const Store::Config::Params & params)
-        : StoreConfig(params)
-        , HttpBinaryCacheStoreConfig(url, params)
-    {
-    }
-
-    ref<TestHttpBinaryCacheStore> openTestStore(ref<FileTransfer> fileTransfer) const;
-};
-
 class HttpsBinaryCacheStoreTest : public virtual LibStoreNetworkTest
 {
     std::unique_ptr<AutoDelete> delTmpDir;
@@ -86,8 +49,8 @@ protected:
     void TearDown() override;
 
     virtual std::vector<std::string> serverArgs();
-    ref<TestHttpBinaryCacheStoreConfig> makeConfig();
-    ref<TestHttpBinaryCacheStore> openStore(ref<TestHttpBinaryCacheStoreConfig> config);
+    ref<HttpBinaryCacheStore::Config> makeConfig();
+    ref<HttpBinaryCacheStore> openStore(ref<HttpBinaryCacheStore::Config> config);
 };
 
 class HttpsBinaryCacheStoreMtlsTest : public HttpsBinaryCacheStoreTest

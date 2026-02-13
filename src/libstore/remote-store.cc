@@ -29,9 +29,10 @@
 namespace nix {
 
 /* TODO: Separate these store types into different files, give them better names */
-RemoteStore::RemoteStore(const Config & config)
+RemoteStore::RemoteStore(const Config & config, SharedSync<PathInfoCachedStore::Cache> * pathInfoCache)
     : Store{config}
     , config{config}
+    , pathInfoCache{pathInfoCache}
     , connections(
           make_ref<Pool<Connection>>(
               std::max(1, config.maxConnections.get()),
@@ -166,7 +167,7 @@ void RemoteStore::setOptions()
     setOptions(*(getConnection().handle));
 }
 
-bool RemoteStore::isValidPathUncached(const StorePath & path)
+bool RemoteStore::isValidPath(const StorePath & path)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::IsValidPath;
@@ -224,7 +225,7 @@ void RemoteStore::querySubstitutablePathInfos(const StorePathCAMap & pathsMap, S
     }
 }
 
-void RemoteStore::queryPathInfoUncached(
+void RemoteStore::queryPathInfo(
     const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept
 {
     try {
@@ -397,7 +398,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
         auto path = WorkerProto::Serialise<StorePath>::read(*this, *conn);
         // Release our connection to prevent a deadlock in queryPathInfo().
         conn_.reset();
-        return queryPathInfo(path);
+        return Store::queryPathInfo(path);
     }
 }
 
@@ -428,7 +429,8 @@ StorePath RemoteStore::addToStoreFromDump(
     if (fsm != dumpMethod)
         unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
     auto storePath = addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
-    invalidatePathInfoCacheFor(storePath);
+    if (pathInfoCache)
+        pathInfoCache->lock()->erase(storePath);
     return storePath;
 }
 
@@ -512,7 +514,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     conn.processStderr();
 }
 
-void RemoteStore::queryRealisationUncached(
+void RemoteStore::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
@@ -635,7 +637,7 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
                                     output);
                             auto outputId = DrvOutput{*outputHash, output};
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-                                auto realisation = queryRealisation(outputId);
+                                auto realisation = Store::queryRealisation(outputId);
                                 if (!realisation)
                                     throw MissingRealisation(outputId);
                                 success.builtOutputs.emplace(output, Realisation{*realisation, outputId});
@@ -719,7 +721,8 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     results.bytesFreed = readLongLong(conn->from);
     readLongLong(conn->from); // obsolete
 
-    pathInfoCache->lock()->clear();
+    if (pathInfoCache)
+        pathInfoCache->lock()->clear();
 }
 
 void RemoteStore::optimiseStore()
