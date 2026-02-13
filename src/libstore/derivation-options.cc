@@ -4,6 +4,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/machines.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/globals.hh"
@@ -369,9 +370,16 @@ bool DerivationOptions<Input>::canBuildLocally(Store & localStore, const BasicDe
     if (settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
         return false;
 
-    for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.config.systemFeatures.get().count(feature))
-            return false;
+    auto features = getRequiredSystemFeatures(drv);
+    if (experimentalFeatureSettings.isEnabled(Xp::ResourceManagement)) {
+        auto featureCount = Machine::countFeatures(features);
+        for (auto & feature : featureCount)
+            if (!localStore.config.systemFeatures.get().count(feature.first))
+                return false;
+    } else
+        for (auto & feature : features)
+            if (!localStore.config.systemFeatures.get().count(feature))
+                return false;
 
     return true;
 }

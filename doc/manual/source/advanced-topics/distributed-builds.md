@@ -108,3 +108,17 @@ causes the list of machines in `/etc/nix/machines` to be included.
 (This is the default.)
 
 [Nix instance]: @docroot@/glossary.md#gloss-nix-instance
+
+## Resource Management
+
+Adding `resource-management` to the `experimental-features` setting in `nix.conf` enables a basic resource management scheme for system features. This is akin to what can be accomplished with job schedulers like Slurm, where a remote machine can have a limited quantity of a resource that can be temporarily "consumed" by a job. This can be used with memory-heavy builds, or derivations that require exclusive access to particular hardware resources.
+
+Resource management is supported in both the supported features and mandatory features of a remote machine configuration, by appending a colon `:` to a feature name followed by the quantity that this machine has. This is tracked on a per-store basis, so different users on a multi-user installation share the same pool of resources for their remote build machines. A derivation specifies that it consumes a resource with the same notation in the `requiredSystemFeatures` attribute.
+
+For example, this builder can provide exclusive access to two GPUs and 128G of memory for remote builds:
+
+    builders = ssh://gpu-node x86_64-linux - 32 1 gpu:2,mem:128
+
+A derivation that might use this machine may set its `requiredSystemFeatures` to `["gpu:1" "mem:4"]` to indicate that it requires a GPU and consumes 4G of system memory. A particularly memory-heavy derivation that doesn't need a GPU may still use the machine with a value of `["mem:64"]`. This helps ensure that limited system resources are not over-consumed by remote builds. Note that Nix does not do any actual delegation or enforcement of GPU, memory, or other resource usage, that is up to the derivations to manage.
+
+When configuring the `system-features` setting on the remote machine's `nix.conf`, only include the name of the consumable feature, not the quantity availble. Resource limits are tracked on the dispatching end within the local store.
