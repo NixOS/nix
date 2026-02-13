@@ -207,9 +207,4 @@ Machines Machine::parseConfig(const StringSet & defaultSystems, const std::strin
     return parseBuilderLines(defaultSystems, builderLines);
 }
 
-Machines getMachines()
-{
-    return Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
-}
-
 } // namespace nix
