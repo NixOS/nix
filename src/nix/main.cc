@@ -566,8 +566,8 @@ void mainWrapped(int argc, char ** argv)
 
     if (args.refresh) {
         fetchSettings.tarballTtl = 0;
-        settings.ttlNegativeNarInfoCache = 0;
-        settings.ttlPositiveNarInfoCache = 0;
+        settings.getNarInfoDiskCacheSettings().ttlNegative = 0;
+        settings.getNarInfoDiskCacheSettings().ttlPositive = 0;
     }
 
     if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {

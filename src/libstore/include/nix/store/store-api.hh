@@ -40,7 +40,8 @@ struct BasicDerivation;
 struct Derivation;
 
 struct SourceAccessor;
-class NarInfoDiskCache;
+struct NarInfoDiskCache;
+struct NarInfoDiskCacheSettings;
 class Store;
 
 typedef std::map<std::string, StorePath> OutputPathMap;
@@ -300,7 +301,7 @@ protected:
          * Whether the value is valid as a cache entry. The path may not
          * exist.
          */
-        bool isKnownNow();
+        bool isKnownNow(const NarInfoDiskCacheSettings & settings);
 
         /**
          * Past tense, because a path can only be assumed to exists when

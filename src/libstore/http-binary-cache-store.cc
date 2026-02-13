@@ -4,6 +4,7 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
 
 namespace nix {
 
@@ -64,7 +65,8 @@ HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer>
     , fileTransfer{fileTransfer}
     , config{config}
 {
-    diskCache = getNarInfoDiskCache();
+    diskCache =
+        NarInfoDiskCache::get(settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL});
 }
 
 void HttpBinaryCacheStore::init()

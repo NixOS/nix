@@ -338,10 +338,10 @@ bool StoreConfig::getReadOnly() const
     return settings.readOnlyMode;
 }
 
-bool Store::PathInfoCacheValue::isKnownNow()
+bool Store::PathInfoCacheValue::isKnownNow(const NarInfoDiskCacheSettings & settings)
 {
-    std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
-                                           : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
+    std::chrono::duration ttl =
+        didExist() ? std::chrono::seconds(settings.ttlPositive) : std::chrono::seconds(settings.ttlNegative);
 
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
@@ -513,7 +513,7 @@ StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
 bool Store::isValidPath(const StorePath & storePath)
 {
     auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
         stats.narInfoReadAverted++;
         return res->didExist();
     }
@@ -579,7 +579,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     auto hashPart = std::string(storePath.hashPart());
 
     auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
         stats.narInfoReadAverted++;
         if (res->didExist())
             return std::make_optional(res->value);
