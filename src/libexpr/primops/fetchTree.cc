@@ -220,12 +220,17 @@ static void fetchTree(
             throw Error("input '%s' is not allowed to use the '__final' attribute", input.to_string());
     }
 
-    auto cachedInput =
-        state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+    try {
+        auto cachedInput =
+            state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
 
-    auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
+        auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
+        emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
+    } catch (Error & e) {
+        state.runDebugRepl(&e);
+        throw;
+    }
 }
 
 static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
