@@ -19,6 +19,8 @@
   gid ? 0,
   uname ? "root",
   gname ? "root",
+  extraFakeRootCommands ? "",
+  extraExtraCommands ? "",
   Labels ? {
     "org.opencontainers.image.title" = "Nix";
     "org.opencontainers.image.source" = "https://github.com/NixOS/nix";
@@ -27,6 +29,8 @@
     "org.opencontainers.image.description" = "Nix container image";
   },
   Cmd ? [ (lib.getExe bashInteractive) ],
+  Entrypoint ? null,
+  Env ? [],
   # Default Packages
   nix ? pkgs.nix,
   bashInteractive ? pkgs.bashInteractive,
@@ -359,16 +363,16 @@ dockerTools.buildLayeredImageWithNixDb {
   extraCommands = ''
     rm -rf nix-support
     ln -s /nix/var/nix/profiles nix/var/nix/gcroots/profiles
-  '';
+  '' + extraExtraCommands;
   fakeRootCommands = ''
     chmod 1777 tmp
     chmod 1777 var/tmp
     chown -R ${toString uid}:${toString gid} .${userHome}
     chown -R ${toString uid}:${toString gid} nix
-  '';
+  '' + extraFakeRootCommands;
 
   config = {
-    inherit Cmd Labels;
+    inherit Cmd Labels Entrypoint;
     User = "${toString uid}:${toString gid}";
     Env = [
       "USER=${uname}"
@@ -389,7 +393,7 @@ dockerTools.buildLayeredImageWithNixDb {
       "GIT_SSL_CAINFO=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"
       "NIX_PATH=/nix/var/nix/profiles/per-user/${uname}/channels:${userHome}/.nix-defexpr/channels"
-    ];
+    ] ++ Env;
   };
 
 }
