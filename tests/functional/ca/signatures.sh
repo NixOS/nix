@@ -2,6 +2,8 @@
 
 source common.sh
 
+requireDaemonNewerThan "2.34pre20260122"
+
 clearStore
 clearCache
 
