@@ -466,9 +466,11 @@ struct Derivation : BasicDerivation
 class Store;
 
 /**
- * Write a derivation to the Nix store, and return its path.
+ * Compute the store path that would be used for a derivation without writing it.
+ *
+ * This is a pure computation based on the derivation content and store directory.
  */
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair = NoRepair, bool readOnly = false);
+StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
 
 /**
  * Read a derivation from a file.

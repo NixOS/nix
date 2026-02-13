@@ -51,7 +51,7 @@ protected:
         depDrv.fillInOutputPaths(*store);
 
         // Write the dependency to the store
-        return writeDerivation(*store, depDrv, NoRepair);
+        return store->writeDerivation(depDrv, NoRepair);
     }
 
 public:

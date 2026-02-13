@@ -35,6 +35,8 @@ struct DummyStoreConfig : public std::enable_shared_from_this<DummyStoreConfig>,
           No additional memory will be used, because no information needs to be stored.
         )"};
 
+    bool getReadOnly() const override;
+
     static const std::string name()
     {
         return "Dummy Store";

@@ -219,6 +219,12 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
         false};
 
     /**
+     * Whether we're allowed to write to this store, also takes into account
+     * global `readOnly`'s mode setting, not just any per-store settings.
+     */
+    virtual bool getReadOnly() const;
+
+    /**
      * Open a store of the type corresponding to this configuration
      * type.
      */

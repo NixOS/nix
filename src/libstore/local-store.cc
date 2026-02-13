@@ -473,6 +473,11 @@ StoreReference LocalStoreConfig::getReference() const
     };
 }
 
+bool LocalStoreConfig::getReadOnly() const
+{
+    return readOnly.get() || StoreConfig::getReadOnly();
+}
+
 int LocalStore::getSchema()
 {
     int curSchema = 0;

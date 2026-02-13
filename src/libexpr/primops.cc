@@ -1814,8 +1814,13 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         drv.fillInOutputPaths(*state.store);
     }
 
-    /* Write the resulting term into the Nix store directory. */
-    auto drvPath = writeDerivation(*state.store, drv, state.repair);
+    /* Write the resulting term into the Nix store directory.
+
+       Unless we are in read-only mode, that is, in which case we do not
+       write anything. Users commonly do this to speed up evaluation in
+       contexts where they don't actually want to build anything. */
+    auto drvPath =
+        settings.readOnlyMode ? computeStorePath(*state.store, drv) : state.store->writeDerivation(drv, state.repair);
     auto drvPathS = state.store->printStorePath(drvPath);
 
     printMsg(lvlChatty, "instantiated '%1%' -> '%2%'", drvName, drvPathS);

@@ -119,6 +119,11 @@ ref<Store> DummyStoreConfig::openStore() const
     return openDummyStore();
 }
 
+bool DummyStoreConfig::getReadOnly() const
+{
+    return readOnly.get() || StoreConfig::getReadOnly();
+}
+
 struct DummyStoreImpl : DummyStore
 {
     using Config = DummyStoreConfig;
@@ -296,7 +301,7 @@ struct DummyStoreImpl : DummyStore
 
     StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair) override
     {
-        auto drvPath = ::nix::writeDerivation(*this, drv, repair, /*readonly=*/true);
+        auto drvPath = nix::computeStorePath(*this, drv);
 
         if (!derivations.contains(drvPath) || repair) {
             if (config->readOnly)

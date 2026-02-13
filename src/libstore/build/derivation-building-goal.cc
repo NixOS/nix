@@ -123,7 +123,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
         assert(drv->inputDrvs.map.empty());
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
-        writeDerivation(worker.store, *drv);
+        worker.store.writeDerivation(*drv);
     }
 
     StorePathSet inputPaths;

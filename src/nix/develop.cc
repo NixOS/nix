@@ -291,7 +291,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     }
     drv.fillInOutputPaths(*evalStore);
 
-    auto shellDrvPath = writeDerivation(*evalStore, drv);
+    auto shellDrvPath = evalStore->writeDerivation(drv);
 
     /* Build the derivation. */
     store->buildPaths(
