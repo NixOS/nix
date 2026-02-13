@@ -36,6 +36,7 @@ headers = [ config_pub_h ] + files(
   'derivations.hh',
   'derived-path-map.hh',
   'derived-path.hh',
+  'disk-cached-binary-cache-store.hh',
   'downstream-placeholder.hh',
   'dummy-store-impl.hh',
   'dummy-store.hh',

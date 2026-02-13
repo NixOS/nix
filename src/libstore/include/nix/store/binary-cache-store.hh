@@ -151,13 +151,15 @@ public:
 
     virtual void init() override;
 
-private:
+    virtual void writeNarInfo(ref<NarInfo> narInfo);
 
-    std::string narMagic;
+protected:
 
     std::string narInfoFileFor(const StorePath & storePath);
 
-    void writeNarInfo(ref<NarInfo> narInfo);
+private:
+
+    std::string narMagic;
 
     ref<const ValidPathInfo> addToStoreCommon(
         Source & narSource,

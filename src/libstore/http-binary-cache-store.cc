@@ -1,4 +1,5 @@
 #include "nix/store/http-binary-cache-store.hh"
+#include "nix/store/disk-cached-binary-cache-store.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
@@ -64,26 +65,14 @@ HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer>
     , fileTransfer{fileTransfer}
     , config{config}
 {
-    diskCache = getNarInfoDiskCache();
 }
 
 void HttpBinaryCacheStore::init()
 {
-    // FIXME: do this lazily?
-    // For consistent cache key handling, use the reference without parameters
-    // This matches what's used in Store::queryPathInfo() lookups
-    auto cacheKey = config->getReference().render(/*withParams=*/false);
-
-    if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
-        config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-        config->priority.setDefault(cacheInfo->priority);
-    } else {
-        try {
-            BinaryCacheStore::init();
-        } catch (UploadToHTTP &) {
-            throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
-        }
-        diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
+    try {
+        BinaryCacheStore::init();
+    } catch (UploadToHTTP &) {
+        throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
     }
 }
 
@@ -295,10 +284,11 @@ std::optional<TrustedFlag> HttpBinaryCacheStore::isTrustedClient()
 
 ref<Store> HttpBinaryCacheStore::Config::openStore(ref<FileTransfer> fileTransfer) const
 {
-    return make_ref<HttpBinaryCacheStore>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
-        fileTransfer);
+    auto self = ref{std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())};
+    auto httpStore = make_ref<HttpBinaryCacheStore>(self, fileTransfer);
+    auto store = make_ref<DiskCachedBinaryCacheStore>(httpStore, getNarInfoDiskCache());
+    store->init();
+    return store;
 }
 
 ref<Store> HttpBinaryCacheStoreConfig::openStore() const

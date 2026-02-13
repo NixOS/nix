@@ -4,21 +4,6 @@
 
 namespace nix::testing {
 
-void TestHttpBinaryCacheStore::init()
-{
-    BinaryCacheStore::init();
-}
-
-ref<TestHttpBinaryCacheStore> TestHttpBinaryCacheStoreConfig::openTestStore(ref<FileTransfer> fileTransfer) const
-{
-    auto store = make_ref<TestHttpBinaryCacheStore>(
-        ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
-        fileTransfer);
-    store->init();
-    return store;
-}
-
 void HttpsBinaryCacheStoreTest::openssl(Strings args)
 {
     runProgram("openssl", /*lookupPath=*/true, args);
@@ -118,9 +103,9 @@ std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
     return args;
 }
 
-ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
+ref<HttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
 {
-    auto res = make_ref<TestHttpBinaryCacheStoreConfig>(
+    auto res = make_ref<HttpBinaryCacheStoreConfig>(
         ParsedURL{
             .scheme = "https",
             .authority =
@@ -129,14 +114,18 @@ ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
                     .port = port,
                 },
         },
-        TestHttpBinaryCacheStoreConfig::Params{});
+        HttpBinaryCacheStoreConfig::Params{});
     res->pathInfoCacheSize = 0; /* We don't want any caching in tests. */
     return res;
 }
 
-ref<TestHttpBinaryCacheStore> HttpsBinaryCacheStoreTest::openStore(ref<TestHttpBinaryCacheStoreConfig> config)
+ref<HttpBinaryCacheStore> HttpsBinaryCacheStoreTest::openStore(ref<HttpBinaryCacheStoreConfig> config)
 {
-    return config->openTestStore(ref<FileTransfer>{testFileTransfer});
+    /* Create the store directly without the DiskCachedBinaryCacheStore wrapper,
+       since we don't want disk caching in tests. */
+    auto store = make_ref<HttpBinaryCacheStore>(config, ref<FileTransfer>{testFileTransfer});
+    store->init();
+    return store;
 }
 
 } // namespace nix::testing
