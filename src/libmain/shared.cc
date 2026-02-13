@@ -3,6 +3,7 @@
 #include "nix/util/executable-path.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/main/loggers.hh"
 #include "nix/main/progress-bar.hh"
@@ -331,7 +332,8 @@ void printVersion(const std::string & programName)
         std::cout << "System configuration file: " << nixConfFile() << "\n";
         std::cout << "User configuration files: "
                   << os_string_to_string(ExecutablePath{.directories = nixUserConfFiles()}.render()) << "\n";
-        std::cout << "Store directory: " << settings.nixStore << "\n";
+        std::cout << "Store directory: " << resolveStoreConfig(StoreReference{settings.storeUri.get()})->storeDir
+                  << "\n";
         std::cout << "State directory: " << settings.nixStateDir << "\n";
     }
     throw Exit();

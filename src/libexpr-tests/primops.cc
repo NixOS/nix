@@ -756,7 +756,7 @@ TEST_F(PrimOpTest, langVersion)
 TEST_F(PrimOpTest, storeDir)
 {
     auto v = eval("builtins.storeDir");
-    ASSERT_THAT(v, IsStringEq(settings.nixStore));
+    ASSERT_THAT(v, IsStringEq(state.store->storeDir));
 }
 
 TEST_F(PrimOpTest, nixVersion)
