@@ -50,7 +50,47 @@ public:
         {"build-compress-log"}};
 };
 
-class Settings : public virtual Config, private LocalSettings, private LogFileSettings, private WorkerSettings
+struct NarInfoDiskCacheSettings : public virtual Config
+{
+    Setting<unsigned int> ttlNegative{
+        this,
+        3600,
+        "narinfo-cache-negative-ttl",
+        R"(
+          The TTL in seconds for negative lookups.
+          If a store path is queried from a [substituter](#conf-substituters) but was not found, a negative lookup is cached in the local disk cache database for the specified duration.
+
+          Set to `0` to force updating the lookup cache.
+
+          To wipe the lookup cache completely:
+
+          ```shell-session
+          $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
+          # rm /root/.cache/nix/binary-cache-v*.sqlite*
+          ```
+        )"};
+
+    Setting<unsigned int> ttlPositive{
+        this,
+        30 * 24 * 3600,
+        "narinfo-cache-positive-ttl",
+        R"(
+          The TTL in seconds for positive lookups. If a store path is queried
+          from a substituter, the result of the query is cached in the
+          local disk cache database including some of the NAR metadata. The
+          default TTL is a month, setting a shorter TTL for positive lookups
+          can be useful for binary caches that have frequent garbage
+          collection, in which case having a more frequent cache invalidation
+          would prevent trying to pull the path again and failing with a hash
+          mismatch if the build isn't reproducible.
+        )"};
+};
+
+class Settings : public virtual Config,
+                 private LocalSettings,
+                 private LogFileSettings,
+                 private WorkerSettings,
+                 private NarInfoDiskCacheSettings
 {
     StringSet getDefaultSystemFeatures();
 
@@ -99,6 +139,19 @@ public:
     }
 
     const WorkerSettings & getWorkerSettings() const
+    {
+        return *this;
+    }
+
+    /**
+     * Get the NAR info disk cache settings.
+     */
+    NarInfoDiskCacheSettings & getNarInfoDiskCacheSettings()
+    {
+        return *this;
+    }
+
+    const NarInfoDiskCacheSettings & getNarInfoDiskCacheSettings() const
     {
         return *this;
     }
@@ -310,39 +363,6 @@ public:
           Unprivileged users (those set in only [`allowed-users`](#conf-allowed-users) but not [`trusted-users`](#conf-trusted-users)) can pass as `substituters` only those URLs listed in `trusted-substituters`.
         )",
         {"trusted-binary-caches"}};
-
-    Setting<unsigned int> ttlNegativeNarInfoCache{
-        this,
-        3600,
-        "narinfo-cache-negative-ttl",
-        R"(
-          The TTL in seconds for negative lookups.
-          If a store path is queried from a [substituter](#conf-substituters) but was not found, a negative lookup is cached in the local disk cache database for the specified duration.
-
-          Set to `0` to force updating the lookup cache.
-
-          To wipe the lookup cache completely:
-
-          ```shell-session
-          $ rm $HOME/.cache/nix/binary-cache-v*.sqlite*
-          # rm /root/.cache/nix/binary-cache-v*.sqlite*
-          ```
-        )"};
-
-    Setting<unsigned int> ttlPositiveNarInfoCache{
-        this,
-        30 * 24 * 3600,
-        "narinfo-cache-positive-ttl",
-        R"(
-          The TTL in seconds for positive lookups. If a store path is queried
-          from a substituter, the result of the query is cached in the
-          local disk cache database including some of the NAR metadata. The
-          default TTL is a month, setting a shorter TTL for positive lookups
-          can be useful for binary caches that have frequent garbage
-          collection, in which case having a more frequent cache invalidation
-          would prevent trying to pull the path again and failing with a hash
-          mismatch if the build isn't reproducible.
-        )"};
 
     // move it out in the 2nd pass
     Setting<bool> printMissing{
