@@ -647,7 +647,7 @@ static void performOp(
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;
-            drvPath = writeDerivation(*store, Derivation{drv2});
+            drvPath = store->writeDerivation(Derivation{drv2});
         }
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
