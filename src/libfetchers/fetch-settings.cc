@@ -2,6 +2,9 @@
 
 namespace nix::fetchers {
 
-Settings::Settings() {}
+Settings::Settings(const nix::Settings & storeSettings)
+    : storeSettings(storeSettings)
+{
+}
 
 } // namespace nix::fetchers

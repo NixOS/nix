@@ -47,7 +47,7 @@ struct CacheImpl : Cache
         auto dbPath = (getCacheDir() / "fetcher-cache-v4.sqlite").string();
         createDirs(dirOf(dbPath));
 
-        state->db = SQLite(dbPath, {.useWAL = nix::settings.useSQLiteWAL});
+        state->db = SQLite(dbPath, {.useWAL = settings.storeSettings.useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 

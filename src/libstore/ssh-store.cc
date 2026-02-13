@@ -11,10 +11,11 @@
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : Store::Config{params}
-    , RemoteStore::Config{params}
-    , CommonSSHStoreConfig{scheme, authority, params}
+SSHStoreConfig::SSHStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+    : Store::Config{settings, params}
+    , RemoteStore::Config{settings, params}
+    , CommonSSHStoreConfig{settings, scheme, authority, params}
 {
 }
 
@@ -88,21 +89,22 @@ protected:
     };
 };
 
-MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(params)
-    , SSHStoreConfig(params)
-    , LocalFSStoreConfig(params)
+MountedSSHStoreConfig::MountedSSHStoreConfig(nix::Settings & settings, StringMap params)
+    : StoreConfig(settings, params)
+    , RemoteStoreConfig(settings, params)
+    , CommonSSHStoreConfig(settings, params)
+    , SSHStoreConfig(settings, params)
+    , LocalFSStoreConfig(settings, "", params)
 {
 }
 
-MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(scheme, host, params)
-    , LocalFSStoreConfig(params)
+MountedSSHStoreConfig::MountedSSHStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view host, StringMap params)
+    : StoreConfig(settings, params)
+    , RemoteStoreConfig(settings, params)
+    , CommonSSHStoreConfig(settings, scheme, host, params)
+    , SSHStoreConfig(settings, scheme, host, params)
+    , LocalFSStoreConfig(settings, "", params)
 {
 }
 

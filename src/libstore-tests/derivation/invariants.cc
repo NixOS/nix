@@ -16,11 +16,11 @@ class FillInOutputPathsTest : public LibStoreTest, public JsonCharacterizationTe
 
 protected:
     FillInOutputPathsTest()
-        : LibStoreTest([]() {
-            auto config = make_ref<DummyStoreConfig>(DummyStoreConfig::Params{});
+        : LibStoreTest([](auto & settings) {
+            auto config = make_ref<DummyStoreConfig>(settings, DummyStoreConfig::Params{});
             config->readOnly = false;
             return config->openDummyStore();
-        }())
+        })
     {
     }
 
@@ -51,7 +51,7 @@ protected:
         depDrv.fillInOutputPaths(*store);
 
         // Write the dependency to the store
-        return writeDerivation(*store, depDrv, NoRepair);
+        return store->writeDerivation(depDrv, NoRepair);
     }
 
 public:

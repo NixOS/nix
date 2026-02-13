@@ -8,6 +8,8 @@
 
 namespace nix {
 
+class Settings;
+
 /**
  * Fetch the build log for a store path, searching the store and its
  * substituters.
@@ -18,6 +20,6 @@ namespace nix {
  * @return The build log content.
  * @throws Error if the build log is not available.
  */
-std::string fetchBuildLog(ref<Store> store, const StorePath & path, std::string_view what);
+std::string fetchBuildLog(Settings & settings, ref<Store> store, const StorePath & path, std::string_view what);
 
 } // namespace nix

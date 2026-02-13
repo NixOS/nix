@@ -6,6 +6,7 @@
 
 namespace nix {
 
+class Settings;
 class Store;
 
 struct Machine;
@@ -67,7 +68,7 @@ struct Machine
      * nix::openStore(completeStoreReference())
      * ```
      */
-    ref<Store> openStore() const;
+    ref<Store> openStore(Settings & settings) const;
 
     /**
      * Parse a machine configuration.
@@ -78,12 +79,5 @@ struct Machine
      */
     static Machines parseConfig(const StringSet & defaultSystems, const std::string & config);
 };
-
-/**
- * Parse machines from the global config
- *
- * @todo Remove, globals are bad.
- */
-Machines getMachines();
 
 } // namespace nix

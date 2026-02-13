@@ -12,6 +12,8 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
 
+#include "nix/store/tests/test-main.hh"
+
 namespace nix::testing {
 
 class TestHttpBinaryCacheStoreConfig;
@@ -42,9 +44,9 @@ public:
 class TestHttpBinaryCacheStoreConfig : public HttpBinaryCacheStoreConfig
 {
 public:
-    TestHttpBinaryCacheStoreConfig(ParsedURL url, const Store::Config::Params & params)
-        : StoreConfig(params)
-        , HttpBinaryCacheStoreConfig(url, params)
+    TestHttpBinaryCacheStoreConfig(nix::Settings & settings, ParsedURL url, const Store::Config::Params & params)
+        : StoreConfig(settings, params)
+        , HttpBinaryCacheStoreConfig(settings, url, params)
     {
     }
 
@@ -56,6 +58,8 @@ class HttpsBinaryCacheStoreTest : public virtual LibStoreNetworkTest
     std::unique_ptr<AutoDelete> delTmpDir;
 
 public:
+    Settings settings = getTestSettings();
+
     static void SetUpTestSuite()
     {
         initLibStore(/*loadConfig=*/false);

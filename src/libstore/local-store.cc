@@ -56,9 +56,10 @@
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+LocalStoreConfig::LocalStoreConfig(
+    nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params)
+    : StoreConfig(settings, params)
+    , LocalFSStoreConfig(settings, authority, params)
 {
 }
 
@@ -505,7 +506,8 @@ void LocalStore::openDB(State & state, bool create)
     auto openMode = config->readOnly ? SQLiteOpenMode::Immutable
                     : create         ? SQLiteOpenMode::Normal
                                      : SQLiteOpenMode::NoCreate;
-    state.db = SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = settings.useSQLiteWAL});
+    state.db =
+        SQLite(std::filesystem::path(dbDir) / "db.sqlite", {.mode = openMode, .useWAL = config->settings.useSQLiteWAL});
 
 #ifdef __CYGWIN__
     /* The cygwin version of sqlite3 has a patch which calls
@@ -529,7 +531,7 @@ void LocalStore::openDB(State & state, bool create)
 
     /* Set the SQLite journal mode.  WAL mode is fastest, so it's the
        default. */
-    std::string mode = settings.useSQLiteWAL ? "wal" : "truncate";
+    std::string mode = config->settings.useSQLiteWAL ? "wal" : "truncate";
     std::string prevMode;
     {
         SQLiteStmt stmt;
@@ -974,7 +976,7 @@ const PublicKeys & LocalStore::getPublicKeys()
 {
     auto state(_state->lock());
     if (!state->publicKeys)
-        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys());
+        state->publicKeys = std::make_unique<PublicKeys>(getDefaultPublicKeys(config->settings));
     return *state->publicKeys;
 }
 

@@ -144,7 +144,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             }
             assert(attempt);
 
-            auto pathResolved = writeDerivation(worker.store, *attempt, NoRepair, /*readOnly =*/true);
+            auto pathResolved = computeStorePath(worker.store, Derivation{*attempt});
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",

@@ -1,4 +1,5 @@
 #include "nix/store/globals.hh"
+#include "nix/store/profiles.hh"
 #include "nix/util/config-impl.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/current-process.hh"
@@ -77,10 +78,6 @@ LogFileSettings::LogFileSettings()
     : nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
 {
 }
-
-Settings settings;
-
-static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixStore(
@@ -292,6 +289,14 @@ const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const
         it != externalBuilders.get().end())
         return &*it;
     return nullptr;
+}
+
+ProfileDirsOptions Settings::getProfileDirsOptions() const
+{
+    return {
+        .nixStateDir = nixStateDir,
+        .useXDGBaseDirectories = useXDGBaseDirectories,
+    };
 }
 
 std::string nixVersion = PACKAGE_VERSION;

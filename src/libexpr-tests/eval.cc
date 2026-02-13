@@ -179,12 +179,15 @@ class PureEvalTest : public LibExprTest
 {
 public:
     PureEvalTest()
-        : LibExprTest(openStore("dummy://", {{"read-only", "false"}}), [](bool & readOnlyMode) {
-            EvalSettings settings{readOnlyMode};
-            settings.pureEval = true;
-            settings.restrictEval = true;
-            return settings;
-        })
+        : LibExprTest{
+              [](auto & settings) {
+                  EvalSettings evalSettings{settings};
+                  evalSettings.pureEval = true;
+                  evalSettings.restrictEval = true;
+                  return evalSettings;
+              },
+              [](auto & settings) { return openStore(settings, "dummy://", {{"read-only", "false"}}); },
+          }
     {
     }
 };

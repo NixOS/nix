@@ -230,7 +230,7 @@ struct ClientSettings
     bool useSubstitutes;
     StringMap overrides;
 
-    void apply(TrustedFlag trusted)
+    void apply(Settings & settings, TrustedFlag trusted)
     {
         settings.keepFailed = keepFailed;
         settings.getWorkerSettings().keepGoing = keepGoing;
@@ -647,7 +647,7 @@ static void performOp(
 
             Derivation drv2;
             static_cast<BasicDerivation &>(drv2) = drv;
-            drvPath = writeDerivation(*store, Derivation{drv2});
+            drvPath = store->writeDerivation(Derivation{drv2});
         }
 
         auto res = store->buildDerivation(drvPath, drv, buildMode);
@@ -783,7 +783,7 @@ static void performOp(
         // FIXME: use some setting in recursive mode. Will need to use
         // non-global variables.
         if (!recursive)
-            clientSettings.apply(trusted);
+            clientSettings.apply(store->config.settings, trusted);
 
         logger->stopWork();
         break;

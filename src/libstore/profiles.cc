@@ -291,31 +291,32 @@ std::string optimisticLockProfile(const std::filesystem::path & profile)
     return pathExists(profile) ? readLink(profile).string() : "";
 }
 
-std::filesystem::path profilesDir()
+std::filesystem::path profilesDir(ProfileDirsOptions settings)
 {
-    auto profileRoot = isRootUser() ? rootProfilesDir() : std::filesystem::path{createNixStateDir()} / "profiles";
+    auto profileRoot =
+        isRootUser() ? rootProfilesDir(settings) : std::filesystem::path{createNixStateDir()} / "profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-std::filesystem::path rootProfilesDir()
+std::filesystem::path rootProfilesDir(ProfileDirsOptions settings)
 {
-    return std::filesystem::path{settings.nixStateDir} / "profiles/per-user/root";
+    return settings.nixStateDir / "profiles/per-user/root";
 }
 
-std::filesystem::path getDefaultProfile()
+std::filesystem::path getDefaultProfile(ProfileDirsOptions settings)
 {
     std::filesystem::path profileLink = settings.useXDGBaseDirectories
                                             ? std::filesystem::path{createNixStateDir()} / "profile"
                                             : std::filesystem::path{getHome()} / ".nix-profile";
     try {
-        auto profile = profilesDir() / "profile";
+        auto profile = profilesDir(settings) / "profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
         // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
-        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles" / "default";
+        auto globalProfileLink = settings.nixStateDir / "profiles" / "default";
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
@@ -328,14 +329,14 @@ std::filesystem::path getDefaultProfile()
     }
 }
 
-std::filesystem::path defaultChannelsDir()
+std::filesystem::path defaultChannelsDir(ProfileDirsOptions settings)
 {
-    return profilesDir() / "channels";
+    return profilesDir(settings) / "channels";
 }
 
-std::filesystem::path rootChannelsDir()
+std::filesystem::path rootChannelsDir(ProfileDirsOptions settings)
 {
-    return rootProfilesDir() / "channels";
+    return rootProfilesDir(settings) / "channels";
 }
 
 } // namespace nix

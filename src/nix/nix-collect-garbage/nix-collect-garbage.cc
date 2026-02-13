@@ -88,10 +88,11 @@ static int main_nix_collect_garbage(int argc, char ** argv)
         });
 
         if (removeOld) {
+            auto profilesDirOpts = settings.getProfileDirsOptions();
             std::set<std::filesystem::path> dirsToClean = {
-                profilesDir(),
+                profilesDir(profilesDirOpts),
                 std::filesystem::path{settings.nixStateDir} / "profiles",
-                getDefaultProfile().parent_path(),
+                getDefaultProfile(profilesDirOpts).parent_path(),
             };
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);
@@ -99,7 +100,7 @@ static int main_nix_collect_garbage(int argc, char ** argv)
 
         // Run the actual garbage collector.
         if (!dryRun) {
-            auto store = openStore();
+            auto store = openStore(settings);
             auto & gcStore = require<GcStore>(*store);
             options.action = GCOptions::gcDeleteDead;
             GCResults results;

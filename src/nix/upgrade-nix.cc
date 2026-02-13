@@ -10,6 +10,7 @@
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
+#include "nix/main/shared.hh"
 #include "self-exe.hh"
 
 using namespace nix;

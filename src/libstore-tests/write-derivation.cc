@@ -12,19 +12,22 @@ namespace {
 class WriteDerivationTest : public LibStoreTest
 {
 protected:
-    WriteDerivationTest(ref<DummyStoreConfig> config_)
-        : LibStoreTest(config_->openDummyStore())
-        , config(std::move(config_))
+    WriteDerivationTest(auto && makeConfig)
+        : LibStoreTest([&](auto & settings) {
+            this->config = makeConfig(settings);
+            return config->openDummyStore();
+        })
     {
         config->readOnly = false;
     }
 
     WriteDerivationTest()
-        : WriteDerivationTest(make_ref<DummyStoreConfig>(DummyStoreConfig::Params{}))
+        : WriteDerivationTest(
+              [](auto & settings) { return make_ref<DummyStoreConfig>(settings, DummyStoreConfig::Params{}); })
     {
     }
 
-    ref<DummyStoreConfig> config;
+    std::shared_ptr<DummyStoreConfig> config;
 };
 
 static Derivation makeSimpleDrv()
@@ -44,12 +47,12 @@ TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
     auto drv = makeSimpleDrv();
 
-    auto path1 = writeDerivation(*store, drv, NoRepair);
+    auto path1 = store->writeDerivation(drv, NoRepair);
     config->readOnly = true;
-    auto path2 = writeDerivation(*store, drv, NoRepair);
+    auto path2 = computeStorePath(*store, drv);
     EXPECT_EQ(path1, path2);
     EXPECT_THAT(
-        [&] { writeDerivation(*store, drv, Repair); },
+        [&] { store->writeDerivation(drv, Repair); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("operation 'writeDerivation' is not supported by store 'dummy://'")));
 }

@@ -33,6 +33,12 @@ enum class SQLiteOpenMode {
     Immutable,
 };
 
+struct SQLiteSettings
+{
+    SQLiteOpenMode mode = SQLiteOpenMode::Normal;
+    bool useWAL;
+};
+
 /**
  * RAII wrapper to close a SQLite database automatically.
  */
@@ -42,11 +48,7 @@ struct SQLite
 
     SQLite() {}
 
-    struct Settings
-    {
-        SQLiteOpenMode mode = SQLiteOpenMode::Normal;
-        bool useWAL;
-    };
+    using Settings = SQLiteSettings;
 
     SQLite(const std::filesystem::path & path, Settings && settings);
     SQLite(const SQLite & from) = delete;
