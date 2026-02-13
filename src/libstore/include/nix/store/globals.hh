@@ -161,11 +161,6 @@ public:
     static unsigned int getDefaultCores();
 
     /**
-     * The directory where we store sources and derived files.
-     */
-    Path nixStore;
-
-    /**
      * The directory where state is stored.
      */
     std::filesystem::path nixStateDir;

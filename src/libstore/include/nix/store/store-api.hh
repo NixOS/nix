@@ -83,8 +83,8 @@ struct StoreConfigBase : Config
 private:
 
     /**
-     * An indirection so that we don't need to refer to global settings
-     * in headers.
+     * Compute the default Nix store directory from environment variables
+     * (`NIX_STORE_DIR`, `NIX_STORE`) or the compile-time default.
      */
     static Path getDefaultNixStoreDir();
 

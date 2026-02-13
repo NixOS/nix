@@ -84,14 +84,7 @@ Settings settings;
 static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
-    : nixStore(
-#ifndef _WIN32
-          // On Windows `/nix/store` is not a canonical path, but we dont'
-          // want to deal with that yet.
-          canonPath
-#endif
-          (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
+    : nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
     , nixDaemonSocketFile(canonPath(getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))
                                         .transform([](auto && s) { return std::filesystem::path(s); })
                                         .value_or(nixStateDir / DEFAULT_SOCKET_PATH)))

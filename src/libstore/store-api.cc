@@ -18,6 +18,10 @@
 // `addMultipleToStore`.
 #include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
+
+#include "store-config-private.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
@@ -30,7 +34,11 @@ namespace nix {
 
 Path StoreConfigBase::getDefaultNixStoreDir()
 {
-    return settings.nixStore;
+    return
+#ifndef _WIN32
+        canonPath
+#endif
+        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR)));
 }
 
 StoreConfig::StoreConfig(const Params & params)
