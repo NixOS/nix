@@ -106,7 +106,7 @@ bool BasicDerivation::isBuiltin() const
     return builder.substr(0, 8) == "builtin:";
 }
 
-static auto infoForDerivation(Store & store, const Derivation & drv)
+static auto infoForDerivation(const StoreDirConfig & store, const Derivation & drv)
 {
     auto references = drv.inputSrcs;
     for (auto & i : drv.inputDrvs.map)
@@ -126,13 +126,10 @@ static auto infoForDerivation(Store & store, const Derivation & drv)
     };
 }
 
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair, bool readOnly)
+StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv)
 {
-    if (readOnly || settings.readOnlyMode) {
-        auto [_x, _y, _z, path] = infoForDerivation(store, drv);
-        return path;
-    } else
-        return store.writeDerivation(drv, repair);
+    auto [_suffix, _contents, _references, path] = infoForDerivation(store, drv);
+    return path;
 }
 
 StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)

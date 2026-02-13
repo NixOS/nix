@@ -193,7 +193,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     };
 
     // Write the derivation to the destination store
-    auto drvPath = writeDerivation(*dummyStore, drv);
+    auto drvPath = dummyStore->writeDerivation(drv);
 
     // Snapshot the destination store before
     checkpointJson("ca-drv/store-before", dummyStore);
@@ -297,7 +297,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     };
 
     // Write the dependency derivation to the destination store
-    auto depDrvPath = writeDerivation(*dummyStore, depDrv);
+    auto depDrvPath = dummyStore->writeDerivation(depDrv);
 
     // Compute the hash modulo for the dependency derivation
     auto depHashModulo = hashDerivationModulo(*dummyStore, depDrv, true);
@@ -348,7 +348,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     rootDrv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     // Write the root derivation to the destination store
-    auto rootDrvPath = writeDerivation(*dummyStore, rootDrv);
+    auto rootDrvPath = dummyStore->writeDerivation(rootDrv);
 
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);
