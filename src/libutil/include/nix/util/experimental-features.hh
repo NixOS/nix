@@ -24,7 +24,6 @@ enum struct ExperimentalFeature {
     NixCommand,
     GitHashing,
     RecursiveNix,
-    NoUrlLiterals,
     FetchClosure,
     AutoAllocateUids,
     Cgroups,

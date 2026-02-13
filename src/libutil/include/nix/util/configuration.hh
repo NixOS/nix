@@ -9,6 +9,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/util/deprecated-features.hh"
 
 namespace nix {
 
@@ -431,7 +432,7 @@ public:
     void operator=(const std::optional<Path> & v);
 };
 
-struct ExperimentalFeatureSettings : Config
+struct FeatureSettings : Config
 {
 
     Setting<std::set<ExperimentalFeature>> experimentalFeatures{
@@ -489,9 +490,47 @@ struct ExperimentalFeatureSettings : Config
      * disabled, and so the function does nothing in that case.
      */
     void require(const std::optional<ExperimentalFeature> &) const;
+
+    Setting<std::set<DeprecatedFeature>> deprecatedFeatures{
+        this,
+        {},
+        "deprecated-features",
+        R"(
+          Deprecated features that are enabled. (Currently there are none.)
+
+          The following deprecated feature features can be re-activated:
+
+          {{#include deprecated-features-shortlist.md}}
+
+          Deprecated features are [further documented in the manual](@docroot@/development/deprecated-features.md).
+        )"};
+
+    /**
+     * Check whether the given deprecated feature is enabled.
+     */
+    bool isEnabled(const DeprecatedFeature &) const;
+
+    /**
+     * Require an deprecated feature be enabled, throwing an error if it is
+     * not.
+     */
+    void require(const DeprecatedFeature &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function returns true in that case.
+     */
+    bool isEnabled(const std::optional<DeprecatedFeature> &) const;
+
+    /**
+     * `std::nullopt` pointer means no feature, which means there is nothing that could be
+     * disabled, and so the function does nothing in that case.
+     */
+    void require(const std::optional<DeprecatedFeature> &) const;
 };
 
 // FIXME: don't use a global variable.
-extern ExperimentalFeatureSettings experimentalFeatureSettings;
+extern FeatureSettings experimentalFeatureSettings;
+using ExperimentalFeatureSettings = FeatureSettings;
 
 } // namespace nix

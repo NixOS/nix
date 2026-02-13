@@ -26,6 +26,7 @@ headers = files(
   'config-impl.hh',
   'configuration.hh',
   'current-process.hh',
+  'deprecated-features.hh',
   'english.hh',
   'environment-variables.hh',
   'error.hh',

@@ -44,6 +44,12 @@ struct BaseSetting<std::set<ExperimentalFeature>>::trait
     static constexpr bool appendable = true;
 };
 
+template<>
+struct BaseSetting<std::set<DeprecatedFeature>>::trait
+{
+    static constexpr bool appendable = true;
+};
+
 template<typename T>
 struct BaseSetting<T>::trait
 {
@@ -64,6 +70,8 @@ template<>
 void BaseSetting<StringMap>::appendOrSet(StringMap newValue, bool append);
 template<>
 void BaseSetting<std::set<ExperimentalFeature>>::appendOrSet(std::set<ExperimentalFeature> newValue, bool append);
+template<>
+void BaseSetting<std::set<DeprecatedFeature>>::appendOrSet(std::set<DeprecatedFeature> newValue, bool append);
 
 template<typename T>
 void BaseSetting<T>::appendOrSet(T newValue, bool append)
@@ -135,6 +143,7 @@ DECLARE_CONFIG_SERIALISER(Strings)
 DECLARE_CONFIG_SERIALISER(StringSet)
 DECLARE_CONFIG_SERIALISER(StringMap)
 DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
+DECLARE_CONFIG_SERIALISER(std::set<DeprecatedFeature>)
 DECLARE_CONFIG_SERIALISER(std::filesystem::path)
 DECLARE_CONFIG_SERIALISER(std::optional<std::filesystem::path>)
 
