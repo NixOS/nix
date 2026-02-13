@@ -66,7 +66,8 @@ HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer>
     , fileTransfer{fileTransfer}
     , config{config}
 {
-    diskCache = NarInfoDiskCache::get(config->settings.getNarInfoDiskCacheSettings(), {.useWAL = config->settings.useSQLiteWAL});
+    diskCache = NarInfoDiskCache::get(
+        config->settings.getNarInfoDiskCacheSettings(), {.useWAL = config->settings.useSQLiteWAL});
 }
 
 void HttpBinaryCacheStore::init()

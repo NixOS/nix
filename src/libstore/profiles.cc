@@ -291,7 +291,7 @@ std::string optimisticLockProfile(const std::filesystem::path & profile)
     return pathExists(profile) ? readLink(profile).string() : "";
 }
 
-std::filesystem::path profilesDir(const Settings & settings)
+std::filesystem::path profilesDir(ProfileDirsOptions settings)
 {
     auto profileRoot =
         isRootUser() ? rootProfilesDir(settings) : std::filesystem::path{createNixStateDir()} / "profiles";
@@ -299,12 +299,12 @@ std::filesystem::path profilesDir(const Settings & settings)
     return profileRoot;
 }
 
-std::filesystem::path rootProfilesDir(const Settings & settings)
+std::filesystem::path rootProfilesDir(ProfileDirsOptions settings)
 {
-    return std::filesystem::path{settings.nixStateDir} / "profiles/per-user/root";
+    return settings.nixStateDir / "profiles/per-user/root";
 }
 
-std::filesystem::path getDefaultProfile(const Settings & settings)
+std::filesystem::path getDefaultProfile(ProfileDirsOptions settings)
 {
     std::filesystem::path profileLink = settings.useXDGBaseDirectories
                                             ? std::filesystem::path{createNixStateDir()} / "profile"
@@ -316,7 +316,7 @@ std::filesystem::path getDefaultProfile(const Settings & settings)
         }
         // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
-        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles" / "default";
+        auto globalProfileLink = settings.nixStateDir / "profiles" / "default";
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
@@ -329,12 +329,12 @@ std::filesystem::path getDefaultProfile(const Settings & settings)
     }
 }
 
-std::filesystem::path defaultChannelsDir(const Settings & settings)
+std::filesystem::path defaultChannelsDir(ProfileDirsOptions settings)
 {
     return profilesDir(settings) / "channels";
 }
 
-std::filesystem::path rootChannelsDir(const Settings & settings)
+std::filesystem::path rootChannelsDir(ProfileDirsOptions settings)
 {
     return rootProfilesDir(settings) / "channels";
 }

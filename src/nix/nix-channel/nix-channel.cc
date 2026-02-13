@@ -192,7 +192,7 @@ static int main_nix_channel(int argc, char ** argv)
         nixDefExpr = getNixDefExpr(settings);
 
         // Figure out the name of the channels profile.
-        profile = profilesDir(settings) + "/channels";
+        profile = profilesDir(settings.getProfileDirsOptions()) + "/channels";
         createDirs(dirOf(profile));
 
         enum { cNone, cAdd, cRemove, cList, cUpdate, cListGenerations, cRollback } cmd = cNone;

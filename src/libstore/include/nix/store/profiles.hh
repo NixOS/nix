@@ -16,7 +16,6 @@
 
 namespace nix {
 
-class Settings;
 class StorePath;
 
 /**
@@ -210,32 +209,38 @@ void lockProfile(PathLocks & lock, const std::filesystem::path & profile);
  */
 std::string optimisticLockProfile(const std::filesystem::path & profile);
 
+struct ProfileDirsOptions
+{
+    const std::filesystem::path & nixStateDir;
+    bool useXDGBaseDirectories;
+};
+
 /**
  * Create and return the path to a directory suitable for storing the user's
  * profiles.
  */
-std::filesystem::path profilesDir(const Settings & settings);
+std::filesystem::path profilesDir(ProfileDirsOptions opts);
 
 /**
  * Return the path to the profile directory for root (but don't try creating it)
  */
-std::filesystem::path rootProfilesDir(const Settings & settings);
+std::filesystem::path rootProfilesDir(ProfileDirsOptions opts);
 
 /**
  * Create and return the path to the file used for storing the users's channels
  */
-std::filesystem::path defaultChannelsDir(const Settings & settings);
+std::filesystem::path defaultChannelsDir(ProfileDirsOptions opts);
 
 /**
  * Return the path to the channel directory for root (but don't try creating it)
  */
-std::filesystem::path rootChannelsDir(const Settings & settings);
+std::filesystem::path rootChannelsDir(ProfileDirsOptions opts);
 
 /**
  * Resolve the default profile (~/.nix-profile by default,
  * $XDG_STATE_HOME/nix/profile if XDG Base Directory Support is enabled),
  * and create if doesn't exist
  */
-std::filesystem::path getDefaultProfile(const Settings & settings);
+std::filesystem::path getDefaultProfile(ProfileDirsOptions opts);
 
 } // namespace nix

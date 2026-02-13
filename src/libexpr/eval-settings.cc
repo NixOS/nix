@@ -71,8 +71,9 @@ Strings EvalSettings::getDefaultNixPath(nix::Settings & settings)
     };
 
     add(std::filesystem::path{getNixDefExpr(settings)} / "channels");
-    add(rootChannelsDir(settings) / "nixpkgs", "nixpkgs");
-    add(rootChannelsDir(settings));
+    auto profilesDirOpts = settings.getProfileDirsOptions();
+    add(rootChannelsDir(profilesDirOpts) / "nixpkgs", "nixpkgs");
+    add(rootChannelsDir(profilesDirOpts));
 
     return res;
 }

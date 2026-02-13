@@ -326,7 +326,7 @@ void MixProfile::updateProfile(Store & store, const BuiltPaths & buildables)
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile(settings).string();
+    profile = getDefaultProfile(settings.getProfileDirsOptions()).string();
 }
 
 static constexpr auto environmentVariablesCategory = "Options that change environment variables";
