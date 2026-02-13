@@ -4,6 +4,7 @@
 #include "nix/util/executable-path.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/finally.hh"
@@ -216,16 +217,18 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
     startInfo.hStdOutput = out.writeSide.get();
     startInfo.hStdError = out.writeSide.get();
 
-    std::string envline;
-    // Retain the current processes' environment variables.
-    for (const auto & envVar : getEnv()) {
-        envline += (envVar.first + '=' + envVar.second + '\0');
-    }
-    // Also add new ones specified in options.
+    auto env = getEnvOs();
+
     if (options.environment) {
         for (const auto & envVar : *options.environment) {
-            envline += (envVar.first + '=' + envVar.second + '\0');
+            env[envVar.first] = envVar.second;
         }
+    }
+
+    OsString envline;
+
+    for (const auto & envVar : env) {
+        envline += (envVar.first + L'=' + envVar.second + L'\0');
     }
 
     std::string cmdline = windowsEscape(realProgram, false);
@@ -244,8 +247,8 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
             NULL,
             TRUE,
             CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,
-            string_to_os_string(envline).data(),
-            options.chdir.has_value() ? string_to_os_string(*options.chdir).data() : NULL,
+            envline.data(),
+            options.chdir.has_value() ? options.chdir->c_str() : NULL,
             &startInfo,
             &procInfo)
         == 0) {

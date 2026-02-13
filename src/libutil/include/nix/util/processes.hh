@@ -4,6 +4,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-path.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/ansicolor.hh"
 
@@ -119,8 +120,8 @@ struct RunOptions
     std::optional<uid_t> uid;
     std::optional<uid_t> gid;
 #endif
-    std::optional<Path> chdir;
-    std::optional<StringMap> environment;
+    std::optional<std::filesystem::path> chdir;
+    std::optional<OsStringMap> environment;
     std::optional<std::string> input;
     Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
