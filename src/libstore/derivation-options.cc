@@ -6,7 +6,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/variant-wrapper.hh"
 
 #include <optional>
@@ -357,29 +356,6 @@ StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivat
     if (!drv.type().hasKnownOutputPaths())
         res.insert("ca-derivations");
     return res;
-}
-
-template<typename Input>
-bool DerivationOptions<Input>::canBuildLocally(Store & localStore, const BasicDerivation & drv) const
-{
-    if (drv.platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv.platform)
-        && !drv.isBuiltin())
-        return false;
-
-    if (settings.getWorkerSettings().maxBuildJobs.get() == 0 && !drv.isBuiltin())
-        return false;
-
-    for (auto & feature : getRequiredSystemFeatures(drv))
-        if (!localStore.config.systemFeatures.get().count(feature))
-            return false;
-
-    return true;
-}
-
-template<typename Input>
-bool DerivationOptions<Input>::willBuildLocally(Store & localStore, const BasicDerivation & drv) const
-{
-    return preferLocalBuild && canBuildLocally(localStore, drv);
 }
 
 template<typename Input>
