@@ -656,8 +656,83 @@ struct SourceHutInputScheme : GitArchiveInputScheme
     }
 };
 
+struct GiteaInputScheme : GitArchiveInputScheme
+{
+    std::string_view schemeName() const override { return "gitea"; }
+
+    std::optional<std::pair<std::string, std::string>> accessHeaderFromToken(const std::string & token) const override
+    {
+        // Gitea supports OAuth2 tokens and HTTP Basic
+        // Authentication.  The former simply specifies the token, the
+        // latter can use the token as the password.  Only the first
+        // is used here. See
+        // https://docs.gitea.com/development/api-usage#authentication
+        return std::pair<std::string, std::string>("Authorization", fmt("token %s", token));
+    }
+
+    std::string getHost(const Input & input) const
+    {
+        return maybeGetStrAttr(input.attrs, "host").value_or("codeberg.org");
+    }
+
+    std::string getOwner(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "owner");
+    }
+
+    std::string getRepo(const Input & input) const
+    {
+        return getStrAttr(input.attrs, "repo");
+    }
+
+    RefInfo getRevFromRef(nix::ref<Store> store, const Input & input) const override
+    {
+        auto host = getHost(input);
+        auto url = fmt("https://%s/api/v1/repos/%s/%s/commits?sha=%s", host, getOwner(input), getRepo(input), *input.getRef());
+
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+
+        auto json = nlohmann::json::parse(
+            readFile(
+                store->toRealPath(
+                    downloadFile(store, url, "source", headers).storePath)));
+
+        return RefInfo {
+            .rev = Hash::parseAny(std::string { json[1]["sha"] }, HashAlgorithm::SHA1),
+            .treeHash = Hash::parseAny(std::string { json[1]["commit"]["tree"]["sha"] }, HashAlgorithm::SHA1)
+        };
+    }
+
+    DownloadUrl getDownloadUrl(const Input & input) const override
+    {
+        auto host = getHost(input);
+
+        Headers headers = makeHeadersWithAuthTokens(*input.settings, host);
+
+        // If we have no auth headers then we default to the public archive
+        // urls so we do not run into rate limits.
+        const auto urlFmt = headers.empty() ? "https://%s/%s/%s/archive/%s.tar.gz" : "https://%s/api/v1/repos/%s/%s/archive/%s.tar.gz";
+
+        const auto url = fmt(urlFmt, host, getOwner(input), getRepo(input),
+            input.getRev()->to_string(HashFormat::Base16, false));
+
+        return DownloadUrl { url, headers };
+    }
+
+    void clone(const Input & input, const Path & destDir) const override
+    {
+        auto host = getHost(input);
+        Input::fromURL(*input.settings, fmt("git+https://%s/%s/%s.git",
+                host, getOwner(input), getRepo(input)))
+            .applyOverrides(input.getRef(), input.getRev())
+            .clone(destDir);
+    }
+};
+
+
 static auto rGitHubInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitHubInputScheme>()); });
 static auto rGitLabInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GitLabInputScheme>()); });
 static auto rSourceHutInputScheme = OnStartup([] { registerInputScheme(std::make_unique<SourceHutInputScheme>()); });
+static auto rGiteaInputScheme = OnStartup([] { registerInputScheme(std::make_unique<GiteaInputScheme>()); });
 
 } // namespace nix::fetchers
