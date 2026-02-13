@@ -14,7 +14,6 @@
 
 namespace nix {
 
-class Store;
 struct StoreDirConfig;
 struct BasicDerivation;
 struct StructuredAttrs;
@@ -183,16 +182,6 @@ struct DerivationOptions
      * `DerivationOptions` instead.
      */
     StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
-
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    bool canBuildLocally(Store & localStore, const BasicDerivation & drv) const;
-
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    bool willBuildLocally(Store & localStore, const BasicDerivation & drv) const;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 

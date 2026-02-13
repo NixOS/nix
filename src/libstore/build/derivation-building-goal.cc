@@ -325,10 +325,25 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             }
         }
 
+        bool canBuildLocally = [&] {
+            if (drv->platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv->platform)
+                && !drv->isBuiltin())
+                return false;
+
+            if (worker.settings.maxBuildJobs.get() == 0 && !drv->isBuiltin())
+                return false;
+
+            for (auto & feature : drvOptions.getRequiredSystemFeatures(*drv))
+                if (!worker.store.config.systemFeatures.get().count(feature))
+                    return false;
+
+            return true;
+        }();
+
         /* Don't do a remote build if the derivation has the attribute
            `preferLocalBuild' set.  Also, check and repair modes are only
            supported for local builds. */
-        bool buildLocally = (buildMode != bmNormal || drvOptions.willBuildLocally(worker.store, *drv))
+        bool buildLocally = (buildMode != bmNormal || (drvOptions.preferLocalBuild && canBuildLocally))
                             && worker.settings.maxBuildJobs.get() != 0;
 
         if (buildLocally) {
@@ -363,7 +378,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 
                 externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
 
-                if (!externalBuilder && !drvOptions.canBuildLocally(worker.store, *drv)) {
+                if (!externalBuilder && !canBuildLocally) {
                     auto msg =
                         fmt("Cannot build '%s'.\n"
                             "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
