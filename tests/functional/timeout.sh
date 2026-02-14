@@ -17,4 +17,4 @@ expectStderr 101 nix-build timeout.nix -A silent --max-silent-time 2 | grepQuiet
 
 expectStderr 100 nix-build timeout.nix -A closeLog | grepQuiet "builder failed due to signal"
 
-expectStderr 1 nix build -f timeout.nix silent --max-silent-time 2 | grepQuiet "timed out after 2 seconds"
+expectStderr 101 nix build -f timeout.nix silent --max-silent-time 2 | grepQuiet "timed out after 2 seconds"

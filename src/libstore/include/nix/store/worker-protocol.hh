@@ -110,6 +110,13 @@ struct WorkerProto
     static const Version minimum;
 
     /**
+     * Feature for transmitting HashMismatch and Cancelled statuses.
+     * Falls back to OutputRejected / MiscFailure when communicating
+     * with older remotes that lack this feature.
+     */
+    static constexpr std::string_view featureCancelledAndHashMismatchStatus = "cancelled-and-hash-mismatch-status";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -296,6 +303,8 @@ inline std::ostream & operator<<(std::ostream & s, WorkerProto::Op op)
         static void write(const StoreDirConfig & store, WorkerProto::WriteConn conn, const T & t); \
     };
 
+template<>
+DECLARE_WORKER_SERIALISER(BuildResultStatus);
 template<>
 DECLARE_WORKER_SERIALISER(DerivedPath);
 template<>

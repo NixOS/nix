@@ -17,6 +17,7 @@
 #include "nix/cmd/markdown.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/fetch-to-store.hh"
+#include "nix/store/build-result.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
 
@@ -360,6 +361,7 @@ struct CmdFlakeCheck : FlakeCommand
         auto localSystem = std::string(settings.thisSystem.get());
 
         bool hasErrors = false;
+        ExitStatusFlags exitStatusFlags{};
         auto reportError = [&](const Error & e) {
             try {
                 throw e;
@@ -819,10 +821,12 @@ struct CmdFlakeCheck : FlakeCommand
             // Report build failures with attribute paths
             for (auto & result : results) {
                 if (auto * failure = result.tryGetFailure()) {
+                    exitStatusFlags.updateFromStatus(failure->status);
                     auto it = attrPathsByDrv.find(result.path);
                     if (it != attrPathsByDrv.end() && !it->second.empty()) {
                         for (auto & attrPath : it->second) {
                             reportError(Error(
+                                exitStatusFlags.failingExitStatus(),
                                 "failed to build attribute '%s', build of '%s' failed: %s",
                                 attrPath.to_string(*state),
                                 result.path.to_string(*store),
@@ -830,14 +834,17 @@ struct CmdFlakeCheck : FlakeCommand
                         }
                     } else {
                         // Derivation has no attribute path (e.g., a build dependency)
-                        reportError(
-                            Error("build of '%s' failed: %s", result.path.to_string(*store), failure->message()));
+                        reportError(Error(
+                            exitStatusFlags.failingExitStatus(),
+                            "build of '%s' failed: %s",
+                            result.path.to_string(*store),
+                            failure->message()));
                     }
                 }
             }
         }
         if (hasErrors)
-            throw Error("some errors were encountered during the evaluation");
+            throw Error(exitStatusFlags.failingExitStatus(), "some errors were encountered during the evaluation");
 
         logger->log(lvlInfo, ANSI_GREEN "all checks passed!" ANSI_NORMAL);
 

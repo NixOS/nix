@@ -586,13 +586,18 @@ static void throwBuildErrors(std::vector<KeyedBuildResult> & buildResults, const
             throw *failedResult->second;
         } else {
             StringSet failedPaths;
+            /* Compute aggregate exit status from all failures */
+            ExitStatusFlags flags{};
             for (; failedResult != failed.end(); failedResult++) {
                 if (!failedResult->second->message().empty()) {
                     logError(failedResult->second->info());
                 }
                 failedPaths.insert(failedResult->first->path.to_string(store));
+                auto status = failedResult->second->status;
+                flags.updateFromStatus(status);
             }
-            throw Error("build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
+            auto exitStatus = flags.failingExitStatus();
+            throw Error(exitStatus, "build of %s failed", concatStringsSep(", ", quoteStrings(failedPaths)));
         }
     }
 }
