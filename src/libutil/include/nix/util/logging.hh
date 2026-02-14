@@ -129,7 +129,12 @@ public:
         return false;
     }
 
-    virtual void log(Verbosity lvl, std::string_view s) = 0;
+    /**
+     * @param machine The origin machine for messages forwarded from
+     * a remote store connection (e.g. "ssh-ng://host"). Empty for
+     * locally-generated messages.
+     */
+    virtual void log(Verbosity lvl, std::string_view s, const std::string & machine = "") = 0;
 
     void log(std::string_view s)
     {
@@ -152,11 +157,12 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) {};
+        ActivityId parent,
+        const std::string & machine = "") {};
 
-    virtual void stopActivity(ActivityId act) {};
+    virtual void stopActivity(ActivityId act, const std::string & machine = "") {};
 
-    virtual void result(ActivityId act, ResultType type, const Fields & fields) {};
+    virtual void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") {};
 
     virtual void writeToStdout(std::string_view s);
 
@@ -202,7 +208,8 @@ struct Activity
         ActivityType type,
         const std::string & s = "",
         const Logger::Fields & fields = {},
-        ActivityId parent = getCurActivity());
+        ActivityId parent = getCurActivity(),
+        const std::string & machine = "");
 
     Activity(
         Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
@@ -285,7 +292,8 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted);
+    bool trusted,
+    const std::string & machine = "");
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
@@ -295,7 +303,8 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted);
+    bool trusted,
+    const std::string & machine = "");
 
 /**
  * suppress msgs > this

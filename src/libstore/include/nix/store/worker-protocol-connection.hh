@@ -63,6 +63,13 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      */
     virtual ~BasicClientConnection();
 
+    /**
+     * A description of the remote store (e.g. "ssh-ng://host").
+     * Used to tag all log messages and activities forwarded from
+     * the remote daemon so that consumers can identify their origin.
+     */
+    std::string remoteDescription;
+
     virtual void closeWrite() = 0;
 
     std::exception_ptr processStderrReturn(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);

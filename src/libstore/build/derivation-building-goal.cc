@@ -528,7 +528,23 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
                         auto json = parseJSONMessage(currentHookLine, "the derivation builder");
                         if (json) {
                             auto s = handleJSONLogMessage(
-                                *json, worker.act, hook->activities, "the derivation builder", true);
+                                *json, worker.act, hook->activities, "the derivation builder", true, hook->machineName);
+
+                            // Update the expected build count when the remote daemon
+                            // starts building sub-dependencies we didn't know about.
+                            // Skip the top-level build (already counted by the local
+                            // DerivationGoal's MaintainCount on expectedBuilds).
+                            if ((*json)["action"] == "start" && (ActivityType) (int) (*json)["type"] == actBuild) {
+                                auto remoteFields = (*json)["fields"];
+                                auto remoteDrvPath = !remoteFields.is_null() && remoteFields.size() > 0
+                                                         ? remoteFields[0].get<std::string>()
+                                                         : "";
+                                if (remoteDrvPath != worker.store.printStorePath(drvPath)) {
+                                    worker.expectedBuilds++;
+                                    worker.updateProgress();
+                                }
+                            }
+
                             // ensure that logs from a builder using `ssh-ng://` as protocol
                             // are also available to `nix log`.
                             if (s && logFile->sink) {
@@ -1006,7 +1022,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
                     throw;
                 }
             }();
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
+            if (handleJSONLogMessage(
+                    s, worker.act, worker.hook->activities, "the build hook", true, worker.hook->machineName))
                 ;
             else if (s.substr(0, 2) == "# ") {
                 reply = s.substr(2);
