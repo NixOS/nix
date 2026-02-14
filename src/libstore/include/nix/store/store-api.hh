@@ -806,13 +806,19 @@ public:
      * `storePath` is returned; that is, the closures under the
      * `referrers` relation instead of the `references` relation is
      * returned.
+     *
+     * @param onPathDiscovered A callback invoked on each discovered store
+     * path. Returning `false` from the callback will stop recursion on
+     * that path. Returning `true` will continue recursion. A `nullptr` is
+     * equivalent to a callback which always returns  `true`.
      */
     virtual void computeFSClosure(
         const StorePathSet & paths,
         StorePathSet & out,
         bool flipDirection = false,
         bool includeOutputs = false,
-        bool includeDerivers = false);
+        bool includeDerivers = false,
+        std::function<bool(const StorePath & path)> onPathDiscovered = nullptr);
 
     void computeFSClosure(
         const StorePath & path,

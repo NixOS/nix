@@ -21,7 +21,8 @@ void Store::computeFSClosure(
     StorePathSet & paths_,
     bool flipDirection,
     bool includeOutputs,
-    bool includeDerivers)
+    bool includeDerivers,
+    std::function<bool(const StorePath & path)> onPathDiscovered)
 {
     std::function<std::set<StorePath>(const StorePath & path, std::future<ref<const ValidPathInfo>> &)> queryDeps;
     if (flipDirection)
@@ -65,6 +66,12 @@ void Store::computeFSClosure(
         startPaths,
         paths_,
         [&](const StorePath & path, std::function<void(std::promise<std::set<StorePath>> &)> processEdges) {
+            if (onPathDiscovered && !onPathDiscovered(path)) {
+                std::promise<std::set<StorePath>> promise;
+                promise.set_value({});
+                processEdges(promise);
+                return;
+            }
             std::promise<std::set<StorePath>> promise;
             std::function<void(std::future<ref<const ValidPathInfo>>)> getDependencies =
                 [&](std::future<ref<const ValidPathInfo>> fut) {
