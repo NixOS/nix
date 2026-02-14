@@ -185,8 +185,10 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
-                    if (pathExists(flakeRoot + "/.git/shallow"))
-                        parsedURL.query.insert_or_assign("shallow", "1");
+                    if (!parsedURL.query.count("shallow")) {
+                       // We assume shallow by default, so we don't need to compute the revCount, which is an expensive operation.
+                       parsedURL.query.insert_or_assign("shallow", "1");
+                    }
 
                     return fromParsedURL(fetchSettings, std::move(parsedURL), isFlake);
                 }

@@ -63,3 +63,8 @@ fi
 # Verify that we can shallow fetch the worktree
 git -C "$TEST_ROOT/shallow-worktree" rev-list --count HEAD >/dev/null
 nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$TEST_ROOT/shallow-worktree\"; shallow = true; }).rev"
+
+# Normal flake operation work because they use shallow by default
+pushd "$TEST_ROOT/shallow-worktree"
+nix flake metadata
+popd
