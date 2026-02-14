@@ -112,3 +112,7 @@ path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" 
 [[ $(cat "$path/a/b/xyzzy") = xyzzy ]]
 [[ $(cat "$path/a/b/foo") = foo ]]
 [[ $(cat "$path/bla") = abc ]]
+
+# Test that unpacking an empty file does not segfault (see https://github.com/NixOS/nix/issues/15116).
+touch "$TEST_ROOT/empty"
+expectStderr 1 nix store prefetch-file --unpack "file://$TEST_ROOT/empty" | grepQuiet "archive.*is empty"
