@@ -62,10 +62,10 @@ struct AuthorizationSettings : Config
         {"root"},
         "trusted-users",
         R"(
-          A list of user names, separated by whitespace.
+          A list of user names and/or numeric UIDs, separated by whitespace.
           These users will have additional rights when connecting to the Nix daemon, such as the ability to specify additional [substituters](#conf-substituters), or to import unsigned realisations or unsigned input-addressed store objects.
 
-          You can also specify groups by prefixing names with `@`.
+          You can also specify group names and/or numeric GIDs by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.
 
           > **Warning**
@@ -82,10 +82,10 @@ struct AuthorizationSettings : Config
         {"*"},
         "allowed-users",
         R"(
-          A list of user names, separated by whitespace.
+          A list of user names and/or numeric UIDs, separated by whitespace.
           These users are allowed to connect to the Nix daemon.
 
-          You can specify groups by prefixing names with `@`.
+          You can specify group names and/or numeric GIDs by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.
           Also, you can allow all users by specifying `*`.
 
@@ -147,7 +147,7 @@ static void setSigChldAction(bool autoReap)
  *
  * @param group Group the user might be a member of.
  */
-static bool matchUser(std::string_view user, const struct group & gr)
+static bool isUserInGroup(std::string_view user, const struct group & gr)
 {
     for (char ** mem = gr.gr_mem; *mem; mem++)
         if (user == std::string_view(*mem))
@@ -169,25 +169,53 @@ static bool matchUser(std::string_view user, const struct group & gr)
  *
  * Otherwise: No.
  */
-static bool
-matchUser(const std::optional<std::string> & user, const std::optional<std::string> & group, const Strings & users)
+static bool matchUser(std::optional<uid_t> uid, std::optional<gid_t> gid, const Strings & users)
 {
     if (find(users.begin(), users.end(), "*") != users.end())
         return true;
 
-    if (user && find(users.begin(), users.end(), *user) != users.end())
+    if (!uid)
+        return false;
+
+    if (find(users.begin(), users.end(), std::to_string(uid.value())) != users.end())
         return true;
 
-    for (auto & i : users)
-        if (i.substr(0, 1) == "@") {
-            if (group && *group == i.substr(1))
-                return true;
-            struct group * gr = getgrnam(i.c_str() + 1);
-            if (!gr)
-                continue;
-            if (user && matchUser(*user, *gr))
-                return true;
+    auto pw = getpwuid(uid.value());
+
+    if (pw) {
+        if (find(users.begin(), users.end(), pw->pw_name) != users.end())
+            return true;
+
+        if (gid) {
+            auto gr = getgrgid(gid.value());
+            auto group = gr    ? std::optional<std::string>(gr->gr_name)
+                         : gid ? std::optional(std::to_string(*gid))
+                               : std::nullopt;
+
+            /* Don't allow connecting as the build users group. */
+            if (group && group == settings.getLocalSettings().buildUsersGroup)
+                return false;
+
+            for (auto & i : users)
+                if (i.substr(0, 1) == "@") {
+                    /* Check if the client's primary group matches. */
+                    if (gr && gr->gr_name == i.substr(1))
+                        return true;
+
+                    if (std::to_string(gid.value()) == i.substr(1))
+                        return true;
+
+                    /* Otherwise, check if the client's uid is a
+                       member of this group. */
+                    auto gr2 = getgrnam(i.c_str() + 1);
+                    if (!gr2)
+                        continue;
+
+                    if (isUserInGroup(pw->pw_name, *gr2))
+                        return true;
+                }
         }
+    }
 
     return false;
 }
@@ -212,18 +240,13 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::P
                 : peer.uid ? std::optional(std::to_string(*peer.uid))
                            : std::nullopt;
 
-    auto gr = peer.gid ? getgrgid(*peer.gid) : 0;
-    auto group = gr         ? std::optional<std::string>(gr->gr_name)
-                 : peer.gid ? std::optional(std::to_string(*peer.gid))
-                            : std::nullopt;
-
     const Strings & trustedUsers = authorizationSettings.trustedUsers;
     const Strings & allowedUsers = authorizationSettings.allowedUsers;
 
-    if (matchUser(user, group, trustedUsers))
+    if (matchUser(peer.uid, peer.gid, trustedUsers))
         trusted = Trusted;
 
-    if ((!trusted && !matchUser(user, group, allowedUsers)) || group == settings.getLocalSettings().buildUsersGroup)
+    if ((!trusted && !matchUser(peer.uid, peer.gid, allowedUsers)))
         throw Error("user '%1%' is not allowed to connect to the Nix daemon", user.value_or("<unknown>"));
 
     return {trusted, std::move(user)};
