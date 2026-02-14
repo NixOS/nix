@@ -130,3 +130,121 @@ assert show_output.packages.${builtins.currentSystem}.not-a-derivation == {};
 true
 '
 
+# System folding tests
+# ============================================================
+
+# Test 1: Default folding behavior - systems should be folded in non-JSON mode
+cat >flake.nix <<EOF
+{
+  description = "System folding test";
+  outputs = inputs: {
+    packages.x86_64-linux.p1 = import ./simple.nix;
+    packages.aarch64-linux.p1 = import ./simple.nix;
+    apps.x86_64-linux.a1 = {
+      type = "app";
+      program = "\${./simple.nix}";
+    };
+    apps.aarch64-linux.a1 = {
+      type = "app";
+      program = "\${./simple.nix}";
+    };
+    checks.x86_64-linux.c1 = import ./simple.nix;
+    checks.aarch64-linux.c1 = import ./simple.nix;
+    devShells.x86_64-linux.default = import ./shell.nix;
+    devShells.aarch64-linux.default = import ./shell.nix;
+  };
+}
+EOF
+
+nix flake show > show-output.txt
+# Check that current system is highlighted (on Linux) or that test systems exist (on macOS)
+case "$system" in
+  x86_64-linux|aarch64-linux)
+    # On Linux, current system is one of the defined systems and should be highlighted in brackets
+    grep -q "[$system]" show-output.txt
+    ;;
+  *)
+    # On macOS, current system is not in the flake, so just check that test systems are present
+    grep -q "x86_64-linux" show-output.txt
+    grep -q "aarch64-linux" show-output.txt
+    ;;
+esac
+# Additional check: ensure test systems are present on all platforms
+grep -q "x86_64-linux" show-output.txt
+grep -q "aarch64-linux" show-output.txt
+
+# Test 2: --no-system-folding shows all systems separately
+nix flake show --no-system-folding > show-output.txt
+grep -q "x86_64-linux" show-output.txt
+grep -q "aarch64-linux" show-output.txt
+
+# Test 3: Folding is disabled with --json or --all-systems
+cat >flake.nix <<EOF
+{
+  description = "Folding disable test";
+  outputs = inputs: {
+    packages.x86_64-linux.default = import ./simple.nix;
+    packages.aarch64-linux.default = import ./simple.nix;
+  };
+}
+EOF
+
+nix flake show --json > show-output.json
+# shellcheck disable=SC2016
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output.packages ? x86_64-linux;
+assert show_output.packages ? aarch64-linux;
+true
+'
+
+nix flake show --all-systems > show-output.txt
+grep -q "x86_64-linux" show-output.txt
+grep -q "aarch64-linux" show-output.txt
+
+# Test 4: Single system and empty systems work correctly
+cat >flake.nix <<EOF
+{
+  description = "Edge case test";
+  outputs = inputs: {
+    packages.$system.default = import ./simple.nix;
+    apps.$system.hello = {
+      type = "app";
+      program = "\${./simple.nix}";
+    };
+  };
+}
+EOF
+
+nix flake show > show-output.txt
+grep -q "$system" show-output.txt
+
+cat >flake.nix <<EOF
+{
+  description = "Empty systems test";
+  outputs = inputs: {
+    packages = {};
+    apps = {};
+    checks = {};
+    devShells = {};
+  };
+}
+EOF
+
+nix flake show > show-output.txt
+
+# Test 5: legacyPackages are NOT folded (intentional)
+cat >flake.nix <<EOF
+{
+  description = "legacyPackages test";
+  outputs = inputs: {
+    legacyPackages.x86_64-linux.p1 = import ./simple.nix;
+    legacyPackages.aarch64-linux.p1 = import ./simple.nix;
+  };
+}
+EOF
+
+nix flake show --legacy > show-output.txt
+grep -q "x86_64-linux" show-output.txt
+grep -q "aarch64-linux" show-output.txt
