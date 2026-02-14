@@ -20,6 +20,10 @@ const WorkerProto::Version WorkerProto::latest = {
             .major = 1,
             .minor = 38,
         },
+    .features =
+        {
+            "gc-closure",
+        },
 };
 
 const WorkerProto::Version WorkerProto::minimum = {

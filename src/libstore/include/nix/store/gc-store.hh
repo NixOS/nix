@@ -50,7 +50,8 @@ struct GCOptions
     bool ignoreLiveness{false};
 
     /**
-     * For `gcDeleteSpecific`, the paths to delete.
+     * The paths from which to delete.
+     * If empty, and `action` is not `gcDeleteSpecific`, act on the whole store.
      */
     StorePathSet pathsToDelete;
 
