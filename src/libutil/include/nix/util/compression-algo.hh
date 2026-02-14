@@ -7,6 +7,7 @@
 
 namespace nix {
 
+// Do we want to add Identity to the list???
 #define NIX_FOR_EACH_COMPRESSION_ALGO(MACRO) \
     MACRO("none", none)                      \
     MACRO("br", brotli)                      \

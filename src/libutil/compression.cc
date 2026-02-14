@@ -1,4 +1,5 @@
 #include "nix/util/compression.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/finally.hh"
@@ -38,9 +39,9 @@ struct ArchiveDecompressionSource : Source
 {
     std::unique_ptr<TarArchive> archive = 0;
     Source & src;
-    std::optional<std::string> compressionMethod;
+    std::optional<CompressionAlgo> compressionMethod;
 
-    ArchiveDecompressionSource(Source & src, std::optional<std::string> compressionMethod = std::nullopt)
+    ArchiveDecompressionSource(Source & src, std::optional<CompressionAlgo> compressionMethod = std::nullopt)
         : src(src)
         , compressionMethod(std::move(compressionMethod))
     {
@@ -239,7 +240,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
-std::string decompress(const std::string & method, std::string_view in)
+std::string decompress(const std::optional<CompressionAlgo> & method, std::string_view in)
 {
     StringSink ssink;
     auto sink = makeDecompressionSink(method, ssink);
@@ -248,11 +249,11 @@ std::string decompress(const std::string & method, std::string_view in)
     return std::move(ssink.s);
 }
 
-std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
+std::unique_ptr<FinishSink> makeDecompressionSink(const std::optional<CompressionAlgo> & method, Sink & nextSink)
 {
-    if (method == "none" || method == "" || method == "identity")
+    if (!method.has_value() || method == CompressionAlgo::none)
         return std::make_unique<NoneSink>(nextSink);
-    else if (method == "br")
+    else if (method == CompressionAlgo::brotli)
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
         return sourceToSink([method, &nextSink](Source & source) {

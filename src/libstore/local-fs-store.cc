@@ -1,4 +1,5 @@
 #include "nix/util/archive.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
@@ -130,7 +131,7 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
         else if (pathExists(logBz2Path)) {
             try {
-                return decompress("bzip2", readFile(logBz2Path));
+                return decompress(CompressionAlgo::bzip2, readFile(logBz2Path));
             } catch (Error &) {
             }
         }

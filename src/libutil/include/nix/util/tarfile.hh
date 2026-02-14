@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/compression-algo.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/fs-sink.hh"
 #include <archive.h>
@@ -22,7 +23,7 @@ struct TarArchive
     /// @param raw - Whether to enable raw file support. For more info look in docs:
     /// https://manpages.debian.org/stretch/libarchive-dev/archive_read_format.3.en.html
     /// @param compression_method - Primary compression method to use. std::nullopt means 'all'.
-    TarArchive(Source & source, bool raw = false, std::optional<std::string> compression_method = std::nullopt);
+    TarArchive(Source & source, bool raw = false, std::optional<CompressionAlgo> compression_method = std::nullopt);
 
     /// Disable copy constructor. Explicitly default move assignment/constructor.
     TarArchive(const TarArchive &) = delete;

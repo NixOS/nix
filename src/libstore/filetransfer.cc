@@ -1,5 +1,6 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/compression.hh"
@@ -106,7 +107,7 @@ struct curlFileTransfer : public FileTransfer
 
         curlSList requestHeaders;
 
-        std::string encoding;
+        std::optional<CompressionAlgo> encoding;
 
         bool acceptRanges = false;
 
@@ -288,7 +289,7 @@ struct curlFileTransfer : public FileTransfer
                 result.bodySize = 0;
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
-                encoding = "";
+                encoding = std::nullopt;
                 appendCurrentUrl();
             } else {
 
@@ -312,7 +313,7 @@ struct curlFileTransfer : public FileTransfer
                     }
 
                     else if (name == "content-encoding")
-                        encoding = trim(line.substr(i + 1));
+                        encoding = parseCompressionAlgo(trim(line.substr(i + 1)));
 
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
@@ -738,7 +739,7 @@ struct curlFileTransfer : public FileTransfer
                    sink, we can only retry if the server supports
                    ranged requests. */
                 if (err == Transient && attempt < request.tries
-                    && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && encoding.empty()))) {
+                    && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && !encoding.has_value()))) {
                     int ms = retryTimeMs
                              * std::pow(
                                  2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));

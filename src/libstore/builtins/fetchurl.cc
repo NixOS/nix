@@ -3,6 +3,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/file-system.hh"
 
@@ -54,7 +55,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             }
 #endif
 
-            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? "xz" : "none", sink);
+            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? CompressionAlgo::xz : CompressionAlgo::none, sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });

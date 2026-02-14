@@ -1,4 +1,5 @@
 #include "nix/store/nar-info-disk-cache.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/users.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/sqlite.hh"
@@ -269,7 +270,7 @@ public:
                 auto narInfo = make_ref<NarInfo>(
                     cache.storeDir, StorePath(hashPart + "-" + namePart), Hash::parseAnyPrefixed(queryNAR.getStr(6)));
                 narInfo->url = queryNAR.getStr(2);
-                narInfo->compression = queryNAR.getStr(3);
+                narInfo->compression = parseCompressionAlgo(queryNAR.getStr(3));
                 if (!queryNAR.isNull(4))
                     narInfo->fileHash = Hash::parseAnyPrefixed(queryNAR.getStr(4));
                 narInfo->fileSize = queryNAR.getInt(5);
@@ -334,7 +335,8 @@ public:
 
                 state->insertNAR
                     .use()(cache.id)(hashPart) (std::string(info->path.name()))(
-                        narInfo ? narInfo->url : "", narInfo != 0)(narInfo ? narInfo->compression : "", narInfo != 0)(
+                        narInfo ? narInfo->url : "",
+                        narInfo != 0)(narInfo ? showCompressionAlgo(narInfo->compression.value()) : "", narInfo != 0)(
                         narInfo && narInfo->fileHash ? narInfo->fileHash->to_string(HashFormat::Nix32, true) : "",
                         narInfo && narInfo->fileHash)(
                         narInfo ? narInfo->fileSize : 0, narInfo != 0 && narInfo->fileSize)(info->narHash.to_string(
