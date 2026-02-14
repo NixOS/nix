@@ -737,7 +737,7 @@ struct curlFileTransfer : public FileTransfer
                    download after a while. If we're writing to a
                    sink, we can only retry if the server supports
                    ranged requests. */
-                if (err == Transient && attempt < request.tries
+                if (err == Transient && attempt < fileTransfer.settings.tries
                     && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && encoding.empty()))) {
                     int ms = retryTimeMs
                              * std::pow(

@@ -50,9 +50,11 @@ void HttpsBinaryCacheStoreTest::SetUp()
     // clang-format off
     openssl({"ecparam", "-genkey", "-name", "prime256v1", "-out", caKey.string()});
     openssl({"req", "-new", "-x509", "-days", "1", "-key", caKey.string(), "-out", caCert.string(), "-subj", "/CN=TestCA"});
+    auto serverExtFile = tmpDir / "server.ext";
+    writeFile(serverExtFile, "subjectAltName=DNS:localhost,IP:127.0.0.1");
     openssl({"ecparam", "-genkey", "-name", "prime256v1", "-out", serverKey.string()});
-    openssl({"req", "-new", "-key", serverKey.string(), "-out", (tmpDir / "server.csr").string(), "-subj", "/CN=localhost"});
-    openssl({"x509", "-req", "-in", (tmpDir / "server.csr").string(), "-CA", caCert.string(), "-CAkey", caKey.string(), "-CAcreateserial", "-out", serverCert.string(), "-days", "1"});
+    openssl({"req", "-new", "-key", serverKey.string(), "-out", (tmpDir / "server.csr").string(), "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"});
+    openssl({"x509", "-req", "-in", (tmpDir / "server.csr").string(), "-CA", caCert.string(), "-CAkey", caKey.string(), "-CAcreateserial", "-out", serverCert.string(), "-days", "1", "-extfile", serverExtFile.string()});
     openssl({"ecparam", "-genkey", "-name", "prime256v1", "-out", clientKey.string()});
     openssl({"req", "-new", "-key", clientKey.string(), "-out", (tmpDir / "client.csr").string(), "-subj", "/CN=TestClient"});
     openssl({"x509", "-req", "-in", (tmpDir / "client.csr").string(), "-CA", caCert.string(), "-CAkey", caKey.string(), "-CAcreateserial", "-out", clientCert.string(), "-days", "1"});
