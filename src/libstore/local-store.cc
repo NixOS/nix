@@ -457,6 +457,11 @@ LocalStore::~LocalStore()
     }
 }
 
+std::filesystem::path LocalStoreConfig::getRootsSocketPath() const
+{
+    return std::filesystem::path(stateDir.get()) / "gc-roots-socket" / "socket";
+}
+
 StoreReference LocalStoreConfig::getReference() const
 {
     auto params = getQueryParams();

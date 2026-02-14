@@ -64,7 +64,7 @@ in
 
         environment = {
           CURL_CA_BUNDLE = config.security.pki.caBundle;
-          NIX_REMOTE = "local?ignore-gc-delete-failure=true";
+          NIX_REMOTE = "local?ignore-gc-delete-failure=true&use-roots-daemon=true";
           NIX_CONFIG = ''
             experimental-features = local-overlay-store auto-allocate-uids
             build-users-group =
@@ -85,6 +85,32 @@ in
         };
       };
 
+      systemd.services.nix-roots-daemon = {
+        environment = {
+          # `use-roots-daemon` is not needed because it is only relevant
+          # for the *client* of this daemon (i.e. the nix daemon opening
+          # the local store in this case). The Nix roots daemon *itself*
+          # doesn't care about this setting --- there's no problem if
+          # someone else opens the local store and directly scans for
+          # roots instead of using this daemon, for example.
+          NIX_REMOTE = "local";
+          NIX_CONFIG = ''
+            extra-experimental-features = local-overlay-store
+          '';
+        };
+        serviceConfig.ExecStart = "${config.nix.package.out}/bin/nix --extra-experimental-features nix-command store roots-daemon";
+      };
+
+      systemd.sockets.nix-roots-daemon = {
+        wantedBy = [
+          "nix-daemon.service"
+        ];
+        listenStreams = [ "/nix/var/nix/gc-roots-socket/socket" ];
+        unitConfig = {
+          ConditionPathIsReadWrite = "/nix/var/nix/gc-roots-socket";
+          RequiresMountsFor = "/nix/store";
+        };
+      };
       systemd.sockets.nix-daemon.wantedBy = [ "sockets.target" ];
 
       systemd.tmpfiles.rules = [
@@ -97,6 +123,7 @@ in
         "d  /nix/var/nix/daemon-socket         0755 nix-daemon nix-daemon - -"
         "d  /nix/var/nix/gcroots               0755 nix-daemon nix-daemon - -"
         "L+ /nix/var/nix/gcroots/booted-system 0755 nix-daemon nix-daemon - /run/booted-system"
+        "d  /nix/var/nix/gc-roots-socket       0755 nix-daemon nix-daemon - -"
         "d  /var/empty/.cache/nix              0755 nix-daemon nix-daemon - -"
       ];
     };

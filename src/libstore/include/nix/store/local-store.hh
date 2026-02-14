@@ -133,6 +133,18 @@ public:
         Xp::LocalOverlayStore,
     };
 
+    Setting<bool> useRootsDaemon{
+        this,
+        false,
+        "use-roots-daemon",
+        "Whether to request roots from an external privileged daemon",
+        {},
+        true,
+        Xp::LocalOverlayStore,
+    };
+
+    std::filesystem::path getRootsSocketPath() const;
+
     static const std::string name()
     {
         return "Local Store";
