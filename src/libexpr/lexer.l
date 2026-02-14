@@ -14,6 +14,7 @@
 %x INPATH
 %x INPATH_SLASH
 %x PATH_START
+%x REPL_BINDINGS_MODE
 
 %top {
 #include "parser-tab.hh" // YYSTYPE
@@ -113,6 +114,13 @@ URI         [a-zA-Z][a-zA-Z0-9\+\-\.]*\:[a-zA-Z0-9\%\/\?\:\@\&\=\+\$\,\-\_\.\!\~
 
 %%
 
+ /* REPL bindings mode: inject REPL_BINDINGS token at start, then switch to normal lexing */
+<REPL_BINDINGS_MODE>.|\n {
+  yyless(0);
+  yylloc->unstash();
+  POP_STATE();
+  return REPL_BINDINGS;
+}
 
 if          { return IF; }
 then        { return THEN; }
@@ -339,3 +347,17 @@ or          { return OR_KW; }
             }
 
 %%
+
+#include <type_traits>
+
+// Verify that the forward declaration in parser.y matches flex's definition
+static_assert(std::is_same_v<yyscan_t, void *>);
+
+namespace nix {
+
+void setReplBindingsMode(yyscan_t scanner)
+{
+    yy_push_state(REPL_BINDINGS_MODE, scanner);
+}
+
+}
