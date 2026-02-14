@@ -517,4 +517,22 @@ TEST_F(nix_api_expr_test, nix_expr_attrset_update)
     assert_ctx_ok();
 }
 
+/**
+ * @brief Validates the fix for https://github.com/NixOS/nix/issues/11972
+ */
+TEST_F(nix_api_expr_test, fromTOML_invalid_syntax_should_error_gracefully)
+{
+    const char * expr = "builtins.fromTOML ''0000000000000000000000000000000000000'0''";
+
+    int status = nix_expr_eval_from_string(ctx, state, expr, ".", value);
+
+    ASSERT_NE(0, status) << "Evaluation should have failed but returned a success code.";
+
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_NIX_ERROR)
+        << "Expected a generic Nix error, but a different error code was set.";
+
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::testing::HasSubstr("invalid key value separator"))
+        << "The error message should indicate a TOML parsing issue.";
+}
+
 } // namespace nixC
