@@ -16,7 +16,8 @@ TEST(compress, noneMethodDoesNothingToTheInput)
 
 TEST(decompress, decompressNoneCompressed)
 {
-    auto method = "none";
+
+    auto method = CompressionAlgo::none;
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(method, str);
 
@@ -27,7 +28,7 @@ TEST(decompress, decompressEmptyCompressed)
 {
     // Empty-method decompression used e.g. by S3 store
     // (Content-Encoding == "").
-    auto method = "";
+    auto method = CompressionAlgo::none; // Do we handle this in S3 store???
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(method, str);
 
@@ -36,7 +37,7 @@ TEST(decompress, decompressEmptyCompressed)
 
 TEST(decompress, decompressXzCompressed)
 {
-    auto method = "xz";
+    auto method = CompressionAlgo::xz;
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(method, compress(CompressionAlgo::xz, str));
 
@@ -45,7 +46,7 @@ TEST(decompress, decompressXzCompressed)
 
 TEST(decompress, decompressBzip2Compressed)
 {
-    auto method = "bzip2";
+    auto method = CompressionAlgo::bzip2;
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(method, compress(CompressionAlgo::bzip2, str));
 
@@ -54,7 +55,7 @@ TEST(decompress, decompressBzip2Compressed)
 
 TEST(decompress, decompressBrCompressed)
 {
-    auto method = "br";
+    auto method = CompressionAlgo::brotli;
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(method, compress(CompressionAlgo::brotli, str));
 
@@ -63,7 +64,7 @@ TEST(decompress, decompressBrCompressed)
 
 TEST(decompress, decompressInvalidInputThrowsCompressionError)
 {
-    auto method = "bzip2";
+    auto method = CompressionAlgo::bzip2;
     auto str = "this is a string that does not qualify as valid bzip2 data";
 
     ASSERT_THROW(decompress(method, str), CompressionError);
@@ -88,7 +89,7 @@ TEST(makeCompressionSink, compressAndDecompress)
 {
     StringSink strSink;
     auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto decompressionSink = makeDecompressionSink("bzip2", strSink);
+    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
     auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
 
     (*sink)(inputString);

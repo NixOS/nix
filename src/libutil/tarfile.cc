@@ -1,6 +1,8 @@
 #include <archive.h>
 #include <archive_entry.h>
+#include <optional>
 
+#include "nix/util/compression-algo.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/tarfile.hh"
@@ -57,11 +59,12 @@ void TarArchive::check(int err, const std::string & reason)
 /// Instead it's necessary to use this kludge to convert method -> code and
 /// then use archive_read_support_filter_by_code. Arguably this is better than
 /// hand-rolling the equivalent function that is better implemented in libarchive.
-int getArchiveFilterCodeByName(const std::string & method)
+int getArchiveFilterCodeByName(const std::optional<CompressionAlgo> & method)
 {
     auto * ar = archive_write_new();
     auto cleanup = Finally{[&ar]() { checkLibArchive(ar, archive_write_close(ar), "failed to close archive: %s"); }};
-    auto err = archive_write_add_filter_by_name(ar, method.c_str());
+    auto err = archive_write_add_filter_by_name(
+        ar, showCompressionAlgo(method.value()).c_str()); // method.value_or(CompressionAlgo::none)
     checkLibArchive(ar, err, "failed to get libarchive filter by name: %s");
     auto code = archive_filter_code(ar, 0);
     return code;
@@ -78,7 +81,7 @@ static void enableSupportedFormats(struct archive * archive)
     archive_read_support_format_empty(archive);
 }
 
-TarArchive::TarArchive(Source & source, bool raw, std::optional<std::string> compression_method)
+TarArchive::TarArchive(Source & source, bool raw, std::optional<CompressionAlgo> compression_method)
     : archive{archive_read_new()}
     , source{&source}
     , buffer(defaultBufferSize)

@@ -6,6 +6,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/compression-algo.hh"
 
+#include <optional>
 #include <string>
 
 namespace nix {
@@ -17,9 +18,9 @@ struct CompressionSink : BufferedSink, FinishSink
     using FinishSink::finish;
 };
 
-std::string decompress(const std::string & method, std::string_view in);
+std::string decompress(const std::optional<CompressionAlgo> & method, std::string_view in);
 
-std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink);
+std::unique_ptr<FinishSink> makeDecompressionSink(const std::optional<CompressionAlgo> & method, Sink & nextSink);
 
 std::string compress(CompressionAlgo method, std::string_view in, const bool parallel = false, int level = -1);
 

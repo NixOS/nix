@@ -13,7 +13,8 @@ struct StoreDirConfig;
 struct UnkeyedNarInfo : virtual UnkeyedValidPathInfo
 {
     std::string url;
-    std::string compression; // FIXME: Use CompressionAlgo
+
+    std::optional<CompressionAlgo> compression;
     std::optional<Hash> fileHash;
     uint64_t fileSize = 0;
 
