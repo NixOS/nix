@@ -5,8 +5,8 @@
 #include <future>
 
 #include "nix/store/store-api.hh"
-#include "nix/store/build/goal.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/build/goal.hh"
 #include "nix/util/muxable-pipe.hh"
 
 namespace nix {
@@ -14,11 +14,11 @@ namespace nix {
 class Worker;
 
 /**
- * Fetch a `Realisation` (drv ⨯ output name -> output path) from a
- * substituter.
+ * Try to obtain build trace key-value pairs for a concrete derivation output.
  *
- * If the output store object itself should also be substituted, that is
- * the responsibility of the caller to do so.
+ * This goal takes a concrete `DrvOutput` (StorePath + output name) and queries
+ * substituters for the realisation. For nested/dynamic derivations, use
+ * `BuildTraceTrampolineGoal` which resolves the path first.
  *
  * @todo rename this `BuidlTraceEntryGoal`, which will make sense
  * especially once `Realisation` is renamed to `BuildTraceEntry`.
@@ -27,7 +27,7 @@ class DrvOutputSubstitutionGoal : public Goal
 {
 
     /**
-     * The drv output we're trying to substitute
+     * The concrete derivation output we're trying to find.
      */
     DrvOutput id;
 

@@ -83,7 +83,7 @@ properties:
         description: |
           A mapping from output names to their build trace entries.
         additionalProperties:
-          "$ref": "build-trace-entry-v2.yaml"
+          "$ref": "build-trace-entry-v2.yaml#/$defs/value"
 
   failure:
     type: object

@@ -61,7 +61,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, Mix
             stuffToCopy.insert(theseRealisations.begin(), theseRealisations.end());
         }
 
-        copyPaths(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
+        copyClosure(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
 
         updateProfile(*dstStore, rootPaths);
 

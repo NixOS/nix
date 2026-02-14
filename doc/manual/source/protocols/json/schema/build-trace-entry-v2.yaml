@@ -16,24 +16,21 @@ description: |
 
   - Version 1: Original format
 
-  - Version 2: Remove `dependentRealisations`
+  - Version 2:
+    - Use `drvPath` not `drvHash` to refer to derivation in a more conventional way.
+    - Remove `dependentRealisations`
+    - Separate into `key` and `value`
 
 type: object
 required:
-  - id
-  - outPath
-  - signatures
-allOf:
-  - "$ref": "#/$defs/key"
-  - "$ref": "#/$defs/value"
+  - key
+  - value
 properties:
-  id: {}
-  outPath: {}
-  signatures: {}
-additionalProperties:
-  dependentRealisations:
-    description: deprecated field
-    type: object
+  key:
+    "$ref": "#/$defs/key"
+  value:
+    "$ref": "#/$defs/value"
+additionalProperties: false
 
 "$defs":
   key:
@@ -43,23 +40,20 @@ additionalProperties:
       This is the "key" part, refering to a derivation and output.
     type: object
     required:
-      - id
+      - drvPath
+      - outputName
     properties:
-      id:
-        type: string
-        title: Derivation Output ID
-        pattern: "^sha256:[0-9a-f]{64}![a-zA-Z_][a-zA-Z0-9_-]*$"
+      drvPath:
+        "$ref": "store-path-v1.yaml"
+        title: Derivation Path
         description: |
-          Unique identifier for the derivation output that was built.
-
-          Format: `{hash-quotient-drv}!{output-name}`
-
-          - **hash-quotient-drv**: SHA-256 [hash of the quotient derivation](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv).
-            Begins with `sha256:`.
-
-          - **output-name**: Name of the specific output (e.g., "out", "dev", "doc")
-
-          Example: `"sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad!foo"`
+          The store path of the derivation that was built.
+      outputName:
+        type: string
+        title: Output Name
+        description: |
+          Name of the specific output (e.g., "out", "dev", "doc")
+    additionalProperties: false
 
   value:
     title: Build Trace Value
@@ -76,13 +70,6 @@ additionalProperties:
         title: Output Store Path
         description: |
           The path to the store object that resulted from building this derivation for the given output name.
-
-        patternProperties:
-          "^sha256:[0-9a-f]{64}![a-zA-Z_][a-zA-Z0-9_-]*$":
-            "$ref": "store-path-v1.yaml"
-            title: Dependent Store Path
-            description: Store path that this dependency resolved to during the build
-        additionalProperties: false
 
       signatures:
         type: array
