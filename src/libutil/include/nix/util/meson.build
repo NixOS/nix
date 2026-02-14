@@ -10,6 +10,7 @@ headers = files(
   'args.hh',
   'args/root.hh',
   'array-from-string-literal.hh',
+  'async.hh',
   'base-n.hh',
   'base-nix-32.hh',
   'callback.hh',
