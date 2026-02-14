@@ -1,0 +1,8 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-nix-path.nix:1:1:
+            1| builtins.derivationOf ./.
+             | ^
+            2|
+
+       error: '/pwd/lang' is not a valid store path
