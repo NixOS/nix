@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Links);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -318,6 +318,16 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "blake3-hashes",
         .description = R"(
             Enables support for BLAKE3 hashes.
+        )",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
+    },
+    {
+        .tag = Xp::BLAKE3Links,
+        .name = "blake3-links",
+        .description = R"(
+            Use BLAKE3 hashes for the store hardlink farm (`.links-b3`),
+            replacing the default SHA-256-based `.links` directory used
+            by `nix-store --optimise`.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
     },
