@@ -47,6 +47,7 @@ config_priv_h = configure_file(
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'bindings.cc',
   'derived-path.cc',
   'error_traces.cc',
   'eval.cc',
