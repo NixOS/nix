@@ -183,9 +183,11 @@ bool isInDir(const std::filesystem::path & path, const std::filesystem::path & d
     /* Note that while the standard doesn't guarantee this, the
       `lexically_*` functions should do no IO and not throw. */
     auto rel = path.lexically_relative(dir);
-    /* Method from
-       https://stackoverflow.com/questions/62503197/check-if-path-contains-another-in-c++ */
-    return !rel.empty() && rel.native()[0] != OS_STR('.');
+    if (rel.empty())
+        return false;
+
+    auto first = *rel.begin();
+    return first != "." && first != "..";
 }
 
 bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::path & dir)
