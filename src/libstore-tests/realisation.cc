@@ -46,13 +46,10 @@ TEST_P(RealisationJsonTest, to_json)
 
 Realisation simple{
     {
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
     },
     {
-        .drvHash = Hash::parseExplicitFormatUnprefixed(
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-            HashAlgorithm::SHA256,
-            HashFormat::Base16),
+        .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
         .outputName = "foo",
     },
 };
@@ -76,15 +73,5 @@ INSTANTIATE_TEST_SUITE_P(
                 return r;
             }(),
         }));
-
-/**
- * We no longer have a notion of "dependent realisations", but we still
- * want to parse old realisation files. So make this just be a read test
- * (no write direction), accordingly.
- */
-TEST_F(RealisationTest, dependent_realisations_from_json)
-{
-    readJsonTest("with-dependent-realisations", simple);
-}
 
 } // namespace nix
