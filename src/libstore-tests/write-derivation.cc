@@ -44,12 +44,12 @@ TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
     auto drv = makeSimpleDrv();
 
-    auto path1 = writeDerivation(*store, drv, NoRepair);
+    auto path1 = store->writeDerivation(drv, NoRepair);
     config->readOnly = true;
-    auto path2 = writeDerivation(*store, drv, NoRepair);
+    auto path2 = computeStorePath(*store, drv);
     EXPECT_EQ(path1, path2);
     EXPECT_THAT(
-        [&] { writeDerivation(*store, drv, Repair); },
+        [&] { store->writeDerivation(drv, Repair); },
         ::testing::ThrowsMessage<Error>(
             testing::HasSubstrIgnoreANSIMatcher("operation 'writeDerivation' is not supported by store 'dummy://'")));
 }

@@ -301,7 +301,7 @@ struct DummyStoreImpl : DummyStore
 
     StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair) override
     {
-        auto drvPath = ::nix::writeDerivation(*this, drv, repair, /*readonly=*/true);
+        auto drvPath = nix::computeStorePath(*this, drv);
 
         if (!derivations.contains(drvPath) || repair) {
             if (config->readOnly)
