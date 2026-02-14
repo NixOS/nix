@@ -26,6 +26,7 @@ struct GlobalConfig : public AbstractConfig
     struct Register
     {
         Register(Config * config);
+        Register(Config * config, std::function<void()> && callback);
     };
 };
 

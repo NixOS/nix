@@ -19,13 +19,8 @@
 
 namespace nix {
 
-fetchers::Settings fetchSettings;
-
-static GlobalConfig::Register rFetchSettings(&fetchSettings);
-
-EvalSettings evalSettings{
-    settings.readOnlyMode,
-    {
+static GlobalConfig::Register rEvalSettings(&evalSettings, [] {
+    evalSettings.lookupPathHooks = {
         {
             "flake",
             [](EvalState & state, std::string_view rest) {
@@ -45,10 +40,8 @@ EvalSettings evalSettings{
                 return state.storePath(storePath);
             },
         },
-    },
-};
-
-static GlobalConfig::Register rEvalSettings(&evalSettings);
+    };
+});
 
 flake::Settings flakeSettings;
 

@@ -1,4 +1,5 @@
 #include "nix/util/users.hh"
+#include "nix/util/config-global.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/profiles.hh"
 #include "nix/expr/eval.hh"
@@ -108,5 +109,9 @@ std::filesystem::path getNixDefExpr()
 {
     return settings.useXDGBaseDirectories ? getStateDir() / "defexpr" : getHome() / ".nix-defexpr";
 }
+
+EvalSettings evalSettings{settings.readOnlyMode};
+
+static GlobalConfig::Register rEvalSettings(&evalSettings);
 
 } // namespace nix
