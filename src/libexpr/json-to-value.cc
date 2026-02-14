@@ -201,10 +201,11 @@ public:
     }
 };
 
-void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
+void parseJSON(EvalState & state, const std::string_view & s_, Value & v, bool allowComments)
 {
     JSONSax parser(state, v);
-    bool res = json::sax_parse(s_, &parser);
+    bool res = json::sax_parse(
+        s_, &parser, nlohmann::detail::input_format_t::json, /* strict= */ true, /* ignore_comments= */ allowComments);
     if (!res)
         throw JSONParseError("Invalid JSON Value");
 }
