@@ -705,6 +705,10 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(getConnection());
 
+    if (options.action != GCOptions::gcDeleteSpecific && !options.pathsToDelete.empty()
+        && !conn->protoVersion.features.contains(FEATURE_GC_CLOSURE)) {
+        throw Error("Your daemon version is too old to support garbage collecting a closure");
+    }
     conn->to << WorkerProto::Op::CollectGarbage;
     WorkerProto::write(*this, *conn, options.action);
     WorkerProto::write(*this, *conn, options.pathsToDelete);
