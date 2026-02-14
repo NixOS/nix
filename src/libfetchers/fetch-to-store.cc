@@ -47,6 +47,12 @@ std::pair<StorePath, Hash> fetchToStore2(
             auto hash = Hash::parseSRI(fetchers::getStrAttr(*res, "hash"));
             auto storePath =
                 store.makeFixedOutputPathFromCA(name, ContentAddressWithReferences::fromParts(method, hash, {}));
+
+            /* Add a temproot before the call to isValidPath to prevent accidental GC in case the
+               input is cached. Note that this must be done before to avoid races. */
+            if (mode != FetchMode::DryRun)
+                store.addTempRoot(storePath);
+
             if (mode == FetchMode::DryRun || store.isValidPath(storePath)) {
                 debug(
                     "source path '%s' cache hit in '%s' (hash '%s')",
