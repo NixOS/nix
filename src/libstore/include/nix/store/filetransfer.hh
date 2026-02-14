@@ -182,7 +182,6 @@ struct FileTransferRequest
     Headers headers;
     std::string expectedETag;
     HttpMethod method = HttpMethod::Get;
-    size_t tries = fileTransferSettings.tries;
     unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
