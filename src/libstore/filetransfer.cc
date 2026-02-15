@@ -1,5 +1,6 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/compression-algo.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/compression.hh"
@@ -7,9 +8,11 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 
+#include "nix/util/util.hh"
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
 #include <optional>
+#include <string_view>
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
@@ -275,6 +278,28 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
+        std::string parseContentEncoding(std::string_view contentEncoding){
+
+            if(contentEncoding.find(",") != std::string::npos){
+                throw nix::Error("Stacked contentEncoding is not supported: %s", contentEncoding);
+            }
+
+            if(contentEncoding == "gzip" || contentEncoding == "x-gzip")
+                return "gzip";
+            else if(contentEncoding == "compress" || contentEncoding == "x-compress")
+                return "compress";
+            else if(contentEncoding == "br")
+                return "br";
+            else if(contentEncoding == "zstd")
+                return "zstd";
+            else if(contentEncoding == "bzip2")
+                return "bzip2";
+            else if(contentEncoding == "identity")
+                return "identity";
+
+            throw nix::Error("Invalid content-encoding: %s", contentEncoding);
+        }
+
         size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
         try {
             size_t realSize = size * nmemb;
@@ -312,7 +337,7 @@ struct curlFileTransfer : public FileTransfer
                     }
 
                     else if (name == "content-encoding")
-                        encoding = trim(line.substr(i + 1));
+                        encoding = parseContentEncoding(toLower(trim(line.substr(i + 1))));
 
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
