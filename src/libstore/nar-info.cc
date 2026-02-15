@@ -174,7 +174,8 @@ UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nloh
 
     if (auto * compression = get(obj, "compression")) {
         auto compression_value = getString(*compression);
-        res.compression = compression_value.empty() ? std::nullopt : std::make_optional(parseCompressionAlgo(compression_value));
+        res.compression =
+            compression_value.empty() ? std::nullopt : std::make_optional(parseCompressionAlgo(compression_value));
     }
 
     if (auto * downloadHash = get(obj, "downloadHash")) {

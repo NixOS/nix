@@ -55,7 +55,8 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             }
 #endif
 
-            auto decompressor = makeDecompressionSink(unpack && hasSuffix(mainUrl, ".xz") ? CompressionAlgo::xz : CompressionAlgo::none, sink);
+            auto decompressor = makeDecompressionSink(
+                unpack && hasSuffix(mainUrl, ".xz") ? CompressionAlgo::xz : CompressionAlgo::none, sink);
             fileTransfer->download(std::move(request), *decompressor);
             decompressor->finish();
         });
