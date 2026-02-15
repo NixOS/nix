@@ -186,8 +186,8 @@ PosixStat stat(const std::filesystem::path & path)
 
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (STAT(path.c_str(), &*st)) {
+    PosixStat st;
+    if (STAT(path.c_str(), &st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             return std::nullopt;
         throw SysError("getting status of %s", PathFmt(path));

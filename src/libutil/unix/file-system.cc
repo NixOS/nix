@@ -252,7 +252,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     auto parentDirPath = path.parent_path();
     assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = openDirectory(parentDirPath);
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
     if (!dirfd) {
         if (errno == ENOENT)
             return;

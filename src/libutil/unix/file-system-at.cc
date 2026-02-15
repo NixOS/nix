@@ -23,6 +23,8 @@
 #  define HAVE_FCHMODAT2 0
 #endif
 
+#include "util-unix-config-private.hh"
+
 namespace nix {
 
 #ifdef __linux__
@@ -168,8 +170,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             });
 
             if (errno == ENOTDIR) /* Path component might be a symlink. */ {
-                struct ::stat st;
-                if (::fstatat(getParentFd(), component.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(st.st_mode))
+                if (auto st = maybeFstatat(getParentFd(), CanonPath(component)); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
             } else if (errno == ELOOP) {
@@ -221,11 +222,69 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
     }
 }
 
+static void symlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::symlinkat(target.c_str(), dirFd, path.rel_c_str()) == -1) {
+        throw SysError([&] {
+            return HintFmt("creating symlink %1% -> %2%", PathFmt(descriptorToPath(dirFd) / path.rel()), target);
+        });
+    }
+}
+
+void createFileSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createDirectorySymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createUnknownSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::mkdirat(dirFd, path.rel_c_str(), 0777) == -1) {
+        throw SysError(
+            [&] { return HintFmt("creating directory %1%", PathFmt(descriptorToPath(dirFd) / path.rel())); });
+    }
+}
+
 PosixStat fstat(Descriptor fd)
 {
     PosixStat st;
     if (::fstat(fd, &st)) {
         throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(fd))); });
+    }
+    return st;
+}
+
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    PosixStat st;
+    if (::fstatat(dirFd, path.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW)) {
+        throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path.rel())); });
+    }
+    return st;
+}
+
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    PosixStat st;
+    if (::fstatat(dirFd, path.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            return std::nullopt;
+        throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path.rel())); });
     }
     return st;
 }

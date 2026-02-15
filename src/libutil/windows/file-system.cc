@@ -113,10 +113,10 @@ time_t windows::fileTimeToUnixTime(const FILETIME & ft)
     ull.HighPart = ft.dwHighDateTime;
 
     // file_clock on Windows matches FILETIME's epoch (1601-01-01) and resolution (100ns)
-    auto fileTP = std::chrono::file_clock::time_point{std::chrono::file_clock::duration{ull.QuadPart}};
+    auto file_tp = std::chrono::file_clock::time_point{std::chrono::file_clock::duration{ull.QuadPart}};
 
-    auto sysTP = std::chrono::clock_cast<std::chrono::system_clock>(fileTP);
-    return std::chrono::system_clock::to_time_t(sysTP);
+    auto sys_tp = std::chrono::clock_cast<std::chrono::system_clock>(file_tp);
+    return std::chrono::system_clock::to_time_t(sys_tp);
 }
 
 void windows::statFromFileInfo(

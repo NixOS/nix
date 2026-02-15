@@ -13,9 +13,6 @@ namespace nix {
 
 TEST(readLinkAt, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
@@ -29,10 +26,11 @@ TEST(readLinkAt, works)
     std::string mediumTarget(maxPathLength / 2, 'x');
     std::string longTarget(maxPathLength - 1, 'y');
 
+#ifdef _WIN32
+    try
+#endif
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createSymlink(CanonPath("link"), "target");
         sink.createSymlink(CanonPath("relative"), "../relative/path");
         sink.createSymlink(CanonPath("absolute"), "/absolute/path");
@@ -44,6 +42,11 @@ TEST(readLinkAt, works)
         sink.createRegularFile(CanonPath("regular"), [](CreateRegularFileSink &) {});
         sink.createDirectory(CanonPath("dir"));
     }
+#ifdef _WIN32
+    catch (SystemError &) {
+        GTEST_SKIP() << "This works locally for me with Wine, but fails with Wine inside a sandboxed build. Confusing!";
+    }
+#endif
 
     auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
@@ -76,9 +79,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("c"));
         sink.createDirectory(CanonPath("c/d"));
