@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -35,6 +36,11 @@ using OsString = std::basic_string<OsChar>;
  * `std::string_view` counterpart for `OsString`.
  */
 using OsStringView = std::basic_string_view<OsChar>;
+
+/**
+ * `nix::StringMap` counterpart for `OsString`
+ */
+using OsStringMap = std::map<OsString, OsString, std::less<>>;
 
 std::string os_string_to_string(OsStringView path);
 

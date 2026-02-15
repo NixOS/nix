@@ -4,6 +4,7 @@
 #include "nix/util/executable-path.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/finally.hh"
@@ -56,29 +57,30 @@ void Pid::operator=(AutoCloseFD pid)
     this->pid = std::move(pid);
 }
 
-// TODO: Implement (not needed for process spawning yet)
 int Pid::kill(bool allowInterrupts)
 {
     assert(pid.get() != INVALID_DESCRIPTOR);
 
     debug("killing process %1%", pid.get());
 
-    throw UnimplementedError("Pid::kill unimplemented");
+    if (!TerminateProcess(pid.get(), 1))
+        logError(WinError("terminating process %1%", pid.get()).info());
+
+    return wait(allowInterrupts);
 }
 
+// Note that `allowInterrupts` is ignored for now, but there to match
+// Unix.
 int Pid::wait(bool allowInterrupts)
 {
-    // https://github.com/nix-windows/nix/blob/windows-meson/src/libutil/util.cc#L1938
     assert(pid.get() != INVALID_DESCRIPTOR);
     DWORD status = WaitForSingleObject(pid.get(), INFINITE);
-    if (status != WAIT_OBJECT_0) {
-        debug("WaitForSingleObject returned %1%", status);
-    }
+    if (status != WAIT_OBJECT_0)
+        throw WinError("waiting for process %1%", pid.get());
 
     DWORD exitCode = 0;
-    if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE) {
-        debug("GetExitCodeProcess failed on pid %1%", pid.get());
-    }
+    if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE)
+        throw WinError("getting exit code of process %1%", pid.get());
 
     pid.close();
     return exitCode;
@@ -216,16 +218,18 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
     startInfo.hStdOutput = out.writeSide.get();
     startInfo.hStdError = out.writeSide.get();
 
-    std::string envline;
-    // Retain the current processes' environment variables.
-    for (const auto & envVar : getEnv()) {
-        envline += (envVar.first + '=' + envVar.second + '\0');
-    }
-    // Also add new ones specified in options.
+    auto env = getEnvOs();
+
     if (options.environment) {
         for (const auto & envVar : *options.environment) {
-            envline += (envVar.first + '=' + envVar.second + '\0');
+            env[envVar.first] = envVar.second;
         }
+    }
+
+    OsString envline;
+
+    for (const auto & envVar : env) {
+        envline += (envVar.first + L'=' + envVar.second + L'\0');
     }
 
     std::string cmdline = windowsEscape(realProgram, false);
@@ -244,8 +248,8 @@ Pid spawnProcess(const Path & realProgram, const RunOptions & options, Pipe & ou
             NULL,
             TRUE,
             CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED,
-            string_to_os_string(envline).data(),
-            options.chdir.has_value() ? string_to_os_string(*options.chdir).data() : NULL,
+            envline.data(),
+            options.chdir.has_value() ? options.chdir->c_str() : NULL,
             &startInfo,
             &procInfo)
         == 0) {

@@ -24,6 +24,11 @@ std::optional<std::string> getEnv(const std::string & key);
 std::optional<OsString> getEnvOs(const OsString & key);
 
 /**
+ * Like `getEnv`, but using `OsString` to avoid coercions.
+ */
+OsStringMap getEnvOs();
+
+/**
  * @return a non empty environment variable. Returns nullopt if the env
  * variable is set to ""
  */
@@ -59,6 +64,11 @@ int setEnv(const char * name, const char * value);
  * Like `setEnv`, but using `OsString` to avoid coercions.
  */
 int setEnvOs(const OsString & name, const OsString & value);
+
+/**
+ * Like `unsetenv`, but using `OsChar` to avoid coercions.
+ */
+int unsetEnvOs(const OsChar * name);
 
 /**
  * Clear the environment.

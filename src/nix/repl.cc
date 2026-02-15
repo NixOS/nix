@@ -7,14 +7,15 @@
 #include "nix/cmd/installable-value.hh"
 #include "nix/cmd/repl.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/environment-variables.hh"
 #include "self-exe.hh"
 
 namespace nix {
 
 void runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input = {})
 {
-    auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
+    auto subprocessEnv = getEnvOs();
+    subprocessEnv[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
     // isInteractive avoid grabling interactive commands
     runProgram2(
         RunOptions{
