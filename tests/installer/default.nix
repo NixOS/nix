@@ -137,6 +137,15 @@ let
       extraQemuOpts = "-cpu Westmere-v2";
     };
 
+    "alpine-3-18" = {
+      image = import <nix/fetchurl.nix> {
+        url = "https://app.vagrantup.com/nix-installer/boxes/alpine318/versions/1.0.1/providers/libvirt.box";
+        hash = "sha256-97fgBByJXzaHodG82G315a0RO5pE6LuVKC2AF5E1gfM=";
+      };
+      rootDisk = "box.img";
+      system = "x86_64-linux";
+    };
+
   };
 
   makeTest =
@@ -190,6 +199,7 @@ let
 
         ssh_opts="-o StrictHostKeyChecking=no -o HostKeyAlgorithms=+ssh-rsa -o PubkeyAcceptedKeyTypes=+ssh-rsa -i ./vagrant_insecure_key"
         ssh="ssh -p 20022 -q $ssh_opts vagrant@localhost"
+        ssh_env="$ssh bash -l"
 
         echo "Waiting for SSH..."
         for ((i = 0; i < 120; i++)); do
@@ -222,14 +232,8 @@ let
         tar -C ${mockChannel pkgs} -c channel | ssh -p 20022 $ssh_opts vagrant@localhost tar x -f-
 
         echo "Testing Nix installation..."
-        $ssh <<EOF
+        $ssh_env <<EOF
           set -ex
-
-          # FIXME: get rid of this; ideally ssh should just work.
-          source ~/.bash_profile || true
-          source ~/.bash_login || true
-          source ~/.profile || true
-          source /etc/bashrc || true
 
           nix-env --version
           nix --extra-experimental-features nix-command store info
