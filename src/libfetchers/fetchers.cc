@@ -508,10 +508,7 @@ void InputScheme::clone(
     if (!parentDirFd)
         throw NativeSysError("opening directory %s", PathFmt(parentPath));
 
-    RestoreSink sink{/*startFsync=*/false};
-    sink.parentPath = parentPath;
-    sink.childName = absPath.filename();
-    sink.dirFd = parentDirFd.get();
+    RestoreSink sink{parentDirFd.get(), absPath.filename(), /*startFsync=*/false};
     copyRecursive(*accessor, CanonPath::root, sink);
 }
 

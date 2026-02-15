@@ -273,10 +273,7 @@ void restorePath(
     if (!parentDir)
         throw NativeSysError("opening directory %s", PathFmt(parentPath));
 
-    RestoreSink sink{startFsync};
-    sink.parentPath = parentPath;
-    sink.childName = childName;
-    sink.dirFd = parentDir.get();
+    RestoreSink sink{parentDir.get(), childName, startFsync};
     parseDump(sink, source);
 }
 

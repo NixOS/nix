@@ -148,27 +148,6 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
 
 using File = MemorySourceAccessor::File;
 
-void MemorySink::MemoryDirectory::createChild(std::string_view name, ChildCreatedCallback callback)
-{
-    auto [it, inserted] = dir.entries.emplace(std::string{name}, File::Directory{});
-    MemorySink childSink{[&](File file) -> File & {
-        it->second = std::move(file);
-        return it->second;
-    }};
-    callback(childSink);
-}
-
-void MemorySink::createDirectory(DirectoryCreatedCallback callback)
-{
-    auto & f = createRoot(File::Directory{});
-    auto * dirP = std::get_if<File::Directory>(&f.raw);
-    if (!dirP)
-        throw Error("cannot create directory: not a directory");
-
-    MemoryDirectory dir{*dirP};
-    callback(dir);
-}
-
 struct CreateMemoryRegularFile : FileSystemObjectSink::OnRegularFile
 {
     File::Regular & regularFile;
@@ -182,14 +161,29 @@ struct CreateMemoryRegularFile : FileSystemObjectSink::OnRegularFile
     void preallocateContents(uint64_t size) override;
 };
 
+void MemorySink::MemoryDirectory::createChild(std::string_view name, ChildCreatedCallback callback)
+{
+    MemorySink childSink{[&, name = std::string{name}](File file) -> File & {
+        auto [it, inserted] = dir.entries.insert_or_assign(name, std::move(file));
+        return it->second;
+    }};
+    callback(childSink);
+}
+
+void MemorySink::createDirectory(DirectoryCreatedCallback callback)
+{
+    File & dst = createRoot(File{File::Directory{}});
+    MemoryDirectory dir{std::get<File::Directory>(dst.raw)};
+    callback(dir);
+}
+
 void MemorySink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
 {
-    auto & f = createRoot(File::Regular{.executable = isExecutable});
-    if (auto * rp = std::get_if<File::Regular>(&f.raw)) {
-        CreateMemoryRegularFile crf{*rp};
-        func(crf);
-    } else
-        throw Error("cannot create regular file: not a regular file");
+    File & dst = createRoot(File{File::Regular{}});
+    auto & reg = std::get<File::Regular>(dst.raw);
+    reg.executable = isExecutable;
+    CreateMemoryRegularFile crf{reg};
+    func(crf);
 }
 
 void CreateMemoryRegularFile::preallocateContents(uint64_t len)
@@ -204,17 +198,14 @@ void CreateMemoryRegularFile::operator()(std::string_view data)
 
 void MemorySink::createSymlink(const std::string & target)
 {
-    auto & f = createRoot(File::Symlink{.target = target});
-    if (!std::holds_alternative<File::Symlink>(f.raw))
-        throw Error("cannot create symlink: not a symlink");
+    createRoot(File{File::Symlink{.target = target}});
 }
 
 ref<SourceAccessor> makeEmptySourceAccessor()
 {
     static auto empty = []() {
         auto empty = make_ref<MemorySourceAccessor>();
-        MemorySink sink{[&](File file) -> File & { return empty->root.emplace(std::move(file)); }};
-        sink.createDirectory([](auto &) {});
+        empty->root = File{File::Directory{}};
         /* Don't forget to clear the display prefix, as the default constructed
            SourceAccessor has the «unknown» prefix. Since this accessor is supposed
            to mimic an empty root directory the prefix needs to be empty. */

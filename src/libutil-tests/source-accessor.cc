@@ -95,10 +95,7 @@ TEST_F(FSSourceAccessorTest, works)
     auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
     // Create entire test structure through a single RestoreSink
-    RestoreSink sink{/*startFsync=*/false};
-    sink.parentPath = tmpDir;
-    sink.childName = "root";
-    sink.dirFd = parentFd.get();
+    RestoreSink sink{parentFd.get(), "root", /*startFsync=*/false};
     sink.createDirectory([](FileSystemObjectSink::OnDirectory & root) {
         root.createChild("file1", [](FileSystemObjectSink & s) {
             s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("content1"); });
@@ -164,10 +161,7 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
-    RestoreSink sink{/*startFsync=*/false};
-    sink.parentPath = tmpDir;
-    sink.childName = "rootfile";
-    sink.dirFd = parentFd.get();
+    RestoreSink sink{parentFd.get(), "rootfile", /*startFsync=*/false};
     sink.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile & crf) { crf("root content"); });
 
     EXPECT_THAT(makeFSSourceAccessor(filePath), HasContents(CanonPath::root, "root content"));
@@ -175,15 +169,9 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 
 TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "symlinks have some problems under Wine";
-#endif
     auto linkPath = tmpDir / "rootlink2";
     auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
-    RestoreSink sink{/*startFsync=*/false};
-    sink.parentPath = tmpDir;
-    sink.childName = "rootlink2";
-    sink.dirFd = parentFd.get();
+    RestoreSink sink{parentFd.get(), "rootlink2", /*startFsync=*/false};
     sink.createSymlink("symlink_target");
 
     EXPECT_THAT(makeFSSourceAccessor(linkPath), HasSymlink(CanonPath::root, "symlink_target"));

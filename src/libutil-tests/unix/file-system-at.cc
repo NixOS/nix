@@ -31,10 +31,7 @@ TEST(fchmodatTryNoFollow, works)
         auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
         // Create entire test structure through a single RestoreSink
-        RestoreSink sink{/*startFsync=*/false};
-        sink.parentPath = tmpDir;
-        sink.childName = "root";
-        sink.dirFd = parentFd.get();
+        RestoreSink sink{parentFd.get(), "root", /*startFsync=*/false};
         sink.createDirectory([](FileSystemObjectSink::OnDirectory & root) {
             root.createChild("file", [](FileSystemObjectSink & s) {
                 s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
@@ -57,7 +54,7 @@ TEST(fchmodatTryNoFollow, works)
     /* Check that symlinks are not followed and targets are not changed. */
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("filelink"), 0777); } catch (SysError & e) {
+        try { fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("filelink"), 0777); } catch (SysError & e) {
             if (e.errNo != EOPNOTSUPP)
                 throw;
         });
@@ -65,7 +62,7 @@ TEST(fchmodatTryNoFollow, works)
     EXPECT_EQ(st.st_mode & 0777, 0644);
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("dirlink"), 0777); } catch (SysError & e) {
+        try { fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("dirlink"), 0777); } catch (SysError & e) {
             if (e.errNo != EOPNOTSUPP)
                 throw;
         });
@@ -74,11 +71,11 @@ TEST(fchmodatTryNoFollow, works)
 
     /* Check fchmodatTryNoFollow works on regular files and directories. */
 
-    EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600));
+    EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("file"), 0600));
     ASSERT_EQ(stat((testDir / "file").c_str(), &st), 0);
     EXPECT_EQ(st.st_mode & 0777, 0600);
 
-    EXPECT_NO_THROW((fchmodatTryNoFollow(dirFd.get(), CanonPath("dir"), 0700), 0));
+    EXPECT_NO_THROW((fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("dir"), 0700), 0));
     ASSERT_EQ(stat((testDir / "dir").c_str(), &st), 0);
     EXPECT_EQ(st.st_mode & 0777, 0700);
 }
@@ -98,10 +95,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
         auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
         // Create entire test structure through a single RestoreSink
-        RestoreSink sink{/*startFsync=*/false};
-        sink.parentPath = tmpDir;
-        sink.childName = "root";
-        sink.dirFd = parentFd.get();
+        RestoreSink sink{parentFd.get(), "root", /*startFsync=*/false};
         sink.createDirectory([](FileSystemObjectSink::OnDirectory & root) {
             root.createChild("file", [](FileSystemObjectSink & s) {
                 s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
@@ -128,13 +122,13 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
                 exit(1);
 
             try {
-                fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600);
+                fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("file"), 0600);
             } catch (SysError & e) {
                 _exit(1);
             }
 
             try {
-                fchmodatTryNoFollow(dirFd.get(), CanonPath("link"), 0777);
+                fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("link"), 0777);
             } catch (SysError & e) {
                 if (e.errNo == EOPNOTSUPP)
                     _exit(0); /* Success. */

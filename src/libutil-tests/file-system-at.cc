@@ -15,9 +15,6 @@ namespace nix {
 
 TEST(readLinkAt, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
@@ -32,14 +29,14 @@ TEST(readLinkAt, works)
     std::string longTarget(maxPathLength - 1, 'y');
 
     auto testDir = tmpDir / "root";
+#ifdef _WIN32
+    try
+#endif
     {
         auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
         // Create entire test structure through a single RestoreSink
-        RestoreSink sink{/*startFsync=*/false};
-        sink.parentPath = tmpDir;
-        sink.childName = "root";
-        sink.dirFd = parentFd.get();
+        RestoreSink sink{parentFd.get(), "root", /*startFsync=*/false};
         sink.createDirectory([&](FileSystemObjectSink::OnDirectory & root) {
             root.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
             root.createChild("relative", [](FileSystemObjectSink & s) { s.createSymlink("../relative/path"); });
@@ -62,23 +59,28 @@ TEST(readLinkAt, works)
                 "dir", [](FileSystemObjectSink & s) { s.createDirectory([](FileSystemObjectSink::OnDirectory &) {}); });
         });
     }
+#ifdef _WIN32
+    catch (SystemError &) {
+        GTEST_SKIP() << "This works locally for me with Wine, but fails with Wine inside a sandboxed build. Confusing!";
+    }
+#endif
 
     auto dirFd = openDirectory(testDir, FinalSymlink::Follow);
 
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("absolute")), OS_STR("/absolute/path"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("medium")), string_to_os_string(mediumTarget));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("link")), OS_STR("target"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("relative")), OS_STR("../relative/path"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("absolute")), OS_STR("/absolute/path"));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("medium")), string_to_os_string(mediumTarget));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("long")), string_to_os_string(longTarget));
+    EXPECT_EQ(readLinkAt(dirFd.get(), std::filesystem::path("a/b/link")), OS_STR("nested_target"));
 
     auto subDirFd = openDirectory(testDir / "a", FinalSymlink::Follow);
-    EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
+    EXPECT_EQ(readLinkAt(subDirFd.get(), std::filesystem::path("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("regular")), SystemError);
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("dir")), SystemError);
-    EXPECT_THROW(readLinkAt(dirFd.get(), CanonPath("nonexistent")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), std::filesystem::path("regular")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), std::filesystem::path("dir")), SystemError);
+    EXPECT_THROW(readLinkAt(dirFd.get(), std::filesystem::path("nonexistent")), SystemError);
 }
 
 /* ----------------------------------------------------------------------------
@@ -87,9 +89,6 @@ TEST(readLinkAt, works)
 
 TEST(openFileEnsureBeneathNoSymlinks, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
@@ -98,10 +97,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         auto parentFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
         // Create entire test structure through a single RestoreSink
-        RestoreSink sink{/*startFsync=*/false};
-        sink.parentPath = tmpDir;
-        sink.childName = "root";
-        sink.dirFd = parentFd.get();
+        RestoreSink sink{parentFd.get(), "root", /*startFsync=*/false};
         sink.createDirectory([&](FileSystemObjectSink::OnDirectory & root) {
             root.createChild("a", [&](FileSystemObjectSink & s) {
                 s.createDirectory([&](FileSystemObjectSink::OnDirectory & a) {
@@ -139,16 +135,13 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             auto abDir = openDirectory(testDir / "a" / "b", FinalSymlink::Follow);
             bool threw = false;
             try {
-                RestoreSink sink{/*startFsync=*/false};
-                sink.parentPath = testDir / "a" / "b";
-                sink.childName = "c";
-                sink.dirFd = abDir.get();
+                RestoreSink sink{abDir.get(), "c", /*startFsync=*/false};
                 sink.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
-            } catch (const SysError & e) {
+            } catch (const SystemError & e) {
                 threw = true;
                 EXPECT_TRUE(e.is(std::errc::file_exists));
             }
-            EXPECT_TRUE(threw) << "Expected SysError to be thrown";
+            EXPECT_TRUE(threw) << "Expected SystemError to be thrown";
         }
 
         // a/b/d already exists (as a directory), so trying to create there should fail
@@ -156,16 +149,13 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             auto abDir = openDirectory(testDir / "a" / "b", FinalSymlink::Follow);
             bool threw = false;
             try {
-                RestoreSink sink{/*startFsync=*/false};
-                sink.parentPath = testDir / "a" / "b";
-                sink.childName = "d";
-                sink.dirFd = abDir.get();
+                RestoreSink sink{abDir.get(), "d", /*startFsync=*/false};
                 sink.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
-            } catch (const SysError & e) {
+            } catch (const SystemError & e) {
                 threw = true;
                 EXPECT_TRUE(e.is(std::errc::file_exists));
             }
-            EXPECT_TRUE(threw) << "Expected SysError to be thrown";
+            EXPECT_TRUE(threw) << "Expected SystemError to be thrown";
         }
     }
 
@@ -175,7 +165,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     auto openRead = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
-            CanonPath(path),
+            std::filesystem::path(path),
 #ifdef _WIN32
             FILE_READ_DATA | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
             0
@@ -189,7 +179,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     auto openReadDir = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
-            CanonPath(path),
+            std::filesystem::path(path),
 #ifdef _WIN32
             FILE_READ_ATTRIBUTES | SYNCHRONIZE,
             FILE_DIRECTORY_FILE
@@ -203,7 +193,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     auto openCreateExclusive = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
-            CanonPath(path),
+            std::filesystem::path(path),
 #ifdef _WIN32
             FILE_WRITE_DATA | SYNCHRONIZE,
             0,

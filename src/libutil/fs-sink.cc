@@ -4,6 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/util.hh"
 
 #ifdef _WIN32
 #  include <fileapi.h>
@@ -63,39 +64,37 @@ static GlobalConfig::Register r1(&restoreSinkSettings);
 
 void RestoreSink::Directory::createChild(std::string_view name, ChildCreatedCallback callback)
 {
-    RestoreSink childSink{back.startFsync};
-    childSink.parentPath = dirPath;
-    childSink.childName = name;
-    childSink.dirFd = dirFd.get();
+    RestoreSink childSink{directory.get(), std::string{name}, startFsync};
     callback(childSink);
 }
 
 void RestoreSink::createDirectory(DirectoryCreatedCallback callback)
 {
-    auto dstPath = parentPath / childName;
-#ifndef _WIN32
-    if (dirFd != INVALID_DESCRIPTOR) {
-        if (::mkdirat(dirFd, childName.c_str(), 0777) == -1)
-            throw SysError("creating directory %s", PathFmt(dstPath));
-    } else
-#endif
-    {
-        if (!std::filesystem::create_directory(dstPath))
-            throw Error("path %s already exists", PathFmt(dstPath));
+    if (auto result = openDirectoryAt(parentDir, name, true); !result) {
+        auto ec = result.error();
+        auto fullPath = descriptorToPath(parentDir) / name;
+        // ENOTDIR or ELOOP means the path exists but is not a directory (e.g., it's a symlink)
+        if (ec == std::errc::not_a_directory || ec == std::errc::too_many_symbolic_link_levels)
+            throw SymlinkNotAllowed(fullPath);
+        throw SystemError(ec, "creating directory %s", PathFmt(fullPath));
     }
 
-    AutoCloseFD newDirFd;
-#ifndef _WIN32
-    if (dirFd != INVALID_DESCRIPTOR) {
-        newDirFd = AutoCloseFD{::openat(dirFd, childName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)};
-    } else {
-        newDirFd = AutoCloseFD{::open(dstPath.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)};
-    }
-    if (!newDirFd)
-        throw SysError("opening directory %s", PathFmt(dstPath));
+    auto dirFd = openFileEnsureBeneathNoSymlinks(
+        parentDir,
+        name,
+#ifdef _WIN32
+        FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_DIRECTORY_FILE
+#else
+        O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC,
+        0
 #endif
+    );
+    if (!dirFd)
+        throw NativeSysError(
+            [&] { return HintFmt("opening directory %s", PathFmt(descriptorToPath(parentDir) / name)); });
 
-    Directory dir{*this, dstPath, std::move(newDirFd)};
+    Directory dir{std::move(dirFd), startFsync};
     callback(dir);
 }
 
@@ -126,31 +125,22 @@ struct RestoreRegularFile : FileSystemObjectSink::OnRegularFile, FdSink
 
 void RestoreSink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
 {
-    auto dstPath = parentPath / childName;
-    auto crf = RestoreRegularFile(
-        startFsync,
+    auto fd = openFileEnsureBeneathNoSymlinks(
+        parentDir,
+        name,
 #ifdef _WIN32
-        CreateFileW(
-            dstPath.c_str(),
-            GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            NULL,
-            CREATE_NEW,
-            FILE_ATTRIBUTE_NORMAL,
-            NULL)
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_NON_DIRECTORY_FILE,
+        FILE_CREATE
 #else
-        [&]() {
-            /* O_EXCL together with O_CREAT ensures symbolic links in the last
-               component are not followed. */
-            constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
-            if (dirFd == INVALID_DESCRIPTOR)
-                return AutoCloseFD{::open(dstPath.c_str(), flags, 0666)};
-            return AutoCloseFD{::openat(dirFd, childName.c_str(), flags, 0666)};
-        }()
+        O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC,
+        0666
 #endif
     );
-    if (!crf.fd)
-        throw NativeSysError("creating file %1%", PathFmt(dstPath));
+    if (!fd)
+        throw NativeSysError([&] { return HintFmt("creating file %s", PathFmt(descriptorToPath(parentDir) / name)); });
+
+    auto crf = RestoreRegularFile(startFsync, std::move(fd));
     func(crf);
     crf.flush();
     // Windows doesn't have a notion of executable file permissions we
@@ -184,15 +174,7 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
 
 void RestoreSink::createSymlink(const std::string & target)
 {
-    auto dstPath = parentPath / childName;
-#ifndef _WIN32
-    if (dirFd != INVALID_DESCRIPTOR) {
-        if (::symlinkat(requireCString(target), dirFd, childName.c_str()) == -1)
-            throw SysError("creating symlink from %1% -> '%2%'", PathFmt(dstPath), target);
-        return;
-    }
-#endif
-    nix::createSymlink(target, dstPath.string());
+    createUnknownSymlinkAt(parentDir, name, string_to_os_string(target));
 }
 
 void RegularFileSink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)

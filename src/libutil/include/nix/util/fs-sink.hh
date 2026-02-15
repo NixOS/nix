@@ -134,31 +134,24 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 
 /**
  * Write files at the given path
+ *
+ * This sink must *never* follow intermediate symlinks in case a file collision
+ * is encountered for various reasons like case-insensitivity or other types of
+ * normalization. Using appropriate *at system calls and traversing only one
+ * path component at a time ensures that writing is race-free and is not
+ * susceptible to symlink replacement.
  */
 struct RestoreSink : FileSystemObjectSink
 {
     /**
-     * Path to the parent directory. Used for fallback operations when dirFd
-     * is not available, and for error messages.
-     */
-    std::filesystem::path parentPath;
-    /**
-     * Name of the child to create within the parent directory.
-     */
-    std::string childName;
-    /**
-     * File descriptor for the parent directory. Used for *at
-     * operations relative to this file descriptor. This sink must *never*
-     * follow intermediate symlinks in case a file collision is encountered
-     * for various reasons like case-insensitivity or other types of
-     * normalization. Using appropriate *at system calls and traversing
-     * only one path component at a time ensures that writing is race-free
-     * and is not susceptible to symlink replacement.
-     *
      * This is a borrowed descriptor; the caller must ensure it remains valid
      * for the lifetime of operations on this sink.
      */
-    Descriptor dirFd = INVALID_DESCRIPTOR;
+    Descriptor parentDir;
+    /**
+     * Name of the child to create within the parent directory.
+     */
+    std::filesystem::path name;
     bool startFsync = false;
 
     /**
@@ -166,22 +159,25 @@ struct RestoreSink : FileSystemObjectSink
      */
     struct Directory : OnDirectory
     {
-        RestoreSink & back;
-        std::filesystem::path dirPath;
-        AutoCloseFD dirFd;
+        AutoCloseFD directory;
+        bool startFsync;
 
-        Directory(RestoreSink & back, std::filesystem::path dirPath, AutoCloseFD dirFd)
-            : back{back}
-            , dirPath{std::move(dirPath)}
-            , dirFd{std::move(dirFd)}
+        Directory(AutoCloseFD directory, bool startFsync)
+            : directory{std::move(directory)}
+            , startFsync{startFsync}
         {
         }
 
         void createChild(std::string_view name, ChildCreatedCallback callback) override;
     };
 
-    explicit RestoreSink(bool startFsync)
-        : startFsync{startFsync}
+    /**
+     * Construct a sink.
+     */
+    explicit RestoreSink(Descriptor parentDir, std::filesystem::path name, bool startFsync = false)
+        : parentDir{parentDir}
+        , name{std::move(name)}
+        , startFsync{startFsync}
     {
     }
 
@@ -217,7 +213,7 @@ struct RegularFileSink : FileSystemObjectSink
         regular = false;
     }
 
-    void createRegularFile(bool isExecutable, RegularFileCreatedCallback) override;
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
 };
 
 } // namespace nix
