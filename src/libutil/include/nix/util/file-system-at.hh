@@ -34,6 +34,27 @@ namespace nix {
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
 
 /**
+ * Create a symlink relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target);
+
+/**
+ * Create a directory relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new directory
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path);
+
+/**
  * Safe(r) function to open a file relative to dirFd, while
  * disallowing escaping from a directory and any symlinks in the process.
  *
@@ -75,7 +96,7 @@ namespace linux {
  *
  * @see https://man7.org/linux/man-pages/man2/openat2.2.html
  * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
-v*
+ *
  * @param flags O_* flags
  * @param mode Mode for O_{CREAT,TMPFILE}
  * @param resolve RESOLVE_* flags

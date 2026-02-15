@@ -28,11 +28,20 @@
  * Polyfill for MinGW
  *
  * Windows does in fact support symlinks, but the C runtime interfaces predate this.
- *
- * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ * We define S_IFLNK and S_ISLNK so that our lstat implementation can properly
+ * indicate symlinks by setting these mode bits when it detects a reparse point.
  */
+#ifndef S_IFLNK
+#  ifndef _WIN32
+#    error "S_IFLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_IFLNK 0120000
+#endif
 #ifndef S_ISLNK
-#  define S_ISLNK(m) false
+#  ifndef _WIN32
+#    error "S_ISLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
 
 namespace nix {
@@ -189,26 +198,26 @@ Path readLink(const Path & path);
  */
 std::filesystem::path readLink(const std::filesystem::path & path);
 
-#ifdef _WIN32
-namespace windows {
-
 /**
- * Get the path associated with a file handle.
+ * Get the path associated with a file descriptor.
  *
  * @note One MUST only use this for error handling, because it creates
  * TOCTOU issues. We don't mind if error messages point to out of date
  * paths (that is a rather trivial TOCTOU --- the error message is best
  * effort) but for anything else we do.
+ *
+ * @note this function will clobber `errno` (Unix) / "last error"
+ * (Windows), so care must be used to get those error codes, then call
+ * this, then build a `SysError` / `WinError` with the saved error code.
  */
-std::filesystem::path handleToPath(Descriptor handle);
-
-} // namespace windows
-#endif
+std::filesystem::path descriptorToPath(Descriptor fd);
 
 /**
  * Open a `Descriptor` with read-only access to the given directory.
+ *
+ * @param followSymlinks If false, fail if the path is a symlink.
  */
-Descriptor openDirectory(const std::filesystem::path & path);
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink = true);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.
@@ -268,8 +277,7 @@ writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 066
     return writeFile(path.string(), source, mode, sync);
 }
 
-void writeFile(
-    AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const Path * origPath = nullptr);
 
 /**
  * Flush a path's parent directory to disk.

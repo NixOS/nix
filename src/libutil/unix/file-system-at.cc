@@ -71,8 +71,10 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
         if (res < 0) {
             if (errno == ENOSYS)
                 fchmodat2Unsupported.test_and_set();
-            else
-                throw SysError("fchmodat2 '%s' relative to parent directory", path.rel());
+            else {
+                auto savedErrno = errno;
+                throw SysError(savedErrno, "fchmodat2 %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
+            }
         } else
             return;
     }
@@ -80,18 +82,24 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
 
 #ifdef __linux__
     AutoCloseFD pathFd = ::openat(dirFd, path.rel_c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
-    if (!pathFd)
+    if (!pathFd) {
+        auto savedErrno = errno;
         throw SysError(
-            "opening '%s' relative to parent directory to get an O_PATH file descriptor (fchmodat2 is unsupported)",
-            path.rel());
+            savedErrno,
+            "opening %s to get an O_PATH file descriptor (fchmodat2 is unsupported)",
+            PathFmt(descriptorToPath(dirFd) / path.rel()));
+    }
 
     struct ::stat st;
     /* Possible since https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
-    if (::fstat(pathFd.get(), &st) == -1)
-        throw SysError("statting '%s' relative to parent directory via O_PATH file descriptor", path.rel());
+    if (::fstat(pathFd.get(), &st) == -1) {
+        auto savedErrno = errno;
+        throw SysError(
+            savedErrno, "statting %s via O_PATH file descriptor", PathFmt(descriptorToPath(dirFd) / path.rel()));
+    }
 
     if (S_ISLNK(st.st_mode))
-        throw SysError(EOPNOTSUPP, "can't change mode of symlink '%s' relative to parent directory", path.rel());
+        throw SysError(EOPNOTSUPP, "can't change mode of symlink %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
 
     static std::atomic_flag dontHaveProc{};
     if (!dontHaveProc.test()) {
@@ -101,8 +109,11 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
         if (int res = ::chmod(selfProcFdPath.c_str(), mode); res == -1) {
             if (errno == ENOENT)
                 dontHaveProc.test_and_set();
-            else
-                throw SysError("chmod '%s' ('%s' relative to parent directory)", selfProcFdPath, path);
+            else {
+                auto savedErrno = errno;
+                throw SysError(
+                    savedErrno, "chmod %s (%s)", selfProcFdPath, PathFmt(descriptorToPath(dirFd) / path.rel()));
+            }
         } else
             return;
     }
@@ -122,8 +133,10 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
 #endif
     );
 
-    if (res == -1)
-        throw SysError("fchmodat '%s' relative to parent directory", path.rel());
+    if (res == -1) {
+        auto savedErrno = errno;
+        throw SysError(savedErrno, "fchmodat %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
+    }
 }
 
 static Descriptor
@@ -206,10 +219,32 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
         checkInterrupt();
         buf.resize(bufSize);
         ssize_t rlSize = ::readlinkat(dirFd, path.rel_c_str(), buf.data(), bufSize);
-        if (rlSize == -1)
-            throw SysError("reading symbolic link '%1%' relative to parent directory", path.rel());
-        else if (rlSize < bufSize)
+        if (rlSize == -1) {
+            auto savedErrno = errno;
+            throw SysError(savedErrno, "reading symbolic link %1%", PathFmt(descriptorToPath(dirFd) / path.rel()));
+        } else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
+    }
+}
+
+void createSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::symlinkat(target.c_str(), dirFd, path.rel_c_str()) == -1) {
+        auto savedErrno = errno;
+        throw SysError(
+            savedErrno, "creating symlink %1% -> %2%", PathFmt(descriptorToPath(dirFd) / path.rel()), target);
+    }
+}
+
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::mkdirat(dirFd, path.rel_c_str(), 0777) == -1) {
+        auto savedErrno = errno;
+        throw SysError(savedErrno, "creating directory %1%", PathFmt(descriptorToPath(dirFd) / path.rel()));
     }
 }
 

@@ -197,10 +197,8 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
 
 #ifdef _WIN32
 #  define STAT _wstat64
-#  define LSTAT _wstat64
 #else
 #  define STAT stat
-#  define LSTAT lstat
 #endif
 
 PosixStat stat(const std::filesystem::path & path)
@@ -211,13 +209,15 @@ PosixStat stat(const std::filesystem::path & path)
     return st;
 }
 
+#ifndef _WIN32
 PosixStat lstat(const std::filesystem::path & path)
 {
     PosixStat st;
-    if (LSTAT(path.c_str(), &st))
+    if (::lstat(path.c_str(), &st))
         throw SysError("getting status of %s", PathFmt(path));
     return st;
 }
+#endif
 
 PosixStat fstat(int fd)
 {
@@ -245,10 +245,11 @@ std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
     return st;
 }
 
+#ifndef _WIN32
 std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 {
     std::optional<PosixStat> st{std::in_place};
-    if (LSTAT(path.c_str(), &*st)) {
+    if (::lstat(path.c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
             st.reset();
         else
@@ -256,9 +257,9 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
     }
     return st;
 }
+#endif
 
 #undef STAT
-#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -336,23 +337,23 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    writeFile(fd, path, s, mode, sync);
+    writeFile(fd.get(), s, sync, &path);
 
     /* Close explicitly to propagate the exceptions. */
     fd.close();
 }
 
-void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode, FsSync sync)
+void writeFile(Descriptor fd, std::string_view s, FsSync sync, const Path * origPath)
 {
-    assert(fd);
+    assert(fd != INVALID_DESCRIPTOR);
     try {
-        writeFull(fd.get(), s);
+        writeFull(fd, s);
 
         if (sync == FsSync::Yes)
-            fd.fsync();
+            fsync(fd);
 
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", origPath);
+        e.addTrace({}, "writing file '%1%'", origPath ? *origPath : descriptorToPath(fd).string());
         throw;
     }
 }

@@ -23,9 +23,9 @@
 
 namespace nix {
 
-Descriptor openDirectory(const std::filesystem::path & path)
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink)
 {
-    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (followFinalSymlink ? 0 : O_NOFOLLOW));
 }
 
 Descriptor openFileReadonly(const std::filesystem::path & path)
@@ -44,6 +44,31 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
         flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
     }
     return open(path.c_str(), flags, mode);
+}
+
+std::filesystem::path descriptorToPath(Descriptor fd)
+{
+    if (fd == STDIN_FILENO)
+        return "<stdin>";
+    if (fd == STDOUT_FILENO)
+        return "<stdout>";
+    if (fd == STDERR_FILENO)
+        return "<stderr>";
+
+#if defined(__linux__)
+    try {
+        return readLink("/proc/self/fd/" + std::to_string(fd));
+    } catch (...) {
+    }
+#elif HAVE_F_GETPATH
+    /* F_GETPATH requires PATH_MAX buffer per POSIX */
+    char buf[PATH_MAX];
+    if (fcntl(fd, F_GETPATH, buf) != -1)
+        return buf;
+#endif
+
+    /* Fallback for unknown fd or unsupported platform */
+    return "<fd " + std::to_string(fd) + ">";
 }
 
 std::filesystem::path defaultTempDir()
