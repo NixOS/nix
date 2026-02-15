@@ -115,6 +115,9 @@
                     }
                     // lib.optionalAttrs (crossSystem == "x86_64-unknown-freebsd13") {
                       useLLVM = true;
+                    }
+                    // lib.optionalAttrs (crossSystem == "x86_64-w64-mingw32") {
+                      emulator = pkgs: "${pkgs.buildPackages.wineWow64Packages.stable_11}/bin/wine";
                     };
                 overlays = [
                   (overlayFor (pkgs: pkgs.${stdenv}))
