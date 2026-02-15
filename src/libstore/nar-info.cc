@@ -4,6 +4,7 @@
 #include "nix/util/compression-algo.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/json-utils.hh"
+#include <optional>
 
 namespace nix {
 
@@ -53,6 +54,9 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
         } else if (name == "URL")
             url = value;
         else if (name == "Compression")
+            if(value.empty())
+                compression = std::nullopt;
+            else
             compression = parseCompressionAlgo(value);
         else if (name == "FileHash")
             fileHash = parseHashField(value);
@@ -171,8 +175,10 @@ UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nloh
     if (auto * url = get(obj, "url"))
         res.url = getString(*url);
 
-    if (auto * compression = get(obj, "compression"))
-        res.compression = parseCompressionAlgo(getString(*compression));
+    if (auto * compression = get(obj, "compression")) {
+        auto compression_value = getString(*compression);
+        res.compression = compression_value.empty() ? std::nullopt : std::make_optional(parseCompressionAlgo(compression_value));
+    }
 
     if (auto * downloadHash = get(obj, "downloadHash")) {
         if (format == PathInfoJsonFormat::V1)
