@@ -54,10 +54,7 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
         } else if (name == "URL")
             url = value;
         else if (name == "Compression")
-            if(value.empty())
-                compression = std::nullopt;
-            else
-            compression = parseCompressionAlgo(value);
+            compression = value.empty() ? std::nullopt : std::make_optional(parseCompressionAlgo(value));
         else if (name == "FileHash")
             fileHash = parseHashField(value);
         else if (name == "FileSize") {
