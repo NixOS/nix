@@ -231,23 +231,30 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
-struct SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
-{
-    CanonPath path;
-
-    SymlinkNotAllowed(CanonPath path)
-        : CloneableError("relative path '%s' points to a symlink, which is not allowed", path.rel())
-        , path(std::move(path))
-    {
+#define MakeSymlinkError(errorName, defaultMsg)                                        \
+    struct errorName final : public CloneableError<errorName, Error>                   \
+    {                                                                                  \
+        std::filesystem::path path;                                                    \
+        errorName(std::filesystem::path path)                                          \
+            : CloneableError(defaultMsg, PathFmt(path))                                \
+            , path(std::move(path))                                                    \
+        {                                                                              \
+        }                                                                              \
+        template<typename... Args>                                                     \
+        errorName(std::filesystem::path path, const std::string & fs, Args &&... args) \
+            : CloneableError(fs, std::forward<Args>(args)...)                          \
+            , path(std::move(path))                                                    \
+        {                                                                              \
+        }                                                                              \
     }
 
-    template<typename... Args>
-    SymlinkNotAllowed(CanonPath path, const std::string & fs, Args &&... args)
-        : CloneableError(fs, std::forward<Args>(args)...)
-        , path(std::move(path))
-    {
-    }
-};
+MakeSymlinkError(SymlinkNotAllowed, "relative path '%s' points to a symlink, which is not allowed");
+
+/**
+ * Thrown when symlink resolution exceeds the maximum depth, indicating
+ * either infinite recursion or an excessively long symlink chain.
+ */
+MakeSymlinkError(SymlinkResolutionTooDeep, "too many symbolic links encountered while resolving path '%s'");
 
 /**
  * Return an accessor for the root filesystem.

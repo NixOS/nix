@@ -64,6 +64,16 @@ std::optional<CanonPath> CanonPath::parent() const
     return CanonPath(unchecked_t(), path.substr(0, std::max((size_t) 1, path.rfind('/'))));
 }
 
+std::optional<std::pair<CanonPath, std::string_view>> CanonPath::parentAndChild() const
+{
+    if (isRoot())
+        return std::nullopt;
+    auto slash = path.rfind('/');
+    return {
+        {CanonPath(unchecked_t(), path.substr(0, std::max((size_t) 1, slash))),
+         std::string_view{path}.substr(slash + 1)}};
+}
+
 void CanonPath::pop()
 {
     assert(!isRoot());

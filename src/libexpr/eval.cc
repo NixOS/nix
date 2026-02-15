@@ -3166,7 +3166,10 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
     while (!path.path.isRoot()) {
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+            throw SymlinkResolutionTooDeep(
+                std::filesystem::path(path.path.rel()),
+                "too many symbolic links encountered while traversing the path '%s'",
+                path);
         auto p = path.parent().resolveSymlinks() / path.baseName();
         if (p.lstat().type != SourceAccessor::tSymlink)
             break;

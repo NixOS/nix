@@ -16,6 +16,15 @@ namespace nix {
 
 using namespace nix::windows;
 
+AutoCloseFD dupDescriptor(Descriptor fd)
+{
+    HANDLE newHandle;
+    if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+        throw WinError("duplicating handle");
+    }
+    return AutoCloseFD{newHandle};
+}
+
 std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     LARGE_INTEGER li;

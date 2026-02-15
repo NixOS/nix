@@ -110,7 +110,7 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
             if (mode == SymlinkResolution::Full || !todo.empty()) {
                 if (auto st = maybeLstat(res); st && st->type == SourceAccessor::tSymlink) {
                     if (!linksAllowed--)
-                        throw Error("infinite symlink recursion in path '%s'", showPath(path));
+                        throw SymlinkResolutionTooDeep(std::filesystem::path(path.rel()));
                     auto target = readLink(res);
                     if (std::filesystem::path(target).is_absolute()) {
                         res = CanonPath::root;

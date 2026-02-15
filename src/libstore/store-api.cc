@@ -98,7 +98,8 @@ std::filesystem::path Store::followLinksToStore(std::string_view _path) const
             break;
 
         if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while resolving '%s'", _path);
+            throw SymlinkResolutionTooDeep(
+                std::filesystem::path(_path), "too many symbolic links encountered while resolving '%s'", _path);
 
         auto target = readLink(path);
         auto parentPath = path.parent_path();

@@ -764,7 +764,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
        POSIX semantics.*/
-    tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+    tmpDirFd = openDirectory(tmpDir, FinalSymlink::DontFollow);
     if (!tmpDirFd)
         throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
@@ -1273,10 +1273,11 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
     /* Path must be the same after normalisation. This is an additional sanity check in addition to
        existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
        a single path component without any `..`, `.` components. */
-    auto relPath = CanonPath::fromFilename(name);
+    auto relPath = std::filesystem::path(name);
+    assert(relPath == relPath.filename());
     AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
         tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666);
-    auto path = tmpDir / relPath.rel(); /* This is used only for error messages. */
+    auto path = tmpDir / relPath; /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
     writeFile(fd.get(), contents);

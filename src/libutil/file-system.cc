@@ -1,10 +1,12 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/file-path-impl.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/util.hh"
 
 #include <atomic>
@@ -115,7 +117,7 @@ std::filesystem::path canonPath(const std::filesystem::path & path, bool resolve
         [&followCount, &temp, maxFollow, resolveSymlinks](std::string & result, std::string_view & remaining) {
             if (resolveSymlinks && std::filesystem::is_symlink(result)) {
                 if (++followCount >= maxFollow)
-                    throw Error("infinite symlink recursion in path '%1%'", remaining);
+                    throw SymlinkResolutionTooDeep(std::filesystem::path(remaining));
                 remaining = (temp = concatStrings(readLink(result).string(), remaining));
                 if (std::filesystem::path(remaining).is_absolute()) {
                     /* restart for symlinks pointing to absolute path */
@@ -171,10 +173,8 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
 
 #ifdef _WIN32
 #  define STAT _wstat64
-#  define LSTAT _wstat64
 #else
 #  define STAT stat
-#  define LSTAT lstat
 #endif
 
 PosixStat stat(const std::filesystem::path & path)
@@ -185,54 +185,18 @@ PosixStat stat(const std::filesystem::path & path)
     return st;
 }
 
-PosixStat lstat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (LSTAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-PosixStat fstat(int fd)
-{
-    PosixStat st;
-    if (
-#ifdef _WIN32
-        _fstat64
-#else
-        ::fstat
-#endif
-        (fd, &st))
-        throw SysError("getting status of fd %d", fd);
-    return st;
-}
-
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
     std::optional<PosixStat> st{std::in_place};
     if (STAT(path.c_str(), &*st)) {
         if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
-    }
-    return st;
-}
-
-std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
-{
-    std::optional<PosixStat> st{std::in_place};
-    if (LSTAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+            return std::nullopt;
+        throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
 }
 
 #undef STAT
-#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -254,11 +218,19 @@ bool pathAccessible(const std::filesystem::path & path)
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::read_symlink on Windows yet
+    auto parentDir = openDirectory(path.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(path));
+    return readLinkAt(parentDir.get(), path.filename());
+#else
     try {
         return std::filesystem::read_symlink(path);
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
+#endif
 }
 
 std::string readFile(const std::filesystem::path & path)
@@ -363,7 +335,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
 void syncParent(const std::filesystem::path & path)
 {
     assert(path.has_parent_path());
-    AutoCloseFD fd = openDirectory(path.parent_path());
+    AutoCloseFD fd = openDirectory(path.parent_path(), FinalSymlink::Follow);
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
@@ -408,7 +380,7 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = openDirectory(*dir); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openDirectory(*dir, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
@@ -620,10 +592,18 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
 {
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::create_symlink on Windows yet
+    auto parentDir = openDirectory(link.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(link));
+    createUnknownSymlinkAt(parentDir.get(), link.filename(), target.native());
+#else
     std::error_code ec;
     std::filesystem::create_symlink(target, link, ec);
     if (ec)
-        throw SysError(ec.value(), "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+        throw SystemError(ec, "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+#endif
 }
 
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
@@ -633,11 +613,11 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         tmp = tmp.lexically_normal();
 
         try {
-            std::filesystem::create_symlink(target, tmp);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::file_exists)
+            createSymlink(target, tmp);
+        } catch (SystemError & e) {
+            if (e.is(std::errc::file_exists))
                 continue;
-            throw SystemError(e.code(), "creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
+            throw;
         }
 
         try {
@@ -701,15 +681,14 @@ void moveFile(const std::filesystem::path & oldName, const std::filesystem::path
         auto newPath = newName;
         // For the move to be as atomic as possible, copy to a temporary
         // directory
-        std::filesystem::path temp = createTempDir(os_string_to_string(PathView{newPath.parent_path()}), "rename-tmp");
+        std::filesystem::path temp = createTempDir(newPath.parent_path(), "rename-tmp");
         Finally removeTemp = [&]() { std::filesystem::remove(temp); };
         auto tempCopyTarget = temp / "copy-target";
         if (e.code().value() == EXDEV) {
             std::filesystem::remove(newPath);
             warn("can’t rename %s as %s, copying instead", PathFmt(oldName), PathFmt(newName));
             copyFile(oldPath, tempCopyTarget, true);
-            std::filesystem::rename(
-                os_string_to_string(PathView{tempCopyTarget}), os_string_to_string(PathView{newPath}));
+            std::filesystem::rename(tempCopyTarget, newPath);
         }
     }
 }
