@@ -179,7 +179,7 @@ struct curlFileTransfer : public FileTransfer
 #if NIX_WITH_AWS_AUTH
             if (!request.awsSigV4Provider)
 #endif
-                appendHeaders("Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
+                appendHeaders("Accept-Encoding: zstd, br, gzip, deflate, bzip2");
             if (!request.expectedETag.empty())
                 appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
@@ -277,23 +277,24 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
-        std::string parseContentEncoding(std::string_view contentEncoding){
+        std::string parseContentEncoding(std::string_view contentEncoding)
+        {
 
-            if(contentEncoding.find(",") != std::string::npos){
-                throw nix::Error("Stacked contentEncoding is not supported: %s", contentEncoding);
+            if (contentEncoding.find(",") != std::string::npos) {
+                throw nix::Error("Stacked Content-Encoding is not supported: %s", contentEncoding);
             }
 
-            if(contentEncoding == "gzip" || contentEncoding == "x-gzip")
+            if (contentEncoding == "gzip" || contentEncoding == "x-gzip")
                 return "gzip";
-            else if(contentEncoding == "compress" || contentEncoding == "x-compress")
+            else if (contentEncoding == "compress" || contentEncoding == "x-compress")
                 return "compress";
-            else if(contentEncoding == "br")
+            else if (contentEncoding == "br")
                 return "br";
-            else if(contentEncoding == "zstd")
+            else if (contentEncoding == "zstd")
                 return "zstd";
-            else if(contentEncoding == "bzip2")
+            else if (contentEncoding == "bzip2")
                 return "bzip2";
-            else if(contentEncoding == "identity")
+            else if (contentEncoding == "identity")
                 return "identity";
 
             throw nix::Error("Invalid content-encoding: %s", contentEncoding);
@@ -335,6 +336,9 @@ struct curlFileTransfer : public FileTransfer
                         }
                     }
 
+                    /* https://www.rfc-editor.org/rfc/rfc9110.html#name-content-codings
+                     * All content codings are case-insensitive and ought to be
+                     * registered within the "HTTP Content Coding Registry" */
                     else if (name == "content-encoding")
                         encoding = parseContentEncoding(toLower(trim(line.substr(i + 1))));
 
