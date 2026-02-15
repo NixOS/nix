@@ -205,7 +205,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         fetchSettings,
         {
             .scheme = "path",
-            .authority = ParsedURL::Authority{},
+            .authority = isAbsolute(path) ? std::optional{ParsedURL::Authority{}} : std::nullopt,
             .path = splitString<std::vector<std::string>>(path, "/"),
             .query = query,
             .fragment = fragment,
