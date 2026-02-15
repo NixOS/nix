@@ -17,9 +17,12 @@
 #include <cstdlib>
 #include <sys/time.h>
 #include <sys/stat.h>
-#include <sys/resource.h>
 #include <unistd.h>
 #include <signal.h>
+
+#ifndef _WIN32
+#  include <sys/resource.h>
+#endif
 #ifdef __linux__
 #  include <features.h>
 #endif

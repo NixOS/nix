@@ -1,5 +1,6 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/store/globals.hh"
@@ -16,9 +17,9 @@ namespace nix::fetchers {
 
 static RunOptions hgOptions(const Strings & args)
 {
-    auto env = getEnv();
+    auto env = getEnvOs();
     // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
-    env["HGPLAIN"] = "";
+    env[OS_STR("HGPLAIN")] = OS_STR("");
 
     return {.program = "hg", .lookupPath = true, .args = args, .environment = env};
 }

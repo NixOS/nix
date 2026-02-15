@@ -5,6 +5,7 @@
 #  include "nix/store/build/derivation-builder.hh"
 #endif
 #include "nix/util/processes.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
@@ -888,11 +889,12 @@ static void runPostBuildHook(
         fmt("running post-build-hook '%s'", workerSettings.postBuildHook),
         Logger::Fields{store.printStorePath(drvPath)});
     PushActivity pact(act.id);
-    StringMap hookEnvironment = getEnv();
+    OsStringMap hookEnvironment = getEnvOs();
 
-    hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
-    hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
+    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
+    hookEnvironment.emplace(
+        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
+    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
     struct LogSink : Sink
     {
