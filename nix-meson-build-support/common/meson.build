@@ -27,12 +27,18 @@ add_project_arguments(
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
-  '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
   language : 'cpp',
 )
 
 # GCC doesn't benefit much from precompiled headers.
 do_pch = cxx.get_id() == 'clang'
+
+if cxx.get_id() == 'gcc'
+  add_project_arguments(
+    '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
+    language : 'cpp',
+  )
+endif
 
 # This is a clang-only option for improving build times.
 # It forces the instantiation of templates in the PCH itself and
