@@ -5,7 +5,7 @@
 
 namespace nix::fetchers {
 
-std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
+std::regex flakeRegex("[a-zA-Z_][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme
 {
