@@ -29,6 +29,25 @@ runCommand "repl-completion"
           exit 1
         }
       }
+      # Regression https://github.com/NixOS/nix/issues/15133
+      # Tab-completing an expression that throws a non-EvalError (e.g.
+      # JSONParseError from fromJSON) should not crash the REPL.
+      send "err1 = builtins.fromJSON \"nixnix\"\n"
+      expect "nix-repl>"
+      send "err1.\t"
+      sleep 0.5
+      # Send Ctrl-C to cancel the current line and get a fresh prompt,
+      # since tab with no completions leaves the cursor on the same line.
+      send "\x03"
+      expect {
+        "nix-repl>" {
+          puts "Got another prompt after fromJSON error."
+        }
+        eof {
+          puts "REPL crashed after fromJSON tab-complete."
+          exit 1
+        }
+      }
       exit 0
     '';
     passAsFile = [ "expectScript" ];
