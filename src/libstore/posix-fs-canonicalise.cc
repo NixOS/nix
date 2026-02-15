@@ -5,7 +5,15 @@
 #include "nix/util/util.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/canon-path.hh"
 #include "store-config-private.hh"
+
+#ifndef _WIN32
+#  include <fcntl.h>
+#  include <dirent.h>
+#  include <sys/stat.h>
+#endif
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>
@@ -15,48 +23,67 @@ namespace nix {
 
 const time_t mtimeStore = 1; /* 1 second into the epoch */
 
-static void canonicaliseTimestampAndPermissions(const Path & path, const PosixStat & st)
+static void canonicaliseTimestampAndPermissions(Descriptor dirFd, const CanonPath & path, const struct stat & st)
 {
     if (!S_ISLNK(st.st_mode)) {
-
         /* Mask out all type related bits. */
         mode_t mode = st.st_mode & ~S_IFMT;
         bool isDir = S_ISDIR(st.st_mode);
         if ((mode != 0444 || isDir) && mode != 0555) {
-            mode = (st.st_mode & S_IFMT) | 0444 | (st.st_mode & S_IXUSR || isDir ? 0111 : 0);
-            chmod(path, mode);
+            mode = 0444 | (st.st_mode & S_IXUSR || isDir ? 0111 : 0);
+#ifndef _WIN32
+            unix::fchmodatTryNoFollow(dirFd, path, mode);
+#else
+            // TODO: implement fchmodatTryNoFollow for Windows
+#endif
         }
     }
 
-#ifndef _WIN32 // TODO implement
     if (st.st_mtime != mtimeStore) {
-        PosixStat st2 = st;
-        st2.st_mtime = mtimeStore, setWriteTime(path, st2);
+        setWriteTime(dirFd, path, st.st_atime, mtimeStore);
     }
-#endif
 }
 
 void canonicaliseTimestampAndPermissions(const Path & path)
 {
-    canonicaliseTimestampAndPermissions(path, lstat(path));
+    auto parent = std::filesystem::path(path).parent_path();
+    auto name = std::filesystem::path(path).filename();
+
+    if (parent.empty())
+        parent = ".";
+
+    AutoCloseFD dirFd = toDescriptor(open(parent.string().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
+    if (!dirFd)
+        throw SysError("opening parent directory of '%s'", path);
+
+    struct stat st;
+    if (fstatat(dirFd.get(), name.string().c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("statting '%s'", path);
+
+    canonicaliseTimestampAndPermissions(dirFd.get(), CanonPath(name.string()), st);
 }
 
-static void
-canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
+static void canonicalisePathMetaData_(
+    Descriptor dirFd, const CanonPath & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
     checkInterrupt();
+
+    struct stat st;
+    if (fstatat(dirFd, path.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1)
+        throw SysError("statting '%s'", path);
 
 #ifdef __APPLE__
     /* Remove flags, in particular UF_IMMUTABLE which would prevent
        the file from being garbage-collected. FIXME: Use
        setattrlist() to remove other attributes as well. */
-    if (lchflags(path.c_str(), 0)) {
+    AutoCloseFD fd = openat(dirFd, path.rel_c_str(), O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+    if (!fd)
+        throw SysError("opening '%s' to clear flags", path);
+    if (fchflags(fd.get(), 0)) {
         if (errno != ENOTSUP)
             throw SysError("clearing flags of path '%1%'", path);
     }
 #endif
-
-    auto st = lstat(path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
@@ -64,7 +91,19 @@ canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions opt
 
 #if NIX_SUPPORT_ACL
     /* Remove extended attributes / ACLs. */
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+    /* We need a file descriptor for xattr operations on Linux. */
+    AutoCloseFD fd = openat(
+        dirFd,
+        path.rel_c_str(),
+        O_RDONLY | O_NOFOLLOW | O_CLOEXEC
+#  ifdef O_PATH
+            | O_PATH
+#  endif
+    );
+    if (!fd)
+        throw SysError("opening '%s' to remove extended attributes", path);
+
+    ssize_t eaSize = flistxattr(fd.get(), nullptr, 0);
 
     if (eaSize < 0) {
         if (errno != ENOTSUP && errno != ENODATA)
@@ -72,19 +111,18 @@ canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions opt
     } else if (eaSize > 0) {
         std::vector<char> eaBuf(eaSize);
 
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+        if ((eaSize = flistxattr(fd.get(), eaBuf.data(), eaBuf.size())) < 0)
             throw SysError("querying extended attributes of '%s'", path);
 
         for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
             if (options.ignoredAcls.count(eaName))
                 continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+            if (fremovexattr(fd.get(), eaName.c_str()) == -1)
                 throw SysError("removing extended attribute '%s' from '%s'", eaName, path);
         }
     }
 #endif
 
-#ifndef _WIN32
     /* Fail if the file is not owned by the build user.  This prevents
        us from messing up the ownership/permissions of files
        hard-linked into the output (e.g. "ln /etc/shadow $out/foo").
@@ -100,58 +138,59 @@ canonicalisePathMetaData_(const Path & path, CanonicalizePathMetadataOptions opt
             || (st.st_uid == geteuid() && (mode == 0444 || mode == 0555) && st.st_mtime == mtimeStore));
         return;
     }
-#endif
 
     inodesSeen.insert(Inode(st.st_dev, st.st_ino));
 
-    canonicaliseTimestampAndPermissions(path, st);
+    canonicaliseTimestampAndPermissions(dirFd, path, st);
 
-#ifndef _WIN32
-    /* Change ownership to the current uid.  If it's a symlink, use
-       lchown if available, otherwise don't bother.  Wrong ownership
-       of a symlink doesn't matter, since the owning user can't change
-       the symlink and can't delete it because the directory is not
-       writable.  The only exception is top-level paths in the Nix
-       store (since that directory is group-writable for the Nix build
-       users group); we check for this case below. */
+    /* Change ownership to the current uid. */
     if (st.st_uid != geteuid()) {
-#  if HAVE_LCHOWN
-        if (lchown(path.c_str(), geteuid(), getegid()) == -1)
-#  else
-        if (!S_ISLNK(st.st_mode) && chown(path.c_str(), geteuid(), getegid()) == -1)
-#  endif
+        if (fchownat(dirFd, path.rel_c_str(), geteuid(), getegid(), AT_SYMLINK_NOFOLLOW) == -1)
             throw SysError("changing owner of '%1%' to %2%", path, geteuid());
     }
-#endif
 
     if (S_ISDIR(st.st_mode)) {
-        for (auto & i : DirectoryIterator{path}) {
+        AutoCloseFD childDirFd =
+            openFileEnsureBeneathNoSymlinks(dirFd, path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+        if (!childDirFd)
+            throw SysError("opening directory '%s'", path);
+
+        AutoCloseDir dir(fdopendir(dup(childDirFd.get())));
+        if (!dir)
+            throw SysError("opening directory '%s' for iteration", path);
+
+        struct dirent * dirent;
+        while (errno = 0, dirent = readdir(dir.get())) {
             checkInterrupt();
-            canonicalisePathMetaData_(i.path().string(), options, inodesSeen);
+            std::string childName = dirent->d_name;
+            if (childName == "." || childName == "..")
+                continue;
+            canonicalisePathMetaData_(childDirFd.get(), CanonPath(childName), options, inodesSeen);
         }
+        if (errno)
+            throw SysError("reading directory '%s'", path);
     }
 }
 
 void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
-    canonicalisePathMetaData_(path, options, inodesSeen);
+    auto parent = std::filesystem::path(path).parent_path();
+    auto name = std::filesystem::path(path).filename();
 
-#ifndef _WIN32
-    /* On platforms that don't have lchown(), the top-level path can't
-       be a symlink, since we can't change its ownership. */
-    auto st = lstat(path);
+    if (parent.empty())
+        parent = ".";
 
-    if (st.st_uid != geteuid()) {
-        assert(S_ISLNK(st.st_mode));
-        throw Error("wrong ownership of top-level store path '%1%'", path);
-    }
-#endif
+    AutoCloseFD dirFd = toDescriptor(open(parent.string().c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC));
+    if (!dirFd)
+        throw SysError("opening parent directory of '%s'", path);
+
+    canonicalisePathMetaData_(dirFd.get(), CanonPath(name.string()), options, inodesSeen);
 }
 
 void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options)
 {
     InodesSeen inodesSeen;
-    canonicalisePathMetaData_(path, options, inodesSeen);
+    canonicalisePathMetaData(path, options, inodesSeen);
 }
 
 } // namespace nix
