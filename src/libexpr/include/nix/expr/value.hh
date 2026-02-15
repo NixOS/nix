@@ -21,6 +21,10 @@
 #include <boost/unordered/unordered_flat_map_fwd.hpp>
 #include <nlohmann/json_fwd.hpp>
 
+#if defined(__x86_64__) && defined(__SSE2__)
+#  include <emmintrin.h>
+#endif
+
 namespace nix {
 
 struct Value;
@@ -517,6 +521,11 @@ protected:
     {
         return internalType;
     }
+
+    static bool isAtomic()
+    {
+        return false;
+    }
 };
 
 namespace detail {
@@ -550,7 +559,11 @@ class alignas(16)
 
     using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
     using Payload = std::array<PackedPointer, 2>;
-    Payload payload = {};
+#if defined(__x86_64__) && defined(__SSE2__)
+    __m128i payloadWords;
+#else
+    Payload payloadWords = {};
+#endif
 
     static constexpr int discriminatorBits = 3;
     static constexpr PackedPointer discriminatorMask = (PackedPointer(1) << discriminatorBits) - 1;
@@ -594,6 +607,54 @@ class alignas(16)
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
 
+#if defined(__x86_64__) && defined(__SSE2__)
+    /* Why do we even bother with hand-rolling these arch-specific intrinsics
+     * and don't use libatomic directly for 16 byte atomics? Here's why:
+     *  - https://gcc.gnu.org/legacy-ml/gcc/2018-02/msg00224.html
+     *  - https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84563
+     *
+     * Basically, we don't really ever want to go through libatomic. As is
+     * so happens on x86_64 with AVX, MOVDQA/MOVAPS instructions (16-byte aligned
+     * 128-bit loads and stores) are atomic [^]. Note that
+     * these instructions are not part of AVX but rather SSE2, which is x86_64-v1.
+     * They are just not guaranteed to be atomic without AVX.
+     *
+     * For more details see:
+     *  - [^] Intel® 64 and IA-32 Architectures Software Developer’s Manual (10.1.1 Guaranteed Atomic Operations).
+     *  - https://patchwork.sourceware.org/project/gcc/patch/YhxkfzGEEQ9KHbBC@tucnak/
+     *  - https://ibraheem.ca/posts/128-bit-atomics/
+     *  - https://rigtorp.se/isatomic/
+     */
+    [[gnu::always_inline]]
+    void updatePayload(Payload payload) noexcept
+    {
+        /* This intrinsic corresponds to MOVAPS. Note that Value (and thus the first member
+           payloadWords) is 16 bytes aligned. */
+        _mm_store_si128(&payloadWords, std::bit_cast<__m128i>(payload));
+    }
+
+    [[gnu::always_inline]]
+    Payload loadPayload() const noexcept
+    {
+        /* This intrinsic corresponds to MOVDQA. Note that Value (and thus the first member
+           payloadWords) is 16 bytes aligned. */
+        __m128i res = _mm_load_si128(&payloadWords);
+        return std::bit_cast<Payload>(res);
+    }
+#else
+    [[gnu::always_inline]]
+    void updatePayload(Payload payload) noexcept
+    {
+        payloadWords = payload;
+    }
+
+    [[gnu::always_inline]]
+    Payload loadPayload() const noexcept
+    {
+        return payloadWords;
+    }
+#endif
+
     template<typename T>
         requires std::is_pointer_v<T>
     static T untagPointer(PackedPointer val) noexcept
@@ -601,9 +662,9 @@ class alignas(16)
         return std::bit_cast<T>(val & ~discriminatorMask);
     }
 
-    PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
+    PrimaryDiscriminator getPrimaryDiscriminator(PackedPointer firstDWord) const noexcept
     {
-        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+        return static_cast<PrimaryDiscriminator>(firstDWord & discriminatorMask);
     }
 
     static void assertAligned(PackedPointer val) noexcept
@@ -614,25 +675,30 @@ class alignas(16)
     template<InternalType type>
     void setSingleDWordPayload(PackedPointer untaggedVal) noexcept
     {
+        Payload payload;
         /* There's plenty of free upper bits in the first dword, which is
            used only for the discriminator. */
         payload[0] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
         payload[1] = untaggedVal;
+        updatePayload(payload);
     }
 
     template<PrimaryDiscriminator discriminator, typename T, typename U>
     void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
     {
+        Payload payload;
         static_assert(discriminator >= pdListN && discriminator <= pdPath);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
         payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
         payload[1] = std::bit_cast<PackedPointer>(untaggableField);
+        updatePayload(payload);
     }
 
     template<InternalType type, typename T, typename U>
     void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
     {
+        Payload payload;
         static_assert(type >= tListSmall && type <= tLambda);
         {
             auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
@@ -644,21 +710,58 @@ class alignas(16)
             assertAligned(secondFieldPayload);
             payload[1] = (type - tListSmall) | secondFieldPayload;
         }
+        updatePayload(payload);
     }
 
     template<typename T, typename U>
         requires std::is_pointer_v<T> && std::is_pointer_v<U>
     void getPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
     {
+        Payload payload = loadPayload();
         firstPtrField = untagPointer<T>(payload[0]);
         secondPtrField = untagPointer<U>(payload[1]);
     }
 
+public:
+    ValueStorage()
+    {
+        updatePayload({});
+    }
+
+    ValueStorage(const ValueStorage & other)
+    {
+        updatePayload(other.loadPayload());
+    }
+
+    ValueStorage & operator=(const ValueStorage & other)
+    {
+        updatePayload(other.loadPayload());
+        return *this;
+    }
+
+    ValueStorage(ValueStorage && other) noexcept
+    {
+        updatePayload(other.loadPayload());
+        other.updatePayload({}); // Zero out rhs
+    }
+
+    ValueStorage & operator=(ValueStorage && other) noexcept
+    {
+        updatePayload(other.loadPayload());
+        other.updatePayload({}); // Zero out rhs
+        return *this;
+    }
+
+    ~ValueStorage() noexcept {}
+
 protected:
+    static bool isAtomic();
+
     /** Get internal type currently occupying the storage. */
     InternalType getInternalType() const noexcept
     {
-        switch (auto pd = getPrimaryDiscriminator()) {
+        Payload payload = loadPayload();
+        switch (auto pd = getPrimaryDiscriminator(payload[0])) {
         case pdUninitialized:
             /* Discriminator value of zero is used to distinguish uninitialized values. */
             return tUninitialized;
@@ -700,6 +803,7 @@ protected:
 
     void getStorage(NixInt & integer) const noexcept
     {
+        Payload payload = loadPayload();
         /* PackedPointerType -> int64_t here is well-formed, since the standard requires
            this conversion to follow 2's complement rules. This is just a no-op. */
         integer = NixInt(payload[1]);
@@ -707,6 +811,7 @@ protected:
 
     void getStorage(bool & boolean) const noexcept
     {
+        Payload payload = loadPayload();
         boolean = payload[1];
     }
 
@@ -714,38 +819,45 @@ protected:
 
     void getStorage(NixFloat & fpoint) const noexcept
     {
+        Payload payload = loadPayload();
         fpoint = std::bit_cast<NixFloat>(payload[1]);
     }
 
     void getStorage(ExternalValueBase *& external) const noexcept
     {
+        Payload payload = loadPayload();
         external = std::bit_cast<ExternalValueBase *>(payload[1]);
     }
 
     void getStorage(PrimOp *& primOp) const noexcept
     {
+        Payload payload = loadPayload();
         primOp = std::bit_cast<PrimOp *>(payload[1]);
     }
 
     void getStorage(Bindings *& attrs) const noexcept
     {
+        Payload payload = loadPayload();
         attrs = std::bit_cast<Bindings *>(payload[1]);
     }
 
     void getStorage(List & list) const noexcept
     {
+        Payload payload = loadPayload();
         list.elems = untagPointer<decltype(list.elems)>(payload[0]);
         list.size = payload[1];
     }
 
     void getStorage(StringWithContext & string) const noexcept
     {
+        Payload payload = loadPayload();
         string.context = untagPointer<decltype(string.context)>(payload[0]);
         string.str = std::bit_cast<const StringData *>(payload[1]);
     }
 
     void getStorage(Path & path) const noexcept
     {
+        Payload payload = loadPayload();
         path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
         path.path = std::bit_cast<const StringData *>(payload[1]);
     }
