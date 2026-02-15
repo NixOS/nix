@@ -11,18 +11,18 @@ rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'path ".*/out" already exists'
 
 rm -rf "$TEST_ROOT/out"
 echo foo > "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'path ".*/out" already exists'
 
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'path ".*/out" already exists'
 
 mkdir -p "$TEST_ROOT/out2"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'path ".*/out" already exists'
 
 # The same, but for a regular file.
 nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"

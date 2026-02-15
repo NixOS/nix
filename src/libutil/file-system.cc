@@ -171,10 +171,8 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
 
 #ifdef _WIN32
 #  define STAT _wstat64
-#  define LSTAT _wstat64
 #else
 #  define STAT stat
-#  define LSTAT lstat
 #endif
 
 PosixStat stat(const std::filesystem::path & path)
@@ -185,54 +183,18 @@ PosixStat stat(const std::filesystem::path & path)
     return st;
 }
 
-PosixStat lstat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (LSTAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-PosixStat fstat(int fd)
-{
-    PosixStat st;
-    if (
-#ifdef _WIN32
-        _fstat64
-#else
-        ::fstat
-#endif
-        (fd, &st))
-        throw SysError("getting status of fd %d", fd);
-    return st;
-}
-
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (STAT(path.c_str(), &*st)) {
+    PosixStat st;
+    if (STAT(path.c_str(), &st)) {
         if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
-    }
-    return st;
-}
-
-std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
-{
-    std::optional<PosixStat> st{std::in_place};
-    if (LSTAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+            return std::nullopt;
+        throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
 }
 
 #undef STAT
-#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -363,7 +325,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
 void syncParent(const std::filesystem::path & path)
 {
     assert(path.has_parent_path());
-    AutoCloseFD fd = openDirectory(path.parent_path());
+    AutoCloseFD fd = openDirectory(path.parent_path(), FinalSymlink::Follow);
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
@@ -408,7 +370,7 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = openDirectory(*dir); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openDirectory(*dir, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();

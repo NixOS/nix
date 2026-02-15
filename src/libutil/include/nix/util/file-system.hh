@@ -29,11 +29,20 @@
  * Polyfill for MinGW
  *
  * Windows does in fact support symlinks, but the C runtime interfaces predate this.
- *
- * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ * We define S_IFLNK and S_ISLNK so that our lstat implementation can properly
+ * indicate symlinks by setting these mode bits when it detects a reparse point.
  */
+#ifndef S_IFLNK
+#  ifndef _WIN32
+#    error "S_IFLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_IFLNK 0120000
+#endif
 #ifndef S_ISLNK
-#  define S_ISLNK(m) false
+#  ifndef _WIN32
+#    error "S_ISLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
 
 namespace nix {
@@ -96,6 +105,38 @@ using PosixStat =
 #endif
     ;
 
+#ifdef _WIN32
+namespace windows {
+
+/**
+ * Convert Windows FILETIME to Unix time_t.
+ */
+time_t fileTimeToUnixTime(const FILETIME & ft);
+
+/**
+ * Fill a PosixStat structure from file attributes and timestamps.
+ *
+ * @param dwFileAttributes File attributes (FILE_ATTRIBUTE_*)
+ * @param ftCreationTime Creation time
+ * @param ftLastAccessTime Last access time
+ * @param ftLastWriteTime Last write time
+ * @param nFileSizeHigh High 32 bits of file size
+ * @param nFileSizeLow Low 32 bits of file size
+ * @param nNumberOfLinks Number of hard links (default 1)
+ */
+void statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks = 1);
+
+} // namespace windows
+#endif
+
 /**
  * Get status of `path`.
  */
@@ -104,10 +145,6 @@ PosixStat lstat(const std::filesystem::path & path);
  * Get status of `path` following symlinks.
  */
 PosixStat stat(const std::filesystem::path & path);
-/**
- * Get status of an open file descriptor.
- */
-PosixStat fstat(int fd);
 /**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
@@ -166,9 +203,16 @@ std::filesystem::path readLink(const std::filesystem::path & path);
 std::filesystem::path descriptorToPath(Descriptor fd);
 
 /**
- * Open a `Descriptor` with read-only access to the given directory.
+ * Type-safe boolean for whether to follow the final symlink component.
  */
-AutoCloseFD openDirectory(const std::filesystem::path & path);
+enum struct FinalSymlink : bool { DontFollow = false, Follow = true };
+
+/**
+ * Open a `Descriptor` with read-only access to the given directory.
+ *
+ * @param finalSymlink If `DontFollow`, fail if the path is a symlink.
+ */
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.
